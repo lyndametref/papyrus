@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Business Glossary</title>
+<style>
+  :root { --bg:#f4f4f2; --panel:#fff; --border:#e2e2df; --ink:#1c1c1a; --muted:#6b6b66; --accent:#3b5b8a; --soft:#e8eef7; --badge:#eceff1; }
+  * { box-sizing:border-box; } html,body { height:100%; margin:0; }
+  body { background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; display:grid; place-items:center; padding:24px; }
+  .app { width:min(1200px,100%); height:min(88vh,900px); background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.08); display:grid; grid-template-rows:auto 1fr; overflow:hidden; }
+  header { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:baseline; gap:12px; } h1 { font-size:17px; margin:0; } .sub { color:var(--muted); font-size:13px; } .back { margin-left:auto; color:var(--accent); font-size:13px; text-decoration:none; } .back:hover { text-decoration:underline; }
+  .panes { display:grid; grid-template-columns:330px 1fr; min-height:0; } nav { border-right:1px solid var(--border); overflow:auto; padding:12px; background:#fafaf9; } main { overflow:auto; padding:26px 30px; }
+  #filter { width:100%; padding:7px 10px; margin-bottom:10px; border:1px solid var(--border); border-radius:8px; font:inherit; font-size:13px; }
+  .term { display:flex; align-items:baseline; gap:8px; width:100%; background:none; border:0; border-radius:6px; padding:7px 8px; font:inherit; font-size:13.5px; color:var(--ink); cursor:pointer; text-align:left; }
+  .term:hover { background:#f0f0ee; } .term.active { background:var(--soft); color:var(--accent); font-weight:600; }
+  .badge { font:11px ui-monospace,SFMono-Regular,Menlo,monospace; background:var(--badge); color:var(--muted); border-radius:5px; padding:1px 6px; flex:none; }
+  .term.active .badge { background:#d5deec; color:var(--accent); } .label { overflow-wrap:anywhere; }
+  .rid { font:13px ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--accent); } h2 { margin:2px 0 10px; font-size:22px; }
+  h3 { font-size:12px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); margin:20px 0 6px; }
+  .content { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; } .empty { color:var(--muted); } .hidden { display:none !important; }
+  @media(max-width:720px) { body{padding:0}.app{height:100vh;border-radius:0}.panes{grid-template-columns:minmax(150px,40%) 1fr}main{padding:18px} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1>Business Glossary</h1><span class="sub" id="counts"></span><a class="back" href="../../index.html">Back to documentation index</a></header>
+  <div class="panes">
+    <nav aria-label="Business glossary terms"><input id="filter" type="search" placeholder="Filter terms…" autocomplete="off"><div id="list"></div></nav>
+    <main><article id="detail" aria-live="polite"></article></main>
+  </div>
+</div>
+<script id="data" type="application/json">{"terms":[{"id":"audit-record","term":"Audit Record","definition":"A document with a title, type, and content. Its type may be one of the built-in values `security` and `licence`, or an additional configurable type.","aliases":""},{"id":"business-requirement","term":"Business Requirement","definition":"A documented business requirement with an identifier, title, user story, and description; it may be assigned to a requirement group and has an active or deprecated lifecycle.","aliases":""},{"id":"business-rule","term":"Business Rule","definition":"A documented statement that describes a rule, its rationale, and the context in which it applies; it may reference business requirements and has an active or deprecated lifecycle.","aliases":""},{"id":"decision","term":"Decision","definition":"A record of a decision, including its type, status, context, decision, and consequences. It may reference business and non-functional requirements and may be superseded by a decision of the same type.","aliases":""},{"id":"glossary-term","term":"Glossary Term","definition":"A documented term consisting of term text and a definition, with an active or deprecated lifecycle.","aliases":""},{"id":"milestone","term":"Milestone","definition":"A grouping for tasks that may be assigned to zero or one release and has an active or archived lifecycle.","aliases":""},{"id":"non-functional-requirement","term":"Non-functional Requirement","definition":"A documented non-functional requirement with an identifier, title, and description; it may be assigned to a requirement group and has an active or deprecated lifecycle.","aliases":""},{"id":"release","term":"Release","definition":"A grouping for milestones that has an active or archived lifecycle.","aliases":""},{"id":"requirement-group","term":"Requirement Group","definition":"A record used to organize requirements of one type: business requirements or non-functional requirements. A group cannot contain both types.","aliases":""},{"id":"task","term":"Task","definition":"A tracked unit of work with a status, description, acceptance criteria, labels, and assignee. A task may depend on other tasks, be assigned to zero or one milestone, and reference business requirements, non-functional requirements, UI specifications, or business rules.","aliases":""},{"id":"technical-specification","term":"Technical Specification","definition":"A document that describes a product or system's technical design or behavior.","aliases":""},{"id":"ui-specification","term":"UI Specification","definition":"A documented specification with an identifier, title, description, and a view descriptor that names the part of the user interface it covers. It has an active or deprecated lifecycle.","aliases":""}]}</script>
+<script>
+const DATA = JSON.parse(document.getElementById("data").textContent);
+const listEl = document.getElementById("list");
+const detailEl = document.getElementById("detail");
+const filterEl = document.getElementById("filter");
+const buttons = new Map();
+
+function addField(label, value) {
+  const heading = document.createElement("h3");
+  heading.textContent = label;
+  const text = document.createElement("p");
+  text.className = value ? "content" : "content empty";
+  text.textContent = value || "—";
+  detailEl.append(heading, text);
+}
+
+function select(term) {
+  for (const button of buttons.values()) button.classList.remove("active");
+  buttons.get(term.id).classList.add("active");
+  detailEl.replaceChildren();
+  const id = document.createElement("div");
+  id.className = "rid";
+  id.textContent = term.id;
+  const title = document.createElement("h2");
+  title.textContent = term.term;
+  detailEl.append(id, title);
+  addField("Definition", term.definition);
+  addField("Aliases", term.aliases);
+}
+
+for (const term of DATA.terms) {
+  const button = document.createElement("button");
+  button.className = "term";
+  button.dataset.search = [term.id, term.term, term.definition, term.aliases].join(" ").toLowerCase();
+  const badge = document.createElement("span");
+  badge.className = "badge";
+  badge.textContent = term.term;
+  const label = document.createElement("span");
+  label.className = "label";
+  label.textContent = term.term;
+  button.append(badge, label);
+  button.addEventListener("click", () => select(term));
+  listEl.appendChild(button);
+  buttons.set(term.id, button);
+}
+if (!DATA.terms.length) {
+  const empty = document.createElement("p");
+  empty.className = "empty";
+  empty.textContent = "No glossary terms yet.";
+  listEl.appendChild(empty);
+}
+
+filterEl.addEventListener("input", () => {
+  const query = filterEl.value.trim().toLowerCase();
+  for (const button of buttons.values()) button.classList.toggle("hidden", !button.dataset.search.includes(query));
+});
+document.getElementById("counts").textContent = DATA.terms.length + (DATA.terms.length === 1 ? " term" : " terms");
+if (DATA.terms.length) select(DATA.terms[0]);
+</script>
+</body>
+</html>
