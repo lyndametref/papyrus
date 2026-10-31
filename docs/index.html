@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project Documentation</title>
+  <style>
+    :root { color-scheme:light; --ink:#1c1c1a; --muted:#6b6b66; --line:#ddd; --accent:#33506f; }
+    * { box-sizing:border-box; }
+    body { max-width:900px; margin:3rem auto; padding:0 1.5rem; color:var(--ink); font:16px/1.55 system-ui,sans-serif; }
+    h1 { font-size:1.6rem; margin:0; }
+    .intro { color:var(--muted); margin:.5rem 0 1.5rem; }
+    ul { list-style:none; margin:0; padding:0; display:grid; gap:.75rem; }
+    li { border:1px solid var(--line); border-radius:10px; padding:1rem 1.1rem; }
+    a { color:var(--accent); font-weight:650; text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    p { margin:.3rem 0 0; color:var(--muted); font-size:.92rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Project Documentation</h1>
+    <p class="intro">Project documentation indexes</p>
+  </header>
+  <main><ul id="indexes"></ul></main>
+  <script id="data" type="application/json">{"indexes":[{"title":"Architecture Decision Records","href":"architecture/adr/index.html","description":"Architecture decisions, status, and rationale."},{"title":"Business Requirements","href":"requirements/business/index.html","description":"Business requirements."},{"title":"Non-Functional Requirements","href":"requirements/non-functional/index.html","description":"Non-functional requirements."},{"title":"Business Rules","href":"business-rules/index.html","description":"Validated business rules and applicability."},{"title":"Business Glossary","href":"domain-model/business-glossary/index.html","description":"Canonical business terms and definitions."}]}</script>
+  <script>
+    const { indexes } = JSON.parse(document.getElementById("data").textContent);
+    const list = document.getElementById("indexes");
+    for (const item of indexes) {
+      const entry = document.createElement("li");
+      const link = document.createElement("a");
+      link.href = item.href;
+      link.textContent = item.title;
+      const description = document.createElement("p");
+      description.textContent = item.description;
+      entry.append(link, description);
+      list.appendChild(entry);
+    }
+  </script>
+</body>
+</html>

@@ -303,34 +303,6 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
           <b style="color: light-dark(#1a7f37, #3fb950);">-d, --description &lt;text&gt;</b>
           Update the description.
 
-<b style="color: light-dark(#0969da, #58a6ff);">board</b>
-
-       Show a live Kanban board in the terminal.
-       <code style="font-weight: bold;">
-       papyrus board [--milestone &lt;id&gt;] [--status &lt;status&gt;]... [--watch]
-       papyrus board export [--output &lt;file&gt;] [--milestone &lt;id&gt;]
-       </code>
-       <b style="color: light-dark(#8250df, #d2a8ff);">board</b>
-       Show the Kanban board.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--milestone &lt;id&gt;</b>
-          Restrict the board to one milestone.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--status &lt;status&gt;</b>
-          Restrict the board to one or more statuses. Repeatable.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--watch</b>
-          Refresh on changes.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">board export</b>
-       Export a Markdown snapshot of the board.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--output &lt;file&gt;</b>
-          Output file. Default: <b>board.md</b> in the project directory.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--milestone &lt;id&gt;</b>
-          Restrict the board to one milestone.
-
 <b style="color: light-dark(#0969da, #58a6ff);">decision</b>
 
        Manage decisions (<b>ADR-001</b>, <b>BDR-001</b>, ...). Decisions may reference zero or more business requirements and zero or more non-functional requirements, and may be superseded by zero or one decision of the same type.

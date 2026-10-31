@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Non-Functional Requirements</title>
+<style>
+  :root { --bg:#f4f4f2; --panel:#fff; --border:#e2e2df; --ink:#1c1c1a; --muted:#6b6b66; --accent:#2f6f4f; --accent-soft:#e7f1ec; --badge:#eceff1; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body { background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; display:grid; place-items:center; padding:24px; }
+  .app { width:min(1200px,100%); height:min(88vh,900px); background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.08); display:grid; grid-template-rows:auto 1fr; overflow:hidden; }
+  header { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:baseline; gap:12px; }
+  header h1 { font-size:17px; margin:0; } header .sub { color:var(--muted); font-size:13px; } header .back { margin-left:auto; color:var(--accent); font-size:13px; text-decoration:none; } header .back:hover { text-decoration:underline; }
+  .panes { display:grid; grid-template-columns:330px 1fr; min-height:0; }
+  .tree-pane { border-right:1px solid var(--border); overflow-y:auto; padding:12px; background:#fafaf9; }
+  #filter { width:100%; padding:7px 10px; margin-bottom:10px; border:1px solid var(--border); border-radius:8px; font:inherit; font-size:13px; }
+  .root-title { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:14px 6px 6px; }
+  .root-title:first-child { margin-top:2px; }
+  .group-head { display:flex; align-items:center; gap:6px; width:100%; background:none; border:0; padding:6px; font:inherit; font-weight:600; font-size:13.5px; color:var(--ink); cursor:pointer; border-radius:6px; text-align:left; }
+  .group-head:hover,.leaf:hover { background:#f0f0ee; }
+  .caret { width:12px; color:var(--muted); flex:none; transition:transform .12s; }
+  .group.collapsed .caret { transform:rotate(-90deg); } .group.collapsed .leaves { display:none; }
+  .leaves { list-style:none; margin:0 0 4px; padding:0 0 0 14px; }
+  .leaf { display:flex; align-items:baseline; gap:8px; width:100%; background:none; border:0; border-radius:6px; padding:5px 8px; font:inherit; font-size:13.5px; color:var(--ink); cursor:pointer; text-align:left; }
+  .leaf.active { background:var(--accent-soft); color:var(--accent); font-weight:600; }
+  .badge { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; background:var(--badge); color:var(--muted); border-radius:5px; padding:1px 6px; flex:none; }
+  .leaf.active .badge { background:#d5e8de; color:var(--accent); }
+  .detail-pane { overflow-y:auto; padding:26px 30px; }
+  .detail .rid { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; color:var(--accent); }
+  .detail h2 { margin:2px 0 10px; font-size:22px; }
+  .tags { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .tag { font-size:12px; border:1px solid var(--border); border-radius:999px; padding:2px 10px; color:var(--muted); background:#fafaf9; }
+  .tag.must { border-color:#bcd8c9; background:var(--accent-soft); color:var(--accent); }
+  .detail h3 { font-size:12px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); margin:20px 0 6px; }
+  .detail p { margin:0 0 8px; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .detail .story { font-style:italic; color:#444; }
+  .empty { color:var(--muted); } .hidden { display:none !important; }
+  @media(max-width:720px) { body{padding:0}.app{height:100vh;border-radius:0}.panes{grid-template-columns:minmax(150px,40%) 1fr}.detail-pane{padding:18px} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1>Non-Functional Requirements</h1><span class="sub" id="counts"></span><a class="back" href="../../index.html">Back to documentation index</a></header>
+  <div class="panes">
+    <nav class="tree-pane" aria-label="Requirements">
+      <input id="filter" type="search" placeholder="Filter requirements…" autocomplete="off">
+      <div id="tree"></div>
+    </nav>
+    <main class="detail-pane"><div class="detail" id="detail" aria-live="polite"></div></main>
+  </div>
+</div>
+<script id="data" type="application/json">{"groups":[{"id":"NFR-01","title":"Product Form","userStory":"","description":"This group records Papyrus's command-line and browser-based product-form constraints, including operation through a local web server without an internet connection.","children":[{"id":"NFR-01.001","title":"Provide Papyrus as a Command-Line Tool","description":"Papyrus shall be provided as a command-line tool.","rationale":"This records the confirmed product form so the product scope and its verification remain aligned.","verification":"Review the documented product entry point and invocation instructions to confirm that Papyrus is provided as a command-line tool."},{"id":"NFR-01.002","title":"View and Edit Papyrus Content in an Offline Browser","description":"Papyrus content shall be viewable and editable through a web browser served by a local web server, without requiring an internet connection.","rationale":"This records the requested browser-based access and editing capability while preserving the command-line product form in NFR-01.001.","verification":"With internet access unavailable, start Papyrus's local web server and use a web browser to view and edit Papyrus content; confirm that the edits are saved and can be viewed again."}]},{"id":"NFR-02","title":"Security","userStory":"","description":"This group records the stated security priority. Concrete security objectives remain to be defined.","children":[{"id":"NFR-02.001","title":"Treat Security as a Project Priority","description":"Security shall be treated as a priority when making Papyrus design and review decisions.","rationale":"This records the requested security focus without prescribing unspecified security standards, controls, or risk targets.","verification":"Review project design and review records to confirm that security is explicitly considered. This verifies the stated priority only; security objectives and measurable acceptance criteria have not been specified."}]},{"id":"NFR-03","title":"Implementation and Distribution","userStory":"","description":"This group records the requested implementation-language and distribution-package constraints.","children":[{"id":"NFR-03.001","title":"Implement Papyrus in Rust","description":"The Papyrus application shall be implemented in Rust.","rationale":"This records the requested programming language constraint.","verification":"Review the application's source files and build metadata to confirm that Rust is its implementation language."},{"id":"NFR-03.002","title":"Distribute Papyrus as a Debian Package","description":"Papyrus shall be distributed as a Debian `.deb` package.","rationale":"This records the requested distribution-package format.","verification":"Inspect the Papyrus distribution artifacts and confirm that a Debian `.deb` package is provided."}]},{"id":"NFR-04","title":"Persistence","userStory":"","description":"This group records the requested text-file-only persistence constraint. Its detailed interpretation remains to be confirmed where noted in the atomic requirement.","children":[{"id":"NFR-04.001","title":"Persist Application Data Only in Text Files","description":"Persisted Papyrus application data shall use text files only; no other persistence mechanism shall be used.","rationale":"This records the requested text-file-only persistence constraint without deciding which files or data count as application data.","verification":"Review the application's persistence paths and stored formats to confirm that persisted application data is held only in text files and that no other persistence mechanism is used. The boundary of application data and what qualifies as a text file remain unspecified."}]},{"id":"NFR-05","title":"Browser Compatibility","userStory":"","description":"This group records the supported browser interface. Browser display criteria remain to be defined.","children":[{"id":"NFR-05.001","title":"Display the Browser Interface in Named Browsers","description":"The Papyrus browser interface shall display in Firefox, Microsoft Edge, and Safari.","rationale":"This records the requested browser support without assuming browser versions or defining visual behavior not supplied in the scope.","verification":"Open the browser interface in Firefox, Microsoft Edge, and Safari and confirm that it renders in each. Specific versions and criteria for what constitutes displaying properly remain unspecified."}]},{"id":"NFR-06","title":"Licensing","userStory":"","description":"This group records the requested product license and dependency-license compatibility constraints. Their detailed interpretation remains to be confirmed where noted in the atomic requirements.","children":[{"id":"NFR-06.001","title":"License Papyrus Under GPLv3","description":"Papyrus shall be licensed under GPLv3.","rationale":"This records the requested project license without choosing an interpretation beyond the supplied GPLv3 designation.","verification":"Review the project's licensing declaration and distributed license notice to confirm that GPLv3 is stated. Whether the intended license is GPL-3.0-only or GPL-3.0-or-later remains unspecified."},{"id":"NFR-06.002","title":"Use GPLv3-Compatible Dependency Licenses","description":"Licenses for Papyrus dependencies shall be compatible with Papyrus's GPLv3 license.","rationale":"This records the requested license-compatibility constraint without silently defining the compatibility policy or the dependency scope.","verification":"Review an inventory of dependency licenses against the project's confirmed GPLv3 compatibility policy. The meaning of compatible and whether the scope includes development, build, and runtime dependencies remain unspecified."}]}]}</script>
+<script>
+const DATA = JSON.parse(document.getElementById("data").textContent);
+const treeEl = document.getElementById("tree");
+const detailEl = document.getElementById("detail");
+const filterEl = document.getElementById("filter");
+const nodes = {};
+
+function leafButton(leaf) {
+  const button = document.createElement("button");
+  button.className = "leaf";
+  button.dataset.id = leaf.id;
+  button.dataset.search = (leaf.id + " " + leaf.title).toLowerCase();
+  const badge = document.createElement("span");
+  badge.className = "badge";
+  badge.textContent = leaf.id;
+  const label = document.createElement("span");
+  label.textContent = leaf.title;
+  button.append(badge, label);
+  button.addEventListener("click", () => select(leaf.id));
+  nodes[leaf.id] = leaf;
+  return button;
+}
+
+function renderTree() {
+  const fragment = document.createDocumentFragment();
+  for (const group of DATA.groups) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "group";
+    wrapper.dataset.group = group.id;
+    const head = document.createElement("button");
+    head.className = "group-head";
+    const caret = document.createElement("span");
+    caret.className = "caret";
+    caret.textContent = "▾";
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.textContent = group.id;
+    const label = document.createElement("span");
+    label.textContent = group.title;
+    head.append(caret, badge, label);
+    head.addEventListener("click", () => wrapper.classList.toggle("collapsed"));
+    wrapper.appendChild(head);
+    const list = document.createElement("ul");
+    list.className = "leaves";
+    for (const leaf of group.children) list.appendChild(leafButton(leaf));
+    wrapper.appendChild(list);
+    fragment.appendChild(wrapper);
+  }
+  treeEl.appendChild(fragment);
+}
+
+function addField(label, value, className) {
+  const heading = document.createElement("h3");
+  heading.textContent = label;
+  const text = document.createElement("p");
+  text.className = value ? (className || "") : "empty";
+  text.textContent = value || "—";
+  detailEl.append(heading, text);
+}
+
+function renderDetail(leaf) {
+  const isReq = leaf.id.startsWith("REQ-");
+  const id = document.createElement("div");
+  id.className = "rid";
+  id.textContent = leaf.id;
+  const title = document.createElement("h2");
+  title.textContent = leaf.title;
+  detailEl.replaceChildren(id, title);
+  const tags = document.createElement("div");
+  tags.className = "tags";
+  if (isReq) {
+    const criticality = document.createElement("span");
+    criticality.className = "tag" + (leaf.criticality === "Must have" ? " must" : "");
+    criticality.textContent = leaf.criticality || "—";
+    tags.appendChild(criticality);
+  }
+  const type = document.createElement("span");
+  type.className = "tag";
+  type.textContent = isReq ? "Business requirement" : "Non-functional requirement";
+  tags.appendChild(type);
+  detailEl.appendChild(tags);
+  if (isReq) {
+    addField("User Story", leaf.userStory, "story");
+    addField("Description", leaf.description);
+    const criteria = (leaf.criteria || "").split("\n").map(line => line.replace(/^[-*]\s+/, "")).filter(Boolean).join("\n");
+    addField("Acceptance Criteria", criteria);
+  } else {
+    addField("Description", leaf.description);
+    addField("Rationale", leaf.rationale);
+    addField("Verification Method", leaf.verification);
+  }
+}
+
+function select(id) {
+  document.querySelectorAll(".leaf.active").forEach(button => button.classList.remove("active"));
+  const button = document.querySelector('.leaf[data-id="' + CSS.escape(id) + '"]');
+  if (button) button.classList.add("active");
+  if (nodes[id]) renderDetail(nodes[id]);
+}
+
+function applyFilter() {
+  const query = filterEl.value.trim().toLowerCase();
+  document.querySelectorAll(".group").forEach(group => {
+    let shown = 0;
+    group.querySelectorAll(".leaf").forEach(leaf => {
+      const hit = !query || leaf.dataset.search.includes(query);
+      leaf.classList.toggle("hidden", !hit);
+      if (hit) shown++;
+    });
+    group.classList.toggle("hidden", shown === 0);
+    if (query && shown) group.classList.remove("collapsed");
+  });
+}
+
+filterEl.addEventListener("input", applyFilter);
+renderTree();
+const leafCount = DATA.groups.reduce((n, group) => n + group.children.length, 0);
+if (!leafCount) {
+  const empty = document.createElement("p");
+  empty.className = "empty";
+  empty.textContent = "No requirements yet.";
+  treeEl.appendChild(empty);
+}
+document.getElementById("counts").textContent = leafCount + " requirements";
+const first = DATA.groups.find(group => group.children.length)?.children[0];
+if (first) select(first.id);
+</script>
+</body>
+</html>
