@@ -1,10 +1,13 @@
-# NFR-06.002 Use GPLv3-Compatible Dependency Licenses
+# NFR-06.002 Use Open-Source Dependencies That Permit GPLv3-or-Later Linking
 
 ## Description
-Licenses for Papyrus dependencies shall be compatible with Papyrus's GPLv3 license.
+Papyrus shall use only open-source dependencies with licenses that do not prevent linking those dependencies in a GPLv3-or-later application.
 
 ## Rationale
-This records the requested license-compatibility constraint without silently defining the compatibility policy or the dependency scope.
+This records the requested open-source and linking-license constraints for dependencies used by Papyrus.
 
 ## Verification Method
-Review an inventory of dependency licenses against the project's confirmed GPLv3 compatibility policy. The meaning of compatible and whether the scope includes development, build, and runtime dependencies remain unspecified.
+Review the dependency inventory and each dependency's license to confirm that every dependency is open source and its license does not prevent linking it in a GPLv3-or-later application.
+
+## Open Questions
+The exact dependency inventory scope (for example, development or build-time dependencies) and the intended interpretation of “open-source” and “linking” have not been specified.

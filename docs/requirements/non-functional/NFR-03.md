@@ -1,4 +1,4 @@
 # NFR-03 Implementation and Distribution
 
 ## Description
-This group records the requested implementation-language and distribution-package constraints.
+This group records the requested implementation-language constraint and distribution as amd64 Debian `.deb` packages for Trixie, Forky, and later Debian releases.
