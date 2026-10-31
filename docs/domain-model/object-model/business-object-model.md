@@ -55,7 +55,7 @@ graph LR
 | **Glossary Term**              | Documentation Management | A term with an ID, term text, and definition. It shares the document lifecycle: active or deprecated.                                                                                                                                                                                                                                                               |
 | **UI Specification**           | Documentation Management | A UI specification with an ID, title, description, and a view descriptor that names the part of the UI it covers. It shares the document lifecycle: active or deprecated. |
 | **Technical Specification**    | Documentation Management | A document describing a technical design or behavior. It may reference non-functional requirements. Other attributes, lifecycle, and relationships are unspecified. |
-| **Audit Record**               | Documentation Management | A document with a title, type, and content. Default types are `security` and `licence`; additional types are configurable. Lifecycle and relationships are unspecified. |
+| **Audit Record**               | Documentation Management | A document containing the result of an audit with title, type, and content. Default types are `security` and `licence`; additional types are configurable. It has an active/deprecated lifecycle. Relationships beyond task references are unspecified. |
 | **Business Rule**              | Documentation Management | A rule document with an ID, title, description, rationale, applicability, and zero or more references to business requirements. It shares the document lifecycle: active or deprecated.                                                                                                                                                                             |
 
 ## Documented relationships
@@ -79,4 +79,4 @@ graph LR
 ## Open questions
 
 1. **Technical Specification:** What other attributes, lifecycle, and relationships apply, and what is the cardinality of its references to non-functional requirements?
-2. **Audit Record:** What lifecycle and relationships apply to audit records?
+2. **Audit Record:** What relationships beyond task references apply to audit records?

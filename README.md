@@ -28,7 +28,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        <b>papyrus</b> manages a project's backlog and long-term documentation from a single command-line interface. It combines:
 
        - **Backlog management** - tasks, milestones, releases, and decisions.
-       - **Documentation management** - active and deprecated documents.
+        - **Documentation management** - business and non-functional requirements, glossary terms, UI and technical specifications, audit records, and business rules.
 
        All project data lives in the project directory selected with <b>--dir</b> (default: the current working directory). IDs are generated automatically and remain stable across archive/restore and deprecate/restore cycles.
 
@@ -463,7 +463,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
 <b style="color: light-dark(#0969da, #58a6ff);">nfreq</b>
 
-         Manage non-functional requirements (NFR-...). Requirement-to-group cardinality is <b>1..1</b>; each group contains non-functional requirements only.
+          Manage non-functional requirements (NFR-...). Requirement-to-group cardinality is <b>1..1</b>; each group contains non-functional requirements only. Non-functional requirements may be referenced by tasks, decisions, and technical specifications.
 
        <code style="font-weight: bold;">
         papyrus nfreq create &lt;title&gt; [-d &lt;description&gt;] --group &lt;id&gt;
@@ -667,6 +667,56 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
        Return a deprecated business rule to its original folder. The ID is preserved.
 
+<b style="color: light-dark(#0969da, #58a6ff);">audit</b>
+
+        Manage audit records (<b>AUD-001</b>, ...).
+       <code style="font-weight: bold;">
+       papyrus audit create --title &lt;title&gt; --content &lt;text&gt; [--audit-type &lt;type&gt;]
+       papyrus audit list
+       papyrus audit view &lt;id&gt;
+       papyrus audit edit &lt;id&gt; [--title &lt;title&gt;] [--content &lt;text&gt;] [--audit-type &lt;type&gt;] [--editor]
+       papyrus audit deprecate &lt;id&gt;
+       papyrus audit restore &lt;id&gt;
+       </code>
+       <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
+       Create an audit record.
+
+          <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
+          Audit record title.
+
+          <b style="color: light-dark(#1a7f37, #3fb950);">--content &lt;text&gt;</b>
+          Audit record content.
+
+          <b style="color: light-dark(#1a7f37, #3fb950);">--audit-type &lt;type&gt;</b>
+          Audit record type. Built-in types: <b>security</b> (default) and <b>licence</b>; additional types are configurable.
+
+       <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
+       List audit records.
+
+       <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
+       View an audit record.
+
+       <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
+       Edit an audit record.
+
+          <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
+          Update the title.
+
+          <b style="color: light-dark(#1a7f37, #3fb950);">--content &lt;text&gt;</b>
+          Update the content.
+
+          <b style="color: light-dark(#1a7f37, #3fb950);">--audit-type &lt;type&gt;</b>
+          Set the audit record type.
+
+          <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
+          Open the audit record content in $VISUAL or $EDITOR.
+
+       <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
+       Deprecate an audit record.
+
+       <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
+       Restore a deprecated audit record.
+
 <b style="color: light-dark(#0969da, #58a6ff);">search</b>
 
        Search tasks, milestones, releases, decisions, and documents in one pass.
@@ -784,6 +834,13 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
         <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.rule.directory&gt;/deprecated/</b>
         Deprecated business rules, under the configured business rules folder.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">docs/audit-records/</b>
+        Audit records. Path is <b>doc_directory</b> plus
+        <b>document_types.audit.directory</b>.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.audit.directory&gt;/deprecated/</b>
+        Deprecated audit records, under the configured audit records folder.
 
 <b style="color: light-dark(#0969da, #58a6ff);">ENVIRONMENT</b>
 
@@ -961,6 +1018,7 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
          glossary: { prefix: GLO, directory: glossary/,                    enabled: true }
          rule:     { prefix: RUL, directory: business-rules/,              enabled: true }
          ui-spec:  { prefix: UI,  directory: specifications/ui/,           enabled: true }
+         audit:    { prefix: AUD, directory: audit-records/,                enabled: true }
          deploy:   { prefix: DEP, directory: architecture/deployment/,     enabled: true }
        </code>
 
@@ -1003,6 +1061,7 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
          glossary: { prefix: GLO, directory: glossary/,                    enabled: true }
          rule:     { prefix: RUL, directory: business-rules/,              enabled: true }
          ui-spec:  { prefix: UI,  directory: specifications/ui/,           enabled: true }
+         audit:    { prefix: AUD, directory: audit-records/,                enabled: true }
          deploy:   { prefix: DEP, directory: architecture/deployment/,     enabled: true }
        # Deprecated documents live under each type directory's deprecated/ subfolder.
 
