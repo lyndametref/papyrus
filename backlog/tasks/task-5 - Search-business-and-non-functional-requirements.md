@@ -4,6 +4,7 @@ title: Search business and non-functional requirements
 status: To Do
 assignee: []
 created_date: '2026-10-31T22:25:00Z'
+updated_date: '2026-11-01T20:32:00Z'
 labels: []
 milestone: m-1
 dependencies:
@@ -14,7 +15,7 @@ references:
   - docs/requirements/business/REQ-05.001.md
   - docs/requirements/business/REQ-05.002.md
   - docs/requirements/business/REQ-05.007.md
-  - docs/business-rules/BR-001-papyrus-command-behavior.md
+  - docs/business-rules/BR-015-search-command-behavior.md
 ordinal: 5000
 ---
 

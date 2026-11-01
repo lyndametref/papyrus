@@ -4,6 +4,7 @@ title: Manage tasks and task lifecycle from the CLI
 status: To Do
 assignee: []
 created_date: '2026-10-31T22:25:00Z'
+updated_date: '2026-11-01T20:32:00Z'
 labels: []
 milestone: m-2
 dependencies:
@@ -17,7 +18,7 @@ references:
   - docs/requirements/non-functional/NFR-02.002.md
   - docs/requirements/non-functional/NFR-04.001.md
   - docs/requirements/non-functional/NFR-04.002.md
-  - docs/business-rules/BR-001-papyrus-command-behavior.md
+  - docs/business-rules/BR-005-task-command-behavior.md
 ordinal: 9000
 ---
 

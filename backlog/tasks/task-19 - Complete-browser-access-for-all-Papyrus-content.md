@@ -4,7 +4,7 @@ title: Complete browser access for all Papyrus content
 status: To Do
 assignee: []
 created_date: '2026-10-31T22:26:00Z'
-updated_date: '2026-10-31T22:27:00Z'
+updated_date: '2026-11-01T20:32:00Z'
 labels: []
 milestone: m-4
 dependencies:
@@ -24,7 +24,6 @@ references:
   - docs/requirements/business/REQ-05.004.md
   - docs/requirements/business/REQ-05.005.md
   - docs/requirements/business/REQ-05.006.md
-  - docs/business-rules/BR-001-papyrus-command-behavior.md
   - docs/requirements/business/REQ-02.001.md
   - docs/requirements/business/REQ-02.002.md
   - docs/requirements/business/REQ-03.001.md
@@ -32,6 +31,7 @@ references:
   - docs/requirements/business/REQ-04.001.md
   - docs/requirements/business/REQ-04.002.md
   - docs/requirements/business/REQ-05.007.md
+  - docs/business-rules/BR-004-browser-command-behavior.md
 ordinal: 19000
 ---
 

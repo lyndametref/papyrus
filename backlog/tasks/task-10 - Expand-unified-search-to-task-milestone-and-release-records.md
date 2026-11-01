@@ -4,6 +4,7 @@ title: Expand unified search to task, milestone, and release records
 status: To Do
 assignee: []
 created_date: '2026-10-31T22:26:00Z'
+updated_date: '2026-11-01T20:32:00Z'
 labels: []
 milestone: m-2
 dependencies:
@@ -15,7 +16,7 @@ references:
   - docs/requirements/business/REQ-02.003.md
   - docs/requirements/business/REQ-03.001.md
   - docs/requirements/business/REQ-03.002.md
-  - docs/business-rules/BR-001-papyrus-command-behavior.md
+  - docs/business-rules/BR-015-search-command-behavior.md
 ordinal: 10000
 ---
 

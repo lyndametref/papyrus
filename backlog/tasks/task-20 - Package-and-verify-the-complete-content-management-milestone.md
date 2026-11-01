@@ -4,6 +4,7 @@ title: Package and verify the complete content-management milestone
 status: To Do
 assignee: []
 created_date: '2026-10-31T22:26:00Z'
+updated_date: '2026-11-01T20:32:00Z'
 labels: []
 milestone: m-4
 dependencies:
@@ -21,7 +22,13 @@ references:
   - docs/requirements/non-functional/NFR-04.md
   - docs/requirements/non-functional/NFR-05.md
   - docs/requirements/non-functional/NFR-06.md
-  - docs/business-rules/BR-001-papyrus-command-behavior.md
+  - docs/business-rules/BR-011-glossary-command-behavior.md
+  - docs/business-rules/BR-012-ui-spec-command-behavior.md
+  - docs/business-rules/BR-013-rule-command-behavior.md
+  - docs/business-rules/BR-014-audit-command-behavior.md
+  - docs/business-rules/BR-004-browser-command-behavior.md
+  - docs/business-rules/BR-009-req-command-behavior.md
+  - docs/business-rules/BR-010-nfreq-command-behavior.md
 ordinal: 20000
 ---
 
