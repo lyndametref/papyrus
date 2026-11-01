@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture Decision Records</title>
+<style>
+  :root { --bg:#f4f4f2; --panel:#fff; --border:#e2e2df; --ink:#1c1c1a; --muted:#6b6b66; --accent:#33506f; --accent-soft:#e8eef5; --badge:#eceff1; }
+  * { box-sizing:border-box; } html,body { height:100%; margin:0; }
+  body { background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; display:grid; place-items:center; padding:24px; }
+  .app { width:min(1200px,100%); height:min(88vh,900px); background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.08); display:grid; grid-template-rows:auto 1fr; overflow:hidden; }
+  header { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:baseline; gap:12px; } header h1 { font-size:17px; margin:0; } header .sub { color:var(--muted); font-size:13px; } header .back { margin-left:auto; color:var(--accent); font-size:13px; text-decoration:none; } header .back:hover { text-decoration:underline; }
+  .panes { display:grid; grid-template-columns:330px 1fr; min-height:0; } .tree-pane { border-right:1px solid var(--border); overflow-y:auto; padding:12px; background:#fafaf9; }
+  #filter { width:100%; padding:7px 10px; margin-bottom:10px; border:1px solid var(--border); border-radius:8px; font:inherit; font-size:13px; }
+  .root-title { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:2px 6px 6px; }
+  .leaf { display:flex; align-items:center; gap:8px; width:100%; background:none; border:0; border-radius:6px; padding:6px 8px; font:inherit; font-size:13.5px; color:var(--ink); cursor:pointer; text-align:left; }
+  .leaf:hover { background:#f0f0ee; } .leaf.active { background:var(--accent-soft); color:var(--accent); font-weight:600; }
+  .badge { font:11px ui-monospace,SFMono-Regular,Menlo,monospace; background:var(--badge); color:var(--muted); border-radius:5px; padding:1px 6px; flex:none; }
+  .leaf.active .badge { background:#d7e2ee; color:var(--accent); } .leaf .label { flex:1 1 auto; }
+  .dot { width:8px; height:8px; border-radius:50%; flex:none; background:#c9c9c4; }
+  .dot.proposed { background:#b6892b; } .dot.accepted { background:#2f6f4f; } .dot.refused { background:#b0443f; } .dot.deprecated { background:#8a8a85; } .dot.superseded { background:#4a6fa5; }
+  .detail-pane { overflow-y:auto; padding:26px 30px; } .detail .rid { font:13px ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--accent); }
+  .detail h2 { margin:2px 0 10px; font-size:22px; } .tags { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+  .tag { font-size:12px; border:1px solid var(--border); border-radius:999px; padding:2px 10px; color:var(--muted); background:#fafaf9; }
+  .tag.status-proposed { border-color:#e4d3ab; background:#faf3e2; color:#7d5c15; } .tag.status-accepted { border-color:#bcd8c9; background:#e7f1ec; color:#2f6f4f; }
+  .tag.status-refused { border-color:#e6c2c0; background:#f8eaea; color:#b0443f; } .tag.status-deprecated { border-color:#d8d8d3; background:#f0f0ee; color:#6b6b66; } .tag.status-superseded { border-color:#c3d0e2; background:#eaf0f7; color:#4a6fa5; }
+  .detail h3 { font-size:12px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); margin:22px 0 6px; }
+  .detail h4 { font-size:14px; margin:16px 0 6px; } .detail p { margin:0 0 8px; } .detail ul,.detail ol { margin:4px 0 10px; padding-left:22px; }
+  .detail li { margin:3px 0; } .detail code { font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace; background:#f2f2ef; border-radius:4px; padding:1px 4px; }
+  .detail a { color:var(--accent); } .detail .note,.detail .empty { color:var(--muted); } .detail pre { margin:6px 0 12px; padding:12px 14px; overflow-x:auto; background:#f7f7f4; border:1px solid var(--border); border-radius:8px; font:12.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre; tab-size:4; }
+  .detail pre code { background:none; padding:0; font-size:inherit; } .table-wrap { overflow-x:auto; margin:6px 0 12px; } .detail table { border-collapse:collapse; font-size:13.5px; }
+  .detail th,.detail td { border:1px solid var(--border); padding:5px 9px; text-align:left; vertical-align:top; } .detail th { background:#fafaf9; font-weight:600; }
+  .empty { color:var(--muted); padding:0 8px; } .hidden { display:none !important; }
+  @media(max-width:720px) { body{padding:0}.app{height:100vh;border-radius:0}.panes{grid-template-columns:minmax(150px,40%) 1fr}.detail-pane{padding:18px} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1>Architecture Decision Records</h1><span class="sub" id="counts"></span><a class="back" href="../../index.html">Back to documentation index</a></header>
+  <div class="panes">
+    <nav class="tree-pane" aria-label="Architecture decision records">
+      <input id="filter" type="search" placeholder="Filter decisions…" autocomplete="off">
+      <div class="root-title">Decisions</div><div id="tree"></div>
+    </nav>
+    <main class="detail-pane"><div class="detail" id="detail" aria-live="polite"></div></main>
+  </div>
+</div>
+<script id="data" type="application/json">{"adrs":[]}</script>
+<script>
+const DATA = JSON.parse(document.getElementById("data").textContent);
+const treeEl = document.getElementById("tree");
+const detailEl = document.getElementById("detail");
+const filterEl = document.getElementById("filter");
+const nodes = {};
+
+const esc = value => String(value).replace(/[&<>\"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[char]));
+const statusWord = status => (String(status || "").trim().split(/\s+/)[0] || "").toLowerCase();
+
+function inline(source) {
+  const codes = [];
+  let text = esc(source).replace(/`([^`]+)`/g, (_match, code) => {
+    codes.push(code);
+    return "\u0000" + (codes.length - 1) + "\u0000";
+  });
+  text = text.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  text = text.replace(/\*([^*\n]+)\*/g, "<b>$1</b>");
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, href) =>
+    /^(https?:|#|\/|\.{0,2}\/)/.test(href) || !href.includes(":") ? '<a href="' + href + '">' + label + "</a>" : label);
+  return text.replace(/\u0000(\d+)\u0000/g, (_match, index) => "<code>" + codes[Number(index)] + "</code>");
+}
+
+const isUl = line => /^\s*[-*]\s+/.test(line);
+const isOl = line => /^\s*\d+[.)]\s+/.test(line);
+const isTable = line => line.trim().startsWith("|");
+const isFence = line => /^\s*(```|~~~)/.test(line);
+const isHeading = line => /^#{3,6}\s/.test(line);
+const splitRow = line => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(cell => cell.trim());
+const isSeparator = cells => cells.length > 0 && cells.every(cell => /^:?-{3,}:?$/.test(cell));
+const startsBlock = line => !line.trim() || isHeading(line) || isUl(line) || isOl(line) || isTable(line) || isFence(line);
+
+function renderMarkdown(source) {
+  const lines = String(source || "").split("\n");
+  const output = [];
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line.trim()) { index++; continue; }
+    if (isFence(line)) {
+      const marker = /^\s*(```|~~~)/.exec(line)[1];
+      const language = line.trim().slice(marker.length).trim();
+      const code = [];
+      index++;
+      while (index < lines.length && !lines[index].trim().startsWith(marker)) code.push(lines[index++]);
+      if (index < lines.length) index++;
+      output.push("<pre><code" + (language ? ' class="language-' + esc(language) + '"' : "") + ">" + esc(code.join("\n")) + "</code></pre>");
+      continue;
+    }
+    const heading = /^(#{3,6})\s+(.*)$/.exec(line);
+    if (heading) {
+      const level = Math.min(heading[1].length + 1, 6);
+      output.push("<h" + level + ">" + inline(heading[2]) + "</h" + level + ">");
+      index++;
+      continue;
+    }
+    if (isTable(line)) {
+      const rows = [];
+      while (index < lines.length && isTable(lines[index])) rows.push(splitRow(lines[index++]));
+      const hasHeader = rows.length > 1 && isSeparator(rows[1]);
+      const body = hasHeader ? rows.slice(2) : rows;
+      let table = '<div class="table-wrap"><table>';
+      if (hasHeader) table += "<thead><tr>" + rows[0].map(cell => "<th>" + inline(cell) + "</th>").join("") + "</tr></thead>";
+      table += "<tbody>" + body.map(row => "<tr>" + row.map(cell => "<td>" + inline(cell) + "</td>").join("") + "</tr>").join("") + "</tbody></table></div>";
+      output.push(table);
+      continue;
+    }
+    if (isUl(line) || isOl(line)) {
+      const tag = isUl(line) ? "ul" : "ol";
+      const marker = isUl(line) ? /^\s*[-*]\s+/ : /^\s*\d+[.)]\s+/;
+      const items = [];
+      while (index < lines.length && marker.test(lines[index])) items.push(lines[index++].replace(marker, ""));
+      output.push("<" + tag + ">" + items.map(item => "<li>" + inline(item) + "</li>").join("") + "</" + tag + ">");
+      continue;
+    }
+    const paragraph = [line.trim()];
+    index++;
+    while (index < lines.length && !startsBlock(lines[index])) paragraph.push(lines[index++].trim());
+    output.push("<p>" + inline(paragraph.join(" ")) + "</p>");
+  }
+  return output.length ? output.join("") : '<p class="empty">—</p>';
+}
+
+function leafButton(adr) {
+  const button = document.createElement("button");
+  button.className = "leaf";
+  button.dataset.id = adr.id;
+  button.dataset.search = (adr.id + " " + adr.title + " " + adr.status).toLowerCase();
+  const dot = document.createElement("span");
+  dot.className = "dot " + statusWord(adr.status);
+  dot.title = adr.status;
+  const badge = document.createElement("span");
+  badge.className = "badge";
+  badge.textContent = adr.id;
+  const label = document.createElement("span");
+  label.className = "label";
+  label.textContent = adr.title;
+  button.append(dot, badge, label);
+  button.addEventListener("click", () => select(adr.id));
+  nodes[adr.id] = adr;
+  return button;
+}
+
+function renderTree() {
+  const fragment = document.createDocumentFragment();
+  for (const adr of DATA.adrs) fragment.appendChild(leafButton(adr));
+  treeEl.appendChild(fragment);
+}
+
+function renderDetail(adr) {
+  const status = statusWord(adr.status);
+  let content = '<div class="rid">' + esc(adr.id) + "</div>" + "<h2>" + esc(adr.title) + "</h2>" +
+    '<div class="tags"><span class="tag status-' + esc(status) + '">' + esc(adr.status) + "</span></div>";
+  for (const section of adr.sections) content += "<h3>" + esc(section.heading) + "</h3>" + renderMarkdown(section.content);
+  detailEl.innerHTML = content;
+}
+
+function select(id) {
+  document.querySelectorAll(".leaf.active").forEach(button => button.classList.remove("active"));
+  const button = document.querySelector('.leaf[data-id="' + CSS.escape(id) + '"]');
+  if (button) button.classList.add("active");
+  if (nodes[id]) renderDetail(nodes[id]);
+}
+
+function applyFilter() {
+  const query = filterEl.value.trim().toLowerCase();
+  let shown = 0;
+  document.querySelectorAll(".leaf").forEach(leaf => {
+    const hit = !query || leaf.dataset.search.includes(query);
+    leaf.classList.toggle("hidden", !hit);
+    if (hit) shown++;
+  });
+  let note = document.getElementById("no-results");
+  if (!note) {
+    note = document.createElement("p");
+    note.id = "no-results";
+    note.className = "empty";
+    note.textContent = "No matching decisions.";
+    treeEl.parentNode.appendChild(note);
+  }
+  note.classList.toggle("hidden", shown > 0);
+}
+
+filterEl.addEventListener("input", applyFilter);
+renderTree();
+if (!DATA.adrs.length) {
+  const empty = document.createElement("p");
+  empty.className = "empty";
+  empty.textContent = "No decision records yet.";
+  treeEl.appendChild(empty);
+}
+const accepted = DATA.adrs.filter(adr => /^Accepted/i.test(adr.status)).length;
+document.getElementById("counts").textContent = DATA.adrs.length + " decisions · " + accepted + " accepted";
+if (DATA.adrs.length) select(DATA.adrs[0].id);
+</script>
+</body>
+</html>

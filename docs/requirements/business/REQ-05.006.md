@@ -10,11 +10,11 @@ REQ-05 Project Documentation Management
 Must have
 
 ## Description
-The user can create audit records with a title and content, optionally specifying an audit type. Built-in types are `security` (default) and `licence`; additional types are configurable. Records can be listed, viewed, edited, deprecated, and restored.
+The user can create audit records with a title and content, optionally specifying an audit type. Built-in types are `security` (default), `licence`, and `architecture`; additional types are configurable. Records can be listed, viewed, edited, deprecated, and restored.
 
 ## Acceptance Criteria
 - An audit record can be created with the required title and content.
-- The default audit type is `security`; `licence` is also built in, and additional types may be configured.
+- The default audit type is `security`; `licence` and `architecture` are also built in, and additional types may be configured.
 - Audit records can be listed, viewed, and edited for title, content, and type.
 - Audit records can be deprecated and restored using their documented commands.
 

@@ -660,7 +660,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
           Audit record content.
 
           <b style="color: light-dark(#1a7f37, #3fb950);">--audit-type &lt;type&gt;</b>
-          Audit record type. Built-in types: <b>security</b> (default) and <b>licence</b>; additional types are configurable.
+          Audit record type. Built-in types: <b>security</b> (default), <b>licence</b>, and <b>architecture</b>; additional types are configurable.
 
        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
        List audit records.
