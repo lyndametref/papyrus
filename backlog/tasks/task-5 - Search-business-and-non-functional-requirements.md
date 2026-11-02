@@ -1,11 +1,11 @@
 ---
 id: TASK-5
 title: Search business and non-functional requirements
-status: Refined
+status: Done
 assignee:
   - '@orchestrator'
 created_date: '2026-10-31T22:25:00Z'
-updated_date: '2026-11-02T20:14:00Z'
+updated_date: '2026-11-02T20:24:00Z'
 labels: []
 milestone: m-1
 dependencies:
@@ -31,25 +31,25 @@ Implement the first increment of `papyrus search`: a read-only, project-local fr
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 `papyrus search <query> [--type <type>]... [--limit <n>]` is available and accepts exactly the documented types task, milestone, release, decision, and doc, defaulting to all types.
-- [ ] #2 Search returns matching active business and non-functional requirement records, including requirement group documents, from the configured document directories; deprecated records and disabled document types never appear.
-- [ ] #3 Matching is case-insensitive substring matching over the record ID, title, and full body (user story, description, and other body sections); a quoted phrase is matched as one contiguous query and regex metacharacters are literal.
-- [ ] #4 `--type` filters restrict results; task, milestone, release, and decision are accepted and return no matches without error in this increment.
-- [ ] #5 `--limit <n>` caps results after ordering; non-integer, zero, and negative values exit 2; results are ordered by record ID ascending.
-- [ ] #6 Text output is one `<id> <type> <title>` line per result and `--json` output is an ordered array of `{id,type,title,path}`; zero matches exits 0 with empty output or `[]`.
-- [ ] #7 Empty or whitespace-only queries and control characters exit 4; missing query, unknown type, and invalid limit exit 2; IO or boundary violations exit 1; search never writes and never exits 3.
-- [ ] #8 Search reads only within the canonical project directory, never follows a symlink outside it, and adds no dependencies.
-- [ ] #9 Automated tests cover matching and quoted phrases, type filters including unimplemented types, limit and ordering, deprecation and disabled-type exclusion, JSON output, and the exit-code matrix.
+- [x] #1 `papyrus search <query> [--type <type>]... [--limit <n>]` is available and accepts exactly the documented types task, milestone, release, decision, and doc, defaulting to all types.
+- [x] #2 Search returns matching active business and non-functional requirement records, including requirement group documents, from the configured document directories; deprecated records and disabled document types never appear.
+- [x] #3 Matching is case-insensitive substring matching over the record ID, title, and full body (user story, description, and other body sections); a quoted phrase is matched as one contiguous query and regex metacharacters are literal.
+- [x] #4 `--type` filters restrict results; task, milestone, release, and decision are accepted and return no matches without error in this increment.
+- [x] #5 `--limit <n>` caps results after ordering; non-integer, zero, and negative values exit 2; results are ordered by record ID ascending.
+- [x] #6 Text output is one `<id> <type> <title>` line per result and `--json` output is an ordered array of `{id,type,title,path}`; zero matches exits 0 with empty output or `[]`.
+- [x] #7 Empty or whitespace-only queries and control characters exit 4; missing query, unknown type, and invalid limit exit 2; IO or boundary violations exit 1; search never writes and never exits 3.
+- [x] #8 Search reads only within the canonical project directory, never follows a symlink outside it, and adds no dependencies.
+- [x] #9 Automated tests cover matching and quoted phrases, type filters including unimplemented types, limit and ordering, deprecation and disabled-type exclusion, JSON output, and the exit-code matrix.
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 `papyrus search` is implemented in the existing single crate with existing dependencies only; no new crate, application, stack, or dependency is added.
-- [ ] #2 `cargo build`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, and `cargo fmt --check` pass with Rust 1.99.1.
-- [ ] #3 Integration tests in `tests/` exercise the acceptance-criteria checks against the built binary.
-- [ ] #4 The implementation matches `docs/specifications/search-requirements.md`; any deviation is recorded and the specification updated.
-- [ ] #5 Search performs no writes and no reads outside the canonical project directory.
-- [ ] #6 `--json` works for both results and errors, following the existing error shape.
+- [x] #1 `papyrus search` is implemented in the existing single crate with existing dependencies only; no new crate, application, stack, or dependency is added.
+- [x] #2 `cargo build`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, and `cargo fmt --check` pass with Rust 1.99.1.
+- [x] #3 Integration tests in `tests/` exercise the acceptance-criteria checks against the built binary.
+- [x] #4 The implementation matches `docs/specifications/search-requirements.md`; any deviation is recorded and the specification updated.
+- [x] #5 Search performs no writes and no reads outside the canonical project directory.
+- [x] #6 `--json` works for both results and errors, following the existing error shape.
 <!-- DOD:END -->
 
 ## Implementation Plan
