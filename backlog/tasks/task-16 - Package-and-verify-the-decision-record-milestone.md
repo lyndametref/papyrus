@@ -4,10 +4,11 @@ title: Package and verify the decision-record milestone
 status: To Do
 assignee: []
 created_date: '2026-10-31T22:26:00Z'
-updated_date: '2026-11-01T20:32:00Z'
+updated_date: '2026-11-02T20:19:00Z'
 labels: []
 milestone: m-3
 dependencies:
+  - TASK-14
   - TASK-15
 references:
   - docs/requirements/business/REQ-04.md

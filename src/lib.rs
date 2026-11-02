@@ -7,6 +7,7 @@ pub mod nfreq;
 pub mod req;
 pub mod requirement;
 pub mod sanitize;
+pub mod search;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -39,6 +40,16 @@ pub struct Cli {
     pub command: Commands,
 }
 
+/// Documented record types accepted by `papyrus search --type`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum SearchType {
+    Task,
+    Milestone,
+    Release,
+    Decision,
+    Doc,
+}
+
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Initialize a project.
@@ -67,6 +78,18 @@ pub enum Commands {
         #[command(subcommand)]
         action: nfreq::NfreqCmd,
     },
+    /// Search records by free text.
+    Search {
+        /// Free-text search term or phrase. Quote phrases that contain spaces.
+        #[arg(value_name = "query")]
+        query: String,
+        /// Restrict to record types. Repeatable. Default: all types.
+        #[arg(long = "type", value_name = "type", value_enum)]
+        types: Vec<SearchType>,
+        /// Maximum number of results. Must be a positive integer.
+        #[arg(long, value_name = "n", value_parser = parse_limit, allow_hyphen_values = true)]
+        limit: Option<usize>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -90,8 +113,44 @@ pub struct CommandOutput {
     pub json: Option<serde_json::Value>,
 }
 
+/// Parse `--limit`: a positive integer. Zero, negative, and non-integer values
+/// are usage errors (clap exits with code 2).
+fn parse_limit(raw: &str) -> Result<usize, String> {
+    let value: i64 = raw
+        .parse()
+        .map_err(|_| "limit must be a positive integer".to_string())?;
+    if value < 1 {
+        return Err("limit must be a positive integer".to_string());
+    }
+    usize::try_from(value).map_err(|_| "limit must be a positive integer".to_string())
+}
+
 pub fn parse() -> Cli {
     Cli::parse()
+}
+
+/// Build a command context for non-init commands, enforcing the
+/// project-directory boundary for the configuration path.
+fn build_context(
+    project_raw: PathBuf,
+    config_path: PathBuf,
+    json: bool,
+    no_color: bool,
+) -> Result<context::Context, error::AppError> {
+    let project_dir = context::Context::canonical_project_dir(&project_raw)?;
+    let config_path =
+        context::Context::ensure_within(&project_dir, &config_path).map_err(|_| {
+            error::AppError::Runtime(format!(
+                "configuration path resolves outside project directory: {}",
+                config_path.display()
+            ))
+        })?;
+    Ok(context::Context {
+        project_dir,
+        config_path,
+        json,
+        no_color,
+    })
 }
 
 pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
@@ -132,22 +191,7 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
             })
         }
         Commands::Config { action } => {
-            // For non-init commands, canonicalize project dir (must exist).
-            let project_dir = context::Context::canonical_project_dir(&project_raw)?;
-            // Enforce project-directory boundary for config path (incl. explicit --config).
-            let config_path =
-                context::Context::ensure_within(&project_dir, &config_path).map_err(|_| {
-                    crate::error::AppError::Runtime(format!(
-                        "configuration path resolves outside project directory: {}",
-                        config_path.display()
-                    ))
-                })?;
-            let ctx = context::Context {
-                project_dir: project_dir.clone(),
-                config_path,
-                json: cli.json,
-                no_color,
-            };
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
             match action {
                 ConfigCmd::List => commands::config_list(&ctx),
                 ConfigCmd::Get { key } => commands::config_get(&ctx, &key),
@@ -156,38 +200,20 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
             }
         }
         Commands::Req { action } => {
-            let project_dir = context::Context::canonical_project_dir(&project_raw)?;
-            let config_path =
-                context::Context::ensure_within(&project_dir, &config_path).map_err(|_| {
-                    crate::error::AppError::Runtime(format!(
-                        "configuration path resolves outside project directory: {}",
-                        config_path.display()
-                    ))
-                })?;
-            let ctx = context::Context {
-                project_dir,
-                config_path,
-                json: cli.json,
-                no_color,
-            };
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
             req::run(&ctx, action)
         }
         Commands::Nfreq { action } => {
-            let project_dir = context::Context::canonical_project_dir(&project_raw)?;
-            let config_path =
-                context::Context::ensure_within(&project_dir, &config_path).map_err(|_| {
-                    crate::error::AppError::Runtime(format!(
-                        "configuration path resolves outside project directory: {}",
-                        config_path.display()
-                    ))
-                })?;
-            let ctx = context::Context {
-                project_dir,
-                config_path,
-                json: cli.json,
-                no_color,
-            };
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
             nfreq::run(&ctx, action)
+        }
+        Commands::Search {
+            query,
+            types,
+            limit,
+        } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            search::run(&ctx, &query, &types, limit)
         }
     }
 }

@@ -4,10 +4,11 @@ title: Package and verify the complete content-management milestone
 status: To Do
 assignee: []
 created_date: '2026-10-31T22:26:00Z'
-updated_date: '2026-11-01T20:32:00Z'
+updated_date: '2026-11-02T20:19:00Z'
 labels: []
 milestone: m-4
 dependencies:
+  - TASK-18
   - TASK-19
 references:
   - docs/requirements/business/REQ-01.md
@@ -29,7 +30,7 @@ references:
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-009-req-command-behavior.md
   - docs/business-rules/BR-010-nfreq-command-behavior.md
-ordinal: 20000
+ordinal: 22000
 ---
 
 ## Description
