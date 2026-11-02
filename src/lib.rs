@@ -83,7 +83,11 @@ pub fn parse() -> Cli {
 
 pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
     let project_raw = context::Context::select_project_dir(cli.dir.clone())?;
-    let config_path = context::Context::select_config_path(cli.config.clone(), &project_raw);
+    let config_path_raw = context::Context::select_config_path(cli.config.clone(), &project_raw);
+    // Sanitize the selected config path components (exit 4 if unnormalizable).
+    let config_path = crate::sanitize::sanitize_path(&config_path_raw).ok_or_else(|| {
+        crate::error::AppError::Validation("configuration path cannot be normalized".to_string())
+    })?;
 
     // no_color / NO_COLOR
     let no_color = cli.no_color
@@ -117,10 +121,17 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
         Commands::Config { action } => {
             // For non-init commands, canonicalize project dir (must exist).
             let project_dir = context::Context::canonical_project_dir(&project_raw)?;
-            // boundary: ensure config path within project dir? Allow override; but if exists canonicalize.
+            // Enforce project-directory boundary for config path (incl. explicit --config).
+            let config_path =
+                context::Context::ensure_within(&project_dir, &config_path).map_err(|_| {
+                    crate::error::AppError::Runtime(format!(
+                        "configuration path resolves outside project directory: {}",
+                        config_path.display()
+                    ))
+                })?;
             let ctx = context::Context {
                 project_dir: project_dir.clone(),
-                config_path: config_path.clone(),
+                config_path,
                 json: cli.json,
                 no_color,
             };

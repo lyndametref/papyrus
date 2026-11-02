@@ -2,7 +2,6 @@ use crate::CommandOutput;
 use crate::config::{Config, merge_yaml, validate_key_path, yaml_get, yaml_set, yaml_unset};
 use crate::context::Context;
 use crate::error::AppError;
-use crate::sanitize;
 use std::path::Path;
 
 fn yaml_to_json(v: &yaml_serde::Value) -> serde_json::Value {
@@ -72,8 +71,7 @@ pub fn load_effective_config(config_path: &Path, project_dir: &Path) -> Result<C
     let cfg: Config =
         yaml_serde::from_value(val).map_err(|e| AppError::Validation(e.to_string()))?;
     cfg.validate().map_err(AppError::Validation)?;
-    // resolve project_name default handled in methods; store resolved if None? leave None.
-    let _ = (project_dir, sanitize::sanitize_name);
+    let _ = project_dir;
     Ok(cfg)
 }
 
@@ -84,6 +82,7 @@ pub fn config_list(ctx: &Context) -> Result<CommandOutput, AppError> {
     if cfg_json.project_name.is_none() {
         cfg_json.project_name = Some(cfg_json.effective_project_name(&ctx.project_dir));
     }
+    cfg_json.editor = cfg_json.effective_editor();
     let text_lines: Vec<String> = cfg
         .flattened(&ctx.project_dir)
         .into_iter()
@@ -99,10 +98,54 @@ pub fn config_list(ctx: &Context) -> Result<CommandOutput, AppError> {
 }
 
 pub fn config_get(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
-    if !validate_key_path(key) {
+    if !valid_sanitized_key(key) {
         return Err(AppError::Validation("invalid key".to_string()));
     }
     let val = load_effective_value(&ctx.config_path)?;
+
+    // Effective defaults for project_name and editor.
+    if key == "project_name" {
+        let found = yaml_get(&val, key);
+        let is_empty = match found {
+            None => true,
+            Some(yaml_serde::Value::Null) => true,
+            Some(yaml_serde::Value::String(s)) => s.trim().is_empty(),
+            _ => false,
+        };
+        if is_empty {
+            let name = effective_project_name_from_dir(&ctx.project_dir);
+            let json = if ctx.json {
+                Some(serde_json::Value::String(name.clone()))
+            } else {
+                None
+            };
+            return Ok(CommandOutput { text: name, json });
+        }
+    }
+    if key == "editor" {
+        let found = yaml_get(&val, key);
+        let from_config = match found {
+            Some(yaml_serde::Value::String(s)) if !s.is_empty() => Some(s.clone()),
+            _ => None,
+        };
+        if from_config.is_none() {
+            let effective = std::env::var("VISUAL")
+                .ok()
+                .filter(|v| !v.is_empty())
+                .or_else(|| std::env::var("EDITOR").ok().filter(|v| !v.is_empty()));
+            let text = effective.clone().unwrap_or_else(|| "null".to_string());
+            let json = if ctx.json {
+                Some(match effective {
+                    Some(v) => serde_json::Value::String(v),
+                    None => serde_json::Value::Null,
+                })
+            } else {
+                None
+            };
+            return Ok(CommandOutput { text, json });
+        }
+    }
+
     let found =
         yaml_get(&val, key).ok_or_else(|| AppError::NotFound(format!("key not found: {}", key)))?;
     let text = yaml_scalar_to_string(found);
@@ -115,21 +158,35 @@ pub fn config_get(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
 }
 
 pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput, AppError> {
-    if !validate_key_path(key) {
+    if !valid_sanitized_key(key) {
         return Err(AppError::Validation("invalid key".to_string()));
     }
     // parse value as YAML
-    let parsed: yaml_serde::Value =
+    let parsed_raw: yaml_serde::Value =
         yaml_serde::from_str(value).map_err(|e| AppError::Validation(e.to_string()))?;
     // require scalar
-    match parsed {
+    match parsed_raw {
         yaml_serde::Value::Mapping(_) | yaml_serde::Value::Sequence(_) => {
             return Err(AppError::Validation(
                 "value must be a YAML scalar".to_string(),
             ));
         }
+        yaml_serde::Value::Null => {
+            return Err(AppError::Validation(
+                "value cannot be normalized".to_string(),
+            ));
+        }
         _ => {}
     }
+    // Sanitize string values.
+    let parsed = match parsed_raw {
+        yaml_serde::Value::String(s) => {
+            let sanitized = crate::sanitize::sanitize_path_component(&s)
+                .ok_or_else(|| AppError::Validation("value cannot be normalized".to_string()))?;
+            yaml_serde::Value::String(sanitized)
+        }
+        other => other,
+    };
 
     // load file value (or empty mapping)
     let mut file_val = if ctx.config_path.exists() {
@@ -175,7 +232,7 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
 }
 
 pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
-    if !validate_key_path(key) {
+    if !valid_sanitized_key(key) {
         return Err(AppError::Validation("invalid key".to_string()));
     }
     let mut file_val = if ctx.config_path.exists() {
@@ -219,4 +276,21 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
         text: String::new(),
         json,
     })
+}
+
+fn valid_sanitized_key(key: &str) -> bool {
+    if !validate_key_path(key) {
+        return false;
+    }
+    key.split('.')
+        .all(|p| crate::sanitize::sanitize_path_component(p).is_some())
+}
+
+fn effective_project_name_from_dir(project_dir: &std::path::Path) -> String {
+    // Mirror Config::effective_project_name without borrowing Config.
+    project_dir
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("project")
+        .to_string()
 }

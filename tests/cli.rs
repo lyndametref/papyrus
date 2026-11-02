@@ -211,3 +211,175 @@ fn version_output() {
     assert!(out.status.success());
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "papyrus 0.1.0");
 }
+
+#[test]
+fn config_explicit_config_outside_project_exits_one() {
+    let root = tmpdir("boundary1");
+    let proj = root.join("proj");
+    let outside = root.join("outside");
+    fs::create_dir_all(&proj).unwrap();
+    fs::create_dir_all(&outside).unwrap();
+    bin()
+        .args(["--dir", proj.to_str().unwrap(), "init", "Proj", "--no-git"])
+        .output()
+        .unwrap();
+    let out = bin()
+        .args([
+            "--dir",
+            proj.to_str().unwrap(),
+            "--config",
+            outside.join("evil.yml").to_str().unwrap(),
+            "config",
+            "list",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(!outside.join("evil.yml").exists());
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn config_symlink_escape_exits_one() {
+    let root = tmpdir("boundary2");
+    let proj = root.join("proj");
+    let outside = root.join("outside");
+    fs::create_dir_all(&proj).unwrap();
+    fs::create_dir_all(&outside).unwrap();
+    bin()
+        .args(["--dir", proj.to_str().unwrap(), "init", "Proj", "--no-git"])
+        .output()
+        .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        let _ = symlink(outside.join("evil.yml"), proj.join("escape.yml"));
+    }
+    let out = bin()
+        .args([
+            "--dir",
+            proj.to_str().unwrap(),
+            "--config",
+            proj.join("escape.yml").to_str().unwrap(),
+            "config",
+            "list",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn config_sanitization_rejects_bad_value() {
+    let d = tmpdir("san1");
+    bin()
+        .args(["--dir", d.to_str().unwrap(), "init", "Proj", "--no-git"])
+        .output()
+        .unwrap();
+    for bad in [".", "..", "a/b", "x\\y"] {
+        let out = bin()
+            .args([
+                "--dir",
+                d.to_str().unwrap(),
+                "config",
+                "set",
+                "task_prefix",
+                bad,
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(4), "bad={}", bad);
+    }
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn config_sanitization_rejects_bad_key() {
+    let d = tmpdir("san2");
+    bin()
+        .args(["--dir", d.to_str().unwrap(), "init", "Proj", "--no-git"])
+        .output()
+        .unwrap();
+    let out = bin()
+        .args(["--dir", d.to_str().unwrap(), "config", "get", ".."])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(4));
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn config_project_name_defaults_to_dir_name() {
+    let d = tmpdir("defname");
+    bin()
+        .args(["--dir", d.to_str().unwrap(), "init", "Proj", "--no-git"])
+        .output()
+        .unwrap();
+    bin()
+        .args([
+            "--dir",
+            d.to_str().unwrap(),
+            "config",
+            "unset",
+            "project_name",
+        ])
+        .output()
+        .unwrap();
+    let out = bin()
+        .args([
+            "--dir",
+            d.to_str().unwrap(),
+            "config",
+            "get",
+            "project_name",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        d.file_name().unwrap().to_str().unwrap()
+    );
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn config_editor_defaults_to_env() {
+    let d = tmpdir("defed");
+    bin()
+        .args(["--dir", d.to_str().unwrap(), "init", "Proj", "--no-git"])
+        .output()
+        .unwrap();
+    let out = bin()
+        .env("VISUAL", "myeditor")
+        .args(["--dir", d.to_str().unwrap(), "config", "get", "editor"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "myeditor");
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn config_editor_json_null_when_unset() {
+    let d = tmpdir("defedjson");
+    bin()
+        .args(["--dir", d.to_str().unwrap(), "init", "Proj", "--no-git"])
+        .output()
+        .unwrap();
+    let out = bin()
+        .args([
+            "--dir",
+            d.to_str().unwrap(),
+            "--json",
+            "config",
+            "get",
+            "editor",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "null");
+    let _ = fs::remove_dir_all(&d);
+}

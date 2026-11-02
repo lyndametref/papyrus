@@ -135,6 +135,26 @@ impl Config {
             .to_string()
     }
 
+    /// Effective editor command, falling back to `$VISUAL` then `$EDITOR`.
+    pub fn effective_editor(&self) -> Option<String> {
+        if let Some(e) = &self.editor
+            && !e.is_empty()
+        {
+            return Some(e.clone());
+        }
+        if let Ok(v) = std::env::var("VISUAL")
+            && !v.is_empty()
+        {
+            return Some(v);
+        }
+        if let Ok(v) = std::env::var("EDITOR")
+            && !v.is_empty()
+        {
+            return Some(v);
+        }
+        None
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if self.id_padding == 0 {
             return Err("id_padding must be a positive integer".to_string());
@@ -182,7 +202,7 @@ impl Config {
         out.push(("date_format".to_string(), self.date_format.clone()));
         out.push((
             "editor".to_string(),
-            self.editor.clone().unwrap_or_default(),
+            self.effective_editor().unwrap_or_default(),
         ));
         out.push((
             "backlog_directory".to_string(),
