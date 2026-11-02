@@ -3,6 +3,9 @@ pub mod config;
 pub mod context;
 pub mod error;
 pub mod init;
+pub mod nfreq;
+pub mod req;
+pub mod requirement;
 pub mod sanitize;
 
 use clap::{Parser, Subcommand};
@@ -53,6 +56,16 @@ pub enum Commands {
     Config {
         #[command(subcommand)]
         action: ConfigCmd,
+    },
+    /// Manage business requirements.
+    Req {
+        #[command(subcommand)]
+        action: req::ReqCmd,
+    },
+    /// Manage non-functional requirements.
+    Nfreq {
+        #[command(subcommand)]
+        action: nfreq::NfreqCmd,
     },
 }
 
@@ -141,6 +154,40 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
                 ConfigCmd::Set { key, value } => commands::config_set(&ctx, &key, &value),
                 ConfigCmd::Unset { key } => commands::config_unset(&ctx, &key),
             }
+        }
+        Commands::Req { action } => {
+            let project_dir = context::Context::canonical_project_dir(&project_raw)?;
+            let config_path =
+                context::Context::ensure_within(&project_dir, &config_path).map_err(|_| {
+                    crate::error::AppError::Runtime(format!(
+                        "configuration path resolves outside project directory: {}",
+                        config_path.display()
+                    ))
+                })?;
+            let ctx = context::Context {
+                project_dir,
+                config_path,
+                json: cli.json,
+                no_color,
+            };
+            req::run(&ctx, action)
+        }
+        Commands::Nfreq { action } => {
+            let project_dir = context::Context::canonical_project_dir(&project_raw)?;
+            let config_path =
+                context::Context::ensure_within(&project_dir, &config_path).map_err(|_| {
+                    crate::error::AppError::Runtime(format!(
+                        "configuration path resolves outside project directory: {}",
+                        config_path.display()
+                    ))
+                })?;
+            let ctx = context::Context {
+                project_dir,
+                config_path,
+                json: cli.json,
+                no_color,
+            };
+            nfreq::run(&ctx, action)
         }
     }
 }
