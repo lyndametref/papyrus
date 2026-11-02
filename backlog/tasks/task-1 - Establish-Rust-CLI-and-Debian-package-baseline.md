@@ -1,10 +1,10 @@
 ---
 id: TASK-1
 title: Establish Rust CLI and Debian package baseline
-status: Refined
+status: Done
 assignee: []
 created_date: '2026-10-31T22:25:00Z'
-updated_date: '2026-11-02T17:40:00Z'
+updated_date: '2026-11-02T17:57:00Z'
 labels:
   - foundation
 milestone: m-0
