@@ -4,11 +4,12 @@ title: Manage milestones and releases from the CLI
 status: To Do
 assignee: []
 created_date: '2026-10-31T22:25:00Z'
-updated_date: '2026-11-01T20:32:00Z'
+updated_date: '2026-11-02T18:08:00Z'
 labels: []
 milestone: m-2
 dependencies:
   - TASK-7
+  - TASK-22
 references:
   - docs/requirements/business/REQ-03.md
   - docs/requirements/business/REQ-03.001.md

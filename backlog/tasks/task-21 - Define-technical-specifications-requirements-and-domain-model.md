@@ -4,14 +4,18 @@ title: Define technical specifications requirements and domain model
 status: To Do
 assignee: []
 created_date: '2026-10-31T22:34:00Z'
+updated_date: '2026-11-02T18:11:00Z'
 labels: []
-dependencies: []
+milestone: m-4
+dependencies:
+  - TASK-1
 references:
   - README.md
   - docs/requirements/business/REQ-02.001.md
   - docs/requirements/business/REQ-05.md
   - docs/business-rules/BR-001-papyrus-command-behavior.md
-ordinal: 21000
+priority: high
+ordinal: 16500
 ---
 
 ## Description

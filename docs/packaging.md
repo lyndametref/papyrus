@@ -106,9 +106,19 @@ Build-time/proc-macro dependencies are excluded by NFR-06.002 scope.
 | is_terminal_polyfill | 1.70.2 | MIT OR Apache-2.0 | Compatible |
 | strsim | 0.11.1 | MIT | Compatible |
 | utf8parse | 0.2.2 | Apache-2.0 OR MIT | Compatible |
+| serde | 1.0.229 | MIT OR Apache-2.0 | Compatible |
+| serde_core | 1.0.229 | MIT OR Apache-2.0 | Compatible |
+| serde_json | 1.0.154 | MIT OR Apache-2.0 | Compatible |
+| yaml_serde | 0.10.7 | MIT OR Apache-2.0 | Compatible |
+| libyaml-rs | 0.3.0 | MIT | Compatible |
+| indexmap | 2.14.2 | Apache-2.0 OR MIT | Compatible |
+| itoa | 1.0.18 | MIT OR Apache-2.0 | Compatible |
+| memchr | 2.8.3 | Unlicense OR MIT | Compatible |
+| ryu | 1.0.23 | Apache-2.0 OR BSL-1.0 | Compatible |
+| zmij | 1.0.23 | MIT | Compatible |
 
-All runtime dependencies are permissively licensed (MIT / Apache-2.0) and permit
-linking in a GPL-3.0-or-later application. No incompatible runtime dependency
+All runtime dependencies are permissively licensed (MIT / Apache-2.0 / Unlicense / BSL-1.0)
+and permit linking in a GPL-3.0-or-later application. No incompatible runtime dependency
 remains.
 
 Build-time/proc-macro dependencies (excluded from audit scope): clap_derive,
