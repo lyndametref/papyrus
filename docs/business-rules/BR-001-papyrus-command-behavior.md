@@ -104,7 +104,7 @@ Milestones
 
 Releases
 
-        active -> archived
+        active -> released
 
         Releases group milestones.
 

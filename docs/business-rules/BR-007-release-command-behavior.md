@@ -10,7 +10,7 @@ Based on REQ-03.002 — Manage Releases, this rule exists because the documented
 
 ## Applicability
 
-Applies to all invocations of `papyrus release` and the project data they manage. The excerpt below reproduces relevant manpage behavior verbatim; heading identifies README section and exact source line range.
+Applies to all invocations of `papyrus release` and the project data they manage. The excerpts below reproduce relevant manpage behavior verbatim; each heading identifies the README section and exact source line range. No `archive`, `restore`, or `delete` subcommand is documented for `papyrus release`; its lifecycle is `active -> released`.
 
 ### papyrus(1): release — `README.md` lines 279–305
 
@@ -41,4 +41,14 @@ release
 
           -d, --description <text>
           Update the description.
+```
+
+### papyrus(1): STATUSES → Releases — `README.md` lines 737–741
+
+```text
+Releases
+
+        active -> released
+
+        Releases group milestones.
 ```

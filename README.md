@@ -736,7 +736,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
 <b style="color: light-dark(#0969da, #58a6ff);">Releases</b>
 
-        <b>active</b> -&gt; <b>archived</b>
+        <b>active</b> -&gt; <b>released</b>
 
         Releases group milestones.
 
