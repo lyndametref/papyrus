@@ -221,6 +221,32 @@ pub fn create(
     let group_id = sanitize_text(group_raw)?;
 
     if !is_group_id(&group_id, &entry.prefix) {
+        let other_kind = match kind {
+            Kind::Req => Kind::Nfr,
+            Kind::Nfr => Kind::Req,
+        };
+        let mismatch = type_entry(&cfg, other_kind.key())
+            .ok()
+            .filter(|other_entry| is_group_id(&group_id, &other_entry.prefix))
+            .map(|_| {
+                let other_active = active_dir(ctx, &cfg, other_kind.key()).ok();
+                let other_deprecated = deprecated_dir(ctx, &cfg, other_kind.key()).ok();
+                other_active
+                    .as_ref()
+                    .map(|d| d.join(format!("{}.md", group_id)).exists())
+                    .unwrap_or(false)
+                    || other_deprecated
+                        .as_ref()
+                        .map(|d| d.join(format!("{}.md", group_id)).exists())
+                        .unwrap_or(false)
+            })
+            .unwrap_or(false);
+        if mismatch {
+            return Err(AppError::Validation(format!(
+                "group type mismatch: {}",
+                group_id
+            )));
+        }
         return Err(AppError::NotFound(format!("group not found: {}", group_id)));
     }
 

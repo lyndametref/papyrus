@@ -418,3 +418,41 @@ fn sanitization_story_desc_group_id() {
     }
     let _ = fs::remove_dir_all(&d);
 }
+
+#[test]
+fn req_type_mismatch_exits_four() {
+    let d = tmpdir("reqtm");
+    init(&d);
+    let p = d.to_str().unwrap();
+    let out = bin()
+        .args(["--dir", p, "nfreq", "create-group", "--title", "NG"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "NFR-001");
+    let out = bin()
+        .args(["--dir", p, "req", "create", "R", "--group", "NFR-001"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(4));
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn nfreq_type_mismatch_exits_four() {
+    let d = tmpdir("nfreqtm");
+    init(&d);
+    let p = d.to_str().unwrap();
+    let out = bin()
+        .args(["--dir", p, "req", "create-group", "--title", "G"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "REQ-001");
+    let out = bin()
+        .args(["--dir", p, "nfreq", "create", "NR", "--group", "REQ-001"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(4));
+    let _ = fs::remove_dir_all(&d);
+}
