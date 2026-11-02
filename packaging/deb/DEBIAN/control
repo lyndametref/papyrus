@@ -1,0 +1,13 @@
+Package: papyrus
+Version: 0.1.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: Papyrus Maintainers <maintainers@papyrus.example>
+Depends: libc6 (>= 2.34)
+Homepage: https://github.com/papyrus/papyrus
+Description: Project-level backlog and documentation manager
+ Papyrus is a command-line tool for managing a project's backlog and
+ long-term documentation from a single interface. It combines task,
+ milestone, release, and decision tracking with requirements, glossary,
+ UI and technical specifications, audit records, and business rules.

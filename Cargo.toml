@@ -1,0 +1,17 @@
+[package]
+name = "papyrus"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99.1"
+license = "GPL-3.0-or-later"
+description = "Project-level backlog and documentation manager."
+authors = ["Papyrus Maintainers"]
+homepage = "https://github.com/papyrus/papyrus"
+readme = "README.md"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+
+[profile.release]
+lto = true
+strip = true
