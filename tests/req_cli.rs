@@ -281,3 +281,140 @@ fn boundary_config_escape_exits_one() {
     assert_eq!(out.status.code(), Some(1));
     let _ = fs::remove_dir_all(&root);
 }
+
+#[test]
+fn req_symlink_escape_exits_one() {
+    let root = tmpdir("symlinkreq");
+    let proj = root.join("proj");
+    let outside = root.join("outside");
+    fs::create_dir_all(&proj).unwrap();
+    fs::create_dir_all(&outside).unwrap();
+    init(&proj);
+    let p = proj.to_str().unwrap();
+    let _ = bin()
+        .args(["--dir", p, "req", "create-group", "--title", "G"])
+        .output()
+        .unwrap();
+    let _ = bin()
+        .args(["--dir", p, "req", "create", "R", "--group", "REQ-001"])
+        .output()
+        .unwrap();
+    let target = proj.join("docs/requirements/business/REQ-001.001.md");
+    let outside_file = outside.join("evil.md");
+    fs::write(&outside_file, "secret").unwrap();
+    let _ = fs::remove_file(&target);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        let _ = symlink(&outside_file, &target);
+    }
+    // view should reject
+    let out = bin()
+        .args(["--dir", p, "req", "view", "REQ-001.001"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    // deprecate should reject
+    let out = bin()
+        .args(["--dir", p, "req", "deprecate", "REQ-001.001"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn req_editor_body_round_trip() {
+    let d = tmpdir("editor");
+    init(&d);
+    let p = d.to_str().unwrap();
+    let _ = bin()
+        .args(["--dir", p, "req", "create-group", "--title", "G"])
+        .output()
+        .unwrap();
+    let _ = bin()
+        .args(["--dir", p, "req", "create", "R", "--group", "REQ-001"])
+        .output()
+        .unwrap();
+    let script = d.join("editor.sh");
+    fs::write(
+        &script,
+        "#!/bin/sh\nprintf '\\n## Notes\\nhello from editor\\n' >> \"$1\"\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&script).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&script, perms).unwrap();
+    }
+    let out = bin()
+        .env("EDITOR", script.to_str().unwrap())
+        .args(["--dir", p, "req", "edit", "REQ-001.001", "--editor"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let out = bin()
+        .args(["--dir", p, "req", "view", "REQ-001.001"])
+        .output()
+        .unwrap();
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(s.contains("hello from editor"));
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn sanitization_story_desc_group_id() {
+    let d = tmpdir("san2");
+    init(&d);
+    let p = d.to_str().unwrap();
+    let _ = bin()
+        .args(["--dir", p, "req", "create-group", "--title", "G"])
+        .output()
+        .unwrap();
+    for bad in ["a/b", "x\\y", "   ", "a\nb"] {
+        let out = bin()
+            .args([
+                "--dir",
+                p,
+                "req",
+                "create-group",
+                "--title",
+                "G2",
+                "--story",
+                bad,
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(4), "story bad={}", bad);
+    }
+    for bad in ["a/b", "x\\y", "   ", "a\nb"] {
+        let out = bin()
+            .args([
+                "--dir",
+                p,
+                "req",
+                "create-group",
+                "--title",
+                "G3",
+                "-d",
+                bad,
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(4), "desc bad={}", bad);
+    }
+    for bad in ["a/b", "x\\y", "   ", "a\nb"] {
+        let out = bin()
+            .args(["--dir", p, "req", "create", "R", "--group", bad])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(4), "group bad={}", bad);
+    }
+    let _ = fs::remove_dir_all(&d);
+}

@@ -4,7 +4,7 @@ use crate::context::Context;
 use crate::error::AppError;
 use crate::sanitize;
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Kind {
@@ -64,42 +64,13 @@ pub fn type_entry(cfg: &Config, key: &str) -> Result<crate::config::DocTypeEntry
     Ok(entry.clone())
 }
 
-fn lexical_within(project_dir: &Path, target: &Path) -> bool {
-    let mut norm = PathBuf::new();
-    for comp in target.components() {
-        match comp {
-            Component::ParentDir => return false,
-            Component::CurDir => {}
-            _ => norm.push(comp.as_os_str()),
-        }
-    }
-    norm.starts_with(project_dir)
-}
-
 pub fn active_dir(ctx: &Context, cfg: &Config, key: &str) -> Result<PathBuf, AppError> {
     let entry = type_entry(cfg, key)?;
     let raw = ctx
         .project_dir
         .join(&cfg.doc_directory)
         .join(&entry.directory);
-    if !lexical_within(&ctx.project_dir, &raw) {
-        return Err(AppError::Runtime(format!(
-            "path resolves outside project directory: {}",
-            raw.display()
-        )));
-    }
-    let canon_project =
-        fs::canonicalize(&ctx.project_dir).map_err(|e| AppError::Runtime(e.to_string()))?;
-    if raw.exists() {
-        let c = fs::canonicalize(&raw).map_err(|e| AppError::Runtime(e.to_string()))?;
-        if !c.starts_with(&canon_project) {
-            return Err(AppError::Runtime(format!(
-                "path resolves outside project directory: {}",
-                raw.display()
-            )));
-        }
-    }
-    Ok(raw)
+    Context::ensure_within(&ctx.project_dir, &raw)
 }
 
 pub fn deprecated_dir(ctx: &Context, cfg: &Config, key: &str) -> Result<PathBuf, AppError> {
@@ -203,13 +174,8 @@ pub fn create_group(
     let content = render_group(kind, &id, &title, story.as_deref(), desc.as_deref());
 
     let file_path = active.join(format!("{}.md", id));
-    if !lexical_within(&ctx.project_dir, &file_path) {
-        return Err(AppError::Runtime(format!(
-            "path resolves outside project directory: {}",
-            file_path.display()
-        )));
-    }
-    fs::write(&file_path, content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
+    fs::write(&safe_path, content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
     Ok(id)
 }
 
@@ -265,9 +231,11 @@ pub fn create(
 
     let group_active_path = active.join(format!("{}.md", group_id));
     let group_deprecated_path = deprecated.join(format!("{}.md", group_id));
-    let group_deprecated = if group_active_path.exists() {
+    let group_active_safe = Context::ensure_within(&ctx.project_dir, &group_active_path)?;
+    let group_deprecated_safe = Context::ensure_within(&ctx.project_dir, &group_deprecated_path)?;
+    let group_deprecated = if group_active_safe.exists() {
         false
-    } else if group_deprecated_path.exists() {
+    } else if group_deprecated_safe.exists() {
         true
     } else {
         return Err(AppError::NotFound(format!("group not found: {}", group_id)));
@@ -280,7 +248,7 @@ pub fn create(
     }
 
     let group_content =
-        fs::read_to_string(&group_active_path).map_err(|e| AppError::Runtime(e.to_string()))?;
+        fs::read_to_string(&group_active_safe).map_err(|e| AppError::Runtime(e.to_string()))?;
     let group_parsed = parse_document(&group_content);
     let group_title = group_parsed.title.clone();
     if group_title.is_empty() {
@@ -310,13 +278,8 @@ pub fn create(
     );
 
     let file_path = active.join(format!("{}.md", req_id));
-    if !lexical_within(&ctx.project_dir, &file_path) {
-        return Err(AppError::Runtime(format!(
-            "path resolves outside project directory: {}",
-            file_path.display()
-        )));
-    }
-    fs::write(&file_path, content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let safe_file = Context::ensure_within(&ctx.project_dir, &file_path)?;
+    fs::write(&safe_file, content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
     Ok(req_id)
 }
 
@@ -337,7 +300,8 @@ pub fn list(ctx: &Context, kind: Kind) -> Result<crate::CommandOutput, AppError>
                 Some(s) => s.to_string(),
                 None => continue,
             };
-            let content = fs::read_to_string(&path).unwrap_or_default();
+            let safe = Context::ensure_within(&ctx.project_dir, &path)?;
+            let content = fs::read_to_string(&safe).unwrap_or_default();
             let (_, title) = parse_heading(&content);
             let title = if title.is_empty() { id.clone() } else { title };
             items.push((id, title));
@@ -444,20 +408,16 @@ pub fn view(ctx: &Context, kind: Kind, id_raw: &str) -> Result<crate::CommandOut
     let active_path = active.join(format!("{}.md", id));
     let deprecated_path = deprecated.join(format!("{}.md", id));
 
-    let path = if active_path.exists() {
-        active_path
-    } else if deprecated_path.exists() {
-        deprecated_path
+    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
+    let deprecated_safe = Context::ensure_within(&ctx.project_dir, &deprecated_path)?;
+
+    let path = if active_safe.exists() {
+        active_safe
+    } else if deprecated_safe.exists() {
+        deprecated_safe
     } else {
         return Err(AppError::NotFound(format!("not found: {}", id)));
     };
-
-    if !lexical_within(&ctx.project_dir, &path) {
-        return Err(AppError::Runtime(format!(
-            "path resolves outside project directory: {}",
-            path.display()
-        )));
-    }
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
 
@@ -487,20 +447,16 @@ pub fn edit(
     let active_path = active.join(format!("{}.md", id));
     let deprecated_path = deprecated.join(format!("{}.md", id));
 
-    let path = if active_path.exists() {
-        active_path
-    } else if deprecated_path.exists() {
-        deprecated_path
+    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
+    let deprecated_safe = Context::ensure_within(&ctx.project_dir, &deprecated_path)?;
+
+    let path = if active_safe.exists() {
+        active_safe
+    } else if deprecated_safe.exists() {
+        deprecated_safe
     } else {
         return Err(AppError::NotFound(format!("not found: {}", id)));
     };
-
-    if !lexical_within(&ctx.project_dir, &path) {
-        return Err(AppError::Runtime(format!(
-            "path resolves outside project directory: {}",
-            path.display()
-        )));
-    }
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let mut parsed = parse_document(&content);
@@ -537,7 +493,8 @@ pub fn edit(
         )
     };
 
-    fs::write(&path, new_content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
+    fs::write(&safe_write, new_content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     if editor {
         let editor_cmd = cfg.effective_editor();
@@ -549,7 +506,7 @@ pub fn edit(
             }
             let status = std::process::Command::new(prog)
                 .args(parts)
-                .arg(&path)
+                .arg(&safe_write)
                 .status()
                 .map_err(|e| AppError::Runtime(e.to_string()))?;
             if !status.success() {
@@ -586,23 +543,17 @@ pub fn deprecate(
     let active_path = active.join(format!("{}.md", id));
     let deprecated_path = deprecated.join(format!("{}.md", id));
 
-    if deprecated_path.exists() && !active_path.exists() {
+    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
+    let deprecated_safe = Context::ensure_within(&ctx.project_dir, &deprecated_path)?;
+
+    if deprecated_safe.exists() && !active_safe.exists() {
         return Err(AppError::Validation(format!("already deprecated: {}", id)));
     }
-    if !active_path.exists() {
+    if !active_safe.exists() {
         return Err(AppError::NotFound(format!("not found: {}", id)));
     }
 
-    if !lexical_within(&ctx.project_dir, &active_path)
-        || !lexical_within(&ctx.project_dir, &deprecated_path)
-    {
-        return Err(AppError::Runtime(format!(
-            "path resolves outside project directory: {}",
-            id
-        )));
-    }
-
-    fs::rename(&active_path, &deprecated_path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    fs::rename(&active_safe, &deprecated_safe).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))
@@ -626,23 +577,17 @@ pub fn restore(ctx: &Context, kind: Kind, id_raw: &str) -> Result<crate::Command
     let active_path = active.join(format!("{}.md", id));
     let deprecated_path = deprecated.join(format!("{}.md", id));
 
-    if active_path.exists() && !deprecated_path.exists() {
+    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
+    let deprecated_safe = Context::ensure_within(&ctx.project_dir, &deprecated_path)?;
+
+    if active_safe.exists() && !deprecated_safe.exists() {
         return Err(AppError::Validation(format!("not deprecated: {}", id)));
     }
-    if !deprecated_path.exists() {
+    if !deprecated_safe.exists() {
         return Err(AppError::NotFound(format!("not found: {}", id)));
     }
 
-    if !lexical_within(&ctx.project_dir, &active_path)
-        || !lexical_within(&ctx.project_dir, &deprecated_path)
-    {
-        return Err(AppError::Runtime(format!(
-            "path resolves outside project directory: {}",
-            id
-        )));
-    }
-
-    fs::rename(&deprecated_path, &active_path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    fs::rename(&deprecated_safe, &active_safe).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))
