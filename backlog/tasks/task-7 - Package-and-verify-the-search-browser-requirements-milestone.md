@@ -1,11 +1,11 @@
 ---
 id: TASK-7
 title: Package and verify the search/browser requirements milestone
-status: Refined
+status: Done
 assignee:
   - '@orchestrator'
 created_date: '2026-10-31T22:25:00Z'
-updated_date: '2026-11-03T21:00:00Z'
+updated_date: '2026-11-03T21:04:00Z'
 labels:
   - packaging
   - verification
@@ -75,34 +75,34 @@ Specification: docs/specifications/search-browser-milestone-packaging-and-verifi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-03.002 - and the installed binary provides both search over requirement content and the local browser over requirement content; Debian Trixie and any other release are not claimed or verified.
-- [ ] #2 cargo build --release succeeds with the pinned Rust 1.99.1 toolchain and target/release/papyrus --help lists both search and browser (guards against packaging a stale binary).
-- [ ] #3 cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass with Rust 1.99.1, and the test counts are recorded.
-- [ ] #4 scripts/build-deb.sh (unchanged) produces papyrus_<version>_amd64.deb with Version equal to the Cargo package version and Architecture: amd64.
-- [ ] #5 dpkg-deb metadata reports Package: papyrus, Architecture: amd64, Version equal to Cargo.toml, Depends: libc6 (>= 2.34), and a copyright file declaring GPL-3.0-or-later.
-- [ ] #6 The package contains only /usr/bin/papyrus (0755) and /usr/share/doc/papyrus/copyright, with no asset, template, or configuration files, and the installed binary serves /assets/app.css and /assets/app.js from assets compiled into the binary (no runtime asset file dependency).
-- [ ] #7 In an isolated Debian Forky environment (fakeroot dpkg --instdir/--admindir under ./.tmp, or a Forky container/chroot/VM), dpkg -i succeeds, /usr/bin/papyrus exists as root:root 0755, papyrus resolves on PATH, and the host package database and filesystem are unchanged.
-- [ ] #8 In the same isolated environment, dpkg -r (or dpkg --purge) papyrus removes the binary and papyrus no longer resolves on PATH.
-- [ ] #9 The installed binary smoke test passes: papyrus --help exits 0 and lists search and browser, and papyrus --version exits 0 printing papyrus <version> matching the package version.
-- [ ] #10 The installed binary initializes a project and exercises req and nfreq create-group, create, list, view, edit, deprecate, and restore with expected exit codes and persisted files, preserving IDs across deprecate/restore.
-- [ ] #11 Installed-binary search smoke tests pass: a quoted phrase matches contiguously, --type doc restricts to requirement records, --limit caps results, --json returns the {id,type,title,path} array (and [] when empty), and a deprecated record is hidden until restored.
-- [ ] #12 Installed-binary browser smoke tests pass with --no-open on a free port: the startup line is printed, both requirement categories render one at a time with the selected sidebar entry marked aria-current, a record view renders, an edit round-trip returns 303 and persists through both the UI and the CLI, the JSON API responds, both embedded assets are served, 320 px markup hooks are present, and no served page, stylesheet, or script references an external origin.
-- [ ] #13 Offline operation is verified with no internet access (isolated network namespace, or the documented fallback evidence): search and the browser view/edit checks pass using only loopback and locally served assets.
-- [ ] #14 Browser configuration keys work in the installed binary: config list/get/set/unset expose browser_host, browser_port, and browser_open, a configured port is used when --port is absent, --port overrides it, defaults are restored on unset, and invalid values exit 4 without changing the file.
-- [ ] #15 A milestone-level integration test in tests/search_browser_smoke.rs exercises search and browser together end-to-end against the built binary, passes under cargo test, and does not duplicate the contract coverage in tests/browser_cli.rs.
-- [ ] #16 docs/packaging.md states Debian Forky only (amd64), explicitly disclaims Trixie and other releases, and records the isolated install/uninstall procedure, the extended smoke-test checklist, and observed results with environment and date including timezone.
-- [ ] #17 Verification evidence (environment, date/timezone, package file and size, quality-gate results with test counts, smoke-test outcomes, deviations) is recorded in the TASK-7 ticket notes.
+- [x] #1 The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-03.002 - and the installed binary provides both search over requirement content and the local browser over requirement content; Debian Trixie and any other release are not claimed or verified.
+- [x] #2 cargo build --release succeeds with the pinned Rust 1.99.1 toolchain and target/release/papyrus --help lists both search and browser (guards against packaging a stale binary).
+- [x] #3 cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass with Rust 1.99.1, and the test counts are recorded.
+- [x] #4 scripts/build-deb.sh (unchanged) produces papyrus_<version>_amd64.deb with Version equal to the Cargo package version and Architecture: amd64.
+- [x] #5 dpkg-deb metadata reports Package: papyrus, Architecture: amd64, Version equal to Cargo.toml, Depends: libc6 (>= 2.34), and a copyright file declaring GPL-3.0-or-later.
+- [x] #6 The package contains only /usr/bin/papyrus (0755) and /usr/share/doc/papyrus/copyright, with no asset, template, or configuration files, and the installed binary serves /assets/app.css and /assets/app.js from assets compiled into the binary (no runtime asset file dependency).
+- [x] #7 In an isolated Debian Forky environment (fakeroot dpkg --instdir/--admindir under ./.tmp, or a Forky container/chroot/VM), dpkg -i succeeds, /usr/bin/papyrus exists as root:root 0755, papyrus resolves on PATH, and the host package database and filesystem are unchanged.
+- [x] #8 In the same isolated environment, dpkg -r (or dpkg --purge) papyrus removes the binary and papyrus no longer resolves on PATH.
+- [x] #9 The installed binary smoke test passes: papyrus --help exits 0 and lists search and browser, and papyrus --version exits 0 printing papyrus <version> matching the package version.
+- [x] #10 The installed binary initializes a project and exercises req and nfreq create-group, create, list, view, edit, deprecate, and restore with expected exit codes and persisted files, preserving IDs across deprecate/restore.
+- [x] #11 Installed-binary search smoke tests pass: a quoted phrase matches contiguously, --type doc restricts to requirement records, --limit caps results, --json returns the {id,type,title,path} array (and [] when empty), and a deprecated record is hidden until restored.
+- [x] #12 Installed-binary browser smoke tests pass with --no-open on a free port: the startup line is printed, both requirement categories render one at a time with the selected sidebar entry marked aria-current, a record view renders, an edit round-trip returns 303 and persists through both the UI and the CLI, the JSON API responds, both embedded assets are served, 320 px markup hooks are present, and no served page, stylesheet, or script references an external origin.
+- [x] #13 Offline operation is verified with no internet access (isolated network namespace, or the documented fallback evidence): search and the browser view/edit checks pass using only loopback and locally served assets.
+- [x] #14 Browser configuration keys work in the installed binary: config list/get/set/unset expose browser_host, browser_port, and browser_open, a configured port is used when --port is absent, --port overrides it, defaults are restored on unset, and invalid values exit 4 without changing the file.
+- [x] #15 A milestone-level integration test in tests/search_browser_smoke.rs exercises search and browser together end-to-end against the built binary, passes under cargo test, and does not duplicate the contract coverage in tests/browser_cli.rs.
+- [x] #16 docs/packaging.md states Debian Forky only (amd64), explicitly disclaims Trixie and other releases, and records the isolated install/uninstall procedure, the extended smoke-test checklist, and observed results with environment and date including timezone.
+- [x] #17 Verification evidence (environment, date/timezone, package file and size, quality-gate results with test counts, smoke-test outcomes, deviations) is recorded in the TASK-7 ticket notes.
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 All acceptance criteria are verified and recorded in the ticket notes and docs/packaging.md.
-- [ ] #2 cargo build --release, cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass with Rust 1.99.1.
-- [ ] #3 The .deb metadata and contents match the specification, and the package installs and uninstalls cleanly in an isolated Debian Forky environment with the host untouched.
-- [ ] #4 The installed-binary smoke checklist passes: baseline CLI, init, req/nfreq lifecycle, search, browser (categories, view, edit round-trip, API, assets, 320 px markup, no external references), offline operation, config keys, and embedded-asset independence.
-- [ ] #5 The new tests/search_browser_smoke.rs passes and the full existing test suite remains green.
-- [ ] #6 docs/packaging.md is updated with the Forky-only claim, procedures, checklist, observed results (date with timezone), and any recorded limitation.
-- [ ] #7 No requirements, business rules, ADRs, packaging scripts, or UI were changed; any product bug fix is recorded separately in the notes.
+- [x] #1 All acceptance criteria are verified and recorded in the ticket notes and docs/packaging.md.
+- [x] #2 cargo build --release, cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass with Rust 1.99.1.
+- [x] #3 The .deb metadata and contents match the specification, and the package installs and uninstalls cleanly in an isolated Debian Forky environment with the host untouched.
+- [x] #4 The installed-binary smoke checklist passes: baseline CLI, init, req/nfreq lifecycle, search, browser (categories, view, edit round-trip, API, assets, 320 px markup, no external references), offline operation, config keys, and embedded-asset independence.
+- [x] #5 The new tests/search_browser_smoke.rs passes and the full existing test suite remains green.
+- [x] #6 docs/packaging.md is updated with the Forky-only claim, procedures, checklist, observed results (date with timezone), and any recorded limitation.
+- [x] #7 No requirements, business rules, ADRs, packaging scripts, or UI were changed; any product bug fix is recorded separately in the notes.
 <!-- DOD:END -->
 
 ## Implementation Plan
