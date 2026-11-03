@@ -149,8 +149,11 @@ All pages share one shell:
 
 - Summary box at the top of the form: `role="alert"`, heading "There is a problem", one link per error, and the sentence "Nothing was saved. Your typed values are kept below."
 - Field errors sit directly below the field, prefixed with "!" so the cue is not colour alone, and are referenced by `aria-describedby`; the field carries `aria-invalid="true"` and a thicker border.
-- Title error text: "Title is required. Enter a title of 1 to 200 characters."
-- `## ` line error text: "Description cannot contain a line starting with `## `. Remove that line or change it."
+- Title error texts, one per cause: "Title is required." (empty title), "Title must be at most 200 characters." (over the limit), "Title cannot contain control characters."
+- `## ` line error texts, one per field: "Description contains a line starting with `## `." and "User story contains a line starting with `## `."
+- Multi-line length and control-character error texts name the field: "Description must be at most 20000 characters.", "User story must be at most 20000 characters.", "Description cannot contain control characters.", "User story cannot contain control characters."
+- Each summary entry links to its field and reuses that field's message text verbatim.
+- The approved `edit-errors` view of MOCK-0001 draws an earlier, longer wording of the title and `## ` field messages; the shipped text is the list above and MOCK-0001 is left unchanged.
 - Recovery keeps every typed value; resubmitting is the only action needed.
 
 ### 7.4 Conflict presentation
