@@ -190,7 +190,7 @@ The two 404 variants share the layout. The message may be identical so a depreca
 - The document-type sidebar collapses to a single accessible toggle button (labelled "Document types", `aria-expanded` reflecting state, `aria-controls` pointing at the type list). When expanded the type choices stack vertically; when collapsed they are hidden. Type selection still works without JavaScript via the links.
 - Group rows stack: the group link (ID + title, wrapping), the member count on its own line, then the member links.
 - Long titles and long unbreakable words wrap inside the row; there is no horizontal scrolling of text.
-- Edit form fields are full width; Save and Cancel stack and each spans the column.
+- Edit form fields are full width; the action row stacks, only the Save button spans the column (full-width, centred label), and Cancel stays an inline link below it — it does not become a full-width button.
 - At 200% zoom the same rules apply.
 
 ### 9.2 Annotations (`responsive-list-320`, `responsive-edit-320`)
