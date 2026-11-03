@@ -517,10 +517,7 @@ pub fn validate_multiline(label: &str, raw: &str) -> Result<Option<String>, Stri
         return Err(format!("{} cannot contain control characters.", label));
     }
     if value.lines().any(|line| line.starts_with("## ")) {
-        return Err(format!(
-            "{} cannot contain a line starting with ## . Remove that line or change it.",
-            label
-        ));
+        return Err(format!("{} contains a line starting with ## .", label));
     }
     Ok(Some(value.to_string()))
 }

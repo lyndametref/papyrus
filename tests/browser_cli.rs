@@ -1012,8 +1012,7 @@ fn t15_validation_returns_422_without_writing() {
         assert_eq!(fs::read(&path).unwrap(), before);
     }
 
-    let description_message =
-        "Description cannot contain a line starting with ## . Remove that line or change it.";
+    let description_message = "Description contains a line starting with ## .";
     let body = form_body(&[
         ("version", &version),
         ("title", "Valid"),
@@ -1029,8 +1028,7 @@ fn t15_validation_returns_422_without_writing() {
     assert!(html.contains("Line\n## Not allowed\nMore"));
     assert_eq!(fs::read(&path).unwrap(), before);
 
-    let story_message =
-        "User story cannot contain a line starting with ## . Remove that line or change it.";
+    let story_message = "User story contains a line starting with ## .";
     let body = form_body(&[
         ("version", &version),
         ("title", "Valid"),
