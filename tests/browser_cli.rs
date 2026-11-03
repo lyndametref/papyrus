@@ -840,6 +840,40 @@ fn t12_record_views() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+// T-12 / AC #9 (group members are listed in ascending ID order)
+#[test]
+fn group_members_are_ordered_by_id() {
+    let dir = fixture("member-order");
+    // Write members out of order so the test proves the index sorts them.
+    for (id, title) in [
+        ("REQ-001.003", "Third member"),
+        ("REQ-001.002", "Second member"),
+    ] {
+        fs::write(
+            record_path(&dir, "req", id),
+            format!(
+                "# {} {}\n\n## Group\nREQ-001 Payments Group\n\n## Description\nBody\n",
+                id, title
+            ),
+        )
+        .unwrap();
+    }
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let group = get(&server, "/doc/REQ-001").text();
+    let first = group.find("REQ-001.001").unwrap();
+    let second = group.find("REQ-001.002").unwrap();
+    let third = group.find("REQ-001.003").unwrap();
+    assert!(
+        first < second && second < third,
+        "member order: {} {} {}",
+        first,
+        second,
+        third
+    );
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 // T-13
 #[test]
 fn t13_edit_round_trip() {
@@ -1066,6 +1100,26 @@ fn t15_validation_returns_422_without_writing() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+// AC #15 / T-15 (encoded NUL in a form value is a field validation error)
+#[test]
+fn form_encoded_nul_returns_422() {
+    let dir = fixture("form-nul");
+    let path = record_path(&dir, "req", "REQ-001.001");
+    let before = fs::read(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/REQ-001.001/edit").text());
+    let body = format!("version={}&title=bad%00title", urlencode(&version));
+    let response = post_form(&server, "/doc/REQ-001.001", &body);
+    assert_eq!(response.status, 422);
+    let html = response.text();
+    assert!(html.contains("Title cannot contain control characters."));
+    assert_eq!(fs::read(&path).unwrap(), before);
+    // Path decoding stays strict: an encoded NUL in the path is 400.
+    assert_eq!(get(&server, "/doc/%00").status, 400);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 // T-16
 #[test]
 fn t16_immutable_fields_are_ignored() {
@@ -1113,6 +1167,12 @@ fn t17_stale_version_is_conflict() {
     assert!(html.contains("Reload the form"));
     assert!(html.contains("View current record"));
     assert!(html.contains("Back to requirements"));
+    // AC #19 / MOCK-0001 `edit-conflict`: breadcrumb and bordered notice,
+    // not the generic error page with a large status-code block.
+    assert!(html.contains("class=\"breadcrumb\""));
+    assert!(html.contains("class=\"conflict-box\""));
+    assert!(!html.contains("class=\"status-code\""));
+    assert_eq!(html.matches("<h1").count(), 1);
     // The attempted values are shown read-only on the conflict page.
     assert!(html.contains("Should not save"));
     let saved = fs::read_to_string(&path).unwrap();
@@ -1149,6 +1209,29 @@ fn t18_writes_are_atomic_and_leave_no_temporary_file() {
         .map(|entry| entry.unwrap().file_name().to_string_lossy().to_string())
         .collect();
     assert_eq!(before, after);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-18 / AC #12 (atomic write preserves the original file permissions)
+#[cfg(unix)]
+#[test]
+fn atomic_write_preserves_permissions() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = fixture("permissions");
+    let path = record_path(&dir, "req", "REQ-001.001");
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/REQ-001.001/edit").text());
+    let body = form_body(&[("version", &version), ("title", "Permissions kept")]);
+    assert_eq!(post_form(&server, "/doc/REQ-001.001", &body).status, 303);
+    let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o640, "mode changed to {:o}", mode);
+    assert!(
+        fs::read_to_string(&path)
+            .unwrap()
+            .starts_with("# REQ-001.001 Permissions kept")
+    );
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -1441,6 +1524,31 @@ fn t22_request_limits_and_status_codes() {
     stream.read_to_end(&mut bytes).unwrap();
     assert_eq!(parse_response(&bytes).status, 408);
 
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// AC #14 (unknown path is 404 for every method; known path wrong method is 405)
+#[test]
+fn unknown_path_is_404_for_every_method() {
+    let dir = fixture("route-method");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    for method in ["DELETE", "PUT", "OPTIONS"] {
+        let response = request(server.port, method, "/nope", &[], None);
+        assert_eq!(response.status, 404, "{} /nope", method);
+    }
+    let known = request(server.port, "DELETE", "/doc/REQ-001.001", &[], None);
+    assert_eq!(known.status, 405);
+    assert_eq!(known.header("Allow"), Some("GET, HEAD, POST"));
+    let edit = request(server.port, "PUT", "/doc/REQ-001.001/edit", &[], None);
+    assert_eq!(edit.status, 405);
+    assert_eq!(edit.header("Allow"), Some("GET, HEAD, POST"));
+    let asset = request(server.port, "OPTIONS", "/assets/app.css", &[], None);
+    assert_eq!(asset.status, 405);
+    assert_eq!(asset.header("Allow"), Some("GET, HEAD, POST"));
+    // The request log prints the method token exactly as sent.
+    server.wait_for_stderr("DELETE /nope 404");
+    assert!(!server.stderr_text().contains("OTHER "));
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -1818,6 +1926,50 @@ fn config_file_browser_errors_name_the_key() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+// AC #16 (config get/set/unset validate the merged browser configuration)
+#[test]
+fn config_get_set_unset_validate_merged_browser_config() {
+    let dir = test_root("config-merged");
+    init_project(&dir);
+    set_config_value(&dir, "browser_port", "70000");
+    let config_path = dir.join("papyrus.config.yml");
+    let before = fs::read_to_string(&config_path).unwrap();
+
+    let out = bin()
+        .arg("--dir")
+        .arg(&dir)
+        .args(["config", "get", "browser_port"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(4), "config get");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("browser_port:"), "{}", stderr);
+
+    let out = bin()
+        .arg("--dir")
+        .arg(&dir)
+        .args(["config", "set", "browser_open", "false"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(4), "config set");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("browser_port:"), "{}", stderr);
+    assert_eq!(fs::read_to_string(&config_path).unwrap(), before);
+
+    let out = bin()
+        .arg("--dir")
+        .arg(&dir)
+        .args(["config", "unset", "browser_host"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(4), "config unset");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("browser_port:"), "{}", stderr);
+    assert_eq!(fs::read_to_string(&config_path).unwrap(), before);
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
 // AC #19 / T-28 (approved MOCK-0001 shell, 320 px states)
 #[test]
 fn ui_matches_approved_mock_0001_layout() {
@@ -1848,6 +2000,9 @@ fn ui_matches_approved_mock_0001_layout() {
     assert!(narrow.contains(".footer-long { display: none; }"));
     assert!(narrow.contains(".footer-short { display: inline; }"));
     assert!(css.contains(".footer-short { display: none; }"));
+    // At 320 px the edit form draws only the hidden version input; the
+    // visible annotation is omitted (UI description section 9.2).
+    assert!(narrow.contains(".hidden-field { display: none; }"));
 
     let dir = fixture("mock-layout");
     let server = Server::start(&dir, &["--no-open"], &[]);
@@ -1855,6 +2010,11 @@ fn ui_matches_approved_mock_0001_layout() {
     assert!(html.contains("footer-long"));
     assert!(html.contains("footer-short"));
     assert!(html.contains("Papyrus local browser &mdash; served from this project only."));
+    let edit = get(&server, "/doc/REQ-001.001/edit").text();
+    assert!(edit.contains(
+        "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>"
+    ));
+    assert!(edit.contains("<input type=\"hidden\" name=\"version\" value=\""));
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }

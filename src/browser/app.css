@@ -246,6 +246,9 @@ textarea:focus-visible {
 }
 
 /* conflict */
+.conflict-box { border: 2px solid var(--strong); border-radius: 6px; background: var(--box); padding: 14px 18px; max-width: 800px; margin: 18px 0; }
+.conflict-box p { margin: 0 0 8px; }
+.conflict-box p:last-child { margin-bottom: 0; }
 .readonly-block { border: 1px solid var(--line); border-radius: 6px; padding: 16px 20px; max-width: 800px; margin-top: 18px; }
 .readonly-block h2 { font-size: 15px; margin: 0 0 12px; }
 .readonly-block dl { margin: 0; }
@@ -293,6 +296,8 @@ textarea:focus-visible {
   .req-list { padding-left: 10px; }
   .form-actions { flex-direction: column; align-items: stretch; }
   .form-actions .btn { width: 100%; text-align: center; }
+  /* At 320 px the edit form draws only the hidden version input. */
+  .hidden-field { display: none; }
   .actions { flex-direction: column; align-items: flex-start; gap: 6px; }
   .error-card { padding: 22px 20px 26px; }
   .status-code { font-size: 44px; }

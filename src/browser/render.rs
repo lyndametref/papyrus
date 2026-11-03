@@ -698,38 +698,65 @@ pub fn error_page(status: u16, cfg: &Config, chrome: Chrome<'_>, actions: Option
 }
 
 /// Render the 409 conflict page with the attempted values and recovery links.
+///
+/// The approved MOCK-0001 `edit-conflict` view uses the edit breadcrumb and a
+/// bordered conflict notice, not the generic error layout with a large status
+/// code block.
 pub fn conflict_page(
     record: &Record,
     values: &EditValues,
     cfg: &Config,
     chrome: Chrome<'_>,
 ) -> String {
-    let mut actions = format!(
+    let mut content = String::new();
+    content.push_str(
+        "<h1 class=\"h1\">This record changed on disk</h1>\
+<p class=\"sub\">Your changes were not saved. The file was modified after this form was opened.</p>\
+<div class=\"conflict-box\"><p><strong>409 Conflict \u{2014} record changed on disk; reload the form.</strong></p>\
+<p>Reloading shows the current content and a new version token. Copy anything you need first.</p></div>",
+    );
+    content.push_str(&format!(
         "<div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Reload the form</a>\
 <a class=\"link\" href=\"/doc/{}\">View current record</a>\
 <a class=\"link\" href=\"/?type={}\">Back to requirements</a></div>",
         escape(&record.id),
         escape(&record.id),
         record.kind.key()
-    );
-    actions.push_str(
+    ));
+    content.push_str(
         "<div class=\"readonly-block\"><h2>Your unsaved changes (read-only, not saved)</h2><dl>",
     );
-    actions.push_str(&format!("<dt>Title</dt><dd>{}</dd>", escape(&values.title)));
+    content.push_str(&format!("<dt>Title</dt><dd>{}</dd>", escape(&values.title)));
     if record.kind.supports_story() {
-        actions.push_str(&format!(
+        content.push_str(&format!(
             "<dt>User story</dt><dd class=\"text\">{}</dd>",
             escape(&values.story)
         ));
     }
-    actions.push_str(&format!(
+    content.push_str(&format!(
         "<dt>Description</dt><dd class=\"text\">{}</dd>",
         escape(&values.description)
     ));
-    actions.push_str(
+    content.push_str(
         "</dl><p class=\"help\">Copy these values into the form after reloading if you want to keep them.</p></div>",
     );
-    error_page(409, cfg, chrome, Some(&actions))
+
+    let title = format!("Papyrus \u{2014} Edit {}", record.id);
+    render_template(
+        EDIT_TEMPLATE,
+        &[
+            ("title", &title),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("breadcrumb", &edit_breadcrumb(record, None)),
+            ("page_head", &content),
+            ("meta", ""),
+            ("form", ""),
+        ],
+    )
 }
 
 /// Convert a validated change into a [`FieldChange`].

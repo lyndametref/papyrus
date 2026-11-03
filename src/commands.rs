@@ -140,6 +140,7 @@ pub fn config_get(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
         return Err(AppError::Validation("invalid key".to_string()));
     }
     let val = load_effective_value(&ctx.config_path)?;
+    validate_browser_yaml(&val).map_err(AppError::Validation)?;
 
     // Effective defaults for project_name and editor.
     if key == "project_name" {
@@ -277,6 +278,7 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
     let default_cfg = Config::default();
     let mut base = yaml_serde::to_value(&default_cfg).unwrap();
     merge_yaml(&mut base, &file_val);
+    validate_browser_yaml(&base).map_err(AppError::Validation)?;
     let cfg: Config = yaml_serde::from_value(base)
         .map_err(|e| AppError::Validation(format!("{}: {}", key, e)))?;
     cfg.validate().map_err(AppError::Validation)?;
@@ -323,6 +325,7 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
     let default_cfg = Config::default();
     let mut base = yaml_serde::to_value(&default_cfg).unwrap();
     merge_yaml(&mut base, &file_val);
+    validate_browser_yaml(&base).map_err(AppError::Validation)?;
     let cfg: Config =
         yaml_serde::from_value(base).map_err(|e| AppError::Validation(e.to_string()))?;
     cfg.validate().map_err(AppError::Validation)?;

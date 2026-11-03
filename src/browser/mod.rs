@@ -282,7 +282,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) {
         }
     };
 
-    let method = request.method.as_str().to_string();
+    let method = request.raw_method.clone();
     let log_path: String = request.target.path.chars().take(200).collect();
     let head_only = request.method == Method::Head;
     let api = request.target.path.starts_with("/api/");
@@ -444,34 +444,35 @@ fn handle_request(request: Request, state: &ServerState) -> Response {
 }
 
 fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
-    if request.method == Method::Other {
-        return Err(HttpError::new(405));
-    }
     let path = request.target.path.clone();
     let method = request.method;
 
+    // Route matching happens before method rejection: an unknown path is 404
+    // for every method, while a known path with a disallowed method is 405.
     if path == "/assets/app.css" {
-        if method == Method::Post {
-            return Err(HttpError::new(405));
-        }
-        return Ok(Response::text(200, "text/css; charset=utf-8", APP_CSS));
+        return match method {
+            Method::Get | Method::Head => {
+                Ok(Response::text(200, "text/css; charset=utf-8", APP_CSS))
+            }
+            _ => Err(HttpError::new(405)),
+        };
     }
     if path == "/assets/app.js" {
-        if method == Method::Post {
-            return Err(HttpError::new(405));
-        }
-        return Ok(Response::text(
-            200,
-            "text/javascript; charset=utf-8",
-            APP_JS,
-        ));
+        return match method {
+            Method::Get | Method::Head => Ok(Response::text(
+                200,
+                "text/javascript; charset=utf-8",
+                APP_JS,
+            )),
+            _ => Err(HttpError::new(405)),
+        };
     }
 
     if path == "/api/requirements" {
-        if method == Method::Post {
-            return Err(HttpError::new(405));
-        }
-        return api_requirements(&request, state);
+        return match method {
+            Method::Get | Method::Head => api_requirements(&request, state),
+            _ => Err(HttpError::new(405)),
+        };
     }
     if let Some(id) = path.strip_prefix("/api/doc/") {
         if id.is_empty() || id.contains('/') {
@@ -485,20 +486,20 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
     }
 
     if path == "/" {
-        if method == Method::Post {
-            return Err(HttpError::new(405));
-        }
-        return list_page(&request, state);
+        return match method {
+            Method::Get | Method::Head => list_page(&request, state),
+            _ => Err(HttpError::new(405)),
+        };
     }
     if let Some(rest) = path.strip_prefix("/doc/") {
         if let Some(id) = rest.strip_suffix("/edit") {
             if id.is_empty() || id.contains('/') {
                 return Err(HttpError::new(404));
             }
-            if method == Method::Post {
-                return Err(HttpError::new(405));
-            }
-            return edit_page(id, state);
+            return match method {
+                Method::Get | Method::Head => edit_page(id, state),
+                _ => Err(HttpError::new(405)),
+            };
         }
         if rest.is_empty() || rest.contains('/') {
             return Err(HttpError::new(404));

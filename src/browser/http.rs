@@ -50,6 +50,8 @@ pub struct Target {
 #[derive(Clone, Debug)]
 pub struct Request {
     pub method: Method,
+    /// The method token exactly as sent, so the request log can print it.
+    pub raw_method: String,
     pub target: Target,
     pub version: Version,
     pub headers: Vec<(String, String)>,
@@ -159,9 +161,10 @@ fn percent_decode(
                     return Err(HttpError::new(400));
                 };
                 let decoded = (high << 4) | low;
-                if (decoded == 0 || decoded == b'/' || decoded == b'\\')
-                    && (reject_path_separators || decoded == 0)
-                {
+                // Path decoding rejects encoded NUL and separators. Form and
+                // query decoding allow them so field validation can report a
+                // 422 for `%00` instead of a malformed-request 400.
+                if reject_path_separators && matches!(decoded, 0 | b'/' | b'\\') {
                     return Err(HttpError::new(400));
                 }
                 out.push(decoded);
@@ -285,7 +288,8 @@ pub fn read_request(stream: &mut TcpStream) -> Result<Request, HttpError> {
     else {
         return Err(HttpError::new(400));
     };
-    let method = parse_method(method);
+    let raw_method = method.to_string();
+    let method = parse_method(&raw_method);
     let version = match version {
         "HTTP/1.1" => Version::Http11,
         "HTTP/1.0" => Version::Http10,
@@ -367,6 +371,7 @@ pub fn read_request(stream: &mut TcpStream) -> Result<Request, HttpError> {
 
     Ok(Request {
         method,
+        raw_method,
         target,
         version,
         headers,

@@ -5,7 +5,7 @@ status: Implemented
 assignee:
   - '@orchestrator'
 created_date: '2026-10-31T22:25:00Z'
-updated_date: '2026-11-03T20:37:00Z'
+updated_date: '2026-11-03T20:51:00Z'
 labels: []
 milestone: m-1
 dependencies:
@@ -173,6 +173,10 @@ Addressed: edit-form dirty status; 503 Host validation + request log; browser co
 Addressed: over-capacity 503 is written without reading the request (immediate `503 Service Unavailable` with `Connection: close`, log line `- - 503`, no Host/Origin validation), so the accept loop cannot block; configuration-file errors for `browser_port`, `browser_open`, and `browser_host` now exit 4 with a message naming the key; the desktop shell and 320 px states are aligned with MOCK-0001 (210 px sidebar grid column, 30 px gap, main `border-left`, narrow footer/header text, wrapping long "Other requirements" links); 422 summary entries repeat the field-level message; added duplicate `Content-Length` 400, T-14 unknown-section order, 320 px wrapping, and config-file error coverage.
 
 Updated coverage: T-22 `t22_concurrency_limit_returns_503_and_logs` now holds 16 connections, confirms a silent 17th connection receives 503/`Connection: close`/EOF in under 1 s without sending a request, asserts the `- - 503` log line, and confirms a normal request completes in under 1 s after slots free. T-15 `t15_validation_returns_422_without_writing` now asserts each summary entry equals its field-level message for an empty title, a 201-character title, a control character, and a `## ` line in story and description. Test suite: 126 tests pass.
+
+### Third quality-review follow-up (2026-11-03, UTC)
+
+Addressed F1–F6, F8, F9: route matching now precedes method rejection (unknown path is 404 for every method; a known path with a disallowed method is 405 with Allow); config get/set/unset validate the merged browser configuration and name the offending key; the 409 conflict page renders the edit breadcrumb and a bordered conflict notice matching MOCK-0001 edit-conflict without the generic status-code block; the 320 px edit form hides the visible version annotation; encoded NUL in form values is a 422 field validation error while encoded NUL in the path stays 400; the request log prints the actual method token; added regression tests for unknown-path methods, merged-config get/set/unset failures, conflict and 320 px DOM, group member order, and atomic-write permission preservation. Test suite: 131 tests pass (supersedes the earlier 124/126 counts).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
