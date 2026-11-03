@@ -5,7 +5,7 @@ status: Refined
 assignee:
   - '@orchestrator'
 created_date: '2026-10-31T22:25:00Z'
-updated_date: '2026-11-03T20:57:00Z'
+updated_date: '2026-11-03T21:00:00Z'
 labels:
   - packaging
   - verification
@@ -146,5 +146,44 @@ Refinement decisions:
 - New milestone test: tests/search_browser_smoke.rs (2 tests), not an extension of tests/milestone_smoke.rs.
 - No UI mockup needed; MOCK-0001 unchanged.
 
-Final verification evidence (to be appended during execution): environment, date/timezone, package file and size, gate results with test counts, smoke outcomes, deviations.
+## Final verification evidence (2026-11-03, UTC)
+
+Environment: Debian GNU/Linux forky/sid amd64; glibc 2.43-7; dpkg 1.23.11; rustc 1.99.1 (58cf8f9c3 2026-10-13); cargo 1.99.1; clippy 0.1.99; fakeroot; `unshare -rn` with loopback brought up via `ip link set lo up`. Date: 2026-11-03 (UTC). Branch: `task/TASK-7`; implementation commit: `5f7508a`.
+
+Artifact: `papyrus_0.1.0_amd64.deb`, 624048 bytes, SHA-256 `4b2c9e8799016a1f98168f4c373100b3efd2f03e93036e648e2e756951dac697`. The binary inside the package (SHA-256 `bcdeaa99ee1d4aa8125e718a44622d576e4320cd0f461eb605c00bc0c8c0d923`) is byte-identical to the current `target/release/papyrus`.
+
+Freshness: `cargo build --release` was run immediately before `scripts/build-deb.sh` (script unchanged), and `target/release/papyrus --help` listed both `search` and `browser` before packaging, so the stale pre-TASK-5/TASK-6 binary was not shipped.
+
+Package metadata: `Package: papyrus`, `Version: 0.1.0` (= Cargo.toml), `Architecture: amd64`, `Depends: libc6 (>= 2.34)`, `Section: utils`, `Priority: optional`, `Maintainer`, `Homepage`, description naming Papyrus as a project-level backlog and documentation manager; copyright file declares `GPL-3.0-or-later`.
+Package contents: `/usr/bin/papyrus` (0755, 1688240 bytes) and `/usr/share/doc/papyrus/copyright` (0644, 865 bytes) only. No asset, template, configuration, or man files.
+
+Quality gates (Rust 1.99.1):
+- `cargo build --release`: PASS.
+- `cargo test`: PASS - 133 tests (33 unit + 41 browser_cli + 20 cli + 5 milestone_smoke + 11 req_cli + 2 search_browser_smoke + 21 search_cli), 0 failed, 0 ignored.
+- `cargo clippy --all-targets -- -D warnings`: PASS, 0 warnings.
+- `cargo fmt --check`: PASS.
+
+Isolated install/uninstall (Debian Forky, host untouched):
+- `fakeroot dpkg --instdir=.tmp/inst --admindir=.tmp/adm --force-depends -i papyrus_0.1.0_amd64.deb`: PASS (exit 0). dpkg warned that `/var/log/dpkg.log` is not writable and that libc6 is absent from the empty database (host glibc 2.43 satisfies the dependency); no host file or package database entry was created.
+- Installed file `root:root` mode 0755; `papyrus` resolved to `.tmp/inst/usr/bin/papyrus` on PATH; `papyrus --version` printed `papyrus 0.1.0`.
+- Host `dpkg-query -W papyrus` before and after: "no packages found matching papyrus".
+- `dpkg -r papyrus` (isolated): PASS, binary removed, `papyrus` no longer on PATH.
+- Fresh install then `dpkg --purge papyrus` (isolated): PASS, binary and admin entry removed.
+- Scratch roots removed afterwards; `.tmp/` cleaned.
+
+Installed-binary smoke (all PASS):
+- 3.1 `--help` (lists search/browser), `--version`, `init`, req/nfreq create-group/create/list/view/edit/deprecate/restore with IDs preserved.
+- 3.2 Search: contiguous quoted phrase, split words not a phrase, `--type doc`, `--type task` empty, `--limit` cap/oversize, JSON `{id,type,title,path}` array and `[]`, deprecated hidden then restored; usage exits 2 and validation exit 4.
+- 3.3 Browser: exact startup line, both categories one at a time with `aria-current="page"`, record view, edit round-trip (303 + `Location` + updated UI and CLI view), JSON API index/record, both embedded assets (`no-store`, non-empty), 320 px markup hooks and narrow-viewport CSS, no external references, CSP present.
+- 3.4 Offline: `unshare -rn` with loopback; outbound TCP to 1.1.1.1:443 failed; search, view, and assets passed over loopback.
+- 3.5 Config: `browser_host`/`browser_port`/`browser_open` listed and gettable; configured port honored without `--port`; `--port` overrides; defaults restored on unset; invalid values (0, 70000, maybe) exit 4 with the file hash unchanged.
+- 3.6 Embedded assets: search and browser worked from an empty working directory and an asset-free project; assets non-empty.
+
+AC coverage: #1 (Forky-only install, search + browser), #2 (release build + `--help`), #3 (gates/test counts), #4 (script, version, amd64), #5 (metadata + GPL-3.0-or-later), #6 (contents + embedded assets), #7 (isolated install, PATH, host untouched), #8 (isolated remove/purge), #9 (help/version), #10 (init + req/nfreq lifecycle), #11 (search), #12 (browser), #13 (offline), #14 (config keys), #15 (`tests/search_browser_smoke.rs`, 2 tests, no duplication of browser contract tests), #16 (`docs/packaging.md`), #17 (this evidence).
+
+Deviations / notes:
+- `scripts/build-deb.sh` intentionally left unchanged (AC #4 and DoD #7 require packaging scripts unchanged). The stale-binary hazard is mitigated by the documented mandatory `cargo build --release` plus the pre-package `--help` assertion; both were executed.
+- No product bug was found and no product code was changed.
+- OQ-1 limitation recorded in `docs/packaging.md`: verification is markup/asset-level; no GUI Firefox/Edge/Safari run. NFR-05.001 remains covered by TASK-6 and MOCK-0001.
+- Version stays 0.1.0 (OQ-4); Debian Trixie and other releases are not claimed or verified (ADR-0003, NFR-03.002).
 <!-- SECTION:NOTES:END -->
