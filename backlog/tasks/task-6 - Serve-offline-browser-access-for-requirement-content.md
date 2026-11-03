@@ -1,11 +1,11 @@
 ---
 id: TASK-6
 title: Serve offline browser access for requirement content
-status: Implemented
+status: Done
 assignee:
   - '@orchestrator'
 created_date: '2026-10-31T22:25:00Z'
-updated_date: '2026-11-03T20:51:00Z'
+updated_date: '2026-11-03T20:54:00Z'
 labels: []
 milestone: m-1
 dependencies:
@@ -55,38 +55,38 @@ UI mockups: MOCK-0001 (`docs/specifications/ui/mockups/MOCK-0001-browser-require
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The browser command serves the local web interface over the project's documentation store for the requirement record types implemented in this increment (business-requirement and non-functional-requirement groups and requirements) and opens it by default unless disabled; REQ-06.002's backlog-store coverage is delivered by TASK-11.
-- [ ] #2 With no internet connection, users can view and edit all currently implemented business and non-functional requirement content in the browser, and saved changes remain available.
-- [ ] #3 The interface renders in Firefox, Microsoft Edge, and Safari version 100 or later; the default bind address and port and non-loopback warning match the documented behavior.
-- [ ] #4 Browser-facing input is sanitized and the local interface does not read or write outside the project directory, except for init.
-- [ ] #5 `papyrus browser --help` shows exactly `papyrus browser [--host <host>] [--port <port>] [--no-open]`; the command accepts no positional arguments and has no subcommands.
-- [ ] #6 Effective host, port, and open behavior resolve per setting with precedence command line > environment (`PAPYRUS_BROWSER_HOST`, `PAPYRUS_BROWSER_PORT`, `PAPYRUS_BROWSER_OPEN`) > configuration (`browser_host`, `browser_port`, `browser_open`) > defaults 127.0.0.1 / 6420 / true.
-- [ ] #7 An invalid port (0, negative, greater than 65535, non-numeric) exits 2; an invalid host or invalid configuration value exits 4; a port already in use exits 1 with a bind message; the server keeps serving until interrupted.
-- [ ] #8 `--no-open` and `browser_open: false` suppress opening the browser; a missing or failing platform opener produces a warning only and the server keeps serving.
-- [ ] #9 The list page has a persistent left "Document types" sidebar listing Business requirements and Non-functional requirements, shows exactly one category at a time (Business requirements by default via `/` or `/?type=req`, `/?type=nfr` for non-functional, and 400 for any other value including `all`), lists each group with its member requirements in ascending ID order, and renders explicit empty states for a group without members, an empty document type, and an empty project.
-- [ ] #10 A record view shows ID, record form, document type, owning group, user story (business-requirement forms only), and description, with line breaks preserved, no Markdown rendering, and requirement references shown as literal text; a group view additionally lists that group's member requirements (ID and title as links, ascending ID order); the view's only action is Edit, breadcrumbs and the sidebar are the navigation, and the view has no "Back to requirements" action while error pages keep their single recovery link to the list.
-- [ ] #11 Editing persists title and description for all four record forms and user story for business-requirement forms only; ID, record form, document type, and group membership are read-only and never accepted from the request.
-- [ ] #12 A save writes atomically, preserves unknown and editor-added `## ` sections, normalizes line endings to LF, and the following view reads the new content from disk; `papyrus req view` or `papyrus nfreq view` shows the same content.
-- [ ] #13 Deprecated records are absent from lists and return 404 for direct URL access, with no view or edit affordance.
-- [ ] #14 The server enforces the documented limits and returns 400, 403, 404, 405, 408, 411, 413, 414, 415, 431, 501, and 505 for the specified conditions, serves one request per connection with `Connection: close`, and uses no TLS.
-- [ ] #15 Every dynamic value in HTML is escaped; JSON is produced with serde_json; record IDs resolve by exact match against the active directory listing and are never concatenated into a path; a symlink escaping the project directory returns 404 and exposes no outside content.
-- [ ] #16 `browser_host`, `browser_port`, and `browser_open` appear in `config list`, `config get`, `config set`, and `config unset`, validate as specified (port 1-65535), and are included in `config list --json`.
-- [ ] #17 Served HTML, CSS, and JS reference no external origin, font, or script; all assets are embedded in the binary; every page, link, form, and error state works with JavaScript disabled.
-- [ ] #18 Unit and integration tests cover the specified behavior, including spawning the binary and speaking HTTP over `TcpStream`, an edit round-trip, offline asset checks, boundary and symlink rejection, port conflict, non-loopback warning, `--no-open`, HTML-escaping and XSS, and the JSON API; build, tests, clippy with warnings denied, and formatting pass with the existing dependency set unchanged.
-- [ ] #19 The approved UI mockup MOCK-0001 (`docs/specifications/ui/mockups/MOCK-0001-browser-requirements-review.html`, approved 2026-11-03 UTC) is recorded in the specification and in this ticket, and the implemented list/sidebar, record view, edit form, error, and 320 px states match it.
+- [x] #1 The browser command serves the local web interface over the project's documentation store for the requirement record types implemented in this increment (business-requirement and non-functional-requirement groups and requirements) and opens it by default unless disabled; REQ-06.002's backlog-store coverage is delivered by TASK-11.
+- [x] #2 With no internet connection, users can view and edit all currently implemented business and non-functional requirement content in the browser, and saved changes remain available.
+- [x] #3 The interface renders in Firefox, Microsoft Edge, and Safari version 100 or later; the default bind address and port and non-loopback warning match the documented behavior.
+- [x] #4 Browser-facing input is sanitized and the local interface does not read or write outside the project directory, except for init.
+- [x] #5 `papyrus browser --help` shows exactly `papyrus browser [--host <host>] [--port <port>] [--no-open]`; the command accepts no positional arguments and has no subcommands.
+- [x] #6 Effective host, port, and open behavior resolve per setting with precedence command line > environment (`PAPYRUS_BROWSER_HOST`, `PAPYRUS_BROWSER_PORT`, `PAPYRUS_BROWSER_OPEN`) > configuration (`browser_host`, `browser_port`, `browser_open`) > defaults 127.0.0.1 / 6420 / true.
+- [x] #7 An invalid port (0, negative, greater than 65535, non-numeric) exits 2; an invalid host or invalid configuration value exits 4; a port already in use exits 1 with a bind message; the server keeps serving until interrupted.
+- [x] #8 `--no-open` and `browser_open: false` suppress opening the browser; a missing or failing platform opener produces a warning only and the server keeps serving.
+- [x] #9 The list page has a persistent left "Document types" sidebar listing Business requirements and Non-functional requirements, shows exactly one category at a time (Business requirements by default via `/` or `/?type=req`, `/?type=nfr` for non-functional, and 400 for any other value including `all`), lists each group with its member requirements in ascending ID order, and renders explicit empty states for a group without members, an empty document type, and an empty project.
+- [x] #10 A record view shows ID, record form, document type, owning group, user story (business-requirement forms only), and description, with line breaks preserved, no Markdown rendering, and requirement references shown as literal text; a group view additionally lists that group's member requirements (ID and title as links, ascending ID order); the view's only action is Edit, breadcrumbs and the sidebar are the navigation, and the view has no "Back to requirements" action while error pages keep their single recovery link to the list.
+- [x] #11 Editing persists title and description for all four record forms and user story for business-requirement forms only; ID, record form, document type, and group membership are read-only and never accepted from the request.
+- [x] #12 A save writes atomically, preserves unknown and editor-added `## ` sections, normalizes line endings to LF, and the following view reads the new content from disk; `papyrus req view` or `papyrus nfreq view` shows the same content.
+- [x] #13 Deprecated records are absent from lists and return 404 for direct URL access, with no view or edit affordance.
+- [x] #14 The server enforces the documented limits and returns 400, 403, 404, 405, 408, 411, 413, 414, 415, 431, 501, and 505 for the specified conditions, serves one request per connection with `Connection: close`, and uses no TLS.
+- [x] #15 Every dynamic value in HTML is escaped; JSON is produced with serde_json; record IDs resolve by exact match against the active directory listing and are never concatenated into a path; a symlink escaping the project directory returns 404 and exposes no outside content.
+- [x] #16 `browser_host`, `browser_port`, and `browser_open` appear in `config list`, `config get`, `config set`, and `config unset`, validate as specified (port 1-65535), and are included in `config list --json`.
+- [x] #17 Served HTML, CSS, and JS reference no external origin, font, or script; all assets are embedded in the binary; every page, link, form, and error state works with JavaScript disabled.
+- [x] #18 Unit and integration tests cover the specified behavior, including spawning the binary and speaking HTTP over `TcpStream`, an edit round-trip, offline asset checks, boundary and symlink rejection, port conflict, non-loopback warning, `--no-open`, HTML-escaping and XSS, and the JSON API; build, tests, clippy with warnings denied, and formatting pass with the existing dependency set unchanged.
+- [x] #19 The approved UI mockup MOCK-0001 (`docs/specifications/ui/mockups/MOCK-0001-browser-requirements-review.html`, approved 2026-11-03 UTC) is recorded in the specification and in this ticket, and the implemented list/sidebar, record view, edit form, error, and 320 px states match it.
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 `docs/specifications/browser-requirements.md` is the implemented contract; any deviation is recorded in the specification before the code changes.
-- [ ] #2 `Cargo.toml` dependency list is unchanged: no web framework, async runtime, templating engine, Markdown renderer, or second crate added.
-- [ ] #3 `cargo build`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, and `cargo fmt --check` pass.
-- [ ] #4 Unit and integration tests map to checks T-01 to T-30 in the specification, and the mapping is recorded in the implementation notes.
-- [ ] #5 No file under `docs/requirements/` or `docs/business-rules/` is modified.
-- [ ] #6 No reads or writes occur outside the project directory; rejected requests leave no temporary file and no partial write.
-- [ ] #7 UI mockups are approved by the user before UI implementation begins, and the MOCK ids are recorded in the specification and this ticket.
-- [ ] #8 All ticket changes are made through the backlog CLI; no backlog file is edited directly.
-- [ ] #9 The implementation notes state how each acceptance criterion was verified.
+- [x] #1 `docs/specifications/browser-requirements.md` is the implemented contract; any deviation is recorded in the specification before the code changes.
+- [x] #2 `Cargo.toml` dependency list is unchanged: no web framework, async runtime, templating engine, Markdown renderer, or second crate added.
+- [x] #3 `cargo build`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, and `cargo fmt --check` pass.
+- [x] #4 Unit and integration tests map to checks T-01 to T-30 in the specification, and the mapping is recorded in the implementation notes.
+- [x] #5 No file under `docs/requirements/` or `docs/business-rules/` is modified.
+- [x] #6 No reads or writes occur outside the project directory; rejected requests leave no temporary file and no partial write.
+- [x] #7 UI mockups are approved by the user before UI implementation begins, and the MOCK ids are recorded in the specification and this ticket.
+- [x] #8 All ticket changes are made through the backlog CLI; no backlog file is edited directly.
+- [x] #9 The implementation notes state how each acceptance criterion was verified.
 <!-- DOD:END -->
 
 ## Implementation Plan
