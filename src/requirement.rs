@@ -6,7 +6,7 @@ use crate::sanitize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     Req,
     Nfr,
