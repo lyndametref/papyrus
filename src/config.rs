@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::net::IpAddr;
 use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -53,6 +54,9 @@ pub struct Config {
     pub default_status: String,
     pub decision_types: BTreeMap<String, TypeEntry>,
     pub document_types: BTreeMap<String, DocTypeEntry>,
+    pub browser_host: String,
+    pub browser_port: u16,
+    pub browser_open: bool,
 }
 
 impl Default for Config {
@@ -116,6 +120,9 @@ impl Default for Config {
             default_status: "ToDo".to_string(),
             decision_types,
             document_types,
+            browser_host: "127.0.0.1".to_string(),
+            browser_port: 6420,
+            browser_open: true,
         }
     }
 }
@@ -182,6 +189,11 @@ impl Config {
         {
             return Err("ID prefixes must not be empty".to_string());
         }
+        if self.browser_port == 0 {
+            return Err("browser_port: must be between 1 and 65535".to_string());
+        }
+        validate_browser_host(&self.browser_host)
+            .map_err(|reason| format!("browser_host: {}", reason))?;
         Ok(())
     }
 
@@ -237,7 +249,67 @@ impl Config {
                 v.enabled.to_string(),
             ));
         }
+        out.push(("browser_host".to_string(), self.browser_host.clone()));
+        out.push(("browser_port".to_string(), self.browser_port.to_string()));
+        out.push(("browser_open".to_string(), self.browser_open.to_string()));
         out
+    }
+}
+
+/// Validate a browser bind host (specification section 1.10).
+///
+/// A host is an IPv4 literal, an IPv6 literal, or a DNS host name. The value
+/// must be at most 255 bytes, must not contain leading or trailing whitespace,
+/// must not contain whitespace, control characters, or any of `/ \ @ ? # , %`,
+/// and a host name must start with an ASCII letter or digit, may contain only
+/// ASCII letters, digits, `.` and `-`, and must not end with `.` or `-`.
+pub fn validate_browser_host(host: &str) -> Result<(), String> {
+    if host.is_empty() {
+        return Err("must not be empty".to_string());
+    }
+    if host.len() > 255 {
+        return Err("must be at most 255 bytes".to_string());
+    }
+    if host.trim() != host {
+        return Err("must not contain leading or trailing whitespace".to_string());
+    }
+    if host.chars().any(|c| {
+        c.is_whitespace() || c.is_control() || matches!(c, '/' | '\\' | '@' | '?' | '#' | ',' | '%')
+    }) {
+        return Err("contains a forbidden character".to_string());
+    }
+    if host.parse::<IpAddr>().is_ok() {
+        return Ok(());
+    }
+    let bytes = host.as_bytes();
+    if !bytes[0].is_ascii_alphanumeric() {
+        return Err("must start with an ASCII letter or digit".to_string());
+    }
+    if !bytes
+        .iter()
+        .all(|b| b.is_ascii_alphanumeric() || *b == b'.' || *b == b'-')
+    {
+        return Err("is not a valid host name".to_string());
+    }
+    if host.ends_with('.') || host.ends_with('-') {
+        return Err("must not end with '.' or '-'".to_string());
+    }
+    Ok(())
+}
+
+/// Whether a host is a loopback address for the non-loopback warning.
+///
+/// Loopback means an IPv4 address in `127.0.0.0/8`, the IPv6 address `::1`, or
+/// the literal host name `localhost` (case-insensitive). Other host names are
+/// never treated as loopback and are never resolved here.
+pub fn is_loopback_host(host: &str) -> bool {
+    if host.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+    match host.parse::<IpAddr>() {
+        Ok(IpAddr::V4(v4)) => v4.is_loopback(),
+        Ok(IpAddr::V6(v6)) => v6.is_loopback(),
+        Err(_) => false,
     }
 }
 
@@ -391,6 +463,108 @@ mod tests {
             ..Config::default()
         };
         assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn browser_defaults() {
+        let c = Config::default();
+        assert_eq!(c.browser_host, "127.0.0.1");
+        assert_eq!(c.browser_port, 6420);
+        assert!(c.browser_open);
+        assert!(c.validate().is_ok());
+    }
+
+    #[test]
+    fn browser_port_zero_is_invalid() {
+        let c = Config {
+            browser_port: 0,
+            ..Config::default()
+        };
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn browser_host_validation() {
+        for host in [
+            "127.0.0.1",
+            "::1",
+            "localhost",
+            "example.test",
+            "0.0.0.0",
+            "host-1.example",
+        ] {
+            assert!(
+                validate_browser_host(host).is_ok(),
+                "host should be valid: {}",
+                host
+            );
+        }
+        for host in [
+            "",
+            " bad",
+            "bad host",
+            "bad/host",
+            "bad\\host",
+            "bad@host",
+            "bad?host",
+            "bad#host",
+            "bad,host",
+            "bad%host",
+            "host.",
+            "host-",
+            "-host",
+            "_host",
+        ] {
+            assert!(
+                validate_browser_host(host).is_err(),
+                "host should be invalid: {}",
+                host
+            );
+        }
+    }
+
+    #[test]
+    fn browser_validation_messages_name_the_key() {
+        let c = Config {
+            browser_port: 0,
+            ..Config::default()
+        };
+        let error = c.validate().unwrap_err();
+        assert!(error.starts_with("browser_port:"), "{}", error);
+
+        let c = Config {
+            browser_host: "bad/host".to_string(),
+            ..Config::default()
+        };
+        let error = c.validate().unwrap_err();
+        assert!(error.starts_with("browser_host:"), "{}", error);
+    }
+
+    #[test]
+    fn flattened_browser_keys_follow_document_types() {
+        let c = Config::default();
+        let keys: Vec<String> = c
+            .flattened(Path::new("/project"))
+            .into_iter()
+            .map(|(key, _)| key)
+            .collect();
+        let tail: Vec<&str> = keys
+            .iter()
+            .rev()
+            .take(3)
+            .rev()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(tail, vec!["browser_host", "browser_port", "browser_open"]);
+    }
+
+    #[test]
+    fn browser_keys_serialize_to_json() {
+        let c = Config::default();
+        let value = serde_json::to_value(&c).unwrap();
+        assert_eq!(value["browser_host"], "127.0.0.1");
+        assert_eq!(value["browser_port"], 6420);
+        assert_eq!(value["browser_open"], true);
     }
 
     #[test]

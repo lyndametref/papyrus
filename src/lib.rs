@@ -1,3 +1,4 @@
+pub mod browser;
 pub mod commands;
 pub mod config;
 pub mod context;
@@ -78,6 +79,24 @@ pub enum Commands {
         #[command(subcommand)]
         action: nfreq::NfreqCmd,
     },
+    /// Serve the local web interface.
+    #[command(override_usage = "papyrus browser [--host <host>] [--port <port>] [--no-open]")]
+    Browser {
+        /// Bind address. Default: 127.0.0.1.
+        #[arg(long, value_name = "host")]
+        host: Option<String>,
+        /// TCP port. Default: 6420.
+        #[arg(
+            long,
+            value_name = "port",
+            value_parser = parse_browser_port,
+            allow_hyphen_values = true
+        )]
+        port: Option<u16>,
+        /// Do not open the default browser automatically.
+        #[arg(long = "no-open")]
+        no_open: bool,
+    },
     /// Search records by free text.
     Search {
         /// Free-text search term or phrase. Quote phrases that contain spaces.
@@ -115,6 +134,18 @@ pub struct CommandOutput {
 
 /// Parse `--limit`: a positive integer. Zero, negative, and non-integer values
 /// are usage errors (clap exits with code 2).
+/// Parse `--port`: an integer in `1..=65535`. Zero, negative, out-of-range,
+/// and non-numeric values are usage errors (clap exits with code 2).
+fn parse_browser_port(raw: &str) -> Result<u16, String> {
+    let value: i64 = raw
+        .parse()
+        .map_err(|_| "port must be an integer between 1 and 65535".to_string())?;
+    if !(1..=65535).contains(&value) {
+        return Err("port must be an integer between 1 and 65535".to_string());
+    }
+    u16::try_from(value).map_err(|_| "port must be an integer between 1 and 65535".to_string())
+}
+
 fn parse_limit(raw: &str) -> Result<usize, String> {
     let value: i64 = raw
         .parse()
@@ -206,6 +237,14 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
         Commands::Nfreq { action } => {
             let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
             nfreq::run(&ctx, action)
+        }
+        Commands::Browser {
+            host,
+            port,
+            no_open,
+        } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            browser::run(&ctx, host.as_deref(), port, no_open)
         }
         Commands::Search {
             query,

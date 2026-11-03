@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}}</title>
+<link rel="stylesheet" href="/assets/app.css">
+<script src="/assets/app.js" defer></script>
+</head>
+<body>
+<div class="app">
+<header class="site-header">
+<div class="brand"><span class="mark" aria-hidden="true">P</span><span><span class="brand-name">Papyrus</span><span class="project">{{project}}</span></span></div>
+<p class="top-meta">Local browser<br>offline &middot; {{bind_note}}</p>
+</header>
+<div class="layout">
+{{sidebar}}
+<main class="main">
+<div class="error-page">
+<div class="error-card">
+<p class="status-code">{{status_code}}</p>
+<h1>{{heading}}</h1>
+<p>{{message}}</p>
+<p class="help">{{hint}}</p>
+{{actions}}
+</div>
+</div>
+</main>
+</div>
+<footer class="site-footer"><span class="footer-long">Papyrus local browser &mdash; every page is served from this project; no network access.</span><span class="footer-short">Papyrus local browser &mdash; served from this project only.</span></footer>
+</div>
+</body>
+</html>

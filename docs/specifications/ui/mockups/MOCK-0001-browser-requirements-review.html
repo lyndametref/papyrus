@@ -1,0 +1,2905 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' file: 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MOCK-0001 — Browser requirement content review package</title>
+<style>
+/* Wireframe stylesheet for Papyrus browser mockups (TASK-6).
+   Layout only: grayscale, system fonts, no external resources.
+   Deliberately uses only widely supported CSS (flexbox, grid, custom properties). */
+
+:root {
+  --ink: #111827;
+  --muted: #6b7280;
+  --line: #d1d5db;
+  --soft: #f3f4f6;
+  --box: #fbfbfc;
+  --strong: #374151;
+  --white: #ffffff;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--white);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a { color: var(--ink); }
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.wf-app { max-width: 1040px; margin: 0 auto; padding: 0 24px 56px; }
+
+/* ---------- header ---------- */
+.wf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.wf-brand { display: flex; align-items: center; gap: 12px; }
+.wf-mark {
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--soft);
+  font-weight: 700;
+  font-size: 13px;
+}
+.wf-brand-name { display: block; font-size: 17px; font-weight: 700; line-height: 1.2; }
+.wf-project { display: block; font-size: 12px; color: var(--muted); }
+.wf-top-meta { text-align: right; font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+/* ---------- page head ---------- */
+.wf-main { padding-top: 26px; }
+.wf-breadcrumb { font-size: 13px; margin: 0 0 14px; }
+.wf-breadcrumb ol { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
+.wf-breadcrumb li + li::before { content: "›"; color: var(--muted); margin-right: 6px; }
+.wf-breadcrumb [aria-current="page"] { color: var(--muted); }
+
+.wf-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.wf-h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; }
+.wf-id { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 13px; color: var(--muted); margin: 0 0 4px; }
+.wf-sub { color: var(--muted); font-size: 14px; margin: 0 0 4px; }
+.wf-actions { display: flex; align-items: center; gap: 18px; padding-top: 6px; flex: none; }
+
+/* ---------- buttons and links ---------- */
+.wf-btn {
+  display: inline-block;
+  padding: 9px 18px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.wf-btn-primary { background: var(--strong); border-color: var(--strong); color: var(--white); }
+.wf-link { text-decoration: underline; }
+.wf-link-muted { color: var(--muted); }
+
+/* ---------- filter ---------- */
+.wf-filter { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 26px; margin: 14px 0 8px; }
+.wf-filter-label { font-size: 12px; color: var(--muted); margin-right: 4px; }
+.wf-filter ul { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 26px; margin: 0; padding: 0; }
+.wf-filter a { text-decoration: none; color: var(--strong); }
+.wf-filter a[aria-current="page"] { color: var(--ink); font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
+
+/* ---------- sections and groups ---------- */
+.wf-section { margin-top: 26px; }
+.wf-section-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--line);
+}
+.wf-h2 { font-size: 21px; margin: 0; }
+.wf-h3 { font-size: 17px; margin: 0; }
+.wf-count { font-size: 13px; color: var(--muted); flex: none; }
+
+.wf-group {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--white);
+  margin-top: 12px;
+  padding: 12px 20px 12px;
+}
+.wf-group-head { display: flex; align-items: baseline; gap: 14px; }
+.wf-group-id { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 15px; font-weight: 700; }
+.wf-group-title { margin: 0; font-size: 16px; font-weight: 400; line-height: 1.4; }
+.wf-group-count { margin-left: auto; font-size: 12px; color: var(--muted); flex: none; }
+.wf-req-list { list-style: none; margin: 6px 0 0; padding: 0 0 0 20px; }
+.wf-req-list li { padding: 3px 0; }
+.wf-req-id { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 13px; }
+.wf-empty-group { margin: 6px 0 0 20px; color: var(--muted); font-style: italic; font-size: 14px; }
+
+.wf-other { margin-top: 26px; }
+.wf-other-note { font-size: 12px; color: var(--muted); margin: 2px 0 8px; }
+.wf-other-list { list-style: none; margin: 0; padding: 0; }
+.wf-other-list li { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 4px 0; }
+.wf-other-ref { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+.wf-empty {
+  margin-top: 12px;
+  padding: 16px 20px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  background: var(--box);
+}
+.wf-empty p { margin: 0; }
+.wf-empty .wf-help { margin-top: 4px; }
+
+/* ---------- record view ---------- */
+.wf-meta {
+  max-width: 800px;
+  margin-top: 20px;
+  padding: 14px 20px 18px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--box);
+}
+.wf-dl { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px; margin: 0; }
+.wf-dl div { margin: 0; }
+.wf-dl dt { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 0 0 2px; }
+.wf-dl dd { margin: 0; font-size: 15px; }
+.wf-dl .wf-mono { font-family: ui-monospace, "DejaVu Sans Mono", monospace; }
+
+.wf-record-section { margin-top: 28px; }
+.wf-record-section h2 { font-size: 18px; margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.wf-text { white-space: pre-wrap; overflow-wrap: break-word; margin: 0 0 12px; max-width: 780px; }
+.wf-unresolved { color: var(--muted); font-size: 12px; }
+
+/* ---------- form ---------- */
+.wf-form { margin-top: 24px; max-width: 800px; }
+.wf-field { margin-bottom: 22px; }
+.wf-field label { display: block; font-weight: 700; margin-bottom: 6px; }
+.wf-field .wf-req { font-weight: 400; color: var(--muted); font-size: 12px; }
+.wf-input,
+.wf-textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+}
+.wf-textarea { min-height: 120px; resize: vertical; }
+.wf-input[aria-invalid="true"],
+.wf-textarea[aria-invalid="true"] { border: 2px solid var(--strong); }
+.wf-help { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+.wf-error { font-size: 13px; font-weight: 700; margin: 6px 0 0; }
+.wf-error::before { content: "! "; }
+
+.wf-alert {
+  border: 2px solid var(--strong);
+  border-radius: 5px;
+  background: var(--box);
+  padding: 14px 18px;
+  margin: 0 0 22px;
+}
+.wf-alert h2 { font-size: 16px; margin: 0 0 8px; }
+.wf-alert ul { margin: 0; padding-left: 20px; }
+.wf-alert li { margin: 2px 0; }
+.wf-alert p { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+
+.wf-form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; margin-top: 8px; }
+.wf-form-note { font-size: 12px; color: var(--muted); }
+.wf-hidden-field {
+  display: inline-block;
+  margin: 18px 0 14px;
+  padding: 4px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.wf-status { font-size: 13px; font-weight: 700; }
+.wf-status[hidden] { display: none; }
+
+/* ---------- conflict ---------- */
+.wf-conflict-box {
+  border: 2px solid var(--strong);
+  border-radius: 5px;
+  background: var(--box);
+  padding: 14px 18px;
+  margin: 18px 0 22px;
+  max-width: 800px;
+}
+.wf-conflict-box p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.wf-readonly-block { border: 1px solid var(--line); border-radius: 6px; padding: 16px 20px; max-width: 800px; }
+.wf-readonly-block h2 { font-size: 15px; margin: 0 0 12px; }
+.wf-readonly-block dl { margin: 0; }
+.wf-readonly-block dt { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-top: 10px; }
+.wf-readonly-block dd { margin: 2px 0 0; }
+
+/* ---------- error page ---------- */
+.wf-error-page { max-width: 800px; margin: 60px auto 0; }
+.wf-error-card { border: 1px solid var(--line); border-radius: 8px; background: var(--box); padding: 34px 40px 38px; }
+.wf-status-code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 60px; font-weight: 700; line-height: 1; margin: 0 0 14px; }
+.wf-error-card h1 { font-size: 26px; margin: 0 0 10px; }
+.wf-error-card p { margin: 0 0 8px; }
+.wf-error-card .wf-help { margin-bottom: 18px; }
+
+/* ---------- footer ---------- */
+.wf-footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+
+/* ---------- prototype chrome (not part of the designed UI) ---------- */
+.wf-proto {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--soft);
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  padding: 8px 16px;
+}
+.wf-proto-inner { max-width: 1320px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.wf-proto-title { font-weight: 700; }
+.wf-proto-note { color: var(--muted); }
+.wf-proto-nav ul { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 0; padding: 0; }
+.wf-proto-nav a {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  text-decoration: none;
+  color: var(--strong);
+}
+.wf-proto-nav a[aria-current="true"] { background: var(--strong); border-color: var(--strong); color: var(--white); }
+.wf-proto-sep { color: var(--muted); }
+
+.wf-screen[hidden] { display: none; }
+
+/* ---------- responsive frame used by the narrow screens ---------- */
+.wf-narrow-wrap { display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start; padding: 24px; }
+.wf-narrow {
+  width: 320px;
+  max-width: 100%;
+  border: 2px solid var(--strong);
+  border-radius: 18px;
+  padding: 10px;
+  background: var(--white);
+}
+.wf-narrow .wf-app { padding: 0 10px 24px; max-width: none; }
+.wf-narrow .wf-header { padding: 10px 0; }
+.wf-narrow .wf-top-meta { display: none; }
+.wf-narrow .wf-main { padding-top: 16px; }
+.wf-narrow .wf-h1 { font-size: 22px; }
+.wf-narrow .wf-h2 { font-size: 15px; }
+.wf-narrow .wf-filter ul { flex-direction: column; gap: 4px; }
+.wf-narrow .wf-filter { display: block; }
+.wf-narrow .wf-group { padding: 10px 12px; }
+.wf-narrow .wf-group-head { flex-wrap: wrap; gap: 2px 10px; }
+.wf-narrow .wf-group-title { width: 100%; }
+.wf-narrow .wf-group-count { margin-left: 0; width: 100%; }
+.wf-narrow .wf-req-list { padding-left: 10px; }
+.wf-narrow .wf-req-list a { display: inline-block; }
+.wf-narrow .wf-dl { grid-template-columns: 1fr 1fr; gap: 10px; }
+.wf-narrow .wf-form-actions { flex-direction: column; align-items: stretch; }
+.wf-narrow .wf-form-actions .wf-btn { width: 100%; text-align: center; }
+.wf-narrow .wf-actions { flex-direction: column; align-items: flex-start; gap: 6px; }
+.wf-narrow .wf-page-head { flex-direction: column; gap: 10px; }
+.wf-narrow .wf-breadcrumb ol { font-size: 12px; }
+
+/* ---------- accessibility annotation layer ---------- */
+.wf-anno {
+  display: none;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--strong);
+  color: var(--white);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+body.wf-annotate .wf-anno { display: inline-block; }
+.wf-legend {
+  display: none;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  background: var(--box);
+  padding: 14px 18px;
+  margin-top: 18px;
+  max-width: 620px;
+}
+body.wf-annotate .wf-legend { display: block; }
+.wf-legend h2 { font-size: 15px; margin: 0 0 8px; }
+.wf-legend ol { margin: 0; padding-left: 20px; }
+.wf-legend li { margin: 4px 0; font-size: 13px; }
+
+.wf-toggle { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+
+/* ---------- narrow-screen note ---------- */
+.wf-note { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
+
+@media (max-width: 720px) {
+  .wf-page-head { flex-direction: column; }
+  .wf-dl { grid-template-columns: 1fr; }
+  .wf-actions { flex-direction: row; flex-wrap: wrap; }
+}
+
+/* ---------- document-type sidebar (persistent) ---------- */
+.wf-sidebar {
+  float: left;
+  width: 190px;
+  margin: 0 24px 16px 0;
+  padding: 8px 12px 8px 0;
+  border-right: 1px solid var(--line);
+}
+.wf-sidebar-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.wf-sidebar ul { list-style: none; margin: 0; padding: 0; }
+.wf-sidebar li { margin: 4px 0; }
+.wf-sidebar a { text-decoration: none; color: var(--strong); display: block; }
+.wf-sidebar a[aria-current="page"] { color: var(--ink); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.wf-sidebar-toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  cursor: pointer;
+}
+.wf-main::after { content: ""; display: block; clear: both; }
+.wf-narrow .wf-sidebar { float: none; width: auto; border-right: 0; border-bottom: 1px solid var(--line); margin: 0 0 12px; padding: 0 0 8px; }
+.wf-narrow .wf-sidebar ul { display: none; }
+.wf-narrow .wf-sidebar ul[aria-expanded="true"] { display: block; }
+
+/* ==========================================================================
+   Review package scaffolding (single-file MOCK review)
+   Not part of the designed interface: chrome, landing, deck, prototype frame.
+   Scoped to body.wf-package so standalone view files keep their old layout.
+   ========================================================================== */
+
+body.wf-package { background: #e5e7eb; }
+
+.wf-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- reviewer chrome ---------- */
+body.wf-package .wf-chrome {
+  background: #1f2937;
+  color: #f9fafb;
+  padding: 8px 20px;
+  font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+body.wf-package .wf-chrome-title { font-weight: 700; }
+body.wf-package .wf-chrome-label {
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+body.wf-package .wf-chrome nav { display: flex; flex-wrap: wrap; gap: 6px; }
+body.wf-package .wf-chrome a {
+  color: #f9fafb;
+  text-decoration: none;
+  padding: 3px 10px;
+  border: 1px solid #4b5563;
+  border-radius: 999px;
+}
+body.wf-package .wf-chrome a[aria-current="page"] {
+  background: #f9fafb;
+  border-color: #f9fafb;
+  color: #111827;
+  font-weight: 700;
+}
+body.wf-package .wf-chrome-meta { margin-left: auto; color: #d1d5db; font-size: 12px; }
+
+/* ---------- review sections ---------- */
+body.wf-package .wf-review {
+  display: none;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 30px 24px 64px;
+}
+body.wf-package .wf-review.is-active { display: block; }
+
+/* ---------- landing ---------- */
+.wf-index-head { border-bottom: 1px solid var(--line); padding-bottom: 16px; }
+.wf-index-head h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; }
+.wf-index-head .wf-lede { font-size: 15px; color: var(--strong); margin: 0; max-width: 780px; }
+.wf-index-kicker {
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+.wf-meta-table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 13px; }
+.wf-meta-table th,
+.wf-meta-table td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.wf-meta-table th { width: 190px; font-weight: 700; color: var(--strong); }
+.wf-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+.wf-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 26px;
+}
+.wf-card {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  padding: 18px 20px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.wf-card:hover,
+.wf-card:focus-visible { border-color: var(--strong); }
+.wf-card-kind { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.wf-card h2 { font-size: 19px; margin: 4px 0 6px; }
+.wf-card p { margin: 0; font-size: 13px; color: var(--muted); }
+.wf-coverage { margin-top: 30px; }
+.wf-coverage h2 { font-size: 17px; margin: 0 0 8px; }
+.wf-coverage table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.wf-coverage th,
+.wf-coverage td { text-align: left; border-bottom: 1px solid var(--line); padding: 7px 8px 7px 0; vertical-align: top; }
+.wf-coverage th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.wf-coverage td.wf-count-cell { width: 70px; color: var(--muted); }
+
+/* ---------- design deck ---------- */
+body.wf-package .wf-deck-stage {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 26px 30px 24px;
+  min-height: 520px;
+}
+.wf-slide { display: none; }
+.wf-slide.is-active { display: block; }
+.wf-slide-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+.wf-slide-ref { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 12px; color: var(--muted); }
+.wf-slide h2 { font-size: 26px; line-height: 1.2; margin: 0 0 8px; }
+.wf-slide .wf-lede { font-size: 15px; color: var(--strong); margin: 0 0 4px; max-width: 820px; }
+.wf-slide-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 18px; }
+.wf-slide-cols h3 {
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.wf-slide-cols ul { margin: 0; padding-left: 18px; }
+.wf-slide-cols li { margin: 0 0 7px; font-size: 14px; line-height: 1.45; }
+.wf-slide-cols p { font-size: 14px; margin: 0 0 8px; }
+.wf-slide-links {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+  font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  align-items: baseline;
+}
+.wf-slide-links span { color: var(--muted); }
+.wf-deck-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }
+.wf-deck-bar .wf-counter { margin-left: auto; font-size: 13px; color: var(--muted); }
+.wf-deck-hint { font-size: 12px; color: var(--muted); }
+.wf-deck-list { margin: 14px 0 0; padding-left: 20px; columns: 2; column-gap: 32px; font-size: 13px; }
+.wf-deck-list li { margin: 0 0 6px; break-inside: avoid; }
+
+/* ---------- platform prototype ---------- */
+body.wf-package .wf-proto {
+  display: none;
+  position: static;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+}
+body.wf-package .wf-proto.is-active { display: block; }
+body.wf-package .wf-proto-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #f3f4f6;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 20px;
+  font-size: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+body.wf-package .wf-proto-nav .wf-proto-title { font-weight: 700; }
+body.wf-package .wf-proto-nav ul {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin: 0;
+  padding: 0;
+}
+body.wf-package .wf-proto-nav li { margin: 0; }
+body.wf-package .wf-proto-nav a {
+  display: inline-block;
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  text-decoration: none;
+  color: var(--strong);
+}
+body.wf-package .wf-proto-nav a[aria-current="true"] {
+  background: var(--strong);
+  border-color: var(--strong);
+  color: var(--white);
+  font-weight: 700;
+}
+body.wf-package .wf-proto-nav .wf-nav-group {
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-left: 4px;
+}
+.wf-frame-wrap { overflow: hidden; padding: 16px 0 24px; }
+.wf-frame-label {
+  max-width: 1440px;
+  margin: 0 auto 6px;
+  padding: 0 20px;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.wf-frame-label strong { color: var(--strong); }
+.wf-frame {
+  width: 1440px;
+  margin: 0 auto;
+  transform-origin: top left;
+  background: var(--white);
+  border: 1px solid #9ca3af;
+}
+body.wf-package .wf-screen {
+  padding: 0;
+  background: var(--white);
+  min-height: 900px;
+  display: flex;
+  flex-direction: column;
+}
+body.wf-package .wf-screen > .wf-app { flex: 1 0 auto; display: flex; flex-direction: column; width: 100%; }
+body.wf-package .wf-screen > .wf-app > .wf-footer { margin-top: auto; }
+body.wf-package .wf-screen > .wf-narrow-wrap { flex: 1 0 auto; }
+body.wf-package .wf-screen[hidden] { display: none; }
+
+/* desktop page layout: persistent sidebar column beside the page body */
+body.wf-package .wf-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 30px;
+  align-items: stretch;
+}
+body.wf-package .wf-layout > .wf-sidebar {
+  float: none;
+  width: auto;
+  margin: 0;
+  padding: 2px 20px 2px 0;
+  border-right: 0;
+}
+body.wf-package .wf-layout > .wf-main {
+  padding: 0 0 0 30px;
+  min-width: 0;
+  border-left: 1px solid var(--line);
+}
+body.wf-package .wf-main::after { content: none; }
+body.wf-package .wf-layout > .wf-main > .wf-error-page { margin-top: 30px; }
+
+/* 320 px screens live on the same 1440 canvas, beside their legend */
+body.wf-package .wf-narrow-wrap { padding: 24px; }
+body.wf-package .wf-narrow .wf-layout { display: block; }
+body.wf-package .wf-narrow .wf-layout > .wf-sidebar { border-right: 0; border-bottom: 1px solid var(--line); padding: 0 0 8px; margin: 0 0 12px; }
+body.wf-package .wf-narrow .wf-layout > .wf-main { border-left: 0; padding-left: 0; }
+body.wf-package .wf-narrow .wf-dl { grid-template-columns: 1fr; }
+body.wf-package .wf-readonly-block { margin-top: 20px; }
+body.wf-package .wf-narrow .wf-sidebar ul { display: block; }
+body.wf-package .wf-narrow .wf-sidebar ul[hidden] { display: none; }
+
+@media (max-width: 900px) {
+  .wf-slide-cols { grid-template-columns: 1fr; }
+  .wf-deck-list { columns: 1; }
+}
+
+/* Long, unbreakable titles wrap inside their row (list and record views). */
+body.wf-package .wf-group-title,
+body.wf-package .wf-group-title a,
+body.wf-package .wf-req-list a,
+body.wf-package .wf-other-list a,
+body.wf-package .wf-record-section .wf-text {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+body.wf-package .wf-btn[disabled] {
+  opacity: .45;
+  cursor: default;
+}
+</style>
+</head>
+<body class="wf-package wf-annotate" data-mock-id="MOCK-0001">
+
+<header class="wf-chrome">
+  <span class="wf-chrome-title">MOCK-0001 · TASK-6</span>
+  <span class="wf-chrome-label">Review scaffolding — not part of the design</span>
+  <nav aria-label="Review contents">
+    <a href="#index" data-route="index">Overview</a>
+    <a href="#deck" data-route="deck">Design deck</a>
+    <a href="#web" data-route="web">Web prototype</a>
+  </nav>
+  <span class="wf-chrome-meta">Status: approved · web · 25 views</span>
+</header>
+
+<!-- ===================================================================== -->
+<!-- 1. REVIEW LANDING                                                     -->
+<!-- ===================================================================== -->
+<section class="wf-review wf-index is-active" data-review="index" data-screen="index">
+  <div class="wf-index-head">
+    <p class="wf-index-kicker">MOCK-0001 · Review package · Status approved</p>
+    <h1>TASK-6 — Serve offline browser access for requirement content</h1>
+    <p class="wf-lede">Layout review for the first local-browser increment: listing, viewing and editing business-requirement and non-functional-requirement groups and requirements, plus the edit recovery states, error pages, and the 320 CSS-px / accessibility behaviour. Open the design deck for the rationale, then the web prototype to click through every view.</p>
+  </div>
+
+  <table class="wf-meta-table">
+    <caption class="wf-visually-hidden">Review package metadata</caption>
+    <tbody>
+      <tr><th scope="row">Ticket</th><td>TASK-6 — Serve offline browser access for requirement content</td></tr>
+      <tr><th scope="row">Milestone</th><td>m-1</td></tr>
+      <tr><th scope="row">Specification</th><td><code>docs/specifications/browser-requirements.md</code> §4–§10 and the UI design handoff</td></tr>
+      <tr><th scope="row">UI description</th><td><code>docs/specifications/ui/browser-requirements-ui.md</code></td></tr>
+      <tr><th scope="row">Platform</th><td>web — desktop canvas 1440 × 900 CSS px, narrow review at 320 CSS px</td></tr>
+      <tr><th scope="row">Approval status</th><td><span class="wf-pill">approved</span> — explicitly approved by the user on 2026-11-03 (UTC). This package may be implemented as final UI.</td></tr>
+      <tr><th scope="row">Convention</th><td>Grayscale wireframe, layout and interaction only. No colour palette, brand, library, framework, or component set is implied.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="wf-cards">
+    <a class="wf-card" href="#deck">
+      <span class="wf-card-kind">Review content 1</span>
+      <h2>Design deck</h2>
+      <p>12 slides: cover, 9 grouped view slides with “What it shows” and “Why this way”, cross-cutting decisions, open questions and approval status. Page with the buttons or ← →.</p>
+    </a>
+    <a class="wf-card" href="#web">
+      <span class="wf-card-kind">Review content 2</span>
+      <h2>Web prototype</h2>
+      <p>25 clickable views: requirement list (6), record view (5), edit form (6), error pages (6), responsive 320 px with accessibility annotations (2).</p>
+    </a>
+  </div>
+
+  <div class="wf-coverage">
+    <h2>Views in the web prototype</h2>
+    <table>
+      <thead>
+        <tr><th scope="col">Group</th><th scope="col">Views</th><th scope="col">States drawn</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="#web/list-business">Requirement list</a></td>
+          <td class="wf-count-cell">6</td>
+          <td>Business requirements (default), non-functional requirements, empty project, one category empty, group with no members, many groups and long titles</td>
+        </tr>
+        <tr>
+          <td><a href="#web/view-req-business">Record view</a></td>
+          <td class="wf-count-cell">5</td>
+          <td>Business requirement with story, non-functional requirement without story, business group, non-functional group, unresolved group reference</td>
+        </tr>
+        <tr>
+          <td><a href="#web/edit-business">Edit form</a></td>
+          <td class="wf-count-cell">6</td>
+          <td>Pristine business, pristine non-functional, dirty, 422 validation errors, 409 conflict, record view after save</td>
+        </tr>
+        <tr>
+          <td><a href="#web/error-404-unknown">Error page</a></td>
+          <td class="wf-count-cell">6</td>
+          <td>404 unknown, 404 deprecated, 400, 405, 415, 500 — one layout, six messages</td>
+        </tr>
+        <tr>
+          <td><a href="#web/responsive-list-320">Responsive and accessibility</a></td>
+          <td class="wf-count-cell">2</td>
+          <td>320 CSS-px list and 320 CSS-px edit form, each beside a numbered annotation legend</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="wf-note">The prototype navigation band above each view lists every view of the web platform, so the reviewer never needs a second file. Hash routes (<code>#web/&lt;view&gt;</code>) are review scaffolding; the designed pages are ordinary server-rendered pages.</p>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<!-- 2. DESIGN DECK                                                        -->
+<!-- ===================================================================== -->
+<section class="wf-review wf-deck" data-review="deck" data-screen="deck" aria-label="Design deck">
+  <div class="wf-deck-stage">
+
+    <article class="wf-slide is-active" id="deck-1" data-slide="1" data-screen="1">
+      <div class="wf-slide-head">
+        <p class="wf-index-kicker">Cover</p>
+        <p class="wf-slide-ref">TASK-6 · m-1</p>
+      </div>
+      <h2>Papyrus local browser: requirement content</h2>
+      <p class="wf-lede">One wireframe package for listing, viewing and editing business-requirement and non-functional-requirement records from a project-local, offline browser interface.</p>
+      <div class="wf-slide-cols">
+        <section>
+          <h3>Scope</h3>
+          <ul>
+            <li>Requirement list for the two independent document categories.</li>
+            <li>Record view for requirements and groups, including an unresolved group reference.</li>
+            <li>Edit form for the documented content fields, with dirty, 422 and 409 states.</li>
+            <li>One error layout for every HTML error status.</li>
+            <li>320 CSS-px behaviour and accessibility annotations.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Package contents</h3>
+          <ul>
+            <li><strong>Landing</strong> — ticket, milestone, sources, approval status, one button per review content.</li>
+            <li><strong>This deck</strong> — 12 slides: 9 view slides, decisions, open questions.</li>
+            <li><strong>Web prototype</strong> — 25 clickable views with a full view navigation band.</li>
+            <li><strong>Status</strong> — <span class="wf-pill">approved</span>; explicitly approved by the user on 2026-11-03 (UTC).</li>
+            <li><strong>Convention</strong> — grayscale, layout only, no technology choices.</li>
+          </ul>
+        </section>
+      </div>
+      <p class="wf-slide-links"><span>Start here:</span><a href="#web/list-business">Open the requirement list</a><a href="#deck/2">Next: the shell and sidebar</a></p>
+    </article>
+
+    <article class="wf-slide" id="deck-2" data-slide="2" data-screen="2">
+      <div class="wf-slide-head">
+        <p class="wf-index-kicker">View 1 of 9 · shell</p>
+        <p class="wf-slide-ref">#web/list-business</p>
+      </div>
+      <h2>One shell, one persistent left sidebar</h2>
+      <p class="wf-lede">Every page shares the same frame: a header with product, project and the offline note; a left navigation labelled “Document types”; the page body; a footer.</p>
+      <div class="wf-slide-cols">
+        <section>
+          <h3>What it shows</h3>
+          <ul>
+            <li>Header: “Papyrus”, the project name, and a right-aligned “Local browser / offline · 127.0.0.1:6420” note.</li>
+            <li>Persistent left <code>nav</code> “Document types” with vertical choices: Business requirements, Non-functional requirements.</li>
+            <li>The current type is bold, underlined and marked <code>aria-current="page"</code>.</li>
+            <li>Main panel with exactly one <code>h1</code>; footer stating that every page is served from this project with no network access.</li>
+            <li>The same shell, including the type navigation, is drawn on list, record, edit and error pages.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Why this way</h3>
+          <ul>
+            <li><strong>Sidebar, not a top filter.</strong> Document type is a stable axis of the record space, not a transient query, so it stays visible on every page and at every depth.</li>
+            <li><strong>It scales by addition.</strong> A new record type is one more row; a horizontal filter would compete with the page title and the breadcrumb.</li>
+            <li><strong>Three cues</strong> — bold, underline, <code>aria-current</code> — so colour is never the only signal.</li>
+            <li><strong>No top navigation menu.</strong> The list is the only top-level page; a second navigation layer would add targets without destinations.</li>
+            <li><strong>Rejected:</strong> a top segmented control. It reads as a temporary query, pushes the title down, and does not survive the move from list to record view.</li>
+          </ul>
+        </section>
+      </div>
+      <p class="wf-slide-links"><span>Open:</span><a href="#web/list-business">Requirement list with the persistent sidebar</a><a href="#web/view-req-business">Same shell on a record view</a></p>
+    </article>
+
+    <article class="wf-slide" id="deck-3" data-slide="3" data-screen="3">
+      <div class="wf-slide-head">
+        <p class="wf-index-kicker">View 2 of 9 · categories</p>
+        <p class="wf-slide-ref">#web/list-business · #web/list-nonfunctional</p>
+      </div>
+      <h2>Two independent categories, one at a time</h2>
+      <p class="wf-lede">The sidebar selects the category: business requirements by default, non-functional requirements on request. Only the selected section renders; the other category is absent, not empty.</p>
+      <div class="wf-slide-cols">
+        <section>
+          <h3>What it shows</h3>
+          <ul>
+            <li>Section heading with the group and requirement counts right-aligned.</li>
+            <li>Each group is one bordered row: group ID and title as one link, member count, then the member requirements as a nested list of ID + title links.</li>
+            <li>A trailing “Other requirements” subsection for requirements whose stored group reference does not resolve.</li>
+            <li>Switching category keeps the page structure and changes only which section is rendered.</li>
+            <li>Active elements: 2 sidebar links, 1 group link per group, 1 link per member, 1 link per “Other” row.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Why this way</h3>
+          <ul>
+            <li><strong>Separate categories, not a filter.</strong> Business and non-functional records have their own directories, prefixes and group numbering; one merged list would imply a shared namespace.</li>
+            <li><strong>One section per page</strong> removes a scroll region and the “which section am I in” question.</li>
+            <li><strong>Counts on the header line</strong> so volume is known before scanning and the title keeps its line.</li>
+            <li><strong>Members inside their group</strong> so a requirement is one click away and the two-level structure is visible without opening the group.</li>
+            <li><strong>Rejected:</strong> a single page listing both categories (the earlier design). It duplicated headings, doubled the scroll and made the sidebar look like a filter.</li>
+          </ul>
+        </section>
+      </div>
+      <p class="wf-slide-links"><span>Open:</span><a href="#web/list-business">Business requirements (default)</a><a href="#web/list-nonfunctional">Non-functional requirements</a></p>
+    </article>
+
+    <article class="wf-slide" id="deck-4" data-slide="4" data-screen="4">
+      <div class="wf-slide-head">
+        <p class="wf-index-kicker">View 3 of 9 · list states</p>
+        <p class="wf-slide-ref">#web/list-empty-project · #web/list-empty-type · #web/list-group-empty · #web/list-long</p>
+      </div>
+      <h2>Empty and edge states keep their frame</h2>
+      <p class="wf-lede">Four states of the same page: no records at all, the selected category empty while the other has records, a group with no members, and many groups with long or unbreakable titles.</p>
+      <div class="wf-slide-cols">
+        <section>
+          <h3>What it shows</h3>
+          <ul>
+            <li>Empty project: the selected section keeps its heading and the count reads “No groups”; a dashed box states that no records were found and that records are created from the command line.</li>
+            <li>Empty category: only the selected section renders, with its empty state and a pointer to the other category in the sidebar.</li>
+            <li>Group with no members: the row is kept, the count reads “No requirements”, and an in-row note says so.</li>
+            <li>Long content: group titles wrap; an unbreakable requirement title wraps inside the row; no ellipsis and no horizontal scrolling.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Why this way</h3>
+          <ul>
+            <li><strong>Dashed boxes</strong> read as absence, not as a disabled control, and the sentence names both cause and remedy.</li>
+            <li><strong>The header keeps its shape</strong> with “No groups” and zero counts, so the page does not collapse into a bare message.</li>
+            <li><strong>An empty category keeps its frame</strong> so the user learns the structure exists and only the content is missing.</li>
+            <li><strong>A group with no members stays reachable</strong>; removing it would hide a record that exists.</li>
+            <li><strong>Wrapping, never truncation:</strong> the identifying part of a title is usually at the end.</li>
+            <li><strong>Rejected:</strong> a centred empty-state hero with an illustration. It hides the page structure and implies a create action this increment does not offer.</li>
+          </ul>
+        </section>
+      </div>
+      <p class="wf-slide-links"><span>Open:</span><a href="#web/list-empty-project">Empty project</a><a href="#web/list-empty-type">Empty category</a><a href="#web/list-group-empty">Group with no members</a><a href="#web/list-long">Long content</a></p>
+    </article>
+
+    <article class="wf-slide" id="deck-5" data-slide="5" data-screen="5">
+      <div class="wf-slide-head">
+        <p class="wf-index-kicker">View 4 of 9 · record view</p>
+        <p class="wf-slide-ref">#web/view-req-business · #web/view-req-nfr</p>
+      </div>
+      <h2>Record view: identifier, title, one action</h2>
+      <p class="wf-lede">A business requirement with a user story and a non-functional requirement without one: breadcrumb, ID in monospace above the title, one right-aligned Edit action, read-only metadata, then the story and description blocks.</p>
+      <div class="wf-slide-cols">
+        <section>
+          <h3>What it shows</h3>
+          <ul>
+            <li>Breadcrumb: Requirements › owning group (when resolvable) › record ID (current, not a link).</li>
+            <li>Record ID in small monospace text, then the record title as the only <code>h1</code>.</li>
+            <li>Primary “Edit” button, right-aligned on the title line; no second action.</li>
+            <li>Read-only metadata as a definition list: Record ID, Record form, Document type, Owning group.</li>
+            <li>“User story” section only for business records that have one; “Description” with line breaks preserved and references left literal.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Why this way</h3>
+          <ul>
+            <li><strong>One primary action.</strong> Editing is the only write in this increment, so Edit is the only filled control and it sits on the title line.</li>
+            <li><strong>“Back to requirements” removed.</strong> The breadcrumb already goes up; two ways back would compete with the one action.</li>
+            <li><strong>Metadata as a definition list, not disabled inputs.</strong> Those values are facts, are never submitted, and must not look editable or take focus.</li>
+            <li><strong>The story block is omitted</strong> for non-functional records instead of shown empty, so the page has no dead region.</li>
+            <li><strong>Rejected:</strong> a toolbar with Edit, Back, Delete and Deprecate. It would advertise operations this increment does not implement.</li>
+          </ul>
+        </section>
+      </div>
+      <p class="wf-slide-links"><span>Open:</span><a href="#web/view-req-business">Business requirement with story</a><a href="#web/view-req-nfr">Non-functional requirement without story</a></p>
+    </article>
+
+    <article class="wf-slide" id="deck-6" data-slide="6" data-screen="6">
+      <div class="wf-slide-head">
+        <p class="wf-index-kicker">View 5 of 9 · group pages</p>
+        <p class="wf-slide-ref">#web/view-group-business · #web/view-group-nfr · #web/view-unresolved</p>
+      </div>
+      <h2>Group pages list what the group contains</h2>
+      <p class="wf-lede">A group page must answer “what is in here?”. After its own fields it lists the member requirements; an unresolved group reference on a requirement page stays plain text.</p>
+      <div class="wf-slide-cols">
+        <section>
+          <h3>What it shows</h3>
+          <ul>
+            <li>Business group with a story and “None (group record)” as owning group.</li>
+            <li>Non-functional group without a story.</li>
+            <li>“Requirements in this group” section: ID + title links in ascending ID order.</li>
+            <li>Unresolved <code>## Group</code> reference shown as stored text with “(not an active group)”, not a link, and absent from the breadcrumb.</li>
+            <li>Active elements: breadcrumb, owning-group link, Edit, member links.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Why this way</h3>
+          <ul>
+            <li><strong>Member list on the group page</strong> turns the group into a hub; linking back to a filtered list would lose the group context the user came for.</li>
+            <li><strong>The member rows reuse the list’s ID + title link shape</strong>, so both screens read the same way and link text stays descriptive out of context.</li>
+            <li><strong>Unresolved references are plain text</strong> with a note: linking to a 404 would be a trap.</li>
+            <li><strong>“None (group record)” states absence explicitly</strong>; a blank field would read as missing data.</li>
+            <li><strong>Rejected:</strong> a “group contents” table with columns. At this size the list is shorter, wraps better, and matches the requirement list.</li>
+          </ul>
+        </section>
+      </div>
+      <p class="wf-slide-links"><span>Open:</span><a href="#web/view-group-business">Business group</a><a href="#web/view-group-nfr">Non-functional group</a><a href="#web/view-unresolved">Unresolved group reference</a></p>
+    </article>
+
+    <article class="wf-slide" id="deck-7" data-slide="7" data-screen="7">
+      <div class="wf-slide-head">
+        <p class="wf-index-kicker">View 6 of 9 · edit form</p>
+        <p class="wf-slide-ref">#web/edit-business · #web/edit-nonfunctional</p>
+      </div>
+      <h2>Edit form: known facts above, editable fields below</h2>
+      <p class="wf-lede">Pristine business form with title, user story and description; pristine non-functional form with title and description only. Read-only metadata first, help text under each label, Save and Cancel last.</p>
+      <div class="wf-slide-cols">
+        <section>
+          <h3>What it shows</h3>
+          <ul>
+            <li>Breadcrumb Requirements › record ID › Edit (current).</li>
+            <li><code>h1</code> “Edit &lt;ID&gt;” and the current title as a muted line.</li>
+            <li>Read-only metadata block; its owning group is a link, the other values are never inputs.</li>
+            <li>Title text input marked required, with help “1 to 200 characters · shown in lists and headings”.</li>
+            <li>User story textarea on business forms only; description textarea on all forms.</li>
+            <li>Hidden <code>version</code> token drawn as a dashed annotation; primary “Save changes” and outlined “Cancel” link.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Why this way</h3>
+          <ul>
+            <li><strong>Metadata first</strong> so the user confirms what is being edited before typing; its flat, unboxed treatment separates it from the inputs.</li>
+            <li><strong>Labels above fields with the rule beneath</strong>, so the constraint is read before the mistake, not after it.</li>
+            <li><strong>The story field exists only on business forms</strong>; the non-functional form is shorter rather than showing a disabled control.</li>
+            <li><strong>Save is filled, Cancel is an outlined link:</strong> one primary action, one exit that never writes.</li>
+            <li><strong>Rejected:</strong> placeholder-only labels. They vanish as soon as the user types and leave the field unlabelled.</li>
+          </ul>
+        </section>
+      </div>
+      <p class="wf-slide-links"><span>Open:</span><a href="#web/edit-business">Pristine business requirement</a><a href="#web/edit-nonfunctional">Pristine non-functional requirement</a></p>
+    </article>
+
+    <article class="wf-slide" id="deck-8" data-slide="8" data-screen="8">
+      <div class="wf-slide-head">
+        <p class="wf-index-kicker">View 7 of 9 · recovery</p>
+        <p class="wf-slide-ref">#web/edit-dirty · #web/edit-errors · #web/edit-conflict · #web/view-after-save</p>
+      </div>
+      <h2>Recovery states: dirty, 422, 409</h2>
+      <p class="wf-lede">Unsaved changes; a validation failure with a summary, linked errors and every typed value kept; a conflict where nothing was written and the attempted values are shown read-only.</p>
+      <div class="wf-slide-cols">
+        <section>
+          <h3>What it shows</h3>
+          <ul>
+            <li>Dirty: an “Unsaved changes” status beside the heading; Save stays enabled; the leave guard is script-only.</li>
+            <li>422: summary box with <code>role="alert"</code>, “There is a problem”, one link per error, “Nothing was saved. Your typed values are kept below.”</li>
+            <li>Field errors directly below the field, prefixed “!”, with <code>aria-invalid="true"</code> and a thicker border.</li>
+            <li>409: its own page — “This record changed on disk”, the contract message, primary “Reload the form”, then the read-only copy of the attempted values.</li>
+            <li>After save: the ordinary record view re-read from disk, with no success banner.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Why this way</h3>
+          <ul>
+            <li><strong>The summary sits at the top of the form</strong>, under the metadata and above the first field: it is the first thing after the heading and its links jump to each field.</li>
+            <li><strong>Nothing typed is discarded</strong>, so recovery is fix-and-resubmit, and the summary says so.</li>
+            <li><strong>Dirty is a status line, not a disabled Save.</strong> Disabling Save would need script and break the no-JavaScript requirement.</li>
+            <li><strong>Conflict is its own page</strong> with one primary recovery; the read-only copy comes last so it can be copied first.</li>
+            <li><strong>Rejected:</strong> a transient toast for errors. It is not focusable, disappears, and cannot link to the field at fault.</li>
+          </ul>
+        </section>
+      </div>
+      <p class="wf-slide-links"><span>Open:</span><a href="#web/edit-dirty">Dirty</a><a href="#web/edit-errors">422 validation errors</a><a href="#web/edit-conflict">409 conflict</a><a href="#web/view-after-save">Record view after save</a></p>
+    </article>
+
+    <article class="wf-slide" id="deck-9" data-slide="9" data-screen="9">
+      <div class="wf-slide-head">
+        <p class="wf-index-kicker">View 8 of 9 · errors</p>
+        <p class="wf-slide-ref">#web/error-404-unknown · … · #web/error-500</p>
+      </div>
+      <h2>One error layout, six messages</h2>
+      <p class="wf-lede">A large monospace status code, a plain-language heading, one explanatory sentence, a muted hint and a single “Back to requirements” link. Variants: 404 unknown, 404 deprecated, 400, 405, 415, 500.</p>
+      <div class="wf-slide-cols">
+        <section>
+          <h3>What it shows</h3>
+          <ul>
+            <li>The status code is the largest element; the readable message follows as the <code>h1</code>.</li>
+            <li>One sentence of explanation and one muted recovery hint.</li>
+            <li>Exactly one link: “Back to requirements”.</li>
+            <li>The shell stays (header, type navigation, footer) so the page still looks like Papyrus.</li>
+            <li>Six screens in the prototype, one per status.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Why this way</h3>
+          <ul>
+            <li><strong>The taxonomy lives in the words, not the layout:</strong> users learn one recovery pattern and apply it to every failure.</li>
+            <li><strong>The status code is largest</strong> because it is what a user reports or searches for.</li>
+            <li><strong>Exactly one way out.</strong> No retry button, no imitation of browser history, no action that cannot succeed.</li>
+            <li><strong>No paths, request bodies or internal detail</strong>; the two 404 variants stay deliberately non-revealing about deprecation.</li>
+            <li><strong>Rejected:</strong> a distinct layout or illustration per status. It forces the user to relearn recovery on every failure.</li>
+          </ul>
+        </section>
+      </div>
+      <p class="wf-slide-links"><span>Open:</span><a href="#web/error-404-unknown">404 unknown</a><a href="#web/error-404-deprecated">404 deprecated</a><a href="#web/error-400">400</a><a href="#web/error-405">405</a><a href="#web/error-415">415</a><a href="#web/error-500">500</a></p>
+    </article>
+
+    <article class="wf-slide" id="deck-10" data-slide="10" data-screen="10">
+      <div class="wf-slide-head">
+        <p class="wf-index-kicker">View 9 of 9 · narrow and assistive technology</p>
+        <p class="wf-slide-ref">#web/responsive-list-320 · #web/responsive-edit-320</p>
+      </div>
+      <h2>320 px and accessibility, drawn beside a legend</h2>
+      <p class="wf-lede">The list and the edit form at 320 CSS px, each next to a numbered annotation legend: stacked header, collapsed type toggle, stacked group rows, full-width fields, stacked Save and Cancel.</p>
+      <div class="wf-slide-cols">
+        <section>
+          <h3>What it shows</h3>
+          <ul>
+            <li>A 1:1 320-px frame beside a numbered legend, on the same 1440-px review canvas.</li>
+            <li>Header stacks; the “Local browser” note is omitted at this width.</li>
+            <li>The document-type sidebar collapses to one labelled toggle with <code>aria-expanded</code> and <code>aria-controls</code>; the links still work without script.</li>
+            <li>Group rows stack: ID, wrapping title, member count on its own line, then member links.</li>
+            <li>Edit fields are full width; Save and Cancel stack and span the column.</li>
+            <li>Numbered annotations: landmarks, heading order, sidebar semantics, link text, focus ring, labels, metadata as a definition list, error wiring, contrast, no-JavaScript, hidden version token.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Why this way</h3>
+          <ul>
+            <li><strong>320 px is the narrowest supported width</strong> and the place where every stacking decision shows.</li>
+            <li><strong>A 1:1 frame plus a numbered legend</strong> keeps the rules auditable without a second document.</li>
+            <li><strong>Long words wrap inside the row</strong> and text never scrolls sideways, so 200% zoom behaves the same way.</li>
+            <li><strong>Save and Cancel stack and span the column</strong>, keeping a comfortable target instead of shrinking the primary action.</li>
+            <li><strong>Rejected:</strong> arrows drawn over the wireframe. They obscure the layout; numbers can be cited one by one.</li>
+          </ul>
+        </section>
+      </div>
+      <p class="wf-slide-links"><span>Open:</span><a href="#web/responsive-list-320">320 px list with annotations</a><a href="#web/responsive-edit-320">320 px edit form with annotations</a></p>
+    </article>
+
+    <article class="wf-slide" id="deck-11" data-slide="11" data-screen="11">
+      <div class="wf-slide-head">
+        <p class="wf-index-kicker">Cross-cutting decisions</p>
+        <p class="wf-slide-ref">all views</p>
+      </div>
+      <h2>Decisions that apply to every view</h2>
+      <p class="wf-lede">These rules hold across the whole prototype; each is visible somewhere in the 25 screens.</p>
+      <div class="wf-slide-cols">
+        <section>
+          <h3>Navigation and state</h3>
+          <ul>
+            <li>Plain links everywhere: sidebar category, group, member, breadcrumb, Edit, Cancel, error recovery. No control depends on script.</li>
+            <li>The list is the only top-level page; record, edit and error pages hang off it and always offer a way back through the breadcrumb or the error link.</li>
+            <li>Empty and error states keep the type navigation visible, so recovery is one click and the user never lands in a dead end.</li>
+            <li>Nothing on any page creates, deprecates, restores, deletes, moves or searches records.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Responsive, accessible, technology-neutral</h3>
+          <ul>
+            <li>One stacking behaviour for 320 px and 200% zoom; no horizontal scrolling of text.</li>
+            <li>Landmarks <code>header</code>, <code>nav</code>, <code>main</code>, <code>footer</code>; one <code>h1</code> per page; no skipped heading level.</li>
+            <li>Every control has a visible label; errors are associated and announced; the focus ring is 2 px with 2 px offset.</li>
+            <li>Status and errors are never conveyed by colour alone.</li>
+            <li>No library, framework, component set, icon font or brand colour is implied anywhere.</li>
+          </ul>
+        </section>
+      </div>
+      <p class="wf-slide-links"><span>Open:</span><a href="#web/list-empty-project">An empty state that keeps its frame</a><a href="#web/error-500">An error page that keeps the shell</a><a href="#web/responsive-edit-320">The narrow edit form</a></p>
+    </article>
+
+    <article class="wf-slide" id="deck-12" data-slide="12" data-screen="12">
+      <div class="wf-slide-head">
+        <p class="wf-index-kicker">Open questions and approval</p>
+        <p class="wf-slide-ref">MOCK-0001 · approved</p>
+      </div>
+      <h2>Open items before implementation</h2>
+      <p class="wf-lede">These are design decisions or specification gaps found while mocking up. Each needs confirmation or a specification note before the UI is implemented.</p>
+      <div class="wf-slide-cols">
+        <section>
+          <h3>Design and specification gaps</h3>
+          <ul>
+            <li><strong>Unknown sections are preserved but not displayed.</strong> Show them read-only? (Recommended: yes — users cannot see what they are preserving.)</li>
+            <li><strong>Success feedback:</strong> after a save the record view is shown with no banner. Confirm silence, or add a brief inline “Saved” status.</li>
+            <li><strong>Dirty state:</strong> Save stays enabled and the leave guard is script-only. Confirm.</li>
+            <li><strong>404 wording:</strong> unknown and deprecated use distinct but non-revealing messages. Confirm which ships.</li>
+            <li><strong>Project name</strong> in the header comes from the project directory; confirm the source.</li>
+            <li><strong>Edit metadata</strong> shows the owning group ID only; confirm that is enough at 320 px.</li>
+            <li><strong>Conflict page</strong> repeats attempted values read-only; confirm this addition.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Package and approval</h3>
+          <ul>
+            <li><strong>Single-category model:</strong> the specification (§4.6–4.9) still describes a two-section list with <code>type=all</code>; this package follows the revised persistent sidebar with two independent categories and no “all”. The specification wording is updated only after approval.</li>
+            <li><strong>Empty project copy</strong> speaks about the project (“no requirement records were found”) while only the selected category renders. Confirm this wording.</li>
+            <li><strong>Counts</strong> exclude deprecated members; wording is “2 requirements” / “1 requirement” / “No requirements”.</li>
+            <li><strong>Header note</strong> prints the bind address; confirm it is wanted on a non-loopback bind.</li>
+            <li><strong>Status:</strong> <span class="wf-pill">approved</span> — explicitly approved by the user on 2026-11-03 (UTC).</li>
+          </ul>
+        </section>
+      </div>
+      <p class="wf-slide-links"><span>Back to:</span><a href="#index">Overview and approval status</a><a href="#web">All 25 prototype views</a></p>
+    </article>
+
+  </div>
+
+  <div class="wf-deck-bar">
+    <button class="wf-btn" type="button" id="deck-prev">← Previous</button>
+    <button class="wf-btn" type="button" id="deck-next">Next →</button>
+    <span class="wf-counter" id="deck-counter" aria-live="polite" data-slide-total="12" data-slide-current="1">1 / 12</span>
+  </div>
+  <p class="wf-deck-hint">Keyboard: ← →, PageUp / PageDown, Home / End. Deck paging is review scaffolding; it is not part of the designed interface.</p>
+</section>
+
+<!-- ===================================================================== -->
+<!-- 3. WEB PLATFORM PROTOTYPE                                             -->
+<!-- ===================================================================== -->
+<div class="wf-proto" data-platform="web">
+  <nav class="wf-proto-nav" aria-label="Web prototype views">
+    <span class="wf-proto-title">Web prototype · 25 views</span>
+    <span class="wf-nav-group">List</span>
+    <ul>
+      <li><a href="#web/list-business" data-goto="list-business" data-platform="web">Business</a></li>
+      <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional" data-platform="web">Non-functional</a></li>
+      <li><a href="#web/list-empty-project" data-goto="list-empty-project" data-platform="web">Empty project</a></li>
+      <li><a href="#web/list-empty-type" data-goto="list-empty-type" data-platform="web">Empty category</a></li>
+      <li><a href="#web/list-group-empty" data-goto="list-group-empty" data-platform="web">Empty group</a></li>
+      <li><a href="#web/list-long" data-goto="list-long" data-platform="web">Long content</a></li>
+    </ul>
+    <span class="wf-nav-group">Record</span>
+    <ul>
+      <li><a href="#web/view-req-business" data-goto="view-req-business" data-platform="web">Business req.</a></li>
+      <li><a href="#web/view-req-nfr" data-goto="view-req-nfr" data-platform="web">Non-functional req.</a></li>
+      <li><a href="#web/view-group-business" data-goto="view-group-business" data-platform="web">Business group</a></li>
+      <li><a href="#web/view-group-nfr" data-goto="view-group-nfr" data-platform="web">Non-functional group</a></li>
+      <li><a href="#web/view-unresolved" data-goto="view-unresolved" data-platform="web">Unresolved group</a></li>
+    </ul>
+    <span class="wf-nav-group">Edit</span>
+    <ul>
+      <li><a href="#web/edit-business" data-goto="edit-business" data-platform="web">Business</a></li>
+      <li><a href="#web/edit-nonfunctional" data-goto="edit-nonfunctional" data-platform="web">Non-functional</a></li>
+      <li><a href="#web/edit-dirty" data-goto="edit-dirty" data-platform="web">Dirty</a></li>
+      <li><a href="#web/edit-errors" data-goto="edit-errors" data-platform="web">422 errors</a></li>
+      <li><a href="#web/edit-conflict" data-goto="edit-conflict" data-platform="web">409 conflict</a></li>
+      <li><a href="#web/view-after-save" data-goto="view-after-save" data-platform="web">After save</a></li>
+    </ul>
+    <span class="wf-nav-group">Errors</span>
+    <ul>
+      <li><a href="#web/error-404-unknown" data-goto="error-404-unknown" data-platform="web">404 unknown</a></li>
+      <li><a href="#web/error-404-deprecated" data-goto="error-404-deprecated" data-platform="web">404 deprecated</a></li>
+      <li><a href="#web/error-400" data-goto="error-400" data-platform="web">400</a></li>
+      <li><a href="#web/error-405" data-goto="error-405" data-platform="web">405</a></li>
+      <li><a href="#web/error-415" data-goto="error-415" data-platform="web">415</a></li>
+      <li><a href="#web/error-500" data-goto="error-500" data-platform="web">500</a></li>
+    </ul>
+    <span class="wf-nav-group">320 px</span>
+    <ul>
+      <li><a href="#web/responsive-list-320" data-goto="responsive-list-320" data-platform="web">List</a></li>
+      <li><a href="#web/responsive-edit-320" data-goto="responsive-edit-320" data-platform="web">Edit</a></li>
+    </ul>
+  </nav>
+
+  <p class="wf-frame-label"><strong>Web</strong><span>Desktop canvas 1440 × 900 CSS px</span><span>Review frame — scaled to fit the window</span></p>
+  <div class="wf-frame-wrap" id="wf-frame-wrap">
+    <div class="wf-frame" id="wf-frame">
+
+      <!-- ============================================= list-business -->
+      <section class="wf-screen" data-platform="web" data-screen="list-business">
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business" aria-current="page">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <h1 class="wf-h1">Requirements</h1>
+              <p class="wf-sub">Business requirement records in this project.</p>
+
+              <section class="wf-section" aria-label="Business requirements">
+                <div class="wf-section-head">
+                  <h2 class="wf-h2">Business requirements</h2>
+                  <p class="wf-count">2 groups · 5 requirements</p>
+                </div>
+
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-group-business" data-goto="view-group-business"><span class="wf-group-id">REQ-05</span> Project Documentation Management</a></h3>
+                    <span class="wf-group-count">2 requirements</span>
+                  </div>
+                  <ul class="wf-req-list">
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-05.001</span> Manage Business Requirements</a></li>
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-05.002</span> Manage Non-Functional Requirements</a></li>
+                  </ul>
+                </article>
+
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-group-business" data-goto="view-group-business"><span class="wf-group-id">REQ-06</span> Search and Local Web Interface</a></h3>
+                    <span class="wf-group-count">2 requirements</span>
+                  </div>
+                  <ul class="wf-req-list">
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-06.001</span> Search Project Records</a></li>
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-06.002</span> Serve the Local Web Interface</a></li>
+                  </ul>
+                </article>
+
+                <section class="wf-other" aria-label="Other business requirements">
+                  <h3 class="wf-h3">Other requirements</h3>
+                  <p class="wf-other-note">Group reference does not match an active group</p>
+                  <ul class="wf-other-list">
+                    <li>
+                      <a href="#web/view-unresolved" data-goto="view-unresolved"><span class="wf-req-id">REQ-07.001</span> Export Requirement Records</a>
+                      <span class="wf-other-ref">Group: REQ-99 (not found)</span>
+                    </li>
+                  </ul>
+                </section>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ======================================== list-nonfunctional -->
+      <section class="wf-screen" data-platform="web" data-screen="list-nonfunctional" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional" aria-current="page">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <h1 class="wf-h1">Requirements</h1>
+              <p class="wf-sub">Non-functional requirement records in this project.</p>
+
+              <section class="wf-section" aria-label="Non-functional requirements">
+                <div class="wf-section-head">
+                  <h2 class="wf-h2">Non-functional requirements</h2>
+                  <p class="wf-count">2 groups · 4 requirements</p>
+                </div>
+
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-group-nfr" data-goto="view-group-nfr"><span class="wf-group-id">NFR-01</span> Product Form</a></h3>
+                    <span class="wf-group-count">2 requirements</span>
+                  </div>
+                  <ul class="wf-req-list">
+                    <li><a href="#web/view-req-nfr" data-goto="view-req-nfr"><span class="wf-req-id">NFR-01.002</span> Display, View, and Edit All Papyrus Content in a Local Browser</a></li>
+                    <li><a href="#web/view-req-nfr" data-goto="view-req-nfr"><span class="wf-req-id">NFR-01.003</span> Use the Browser Command and Interface Without Internet</a></li>
+                  </ul>
+                </article>
+
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-group-nfr" data-goto="view-group-nfr"><span class="wf-group-id">NFR-04</span> Persistence</a></h3>
+                    <span class="wf-group-count">2 requirements</span>
+                  </div>
+                  <ul class="wf-req-list">
+                    <li><a href="#web/view-req-nfr" data-goto="view-req-nfr"><span class="wf-req-id">NFR-04.001</span> Store All Saved Data as Text Files</a></li>
+                    <li><a href="#web/view-req-nfr" data-goto="view-req-nfr"><span class="wf-req-id">NFR-04.002</span> Restrict File Access to the Project Directory</a></li>
+                  </ul>
+                </article>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ======================================== list-empty-project -->
+      <section class="wf-screen" data-platform="web" data-screen="list-empty-project" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business" aria-current="page">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <h1 class="wf-h1">Requirements</h1>
+              <p class="wf-sub">Business requirement records in this project.</p>
+
+              <section class="wf-section" aria-label="Business requirements">
+                <div class="wf-section-head">
+                  <h2 class="wf-h2">Business requirements</h2>
+                  <p class="wf-count">No groups</p>
+                </div>
+                <div class="wf-empty">
+                  <p>No requirement records were found in the configured document directories.</p>
+                  <p class="wf-help">Records are created from the command line; this browser does not create records.</p>
+                </div>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- =========================================== list-empty-type -->
+      <section class="wf-screen" data-platform="web" data-screen="list-empty-type" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional" aria-current="page">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <h1 class="wf-h1">Requirements</h1>
+              <p class="wf-sub">Non-functional requirement records in this project.</p>
+
+              <section class="wf-section" aria-label="Non-functional requirements">
+                <div class="wf-section-head">
+                  <h2 class="wf-h2">Non-functional requirements</h2>
+                  <p class="wf-count">No groups</p>
+                </div>
+                <div class="wf-empty">
+                  <p>No non-functional requirements in this project.</p>
+                  <p class="wf-help">Business requirements are available in Document types. Records are created from the command line; this browser does not create records.</p>
+                </div>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ========================================== list-group-empty -->
+      <section class="wf-screen" data-platform="web" data-screen="list-group-empty" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business" aria-current="page">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <h1 class="wf-h1">Requirements</h1>
+              <p class="wf-sub">Business requirement records in this project.</p>
+
+              <section class="wf-section" aria-label="Business requirements">
+                <div class="wf-section-head">
+                  <h2 class="wf-h2">Business requirements</h2>
+                  <p class="wf-count">2 groups · 2 requirements</p>
+                </div>
+
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-group-business" data-goto="view-group-business"><span class="wf-group-id">REQ-03</span> Milestone and Release Planning</a></h3>
+                    <span class="wf-group-count">No requirements</span>
+                  </div>
+                  <p class="wf-empty-group">No requirements in this group</p>
+                </article>
+
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-group-business" data-goto="view-group-business"><span class="wf-group-id">REQ-06</span> Search and Local Web Interface</a></h3>
+                    <span class="wf-group-count">2 requirements</span>
+                  </div>
+                  <ul class="wf-req-list">
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-06.001</span> Search Project Records</a></li>
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-06.002</span> Serve the Local Web Interface</a></li>
+                  </ul>
+                </article>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ================================================ list-long -->
+      <section class="wf-screen" data-platform="web" data-screen="list-long" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business" aria-current="page">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <h1 class="wf-h1">Requirements</h1>
+              <p class="wf-sub">Business requirement records in this project.</p>
+
+              <section class="wf-section" aria-label="Business requirements">
+                <div class="wf-section-head">
+                  <h2 class="wf-h2">Business requirements</h2>
+                  <p class="wf-count">5 groups · 14 requirements</p>
+                </div>
+
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-group-business" data-goto="view-group-business"><span class="wf-group-id">REQ-01</span> Project Setup, Configuration, and Command-Line Access for All Project Contributors and Maintainers</a></h3>
+                    <span class="wf-group-count">5 requirements</span>
+                  </div>
+                  <ul class="wf-req-list">
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-01.001</span> Initialize a Papyrus Project</a></li>
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-01.002</span> Read and Edit Project Configuration</a></li>
+                  </ul>
+                </article>
+
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-group-business" data-goto="view-group-business"><span class="wf-group-id">REQ-02</span> Task and Board Management</a></h3>
+                    <span class="wf-group-count">4 requirements</span>
+                  </div>
+                  <ul class="wf-req-list">
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-02.001</span> Create and Describe Tasks</a></li>
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-02.003</span> List and Filter Tasks</a></li>
+                  </ul>
+                </article>
+
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-group-business" data-goto="view-group-business"><span class="wf-group-id">REQ-03</span> Milestone and Release Planning</a></h3>
+                    <span class="wf-group-count">2 requirements</span>
+                  </div>
+                  <ul class="wf-req-list">
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-03.001</span> Manage Milestones</a></li>
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-03.002</span> Manage Releases</a></li>
+                  </ul>
+                </article>
+
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-group-business" data-goto="view-group-business"><span class="wf-group-id">REQ-05</span> Project Documentation Management</a></h3>
+                    <span class="wf-group-count">2 requirements</span>
+                  </div>
+                  <ul class="wf-req-list">
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-05.001</span> Manage Business Requirements</a></li>
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-05.007</span> Manage Documentation Record Lifecycle</a></li>
+                  </ul>
+                </article>
+
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-group-business" data-goto="view-group-business"><span class="wf-group-id">REQ-06</span> Search and Local Web Interface</a></h3>
+                    <span class="wf-group-count">1 requirement</span>
+                  </div>
+                  <ul class="wf-req-list">
+                    <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-06.002</span> InternationalizationAndLocalizationConfigurationConsistencyCheckAcrossAllSupportedBrowsersAndFallbackRenderingGuarantees</a></li>
+                  </ul>
+                </article>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ========================================= view-req-business -->
+      <section class="wf-screen" data-platform="web" data-screen="view-req-business" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business" aria-current="page">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb">
+                <ol>
+                  <li><a href="#web/list-business" data-goto="list-business">Requirements</a></li>
+                  <li><a href="#web/view-group-business" data-goto="view-group-business">REQ-06</a></li>
+                  <li><span aria-current="page">REQ-06.002</span></li>
+                </ol>
+              </nav>
+
+              <div class="wf-page-head">
+                <div>
+                  <p class="wf-id">REQ-06.002</p>
+                  <h1 class="wf-h1">Serve the Local Web Interface</h1>
+                </div>
+                <div class="wf-actions">
+                  <a class="wf-btn wf-btn-primary" href="#web/edit-business" data-goto="edit-business">Edit</a>
+                </div>
+              </div>
+
+              <div class="wf-meta">
+                <dl class="wf-dl">
+                  <div><dt>Record ID</dt><dd class="wf-mono">REQ-06.002</dd></div>
+                  <div><dt>Record form</dt><dd>Requirement</dd></div>
+                  <div><dt>Document type</dt><dd>Business requirement</dd></div>
+                  <div><dt>Owning group</dt><dd><a href="#web/view-group-business" data-goto="view-group-business">REQ-06 Search and Local Web Interface</a></dd></div>
+                </dl>
+              </div>
+
+              <section class="wf-record-section">
+                <h2>User story</h2>
+                <p class="wf-text">As a project contributor, I want to open a local web interface over project stores so that I can access project information through a browser.</p>
+              </section>
+
+              <section class="wf-record-section">
+                <h2>Description</h2>
+                <p class="wf-text">The browser command serves the local web UI over both backlog and documentation stores. Its default bind address is 127.0.0.1 and default port is 6420; the host and port can be selected. A non-loopback host is permitted but causes a warning.</p>
+                <p class="wf-text">The default browser opens automatically unless disabled by option or configuration.</p>
+                <p class="wf-text">Requirement references such as REQ-05.001 and NFR-04.002 are shown as literal text, and Markdown punctuation such as ** is not interpreted.</p>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ============================================== view-req-nfr -->
+      <section class="wf-screen" data-platform="web" data-screen="view-req-nfr" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional" aria-current="page">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb">
+                <ol>
+                  <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Requirements</a></li>
+                  <li><a href="#web/view-group-nfr" data-goto="view-group-nfr">NFR-04</a></li>
+                  <li><span aria-current="page">NFR-04.002</span></li>
+                </ol>
+              </nav>
+
+              <div class="wf-page-head">
+                <div>
+                  <p class="wf-id">NFR-04.002</p>
+                  <h1 class="wf-h1">Restrict File Access to the Project Directory</h1>
+                </div>
+                <div class="wf-actions">
+                  <a class="wf-btn wf-btn-primary" href="#web/edit-nonfunctional" data-goto="edit-nonfunctional">Edit</a>
+                </div>
+              </div>
+
+              <div class="wf-meta">
+                <dl class="wf-dl">
+                  <div><dt>Record ID</dt><dd class="wf-mono">NFR-04.002</dd></div>
+                  <div><dt>Record form</dt><dd>Requirement</dd></div>
+                  <div><dt>Document type</dt><dd>Non-functional requirement</dd></div>
+                  <div><dt>Owning group</dt><dd><a href="#web/view-group-nfr" data-goto="view-group-nfr">NFR-04 Persistence</a></dd></div>
+                </dl>
+              </div>
+
+              <section class="wf-record-section">
+                <h2>Description</h2>
+                <p class="wf-text">Papyrus shall not read from or write to paths outside the project directory, except during init.</p>
+                <p class="wf-text">A symbolic link that resolves outside the project directory is rejected and the outside content is never read or written.</p>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ======================================= view-group-business -->
+      <section class="wf-screen" data-platform="web" data-screen="view-group-business" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business" aria-current="page">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb">
+                <ol>
+                  <li><a href="#web/list-business" data-goto="list-business">Requirements</a></li>
+                  <li><span aria-current="page">REQ-06</span></li>
+                </ol>
+              </nav>
+
+              <div class="wf-page-head">
+                <div>
+                  <p class="wf-id">REQ-06</p>
+                  <h1 class="wf-h1">Search and Local Web Interface</h1>
+                </div>
+                <div class="wf-actions">
+                  <a class="wf-btn wf-btn-primary" href="#web/edit-business" data-goto="edit-business">Edit</a>
+                </div>
+              </div>
+
+              <div class="wf-meta">
+                <dl class="wf-dl">
+                  <div><dt>Record ID</dt><dd class="wf-mono">REQ-06</dd></div>
+                  <div><dt>Record form</dt><dd>Group</dd></div>
+                  <div><dt>Document type</dt><dd>Business requirement group</dd></div>
+                  <div><dt>Owning group</dt><dd class="wf-link-muted">None (group record)</dd></div>
+                </dl>
+              </div>
+
+              <section class="wf-record-section">
+                <h2>User story</h2>
+                <p class="wf-text">As a project contributor, I want to search project records and use the local web interface so that backlog and documentation information can be discovered in a single project context.</p>
+              </section>
+
+              <section class="wf-record-section">
+                <h2>Description</h2>
+                <p class="wf-text">This group covers unified free-text search across the documented record types and starting the local web UI over the project's backlog and documentation stores.</p>
+              </section>
+
+              <section class="wf-record-section">
+                <h2>Requirements in this group</h2>
+                <ul class="wf-req-list">
+                  <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-06.001</span> Search Project Records</a></li>
+                  <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-06.002</span> Serve the Local Web Interface</a></li>
+                </ul>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ============================================ view-group-nfr -->
+      <section class="wf-screen" data-platform="web" data-screen="view-group-nfr" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional" aria-current="page">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb">
+                <ol>
+                  <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Requirements</a></li>
+                  <li><span aria-current="page">NFR-04</span></li>
+                </ol>
+              </nav>
+
+              <div class="wf-page-head">
+                <div>
+                  <p class="wf-id">NFR-04</p>
+                  <h1 class="wf-h1">Persistence</h1>
+                </div>
+                <div class="wf-actions">
+                  <a class="wf-btn wf-btn-primary" href="#web/edit-nonfunctional" data-goto="edit-nonfunctional">Edit</a>
+                </div>
+              </div>
+
+              <div class="wf-meta">
+                <dl class="wf-dl">
+                  <div><dt>Record ID</dt><dd class="wf-mono">NFR-04</dd></div>
+                  <div><dt>Record form</dt><dd>Group</dd></div>
+                  <div><dt>Document type</dt><dd>Non-functional requirement group</dd></div>
+                  <div><dt>Owning group</dt><dd class="wf-link-muted">None (group record)</dd></div>
+                </dl>
+              </div>
+
+              <section class="wf-record-section">
+                <h2>Description</h2>
+                <p class="wf-text">This group records that all saved data use text files and that Papyrus does not read from or write to paths outside the project directory except during init.</p>
+                <p class="wf-text">Detailed boundary interpretations are noted in the atomic requirements.</p>
+              </section>
+
+              <section class="wf-record-section">
+                <h2>Requirements in this group</h2>
+                <ul class="wf-req-list">
+                  <li><a href="#web/view-req-nfr" data-goto="view-req-nfr"><span class="wf-req-id">NFR-04.001</span> Store All Saved Data as Text Files</a></li>
+                  <li><a href="#web/view-req-nfr" data-goto="view-req-nfr"><span class="wf-req-id">NFR-04.002</span> Restrict File Access to the Project Directory</a></li>
+                </ul>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ============================================ view-unresolved -->
+      <section class="wf-screen" data-platform="web" data-screen="view-unresolved" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business" aria-current="page">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb">
+                <ol>
+                  <li><a href="#web/list-business" data-goto="list-business">Requirements</a></li>
+                  <li><span aria-current="page">REQ-07.001</span></li>
+                </ol>
+              </nav>
+
+              <div class="wf-page-head">
+                <div>
+                  <p class="wf-id">REQ-07.001</p>
+                  <h1 class="wf-h1">Export Requirement Records</h1>
+                </div>
+                <div class="wf-actions">
+                  <a class="wf-btn wf-btn-primary" href="#web/edit-business" data-goto="edit-business">Edit</a>
+                </div>
+              </div>
+
+              <div class="wf-meta">
+                <dl class="wf-dl">
+                  <div><dt>Record ID</dt><dd class="wf-mono">REQ-07.001</dd></div>
+                  <div><dt>Record form</dt><dd>Requirement</dd></div>
+                  <div><dt>Document type</dt><dd>Business requirement</dd></div>
+                  <div><dt>Owning group</dt><dd>REQ-99 Archived Requirements <span class="wf-unresolved">(not an active group)</span></dd></div>
+                </dl>
+              </div>
+
+              <section class="wf-record-section">
+                <h2>User story</h2>
+                <p class="wf-text">As a project contributor, I want to export requirement records so that I can share them outside the project.</p>
+              </section>
+
+              <section class="wf-record-section">
+                <h2>Description</h2>
+                <p class="wf-text">The record keeps its stored group reference even when that group is no longer active. The group is displayed as unresolved text and saving never rewrites the group reference.</p>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ============================================= edit-business -->
+      <section class="wf-screen" data-platform="web" data-screen="edit-business" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business" aria-current="page">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb">
+                <ol>
+                  <li><a href="#web/list-business" data-goto="list-business">Requirements</a></li>
+                  <li><a href="#web/view-req-business" data-goto="view-req-business">REQ-06.002</a></li>
+                  <li><span aria-current="page">Edit</span></li>
+                </ol>
+              </nav>
+
+              <div class="wf-page-head">
+                <div>
+                  <h1 class="wf-h1">Edit REQ-06.002</h1>
+                  <p class="wf-sub">Serve the Local Web Interface</p>
+                </div>
+              </div>
+
+              <div class="wf-meta">
+                <dl class="wf-dl">
+                  <div><dt>Record ID</dt><dd class="wf-mono">REQ-06.002</dd></div>
+                  <div><dt>Record form</dt><dd>Requirement</dd></div>
+                  <div><dt>Document type</dt><dd>Business requirement</dd></div>
+                  <div><dt>Owning group</dt><dd><a href="#web/view-group-business" data-goto="view-group-business">REQ-06</a></dd></div>
+                </dl>
+              </div>
+
+              <div class="wf-form" role="group" aria-label="Edit form">
+                <input type="hidden" name="version" value="1762000000.123456789.412">
+
+                <div class="wf-field">
+                  <label for="eb-title">Title <span class="wf-req">(required)</span></label>
+                  <input class="wf-input" id="eb-title" name="title" type="text" required value="Serve the Local Web Interface">
+                  <p class="wf-help">Required · 1 to 200 characters · shown in lists and headings.</p>
+                </div>
+
+                <div class="wf-field">
+                  <label for="eb-story">User story</label>
+                  <textarea class="wf-textarea" id="eb-story" name="story" rows="4">As a project contributor, I want to open a local web interface over project stores so that I can access project information through a browser.</textarea>
+                  <p class="wf-help">Optional · plain text · line breaks are preserved.</p>
+                </div>
+
+                <div class="wf-field">
+                  <label for="eb-desc">Description</label>
+                  <textarea class="wf-textarea" id="eb-desc" name="description" rows="6">The browser command serves the local web UI over both backlog and documentation stores. Its default bind address is 127.0.0.1 and default port is 6420; the host and port can be selected.</textarea>
+                  <p class="wf-help">Optional · a line starting with ## is not allowed.</p>
+                </div>
+
+                <p class="wf-hidden-field">hidden field: version (current record token)</p>
+
+                <div class="wf-form-actions">
+                  <button class="wf-btn wf-btn-primary" type="button" data-goto="view-after-save" data-platform="web">Save changes</button>
+                  <a class="wf-link" href="#web/view-req-business" data-goto="view-req-business">Cancel</a>
+                  <span class="wf-form-note">Returns to the record view without saving.</span>
+                </div>
+              </div>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ======================================== edit-nonfunctional -->
+      <section class="wf-screen" data-platform="web" data-screen="edit-nonfunctional" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional" aria-current="page">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb">
+                <ol>
+                  <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Requirements</a></li>
+                  <li><a href="#web/view-req-nfr" data-goto="view-req-nfr">NFR-04.002</a></li>
+                  <li><span aria-current="page">Edit</span></li>
+                </ol>
+              </nav>
+
+              <div class="wf-page-head">
+                <div>
+                  <h1 class="wf-h1">Edit NFR-04.002</h1>
+                  <p class="wf-sub">Restrict File Access to the Project Directory</p>
+                </div>
+              </div>
+
+              <div class="wf-meta">
+                <dl class="wf-dl">
+                  <div><dt>Record ID</dt><dd class="wf-mono">NFR-04.002</dd></div>
+                  <div><dt>Record form</dt><dd>Requirement</dd></div>
+                  <div><dt>Document type</dt><dd>Non-functional requirement</dd></div>
+                  <div><dt>Owning group</dt><dd><a href="#web/view-group-nfr" data-goto="view-group-nfr">NFR-04</a></dd></div>
+                </dl>
+              </div>
+
+              <div class="wf-form" role="group" aria-label="Edit form">
+                <input type="hidden" name="version" value="1762000000.123456789.412">
+
+                <div class="wf-field">
+                  <label for="en-title">Title <span class="wf-req">(required)</span></label>
+                  <input class="wf-input" id="en-title" name="title" type="text" required value="Restrict File Access to the Project Directory">
+                  <p class="wf-help">Required · 1 to 200 characters · shown in lists and headings.</p>
+                </div>
+
+                <div class="wf-field">
+                  <label for="en-desc">Description</label>
+                  <textarea class="wf-textarea" id="en-desc" name="description" rows="7">Papyrus shall not read from or write to paths outside the project directory, except during init.</textarea>
+                  <p class="wf-help">Optional · a line starting with ## is not allowed.</p>
+                </div>
+
+                <p class="wf-hidden-field">hidden field: version (current record token)</p>
+
+                <div class="wf-form-actions">
+                  <button class="wf-btn wf-btn-primary" type="button" data-goto="view-after-save" data-platform="web">Save changes</button>
+                  <a class="wf-link" href="#web/view-req-nfr" data-goto="view-req-nfr">Cancel</a>
+                  <span class="wf-form-note">Returns to the record view without saving.</span>
+                </div>
+              </div>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ================================================ edit-dirty -->
+      <section class="wf-screen" data-platform="web" data-screen="edit-dirty" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business" aria-current="page">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb">
+                <ol>
+                  <li><a href="#web/list-business" data-goto="list-business">Requirements</a></li>
+                  <li><a href="#web/view-req-business" data-goto="view-req-business">REQ-06.002</a></li>
+                  <li><span aria-current="page">Edit</span></li>
+                </ol>
+              </nav>
+
+              <div class="wf-page-head">
+                <div>
+                  <h1 class="wf-h1">Edit REQ-06.002</h1>
+                  <p class="wf-sub">Serve the Local Web Interface</p>
+                </div>
+                <p class="wf-status">Unsaved changes</p>
+              </div>
+
+              <div class="wf-meta">
+                <dl class="wf-dl">
+                  <div><dt>Record ID</dt><dd class="wf-mono">REQ-06.002</dd></div>
+                  <div><dt>Record form</dt><dd>Requirement</dd></div>
+                  <div><dt>Document type</dt><dd>Business requirement</dd></div>
+                  <div><dt>Owning group</dt><dd><a href="#web/view-group-business" data-goto="view-group-business">REQ-06</a></dd></div>
+                </dl>
+              </div>
+
+              <div class="wf-form" role="group" aria-label="Edit form">
+                <input type="hidden" name="version" value="1762000000.123456789.412">
+
+                <div class="wf-field">
+                  <label for="ed-title">Title <span class="wf-req">(required)</span></label>
+                  <input class="wf-input" id="ed-title" name="title" type="text" required value="Serve the local web interface offline">
+                  <p class="wf-help">Required · 1 to 200 characters · shown in lists and headings.</p>
+                </div>
+
+                <div class="wf-field">
+                  <label for="ed-story">User story</label>
+                  <textarea class="wf-textarea" id="ed-story" name="story" rows="4">As a project contributor, I want to open a local web interface over project stores so that I can access project information through a browser.</textarea>
+                  <p class="wf-help">Optional · plain text · line breaks are preserved.</p>
+                </div>
+
+                <div class="wf-field">
+                  <label for="ed-desc">Description</label>
+                  <textarea class="wf-textarea" id="ed-desc" name="description" rows="5">The browser command serves the local web UI over both backlog and documentation stores. Its default bind address is 127.0.0.1 and default port is 6420.
+A non-loopback host is permitted but prints a warning.</textarea>
+                  <p class="wf-help">Optional · a line starting with ## is not allowed.</p>
+                </div>
+
+                <p class="wf-hidden-field">hidden field: version (current record token)</p>
+
+                <div class="wf-form-actions">
+                  <button class="wf-btn wf-btn-primary" type="button" data-goto="view-after-save" data-platform="web">Save changes</button>
+                  <a class="wf-link" href="#web/view-req-business" data-goto="view-req-business">Cancel</a>
+                  <span class="wf-form-note">Leaving with unsaved changes warns only when JavaScript is available.</span>
+                </div>
+              </div>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- =============================================== edit-errors -->
+      <section class="wf-screen" data-platform="web" data-screen="edit-errors" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business" aria-current="page">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb">
+                <ol>
+                  <li><a href="#web/list-business" data-goto="list-business">Requirements</a></li>
+                  <li><a href="#web/view-req-business" data-goto="view-req-business">REQ-06.002</a></li>
+                  <li><span aria-current="page">Edit</span></li>
+                </ol>
+              </nav>
+
+              <div class="wf-page-head">
+                <div>
+                  <h1 class="wf-h1">Edit REQ-06.002</h1>
+                  <p class="wf-sub">Serve the Local Web Interface</p>
+                </div>
+              </div>
+
+              <div class="wf-meta">
+                <dl class="wf-dl">
+                  <div><dt>Record ID</dt><dd class="wf-mono">REQ-06.002</dd></div>
+                  <div><dt>Record form</dt><dd>Requirement</dd></div>
+                  <div><dt>Document type</dt><dd>Business requirement</dd></div>
+                  <div><dt>Owning group</dt><dd><a href="#web/view-group-business" data-goto="view-group-business">REQ-06</a></dd></div>
+                </dl>
+              </div>
+
+              <div class="wf-form" role="group" aria-label="Edit form with validation errors">
+                <input type="hidden" name="version" value="1762000000.123456789.412">
+
+                <div class="wf-alert" role="alert">
+                  <h2>There is a problem</h2>
+                  <ul>
+                    <li><a href="#ee-title">Title is required.</a></li>
+                    <li><a href="#ee-desc">Description cannot contain a line starting with ## .</a></li>
+                  </ul>
+                  <p>Nothing was saved. Your typed values are kept below.</p>
+                </div>
+
+                <div class="wf-field">
+                  <label for="ee-title">Title <span class="wf-req">(required)</span></label>
+                  <input class="wf-input" id="ee-title" name="title" type="text" required value="" aria-invalid="true" aria-describedby="ee-title-error">
+                  <p class="wf-error" id="ee-title-error">Title is required. Enter a title of 1 to 200 characters.</p>
+                </div>
+
+                <div class="wf-field">
+                  <label for="ee-story">User story</label>
+                  <textarea class="wf-textarea" id="ee-story" name="story" rows="4">As a project contributor, I want to open a local web interface over project stores so that I can access project information through a browser.</textarea>
+                  <p class="wf-help">Optional · plain text · line breaks are preserved.</p>
+                </div>
+
+                <div class="wf-field">
+                  <label for="ee-desc">Description</label>
+                  <textarea class="wf-textarea" id="ee-desc" name="description" rows="5" aria-invalid="true" aria-describedby="ee-desc-error">The browser command serves the local web UI over both backlog and documentation stores.
+## Criticality
+Must have</textarea>
+                  <p class="wf-error" id="ee-desc-error">Description cannot contain a line starting with ## . Remove that line or change it.</p>
+                  <p class="wf-help">Optional · a line starting with ## is not allowed.</p>
+                </div>
+
+                <p class="wf-hidden-field">hidden field: version (current record token)</p>
+
+                <div class="wf-form-actions">
+                  <button class="wf-btn wf-btn-primary" type="button" data-goto="view-after-save" data-platform="web">Save changes</button>
+                  <a class="wf-link" href="#web/view-req-business" data-goto="view-req-business">Cancel</a>
+                  <span class="wf-form-note">Submitting again keeps your values if validation fails again.</span>
+                </div>
+              </div>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ============================================= edit-conflict -->
+      <section class="wf-screen" data-platform="web" data-screen="edit-conflict" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business" aria-current="page">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb">
+                <ol>
+                  <li><a href="#web/list-business" data-goto="list-business">Requirements</a></li>
+                  <li><a href="#web/view-req-business" data-goto="view-req-business">REQ-06.002</a></li>
+                  <li><span aria-current="page">Edit</span></li>
+                </ol>
+              </nav>
+
+              <h1 class="wf-h1">This record changed on disk</h1>
+              <p class="wf-sub">Your changes were not saved. The file was modified after this form was opened.</p>
+
+              <div class="wf-conflict-box">
+                <p><strong>409 Conflict — record changed on disk; reload the form.</strong></p>
+                <p>Reloading shows the current content and a new version token. Copy anything you need first.</p>
+              </div>
+
+              <div class="wf-actions">
+                <button class="wf-btn wf-btn-primary" type="button" data-goto="edit-business" data-platform="web">Reload the form</button>
+                <a class="wf-link" href="#web/view-req-business" data-goto="view-req-business">View current record</a>
+                <a class="wf-link" href="#web/list-business" data-goto="list-business">Back to requirements</a>
+              </div>
+
+              <div class="wf-readonly-block">
+                <h2>Your unsaved changes (read-only, not saved)</h2>
+                <dl>
+                  <dt>Title</dt>
+                  <dd>Serve the local web interface offline</dd>
+                  <dt>User story</dt>
+                  <dd>As a project contributor, I want to open a local web interface over project stores…</dd>
+                  <dt>Description</dt>
+                  <dd>The browser command serves the local web UI over both backlog and documentation stores.<br>A non-loopback host is permitted but prints a warning.</dd>
+                </dl>
+                <p class="wf-help">Copy these values into the form after reloading if you want to keep them.</p>
+              </div>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- =========================================== view-after-save -->
+      <section class="wf-screen" data-platform="web" data-screen="view-after-save" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business" aria-current="page">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb">
+                <ol>
+                  <li><a href="#web/list-business" data-goto="list-business">Requirements</a></li>
+                  <li><a href="#web/view-group-business" data-goto="view-group-business">REQ-06</a></li>
+                  <li><span aria-current="page">REQ-06.002</span></li>
+                </ol>
+              </nav>
+
+              <div class="wf-page-head">
+                <div>
+                  <p class="wf-id">REQ-06.002</p>
+                  <h1 class="wf-h1">Serve the local web interface offline</h1>
+                </div>
+                <div class="wf-actions">
+                  <a class="wf-btn wf-btn-primary" href="#web/edit-dirty" data-goto="edit-dirty">Edit</a>
+                </div>
+              </div>
+
+              <div class="wf-meta">
+                <dl class="wf-dl">
+                  <div><dt>Record ID</dt><dd class="wf-mono">REQ-06.002</dd></div>
+                  <div><dt>Record form</dt><dd>Requirement</dd></div>
+                  <div><dt>Document type</dt><dd>Business requirement</dd></div>
+                  <div><dt>Owning group</dt><dd><a href="#web/view-group-business" data-goto="view-group-business">REQ-06 Search and Local Web Interface</a></dd></div>
+                </dl>
+              </div>
+
+              <section class="wf-record-section">
+                <h2>User story</h2>
+                <p class="wf-text">As a project contributor, I want to open a local web interface over project stores so that I can access project information through a browser.</p>
+              </section>
+
+              <section class="wf-record-section">
+                <h2>Description</h2>
+                <p class="wf-text">The browser command serves the local web UI over both backlog and documentation stores. Its default bind address is 127.0.0.1 and default port is 6420.</p>
+                <p class="wf-text">A non-loopback host is permitted but prints a warning.</p>
+              </section>
+
+              <p class="wf-note">Mockup note: no success banner — the save redirects here and this page reads the record from disk again.</p>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ======================================== error-404-unknown -->
+      <section class="wf-screen" data-platform="web" data-screen="error-404-unknown" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <div class="wf-error-page">
+                <div class="wf-error-card">
+                  <p class="wf-status-code">404</p>
+                  <h1>Record not found</h1>
+                  <p>That record does not exist or is not available.</p>
+                  <p class="wf-help">Check the address, or return to the requirements list.</p>
+                  <a class="wf-link" href="#web/list-business" data-goto="list-business"><strong>Back to requirements</strong></a>
+                </div>
+              </div>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ===================================== error-404-deprecated -->
+      <section class="wf-screen" data-platform="web" data-screen="error-404-deprecated" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <div class="wf-error-page">
+                <div class="wf-error-card">
+                  <p class="wf-status-code">404</p>
+                  <h1>Record not available</h1>
+                  <p>That record is not available.</p>
+                  <p class="wf-help">Deprecated records are not listed and cannot be opened. The same page is used for an unknown address.</p>
+                  <a class="wf-link" href="#web/list-business" data-goto="list-business"><strong>Back to requirements</strong></a>
+                </div>
+              </div>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ============================================== error-400 -->
+      <section class="wf-screen" data-platform="web" data-screen="error-400" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <div class="wf-error-page">
+                <div class="wf-error-card">
+                  <p class="wf-status-code">400</p>
+                  <h1>Bad request</h1>
+                  <p>The request could not be understood.</p>
+                  <p class="wf-help">The address or submitted data is malformed. Return to the list and try again.</p>
+                  <a class="wf-link" href="#web/list-business" data-goto="list-business"><strong>Back to requirements</strong></a>
+                </div>
+              </div>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ============================================== error-405 -->
+      <section class="wf-screen" data-platform="web" data-screen="error-405" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <div class="wf-error-page">
+                <div class="wf-error-card">
+                  <p class="wf-status-code">405</p>
+                  <h1>Method not allowed</h1>
+                  <p>That action is not available on this address.</p>
+                  <p class="wf-help">Records are saved only from the edit form. Return to the list to open a record.</p>
+                  <a class="wf-link" href="#web/list-business" data-goto="list-business"><strong>Back to requirements</strong></a>
+                </div>
+              </div>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ============================================== error-415 -->
+      <section class="wf-screen" data-platform="web" data-screen="error-415" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <div class="wf-error-page">
+                <div class="wf-error-card">
+                  <p class="wf-status-code">415</p>
+                  <h1>Unsupported media type</h1>
+                  <p>That content type is not accepted.</p>
+                  <p class="wf-help">Save the record from its edit form in this browser.</p>
+                  <a class="wf-link" href="#web/list-business" data-goto="list-business"><strong>Back to requirements</strong></a>
+                </div>
+              </div>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ============================================== error-500 -->
+      <section class="wf-screen" data-platform="web" data-screen="error-500" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+              <div class="wf-error-page">
+                <div class="wf-error-card">
+                  <p class="wf-status-code">500</p>
+                  <h1>Something went wrong</h1>
+                  <p>The request could not be completed.</p>
+                  <p class="wf-help">Return to the requirements list and try again.</p>
+                  <a class="wf-link" href="#web/list-business" data-goto="list-business"><strong>Back to requirements</strong></a>
+                </div>
+              </div>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- ====================================== responsive-list-320 -->
+      <section class="wf-screen" data-platform="web" data-screen="responsive-list-320" hidden>
+        <div class="wf-narrow-wrap">
+          <div class="wf-narrow">
+            <div class="wf-app">
+              <header class="wf-header">
+                <div class="wf-brand">
+                  <span class="wf-mark" aria-hidden="true">P</span>
+                  <span><span class="wf-brand-name"><span class="wf-anno" aria-hidden="true">1</span>Papyrus</span><span class="wf-project">papyrus project</span></span>
+                </div>
+                <p class="wf-top-meta">Local browser</p>
+              </header>
+
+              <div class="wf-layout">
+                <aside class="wf-sidebar" aria-label="Document types">
+                  <button class="wf-sidebar-toggle" type="button" aria-expanded="false" aria-controls="narrow-type-list" data-type-toggle>
+                    <span class="wf-anno" aria-hidden="true">3</span>Document types ▾
+                  </button>
+                  <ul id="narrow-type-list" hidden>
+                    <li><a href="#web/list-business" data-goto="list-business" aria-current="page">Business requirements</a></li>
+                    <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+                  </ul>
+                </aside>
+                <main class="wf-main">
+                  <h1 class="wf-h1"><span class="wf-anno" aria-hidden="true">2</span>Requirements</h1>
+                  <p class="wf-sub">Business requirement records.</p>
+
+                  <section class="wf-section" aria-label="Business requirements">
+                    <div class="wf-section-head">
+                      <h2 class="wf-h2">Business requirements</h2>
+                      <p class="wf-count">2 groups</p>
+                    </div>
+
+                    <article class="wf-group">
+                      <div class="wf-group-head">
+                        <h3 class="wf-group-title"><a href="#web/view-group-business" data-goto="view-group-business"><span class="wf-anno" aria-hidden="true">4</span><span class="wf-group-id">REQ-05</span> Project Documentation Management</a></h3>
+                        <span class="wf-group-count">2 requirements</span>
+                      </div>
+                      <ul class="wf-req-list">
+                        <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-anno" aria-hidden="true">5</span><span class="wf-req-id">REQ-05.001</span> Manage Business Requirements</a></li>
+                        <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-05.002</span> Manage Non-Functional Requirements</a></li>
+                      </ul>
+                    </article>
+
+                    <article class="wf-group">
+                      <div class="wf-group-head">
+                        <h3 class="wf-group-title"><a href="#web/view-group-business" data-goto="view-group-business"><span class="wf-group-id">REQ-06</span> Search and Local Web Interface</a></h3>
+                        <span class="wf-group-count">2 requirements</span>
+                      </div>
+                      <ul class="wf-req-list">
+                        <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-06.001</span> Search Project Records</a></li>
+                        <li><a href="#web/view-req-business" data-goto="view-req-business"><span class="wf-req-id">REQ-06.002</span> Serve the Local Web Interface</a></li>
+                      </ul>
+                    </article>
+                  </section>
+                </main>
+              </div>
+
+              <footer class="wf-footer">Papyrus local browser — served from this project only.</footer>
+            </div>
+          </div>
+
+          <div class="wf-legend">
+            <h2>Accessibility annotations — list at 320 CSS px</h2>
+            <ol>
+              <li>Landmarks: <code>header</code>, <code>nav</code> (document types or breadcrumb), <code>main</code>, <code>footer</code>. The project name is text, not a link.</li>
+              <li>One <code>h1</code> per page; the type section is <code>h2</code>; groups are <code>h3</code>. No heading level is skipped.</li>
+              <li>The document-type sidebar is one <code>nav</code> labelled “Document types” with vertical links; the current link uses <code>aria-current="page"</code> plus bold and underline. At this width it collapses behind a labelled toggle with <code>aria-expanded</code> and <code>aria-controls</code>; the links still work without script.</li>
+              <li>A group row is one link (ID + title) with the member count as adjacent text; deprecated members are not counted.</li>
+              <li>Member links read as ID + title, so they are descriptive out of context.</li>
+              <li>Focus order follows document order: sidebar links, then each group link, then its member links. The focus ring is 2 px with 2 px offset and stays visible on every control.</li>
+            </ol>
+            <p class="wf-note">Also: at 320 CSS px and at 200% zoom text wraps without horizontal scrolling; body and muted text meet 4.5:1 contrast; empty states and counts are words, not icons or colour; no JavaScript is required because the type links and records are plain links.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================== responsive-edit-320 -->
+      <section class="wf-screen" data-platform="web" data-screen="responsive-edit-320" hidden>
+        <div class="wf-narrow-wrap">
+          <div class="wf-narrow">
+            <div class="wf-app">
+              <header class="wf-header">
+                <div class="wf-brand">
+                  <span class="wf-mark" aria-hidden="true">P</span>
+                  <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+                </div>
+                <p class="wf-top-meta">Local browser</p>
+              </header>
+
+              <div class="wf-layout">
+                <aside class="wf-sidebar" aria-label="Document types">
+                  <button class="wf-sidebar-toggle" type="button" aria-expanded="false" aria-controls="narrow-type-list-edit" data-type-toggle>
+                    Document types ▾
+                  </button>
+                  <ul id="narrow-type-list-edit" hidden>
+                    <li><a href="#web/list-business" data-goto="list-business" aria-current="page">Business requirements</a></li>
+                    <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+                  </ul>
+                </aside>
+                <main class="wf-main">
+                  <nav class="wf-breadcrumb" aria-label="Breadcrumb">
+                    <ol>
+                      <li><a href="#web/list-business" data-goto="list-business"><span class="wf-anno" aria-hidden="true">1</span>Requirements</a></li>
+                      <li><a href="#web/view-req-business" data-goto="view-req-business">REQ-06.002</a></li>
+                      <li><span aria-current="page">Edit</span></li>
+                    </ol>
+                  </nav>
+
+                  <h1 class="wf-h1"><span class="wf-anno" aria-hidden="true">2</span>Edit REQ-06.002</h1>
+                  <p class="wf-sub">Serve the Local Web Interface</p>
+
+                  <div class="wf-meta">
+                    <dl class="wf-dl">
+                      <div><dt><span class="wf-anno" aria-hidden="true">4</span>Record ID</dt><dd class="wf-mono">REQ-06.002</dd></div>
+                      <div><dt>Record form</dt><dd>Requirement</dd></div>
+                      <div><dt>Document type</dt><dd>Business requirement</dd></div>
+                      <div><dt>Owning group</dt><dd><a href="#web/view-group-business" data-goto="view-group-business">REQ-06</a></dd></div>
+                    </dl>
+                  </div>
+
+                  <div class="wf-form" role="group" aria-label="Edit form">
+                    <input type="hidden" name="version" value="1762000000.123456789.412">
+
+                    <div class="wf-field">
+                      <label for="ne-title"><span class="wf-anno" aria-hidden="true">3</span>Title <span class="wf-req">(required)</span></label>
+                      <input class="wf-input" id="ne-title" name="title" type="text" required value="Serve the Local Web Interface">
+                      <p class="wf-help">Required · 1 to 200 characters.</p>
+                    </div>
+
+                    <div class="wf-field">
+                      <label for="ne-story">User story</label>
+                      <textarea class="wf-textarea" id="ne-story" name="story" rows="3">As a project contributor, I want to open a local web interface over project stores…</textarea>
+                      <p class="wf-help">Optional · line breaks are preserved.</p>
+                    </div>
+
+                    <div class="wf-field">
+                      <label for="ne-desc">Description</label>
+                      <textarea class="wf-textarea" id="ne-desc" name="description" rows="4">The browser command serves the local web UI over both backlog and documentation stores.</textarea>
+                      <p class="wf-help">Optional · a line starting with ## is not allowed.</p>
+                    </div>
+
+                    <div class="wf-form-actions">
+                      <button class="wf-btn wf-btn-primary" type="button" data-goto="view-after-save" data-platform="web"><span class="wf-anno" aria-hidden="true">5</span>Save changes</button>
+                      <a class="wf-link" href="#web/view-req-business" data-goto="view-req-business"><span class="wf-anno" aria-hidden="true">6</span>Cancel</a>
+                    </div>
+                    <p class="wf-note">Unsaved changes are warned about only when JavaScript is available.</p>
+                  </div>
+                </main>
+              </div>
+
+              <footer class="wf-footer">Papyrus local browser — served from this project only.</footer>
+            </div>
+          </div>
+
+          <div class="wf-legend">
+            <h2>Accessibility annotations — edit form at 320 CSS px</h2>
+            <ol>
+              <li>Landmarks: <code>header</code>, <code>nav</code> (breadcrumb), <code>main</code>, <code>footer</code>. The breadcrumb is a <code>nav</code> containing a list; its last item is the current page and is not a link.</li>
+              <li>Heading levels: <code>h1</code> “Edit REQ-06.002”, then <code>h2</code> for each section. No level is skipped.</li>
+              <li>Every control has a visible label associated by <code>for</code>/<code>id</code>. The required field says “required” in the label text and sets the <code>required</code> attribute.</li>
+              <li>Read-only metadata is a definition list, not disabled inputs, so it is neither focusable nor submitted.</li>
+              <li>Save is a submit button and stays enabled; with JavaScript unavailable the form still posts. The <code>version</code> token is a hidden input: never visible, never focusable, always submitted.</li>
+              <li>Cancel is a link back to the record view without saving. Focus order is breadcrumb, read-only link, title, story, description, Save, Cancel; actions stack at 320 px and remain keyboard reachable.</li>
+            </ol>
+            <p class="wf-note">Error annotations: the summary has <code>role="alert"</code> and links to each field; each field message is referenced by <code>aria-describedby</code> and the field has <code>aria-invalid="true"</code>. Error text names the field and what to change, never colour alone. Contrast stays at 4.5:1 and the focus ring remains visible. Without JavaScript, validation re-renders on the server with typed values kept, and only the unsaved-changes warning is absent.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Review scaffolding only: hash router, deck pager, frame fitting, 320 px type toggle. */
+(function () {
+  "use strict";
+
+  var reviews = Array.prototype.slice.call(document.querySelectorAll(".wf-review"));
+  var protos = Array.prototype.slice.call(document.querySelectorAll(".wf-proto"));
+  var screens = Array.prototype.slice.call(document.querySelectorAll(".wf-screen"));
+  var routeLinks = Array.prototype.slice.call(document.querySelectorAll(".wf-chrome a[data-route]"));
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll(".wf-proto-nav a[data-goto]"));
+  var slides = Array.prototype.slice.call(document.querySelectorAll(".wf-slide"));
+  var prevBtn = document.getElementById("deck-prev");
+  var nextBtn = document.getElementById("deck-next");
+  var counter = document.getElementById("deck-counter");
+  var wrap = document.getElementById("wf-frame-wrap");
+  var frame = document.getElementById("wf-frame");
+  var deckIndex = 0;
+  var activePlatform = "web";
+
+  function firstView(platform) {
+    var el = document.querySelector('.wf-screen[data-platform="' + platform + '"]');
+    return el ? el.getAttribute("data-screen") : null;
+  }
+
+  function fitFrame() {
+    if (!wrap || !frame) { return; }
+    var available = wrap.getBoundingClientRect().width - 4;
+    var scale = available < 1440 ? available / 1440 : 1;
+    frame.style.transform = scale < 1 ? "scale(" + scale + ")" : "none";
+    wrap.style.height = Math.round(frame.offsetHeight * scale + 40) + "px";
+  }
+
+  function setChrome(route) {
+    routeLinks.forEach(function (link) {
+      if (link.getAttribute("data-route") === route) {
+        link.setAttribute("aria-current", "page");
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    });
+  }
+
+  function showIndex() {
+    reviews.forEach(function (section) {
+      section.classList.toggle("is-active", section.getAttribute("data-review") === "index");
+    });
+    protos.forEach(function (block) { block.classList.remove("is-active"); });
+    setChrome("index");
+  }
+
+  function showDeck(n) {
+    if (!slides.length) { return; }
+    deckIndex = Math.max(0, Math.min(slides.length - 1, (n || 1) - 1));
+    reviews.forEach(function (section) {
+      section.classList.toggle("is-active", section.getAttribute("data-review") === "deck");
+    });
+    protos.forEach(function (block) { block.classList.remove("is-active"); });
+    slides.forEach(function (slide, i) {
+      slide.classList.toggle("is-active", i === deckIndex);
+    });
+    if (counter) {
+      counter.textContent = (deckIndex + 1) + " / " + slides.length;
+      counter.setAttribute("data-slide-current", String(deckIndex + 1));
+      counter.setAttribute("data-slide-total", String(slides.length));
+    }
+    if (prevBtn) { prevBtn.disabled = deckIndex === 0; }
+    if (nextBtn) { nextBtn.disabled = deckIndex === slides.length - 1; }
+    setChrome("deck");
+    var slideHeading = slides[deckIndex].querySelector("h2");
+    if (slideHeading) {
+      slideHeading.setAttribute("tabindex", "-1");
+      slideHeading.focus();
+    }
+    window.scrollTo(0, 0);
+  }
+
+  function showView(platform, viewId, focusHeading) {
+    var target = viewId || firstView(platform);
+    if (!target) { return; }
+    var found = false;
+    activePlatform = platform;
+    reviews.forEach(function (section) { section.classList.remove("is-active"); });
+    protos.forEach(function (block) {
+      var active = block.getAttribute("data-platform") === platform;
+      block.classList.toggle("is-active", active);
+      if (active) { found = true; }
+    });
+    if (!found) { showIndex(); return; }
+
+    screens.forEach(function (screen) {
+      var match = screen.getAttribute("data-platform") === platform &&
+                  screen.getAttribute("data-screen") === target;
+      screen.hidden = !match;
+    });
+    navLinks.forEach(function (link) {
+      if (link.getAttribute("data-platform") === platform &&
+          link.getAttribute("data-goto") === target) {
+        link.setAttribute("aria-current", "true");
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    });
+    setChrome(platform);
+    fitFrame();
+    if (focusHeading) {
+      var heading = document.querySelector('.wf-screen[data-platform="' + platform +
+        '"][data-screen="' + target + '"] h1');
+      if (heading) {
+        heading.setAttribute("tabindex", "-1");
+        heading.focus();
+      }
+    }
+  }
+
+  function applyHash() {
+    var raw = (window.location.hash || "").replace(/^#/, "");
+    var hash = raw;
+    try { hash = decodeURIComponent(raw); } catch (e) { hash = raw; }
+
+    if (!hash || hash === "index") { showIndex(); return; }
+    var deckMatch = /^deck(?:\/([0-9]+))?$/.exec(hash);
+    if (deckMatch) { showDeck(deckMatch[1] ? parseInt(deckMatch[1], 10) : 1); return; }
+    var viewMatch = /^([a-z0-9-]+)(?:\/([a-z0-9-]+))?$/.exec(hash);
+    if (viewMatch) { showView(viewMatch[1], viewMatch[2] || null, false); return; }
+    /* In-page anchors (for example an error-summary link to a field) keep the current view. */
+    if (document.getElementById(hash)) { return; }
+    showIndex();
+  }
+
+  function go(hash, focusHeading) {
+    if (window.location.hash === "#" + hash) {
+      applyHash();
+    } else {
+      window.location.hash = hash;
+    }
+    if (focusHeading) {
+      var parts = /^([a-z0-9-]+)\/([a-z0-9-]+)$/.exec(hash);
+      if (parts) { showView(parts[1], parts[2], true); }
+    }
+  }
+
+  document.addEventListener("click", function (event) {
+    var node = event.target;
+    while (node && node !== document) {
+      if (node.hasAttribute && node.hasAttribute("data-goto")) {
+        event.preventDefault();
+        var platform = node.getAttribute("data-platform") || activePlatform;
+        var viewId = node.getAttribute("data-goto");
+        go(platform + "/" + viewId, true);
+        return;
+      }
+      node = node.parentNode;
+    }
+  });
+
+  if (prevBtn) {
+    prevBtn.addEventListener("click", function () { go("deck/" + Math.max(1, deckIndex)); });
+  }
+  if (nextBtn) {
+    nextBtn.addEventListener("click", function () {
+      go("deck/" + Math.min(slides.length, deckIndex + 2));
+    });
+  }
+
+  document.addEventListener("keydown", function (event) {
+    var deckActive = document.querySelector('.wf-review[data-review="deck"].is-active');
+    if (!deckActive) { return; }
+    var tag = (event.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") { return; }
+    if (event.key === "ArrowRight" || event.key === "PageDown") {
+      event.preventDefault();
+      go("deck/" + Math.min(slides.length, deckIndex + 2));
+    } else if (event.key === "ArrowLeft" || event.key === "PageUp") {
+      event.preventDefault();
+      go("deck/" + Math.max(1, deckIndex));
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      go("deck/1");
+    } else if (event.key === "End") {
+      event.preventDefault();
+      go("deck/" + slides.length);
+    }
+  });
+
+  document.addEventListener("click", function (event) {
+    var node = event.target;
+    while (node && node !== document) {
+      if (node.hasAttribute && node.hasAttribute("data-type-toggle")) {
+        event.preventDefault();
+        var list = document.getElementById(node.getAttribute("aria-controls"));
+        var expanded = node.getAttribute("aria-expanded") === "true";
+        node.setAttribute("aria-expanded", expanded ? "false" : "true");
+        if (list) { list.hidden = expanded; }
+        return;
+      }
+      node = node.parentNode;
+    }
+  });
+
+  window.addEventListener("hashchange", applyHash);
+  window.addEventListener("resize", fitFrame);
+  applyHash();
+  fitFrame();
+})();
+</script>
+</body>
+</html>
