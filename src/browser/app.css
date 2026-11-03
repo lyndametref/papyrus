@@ -108,6 +108,8 @@ textarea:focus-visible {
 .h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; }
 .id { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 13px; color: var(--muted); margin: 0 0 4px; }
 .sub { color: var(--muted); font-size: 14px; margin: 0 0 4px; }
+.status { font-size: 13px; font-weight: 700; margin: 0; }
+.status[hidden] { display: none; }
 .actions { display: flex; align-items: center; gap: 18px; padding-top: 6px; flex: none; }
 
 /* buttons and links */

@@ -242,14 +242,7 @@ fn serve(listener: TcpListener, state: Arc<ServerState>) -> Result<(), AppError>
         let current = active.fetch_add(1, Ordering::SeqCst);
         if current >= MAX_CONNECTIONS {
             active.fetch_sub(1, Ordering::SeqCst);
-            let mut stream = stream;
-            let _ = stream.set_write_timeout(Some(IO_TIMEOUT));
-            let response = Response::text(
-                503,
-                "text/html; charset=utf-8",
-                "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Service unavailable</title></head><body><h1>Service unavailable</h1></body></html>",
-            );
-            let _ = http::write_response(&mut stream, &response, false);
+            reject_over_capacity(stream, &state);
             continue;
         }
         let state = Arc::clone(&state);
@@ -259,6 +252,35 @@ fn serve(listener: TcpListener, state: Arc<ServerState>) -> Result<(), AppError>
             handle_connection(stream, &state);
         });
     }
+}
+
+/// Reject a connection accepted beyond the concurrency cap.
+///
+/// The request is read so the `Host` header is validated and the standard
+/// one-line request log is emitted, then the client receives `503` with
+/// `Connection: close` (specification sections 2.12 and 3.2).
+fn reject_over_capacity(mut stream: TcpStream, state: &ServerState) {
+    let _ = stream.set_read_timeout(Some(IO_TIMEOUT));
+    let _ = stream.set_write_timeout(Some(IO_TIMEOUT));
+    let (response, head_only) = match http::read_request(&mut stream) {
+        Ok(request) => {
+            let method = request.method.as_str().to_string();
+            let log_path: String = request.target.path.chars().take(200).collect();
+            let head_only = request.method == Method::Head;
+            let api = request.target.path.starts_with("/api/");
+            let response = match validate_host(&request, state) {
+                Ok(_) => error_response(503, api, state),
+                Err(error) => error_response(error.status, api, state),
+            };
+            eprintln!("{} {} {}", method, log_path, response.status);
+            (response, head_only)
+        }
+        Err(error) => {
+            eprintln!("- - {}", error.status);
+            (error_response(error.status, false, state), false)
+        }
+    };
+    let _ = http::write_response(&mut stream, &response, head_only);
 }
 
 fn handle_connection(mut stream: TcpStream, state: &ServerState) {

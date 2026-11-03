@@ -323,6 +323,29 @@ fn record_path(dir: &Path, kind: &str, id: &str) -> PathBuf {
     dir.join(sub).join(format!("{}.md", id))
 }
 
+fn normalized_newlines(text: &str) -> String {
+    text.replace("\r\n", "\n")
+}
+
+/// The exact `## ` section block, from its heading to the next heading.
+fn section_block(content: &str, heading: &str) -> String {
+    let normalized = normalized_newlines(content);
+    let mut block = String::new();
+    let mut inside = false;
+    for line in normalized.lines() {
+        if line == heading {
+            inside = true;
+        } else if inside && line.starts_with("## ") {
+            break;
+        }
+        if inside {
+            block.push_str(line);
+            block.push('\n');
+        }
+    }
+    block
+}
+
 // T-01
 #[test]
 fn t01_command_shape() {
@@ -338,17 +361,42 @@ fn t01_command_shape() {
 // T-02
 #[test]
 fn t02_defaults() {
-    let listener = TcpListener::bind("127.0.0.1:6420");
-    if listener.is_err() {
-        return; // default port occupied on this machine; covered by unit tests
-    }
-    drop(listener);
     let dir = test_root("defaults");
     init_project(&dir);
-    let mut child = bin()
+
+    // The default port is part of the contract. If 6420 is occupied on this
+    // machine, verify the default through `config get` and run the server on a
+    // free port; never silently skip the check.
+    let (port, default_port) = match TcpListener::bind("127.0.0.1:6420") {
+        Ok(listener) => {
+            drop(listener);
+            (6420, true)
+        }
+        Err(_) => {
+            assert_eq!(
+                run_ok(&[
+                    "--dir",
+                    dir.to_str().unwrap(),
+                    "config",
+                    "get",
+                    "browser_port"
+                ]),
+                "6420",
+                "default browser_port"
+            );
+            (free_port(), false)
+        }
+    };
+
+    let mut command = bin();
+    command
         .arg("--dir")
         .arg(&dir)
-        .args(["browser", "--no-open", "--json"])
+        .args(["browser", "--no-open", "--json"]);
+    if !default_port {
+        command.arg("--port").arg(port.to_string());
+    }
+    let mut child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
@@ -358,12 +406,13 @@ fn t02_defaults() {
     reader.read_line(&mut line).unwrap();
     let _ = child.kill();
     let _ = child.wait();
-    let value: serde_json::Value = serde_json::from_str(line.trim()).unwrap();
+    let value: serde_json::Value = serde_json::from_str(line.trim())
+        .unwrap_or_else(|_| panic!("no startup line; browser did not start: {:?}", line));
     assert_eq!(value["status"], "serving");
     assert_eq!(value["host"], "127.0.0.1");
-    assert_eq!(value["port"], 6420);
+    assert_eq!(value["port"], port);
     assert_eq!(value["open"], false);
-    assert_eq!(value["url"], "http://127.0.0.1:6420/");
+    assert_eq!(value["url"], format!("http://127.0.0.1:{}/", port));
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -516,10 +565,9 @@ fn t05_missing_opener_is_a_warning() {
 fn t06_non_loopback_warning() {
     let dir = test_root("nonloopback");
     init_project(&dir);
+    // The specification requires this test to send no traffic.
     let server = Server::start(&dir, &["--host", "0.0.0.0", "--no-open"], &[]);
     server.wait_for_stderr("warning: binding to non-loopback address 0.0.0.0");
-    let response = get(&server, "/");
-    assert_eq!(response.status, 200);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -616,6 +664,67 @@ fn t10_category_parameter() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+// T-09 (empty project and empty document type)
+#[test]
+fn t09_list_empty_project_and_empty_type() {
+    // Empty project: both categories render the project-level empty state.
+    let empty = test_root("empty-project");
+    init_project(&empty);
+    let server = Server::start(&empty, &["--no-open"], &[]);
+    for path in ["/", "/?type=nfr"] {
+        let html = get(&server, path).text();
+        assert!(
+            html.contains(
+                "No requirement records were found in the configured document directories."
+            ),
+            "path={}",
+            path
+        );
+        assert!(html.contains("Records are created from the command line"));
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&empty);
+
+    // Empty document type while the other category has records.
+    let req_only = test_root("empty-type");
+    init_project(&req_only);
+    create_req_group(&req_only, "Only business");
+    create_req(&req_only, "Business record", "REQ-001");
+    let server = Server::start(&req_only, &["--no-open"], &[]);
+    let html = get(&server, "/?type=nfr").text();
+    assert!(html.contains("No non-functional requirements in this project."));
+    assert!(html.contains("Business requirements are available in Document types."));
+    assert!(!html.contains("REQ-001.001"));
+    drop(server);
+    let _ = fs::remove_dir_all(&req_only);
+}
+
+// T-09 / T-12 (group without members and "Other requirements")
+#[test]
+fn t09_group_without_members_and_other_requirements() {
+    let dir = fixture("emptystates");
+    let empty_group = create_req_group(&dir, "Empty Group");
+    let orphan_group = create_req_group(&dir, "Orphan Group");
+    create_req(&dir, "Orphan requirement", &orphan_group);
+    // Remove the group file so the member's stored reference cannot resolve.
+    fs::remove_file(record_path(&dir, "req", &orphan_group)).unwrap();
+
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/").text();
+    assert!(html.contains("No requirements in this group"));
+    assert!(html.contains("No requirements"));
+    assert!(html.contains("Other requirements"));
+    assert!(html.contains(&format!("Group: {} (not found)", orphan_group)));
+    assert!(html.contains(&format!("/doc/{}.001", orphan_group)));
+    assert!(!html.contains(&format!("href=\"/doc/{}\"", orphan_group)));
+
+    let group = get(&server, &format!("/doc/{}", empty_group)).text();
+    assert!(group.contains("Requirements in this group"));
+    assert!(group.contains("No requirements in this group."));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 // T-11
 #[test]
 fn t11_deprecated_records_are_hidden() {
@@ -693,6 +802,67 @@ fn t13_edit_round_trip() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+// T-13 (business-requirement group and non-functional requirement forms)
+#[test]
+fn t13_edit_round_trip_group_and_nonfunctional() {
+    let dir = fixture("roundtrip-forms");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    // Business-requirement group: title, user story, description.
+    let edit = get(&server, "/doc/REQ-001/edit");
+    assert_eq!(edit.status, 200);
+    let html = edit.text();
+    assert!(html.contains("<label for=\"story\">"));
+    let version = extract_version(&html);
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Payments Group revised"),
+        ("story", "Revised group story"),
+        ("description", "Revised group description"),
+    ]);
+    let response = post_form(&server, "/doc/REQ-001", &body);
+    assert_eq!(response.status, 303);
+    assert_eq!(response.header("Location"), Some("/doc/REQ-001"));
+    let view = get(&server, "/doc/REQ-001").text();
+    assert!(view.contains("Payments Group revised"));
+    assert!(view.contains("Revised group story"));
+    assert!(view.contains("Revised group description"));
+    let cli = run_ok(&["--dir", dir.to_str().unwrap(), "req", "view", "REQ-001"]);
+    assert!(cli.contains("Payments Group revised"));
+
+    // Non-functional requirement: title and description only; a story is
+    // ignored and no story field is rendered.
+    let edit = get(&server, "/doc/NFR-001.001/edit");
+    assert_eq!(edit.status, 200);
+    let html = edit.text();
+    assert!(!html.contains("<label for=\"story\">"));
+    let version = extract_version(&html);
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Restrict access revised"),
+        ("story", "must be ignored"),
+        ("description", "Revised nfr description"),
+    ]);
+    let response = post_form(&server, "/doc/NFR-001.001", &body);
+    assert_eq!(response.status, 303);
+    assert_eq!(response.header("Location"), Some("/doc/NFR-001.001"));
+    let view = get(&server, "/doc/NFR-001.001").text();
+    assert!(view.contains("Restrict access revised"));
+    assert!(view.contains("Revised nfr description"));
+    assert!(!view.contains("must be ignored"));
+    let cli = run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "nfreq",
+        "view",
+        "NFR-001.001",
+    ]);
+    assert!(cli.contains("Restrict access revised"));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 // T-14
 #[test]
 fn t14_unknown_sections_are_preserved() {
@@ -704,6 +874,7 @@ fn t14_unknown_sections_are_preserved() {
         original.trim_end()
     );
     fs::write(&path, &with_sections).unwrap();
+    let before = normalized_newlines(&with_sections);
     let server = Server::start(&dir, &["--no-open"], &[]);
     let edit = get(&server, "/doc/REQ-001.001/edit").text();
     let version = extract_version(&edit);
@@ -714,11 +885,21 @@ fn t14_unknown_sections_are_preserved() {
         ("description", "New description"),
     ]);
     assert_eq!(post_form(&server, "/doc/REQ-001.001", &body).status, 303);
-    let saved = fs::read_to_string(&path).unwrap();
-    assert!(saved.contains("## Criticality\nMust have\n"));
-    assert!(saved.contains("## Traceability\n- REQ-001\n"));
-    assert!(saved.contains("## Open Question\nWhy?\n"));
-    assert!(saved.contains("# REQ-001.001 New title"));
+    let after = normalized_newlines(&fs::read_to_string(&path).unwrap());
+
+    // Compare the preserved sections as whole normalized blocks rather than
+    // looking for substrings.
+    for heading in ["## Criticality", "## Traceability", "## Open Question"] {
+        assert_eq!(
+            section_block(&before, heading),
+            section_block(&after, heading),
+            "{} changed",
+            heading
+        );
+    }
+    assert!(after.contains("# REQ-001.001 New title"));
+    assert!(after.contains("## User Story\nNew story"));
+    assert!(after.contains("## Description\nNew description"));
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -751,7 +932,11 @@ fn t15_validation_returns_422_without_writing() {
     ]);
     let response = post_form(&server, "/doc/REQ-001.001", &body);
     assert_eq!(response.status, 422);
-    assert!(response.text().contains("## "));
+    let html = response.text();
+    assert!(html.contains("## "));
+    // Submitted values are preserved.
+    assert!(html.contains("value=\"Valid\""));
+    assert!(html.contains("Line\n## Not allowed\nMore"));
     assert_eq!(fs::read(&path).unwrap(), before);
 
     let body = form_body(&[
@@ -764,6 +949,16 @@ fn t15_validation_returns_422_without_writing() {
     let html = response.text();
     assert!(html.contains("Title is required"));
     assert!(html.contains("## "));
+    // Form-level summary and field-level error association.
+    assert!(html.contains("role=\"alert\""));
+    assert!(html.contains("There is a problem"));
+    assert!(html.contains("href=\"#title\""));
+    assert!(html.contains("href=\"#description\""));
+    assert!(html.contains("Nothing was saved. Your typed values are kept below."));
+    assert!(html.contains("id=\"title-error\""));
+    assert!(html.contains("aria-invalid=\"true\" aria-describedby=\"title-error\""));
+    assert!(html.contains("id=\"description-error\""));
+    assert!(html.contains("aria-invalid=\"true\" aria-describedby=\"description-error\""));
     assert_eq!(fs::read(&path).unwrap(), before);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
@@ -810,7 +1005,14 @@ fn t17_stale_version_is_conflict() {
     let body = form_body(&[("version", &version), ("title", "Should not save")]);
     let response = post_form(&server, "/doc/REQ-001.001", &body);
     assert_eq!(response.status, 409);
-    assert!(response.text().contains("This record changed on disk"));
+    let html = response.text();
+    assert!(html.contains("This record changed on disk"));
+    assert!(html.contains("record changed on disk; reload the form"));
+    assert!(html.contains("Reload the form"));
+    assert!(html.contains("View current record"));
+    assert!(html.contains("Back to requirements"));
+    // The attempted values are shown read-only on the conflict page.
+    assert!(html.contains("Should not save"));
     let saved = fs::read_to_string(&path).unwrap();
     assert!(!saved.contains("Should not save"));
     assert!(saved.contains("## Out of band"));
@@ -950,15 +1152,39 @@ fn t21_json_api() {
         .status,
         400
     );
-    assert_eq!(
-        post_json(
-            &server,
-            "/api/doc/REQ-001.001",
-            &format!("{{\"version\":\"{}\",\"title\":\"x\"}}", "1.2.3")
-        )
-        .status,
-        409
+    let conflict = post_json(
+        &server,
+        "/api/doc/REQ-001.001",
+        &format!("{{\"version\":\"{}\",\"title\":\"x\"}}", "1.2.3"),
     );
+    assert_eq!(conflict.status, 409);
+    let error: serde_json::Value = serde_json::from_str(&conflict.text()).unwrap();
+    assert_eq!(error["error"]["code"], 409);
+    assert_eq!(
+        error["error"]["message"],
+        "record changed on disk; reload the form"
+    );
+
+    let invalid = post_json(
+        &server,
+        "/api/doc/REQ-001.001",
+        &format!("{{\"version\":\"{}\",\"title\":\"\"}}", version),
+    );
+    assert_eq!(invalid.status, 422);
+    let error: serde_json::Value = serde_json::from_str(&invalid.text()).unwrap();
+    assert_eq!(error["error"]["code"], 422);
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("Title")
+    );
+
+    let missing = get(&server, "/api/doc/REQ-404");
+    assert_eq!(missing.status, 404);
+    let error: serde_json::Value = serde_json::from_str(&missing.text()).unwrap();
+    assert_eq!(error["error"]["code"], 404);
+
     assert_eq!(
         request(
             server.port,
@@ -1105,6 +1331,102 @@ fn t22_request_limits_and_status_codes() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+// T-22 (HEAD returns the GET status and headers with no body)
+#[test]
+fn head_matches_get_without_body() {
+    let dir = fixture("head");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    for path in [
+        "/",
+        "/doc/REQ-001.001",
+        "/doc/REQ-001.001/edit",
+        "/assets/app.css",
+        "/assets/app.js",
+        "/api/requirements",
+        "/api/doc/REQ-001.001",
+    ] {
+        let get_response = get(&server, path);
+        let head_response = request(server.port, "HEAD", path, &[], None);
+        assert_eq!(head_response.status, get_response.status, "status {}", path);
+        assert!(head_response.body.is_empty(), "HEAD body {}", path);
+        let get_length = get_response.header("Content-Length").unwrap();
+        assert_eq!(
+            head_response.header("Content-Length"),
+            Some(get_length),
+            "Content-Length {}",
+            path
+        );
+        for name in [
+            "Content-Type",
+            "Connection",
+            "Cache-Control",
+            "X-Content-Type-Options",
+            "Referrer-Policy",
+            "X-Frame-Options",
+        ] {
+            assert_eq!(
+                head_response.header(name),
+                get_response.header(name),
+                "{} {}",
+                name,
+                path
+            );
+        }
+    }
+
+    let get_missing = get(&server, "/nope");
+    let head_missing = request(server.port, "HEAD", "/nope", &[], None);
+    assert_eq!(head_missing.status, 404);
+    assert_eq!(
+        head_missing.header("Content-Length"),
+        get_missing.header("Content-Length")
+    );
+    assert!(head_missing.body.is_empty());
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-22 (concurrency limit: Host validation, request log, 503, Connection: close)
+#[test]
+fn t22_concurrency_limit_returns_503_and_logs() {
+    let dir = fixture("capacity");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let mut held = Vec::new();
+    for _ in 0..16 {
+        let mut stream = TcpStream::connect(("127.0.0.1", server.port)).unwrap();
+        // Hold each handler thread inside the request reader without sending a
+        // complete request, so all 16 connection slots stay occupied.
+        stream.write_all(b"GET / HT").unwrap();
+        held.push(stream);
+    }
+    // Poll until the accept loop has all 16 slots occupied, so the test does
+    // not depend on a fixed startup delay.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let response = loop {
+        let response = get(&server, "/");
+        if response.status == 503 {
+            break response;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "server never reached the concurrency limit"
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    };
+    assert_eq!(response.status, 503);
+    assert_eq!(response.header("Connection"), Some("close"));
+    server.wait_for_stderr("GET / 503");
+
+    // The over-limit path still validates the Host header.
+    let bad_host = send_raw(server.port, b"GET / HTTP/1.1\r\nHost: evil.test\r\n\r\n");
+    assert_eq!(bad_host.status, 400);
+    server.wait_for_stderr("GET / 400");
+
+    drop(held);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 // T-23
 #[test]
 fn t23_one_request_per_connection() {
@@ -1213,13 +1535,26 @@ fn t26_config_keys() {
         ]),
         "7001"
     );
-    let out = bin()
-        .arg("--dir")
-        .arg(&dir)
-        .args(["config", "set", "browser_port", "0"])
-        .output()
-        .unwrap();
-    assert_eq!(out.status.code(), Some(4));
+    for port in ["0", "70000", "abc"] {
+        let out = bin()
+            .arg("--dir")
+            .arg(&dir)
+            .args(["config", "set", "browser_port", port])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(4), "port={}", port);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            stderr.contains("browser_port"),
+            "message must name the key: {}",
+            stderr
+        );
+        assert!(
+            stderr.contains("must be between 1 and 65535"),
+            "message must state the range: {}",
+            stderr
+        );
+    }
     let out = bin()
         .arg("--dir")
         .arg(&dir)
@@ -1227,6 +1562,7 @@ fn t26_config_keys() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(4));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("browser_open"));
     let out = bin()
         .arg("--dir")
         .arg(&dir)
@@ -1234,6 +1570,13 @@ fn t26_config_keys() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(4));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("browser_host"),
+        "message must name the key: {}",
+        stderr
+    );
+    assert!(!stderr.contains("value cannot be normalized"), "{}", stderr);
     let json = run_ok(&["--dir", dir.to_str().unwrap(), "--json", "config", "list"]);
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(value["browser_host"], "127.0.0.1");
@@ -1304,6 +1647,31 @@ fn t28_accessibility_and_compatibility_basics() {
             forbidden
         );
     }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-28 / AC #19 (edit-form dirty status)
+#[test]
+fn edit_form_dirty_status_is_static_and_hidden_until_input() {
+    let dir = fixture("dirty");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/doc/REQ-001.001/edit").text();
+    // Hidden while pristine, static text, and not a focusable control.
+    assert!(html.contains("<p class=\"status\" data-dirty-status hidden>Unsaved changes</p>"));
+    assert!(!html.contains("tabindex"));
+    assert!(!html.contains("<input class=\"status\""));
+    assert!(!html.contains("<button class=\"status\""));
+    // The progressive enhancement reveals it on the first input and keeps the
+    // beforeunload leave guard.
+    assert!(html.contains("data-dirty-guard"));
+    assert!(html.contains("data-form-note"));
+    let js = include_str!("../src/browser/app.js");
+    assert!(js.contains("data-dirty-status"));
+    assert!(js.contains("removeAttribute(\"hidden\")"));
+    assert!(js.contains("beforeunload"));
+    let css = include_str!("../src/browser/app.css");
+    assert!(css.contains(".status[hidden]"));
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }

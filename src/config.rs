@@ -190,10 +190,10 @@ impl Config {
             return Err("ID prefixes must not be empty".to_string());
         }
         if self.browser_port == 0 {
-            return Err("browser_port must be between 1 and 65535".to_string());
+            return Err("browser_port: must be between 1 and 65535".to_string());
         }
         validate_browser_host(&self.browser_host)
-            .map_err(|reason| format!("browser_host {}: {}", self.browser_host, reason))?;
+            .map_err(|reason| format!("browser_host: {}", reason))?;
         Ok(())
     }
 
@@ -521,6 +521,23 @@ mod tests {
                 host
             );
         }
+    }
+
+    #[test]
+    fn browser_validation_messages_name_the_key() {
+        let c = Config {
+            browser_port: 0,
+            ..Config::default()
+        };
+        let error = c.validate().unwrap_err();
+        assert!(error.starts_with("browser_port:"), "{}", error);
+
+        let c = Config {
+            browser_host: "bad/host".to_string(),
+            ..Config::default()
+        };
+        let error = c.validate().unwrap_err();
+        assert!(error.starts_with("browser_host:"), "{}", error);
     }
 
     #[test]

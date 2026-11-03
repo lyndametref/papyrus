@@ -563,12 +563,13 @@ pub fn edit_page(
     form.push_str(&format!(
         "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button>\
 <a class=\"link\" href=\"/doc/{}\">Cancel</a>\
-<span class=\"form-note\">Returns to the record view without saving.</span></div></form>",
+<span class=\"form-note\" data-form-note>Returns to the record view without saving.</span></div></form>",
         escape(&record.id)
     ));
 
     let page_head = format!(
-        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div></div>",
+        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div>\
+<p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
         escape(&record.id),
         escape(&record.title)
     );

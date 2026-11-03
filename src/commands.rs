@@ -1,5 +1,7 @@
 use crate::CommandOutput;
-use crate::config::{Config, merge_yaml, validate_key_path, yaml_get, yaml_set, yaml_unset};
+use crate::config::{
+    Config, merge_yaml, validate_browser_host, validate_key_path, yaml_get, yaml_set, yaml_unset,
+};
 use crate::context::Context;
 use crate::error::AppError;
 use std::path::Path;
@@ -178,12 +180,45 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
         }
         _ => {}
     }
+    // Browser keys are validated here so the message names the offending key
+    // (specification section 8.2). `browser_port` is a `u16`, so an
+    // out-of-range value would otherwise fail deserialization with a message
+    // that does not name the key.
+    if key == "browser_port" {
+        let in_range = match &parsed_raw {
+            yaml_serde::Value::Number(number) => number
+                .as_u64()
+                .map(|port| (1..=65535).contains(&port))
+                .unwrap_or(false),
+            _ => false,
+        };
+        if !in_range {
+            return Err(AppError::Validation(
+                "browser_port: must be between 1 and 65535".to_string(),
+            ));
+        }
+    }
+    if key == "browser_host"
+        && let yaml_serde::Value::String(host) = &parsed_raw
+        && let Err(reason) = validate_browser_host(host)
+    {
+        return Err(AppError::Validation(format!("browser_host: {}", reason)));
+    }
+
     // Sanitize string values.
     let parsed = match parsed_raw {
         yaml_serde::Value::String(s) => {
-            let sanitized = crate::sanitize::sanitize_path_component(&s)
-                .ok_or_else(|| AppError::Validation("value cannot be normalized".to_string()))?;
-            yaml_serde::Value::String(sanitized)
+            if key == "browser_host" {
+                // Host validation above is authoritative; the path-component
+                // sanitizer would reject characters such as `/` with a generic
+                // message that does not name the key.
+                yaml_serde::Value::String(s)
+            } else {
+                let sanitized = crate::sanitize::sanitize_path_component(&s).ok_or_else(|| {
+                    AppError::Validation(format!("{}: value cannot be normalized", key))
+                })?;
+                yaml_serde::Value::String(sanitized)
+            }
         }
         other => other,
     };
@@ -206,8 +241,8 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
     let default_cfg = Config::default();
     let mut base = yaml_serde::to_value(&default_cfg).unwrap();
     merge_yaml(&mut base, &file_val);
-    let cfg: Config =
-        yaml_serde::from_value(base).map_err(|e| AppError::Validation(e.to_string()))?;
+    let cfg: Config = yaml_serde::from_value(base)
+        .map_err(|e| AppError::Validation(format!("{}: {}", key, e)))?;
     cfg.validate().map_err(AppError::Validation)?;
 
     // boundary check for config path? skip

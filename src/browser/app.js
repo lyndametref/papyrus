@@ -47,8 +47,19 @@
   var form = document.querySelector("form[data-dirty-guard]");
   if (form) {
     var dirty = false;
+    var status = document.querySelector("[data-dirty-status]");
+    var note = form.querySelector("[data-form-note]");
     form.addEventListener("input", function () {
+      if (dirty) {
+        return;
+      }
       dirty = true;
+      if (status) {
+        status.removeAttribute("hidden");
+      }
+      if (note) {
+        note.textContent = "Leaving with unsaved changes warns only when JavaScript is available.";
+      }
     });
     window.addEventListener("beforeunload", function (event) {
       if (!dirty) {

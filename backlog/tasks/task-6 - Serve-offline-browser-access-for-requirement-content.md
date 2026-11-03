@@ -1,11 +1,11 @@
 ---
 id: TASK-6
 title: Serve offline browser access for requirement content
-status: Refined
+status: Implemented
 assignee:
   - '@orchestrator'
 created_date: '2026-10-31T22:25:00Z'
-updated_date: '2026-11-03T19:56:00Z'
+updated_date: '2026-11-03T20:20:00Z'
 labels: []
 milestone: m-1
 dependencies:
@@ -55,7 +55,7 @@ UI mockups: MOCK-0001 (`docs/specifications/ui/mockups/MOCK-0001-browser-require
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The browser command serves the local web interface over the project's backlog and documentation stores and opens it by default unless disabled.
+- [ ] #1 The browser command serves the local web interface over the project's documentation store for the requirement record types implemented in this increment (business-requirement and non-functional-requirement groups and requirements) and opens it by default unless disabled; REQ-06.002's backlog-store coverage is delivered by TASK-11.
 - [ ] #2 With no internet connection, users can view and edit all currently implemented business and non-functional requirement content in the browser, and saved changes remain available.
 - [ ] #3 The interface renders in Firefox, Microsoft Edge, and Safari version 100 or later; the default bind address and port and non-loopback warning match the documented behavior.
 - [ ] #4 Browser-facing input is sanitized and the local interface does not read or write outside the project directory, except for init.
@@ -103,6 +103,71 @@ UI mockups: MOCK-0001 (`docs/specifications/ui/mockups/MOCK-0001-browser-require
 9. Add integration tests: HTTP client over `TcpStream`, list/view/edit round-trip, JSON API, status codes and limits, XSS, symlink, port conflict, non-loopback warning, `--no-open` and opener behavior, offline asset scan.
 10. Run build, tests, clippy, and formatting; record the verification mapping in the implementation notes and hand off to quality review.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+### Quality-review follow-up (2026-11-03, UTC)
+
+Addressed: edit-form dirty status; 503 Host validation + request log; browser config error messages naming the key; test coverage gaps (group/NFR round-trip, empty states, HEAD, 422/409 JSON shapes, aria-describedby, T-14 normalized comparison, T-06 no traffic, T-02 explicit fallback); build/tests/clippy/fmt green.
+
+**T-01 to T-30 test mapping**
+
+| Check | Test(s) |
+|---|---|
+| T-01 | `t01_command_shape` |
+| T-02 | `t02_defaults`; `config::tests::browser_defaults` |
+| T-03 | `t03_precedence_per_setting`; `browser::tests::precedence_is_per_setting`, `browser::tests::invalid_environment_values_are_validation_errors` |
+| T-04 | `t04_open_and_no_open` |
+| T-05 | `t05_missing_opener_is_a_warning` |
+| T-06 | `t06_non_loopback_warning` (sends no traffic) |
+| T-07 | `t07_port_in_use_exits_one` |
+| T-08 | `t08_invalid_port_and_host_exit_codes` |
+| T-09 | `t09_list_renders_one_category`; `t09_list_empty_project_and_empty_type`; `t09_group_without_members_and_other_requirements` |
+| T-10 | `t10_category_parameter` |
+| T-11 | `t11_deprecated_records_are_hidden` |
+| T-12 | `t12_record_views`; `t09_group_without_members_and_other_requirements` |
+| T-13 | `t13_edit_round_trip`; `t13_edit_round_trip_group_and_nonfunctional` |
+| T-14 | `t14_unknown_sections_are_preserved` (normalized whole-section comparison) |
+| T-15 | `t15_validation_returns_422_without_writing` (summary, `aria-describedby`, preserved values) |
+| T-16 | `t16_immutable_fields_are_ignored` |
+| T-17 | `t17_stale_version_is_conflict` |
+| T-18 | `t18_writes_are_atomic_and_leave_no_temporary_file` |
+| T-19 | `t19_symlink_escape_is_404` |
+| T-20 | `t20_html_escaping_prevents_script_injection` |
+| T-21 | `t21_json_api` (200/400/409/422/404 error object shapes) |
+| T-22 | `t22_request_limits_and_status_codes`; `head_matches_get_without_body`; `t22_concurrency_limit_returns_503_and_logs` |
+| T-23 | `t23_one_request_per_connection` |
+| T-24 | `t24_assets_are_offline_and_embedded` |
+| T-25 | `t25_non_utf8_record_is_skipped_and_not_rewritten` |
+| T-26 | `t26_config_keys`; `config::tests::browser_validation_messages_name_the_key`, `browser_port_zero_is_invalid`, `browser_host_validation`, `flattened_browser_keys_follow_document_types`, `browser_keys_serialize_to_json` |
+| T-27 | `t24_assets_are_offline_and_embedded` |
+| T-28 | `t28_accessibility_and_compatibility_basics`; `edit_form_dirty_status_is_static_and_hidden_until_input` |
+| T-29 | `cargo build`; `cargo test`; `cargo clippy --all-targets -- -D warnings`; `cargo fmt --check` (all pass; 124 tests) |
+| T-30 | `t30_no_writes_outside_project` |
+
+**Acceptance-criterion verification (#1 to #19)**
+
+- #1: Serves the documentation store for business/non-functional groups and requirements and opens by default unless disabled — `t02_defaults`, `t03_precedence_per_setting`, `t04_open_and_no_open`, `t09_list_renders_one_category`.
+- #2: Offline view/edit with persisted changes — `t13_edit_round_trip`, `t13_edit_round_trip_group_and_nonfunctional`, `t24_assets_are_offline_and_embedded`.
+- #3: Browser baseline, defaults, non-loopback warning — `t28_accessibility_and_compatibility_basics`, `t02_defaults`, `t06_non_loopback_warning`.
+- #4: Input sanitization and project-boundary containment — `t15_validation_returns_422_without_writing`, `t19_symlink_escape_is_404`, `t20_html_escaping_prevents_script_injection`, `t30_no_writes_outside_project`.
+- #5: Exact command shape and no positionals/subcommands — `t01_command_shape`.
+- #6: CLI > environment > configuration > defaults per setting — `t03_precedence_per_setting`; `browser::tests::precedence_is_per_setting`.
+- #7: Exit codes and bind failure — `t08_invalid_port_and_host_exit_codes`, `t07_port_in_use_exits_one`, `t26_config_keys`; every `Server` test keeps the process serving until dropped.
+- #8: `--no-open` / `browser_open: false` and opener warning only — `t04_open_and_no_open`, `t05_missing_opener_is_a_warning`.
+- #9: One-category sidebar, ID ordering, empty states — `t09_list_renders_one_category`, `t10_category_parameter`, `t09_list_empty_project_and_empty_type`, `t09_group_without_members_and_other_requirements`.
+- #10: Record/group view content, member list, no "Back to requirements", breadcrumbs/sidebar — `t12_record_views`, `t09_group_without_members_and_other_requirements`, `t28_accessibility_and_compatibility_basics`.
+- #11: Editable fields per form; ID/form/type/group read-only — `t13_edit_round_trip_group_and_nonfunctional`, `t16_immutable_fields_are_ignored`.
+- #12: Atomic write, unknown-section preservation, LF, reread/CLI parity — `t18_writes_are_atomic_and_leave_no_temporary_file`, `t14_unknown_sections_are_preserved`, `t13_edit_round_trip`, `t13_edit_round_trip_group_and_nonfunctional`.
+- #13: Deprecated records hidden and 404 — `t11_deprecated_records_are_hidden`.
+- #14: Limits, statuses, one request per connection, `Connection: close`, no TLS — `t22_request_limits_and_status_codes`, `head_matches_get_without_body`, `t22_concurrency_limit_returns_503_and_logs`, `t23_one_request_per_connection`.
+- #15: Escaped HTML, `serde_json`, exact ID resolution, symlink 404 — `t20_html_escaping_prevents_script_injection`, `t21_json_api`, `t19_symlink_escape_is_404`.
+- #16: Browser config keys in list/get/set/unset/JSON with validation — `t26_config_keys`; `config::tests::browser_defaults`, `browser_validation_messages_name_the_key`, `browser_keys_serialize_to_json`.
+- #17: Embedded assets, no external origin, no-JS operation — `t24_assets_are_offline_and_embedded`; `t28_accessibility_and_compatibility_basics` (labels, links, landmarks, no forbidden CSS/JS).
+- #18: Integration/unit coverage incl. spawned binary over `TcpStream`, round-trip, assets, boundary/symlink, port conflict, non-loopback, `--no-open`, XSS, JSON, gates — `t01`–`t30` as mapped above; 124 tests pass; dependency list unchanged.
+- #19: MOCK-0001 recorded and implemented states match, including the dirty "Unsaved changes" status — `edit_form_dirty_status_is_static_and_hidden_until_input`, `t09_list_renders_one_category`, `t12_record_views`, `t13_edit_round_trip`, `t15_validation_returns_422_without_writing`, `t17_stale_version_is_conflict`, `t28_accessibility_and_compatibility_basics`.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
@@ -169,6 +234,15 @@ created: 2026-11-03T19:55:00Z
 ---
 
 UI alignment (2026-11-03): MOCK-0001 approved by the user on 2026-11-03 (UTC). Specification updated to the approved UI model: persistent left "Document types" sidebar selecting one category at a time (default Business requirements; `/?type=req|nfr`, no `all` view), group view lists its member requirements, record view has no "Back to requirements" action (breadcrumbs plus sidebar), 320 px sidebar collapse behind an accessible toggle, and `aria-current` plus a non-colour cue on the selected entry. UI design handoff, expected artifacts, and traceability now reference the single self-contained package; the per-state SVG / per-screen-set HTML expectation was removed. ACs #9, #10, and #19 updated accordingly; all other ACs, the DoD, milestone, dependencies, and priority are unchanged. New spec OQ-13 (non-blocking, default recorded) covers a disabled document type's sidebar entry, which the approved mockup does not show.
+
+---
+
+author: @task-refiner
+created: 2026-11-03T20:15:00Z
+
+---
+
+Traceability fix (2026-11-03): AC #1 now states the increment scope — the documentation store for business-requirement and non-functional-requirement groups and requirements — and records that REQ-06.002's backlog-store coverage is delivered by TASK-11. Specification corrected to the approved mockup: §4.15 edit breadcrumb is `Requirements › ID › Edit` (no owning-group crumb), new §4.23 plus §7.12 and UI handoff state the version token is a hidden input with a visible static dashed note, and Assumptions/Traceability record the REQ-06.002 increment boundary. Other ACs, DoD, milestone, dependencies, and priority unchanged.
 
 ---
 <!-- COMMENTS:END -->

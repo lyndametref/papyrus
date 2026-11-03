@@ -121,14 +121,15 @@ All pages share one shell:
 
 ### 7.1 Layout
 
-- Breadcrumb `nav`: Requirements › record ID › Edit (current).
-- `h1` "Edit <ID>" and the current record title as a muted line.
+- Breadcrumb `nav`: Requirements › record ID › Edit (current). Exactly three crumbs, as drawn in every edit view; the owning group is not a crumb, it is shown in the metadata block.
+- `h1` "Edit <ID>" and the current record title as a muted line. The right side of the page head holds the "Unsaved changes" status (§7.2), so the heading block and the status sit on one line group.
 - Read-only metadata box: Record ID, Record form, Document type, Owning group (ID as a link). These values are never inputs and are never submitted.
 - Fields:
   - Title — text input, `required`, labelled "Title (required)", help "Required · 1 to 200 characters · shown in lists and headings."
   - User story — textarea, business-requirement forms only, help "Optional · plain text · line breaks are preserved."
   - Description — textarea, help "Optional · a line starting with `## ` is not allowed."
-- A hidden `version` field carries the optimistic-concurrency token. It is drawn in the mockups as a dashed note because it has no visible representation.
+- The version field is shown as a read-only, visible dashed note below the description field, drawn in MOCK-0001 (`edit-business`, `edit-dirty`, `edit-errors`) with the label "hidden field: version (current record token)"; the specification fixes the shipped label as "Hidden field: version (optimistic-concurrency token)" (§4.23). The note is static text: not an input, not focusable, not submitted, and it never displays the token value.
+- A hidden `version` input carries the optimistic-concurrency token and is always submitted.
 - Actions: primary "Save changes" (submit) and "Cancel" (link back to the view, no write).
 
 ### 7.2 States
@@ -137,10 +138,12 @@ All pages share one shell:
 | --- | --- | --- |
 | Pristine, business requirement | `edit-business` | Title, user story, description |
 | Pristine, non-functional requirement | `edit-nonfunctional` | Title and description only; no story field |
-| Dirty | `edit-dirty` | "Unsaved changes" status; Save stays enabled; the leave-guard warning is JavaScript-only |
+| Dirty | `edit-dirty` | "Unsaved changes" status in the page head; Save stays enabled; the leave guard is JavaScript-only |
 | Validation errors (422) | `edit-errors` | Summary alert with links, field-level messages, submitted values kept, empty title and a `## ` line |
 | Conflict (409) | `edit-conflict` | Nothing written; "Reload the form", "View current record", "Back to requirements"; attempted values shown read-only |
 | Success | `view-after-save` | 303 redirect back to the view; the view reads the file from disk; no success banner page |
+
+**Dirty state (as approved in `edit-dirty`).** The page head carries a right-aligned status element reading "Unsaved changes". It is hidden while the form is pristine and is revealed by the first `input` event on any field; it is static text, not a control, and it does not replace the Save button. Save stays enabled in every state. The form-actions note reads "Returns to the record view without saving." while pristine and "Leaving with unsaved changes warns only when JavaScript is available." once dirty; the `beforeunload` leave guard is progressive enhancement, so without JavaScript the form still posts and leaving is unguarded.
 
 ### 7.3 Error presentation
 
@@ -202,7 +205,7 @@ The two 404 variants share the layout. The message may be identical so a depreca
 | 9 | Error summary has `role="alert"` and links to fields; field messages use `aria-describedby`; fields set `aria-invalid="true"`; error text names the field |
 | 10 | Contrast at least 4.5:1; status and errors are never conveyed by colour alone |
 | 11 | No JavaScript is required: filter links, record links, form posts, and server-rendered errors all work; only the dirty-form warning is progressive enhancement |
-| 12 | The `version` token is a hidden input: never visible, never focusable, always submitted |
+| 12 | The `version` token travels in a hidden input (never focusable, always submitted) and is shown on the edit form as a read-only dashed note below the description: visible static text, not an input, not focusable, never edited |
 
 ### 9.3 Keyboard-only operation
 
@@ -218,7 +221,7 @@ The two 404 variants share the layout. The message may be identical so a depreca
 | --- | --- |
 | List | 2 document-type sidebar links; 1 group link + 1 group-title link per group (same target); 1 link per member requirement; 1 link per "Other requirements" row |
 | View | Breadcrumb links (Requirements, owning group); Edit; owning-group link in metadata |
-| Edit | Title input; user story textarea (business only); description textarea; hidden version input; Save changes; Cancel |
+| Edit | Title input; user story textarea (business only); description textarea; read-only version note (static text); hidden version input; Save changes; Cancel |
 | Error | Back to requirements |
 | All | Header text (not interactive), footer text |
 
@@ -247,7 +250,7 @@ These are design decisions or specification gaps found while mocking up; each ne
 
 1. **Unknown sections are preserved but not displayed.** Section 7.7 preserves `## ` sections such as `## Criticality`, `## Acceptance Criteria`, and `## Traceability`, but §4.10 lists only story and description as view content. The mockups display only story and description. Confirm whether preserved sections should also be shown read-only (recommended: show them read-only, since users cannot see what they are preserving).
 2. **Success feedback.** Per the handoff, a save returns to the plain record view with no success banner; `view-after-save` shows the resulting content. Confirm whether a brief inline "Saved" status is wanted instead of silence.
-3. **Dirty-state button.** Disabling Save while pristine would require script and would break the no-JavaScript requirement, so Save is always enabled and the dirty state is shown as an "Unsaved changes" status plus a JavaScript-only leave guard. Confirm.
+3. **Dirty-state button.** Disabling Save while pristine would require script and would break the no-JavaScript requirement, so Save is always enabled and the dirty state is shown as an "Unsaved changes" status element in the page head plus a JavaScript-only leave guard. Confirm.
 4. **404 wording.** The mockups use distinct but non-revealing messages for unknown and deprecated records; the specification allows them to be identical. Confirm which wording ships.
 5. **Project name in the header.** The specification says "project name"; no display name is configured, so the mockups use the project directory name. Confirm the source of that label.
 6. **Group title in the edit metadata.** The edit form shows the owning group ID only (space is tight at 320 px); the view shows ID plus title. Confirm that the ID alone is acceptable on the edit form.

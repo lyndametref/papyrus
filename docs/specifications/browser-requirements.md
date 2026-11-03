@@ -29,7 +29,7 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 
 - Creating, deprecating, restoring, or deleting records from the browser; moving records between groups; changing record IDs.
 - Browsing or editing tasks, milestones, releases, decisions, glossary terms, business rules, UI specifications, audit records, deployment records, or specification documents — later tickets (TASK-11, TASK-15, TASK-19, TASK-23 … TASK-27).
-- Browsing the backlog store, the decisions store, or the `docs/specifications/` tree.
+- Browsing the backlog store (tasks, milestones, releases), the decisions store, or the `docs/specifications/` tree. REQ-06.002 covers both the backlog and the documentation stores; the backlog-store part of that requirement is delivered by TASK-11, not by this increment (see [Assumptions](#assumptions)).
 - Search inside the browser UI, Markdown rendering, syntax highlighting, rich-text editing, attachments, or file uploads.
 - Authentication, authorization, user accounts, sessions, cookies, or TLS.
 - Automatic opening of the browser when the platform opener is absent beyond a warning.
@@ -134,7 +134,7 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 12. The category selection is a query parameter on the list page: `type=req` (default) or `type=nfr`. `GET /` and `?type=req` select business requirements, `?type=nfr` selects non-functional requirements. There is no combined "all" view: any other value, including `all`, is `400`.
 13. Viewing a requirement shows: ID (read-only), record form (group or requirement), document type (business or non-functional), title, owning group ID and title (as a link to the group record when the group is active), user story for business-requirement records only, and description.
 14. Viewing a group shows the group's own fields — ID, record form, document type, title, user story for business-requirement groups only, and description — followed by a "Requirements in this group" section (`h2`) listing the group's member requirements in ascending ID order as links whose text is "ID + title". A group with no members shows the empty state from section 4.11 in that section.
-15. Breadcrumbs are the primary navigation on record pages: `Requirements` (a link to the record's category, `/?type=req` or `/?type=nfr`), then the owning group when it resolves, then the record ID as the current, non-linked crumb. On the edit page the last crumb is `Edit`.
+15. Breadcrumbs are the primary navigation on record pages. On the record view the breadcrumb is `Requirements` (a link to the record's category, `/?type=req` or `/?type=nfr`), then the owning group when it resolves (a link to the group record), then the record ID as the current, non-linked crumb. On the edit page the breadcrumb is `Requirements › <ID> › Edit`: it does not include the owning group, which appears in the read-only metadata block, and `Edit` is the current, non-linked crumb (matches MOCK-0001).
 16. The record view offers exactly one action, `Edit`. There is no "Back to requirements" action on the record view: the breadcrumb and the sidebar are the navigation. Error pages keep their single recovery link to `/`.
 17. Editing is limited to the documented content fields:
     - business-requirement group: title, user story, description;
@@ -146,6 +146,7 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 20. Field content is displayed as text with preserved line breaks and collapsed runs of whitespace only where CSS chooses; no Markdown is rendered, so `*`, `#`, backticks, and links appear literally.
 21. No create, deprecate, restore, delete, move, or rename operation is offered. There is no "new record" control, and no control performs any of those actions.
 22. The interface is fully usable without internet access: every asset is served by the same process, and no page references an external origin (NFR-01.003).
+23. The edit form carries the optimistic-concurrency token in a hidden `version` input (section 7.12). The approved mockup (MOCK-0001) draws this as a visible, non-interactive dashed annotation on the edit form; the shipped wording is `Hidden field: version (optimistic-concurrency token)`. The annotation is static status text, not a form control: it is not focusable, never contains the token value, is never submitted, and its wording is fixed.
 
 ### 5. HTTP endpoints
 
@@ -255,7 +256,7 @@ Routes are exact. `{id}` is a record ID as defined in section 7.1.
     5. the directory is synced on a best-effort basis;
     6. on any failure the temporary file is removed and the original file is left untouched.
 11. Every read and write path — record directory, record file, temporary file — passes through `Context::ensure_within` before use. A symbolic link that resolves outside the project directory is rejected; the request receives `404` and the outside content is neither read nor written. No temporary file is left behind after a failed or rejected request.
-12. Concurrent edits use optimistic concurrency without locking. The version token is `"<mtime-seconds>.<mtime-nanos>.<length>"` of the record file at render time, sent as the `version` form field or JSON member. On `POST`:
+12. Concurrent edits use optimistic concurrency without locking. The version token is `"<mtime-seconds>.<mtime-nanos>.<length>"` of the record file at render time, sent as the `version` form field or JSON member. The token itself is a hidden, non-focusable input; the edit form additionally shows the static dashed annotation described in section 4.23. On `POST`:
     - missing or malformed `version` → `400`;
     - current on-disk token differs → `409 Conflict` with the message "record changed on disk; reload the form", and no write;
     - token matches → the write proceeds.
@@ -408,8 +409,10 @@ The approved package is the authoritative layout reference for this increment. W
    - Group record with story and description (business) and group record without a story (non-functional), each followed by its "Requirements in this group" member list.
    - Metadata block: ID (read-only), record form, document type, owning group (link when resolvable); breadcrumb `Requirements › group › ID`; single `Edit` action and no "Back to requirements" action; unresolved-group variant.
 3. **Edit form (`/doc/{id}/edit`).**
+   - Breadcrumb `Requirements › ID › Edit` (current, not a link); the owning group is not in the edit breadcrumb and appears only in the read-only metadata block.
    - Pristine business-requirement variant (title, user story, description) and non-functional variant (title, description).
    - Read-only display of ID, record form, document type, and owning group.
+   - Hidden `version` input plus the visible, non-interactive dashed annotation from section 4.23 (shipped label `Hidden field: version (optimistic-concurrency token)`).
    - Field help text (for example: "A line starting with `## ` is not allowed").
    - Dirty state (form modified, Save enabled).
    - Validation error state: form-level summary plus field-level messages, with submitted values preserved; includes an empty-title error and a `## `-line error.
@@ -479,6 +482,7 @@ The approved package is the authoritative layout reference for this increment. W
 - Assumption: Rust 1.99.1, edition 2024, and the repository-root single-crate layout are retained (ADR-0001, ADR-0004). The browser is a module and subcommand inside the existing crate; no new crate, application, stack, or dependency is introduced, so no new ADR is required. The blocking `std::net::TcpListener` server is the intended implementation approach.
 - Assumption: the man page (`papyrus(1)` → browser, `papyrus-config(5)` → Web UI) and BR-004 are the behavior contract; where they are silent, this specification fixes explicit defaults, recorded in Open questions.
 - Assumption: "requirement content" in this increment means business-requirement and non-functional-requirement groups and requirements only; all other record types arrive in later tickets (REQ-06.002, NFR-01.002 scope is filled incrementally).
+- Assumption: REQ-06.002 requires the local web interface over both the backlog and documentation stores; that coverage is delivered incrementally, not by a single ticket. This increment serves the documentation store for the requirement record types implemented so far, and TASK-11 delivers the backlog-store part (tasks, milestones, releases) under the same requirement. The missing backlog store here is therefore a planned increment boundary, not a requirement gap or an unmet acceptance criterion of TASK-6.
 - Assumption: the browser exposes a read/write interface but no lifecycle operations; deprecation and restoration remain CLI-only in this increment (REQ-05.007).
 - Assumption: group records are content too, so they are viewable and editable for their documented fields, not merely listed.
 - Assumption: unknown and editor-added sections are preserved on save rather than dropped, because the record files in this repository already contain sections such as `## Criticality` and `## Traceability`.
@@ -487,7 +491,7 @@ The approved package is the authoritative layout reference for this increment. W
 - Assumption: `Config` must gain the three documented browser keys for them to be settable at all, because `deny_unknown_fields` is in effect and `config set` validates the merged configuration.
 - Assumption: no TLS and no authentication, matching the documented loopback default and the "non-loopback is allowed but warned" contract.
 - Assumption: the environment tier uses `PAPYRUS_BROWSER_HOST`, `PAPYRUS_BROWSER_PORT`, and `PAPYRUS_BROWSER_OPEN`; the man page does not document them (OQ-1).
-- Assumption: the approved UI mockup MOCK-0001 (2026-11-03, UTC) is the authoritative layout reference for this increment; it fixes the persistent document-type sidebar with one category at a time, the group member list on the record view, and the absence of a "Back to requirements" action on the record view.
+- Assumption: the approved UI mockup MOCK-0001 (2026-11-03, UTC) is the authoritative layout reference for this increment; it fixes the persistent document-type sidebar with one category at a time, the group member list on the record view, the absence of a "Back to requirements" action on the record view, the edit-page breadcrumb `Requirements › ID › Edit` (no owning-group crumb), and the version token drawn as a visible dashed annotation (sections 4.15, 4.23, 7.12).
 
 ## Open questions
 
@@ -516,6 +520,7 @@ Each item has a specified default in this document, so none blocks implementatio
 | Business rule | BR-004 (browser command behavior), BR-016 (configuration keys and precedence) |
 | ADR | ADR-0001 (Rust), ADR-0002 (amd64 .deb), ADR-0003 (Debian Forky), ADR-0004 (repository-root single crate) |
 | Ticket | TASK-6 |
+| Increment boundary | REQ-06.002 covers both stores; this increment serves the documentation store only. Backlog-store browsing (tasks, milestones, releases) is delivered by TASK-11 under REQ-06.002, so the increment is not a requirement gap. |
 | UI mockups | MOCK-0001 — approved 2026-11-03 (UTC): [`docs/specifications/ui/mockups/MOCK-0001-browser-requirements-review.html`](ui/mockups/MOCK-0001-browser-requirements-review.html) (single self-contained review package: landing, design deck, 25-view web prototype) |
 | UI description | [`docs/specifications/ui/browser-requirements-ui.md`](ui/browser-requirements-ui.md) |
 | Related specification | `docs/specifications/search-requirements.md` (TASK-5) |
