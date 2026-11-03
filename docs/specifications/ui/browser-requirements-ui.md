@@ -128,7 +128,7 @@ All pages share one shell:
   - Title — text input, `required`, labelled "Title (required)", help "Required · 1 to 200 characters · shown in lists and headings."
   - User story — textarea, business-requirement forms only, help "Optional · plain text · line breaks are preserved."
   - Description — textarea, help "Optional · a line starting with `## ` is not allowed."
-- The version field is shown as a read-only, visible dashed note below the description field, drawn in MOCK-0001 (`edit-business`, `edit-dirty`, `edit-errors`) with the label "hidden field: version (current record token)"; the specification fixes the shipped label as "Hidden field: version (optimistic-concurrency token)" (§4.23). The note is static text: not an input, not focusable, not submitted, and it never displays the token value.
+- The version field is shown as a read-only, visible dashed note below the description field, drawn in MOCK-0001 (`edit-business`, `edit-nonfunctional`, `edit-dirty`, `edit-errors`) with the label "hidden field: version (current record token)"; the specification fixes the shipped label as "Hidden field: version (optimistic-concurrency token)" (§4.23). The note is static text: not an input, not focusable, not submitted, and it never displays the token value.
 - A hidden `version` input carries the optimistic-concurrency token and is always submitted.
 - Actions: primary "Save changes" (submit) and "Cancel" (link back to the view, no write).
 
@@ -183,9 +183,9 @@ The two 404 variants share the layout. The message may be identical so a depreca
 
 ### 9.1 Narrow viewport (320 CSS px)
 
-- The header stacks: product and project name on one line group; the "Local browser" note is omitted at this width.
+- The header keeps the product and project names at the left; the right-aligned "Local browser / offline · 127.0.0.1:6420" note is omitted at this width. The footer shortens to "Papyrus local browser — served from this project only."
 - The document-type sidebar collapses to a single accessible toggle button (labelled "Document types", `aria-expanded` reflecting state, `aria-controls` pointing at the type list). When expanded the type choices stack vertically; when collapsed they are hidden. Type selection still works without JavaScript via the links.
-- Group rows stack: group ID, group title (wrapping), member count on its own line, then member links.
+- Group rows stack: the group link (ID + title, wrapping), the member count on its own line, then the member links.
 - Long titles and long unbreakable words wrap inside the row; there is no horizontal scrolling of text.
 - Edit form fields are full width; Save and Cancel stack and each spans the column.
 - At 200% zoom the same rules apply.
@@ -201,17 +201,17 @@ The two 404 variants share the layout. The message may be identical so a depreca
 | 5 | Member links read as ID + title, so they are descriptive out of context |
 | 6 | Focus order follows document order; focus ring 2 px with 2 px offset, visible on every control |
 | 7 | Every form control has a visible `label` associated by `for`/`id`; required fields say "required" in text and set the `required` attribute |
-| 8 | Read-only metadata is a definition list, not disabled inputs; it is neither focusable nor submitted |
+| 8 | Read-only metadata is a definition list, not disabled inputs; its values are not inputs and are not submitted. The owning-group link is the only focusable item in the block |
 | 9 | Error summary has `role="alert"` and links to fields; field messages use `aria-describedby`; fields set `aria-invalid="true"`; error text names the field |
 | 10 | Contrast at least 4.5:1; status and errors are never conveyed by colour alone |
-| 11 | No JavaScript is required: filter links, record links, form posts, and server-rendered errors all work; only the dirty-form warning is progressive enhancement |
-| 12 | The `version` token travels in a hidden input (never focusable, always submitted) and is shown on the edit form as a read-only dashed note below the description: visible static text, not an input, not focusable, never edited |
+| 11 | No JavaScript is required: document-type links, record links, form posts, and server-rendered errors all work; only the dirty-form warning is progressive enhancement |
+| 12 | The `version` token travels in a hidden input (never focusable, always submitted). The desktop edit views `edit-business`, `edit-nonfunctional`, `edit-dirty`, and `edit-errors` also draw it as a read-only dashed note below the description: visible static text, not an input, not focusable, never edited. The 320 px edit view and `edit-conflict` draw only the hidden input |
 
 ### 9.3 Keyboard-only operation
 
 - Sidebar: Tab to the toggle (narrow viewports) or the type links; Enter/Space activates; the current type is announced.
 - List: Tab moves group link → its member links → next group; Enter opens the record.
-- View: Tab order is breadcrumb links, owning-group link, Edit, Back to requirements.
+- View: Tab order is breadcrumb links, Edit, owning-group link. There is no "Back to requirements" action; the breadcrumb and the sidebar are the way back to the list.
 - Edit: Tab order is breadcrumb, read-only link, title, story (business only), description, Save, Cancel; Enter submits, Space activates buttons.
 - Error summary links move focus to the field they name (anchor links); no keyboard trap.
 
@@ -219,7 +219,7 @@ The two 404 variants share the layout. The message may be identical so a depreca
 
 | Screen | Elements |
 | --- | --- |
-| List | 2 document-type sidebar links; 1 group link + 1 group-title link per group (same target); 1 link per member requirement; 1 link per "Other requirements" row |
+| List | 2 document-type sidebar links; 1 group link per group (ID + title in a single link); 1 link per member requirement; 1 link per "Other requirements" row |
 | View | Breadcrumb links (Requirements, owning group); Edit; owning-group link in metadata |
 | Edit | Title input; user story textarea (business only); description textarea; read-only version note (static text); hidden version input; Save changes; Cancel |
 | Error | Back to requirements |
@@ -229,7 +229,7 @@ No other control exists in this increment: no create, deprecate, restore, delete
 
 ## 11. Interaction flows
 
-1. **List → group → requirement → edit → save → view → list.** All → group `REQ-06` → requirement `REQ-06.002` → Edit → change title/description → Save changes → 303 → view shows the new content read from disk → Back to requirements.
+1. **List → group → requirement → edit → save → view.** All → group `REQ-06` → requirement `REQ-06.002` → Edit → change title/description → Save changes → 303 → view shows the new content read from disk. The view has no "Back to requirements" action: the breadcrumb or the sidebar returns to the list.
 2. **Category change keeps section structure.** Selecting "Business requirements" in the sidebar shows only the business `h2` with its groups and "Other requirements"; the non-functional section is absent, not empty. Selecting "Non-functional requirements" shows only that section. The two categories are independent document sets, not a filter on one set.
 3. **Validation recovery without losing input.** Submit with an empty title and a `## ` line in the description → 422 re-renders the form with the summary, field messages, and all typed values → correct the two fields → Save succeeds.
 4. **Conflict recovery.** Open the edit form, modify the file outside the browser, submit → 409 page → copy unsaved values if needed → Reload the form → new content and token → edit and save again.

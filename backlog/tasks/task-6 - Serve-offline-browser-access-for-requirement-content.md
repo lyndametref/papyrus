@@ -5,7 +5,7 @@ status: Implemented
 assignee:
   - '@orchestrator'
 created_date: '2026-10-31T22:25:00Z'
-updated_date: '2026-11-03T20:20:00Z'
+updated_date: '2026-11-03T20:37:00Z'
 labels: []
 milestone: m-1
 dependencies:
@@ -167,6 +167,12 @@ Addressed: edit-form dirty status; 503 Host validation + request log; browser co
 - #17: Embedded assets, no external origin, no-JS operation — `t24_assets_are_offline_and_embedded`; `t28_accessibility_and_compatibility_basics` (labels, links, landmarks, no forbidden CSS/JS).
 - #18: Integration/unit coverage incl. spawned binary over `TcpStream`, round-trip, assets, boundary/symlink, port conflict, non-loopback, `--no-open`, XSS, JSON, gates — `t01`–`t30` as mapped above; 124 tests pass; dependency list unchanged.
 - #19: MOCK-0001 recorded and implemented states match, including the dirty "Unsaved changes" status — `edit_form_dirty_status_is_static_and_hidden_until_input`, `t09_list_renders_one_category`, `t12_record_views`, `t13_edit_round_trip`, `t15_validation_returns_422_without_writing`, `t17_stale_version_is_conflict`, `t28_accessibility_and_compatibility_basics`.
+
+### Second quality-review follow-up (2026-11-03, UTC)
+
+Addressed: over-capacity 503 is written without reading the request (immediate `503 Service Unavailable` with `Connection: close`, log line `- - 503`, no Host/Origin validation), so the accept loop cannot block; configuration-file errors for `browser_port`, `browser_open`, and `browser_host` now exit 4 with a message naming the key; the desktop shell and 320 px states are aligned with MOCK-0001 (210 px sidebar grid column, 30 px gap, main `border-left`, narrow footer/header text, wrapping long "Other requirements" links); 422 summary entries repeat the field-level message; added duplicate `Content-Length` 400, T-14 unknown-section order, 320 px wrapping, and config-file error coverage.
+
+Updated coverage: T-22 `t22_concurrency_limit_returns_503_and_logs` now holds 16 connections, confirms a silent 17th connection receives 503/`Connection: close`/EOF in under 1 s without sending a request, asserts the `- - 503` log line, and confirms a normal request completes in under 1 s after slots free. T-15 `t15_validation_returns_422_without_writing` now asserts each summary entry equals its field-level message for an empty title, a 201-character title, a control character, and a `## ` line in story and description. Test suite: 126 tests pass.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -243,6 +249,15 @@ created: 2026-11-03T20:15:00Z
 ---
 
 Traceability fix (2026-11-03): AC #1 now states the increment scope — the documentation store for business-requirement and non-functional-requirement groups and requirements — and records that REQ-06.002's backlog-store coverage is delivered by TASK-11. Specification corrected to the approved mockup: §4.15 edit breadcrumb is `Requirements › ID › Edit` (no owning-group crumb), new §4.23 plus §7.12 and UI handoff state the version token is a hidden input with a visible static dashed note, and Assumptions/Traceability record the REQ-06.002 increment boundary. Other ACs, DoD, milestone, dependencies, and priority unchanged.
+
+---
+
+author: @task-refiner
+created: 2026-11-03T20:32:00Z
+
+---
+
+Spec ambiguities resolved after the second quality review (2026-11-03, UTC): §3.2/§2.12 over-capacity 503 is written without reading the request and logs '- - 503' (Host/Origin validation does not apply); §2.6/§2.8 only a spawn failure of the opener is observable and warns, a later non-zero exit is not a Papyrus error; §3.5/§3.6/§3.12 unknown path is 404 for every method and a known path with a disallowed method is 405; §4.10 a requirement without '## Group' appears under 'Other requirements' as 'Group: (none)'; §5.3/§7.5 422 summary entries name the actual field error and repeat the field-level message. Specification only; no source or mockup files changed.
 
 ---
 <!-- COMMENTS:END -->

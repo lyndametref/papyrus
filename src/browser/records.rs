@@ -484,8 +484,14 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
 pub fn validate_title(raw: &str) -> Result<String, String> {
     let value = raw.trim();
     let chars = value.chars().count();
-    if chars == 0 || chars > MAX_TITLE_CHARS {
-        return Err("Title is required. Enter a title of 1 to 200 characters.".to_string());
+    if chars == 0 {
+        return Err("Title is required.".to_string());
+    }
+    if chars > MAX_TITLE_CHARS {
+        return Err(format!(
+            "Title must be at most {} characters.",
+            MAX_TITLE_CHARS
+        ));
     }
     if value.chars().any(|c| c.is_control()) {
         return Err("Title cannot contain control characters.".to_string());

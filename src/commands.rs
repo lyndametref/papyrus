@@ -68,8 +68,44 @@ pub fn load_effective_value(config_path: &Path) -> Result<yaml_serde::Value, App
     Ok(base)
 }
 
+/// Validate the browser keys in the merged YAML before deserialization.
+///
+/// `browser_port` is a `u16` and `browser_open` is a `bool`, so an invalid
+/// value in the configuration file would otherwise fail with a serde message
+/// that does not name the offending key. Validating the merged YAML first
+/// keeps the error stable and names the key (specification section 8.2).
+fn validate_browser_yaml(val: &yaml_serde::Value) -> Result<(), String> {
+    if let Some(port) = yaml_get(val, "browser_port") {
+        let in_range = match port {
+            yaml_serde::Value::Number(number) => number
+                .as_u64()
+                .map(|port| (1..=65535).contains(&port))
+                .unwrap_or(false),
+            _ => false,
+        };
+        if !in_range {
+            return Err("browser_port: must be between 1 and 65535".to_string());
+        }
+    }
+    if let Some(open) = yaml_get(val, "browser_open")
+        && !matches!(open, yaml_serde::Value::Bool(_))
+    {
+        return Err("browser_open: must be a boolean".to_string());
+    }
+    if let Some(host) = yaml_get(val, "browser_host") {
+        match host {
+            yaml_serde::Value::String(host) => {
+                validate_browser_host(host).map_err(|reason| format!("browser_host: {}", reason))?
+            }
+            _ => return Err("browser_host: must be a string".to_string()),
+        }
+    }
+    Ok(())
+}
+
 pub fn load_effective_config(config_path: &Path, project_dir: &Path) -> Result<Config, AppError> {
     let val = load_effective_value(config_path)?;
+    validate_browser_yaml(&val).map_err(AppError::Validation)?;
     let cfg: Config =
         yaml_serde::from_value(val).map_err(|e| AppError::Validation(e.to_string()))?;
     cfg.validate().map_err(AppError::Validation)?;

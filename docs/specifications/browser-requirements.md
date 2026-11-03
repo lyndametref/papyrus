@@ -68,22 +68,22 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
    - text mode: `Serving http://<host>:<port>/`
    - `--json` mode: `{"status":"serving","url":"http://<host>:<port>/","host":"<host>","port":<port>,"open":<bool>}`
 5. `<host>` in the printed URL is the effective bind host, except that a wildcard bind address (`0.0.0.0` or `::`) is printed as `127.0.0.1`, because a wildcard address is not a usable navigation target.
-6. If opening is enabled, the default browser is opened at that URL after the startup line is flushed, using the platform opener: `xdg-open <url>` on Linux and other Unix systems, `open <url>` on macOS, `cmd /C start "" <url>` on Windows. The opener process is spawned without waiting for it and with its standard streams discarded.
+6. If opening is enabled, the default browser is opened at that URL after the startup line is flushed, using the platform opener: `xdg-open <url>` on Linux and other Unix systems, `open <url>` on macOS, `cmd /C start "" <url>` on Windows. The opener process is spawned without waiting for it and with its standard streams discarded; it is never reaped, so only a spawn failure is observable by this command (section 2.8).
 7. Opening is suppressed when `--no-open` is present, or when the resolved open setting is `false`. No other condition suppresses it.
-8. A missing, non-executable, or failing opener is a warning, never a fatal error: `warning: could not open the default browser: <reason>` on standard error. The server keeps serving.
+8. A missing or non-executable opener, or any failure to spawn it, is a warning, never a fatal error: `warning: could not open the default browser: <reason>` on standard error. The server keeps serving. Because the opener is spawned without waiting, a later non-zero exit status of the opener process is not observed and is not a Papyrus error.
 9. After startup the process serves requests until it is interrupted (SIGINT/SIGTERM) or a fatal listener error occurs. There is no graceful-shutdown protocol, no `--daemon`, no PID file, and no automatic exit after inactivity.
 10. A fatal accept-loop error (for example the listener becomes unusable) exits 1 with a runtime message.
 11. Standard output carries only the single startup line; per-request diagnostics go to standard error. Warnings are plain `warning: ...` lines on standard error in both text and `--json` modes, because they are diagnostics and not command output.
-12. Per-request logging is one line per request on standard error: `<METHOD> <path-without-query> <status>`. Logged paths are the decoded request path, truncated to 200 characters; request bodies, form values, and query strings are never logged.
+12. Per-request logging is one line per request on standard error: `<METHOD> <path-without-query> <status>`. Logged paths are the decoded request path, truncated to 200 characters; request bodies, form values, and query strings are never logged. For the over-capacity rejection in section 3.2 the request is never read, so both the method and the path are logged as `-`, giving the line `- - 503`.
 
 ### 3. HTTP server behavior
 
 1. The server is a blocking HTTP/1.1 server implemented with `std::net::TcpListener` and `std::io::{BufReader, Read, Write}` only. No web framework, async runtime, or new dependency is used (ADR-0001, ADR-0004).
-2. Each accepted connection is handled on its own `std::thread`. At most 16 connections are handled concurrently; a connection accepted beyond that limit receives `503 Service Unavailable` with `Connection: close` and is closed immediately.
+2. Each accepted connection is handled on its own `std::thread`. At most 16 connections are handled concurrently. A connection accepted while the limit is already reached is rejected without reading the request: the server immediately writes `503 Service Unavailable` with `Connection: close`, closes the connection, and logs the rejection as specified in section 2.12. This rejection happens before request parsing, so the Host and Origin validation of section 9.8 does not apply to it.
 3. Requests may use HTTP/1.0 or HTTP/1.1. Any other version receives `505 HTTP Version Not Supported`.
 4. Exactly one request is served per connection. Every response includes `Connection: close`, and the connection is closed after the response body is written (no keep-alive, no pipelining).
-5. Allowed methods are `GET`, `HEAD`, and `POST`. `HEAD` returns the same status and headers as the corresponding `GET` with no body. Any other method receives `405 Method Not Allowed` with `Allow: GET, HEAD, POST`.
-6. `POST` is accepted only on `/doc/{id}` and `/api/doc/{id}`; `POST` to any other path receives `405`.
+5. Allowed methods are `GET`, `HEAD`, and `POST`. `HEAD` returns the same status and headers as the corresponding `GET` with no body. Any other method on a known path receives `405 Method Not Allowed` with `Allow: GET, HEAD, POST`; on an unknown path it receives `404`, because unknown paths are `404` for every method (section 3.12).
+6. `POST` is accepted only on `/doc/{id}` and `/api/doc/{id}`. A `POST` to a known path that does not accept `POST` receives `405 Method Not Allowed`; a `POST` to an unknown path receives `404 Not Found`, exactly as for every other method (section 3.12).
 7. Request-line and header limits:
    - request line (method, target, version) at most 8192 bytes, otherwise `414 URI Too Long`;
    - request target at most 2048 bytes, otherwise `414 URI Too Long`;
@@ -100,7 +100,7 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 11. Path traversal is rejected: after decoding, any `.` or `..` segment, any empty segment other than a single trailing slash, or a path that does not start with `/` receives `400`. Paths are matched against a fixed route table; no request path is ever joined to a filesystem path.
 12. Routing and status codes:
     - known route with a valid request: the route's success response;
-    - well-formed request for an unknown route: `404 Not Found`;
+    - well-formed request for an unknown path: `404 Not Found`, for every method;
     - known path with a disallowed method: `405 Method Not Allowed`;
     - malformed request line or headers: `400 Bad Request`;
     - unsupported media type on `POST`: `415 Unsupported Media Type`;
@@ -129,7 +129,7 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 7. The sidebar selects exactly one document category at a time. The list page renders only the selected category; the other category is not rendered at all (not as an empty section, and not as a second section). The two document types are separate categories, not a filter over one combined list.
 8. The default category is business requirements: `GET /` and `GET /?type=req` render the same page.
 9. The selected category renders one section (`h2`) titled with the category name, showing the category's group count and requirement count. Each group is a row containing the group ID and title as one link to the group record, the group's member count, and its member requirements as nested links in ascending ID order; the group row links and the member links use link text "ID + title".
-10. A requirement whose `## Group` reference does not match an active group of the same type is listed in a trailing "Other requirements" subsection (`h3`) of its category, with the stored group reference shown as text (for example `Group: REQ-99 (not found)`).
+10. A requirement whose `## Group` reference does not match an active group of the same type, and a requirement with no `## Group` section, is listed in a trailing "Other requirements" subsection (`h3`) of its category, with the group reference shown as text: an unresolved reference as `Group: REQ-99 (not found)`, and a missing reference as `Group: (none)`.
 11. A group with no member requirements shows an explicit empty state in its row (for example "No requirements in this group") and a member count of "No requirements".
 12. The category selection is a query parameter on the list page: `type=req` (default) or `type=nfr`. `GET /` and `?type=req` select business requirements, `?type=nfr` selects non-functional requirements. There is no combined "all" view: any other value, including `all`, is `400`.
 13. Viewing a requirement shows: ID (read-only), record form (group or requirement), document type (business or non-functional), title, owning group ID and title (as a link to the group record when the group is active), user story for business-requirement records only, and description.
@@ -164,7 +164,7 @@ Routes are exact. `{id}` is a record ID as defined in section 7.1.
 | `GET` | `/assets/app.css` | — | `200 text/css` embedded stylesheet |
 | `GET` | `/assets/app.js` | — | `200 text/javascript` embedded script |
 | `HEAD` | any `GET` route | — | same status and headers, no body |
-| any | any other route | — | `404` (unknown route) or `405` (known path, wrong method) |
+| any | any other route | — | `404` for every method on an unknown path; `405` for a known path with a disallowed method |
 
 1. `/api/requirements` response:
 
@@ -202,7 +202,7 @@ Routes are exact. `{id}` is a record ID as defined in section 7.1.
 3. Error responses:
    - HTML routes return an HTML error page with the status, a short message, and a link back to `/`.
    - JSON routes return `{"error":{"code":<http-status>,"message":"<message>"}}` with the matching HTTP status. The `code` field is the HTTP status, not the CLI exit code.
-   - A `POST` to a form endpoint that fails validation returns `422` with the edit form re-rendered, the submitted values preserved, a summary message, and field-level messages.
+   - A `POST` to a form endpoint that fails validation returns `422` with the edit form re-rendered, the submitted values preserved, a form-level summary, and field-level messages. In the re-rendered form, each summary entry links to the offending field and names the actual field error, using the same text as that field's message (section 7.5).
 4. `POST /doc/{id}` requires `Content-Type: application/x-www-form-urlencoded` (parameters ignored) and rejects anything else with `415`. `POST /api/doc/{id}` requires `Content-Type: application/json` and rejects anything else with `415`.
 5. Form fields are `version` (required), `title` (required), `story` (business-requirement forms only), and `description`. Unknown form fields are ignored. Repeated fields: the last value wins. Field values are percent-decoded with `+` as space; malformed percent-encoding receives `400`.
 6. A successful form `POST` returns `303` and no body; the client re-fetches the view page, which reads the file from disk again (save-then-reread).
@@ -238,7 +238,7 @@ Routes are exact. `{id}` is a record ID as defined in section 7.1.
    - a line whose first two characters are `## ` is rejected with a validation error, because the record format uses `## ` to delimit sections and such a line would change the parsed record;
    - a line consisting only of whitespace is preserved as an empty line;
    - values are stored unescaped and unmodified apart from the trimming and newline normalization above.
-5. Validation failures return `422` (HTML form re-rendered with messages, JSON error object) and never modify the file.
+5. Validation failures return `422` (HTML form re-rendered with messages, JSON error object) and never modify the file. The form-level error summary links each entry to its field, and each summary entry names the actual field error and uses the same text as that field's message: `Title is required.` only for an empty title; `Description contains a line starting with ## .` for a `## ` line; and the field's own accurate text for control-character and length errors (for example `Title cannot contain control characters.` and `Description must be at most 20000 characters.`).
 6. Record ID, group reference, `## Group` section content, and unknown sections are never editable.
 7. Unknown and editor-added sections are preserved. On save:
    1. the file is read as UTF-8 text;
@@ -346,9 +346,10 @@ Routes are exact. `{id}` is a record ID as defined in section 7.1.
 | Invalid configuration key value | exit 4 | Validation message on stderr. |
 | Bind failure (port in use, permission, unresolvable host) | exit 1 | `cannot bind <host>:<port>: <reason>` on stderr. |
 | Non-loopback host | serves | `warning: binding to non-loopback address ...` on stderr. |
-| Opener missing or failing | serves | `warning: could not open the default browser: ...` on stderr. |
+| Opener missing or failing to spawn | serves | `warning: could not open the default browser: ...` on stderr. |
+| Over-capacity connection (17th concurrent) | 503 | Immediate `Service Unavailable` with `Connection: close`; request not read; log line `- - 503`. |
 | Malformed request line, headers, or target | 400 | HTML or JSON error page. |
-| Unknown route | 404 | HTML or JSON error page. |
+| Unknown path (any method) | 404 | HTML or JSON error page. |
 | Known path, wrong method | 405 | Error page with `Allow: GET, HEAD, POST`. |
 | Unsupported media type on `POST` | 415 | Error page. |
 | Request line or target too long | 414 | Error page. |
@@ -460,14 +461,14 @@ The approved package is the authoritative layout reference for this increment. W
 | T-12 | View shows ID, form, type, group, story (business only), description, escaped; a group view lists its members; no "Back to requirements" action | HTML assertions for each of the four record forms, plus a group page whose member links appear in ID order and a scan confirming the view page has no "Back to requirements" link |
 | T-13 | Edit round-trip persists and is visible through both the UI and the CLI | Form `POST` → 303 → `GET` shows new values; `req view` shows the same file |
 | T-14 | Unknown and editor-added sections are preserved content-identically across a save | Fixture with `## Criticality`, `## Traceability`, `## Open Question`; compare before/after with line endings normalized |
-| T-15 | Field validation returns 422 and does not write | Empty title, 201-character title, control character, `## ` line |
+| T-15 | Field validation returns 422 and does not write | Empty title, 201-character title, control character, `## ` line; each summary entry links to its field and repeats that field's message |
 | T-16 | ID, form, and group membership are immutable through the UI | `POST` with `id`, `group`, and `form` fields; stored file and ID unchanged |
 | T-17 | Stale version token returns 409 and does not write | Render form, modify the file out of band, then `POST` |
 | T-18 | Writes are atomic and leave no temporary file | Directory snapshot before/after a save and after a rejected save |
 | T-19 | Symlink escaping the project returns 404 and never exposes outside content | Symlink fixture to a file outside the project |
 | T-20 | HTML escaping prevents script injection | Record title `"><script>alert(1)</script>`; response contains no literal `<script>` and the escaped form |
 | T-21 | JSON API returns the documented shapes and rejects bad bodies | `GET /api/requirements`, `GET /api/doc/{id}`, `POST /api/doc/{id}`, malformed JSON, wrong types |
-| T-22 | Request limits and status codes | 405, 400, 413, 414, 431, 415, 501, 411, 403, 408 fixtures over raw `TcpStream` |
+| T-22 | Request limits and status codes | 405, 400, 413, 414, 431, 415, 501, 411, 403, 408, 503 fixtures over raw `TcpStream`; the over-capacity fixture holds 16 connections open, sends nothing on the 17th, and asserts `503`, `Connection: close`, EOF, and the `- - 503` log line |
 | T-23 | One request per connection and `Connection: close` | Second request on the same socket sees EOF |
 | T-24 | Offline operation | Served HTML/CSS/JS contain no external URL; no outbound socket code path; server works with an unroutable default route |
 | T-25 | Non-UTF-8 record files are skipped and never rewritten | Fixture with invalid bytes |

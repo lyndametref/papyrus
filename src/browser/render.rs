@@ -514,16 +514,18 @@ pub fn edit_page(
 
     if errors.any() {
         form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
-        if errors.title.is_some() {
-            form.push_str("<li><a href=\"#title\">Title is required.</a></li>");
-        }
-        if errors.story.is_some() {
-            form.push_str(
-                "<li><a href=\"#story\">User story contains a line starting with ## .</a></li>",
-            );
-        }
-        if errors.description.is_some() {
-            form.push_str("<li><a href=\"#description\">Description contains a line starting with ## .</a></li>");
+        for (field, message) in [
+            ("title", errors.title.as_deref()),
+            ("story", errors.story.as_deref()),
+            ("description", errors.description.as_deref()),
+        ] {
+            if let Some(message) = message {
+                form.push_str(&format!(
+                    "<li><a href=\"#{}\">{}</a></li>",
+                    field,
+                    escape(message)
+                ));
+            }
         }
         form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
     }

@@ -102,6 +102,28 @@ fn fixture(name: &str) -> PathBuf {
     dir
 }
 
+/// Replace (or append) one top-level scalar in the project configuration file.
+fn set_config_value(dir: &Path, key: &str, value: &str) {
+    let path = dir.join("papyrus.config.yml");
+    let text = fs::read_to_string(&path).unwrap();
+    let prefix = format!("{}:", key);
+    let mut out = String::new();
+    let mut replaced = false;
+    for line in text.lines() {
+        if line.starts_with(&prefix) {
+            out.push_str(&format!("{}: {}\n", key, value));
+            replaced = true;
+        } else {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    if !replaced {
+        out.push_str(&format!("{}: {}\n", key, value));
+    }
+    fs::write(&path, out).unwrap();
+}
+
 fn free_port() -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -235,6 +257,25 @@ fn send_raw(port: u16, raw: &[u8]) -> HttpResponse {
     parse_response(&bytes)
 }
 
+/// Like [`send_raw`], but returns `None` when the peer resets the connection.
+/// Over-capacity rejection closes without reading the request, so a client
+/// that already sent one can observe a reset instead of the response.
+fn try_send_raw(port: u16, raw: &[u8]) -> Option<HttpResponse> {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).ok()?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(15)))
+        .ok()?;
+    stream.write_all(raw).ok()?;
+    let mut bytes = Vec::new();
+    if stream.read_to_end(&mut bytes).is_err() || bytes.is_empty() {
+        return None;
+    }
+    if !bytes.windows(4).any(|window| window == b"\r\n\r\n") {
+        return None;
+    }
+    Some(parse_response(&bytes))
+}
+
 fn request(
     port: u16,
     method: &str,
@@ -311,6 +352,30 @@ fn extract_version(html: &str) -> String {
     let start = html.find(marker).expect("version field") + marker.len();
     let rest = &html[start..];
     let end = rest.find('"').expect("version terminator");
+    rest[..end].to_string()
+}
+
+/// Text of one 422 summary entry, identified by the field it links to.
+fn summary_entry(html: &str, field: &str) -> String {
+    let marker = format!("<li><a href=\"#{}\">", field);
+    let start = html
+        .find(&marker)
+        .unwrap_or_else(|| panic!("summary entry for {}", field))
+        + marker.len();
+    let rest = &html[start..];
+    let end = rest.find("</a></li>").expect("summary entry terminator");
+    rest[..end].to_string()
+}
+
+/// Text of one field-level validation message.
+fn field_error(html: &str, field: &str) -> String {
+    let marker = format!("<p class=\"error\" id=\"{}-error\">", field);
+    let start = html
+        .find(&marker)
+        .unwrap_or_else(|| panic!("field error for {}", field))
+        + marker.len();
+    let rest = &html[start..];
+    let end = rest.find("</p>").expect("field error terminator");
     rest[..end].to_string()
 }
 
@@ -897,6 +962,16 @@ fn t14_unknown_sections_are_preserved() {
             heading
         );
     }
+    // Unknown sections also keep their original order.
+    let order: Vec<usize> = ["## Criticality", "## Traceability", "## Open Question"]
+        .iter()
+        .map(|heading| after.find(heading).unwrap())
+        .collect();
+    assert!(
+        order.windows(2).all(|pair| pair[0] < pair[1]),
+        "unknown sections changed order: {:?}",
+        order
+    );
     assert!(after.contains("# REQ-001.001 New title"));
     assert!(after.contains("## User Story\nNew story"));
     assert!(after.contains("## Description\nNew description"));
@@ -913,18 +988,32 @@ fn t15_validation_returns_422_without_writing() {
     let server = Server::start(&dir, &["--no-open"], &[]);
     let version = extract_version(&get(&server, "/doc/REQ-001.001/edit").text());
 
-    let cases = [
-        ("", "Title is required"),
-        (&"x".repeat(201), "Title"),
-        ("bad\u{0007}title", "control"),
+    let long_title = "x".repeat(201);
+    let cases: [(&str, &str); 3] = [
+        ("", "Title is required."),
+        (long_title.as_str(), "Title must be at most 200 characters."),
+        (
+            "bad\u{0007}title",
+            "Title cannot contain control characters.",
+        ),
     ];
-    for (title, needle) in cases {
+    for (title, expected) in cases {
         let body = form_body(&[("version", &version), ("title", title)]);
         let response = post_form(&server, "/doc/REQ-001.001", &body);
         assert_eq!(response.status, 422, "title={:?}", title);
-        assert!(response.text().contains(needle));
+        let html = response.text();
+        assert_eq!(
+            summary_entry(&html, "title"),
+            expected,
+            "summary must repeat the field message for title={:?}",
+            title
+        );
+        assert_eq!(field_error(&html, "title"), expected);
         assert_eq!(fs::read(&path).unwrap(), before);
     }
+
+    let description_message =
+        "Description cannot contain a line starting with ## . Remove that line or change it.";
     let body = form_body(&[
         ("version", &version),
         ("title", "Valid"),
@@ -933,10 +1022,25 @@ fn t15_validation_returns_422_without_writing() {
     let response = post_form(&server, "/doc/REQ-001.001", &body);
     assert_eq!(response.status, 422);
     let html = response.text();
-    assert!(html.contains("## "));
+    assert_eq!(summary_entry(&html, "description"), description_message);
+    assert_eq!(field_error(&html, "description"), description_message);
     // Submitted values are preserved.
     assert!(html.contains("value=\"Valid\""));
     assert!(html.contains("Line\n## Not allowed\nMore"));
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    let story_message =
+        "User story cannot contain a line starting with ## . Remove that line or change it.";
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Valid"),
+        ("story", "Story\n## Not allowed"),
+    ]);
+    let response = post_form(&server, "/doc/REQ-001.001", &body);
+    assert_eq!(response.status, 422);
+    let html = response.text();
+    assert_eq!(summary_entry(&html, "story"), story_message);
+    assert_eq!(field_error(&html, "story"), story_message);
     assert_eq!(fs::read(&path).unwrap(), before);
 
     let body = form_body(&[
@@ -947,8 +1051,8 @@ fn t15_validation_returns_422_without_writing() {
     let response = post_form(&server, "/doc/REQ-001.001", &body);
     assert_eq!(response.status, 422);
     let html = response.text();
-    assert!(html.contains("Title is required"));
-    assert!(html.contains("## "));
+    assert_eq!(summary_entry(&html, "title"), "Title is required.");
+    assert_eq!(summary_entry(&html, "description"), description_message);
     // Form-level summary and field-level error association.
     assert!(html.contains("role=\"alert\""));
     assert!(html.contains("There is a problem"));
@@ -1281,6 +1385,18 @@ fn t22_request_limits_and_status_codes() {
         .status,
         413
     );
+    assert_eq!(
+        send_raw(
+            port,
+            format!(
+                "POST /doc/REQ-001.001 HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 4\r\nContent-Length: 4\r\n\r\nabcd",
+                port
+            )
+            .as_bytes()
+        )
+        .status,
+        400
+    );
     let long_target = format!("/{}", "a".repeat(3000));
     assert_eq!(
         send_raw(
@@ -1386,7 +1502,7 @@ fn head_matches_get_without_body() {
     let _ = fs::remove_dir_all(&dir);
 }
 
-// T-22 (concurrency limit: Host validation, request log, 503, Connection: close)
+// T-22 (concurrency limit: immediate 503, request never read, - - 503 log)
 #[test]
 fn t22_concurrency_limit_returns_503_and_logs() {
     let dir = fixture("capacity");
@@ -1399,30 +1515,75 @@ fn t22_concurrency_limit_returns_503_and_logs() {
         stream.write_all(b"GET / HT").unwrap();
         held.push(stream);
     }
-    // Poll until the accept loop has all 16 slots occupied, so the test does
-    // not depend on a fixed startup delay.
+    // Wait until the accept loop reports all 16 slots occupied. A probe that is
+    // accepted waits for a request; an over-capacity probe is answered at once.
     let deadline = Instant::now() + Duration::from_secs(5);
-    let response = loop {
-        let response = get(&server, "/");
-        if response.status == 503 {
-            break response;
+    loop {
+        let mut probe = TcpStream::connect(("127.0.0.1", server.port)).unwrap();
+        probe
+            .set_read_timeout(Some(Duration::from_millis(200)))
+            .unwrap();
+        let mut bytes = Vec::new();
+        let rejected = probe.read_to_end(&mut bytes).is_ok()
+            && !bytes.is_empty()
+            && parse_response(&bytes).status == 503;
+        if rejected {
+            break;
         }
         assert!(
             Instant::now() < deadline,
             "server never reached the concurrency limit"
         );
         std::thread::sleep(Duration::from_millis(25));
-    };
+    }
+
+    // The 17th connection sends no request at all and still receives an
+    // immediate 503 with Connection: close followed by EOF. This proves the
+    // accept loop does not read the request on the rejection path.
+    let started = Instant::now();
+    let mut over = TcpStream::connect(("127.0.0.1", server.port)).unwrap();
+    over.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+    let mut bytes = Vec::new();
+    over.read_to_end(&mut bytes).unwrap();
+    let elapsed = started.elapsed();
+    let response = parse_response(&bytes);
     assert_eq!(response.status, 503);
     assert_eq!(response.header("Connection"), Some("close"));
-    server.wait_for_stderr("GET / 503");
+    assert!(
+        elapsed < Duration::from_secs(1),
+        "over-capacity 503 took {:?}",
+        elapsed
+    );
+    server.wait_for_stderr("- - 503");
 
-    // The over-limit path still validates the Host header.
-    let bad_host = send_raw(server.port, b"GET / HTTP/1.1\r\nHost: evil.test\r\n\r\n");
-    assert_eq!(bad_host.status, 400);
-    server.wait_for_stderr("GET / 400");
-
+    // Free the held slots; the next normal request is not delayed by the
+    // rejection path.
     drop(held);
+    let raw = format!(
+        "GET / HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\n\r\n",
+        server.port
+    );
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let started = Instant::now();
+        let response = try_send_raw(server.port, raw.as_bytes());
+        let elapsed = started.elapsed();
+        if let Some(response) = response
+            && response.status == 200
+        {
+            assert!(
+                elapsed < Duration::from_secs(1),
+                "normal request took {:?}",
+                elapsed
+            );
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "server did not recover after releasing the held connections"
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    }
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -1599,6 +1760,104 @@ fn t26_config_keys() {
         ]),
         "6420"
     );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-26 (configuration file load errors, not just `config set`)
+#[test]
+fn config_file_browser_errors_name_the_key() {
+    let dir = test_root("config-file");
+    init_project(&dir);
+    let original = fs::read_to_string(dir.join("papyrus.config.yml")).unwrap();
+    let cases = [
+        (
+            "browser_port",
+            "70000",
+            "browser_port: must be between 1 and 65535",
+        ),
+        ("browser_open", "maybe", "browser_open: must be a boolean"),
+        ("browser_host", "bad/host", "browser_host:"),
+    ];
+    for (key, value, needle) in cases {
+        fs::write(dir.join("papyrus.config.yml"), &original).unwrap();
+        set_config_value(&dir, key, value);
+        let out = bin()
+            .arg("--dir")
+            .arg(&dir)
+            .args(["browser", "--no-open"])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(4), "{}={}", key, value);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            stderr.contains(needle),
+            "{}={} stderr: {}",
+            key,
+            value,
+            stderr
+        );
+        assert!(
+            !stderr.contains("value cannot be normalized"),
+            "{}={} stderr: {}",
+            key,
+            value,
+            stderr
+        );
+        // Every command that loads the merged configuration fails the same way.
+        let out = bin()
+            .arg("--dir")
+            .arg(&dir)
+            .args(["config", "list"])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(4), "config list {}={}", key, value);
+    }
+    set_config_value(&dir, "browser_port", "6420");
+    set_config_value(&dir, "browser_open", "true");
+    set_config_value(&dir, "browser_host", "127.0.0.1");
+    let list = run_ok(&["--dir", dir.to_str().unwrap(), "config", "list"]);
+    assert!(list.contains("browser_port: 6420"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// AC #19 / T-28 (approved MOCK-0001 shell, 320 px states)
+#[test]
+fn ui_matches_approved_mock_0001_layout() {
+    let css = include_str!("../src/browser/app.css");
+    assert!(css.contains("grid-template-columns: 210px minmax(0, 1fr)"));
+    assert!(css.contains("gap: 30px"));
+    assert!(css.contains("border-left: 1px solid var(--line)"));
+    assert!(!css.contains("width: 190px"), "old fixed sidebar width");
+    assert!(!css.contains("float: left"), "old floated sidebar");
+
+    // Long unbreakable "Other requirements" links wrap at 320 px.
+    let other_rule = css
+        .split(".other-list a {")
+        .nth(1)
+        .expect(".other-list a rule");
+    let other_rule = &other_rule[..other_rule.find('}').unwrap()];
+    assert!(other_rule.contains("overflow-wrap: break-word"));
+    assert!(other_rule.contains("word-wrap: break-word"));
+
+    // Narrow viewport: header note omitted, footer shortened, sidebar stacked.
+    let narrow = css
+        .split("@media (max-width: 480px)")
+        .nth(1)
+        .expect("narrow media query");
+    assert!(narrow.contains(".top-meta { display: none; }"));
+    assert!(narrow.contains(".layout { display: block; padding-top: 16px; }"));
+    assert!(narrow.contains(".main { border-left: 0; padding-left: 0; }"));
+    assert!(narrow.contains(".footer-long { display: none; }"));
+    assert!(narrow.contains(".footer-short { display: inline; }"));
+    assert!(css.contains(".footer-short { display: none; }"));
+
+    let dir = fixture("mock-layout");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/").text();
+    assert!(html.contains("footer-long"));
+    assert!(html.contains("footer-short"));
+    assert!(html.contains("Papyrus local browser &mdash; served from this project only."));
+    drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
 
