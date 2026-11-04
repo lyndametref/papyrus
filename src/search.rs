@@ -1,8 +1,4 @@
-//! Read-only project-local free-text search (TASK-5).
-//!
-//! Implements the first increment of `papyrus search`: business and
-//! non-functional requirement records plus their requirement group documents.
-//! The behavior contract is `docs/specifications/search-requirements.md`.
+//! Read-only project-local free-text search (TASK-5 + TASK-10).
 
 use crate::CommandOutput;
 use crate::SearchType;
@@ -14,16 +10,9 @@ use crate::requirement::parse_heading;
 use std::fs;
 use std::path::PathBuf;
 
-/// Document type value reported for every hit in this increment.
 const DOC_TYPE: &str = "doc";
-
-/// Document type keys searched by the `doc` filter (spec section 2.1).
 const DOC_KEYS: [&str; 2] = ["req", "nfr"];
 
-/// Normalize and validate a user-supplied query (spec section 5.3).
-///
-/// Leading and trailing whitespace is trimmed; empty or whitespace-only
-/// queries and queries containing NUL, CR, or LF are rejected with exit 4.
 pub fn sanitize_query(raw: &str) -> Result<String, AppError> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -44,7 +33,6 @@ struct Hit {
     path: PathBuf,
 }
 
-/// Execute a search and render the requested output (spec section 4).
 pub fn run(
     ctx: &Context,
     query_raw: &str,
@@ -60,6 +48,15 @@ pub fn run(
         for key in DOC_KEYS {
             collect_type(ctx, &cfg, key, &needle, &mut hits)?;
         }
+    }
+    if types.is_empty() || types.contains(&SearchType::Task) {
+        collect_backlog_store(ctx, &cfg, "tasks", "task", &needle, &mut hits)?;
+    }
+    if types.is_empty() || types.contains(&SearchType::Milestone) {
+        collect_backlog_store(ctx, &cfg, "milestones", "milestone", &needle, &mut hits)?;
+    }
+    if types.is_empty() || types.contains(&SearchType::Release) {
+        collect_backlog_store(ctx, &cfg, "releases", "release", &needle, &mut hits)?;
     }
 
     hits.sort_by(|a, b| {
@@ -125,9 +122,7 @@ fn collect_type(
         let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
-        // Boundary-check every candidate before reading it (spec section 5.2).
         let safe = Context::ensure_within(&ctx.project_dir, &path)?;
-        // Unreadable or non-UTF-8 records are skipped (spec section 2.12).
         let Ok(content) = fs::read_to_string(&safe) else {
             continue;
         };
@@ -150,9 +145,56 @@ fn collect_type(
     Ok(())
 }
 
-/// Resolve a configured type directory, returning `None` when it does not
-/// exist (spec section 2.11). A symlink that resolves outside the project is a
-/// boundary violation and propagates as exit code 1 (spec section 5.2).
+fn collect_backlog_store(
+    ctx: &Context,
+    cfg: &Config,
+    folder: &str,
+    kind: &'static str,
+    needle: &str,
+    hits: &mut Vec<Hit>,
+) -> Result<(), AppError> {
+    let backlog_raw = ctx.project_dir.join(&cfg.backlog_directory);
+    let backlog_safe = Context::ensure_within(&ctx.project_dir, &backlog_raw)?;
+    let dir_raw = backlog_safe.join(folder);
+    if !dir_raw.exists() {
+        return Ok(());
+    }
+    let dir = Context::ensure_within(&ctx.project_dir, &dir_raw)?;
+    let entries = fs::read_dir(&dir).map_err(|e| {
+        AppError::Runtime(format!("cannot read directory {}: {}", dir.display(), e))
+    })?;
+    for entry in entries {
+        let entry = entry.map_err(|e| AppError::Runtime(e.to_string()))?;
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("md") {
+            continue;
+        }
+        let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        let safe = Context::ensure_within(&ctx.project_dir, &path)?;
+        let Ok(content) = fs::read_to_string(&safe) else {
+            continue;
+        };
+        if !content.to_lowercase().contains(needle) {
+            continue;
+        }
+        let (_, title) = parse_heading(&content);
+        let title = if title.is_empty() {
+            id.to_string()
+        } else {
+            title
+        };
+        hits.push(Hit {
+            id: id.to_string(),
+            kind,
+            title,
+            path: safe,
+        });
+    }
+    Ok(())
+}
+
 fn active_dir(
     ctx: &Context,
     cfg: &Config,
