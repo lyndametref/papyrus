@@ -4,13 +4,14 @@ title: Expose business rules in the local browser
 status: To Do
 assignee: []
 created_date: '2026-11-02T20:19:00Z'
+updated_date: '2026-11-04T19:40:00Z'
 labels:
   - browser
   - documentation
-milestone: m-4
+milestone: m-8
 dependencies:
-  - TASK-24
-  - TASK-17
+  - TASK-43
+  - TASK-45
 references:
   - README.md
   - docs/requirements/business/REQ-05.005.md
@@ -22,7 +23,7 @@ references:
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-013-rule-command-behavior.md
 type: feature
-ordinal: 18500
+ordinal: 26300
 ---
 
 ## Description

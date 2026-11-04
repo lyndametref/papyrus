@@ -4,13 +4,14 @@ title: Expose UI specifications in the local browser
 status: To Do
 assignee: []
 created_date: '2026-11-02T20:19:00Z'
+updated_date: '2026-11-04T19:40:00Z'
 labels:
   - browser
   - documentation
-milestone: m-4
+milestone: m-6
 dependencies:
-  - TASK-23
-  - TASK-17
+  - TASK-34
+  - TASK-36
 references:
   - README.md
   - docs/requirements/business/REQ-05.004.md
@@ -22,7 +23,7 @@ references:
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-012-ui-spec-command-behavior.md
 type: feature
-ordinal: 18000
+ordinal: 24300
 ---
 
 ## Description

@@ -4,13 +4,15 @@ title: Expose glossary terms in the local browser
 status: To Do
 assignee: []
 created_date: '2026-11-02T20:19:00Z'
+updated_date: '2026-11-04T19:22:00Z'
 labels:
   - browser
   - documentation
-milestone: m-4
+milestone: m-5
 dependencies:
+  - TASK-30
+  - TASK-32
   - TASK-15
-  - TASK-17
 references:
   - README.md
   - docs/requirements/business/REQ-05.003.md
@@ -22,7 +24,7 @@ references:
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-011-glossary-command-behavior.md
 type: feature
-ordinal: 17500
+ordinal: 23300
 ---
 
 ## Description
