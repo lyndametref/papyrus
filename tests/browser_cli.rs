@@ -2118,3 +2118,538 @@ fn t30_no_writes_outside_project() {
     let _ = fs::remove_dir_all(&dir);
     let _ = fs::remove_dir_all(&outside);
 }
+
+// ---- T-11 backlog (task/milestone/release) scenarios ----
+
+fn create_release(dir: &Path, title: &str) -> String {
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "release",
+        "create",
+        title,
+        "-d",
+        "Release description",
+    ])
+}
+
+fn create_milestone(dir: &Path, title: &str, release: &str) -> String {
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "milestone",
+        "create",
+        title,
+        "-d",
+        "Milestone description",
+        "--release",
+        release,
+    ])
+}
+
+fn create_task(dir: &Path, title: &str, milestone: &str) -> String {
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "task",
+        "create",
+        title,
+        "-d",
+        "Task description",
+        "--ac",
+        "Acceptance one",
+        "--label",
+        "bug",
+        "--assignee",
+        "alice",
+        "--milestone",
+        milestone,
+    ])
+}
+
+fn backlog_fixture(name: &str) -> PathBuf {
+    let dir = test_root(name);
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_release(&dir, "Release Two");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    create_milestone(&dir, "Milestone Two", "REL-002");
+    create_task(&dir, "Task One", "MS-001");
+    // second task depends on first
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "task",
+        "create",
+        "Task Two",
+        "-d",
+        "Task description two",
+        "--ac",
+        "Acceptance two",
+        "--label",
+        "feature",
+        "--assignee",
+        "bob",
+        "--milestone",
+        "MS-002",
+        "--depends-on",
+        "TASK-001",
+    ]);
+    dir
+}
+
+fn backlog_record_path(dir: &Path, sub: &str, id: &str) -> PathBuf {
+    dir.join("backlog").join(sub).join(format!("{}.md", id))
+}
+
+// T-11a
+#[test]
+fn t11a_list_backlog_by_type() {
+    let dir = backlog_fixture("t11a");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    for (ty, id1, id2) in [
+        ("task", "TASK-001", "TASK-002"),
+        ("milestone", "MS-001", "MS-002"),
+        ("release", "REL-001", "REL-002"),
+    ] {
+        let html = get(&server, &format!("/?type={}", ty)).text();
+        assert!(html.contains(id1), "type={} missing {}", ty, id1);
+        assert!(html.contains(id2), "type={} missing {}", ty, id2);
+        assert!(
+            html.contains("aria-current=\"page\""),
+            "type={} sidebar",
+            ty
+        );
+        let first = html.find(id1).unwrap();
+        let second = html.find(id2).unwrap();
+        assert!(first < second, "type={} order", ty);
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-11b
+#[test]
+fn t11b_category_parameter_backlog() {
+    let dir = backlog_fixture("t11b");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    for ty in ["req", "nfr", "task", "milestone", "release"] {
+        // req/nfr may be empty but should still be 200
+        let status = get(&server, &format!("/?type={}", ty)).status;
+        // req/nfr with no records still 200
+        assert_eq!(status, 200, "type={}", ty);
+    }
+    for ty in ["all", "x", "tasks"] {
+        assert_eq!(
+            get(&server, &format!("/?type={}", ty)).status,
+            400,
+            "type={}",
+            ty
+        );
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-11c
+#[test]
+fn t11c_view_backlog_fields() {
+    let dir = backlog_fixture("t11c");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    let task = get(&server, "/doc/TASK-002").text();
+    for needle in [
+        "Status",
+        "Milestone",
+        "Assignee",
+        "Labels",
+        "Dependencies",
+        "Acceptance criteria",
+        "Comments",
+        "Description",
+    ] {
+        assert!(task.contains(needle), "task view missing {}", needle);
+    }
+    assert!(task.contains("/doc/TASK-001"));
+    assert!(task.contains("/doc/MS-002"));
+
+    let ms = get(&server, "/doc/MS-001").text();
+    assert!(ms.contains("Release"));
+    assert!(ms.contains("/doc/REL-001"));
+
+    let rel = get(&server, "/doc/REL-001").text();
+    assert!(rel.contains("Description"));
+    assert!(rel.contains("Release description"));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-11d
+#[test]
+fn t11d_edit_round_trip_backlog() {
+    let dir = backlog_fixture("t11d");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    // Task
+    let edit = get(&server, "/doc/TASK-001/edit").text();
+    let version = extract_version(&edit);
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Task One revised"),
+        ("status", "Initiated"),
+        ("description", "Revised task desc"),
+        ("milestone", "MS-001"),
+        ("assignee", "bob"),
+        ("labels", "urgent"),
+        ("dependencies", ""),
+        ("acceptance_criteria", "AC revised"),
+    ]);
+    let response = post_form(&server, "/doc/TASK-001", &body);
+    assert_eq!(response.status, 303);
+    let view = get(&server, "/doc/TASK-001").text();
+    assert!(view.contains("Task One revised"));
+    let cli = run_ok(&["--dir", dir.to_str().unwrap(), "task", "view", "TASK-001"]);
+    assert!(cli.contains("Task One revised"));
+
+    // Milestone
+    let edit = get(&server, "/doc/MS-001/edit").text();
+    let version = extract_version(&edit);
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Milestone One revised"),
+        ("description", "Revised ms desc"),
+        ("release", "REL-001"),
+    ]);
+    let response = post_form(&server, "/doc/MS-001", &body);
+    assert_eq!(response.status, 303);
+    let cli = run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "milestone",
+        "view",
+        "MS-001",
+    ]);
+    assert!(cli.contains("Milestone One revised"));
+
+    // Release
+    let edit = get(&server, "/doc/REL-001/edit").text();
+    let version = extract_version(&edit);
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Release One revised"),
+        ("description", "Revised rel desc"),
+    ]);
+    let response = post_form(&server, "/doc/REL-001", &body);
+    assert_eq!(response.status, 303);
+    let cli = run_ok(&["--dir", dir.to_str().unwrap(), "release", "view", "REL-001"]);
+    assert!(cli.contains("Release One revised"));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-11e
+#[test]
+fn t11e_validation_backlog() {
+    let dir = backlog_fixture("t11e");
+    let path = backlog_record_path(&dir, "tasks", "TASK-001");
+    let before = fs::read(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/TASK-001/edit").text());
+
+    // empty title
+    let body = form_body(&[("version", &version), ("title", "")]);
+    let response = post_form(&server, "/doc/TASK-001", &body);
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // unknown status
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Valid"),
+        ("status", "Nope"),
+    ]);
+    let response = post_form(&server, "/doc/TASK-001", &body);
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // unknown milestone
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Valid"),
+        ("status", "ToDo"),
+        ("milestone", "MS-999"),
+    ]);
+    let response = post_form(&server, "/doc/TASK-001", &body);
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // self dependency
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Valid"),
+        ("status", "ToDo"),
+        ("dependencies", "TASK-001"),
+    ]);
+    let response = post_form(&server, "/doc/TASK-001", &body);
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // ## line in description
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Valid"),
+        ("status", "ToDo"),
+        ("description", "Line\n## Not allowed"),
+    ]);
+    let response = post_form(&server, "/doc/TASK-001", &body);
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // milestone unknown release
+    let mpath = backlog_record_path(&dir, "milestones", "MS-001");
+    let mbefore = fs::read(&mpath).unwrap();
+    let medit = get(&server, "/doc/MS-001/edit").text();
+    let mversion = extract_version(&medit);
+    let body = form_body(&[
+        ("version", &mversion),
+        ("title", "Valid"),
+        ("release", "REL-999"),
+    ]);
+    let response = post_form(&server, "/doc/MS-001", &body);
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&mpath).unwrap(), mbefore);
+
+    // release empty title
+    let rpath = backlog_record_path(&dir, "releases", "REL-001");
+    let rbefore = fs::read(&rpath).unwrap();
+    let redit = get(&server, "/doc/REL-001/edit").text();
+    let rversion = extract_version(&redit);
+    let body = form_body(&[("version", &rversion), ("title", "")]);
+    let response = post_form(&server, "/doc/REL-001", &body);
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&rpath).unwrap(), rbefore);
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-11f
+#[test]
+fn t11f_conflict_backlog() {
+    let dir = backlog_fixture("t11f");
+    let path = backlog_record_path(&dir, "tasks", "TASK-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/TASK-001/edit").text());
+    // out-of-band modify
+    let original = fs::read_to_string(&path).unwrap();
+    fs::write(&path, format!("{}\n## Out of band\nchanged\n", original)).unwrap();
+    let body = form_body(&[("version", &version), ("title", "Should not save")]);
+    let response = post_form(&server, "/doc/TASK-001", &body);
+    assert_eq!(response.status, 409);
+    let html = response.text();
+    assert!(html.contains("This record changed on disk"));
+    let saved = fs::read_to_string(&path).unwrap();
+    assert!(!saved.contains("Should not save"));
+    assert!(saved.contains("## Out of band"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-11g
+#[test]
+fn t11g_archived_backlog() {
+    let dir = backlog_fixture("t11g");
+    // archive task and milestone
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "task",
+        "archive",
+        "TASK-001",
+    ]);
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "milestone",
+        "archive",
+        "MS-001",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let list = get(&server, "/?type=task").text();
+    assert!(!list.contains("TASK-001"));
+    assert_eq!(get(&server, "/doc/TASK-001").status, 404);
+    assert_eq!(get(&server, "/doc/TASK-001/edit").status, 404);
+    let list = get(&server, "/?type=milestone").text();
+    assert!(!list.contains("MS-001"));
+    assert_eq!(get(&server, "/doc/MS-001").status, 404);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-11h
+#[test]
+fn t11h_atomic_and_symlink_backlog() {
+    let dir = backlog_fixture("t11h");
+    let path = backlog_record_path(&dir, "tasks", "TASK-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/TASK-001/edit").text());
+    let before: Vec<String> = fs::read_dir(path.parent().unwrap())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+        .collect();
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Atomic"),
+        ("status", "ToDo"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/TASK-001", &body).status, 303);
+    let after: Vec<String> = fs::read_dir(path.parent().unwrap())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+        .collect();
+    assert_eq!(before, after);
+    assert!(!after.iter().any(|n| n.contains(".tmp")));
+
+    // rejected save leaves no temp
+    let body = form_body(&[("version", "1.2.3"), ("title", "Rejected")]);
+    assert_eq!(post_form(&server, "/doc/TASK-001", &body).status, 409);
+    let after: Vec<String> = fs::read_dir(path.parent().unwrap())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+        .collect();
+    assert_eq!(before, after);
+
+    drop(server);
+
+    // symlink escape (unix)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        let outside = test_root("t11h-outside");
+        let secret = outside.join("secret.md");
+        fs::write(&secret, "# TASK-001 SECRET CONTENT\n").unwrap();
+        let p = backlog_record_path(&dir, "tasks", "TASK-001");
+        let _ = fs::remove_file(&p);
+        symlink(&secret, &p).unwrap();
+        let server = Server::start(&dir, &["--no-open"], &[]);
+        assert_eq!(get(&server, "/doc/TASK-001").status, 404);
+        let list = get(&server, "/?type=task").text();
+        assert!(!list.contains("TASK-001"));
+        let body = form_body(&[("version", "1.2.3"), ("title", "Attack")]);
+        assert_eq!(post_form(&server, "/doc/TASK-001", &body).status, 404);
+        assert!(
+            fs::read_to_string(&secret)
+                .unwrap()
+                .contains("SECRET CONTENT")
+        );
+        drop(server);
+        let _ = fs::remove_dir_all(&outside);
+    }
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-11i
+#[test]
+fn t11i_json_api_backlog() {
+    let dir = backlog_fixture("t11i");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    let tasks: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/tasks").text()).unwrap();
+    let arr = tasks.as_array().unwrap();
+    assert_eq!(arr.len(), 2);
+    assert!(arr[0].get("status").is_some());
+    assert!(arr[0].get("milestone").is_some());
+    assert!(arr[0].get("assignee").is_some());
+
+    let ms: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/milestones").text()).unwrap();
+    assert_eq!(ms.as_array().unwrap().len(), 2);
+    assert!(ms[0].get("release").is_some());
+
+    let rels: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/releases").text()).unwrap();
+    assert_eq!(rels.as_array().unwrap().len(), 2);
+
+    let doc: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/doc/TASK-001").text()).unwrap();
+    assert_eq!(doc["id"], "TASK-001");
+    assert_eq!(doc["kind"], "task");
+    assert_eq!(doc["form"], "task");
+    assert!(doc["milestone"].is_object() || doc["milestone"].is_null());
+    assert!(doc["labels"].is_array());
+    assert!(doc["dependencies"].is_array());
+    assert!(doc["acceptance_criteria"].is_array());
+    assert!(doc["comments"].is_array());
+
+    let mdoc: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/doc/MS-001").text()).unwrap();
+    assert_eq!(mdoc["kind"], "milestone");
+    assert!(mdoc["release"].is_object() || mdoc["release"].is_null());
+
+    let rdoc: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/doc/REL-001").text()).unwrap();
+    assert_eq!(rdoc["kind"], "release");
+
+    // POST update
+    let version = doc["version"].as_str().unwrap().to_string();
+    let body = format!(
+        "{{\"version\":\"{}\",\"title\":\"API Task\",\"status\":\"Done\"}}",
+        version
+    );
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/TASK-001", &body).text()).unwrap();
+    assert_eq!(updated["title"], "API Task");
+    assert_eq!(updated["status"], "Done");
+
+    // bad body
+    assert_eq!(
+        post_json(&server, "/api/doc/TASK-001", "{not json").status,
+        400
+    );
+    let version = updated["version"].as_str().unwrap().to_string();
+    assert_eq!(
+        post_json(
+            &server,
+            "/api/doc/TASK-001",
+            &format!("{{\"version\":\"{}\",\"title\":5}}", version)
+        )
+        .status,
+        400
+    );
+    // conflict
+    let conflict = post_json(
+        &server,
+        "/api/doc/TASK-001",
+        &format!("{{\"version\":\"{}\",\"title\":\"x\"}}", "1.2.3"),
+    );
+    assert_eq!(conflict.status, 409);
+    // invalid
+    let invalid = post_json(
+        &server,
+        "/api/doc/TASK-001",
+        &format!("{{\"version\":\"{}\",\"title\":\"\"}}", version),
+    );
+    assert_eq!(invalid.status, 422);
+    // missing
+    assert_eq!(get(&server, "/api/doc/TASK-404").status, 404);
+    // content-type
+    assert_eq!(
+        request(
+            server.port,
+            "POST",
+            "/api/doc/TASK-001",
+            &[("Content-Type", "text/plain")],
+            Some(b"x"),
+        )
+        .status,
+        415
+    );
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
