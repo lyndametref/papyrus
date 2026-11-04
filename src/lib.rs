@@ -4,7 +4,9 @@ pub mod config;
 pub mod context;
 pub mod error;
 pub mod init;
+pub mod milestone;
 pub mod nfreq;
+pub mod release;
 pub mod req;
 pub mod requirement;
 pub mod sanitize;
@@ -78,6 +80,16 @@ pub enum Commands {
     Nfreq {
         #[command(subcommand)]
         action: nfreq::NfreqCmd,
+    },
+    /// Manage milestones.
+    Milestone {
+        #[command(subcommand)]
+        action: milestone::MilestoneCmd,
+    },
+    /// Manage releases.
+    Release {
+        #[command(subcommand)]
+        action: release::ReleaseCmd,
     },
     /// Serve the local web interface.
     #[command(override_usage = "papyrus browser [--host <host>] [--port <port>] [--no-open]")]
@@ -237,6 +249,14 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
         Commands::Nfreq { action } => {
             let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
             nfreq::run(&ctx, action)
+        }
+        Commands::Milestone { action } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            milestone::run(&ctx, action)
+        }
+        Commands::Release { action } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            release::run(&ctx, action)
         }
         Commands::Browser {
             host,
