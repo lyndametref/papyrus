@@ -2,8 +2,8 @@
 
 **Ticket:** TASK-11
 **Milestone:** m-2 (Backlog Discovery and Management)
-**Status:** Refined (execution-ready; UI mockup pending approval)
-**UI mockups:** [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html) (pending) — extends the approved baseline [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html); see [UI design handoff](#ui-design-handoff)
+**Status:** Refined (execution-ready; UI mockup approved)
+**UI mockups:** [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html) (approved) — extends the approved baseline [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html); see [UI design handoff](#ui-design-handoff)
 
 ## Purpose
 
@@ -37,7 +37,7 @@ Extend the first browser increment (TASK-6, `docs/specifications/browser-require
 
 1. The category selector (`?type=`) accepts five values: `req` (default), `nfr`, `task`, `milestone`, `release`. Any other value, including `all`, is `400`.
 2. `GET /` and `GET /?type=req` render the same page (baseline rule retained).
-3. The sidebar lists five categories in this order: Business requirements, Non-functional requirements, Tasks, Milestones, Releases. The selected category carries `aria-current="page"` and the non-colour cue (bold + underline). The sidebar remains extensible: a later increment adds a category by adding one entry and one route value.
+3. The sidebar lists three entries in this order: Business requirements, Non-functional requirements, Backlog. The Backlog entry covers task, milestone, and release records as a single unified view (approved MOCK-0002). The selected entry carries `aria-current="page"` and the non-colour cue (bold + underline). The sidebar remains extensible: a later increment adds a category by adding one entry and one route value.
 4. The list page renders only the selected category; the other categories are not rendered at all.
 5. A missing or unreadable backlog directory is not a server error: the corresponding category renders its empty state and its API returns an empty array (consistent with the baseline and with `task list`/`milestone list`/`release list`).
 6. Archived tasks and milestones are never listed, counted, or reachable by URL, and return `404` exactly as for an unknown ID. Releases have no archived state.
@@ -138,7 +138,7 @@ Extend the first browser increment (TASK-6, `docs/specifications/browser-require
 
 1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox/Edge/Safari 100+), accessibility basics, no external resources, no inline scripts/styles.
 2. Templates may be extended with backlog-specific placeholders; unknown placeholders are left untouched as in the baseline.
-3. The sidebar's five entries and the category-specific list/view/edit templates are the only rendering additions.
+3. The sidebar's Backlog entry and the backlog list/view/edit templates are the only rendering additions.
 
 ### 10. Tests
 
@@ -161,11 +161,11 @@ UI mockups are required before any UI implementation work and must be approved b
 
 **Baseline artifact:** MOCK-0001 — [`docs/specifications/ui/mockups/MOCK-0001-browser-requirements-review.html`](ui/mockups/MOCK-0001-browser-requirements-review.html), approved 2026-11-03 (UTC). It remains the authoritative layout reference for the requirement categories and the shared shell.
 
-**Extension artifact (TASK-11):** MOCK-0002 — to be produced by `@ui-designer` as a new self-contained review package that reuses the MOCK-0001 shell and adds the backlog categories (Tasks, Milestones, Releases) with their list, view, edit, empty, error, and 320 px states. MOCK-0001 is not modified in place; a new MOCK id is allocated per the global sequential rule. Its status will be `pending` until the user explicitly approves it.
+**Extension artifact (TASK-11):** MOCK-0002 — produced by `@ui-designer` as a self-contained review package that reuses the MOCK-0001 shell and adds the unified Backlog view (tasks, milestones, releases) with list, view, edit, empty, error, and 320 px states. MOCK-0001 is not modified in place. Its status is `approved` (explicitly approved by the user on 2026-11-04, TASK-11).
 
 ### Screens to be covered by the extension package
 
-1. **Shared shell** (reused from MOCK-0001): header, sidebar with five entries, `main`, footer, one `h1`.
+1. **Shared shell** (reused from MOCK-0001): header, sidebar with three entries (Business requirements, Non-functional requirements, Backlog), `main`, footer, one `h1`.
 2. **Task list** (`/?type=task`): rows with ID + title link, status, milestone, assignee; empty state; long titles.
 3. **Milestone list** (`/?type=milestone`): rows with ID + title link, release; empty state.
 4. **Release list** (`/?type=release`): rows with ID + title link; empty state.
@@ -196,13 +196,14 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: The configured statuses are the allowed values for a task's `status` field in the browser.
 - Assumption: A new MOCK id (MOCK-0002) is allocated for the extension rather than modifying the approved MOCK-0001 in place, per the global sequential-id rule.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
+- Assumption: AC #10 (real-browser verification in Firefox, Microsoft Edge, and Safari 100+) and NFR-05.001 are deferred follow-ups, not blocking for this ticket; tracked as a follow-up rather than a release gate.
 
 ## Open questions
 
 - **OQ-1 (resolved: comments read-only in the browser)** — Confirmed by user: comments are displayed read-only; comment management stays CLI-only.
 - **OQ-2 (recommended default: one value per line for list fields)** — Labels, dependencies, and acceptance criteria are stored as Markdown lists. The browser edits them as one value per line. If a different delimiter or rich editing is desired, the parsing rules change.
 - **OQ-3 (resolved: per-line 200-character cap)** — Confirmed by user: labels, dependencies, and acceptance-criteria items are capped at 200 Unicode scalar values per line.
-- **OQ-4 (resolved: new MOCK-0002 delivered)** — Confirmed by user: MOCK-0001 stays approved; the extension is delivered as pending MOCK-0002 reusing the approved shell.
+- **OQ-4 (resolved: new MOCK-0002 delivered)** — Confirmed by user: MOCK-0001 stays approved; the extension is delivered as approved MOCK-0002 reusing the approved shell.
 
 ## Traceability
 
@@ -214,6 +215,6 @@ UI mockups are required before any UI implementation work and must be approved b
 | ADR | ADR-0001, ADR-0002, ADR-0003, ADR-0004, ADR-0005, ADR-0006 |
 | Ticket | TASK-6 (baseline), TASK-8, TASK-9, TASK-11 |
 | Increment boundary | REQ-06.002 covers both stores; the documentation-store part was delivered by TASK-6/TASK-7, the backlog-store part by this ticket. |
-| UI mockups | MOCK-0001 (approved baseline); MOCK-0002 (pending) — `docs/specifications/ui/mockups/MOCK-0002-browser-backlog-records-review.html` |
+| UI mockups | MOCK-0001 (approved baseline); MOCK-0002 (approved) — `docs/specifications/ui/mockups/MOCK-0002-browser-backlog-records-review.html` |
 | Related specification | `docs/specifications/browser-requirements.md` (TASK-6 baseline), `docs/specifications/task-management.md` (TASK-9), `docs/specifications/milestone-and-release-management.md` (TASK-8) |
 | Related specification | `docs/specifications/search-requirements.md` (TASK-5/TASK-10) |

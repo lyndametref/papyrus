@@ -1395,7 +1395,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             // Spec section 8.3: version (required), title (required), and editable fields. Omitted fields left unchanged except title required.
             // We'll require title when provided? Actually "title (required)" means request must include title. Require it.
             let title = match object.get("title") {
-                None => record.title.clone(),
+                None => return Err(HttpError::new(400)),
                 Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
                     Ok(t) => t,
                     Err(m) => return Ok(json_error(422, &m)),
@@ -1592,7 +1592,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
         }
         Category::Milestone => {
             let title = match object.get("title") {
-                None => record.title.clone(),
+                None => return Err(HttpError::new(400)),
                 Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
                     Ok(t) => t,
                     Err(m) => return Ok(json_error(422, &m)),
@@ -1654,7 +1654,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
         }
         Category::Release => {
             let title = match object.get("title") {
-                None => record.title.clone(),
+                None => return Err(HttpError::new(400)),
                 Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
                     Ok(t) => t,
                     Err(m) => return Ok(json_error(422, &m)),

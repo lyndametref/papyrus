@@ -95,36 +95,58 @@ fn plural(count: usize, singular: &str, plural: &str) -> String {
 /// Sidebar fragment. Only enabled document types are listed.
 pub fn sidebar(selected: Option<Category>, cfg: &Config) -> String {
     let mut items = String::new();
-    for kind in [
-        Category::Req,
-        Category::Nfr,
-        Category::Task,
-        Category::Milestone,
-        Category::Release,
-    ] {
-        let enabled = if kind.is_requirement() {
-            cfg.document_types
-                .get(kind.key())
-                .map(|e| e.enabled)
-                .unwrap_or(false)
-        } else {
-            true
-        };
-        if !enabled {
-            continue;
-        }
-        let current = if selected == Some(kind) {
+    // Three sidebar entries: Business requirements, Non-functional requirements, Backlog.
+    // The Backlog entry covers task, milestone, and release records.
+    let backlog_selected = matches!(
+        selected,
+        Some(Category::Task | Category::Milestone | Category::Release)
+    );
+    // Business requirements
+    let req_enabled = cfg
+        .document_types
+        .get(Category::Req.key())
+        .map(|e| e.enabled)
+        .unwrap_or(false);
+    if req_enabled {
+        let current = if selected == Some(Category::Req) {
             " aria-current=\"page\""
         } else {
             ""
         };
         items.push_str(&format!(
-            "<li><a href=\"/?type={}\"{}>{}</a></li>",
-            kind.key(),
+            "<li><a href=\"/?type=req\"{}>{}</a></li>",
             current,
-            escape(category_name(kind))
+            escape(category_name(Category::Req))
         ));
     }
+    // Non-functional requirements
+    let nfr_enabled = cfg
+        .document_types
+        .get(Category::Nfr.key())
+        .map(|e| e.enabled)
+        .unwrap_or(false);
+    if nfr_enabled {
+        let current = if selected == Some(Category::Nfr) {
+            " aria-current=\"page\""
+        } else {
+            ""
+        };
+        items.push_str(&format!(
+            "<li><a href=\"/?type=nfr\"{}>{}</a></li>",
+            current,
+            escape(category_name(Category::Nfr))
+        ));
+    }
+    // Backlog (always available)
+    let current = if backlog_selected {
+        " aria-current=\"page\""
+    } else {
+        ""
+    };
+    items.push_str(&format!(
+        "<li><a href=\"/?type=task\"{}>Backlog</a></li>",
+        current
+    ));
     format!(
         "<aside class=\"sidebar\">\
 <button class=\"sidebar-toggle\" type=\"button\" aria-expanded=\"true\" aria-controls=\"type-list\">\
