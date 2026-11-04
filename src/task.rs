@@ -327,17 +327,17 @@ fn milestone_release(ctx: &Context, cfg: &Config, milestone_id: &str) -> Option<
 }
 
 #[derive(Clone, Debug, Default)]
-struct TaskData {
-    id: String,
-    title: String,
-    description: Option<String>,
-    status: String,
-    milestone: Option<String>,
-    assignee: Option<String>,
-    labels: Vec<String>,
-    deps: Vec<String>,
-    acs: Vec<String>,
-    comments: Vec<(String, String)>,
+pub(crate) struct TaskData {
+    pub(crate) id: String,
+    pub(crate) title: String,
+    pub(crate) description: Option<String>,
+    pub(crate) status: String,
+    pub(crate) milestone: Option<String>,
+    pub(crate) assignee: Option<String>,
+    pub(crate) labels: Vec<String>,
+    pub(crate) deps: Vec<String>,
+    pub(crate) acs: Vec<String>,
+    pub(crate) comments: Vec<(String, String)>,
 }
 
 fn parse_heading(content: &str) -> (String, String) {
@@ -385,7 +385,7 @@ fn section_lines(content: &str, name: &str) -> Vec<String> {
     }
 }
 
-fn parse_task(content: &str) -> TaskData {
+pub(crate) fn parse_task(content: &str) -> TaskData {
     let (id, title) = parse_heading(content);
     let desc = section_text(content, "Description");
     let status = section_text(content, "Status")
@@ -473,7 +473,7 @@ fn parse_task(content: &str) -> TaskData {
     }
 }
 
-fn render_task(td: &TaskData) -> String {
+pub(crate) fn render_task(td: &TaskData) -> String {
     let mut parts: Vec<String> = Vec::new();
     parts.push(format!("# {} {}", td.id, td.title));
     if let Some(d) = &td.description

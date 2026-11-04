@@ -1,0 +1,91 @@
+/* Wireframe stylesheet shared by clickable HTML mockups (MOCK-xxxx).
+   Neutral, grayscale, layout-only. No brand colors, fonts, or technology hints. */
+:root {
+  --wf-bg: #ffffff;
+  --wf-fg: #1f2937;
+  --wf-muted: #6b7280;
+  --wf-border: #9ca3af;
+  --wf-fill: #e5e7eb;
+  --wf-fill-2: #f3f4f6;
+  --wf-accent: #4b5563;
+  --wf-radius: 6px;
+  --wf-gap: 12px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--wf-bg); color: var(--wf-fg); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 14px; line-height: 1.4; }
+body { min-height: 100vh; }
+.wf-screen { display: none; min-height: 100vh; padding: 16px; }
+.wf-screen.is-active { display: block; }
+.wf-container { max-width: 1200px; margin: 0 auto; }
+.wf-row { display: flex; gap: var(--wf-gap); flex-wrap: wrap; align-items: stretch; }
+.wf-col { flex: 1 1 0; min-width: 0; }
+.wf-stack { display: flex; flex-direction: column; gap: var(--wf-gap); }
+.wf-bar { display: flex; align-items: center; gap: var(--wf-gap); padding: 10px 12px; border: 1px solid var(--wf-border); border-radius: var(--wf-radius); background: var(--wf-fill-2); }
+.wf-title { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
+.wf-subtitle { font-size: 13px; color: var(--wf-muted); margin: 0 0 12px; }
+.wf-box { border: 1px solid var(--wf-border); border-radius: var(--wf-radius); padding: 12px; background: var(--wf-bg); }
+.wf-placeholder { background: repeating-linear-gradient(45deg, var(--wf-fill), var(--wf-fill) 6px, var(--wf-fill-2) 6px, var(--wf-fill-2) 12px); color: var(--wf-muted); display: flex; align-items: center; justify-content: center; min-height: 48px; border: 1px dashed var(--wf-border); border-radius: var(--wf-radius); }
+.wf-button { display: inline-flex; align-items: center; justify-content: center; padding: 8px 14px; border: 1px solid var(--wf-border); border-radius: var(--wf-radius); background: var(--wf-fill); color: var(--wf-fg); cursor: pointer; font: inherit; }
+.wf-button:hover { background: var(--wf-accent); color: #fff; }
+.wf-button-primary { background: var(--wf-accent); color: #fff; }
+.wf-input { width: 100%; padding: 8px 10px; border: 1px solid var(--wf-border); border-radius: var(--wf-radius); background: var(--wf-bg); font: inherit; }
+.wf-label { display: block; font-size: 12px; color: var(--wf-muted); margin-bottom: 4px; }
+.wf-table { width: 100%; border-collapse: collapse; }
+.wf-table th, .wf-table td { border: 1px solid var(--wf-border); padding: 8px; text-align: left; }
+.wf-table th { background: var(--wf-fill-2); }
+.wf-nav { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--wf-border); margin-bottom: 12px; }
+.wf-link { color: var(--wf-accent); text-decoration: underline; cursor: pointer; background: none; border: none; font: inherit; padding: 0; }
+.wf-badge { display: inline-block; padding: 2px 8px; border: 1px solid var(--wf-border); border-radius: 999px; font-size: 11px; background: var(--wf-fill-2); }
+.wf-modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; align-items: center; justify-content: center; padding: 16px; }
+.wf-modal.is-open { display: flex; }
+.wf-modal-card { background: var(--wf-bg); border: 1px solid var(--wf-border); border-radius: var(--wf-radius); padding: 16px; max-width: 520px; width: 100%; }
+.wf-footer { margin-top: 16px; padding-top: 8px; border-top: 1px solid var(--wf-border); color: var(--wf-muted); font-size: 12px; }
+.wf-note { font-size: 12px; color: var(--wf-muted); font-style: italic; }
+
+/* Review landing + design deck. Scaffolding for reviewers, not part of the design. */
+.wf-review { display: none; }
+.wf-review.is-active { display: block; }
+.wf-index, .wf-deck { padding: 24px 16px; }
+.wf-index .wf-container { max-width: 1100px; }
+.wf-eyebrow { margin: 0 0 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--wf-muted); }
+.wf-section-title { margin: 24px 0 10px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--wf-muted); }
+.wf-ticket { display: flex; flex-direction: column; gap: 6px; }
+.wf-ticket p { margin: 0; }
+.wf-ticket .wf-section-title { margin: 0 0 2px; }
+.wf-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--wf-gap); }
+.wf-card { display: flex; flex-direction: column; gap: 8px; }
+.wf-card h3 { margin: 0; font-size: 15px; }
+.wf-card p { margin: 0; color: var(--wf-muted); flex: 1 1 auto; }
+.wf-card .wf-button, .wf-card .wf-link { align-self: flex-start; text-decoration: none; }
+
+.wf-deck { max-width: 980px; margin: 0 auto; }
+.wf-deck-stage { min-height: 55vh; padding: 24px; border: 1px solid var(--wf-border); border-radius: var(--wf-radius); background: var(--wf-fill-2); }
+.wf-slide { display: none; }
+.wf-slide.is-active { display: block; }
+.wf-slide-title { margin: 0 0 8px; font-size: 22px; }
+.wf-slide-lede { margin: 0 0 16px; font-size: 15px; }
+.wf-slide .wf-box { background: var(--wf-bg); }
+.wf-slide h3 { margin: 0 0 6px; font-size: 14px; }
+.wf-deck-controls { display: flex; align-items: center; justify-content: space-between; gap: var(--wf-gap); margin-top: var(--wf-gap); }
+.wf-deck-counter { color: var(--wf-muted); }
+
+/* Platform prototypes: one block per platform, each with its own clickable screens. */
+.wf-proto { display: none; padding: 16px; }
+.wf-proto.is-active { display: block; }
+.wf-proto-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 1200px; margin: 0 auto 12px; padding: 8px 12px; border: 1px solid var(--wf-border); border-radius: var(--wf-radius); background: var(--wf-fill-2); }
+.wf-view-link { text-decoration: none; }
+.wf-view-link.is-active { background: var(--wf-accent); border-color: var(--wf-accent); color: #fff; }
+.wf-proto .wf-screen { min-height: 0; }
+.wf-frame { margin: 0 auto; width: 100%; }
+.wf-frame--mobile { max-width: 420px; border: 10px solid #374151; border-radius: 28px; overflow: hidden; background: var(--wf-bg); }
+.wf-frame--tablet { max-width: 820px; border: 8px solid #374151; border-radius: 18px; overflow: hidden; background: var(--wf-bg); }
+.wf-frame--desktop { max-width: 1200px; }
+
+/* Reviewer chrome: top control band for switching screens/views/platforms.
+   NOT part of the mockup design; visually distinct scaffolding for reviewers. */
+.wf-chrome { position: sticky; top: 0; z-index: 1000; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; margin: -16px -16px 12px; background: #1f2937; color: #f9fafb; border-bottom: 2px solid #111827; font-size: 12px; }
+.wf-chrome-label { font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #9ca3af; margin-right: 4px; }
+.wf-chrome-btn { display: inline-flex; align-items: center; padding: 4px 10px; border: 1px solid #4b5563; border-radius: 4px; background: #374151; color: #f9fafb; cursor: pointer; font: inherit; font-size: 12px; }
+.wf-chrome-btn:hover { background: #4b5563; }
+.wf-chrome-btn.is-active { background: #9ca3af; color: #111827; border-color: #9ca3af; }
+.wf-chrome-note { margin-left: auto; font-style: italic; color: #9ca3af; }

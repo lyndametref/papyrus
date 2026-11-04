@@ -8,7 +8,6 @@
 use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
-use crate::requirement::Kind;
 use crate::requirement::parse_heading;
 use std::collections::BTreeMap;
 use std::fs;
@@ -23,11 +22,44 @@ pub const MAX_TITLE_CHARS: usize = 200;
 /// Maximum accepted story or description length (section 7.3).
 pub const MAX_TEXT_CHARS: usize = 20000;
 
+/// Browser content category. Covers both document-store and backlog-store records.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Category {
+    Req,
+    Nfr,
+    Task,
+    Milestone,
+    Release,
+}
+
+impl Category {
+    pub fn key(self) -> &'static str {
+        match self {
+            Category::Req => "req",
+            Category::Nfr => "nfr",
+            Category::Task => "task",
+            Category::Milestone => "milestone",
+            Category::Release => "release",
+        }
+    }
+
+    pub fn supports_story(self) -> bool {
+        matches!(self, Category::Req)
+    }
+
+    pub fn is_requirement(self) -> bool {
+        matches!(self, Category::Req | Category::Nfr)
+    }
+}
+
 /// The two record forms in this increment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Form {
     Group,
     Requirement,
+    Task,
+    Milestone,
+    Release,
 }
 
 impl Form {
@@ -35,6 +67,9 @@ impl Form {
         match self {
             Form::Group => "Group",
             Form::Requirement => "Requirement",
+            Form::Task => "Task",
+            Form::Milestone => "Milestone",
+            Form::Release => "Release",
         }
     }
 }
@@ -62,13 +97,23 @@ pub struct Doc {
 #[derive(Clone, Debug)]
 pub struct Record {
     pub id: String,
-    pub kind: Kind,
+    pub kind: Category,
     pub form: Form,
     pub title: String,
     pub story: Option<String>,
     pub group_id: Option<String>,
     pub group_title: Option<String>,
     pub description: Option<String>,
+    pub status: Option<String>,
+    pub milestone_id: Option<String>,
+    pub milestone_title: Option<String>,
+    pub assignee: Option<String>,
+    pub labels: Vec<String>,
+    pub dependencies: Vec<String>,
+    pub acceptance_criteria: Vec<String>,
+    pub comments: Vec<(String, String)>,
+    pub release_id: Option<String>,
+    pub release_title: Option<String>,
     pub doc: Doc,
     pub path: PathBuf,
     pub rel_path: String,
@@ -82,12 +127,16 @@ impl Record {
 
     pub fn type_label(&self) -> String {
         let base = match self.kind {
-            Kind::Req => "Business requirement",
-            Kind::Nfr => "Non-functional requirement",
+            Category::Req => "Business requirement",
+            Category::Nfr => "Non-functional requirement",
+            Category::Task => "Task",
+            Category::Milestone => "Milestone",
+            Category::Release => "Release",
         };
         match self.form {
             Form::Group => format!("{} group", base),
             Form::Requirement => base.to_string(),
+            Form::Task | Form::Milestone | Form::Release => base.to_string(),
         }
     }
 }
@@ -114,7 +163,7 @@ impl Index {
 #[derive(Clone, Debug)]
 pub struct Resolved {
     pub record: Record,
-    pub kind: Kind,
+    pub kind: Category,
 }
 
 fn normalize_newlines(input: &str) -> String {
@@ -241,18 +290,40 @@ fn form_for_stem(prefix: &str, stem: &str) -> Option<Form> {
     None
 }
 
-fn active_entry(cfg: &Config, kind: Kind) -> Option<&crate::config::DocTypeEntry> {
-    cfg.document_types
-        .get(kind.key())
-        .filter(|entry| entry.enabled && !entry.prefix.is_empty())
+fn active_entry(cfg: &Config, kind: Category) -> Option<crate::config::DocTypeEntry> {
+    match kind {
+        Category::Req | Category::Nfr => cfg
+            .document_types
+            .get(kind.key())
+            .cloned()
+            .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
+        Category::Task => Some(crate::config::DocTypeEntry {
+            prefix: cfg.task_prefix.clone(),
+            directory: "tasks".to_string(),
+            enabled: true,
+        }),
+        Category::Milestone => Some(crate::config::DocTypeEntry {
+            prefix: cfg.milestone_prefix.clone(),
+            directory: "milestones".to_string(),
+            enabled: true,
+        }),
+        Category::Release => Some(crate::config::DocTypeEntry {
+            prefix: cfg.release_prefix.clone(),
+            directory: "releases".to_string(),
+            enabled: true,
+        }),
+    }
 }
 
-fn active_dir(ctx: &Context, cfg: &Config, kind: Kind) -> Option<PathBuf> {
+fn active_dir(ctx: &Context, cfg: &Config, kind: Category) -> Option<PathBuf> {
     let entry = active_entry(cfg, kind)?;
-    let raw = ctx
-        .project_dir
-        .join(&cfg.doc_directory)
-        .join(&entry.directory);
+    let base = match kind {
+        Category::Req | Category::Nfr => ctx.project_dir.join(&cfg.doc_directory),
+        Category::Task | Category::Milestone | Category::Release => {
+            ctx.project_dir.join(&cfg.backlog_directory)
+        }
+    };
+    let raw = base.join(&entry.directory);
     Context::ensure_within(&ctx.project_dir, &raw).ok()
 }
 
@@ -293,11 +364,202 @@ fn relative_path(project_dir: &Path, path: &Path) -> String {
         .join("/")
 }
 
-fn load_record_from_path(
+fn load_backlog_record(
     ctx: &Context,
-    kind: Kind,
+    kind: Category,
     path: &Path,
 ) -> Result<Option<Record>, AppError> {
+    let safe = match Context::ensure_within(&ctx.project_dir, path) {
+        Ok(safe) => safe,
+        Err(_) => return Ok(None),
+    };
+    let content = match fs::read_to_string(&safe) {
+        Ok(content) => content,
+        Err(_) => return Ok(None),
+    };
+    let meta = match fs::metadata(&safe) {
+        Ok(meta) => meta,
+        Err(_) => return Ok(None),
+    };
+    let Some(stem) = safe.file_stem().and_then(|s| s.to_str()) else {
+        return Ok(None);
+    };
+    if !valid_id(stem) {
+        return Ok(None);
+    }
+    let cfg = match crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir) {
+        Ok(c) => c,
+        Err(_) => return Ok(None),
+    };
+    let entry = match active_entry(&cfg, kind) {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+    // validate stem against prefix
+    let rest = match stem.strip_prefix(&format!("{}-", entry.prefix)) {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+    if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+        return Ok(None);
+    }
+
+    let (
+        title,
+        status,
+        milestone_id,
+        assignee,
+        labels,
+        dependencies,
+        acceptance_criteria,
+        comments,
+        release_id,
+        description,
+    ) = match kind {
+        Category::Task => {
+            let td = crate::task::parse_task(&content);
+            let title = if td.title.is_empty() {
+                stem.to_string()
+            } else {
+                td.title.clone()
+            };
+            (
+                title,
+                if td.status.is_empty() {
+                    None
+                } else {
+                    Some(td.status.clone())
+                },
+                td.milestone.clone(),
+                td.assignee.clone(),
+                td.labels.clone(),
+                td.deps.clone(),
+                td.acs.clone(),
+                td.comments.clone(),
+                None,
+                td.description.clone(),
+            )
+        }
+        Category::Milestone => {
+            let (_id, title, desc, release) = crate::milestone::parse_milestone(&content);
+            let title = if title.is_empty() {
+                stem.to_string()
+            } else {
+                title
+            };
+            (
+                title,
+                None,
+                None,
+                None,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                release,
+                desc,
+            )
+        }
+        Category::Release => {
+            let (_id, title, desc) = crate::release::parse_release(&content);
+            let title = if title.is_empty() {
+                stem.to_string()
+            } else {
+                title
+            };
+            (
+                title,
+                None,
+                None,
+                None,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+                desc,
+            )
+        }
+        _ => return Ok(None),
+    };
+
+    // milestone title resolution
+    let milestone_title = if kind == Category::Task {
+        milestone_id.as_ref().and_then(|mid| {
+            // read milestone file
+            let dir = active_dir(ctx, &cfg, Category::Milestone)?;
+            let path = dir.join(format!("{}.md", mid));
+            let safe = Context::ensure_within(&ctx.project_dir, &path).ok()?;
+            if !safe.exists() {
+                return None;
+            }
+            let c = fs::read_to_string(&safe).ok()?;
+            let (_, t, _, _) = crate::milestone::parse_milestone(&c);
+            if t.is_empty() { None } else { Some(t) }
+        })
+    } else {
+        None
+    };
+    let release_title = if kind == Category::Milestone {
+        release_id.as_ref().and_then(|rid| {
+            let dir = active_dir(ctx, &cfg, Category::Release)?;
+            let path = dir.join(format!("{}.md", rid));
+            let safe = Context::ensure_within(&ctx.project_dir, &path).ok()?;
+            if !safe.exists() {
+                return None;
+            }
+            let c = fs::read_to_string(&safe).ok()?;
+            let (_, t, _) = crate::release::parse_release(&c);
+            if t.is_empty() { None } else { Some(t) }
+        })
+    } else {
+        None
+    };
+
+    let form = match kind {
+        Category::Task => Form::Task,
+        Category::Milestone => Form::Milestone,
+        Category::Release => Form::Release,
+        _ => return Ok(None),
+    };
+
+    Ok(Some(Record {
+        id: stem.to_string(),
+        kind,
+        form,
+        title,
+        story: None,
+        group_id: None,
+        group_title: None,
+        description,
+        status,
+        milestone_id,
+        milestone_title,
+        assignee,
+        labels,
+        dependencies,
+        acceptance_criteria,
+        comments,
+        release_id,
+        release_title,
+        doc: parse_doc(&content),
+        path: safe.clone(),
+        rel_path: relative_path(&ctx.project_dir, &safe),
+        version: version_token(&meta),
+    }))
+}
+
+fn load_record_from_path(
+    ctx: &Context,
+    kind: Category,
+    path: &Path,
+) -> Result<Option<Record>, AppError> {
+    if matches!(
+        kind,
+        Category::Task | Category::Milestone | Category::Release
+    ) {
+        return load_backlog_record(ctx, kind, path);
+    }
     let safe = match Context::ensure_within(&ctx.project_dir, path) {
         Ok(safe) => safe,
         // A symlink escaping the project is not listed and is not readable.
@@ -335,6 +597,37 @@ fn load_record_from_path(
     } else {
         doc.title.clone()
     };
+    let (
+        status,
+        milestone_id,
+        assignee,
+        labels,
+        dependencies,
+        acceptance_criteria,
+        comments,
+        release_id,
+    ) = match kind {
+        Category::Req | Category::Nfr => (
+            None,
+            None,
+            None,
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            None,
+        ),
+        _ => (
+            None,
+            None,
+            None,
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            None,
+        ),
+    };
     Ok(Some(Record {
         id: stem.to_string(),
         kind,
@@ -344,6 +637,16 @@ fn load_record_from_path(
         group_id,
         group_title,
         description: section_value(&doc, "## Description"),
+        status,
+        milestone_id,
+        milestone_title: None,
+        assignee,
+        labels,
+        dependencies,
+        acceptance_criteria,
+        comments,
+        release_id,
+        release_title: None,
         doc,
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
@@ -351,15 +654,53 @@ fn load_record_from_path(
     }))
 }
 
-fn active_entry_owned(ctx: &Context, kind: Kind) -> Option<crate::config::DocTypeEntry> {
+fn active_entry_owned(ctx: &Context, kind: Category) -> Option<crate::config::DocTypeEntry> {
     let cfg = crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir).ok()?;
-    active_entry(&cfg, kind).cloned()
+    active_entry(&cfg, kind)
 }
 
 /// Build the index for one category. Missing or unreadable directories render
 /// as an empty category; they are not server errors.
-pub fn build_index(ctx: &Context, cfg: &Config, kind: Kind) -> Index {
+pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
     let mut index = Index::default();
+    if matches!(
+        kind,
+        Category::Task | Category::Milestone | Category::Release
+    ) {
+        let Some(entry) = active_entry(cfg, kind) else {
+            return index;
+        };
+        let Some(dir) = active_dir(ctx, cfg, kind) else {
+            return index;
+        };
+        let Ok(read_dir) = fs::read_dir(&dir) else {
+            return index;
+        };
+        for dir_entry in read_dir.flatten() {
+            let path = dir_entry.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("md") {
+                continue;
+            }
+            let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            if !valid_id(stem) {
+                continue;
+            }
+            let rest = match stem.strip_prefix(&format!("{}-", entry.prefix)) {
+                Some(r) => r,
+                None => continue,
+            };
+            if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+                continue;
+            }
+            if let Ok(Some(record)) = load_record_from_path(ctx, kind, &path) {
+                index.records.push(record);
+            }
+        }
+        index.records.sort_by(|a, b| a.id.cmp(&b.id));
+        return index;
+    }
     let Some(entry) = active_entry(cfg, kind) else {
         return index;
     };
@@ -429,8 +770,14 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
     if !valid_id(id) {
         return Ok(None);
     }
-    let mut matches: Vec<(Kind, PathBuf)> = Vec::new();
-    for kind in [Kind::Req, Kind::Nfr] {
+    let mut matches: Vec<(Category, PathBuf)> = Vec::new();
+    for kind in [
+        Category::Req,
+        Category::Nfr,
+        Category::Task,
+        Category::Milestone,
+        Category::Release,
+    ] {
         let Some(entry) = active_entry(cfg, kind) else {
             continue;
         };
@@ -448,7 +795,14 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
             if path.file_stem().and_then(|s| s.to_str()) != Some(id) {
                 continue;
             }
-            if form_for_stem(&entry.prefix, id).is_none() {
+            let valid = if kind.is_requirement() {
+                form_for_stem(&entry.prefix, id).is_some()
+            } else {
+                id.strip_prefix(&format!("{}-", entry.prefix))
+                    .map(|r| !r.is_empty() && r.bytes().all(|b| b.is_ascii_digit()))
+                    .unwrap_or(false)
+            };
+            if !valid {
                 continue;
             }
             // Reject an entry that escapes the project directory.
@@ -530,15 +884,6 @@ pub enum FieldChange {
     Set(String),
 }
 
-fn known_order(heading: &str) -> Option<usize> {
-    match heading {
-        "## User Story" => Some(0),
-        "## Group" => Some(1),
-        "## Description" => Some(2),
-        _ => None,
-    }
-}
-
 fn trailing_empty_lines(body: &[String]) -> usize {
     body.iter().rev().take_while(|line| line.is_empty()).count()
 }
@@ -549,7 +894,11 @@ fn remove_section(sections: &mut Vec<Section>, index: usize) {
     sections.remove(index);
 }
 
-fn set_section(sections: &mut Vec<Section>, heading: &str, value: Option<String>) {
+fn known_index(heading: &str, known: &[&str]) -> Option<usize> {
+    known.iter().position(|h| *h == heading)
+}
+
+fn set_section(sections: &mut Vec<Section>, heading: &str, value: Option<String>, known: &[&str]) {
     let existing = sections.iter().position(|s| s.heading == heading);
     match (existing, value) {
         (Some(index), Some(value)) => {
@@ -562,20 +911,18 @@ fn set_section(sections: &mut Vec<Section>, heading: &str, value: Option<String>
         }
         (Some(index), None) => remove_section(sections, index),
         (None, Some(value)) => {
-            let order = known_order(heading).unwrap_or(usize::MAX);
+            let order = known_index(heading, known).unwrap_or(usize::MAX);
             let mut position = None;
-            // After the last preceding known section.
             for (index, section) in sections.iter().enumerate() {
-                if let Some(section_order) = known_order(&section.heading)
+                if let Some(section_order) = known_index(&section.heading, known)
                     && section_order < order
                 {
                     position = Some(index + 1);
                 }
             }
             if position.is_none() {
-                // Before the first following known section.
                 for (index, section) in sections.iter().enumerate() {
-                    if let Some(section_order) = known_order(&section.heading)
+                    if let Some(section_order) = known_index(&section.heading, known)
                         && section_order > order
                     {
                         position = Some(index);
@@ -600,6 +947,20 @@ fn set_section(sections: &mut Vec<Section>, heading: &str, value: Option<String>
     }
 }
 
+const REQ_KNOWN: &[&str] = &["## User Story", "## Group", "## Description"];
+const TASK_KNOWN: &[&str] = &[
+    "## Description",
+    "## Status",
+    "## Milestone",
+    "## Assignee",
+    "## Labels",
+    "## Dependencies",
+    "## Acceptance Criteria",
+    "## Comments",
+];
+const MILESTONE_KNOWN: &[&str] = &["## Description", "## Release"];
+const RELEASE_KNOWN: &[&str] = &["## Description"];
+
 /// Serialize a document with a new title and optional story/description
 /// changes, preserving every unknown `## ` section content-identically.
 pub fn apply_edit(
@@ -614,16 +975,211 @@ pub fn apply_edit(
     if supports_story {
         match story {
             FieldChange::Keep => {}
-            FieldChange::Clear => set_section(&mut sections, "## User Story", None),
+            FieldChange::Clear => set_section(&mut sections, "## User Story", None, REQ_KNOWN),
             FieldChange::Set(value) => {
-                set_section(&mut sections, "## User Story", Some(value));
+                set_section(&mut sections, "## User Story", Some(value), REQ_KNOWN);
             }
         }
     }
     match description {
         FieldChange::Keep => {}
-        FieldChange::Clear => set_section(&mut sections, "## Description", None),
-        FieldChange::Set(value) => set_section(&mut sections, "## Description", Some(value)),
+        FieldChange::Clear => set_section(&mut sections, "## Description", None, REQ_KNOWN),
+        FieldChange::Set(value) => {
+            set_section(&mut sections, "## Description", Some(value), REQ_KNOWN)
+        }
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    lines.push(format!("# {} {}", id, title));
+    lines.extend(doc.preamble.iter().cloned());
+    for section in sections {
+        lines.push(section.heading);
+        lines.extend(section.body);
+    }
+    while lines.last().is_some_and(|line| line.is_empty()) {
+        lines.pop();
+    }
+    let mut output = lines.join("\n");
+    output.push('\n');
+    output
+}
+
+/// Validate a list field (one value per line) and return the parsed items.
+pub fn validate_list_items(label: &str, raw: &str) -> Result<Vec<String>, String> {
+    let mut items: Vec<String> = Vec::new();
+    for line in normalize_newlines(raw).lines() {
+        let value = line.trim();
+        if value.is_empty() {
+            continue;
+        }
+        let chars = value.chars().count();
+        if chars == 0 || chars > MAX_TITLE_CHARS {
+            return Err(format!("{} must be at most 200 characters.", label));
+        }
+        if value.chars().any(|c| c.is_control()) {
+            return Err(format!("{} cannot contain control characters.", label));
+        }
+        if value.starts_with("## ") {
+            return Err(format!("{} contains a line starting with ## .", label));
+        }
+        if !items.contains(&value.to_string()) {
+            items.push(value.to_string());
+        }
+    }
+    Ok(items)
+}
+
+/// Render a list field body.
+fn render_list_items(items: &[String], prefix: &str) -> String {
+    items
+        .iter()
+        .map(|v| format!("{} {}", prefix, v))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn apply_task_edit(
+    doc: &Doc,
+    id: &str,
+    title: &str,
+    description: FieldChange,
+    status: &str,
+    milestone: FieldChange,
+    assignee: FieldChange,
+    labels: Vec<String>,
+    dependencies: Vec<String>,
+    acceptance_criteria: Vec<String>,
+) -> String {
+    let mut sections = doc.sections.clone();
+    // Status always set (required)
+    set_section(
+        &mut sections,
+        "## Status",
+        Some(status.to_string()),
+        TASK_KNOWN,
+    );
+    match description {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## Description", None, TASK_KNOWN),
+        FieldChange::Set(value) => {
+            set_section(&mut sections, "## Description", Some(value), TASK_KNOWN)
+        }
+    }
+    match milestone {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## Milestone", None, TASK_KNOWN),
+        FieldChange::Set(value) => {
+            set_section(&mut sections, "## Milestone", Some(value), TASK_KNOWN)
+        }
+    }
+    match assignee {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## Assignee", None, TASK_KNOWN),
+        FieldChange::Set(value) => {
+            set_section(&mut sections, "## Assignee", Some(value), TASK_KNOWN)
+        }
+    }
+    if labels.is_empty() {
+        set_section(&mut sections, "## Labels", None, TASK_KNOWN);
+    } else {
+        set_section(
+            &mut sections,
+            "## Labels",
+            Some(render_list_items(&labels, "-")),
+            TASK_KNOWN,
+        );
+    }
+    if dependencies.is_empty() {
+        set_section(&mut sections, "## Dependencies", None, TASK_KNOWN);
+    } else {
+        set_section(
+            &mut sections,
+            "## Dependencies",
+            Some(render_list_items(&dependencies, "-")),
+            TASK_KNOWN,
+        );
+    }
+    if acceptance_criteria.is_empty() {
+        set_section(&mut sections, "## Acceptance Criteria", None, TASK_KNOWN);
+    } else {
+        let body = acceptance_criteria
+            .iter()
+            .map(|v| format!("- [ ] {}", v))
+            .collect::<Vec<_>>()
+            .join("\n");
+        set_section(
+            &mut sections,
+            "## Acceptance Criteria",
+            Some(body),
+            TASK_KNOWN,
+        );
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    lines.push(format!("# {} {}", id, title));
+    lines.extend(doc.preamble.iter().cloned());
+    for section in sections {
+        lines.push(section.heading);
+        lines.extend(section.body);
+    }
+    while lines.last().is_some_and(|line| line.is_empty()) {
+        lines.pop();
+    }
+    let mut output = lines.join("\n");
+    output.push('\n');
+    output
+}
+
+pub fn apply_milestone_edit(
+    doc: &Doc,
+    id: &str,
+    title: &str,
+    description: FieldChange,
+    release: FieldChange,
+) -> String {
+    let mut sections = doc.sections.clone();
+    match description {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## Description", None, MILESTONE_KNOWN),
+        FieldChange::Set(value) => set_section(
+            &mut sections,
+            "## Description",
+            Some(value),
+            MILESTONE_KNOWN,
+        ),
+    }
+    match release {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## Release", None, MILESTONE_KNOWN),
+        FieldChange::Set(value) => {
+            set_section(&mut sections, "## Release", Some(value), MILESTONE_KNOWN)
+        }
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    lines.push(format!("# {} {}", id, title));
+    lines.extend(doc.preamble.iter().cloned());
+    for section in sections {
+        lines.push(section.heading);
+        lines.extend(section.body);
+    }
+    while lines.last().is_some_and(|line| line.is_empty()) {
+        lines.pop();
+    }
+    let mut output = lines.join("\n");
+    output.push('\n');
+    output
+}
+
+pub fn apply_release_edit(doc: &Doc, id: &str, title: &str, description: FieldChange) -> String {
+    let mut sections = doc.sections.clone();
+    match description {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## Description", None, RELEASE_KNOWN),
+        FieldChange::Set(value) => {
+            set_section(&mut sections, "## Description", Some(value), RELEASE_KNOWN)
+        }
     }
 
     let mut lines: Vec<String> = Vec::new();
