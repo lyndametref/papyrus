@@ -11,6 +11,7 @@ pub mod req;
 pub mod requirement;
 pub mod sanitize;
 pub mod search;
+pub mod task;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -91,6 +92,14 @@ pub enum Commands {
         #[command(subcommand)]
         action: release::ReleaseCmd,
     },
+    /// Manage tasks.
+    Task {
+        #[command(subcommand)]
+        action: Option<task::TaskCmd>,
+        /// Task ID (shorthand for view).
+        #[arg(value_name = "id")]
+        id: Option<String>,
+    },
     /// Serve the local web interface.
     #[command(override_usage = "papyrus browser [--host <host>] [--port <port>] [--no-open]")]
     Browser {
@@ -158,7 +167,7 @@ fn parse_browser_port(raw: &str) -> Result<u16, String> {
     u16::try_from(value).map_err(|_| "port must be an integer between 1 and 65535".to_string())
 }
 
-fn parse_limit(raw: &str) -> Result<usize, String> {
+pub(crate) fn parse_limit(raw: &str) -> Result<usize, String> {
     let value: i64 = raw
         .parse()
         .map_err(|_| "limit must be a positive integer".to_string())?;
@@ -257,6 +266,18 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
         Commands::Release { action } => {
             let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
             release::run(&ctx, action)
+        }
+        Commands::Task { action, id } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            if let Some(a) = action {
+                task::run(&ctx, a)
+            } else if let Some(i) = id {
+                task::view(&ctx, &i)
+            } else {
+                Err(error::AppError::Validation(
+                    "missing task subcommand or id".to_string(),
+                ))
+            }
         }
         Commands::Browser {
             host,
