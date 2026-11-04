@@ -112,7 +112,7 @@ fn parse_heading(content: &str) -> (String, String) {
     (id, title)
 }
 
-fn parse_release(content: &str) -> (String, String, Option<String>) {
+pub(crate) fn parse_release(content: &str) -> (String, String, Option<String>) {
     let (id, title) = parse_heading(content);
     let mut desc: Option<String> = None;
     let lines: Vec<&str> = content.lines().collect();
@@ -148,7 +148,7 @@ fn parse_release(content: &str) -> (String, String, Option<String>) {
     (id, title, desc)
 }
 
-fn render_release(id: &str, title: &str, desc: Option<&str>) -> String {
+pub(crate) fn render_release(id: &str, title: &str, desc: Option<&str>) -> String {
     let mut parts: Vec<String> = Vec::new();
     parts.push(format!("# {} {}", id, title));
     if let Some(d) = desc {

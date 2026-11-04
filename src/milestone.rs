@@ -171,7 +171,7 @@ fn parse_heading(content: &str) -> (String, String) {
     (id, title)
 }
 
-fn parse_milestone(content: &str) -> (String, String, Option<String>, Option<String>) {
+pub(crate) fn parse_milestone(content: &str) -> (String, String, Option<String>, Option<String>) {
     let (id, title) = parse_heading(content);
     let mut desc: Option<String> = None;
     let mut release: Option<String> = None;
@@ -214,7 +214,12 @@ fn parse_milestone(content: &str) -> (String, String, Option<String>, Option<Str
     (id, title, desc, release)
 }
 
-fn render_milestone(id: &str, title: &str, desc: Option<&str>, release: Option<&str>) -> String {
+pub(crate) fn render_milestone(
+    id: &str,
+    title: &str,
+    desc: Option<&str>,
+    release: Option<&str>,
+) -> String {
     let mut parts: Vec<String> = Vec::new();
     parts.push(format!("# {} {}", id, title));
     if let Some(d) = desc {

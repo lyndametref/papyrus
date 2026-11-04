@@ -10,12 +10,16 @@ Wireframe mockups for the Papyrus local browser (TASK-6). Layout only: grayscale
 
 | ID | Type | Name | Slug | Artifact | Platform | Views | Status | Source |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| MOCK-0002 | scenario | Browser backlog records review package | browser-backlog-records-review | [`MOCK-0002-browser-backlog-records-review.html`](MOCK-0002-browser-backlog-records-review.html) | web | web:backlog, list-business, list-nonfunctional, list-empty-project, list-empty-type, list-long, view-task, view-milestone, view-release, view-task-unresolved, view-task-deps, edit-task, edit-milestone, edit-release, edit-task-dirty, edit-task-errors, edit-task-conflict, view-after-save, error-404-unknown, error-404-deprecated, error-400, error-405, error-415, error-500, responsive-list-320, responsive-edit-320 (26 views) | approved | browser-tasks-milestones-and-releases.md §3–§9 and UI design handoff; browser-requirements.md (baseline shell); TASK-11 |
 | MOCK-0001 | scenario | Browser requirement content review package | browser-requirements-review | [`MOCK-0001-browser-requirements-review.html`](MOCK-0001-browser-requirements-review.html) | web | web:list-business, list-nonfunctional, list-empty-project, list-empty-type, list-group-empty, list-long, view-req-business, view-req-nfr, view-group-business, view-group-nfr, view-unresolved, edit-business, edit-nonfunctional, edit-dirty, edit-errors, edit-conflict, view-after-save, error-404-unknown, error-404-deprecated, error-400, error-405, error-415, error-500, responsive-list-320, responsive-edit-320 (25 views) | approved | browser-requirements.md §4–§10; browser-requirements-ui.md; TASK-6 |
 
 ## Notes
+
+- MOCK-0002 extends the approved MOCK-0001 shell to backlog records (tasks, milestones, releases). Revised per user feedback: unified single "Backlog" sidebar entry (not separate task/milestone/release views), task status changed by drag-and-drop between kanban columns, and labels edited with the same add/remove tag workflow as dependencies. Status `approved` (explicitly approved by the user on 2026-11-04, TASK-11).
 
 - MOCK-0001 is a single self-contained HTML file: inlined `<style>`, no external stylesheet, script, font, image, or network reference. It opens correctly from any location.
 - The package follows the persistent left document-type sidebar: business and non-functional requirements are separate categories selected by the sidebar, and only the selected category renders. The record view has no repeated "Back to requirements" link; group pages list the requirements in the group.
 - The review package uses a small script only to switch views, page the deck, fit the desktop frame, and toggle the 320 px type list. The designed interface itself is server-rendered and works with JavaScript disabled; the single optional script in the product is the dirty-form leave guard.
 - MOCK ids are global and assigned sequentially; they are never reused or renumbered.
 - MOCK-0001 was explicitly approved by the user on 2026-11-03 (UTC). Status: `approved`.
+- MOCK-0002 was explicitly approved by the user on 2026-11-04 (UTC) (TASK-11). Status: `approved`.
