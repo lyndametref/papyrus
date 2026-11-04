@@ -360,9 +360,80 @@ Environment: isolated `dpkg --instdir/--admindir` under `fakeroot` on the build 
   explicit `cargo build --release` plus the `--help` assertion documented above and
   executed before packaging.
 
+## Smoke test results (TASK-12 verification, backlog-discovery milestone)
+
+- Date: **2026-11-04 (UTC)**.
+- Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43, dpkg 1.23.11,
+  `rustc`/`cargo` 1.99.1, clippy 0.1.99, `fakeroot`, and `unshare -rn`
+  (loopback brought up with `ip link set lo up`).
+- Isolation: `fakeroot dpkg --instdir=./.tmp/inst --admindir=./.tmp/adm
+  --force-depends`; the host package status was unchanged before and after the
+  run (the host already reported `papyrus 0.1.0` installed from prior work and
+  was not modified by this verification). Scratch directories were removed after
+  verification.
+- Package: `papyrus_0.1.0_amd64.deb`, 735840 bytes,
+  SHA-256 `69a2152470fbec6a1f110fabad28ee2b5c40229a02c61bac7bd6bb49f422d3db`.
+- Package metadata: `Package: papyrus`, `Version: 0.1.0`, `Architecture: amd64`,
+  `Depends: libc6 (>= 2.34)`, `Section: utils`, `Priority: optional`, copyright
+  `GPL-3.0-or-later`.
+- Package contents: `/usr/bin/papyrus` (0755, 2112928 bytes) and
+  `/usr/share/doc/papyrus/copyright` (0644, 865 bytes) only; no asset, template,
+  configuration, or man files.
+- New test file: `tests/backlog_discovery_smoke.rs` (2 tests), passing under
+  `cargo test`.
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| `cargo build --release` (Rust 1.99.1) | PASS |
+| `target/release/papyrus --help` lists `task`, `milestone`, `release`, `search`, `browser` | PASS |
+| `cargo test` | PASS — 160 tests (33 unit + integration suites, including the new `backlog_discovery_smoke` 2 tests) |
+| `cargo clippy --all-targets -- -D warnings` | PASS — 0 warnings |
+| `cargo fmt --check` | PASS |
+
+### Install, uninstall, and smoke checks
+
+| Check | Result |
+|---|---|
+| Isolated `dpkg -i` | PASS (exit 0) |
+| Installed `/usr/bin/papyrus` is `root:root` 0755 | PASS |
+| `papyrus` resolves on the isolated `PATH` and runs | PASS |
+| Isolated `dpkg -r papyrus` removes the binary; not on `PATH` | PASS |
+| Isolated `dpkg --purge papyrus` from installed state removes binary and admin entry | PASS |
+| Host package database and filesystem unchanged | PASS |
+| `--help` lists `task`, `milestone`, `release`, `search`, `browser`; `--version` prints `papyrus 0.1.0` | PASS |
+| `init`, release/milestone/task lifecycles, ids preserved across archive/restore | PASS |
+| Search: quoted phrase, split words, `--type task/milestone/release`, `--limit`, `--json`, `[]`, archival visibility | PASS |
+| Browser: startup line, all five categories, `aria-current`, record views | PASS |
+| Browser edit round-trip: `303`, `Location`, updated view and CLI view | PASS |
+| Browser JSON API: `/api/tasks`, `/api/milestones`, `/api/releases`, `/api/doc/<id>` | PASS |
+| Embedded assets: `/assets/app.css`, `/assets/app.js`, non-empty, `no-store` | PASS |
+| 320 px markup hooks and narrow-viewport CSS | PASS |
+| No external references in served HTML/CSS/JS; CSP present | PASS |
+| Offline (`unshare -rn`, outbound TCP fails): search over loopback | PASS |
+| Config keys: list/get/set/unset, configured port honored, `--port` override, defaults restored, invalid values exit 4 with unchanged file | PASS |
+| Embedded assets from an empty working directory and asset-free project | PASS |
+
+### Recorded limitations
+
+- **OQ-1 — no real-GUI browser run.** This headless verification checks served
+  markup, asset set, viewport hooks, and the absence of forbidden features. Firefox,
+  Edge, and Safari 100+ were not driven in a GUI. NFR-05.001 browser support remains
+  covered by TASK-6/TASK-11 (`tests/browser_cli.rs`) and the approved MOCK-0001/
+  MOCK-0002; schedule a manual GUI pass if required.
+- **Forky only.** No Debian Trixie or other release was installed or verified, and
+  none is claimed (ADR-0003, NFR-03.002).
+- **Host baseline.** The build host already reported `papyrus 0.1.0` installed from
+  prior work; the isolated verification did not modify it. The host entry is recorded
+  as unchanged rather than absent.
+- **Packaging script precondition.** `scripts/build-deb.sh` was intentionally left
+  unchanged. The stale-binary hazard is mitigated by the mandatory explicit
+  `cargo build --release` plus the `--help` assertion executed before packaging.
+
 ## Runtime dependency license audit
 
-Reference: TASK-1 license audit (unchanged). TASK-2 to TASK-7 introduced no new
+Reference: TASK-1 license audit (unchanged). TASK-2 to TASK-12 introduced no new
 runtime dependencies beyond those already audited. Audit re-run not required.
 
 Scope: runtime dependencies only (crates linked into the distributed binary).
