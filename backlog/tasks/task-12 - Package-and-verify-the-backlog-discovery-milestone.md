@@ -1,10 +1,10 @@
 ---
 id: TASK-12
 title: Package and verify the backlog-discovery milestone
-status: Implemented
+status: Done
 assignee: []
 created_date: '2026-10-31T22:26:00Z'
-updated_date: '2026-11-04T21:20:00Z'
+updated_date: '2026-11-04T21:24:00Z'
 labels:
   - packaging
   - verification
@@ -144,4 +144,6 @@ New test: tests/backlog_discovery_smoke.rs (milestone_backlog_discovery_flow, in
 Documentation: docs/packaging.md updated with Forky-only claim, procedures, extended checklist, observed results (environment, date/timezone), and limitations.
 
 Limitations/deviations: OQ-1 no real-GUI browser run (markup/asset level only). Forky only; no Trixie verification. Host baseline already had papyrus installed (unchanged, not absent). scripts/build-deb.sh unchanged. No requirements/BR/ADRs/UI changed; no product code changes.
+
+Quality review (gatekeeper): Ready to close. All AC #1-#17 pass; DoD #1-#7 pass. cargo build/test (160)/clippy/fmt all pass; deb build/contents/install/uninstall pass; smoke pass. Scope: tests + docs only, no source changes. NFR-03.002/NFR-04.001/NFR-05.001 (deferred)/NFR-06.001/002 addressed. OQ-1/OQ-2/OQ-4 deferred non-blocking.
 <!-- SECTION:NOTES:END -->
