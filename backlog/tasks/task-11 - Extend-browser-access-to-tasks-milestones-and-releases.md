@@ -1,10 +1,10 @@
 ---
 id: TASK-11
 title: Extend browser access to tasks, milestones, and releases
-status: Refined
+status: Done
 assignee: []
 created_date: '2026-10-31T22:26:00Z'
-updated_date: '2026-11-04T20:41:00Z'
+updated_date: '2026-11-04T20:56:00Z'
 labels:
   - browser
   - backlog
@@ -103,6 +103,8 @@ Deferred (follow-up, non-blocking): AC #10 real-browser verification in Firefox/
 UI mockup MOCK-0002 approved by the user on 2026-11-04 (TASK-11). Extends MOCK-0001 shell: single combined backlog view, kanban by status, expandable milestones, framed tags, bullet-list acceptance criteria, tag-based dependency editing, searchable milestone dropdown. Registry and UI description updated to approved.
 
 Deferred follow-up (non-blocking): AC #10 real-browser verification (Firefox/Edge/Safari 100+) and NFR-05.001 are tracked as follow-up, not a release gate for this ticket.
+
+Quality review (gatekeeper, recheck): Ready to close. All AC #1-#9 pass; AC #10 deferred (real-browser, non-blocking). DoD #1-#6 pass. 10 T-11 tests pass; cargo build/test (150 passed)/clippy/fmt all pass. Scope: browser code + tests + spec/doc. NFR-01.002/003, NFR-02.002, NFR-04.001/002 addressed; NFR-05.001 deferred.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
