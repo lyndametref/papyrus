@@ -327,7 +327,6 @@ pub fn create(
     let active = active_dir(ctx, &cfg)?;
     let archived = archived_dir(ctx, &cfg)?;
     ensure_dir(&active, &ctx.project_dir)?;
-    let _ = ensure_dir(&archived, &ctx.project_dir);
 
     let max = scan_max(&active, &archived, &entry.prefix);
     let next = max + 1;
@@ -422,17 +421,20 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
     let active = active_dir(ctx, &cfg)?;
     let archived = archived_dir(ctx, &cfg)?;
     let _ = ensure_dir(&active, &ctx.project_dir);
-    let _ = ensure_dir(&archived, &ctx.project_dir);
 
     let active_path = active.join(format!("{}.md", id));
     let archived_path = archived.join(format!("{}.md", id));
     let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
-    let archived_safe = Context::ensure_within(&ctx.project_dir, &archived_path)?;
+    let archived_safe = if archived.exists() {
+        Context::ensure_within(&ctx.project_dir, &archived_path).ok()
+    } else {
+        None
+    };
 
     let path = if active_safe.exists() {
         active_safe
-    } else if archived_safe.exists() {
-        archived_safe
+    } else if archived_safe.as_ref().map(|p| p.exists()).unwrap_or(false) {
+        archived_safe.unwrap()
     } else {
         return Err(AppError::NotFound(format!("not found: {}", id)));
     };
@@ -462,17 +464,20 @@ pub fn edit(
     let active = active_dir(ctx, &cfg)?;
     let archived = archived_dir(ctx, &cfg)?;
     let _ = ensure_dir(&active, &ctx.project_dir);
-    let _ = ensure_dir(&archived, &ctx.project_dir);
 
     let active_path = active.join(format!("{}.md", id));
     let archived_path = archived.join(format!("{}.md", id));
     let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
-    let archived_safe = Context::ensure_within(&ctx.project_dir, &archived_path)?;
+    let archived_safe = if archived.exists() {
+        Context::ensure_within(&ctx.project_dir, &archived_path).ok()
+    } else {
+        None
+    };
 
     let path = if active_safe.exists() {
         active_safe
-    } else if archived_safe.exists() {
-        archived_safe
+    } else if archived_safe.as_ref().map(|p| p.exists()).unwrap_or(false) {
+        archived_safe.unwrap()
     } else {
         return Err(AppError::NotFound(format!("not found: {}", id)));
     };
@@ -519,8 +524,17 @@ pub fn edit(
         let sup_active_path = active.join(format!("{}.md", sup_id));
         let sup_archived_path = archived.join(format!("{}.md", sup_id));
         let sup_active_safe = Context::ensure_within(&ctx.project_dir, &sup_active_path)?;
-        let sup_archived_safe = Context::ensure_within(&ctx.project_dir, &sup_archived_path)?;
-        if !sup_active_safe.exists() && !sup_archived_safe.exists() {
+        let sup_archived_safe = if archived.exists() {
+            Context::ensure_within(&ctx.project_dir, &sup_archived_path).ok()
+        } else {
+            None
+        };
+        if !sup_active_safe.exists()
+            && !sup_archived_safe
+                .as_ref()
+                .map(|p| p.exists())
+                .unwrap_or(false)
+        {
             return Err(AppError::NotFound(format!("not found: {}", sup_id)));
         }
         if sup_id == id {
@@ -592,7 +606,6 @@ pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
         json,
     })
 }
-
 
 #[cfg(test)]
 mod tests {
