@@ -1,10 +1,10 @@
 ---
 id: TASK-13
 title: Manage decision records from the CLI
-status: Refined
+status: Done
 assignee: []
 created_date: '2026-10-31T22:26:00Z'
-updated_date: '2026-11-05T12:52:00Z'
+updated_date: '2026-11-05T14:17:00Z'
 labels: []
 milestone: m-3
 dependencies:
