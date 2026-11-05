@@ -2,6 +2,7 @@ pub mod browser;
 pub mod commands;
 pub mod config;
 pub mod context;
+pub mod decision;
 pub mod error;
 pub mod init;
 pub mod milestone;
@@ -99,6 +100,11 @@ pub enum Commands {
         /// Task ID (shorthand for view).
         #[arg(value_name = "id")]
         id: Option<String>,
+    },
+    /// Manage decision records.
+    Decision {
+        #[command(subcommand)]
+        action: decision::DecisionCmd,
     },
     /// Serve the local web interface.
     #[command(override_usage = "papyrus browser [--host <host>] [--port <port>] [--no-open]")]
@@ -278,6 +284,10 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
                     "missing task subcommand or id".to_string(),
                 ))
             }
+        }
+        Commands::Decision { action } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            decision::run(&ctx, action)
         }
         Commands::Browser {
             host,
