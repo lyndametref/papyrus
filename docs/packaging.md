@@ -469,3 +469,24 @@ runtime dependency remains.
 
 Build-time/proc-macro dependencies (excluded from audit scope): clap_derive, heck,
 proc-macro2, quote, syn, unicode-ident.
+
+## Decision-record milestone verification (TASK-16, 2026-11-05)
+
+Verified on Debian Forky (forky/sid), glibc 2.43, dpkg 1.23.11, Rust 1.99.1,
+with `papyrus 0.1.0`.
+
+- `cargo build --release`: success.
+- `cargo test`: all suites pass (including `decision_records_smoke` 3/3).
+- `cargo clippy --all-targets -- -D warnings`: clean.
+- `cargo fmt --check`: clean.
+- `scripts/build-deb.sh`: produced `papyrus_0.1.0_amd64.deb`.
+- Package metadata: `Package: papyrus`, `Version: 0.1.0`, `Architecture: amd64`,
+  `Depends: libc6 (>= 2.34)`, Section utils, Priority optional, GPL-3.0-or-later
+  copyright. Contents: `/usr/bin/papyrus` (0755) and `/usr/share/doc/papyrus/copyright`
+  only; no runtime asset files.
+- Isolated install/uninstall via `fakeroot dpkg` with instdir/admindir under
+  `./.tmp/` succeeded; host package database untouched; purge removed all files.
+- Smoke tests: decision lifecycle (create/list/view/edit/archive), search over
+  decision records (default and `--type decision`, `--limit`), browser decision
+  category (`/?type=decision`, `/doc/ADR-001`, JSON API `/api/decisions`), offline
+  operation over loopback, and browser configuration keys all passed.
