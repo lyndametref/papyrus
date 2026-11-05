@@ -144,7 +144,7 @@ fn type_entry(cfg: &Config, key: &str) -> Result<crate::config::TypeEntry, AppEr
     Ok(entry.clone())
 }
 
-fn type_key_for_id(cfg: &Config, id: &str) -> Option<String> {
+pub fn type_key_for_id(cfg: &Config, id: &str) -> Option<String> {
     for (key, entry) in &cfg.decision_types {
         if !entry.enabled {
             continue;
@@ -277,7 +277,7 @@ fn render_decision(dd: &DecisionData) -> String {
     parts.join("\n\n") + "\n"
 }
 
-const ALLOWED_STATUSES: &[&str] = &[
+pub const ALLOWED_STATUSES: &[&str] = &[
     "proposed",
     "accepted",
     "rejected",
@@ -285,7 +285,7 @@ const ALLOWED_STATUSES: &[&str] = &[
     "superseded",
 ];
 
-fn valid_transition(current: &str, next: &str) -> bool {
+pub fn valid_transition(current: &str, next: &str) -> bool {
     if current == next {
         return true;
     }

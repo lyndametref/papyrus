@@ -426,6 +426,7 @@ fn category_from_query(request: &Request) -> Result<Category, HttpError> {
         Some(value) if value == "task" => Ok(Category::Task),
         Some(value) if value == "milestone" => Ok(Category::Milestone),
         Some(value) if value == "release" => Ok(Category::Release),
+        Some(value) if value == "decision" => Ok(Category::Decision),
         Some(_) => Err(HttpError::new(400)),
     }
 }
@@ -492,6 +493,12 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
     if path == "/api/releases" {
         return match method {
             Method::Get | Method::Head => api_releases(state),
+            _ => Err(HttpError::new(405)),
+        };
+    }
+    if path == "/api/decisions" {
+        return match method {
+            Method::Get | Method::Head => api_decisions(state),
             _ => Err(HttpError::new(405)),
         };
     }
@@ -724,6 +731,24 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 &record,
                 &values,
                 &render::ReleaseFieldErrors::default(),
+                &record.version,
+                &cfg,
+                chrome,
+            )
+        }
+        Category::Decision => {
+            let values = render::DecisionEditValues {
+                title: record.title.clone(),
+                status: record.status.clone().unwrap_or_default(),
+                decision: record.decision.clone().unwrap_or_default(),
+                context: record.context.clone().unwrap_or_default(),
+                consequences: record.consequences.clone().unwrap_or_default(),
+                superseded_by: record.superseded_by.clone().unwrap_or_default(),
+            };
+            render::edit_page_decision(
+                &record,
+                &values,
+                &render::DecisionFieldErrors::default(),
                 &record.version,
                 &cfg,
                 chrome,
@@ -1107,6 +1132,152 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
+        Category::Decision => {
+            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
+            let raw_status = form_field(&fields, "status").unwrap_or("").to_string();
+            let raw_decision = form_field(&fields, "decision").unwrap_or("").to_string();
+            let raw_context = form_field(&fields, "context").unwrap_or("").to_string();
+            let raw_consequences = form_field(&fields, "consequences")
+                .unwrap_or("")
+                .to_string();
+            let raw_superseded = form_field(&fields, "superseded-by")
+                .unwrap_or("")
+                .to_string();
+
+            let mut errors = render::DecisionFieldErrors::default();
+            let title = match records::validate_title(&raw_title) {
+                Ok(t) => Some(t),
+                Err(m) => {
+                    errors.title = Some(m);
+                    None
+                }
+            };
+
+            let status_trimmed = raw_status.trim();
+            let superseded_trimmed = raw_superseded.trim();
+
+            // mutual exclusion
+            if !status_trimmed.is_empty() && !superseded_trimmed.is_empty() {
+                errors.status = Some("Cannot set both status and superseded-by.".to_string());
+                errors.superseded_by =
+                    Some("Cannot set both status and superseded-by.".to_string());
+            }
+
+            // validate status if provided
+            let mut status_value = record.status.clone().unwrap_or_default();
+            if errors.status.is_none() && !status_trimmed.is_empty() {
+                if !crate::decision::ALLOWED_STATUSES.contains(&status_trimmed) {
+                    errors.status = Some(format!("unknown status: {}", status_trimmed));
+                } else if !crate::decision::valid_transition(
+                    record.status.as_deref().unwrap_or("proposed"),
+                    status_trimmed,
+                ) {
+                    errors.status = Some(format!(
+                        "invalid status transition: {} -> {}",
+                        record.status.as_deref().unwrap_or("proposed"),
+                        status_trimmed
+                    ));
+                } else {
+                    status_value = status_trimmed.to_string();
+                }
+            }
+
+            // validate decision/context/consequences
+            let mut decision_change = FieldChange::Keep;
+            if !raw_decision.is_empty() || form_field(&fields, "decision").is_some() {
+                // if field present
+                if form_field(&fields, "decision").is_some() {
+                    match records::validate_multiline("Decision", &raw_decision) {
+                        Ok(v) => decision_change = render::change(v),
+                        Err(m) => errors.decision = Some(m),
+                    }
+                }
+            }
+            let mut context_change = FieldChange::Keep;
+            if form_field(&fields, "context").is_some() {
+                match records::validate_multiline("Context", &raw_context) {
+                    Ok(v) => context_change = render::change(v),
+                    Err(m) => errors.context = Some(m),
+                }
+            }
+            let mut consequences_change = FieldChange::Keep;
+            if form_field(&fields, "consequences").is_some() {
+                match records::validate_multiline("Consequences", &raw_consequences) {
+                    Ok(v) => consequences_change = render::change(v),
+                    Err(m) => errors.consequences = Some(m),
+                }
+            }
+
+            // superseded-by
+            let mut final_status = status_value.clone();
+            if errors.superseded_by.is_none()
+                && !superseded_trimmed.is_empty()
+                && errors.status.is_none()
+            {
+                let sup_id = superseded_trimmed;
+                if sup_id == record.id {
+                    errors.superseded_by = Some("A decision cannot supersede itself.".to_string());
+                } else if !records::decision_exists(&ctx, &cfg, sup_id) {
+                    errors.superseded_by = Some("Decision not found.".to_string());
+                } else {
+                    let current_type = record.decision_type.clone().unwrap_or_default();
+                    let sup_type =
+                        crate::decision::type_key_for_id(&cfg, sup_id).unwrap_or_default();
+                    if current_type != sup_type {
+                        errors.superseded_by = Some("Decision type mismatch.".to_string());
+                    } else {
+                        final_status = format!("Superseded by {}", sup_id);
+                    }
+                }
+            }
+
+            if errors.any() {
+                let values = render::DecisionEditValues {
+                    title: raw_title.clone(),
+                    status: raw_status.clone(),
+                    decision: raw_decision.clone(),
+                    context: raw_context.clone(),
+                    consequences: raw_consequences.clone(),
+                    superseded_by: raw_superseded.clone(),
+                };
+                return Ok(Response::html(
+                    422,
+                    render::edit_page_decision(
+                        &record,
+                        &values,
+                        &errors,
+                        &record.version,
+                        &cfg,
+                        chrome,
+                    ),
+                ));
+            }
+
+            let title = title.unwrap_or_default();
+            // determine final status to write: if superseded set, use final_status; else status_value
+            let status_to_write = if !superseded_trimmed.is_empty() {
+                final_status.clone()
+            } else if !status_trimmed.is_empty() {
+                status_value.clone()
+            } else {
+                record
+                    .status
+                    .clone()
+                    .unwrap_or_else(|| "proposed".to_string())
+            };
+
+            let content = records::apply_decision_edit(
+                &record.doc,
+                &record.id,
+                &title,
+                &status_to_write,
+                decision_change,
+                context_change,
+                consequences_change,
+            );
+            records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
+            Ok(Response::redirect(&format!("/doc/{}", record.id)))
+        }
     }
 }
 
@@ -1131,7 +1302,7 @@ fn record_json(
             serde_json::json!({
                 "id": record.id,
                 "kind": record.kind.key(),
-                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release" },
+                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision" },
                 "title": record.title,
                 "group": group_value,
                 "story": story,
@@ -1192,6 +1363,27 @@ fn record_json(
                 "form": "release",
                 "title": record.title,
                 "description": record.description,
+                "version": record.version,
+                "path": record.rel_path,
+            })
+        }
+        Category::Decision => {
+            let superseded_value = match (&record.superseded_by, &record.superseded_title) {
+                (Some(id), Some(title)) => serde_json::json!({"id": id, "title": title}),
+                (Some(id), None) => serde_json::json!({"id": id, "title": null}),
+                _ => serde_json::Value::Null,
+            };
+            serde_json::json!({
+                "id": record.id,
+                "kind": "decision",
+                "form": "decision",
+                "title": record.title,
+                "type": record.decision_type,
+                "status": record.status,
+                "decision": record.decision,
+                "context": record.context,
+                "consequences": record.consequences,
+                "superseded_by": superseded_value,
                 "version": record.version,
                 "path": record.rel_path,
             })
@@ -1280,6 +1472,24 @@ fn api_releases(state: &ServerState) -> Result<Response, HttpError> {
             serde_json::json!({
                 "id": r.id,
                 "title": r.title,
+            })
+        })
+        .collect();
+    Ok(Response::json(200, serde_json::json!(items)))
+}
+
+fn api_decisions(state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let index = records::build_index(&state.context(), &cfg, Category::Decision);
+    let items: Vec<serde_json::Value> = index
+        .records
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "id": r.id,
+                "title": r.title,
+                "status": r.status,
+                "type": r.decision_type,
             })
         })
         .collect();
@@ -1678,6 +1888,164 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 records::apply_release_edit(&record.doc, &record.id, &title, description_change);
             records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
+            Ok(Response::json(200, record_json(&updated, None, None)))
+        }
+        Category::Decision => {
+            // title required
+            let title = match object.get("title") {
+                None => return Err(HttpError::new(400)),
+                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
+                    Ok(t) => t,
+                    Err(m) => return Ok(json_error(422, &m)),
+                },
+                Some(_) => return Err(HttpError::new(400)),
+            };
+            // mutual exclusion check
+            let has_status = object.get("status").is_some();
+            let superseded_raw = object
+                .get("superseded_by")
+                .or_else(|| object.get("superseded-by"));
+            let has_superseded = superseded_raw
+                .map(|v| !v.is_null() && v.as_str().map(|s| !s.trim().is_empty()).unwrap_or(true))
+                .unwrap_or(false);
+            if has_status && has_superseded {
+                return Ok(json_error(422, "Cannot set both status and superseded-by."));
+            }
+
+            // status
+            let mut status_value = record
+                .status
+                .clone()
+                .unwrap_or_else(|| "proposed".to_string());
+            if let Some(v) = object.get("status") {
+                match v {
+                    serde_json::Value::String(raw) => {
+                        let st = raw.trim();
+                        if !crate::decision::ALLOWED_STATUSES.contains(&st) {
+                            return Ok(json_error(422, &format!("unknown status: {}", st)));
+                        }
+                        if !crate::decision::valid_transition(
+                            record.status.as_deref().unwrap_or("proposed"),
+                            st,
+                        ) {
+                            return Ok(json_error(
+                                422,
+                                &format!(
+                                    "invalid status transition: {} -> {}",
+                                    record.status.as_deref().unwrap_or("proposed"),
+                                    st
+                                ),
+                            ));
+                        }
+                        status_value = st.to_string();
+                    }
+                    _ => return Err(HttpError::new(400)),
+                }
+            }
+
+            // decision/context/consequences
+            let mut decision_change = FieldChange::Keep;
+            if let Some(v) = object.get("decision") {
+                match v {
+                    serde_json::Value::Null => decision_change = FieldChange::Clear,
+                    serde_json::Value::String(raw) => {
+                        match records::validate_multiline("Decision", raw) {
+                            Ok(val) => decision_change = render::change(val),
+                            Err(m) => return Ok(json_error(422, &m)),
+                        }
+                    }
+                    _ => return Err(HttpError::new(400)),
+                }
+            }
+            let mut context_change = FieldChange::Keep;
+            if let Some(v) = object.get("context") {
+                match v {
+                    serde_json::Value::Null => context_change = FieldChange::Clear,
+                    serde_json::Value::String(raw) => {
+                        match records::validate_multiline("Context", raw) {
+                            Ok(val) => context_change = render::change(val),
+                            Err(m) => return Ok(json_error(422, &m)),
+                        }
+                    }
+                    _ => return Err(HttpError::new(400)),
+                }
+            }
+            let mut consequences_change = FieldChange::Keep;
+            if let Some(v) = object.get("consequences") {
+                match v {
+                    serde_json::Value::Null => consequences_change = FieldChange::Clear,
+                    serde_json::Value::String(raw) => {
+                        match records::validate_multiline("Consequences", raw) {
+                            Ok(val) => consequences_change = render::change(val),
+                            Err(m) => return Ok(json_error(422, &m)),
+                        }
+                    }
+                    _ => return Err(HttpError::new(400)),
+                }
+            }
+
+            // superseded-by
+            let mut final_status = status_value.clone();
+            if let Some(v) = superseded_raw {
+                match v {
+                    serde_json::Value::Null => {}
+                    serde_json::Value::String(raw) => {
+                        let sup_id = raw.trim();
+                        if !sup_id.is_empty() {
+                            if sup_id == record.id {
+                                return Ok(json_error(422, "A decision cannot supersede itself."));
+                            }
+                            if !records::decision_exists(&ctx, &cfg, sup_id) {
+                                return Ok(json_error(422, "Decision not found."));
+                            }
+                            let current_type = record.decision_type.clone().unwrap_or_default();
+                            let sup_type =
+                                crate::decision::type_key_for_id(&cfg, sup_id).unwrap_or_default();
+                            if current_type != sup_type {
+                                return Ok(json_error(422, "Decision type mismatch."));
+                            }
+                            final_status = format!("Superseded by {}", sup_id);
+                        }
+                    }
+                    _ => return Err(HttpError::new(400)),
+                }
+            }
+
+            let status_to_write = if superseded_raw.is_some()
+                && superseded_raw
+                    .unwrap()
+                    .as_str()
+                    .map(|s| !s.trim().is_empty())
+                    .unwrap_or(false)
+            {
+                final_status
+            } else if object.get("status").is_some() {
+                status_value
+            } else {
+                record
+                    .status
+                    .clone()
+                    .unwrap_or_else(|| "proposed".to_string())
+            };
+
+            let content = records::apply_decision_edit(
+                &record.doc,
+                &record.id,
+                &title,
+                &status_to_write,
+                decision_change,
+                context_change,
+                consequences_change,
+            );
+            records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
+            let (updated, updated_cfg) = resolve_record(id, state)?;
+            let superseded_title = updated.superseded_by.as_ref().and_then(|sid| {
+                records::resolve_id(&ctx, &updated_cfg, sid)
+                    .ok()
+                    .flatten()
+                    .map(|r| r.record.title)
+            });
+            let _ = superseded_title;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
     }
