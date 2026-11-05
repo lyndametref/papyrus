@@ -4,6 +4,7 @@ pub mod config;
 pub mod context;
 pub mod decision;
 pub mod error;
+pub mod glossary;
 pub mod init;
 pub mod milestone;
 pub mod nfreq;
@@ -105,6 +106,11 @@ pub enum Commands {
     Decision {
         #[command(subcommand)]
         action: decision::DecisionCmd,
+    },
+    /// Manage glossary terms.
+    Glossary {
+        #[command(subcommand)]
+        action: glossary::GlossaryCmd,
     },
     /// Serve the local web interface.
     #[command(override_usage = "papyrus browser [--host <host>] [--port <port>] [--no-open]")]
@@ -288,6 +294,10 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
         Commands::Decision { action } => {
             let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
             decision::run(&ctx, action)
+        }
+        Commands::Glossary { action } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            glossary::run(&ctx, action)
         }
         Commands::Browser {
             host,
