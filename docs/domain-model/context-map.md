@@ -32,4 +32,4 @@ Manages business requirements, non-functional requirements, and their type-speci
 
 ### Documentation Management
 
-Manages glossary terms, UI specifications, technical specifications, audit records, and business rules. Technical specifications may reference non-functional requirements.
+Manages glossary terms, UI specifications, technical specifications, audit records, and business rules. Technical specifications are a recognized documentation type (REQ-05.009) and may reference non-functional requirements; their attributes, lifecycle, ID format, prefix, storage directory, and command behavior are unspecified (REQ-05.009).

@@ -54,7 +54,7 @@ graph LR
 | **Requirement Group**          | Requirements Management  | A grouping record for business requirements or non-functional requirements. Every requirement in a group must have the same type; a group cannot mix the two types.                                                                                                                                                                                           |
 | **Glossary Term**              | Documentation Management | A term with an ID, term text, and definition. It shares the document lifecycle: active or deprecated.                                                                                                                                                                                                                                                               |
 | **UI Specification**           | Documentation Management | A UI specification with an ID, title, description, and a view descriptor that names the part of the UI it covers. It shares the document lifecycle: active or deprecated. |
-| **Technical Specification**    | Documentation Management | A document describing a technical design or behavior. It may reference non-functional requirements. Other attributes, lifecycle, and relationships are unspecified. |
+| **Technical Specification**    | Documentation Management | A documentation type recognized by Papyrus (README DESCRIPTION). A task may reference zero or more technical specifications (REQ-02.001). It may reference non-functional requirements; cardinality is unspecified (README line 438 / BR-010). Other attributes, lifecycle, ID format, prefix, storage directory, and command behavior are unspecified (REQ-05.009, open question 1). |
 | **Audit Record**               | Documentation Management | A document containing the result of an audit with title, type, and content. Default types are `security`, `licence`, and `architecture`; additional types are configurable. It has an active/deprecated lifecycle. Relationships beyond task references are unspecified. |
 | **Business Rule**              | Documentation Management | A rule document with an ID, title, description, rationale, applicability, and zero or more references to business requirements. It shares the document lifecycle: active or deprecated.                                                                                                                                                                             |
 
@@ -78,5 +78,5 @@ graph LR
 
 ## Open questions
 
-1. **Technical Specification:** What other attributes, lifecycle, and relationships apply, and what is the cardinality of its references to non-functional requirements?
+1. **Technical Specification:** What other attributes, lifecycle, and relationships apply, and what is the cardinality of its references to non-functional requirements? (REQ-05.009)
 2. **Audit Record:** What relationships beyond task references apply to audit records?
