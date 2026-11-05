@@ -4,16 +4,16 @@ title: Manage UI specifications from the CLI
 status: To Do
 assignee: []
 created_date: '2026-11-04T19:20:00Z'
-updated_date: '2026-11-04T19:35:00Z'
+updated_date: '2026-11-05T18:47:00Z'
 labels:
   - cli
   - documentation
-milestone: m-6
+milestone: m-4
 dependencies:
-  - TASK-16
+  - TASK-13
 priority: medium
 type: feature
-ordinal: 24000
+ordinal: 17100
 ---
 
 ## Description

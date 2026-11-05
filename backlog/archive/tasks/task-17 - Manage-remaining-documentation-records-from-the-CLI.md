@@ -4,9 +4,9 @@ title: Manage remaining documentation records from the CLI
 status: To Do
 assignee: []
 created_date: '2026-10-31T22:26:00Z'
-updated_date: '2026-11-04T19:20:00Z'
+updated_date: '2026-11-05T18:48:00Z'
 labels: []
-milestone: m-4
+milestone: m-13
 dependencies:
   - TASK-16
   - TASK-21
