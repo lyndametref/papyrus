@@ -4,16 +4,16 @@ title: Manage audit records from the CLI
 status: To Do
 assignee: []
 created_date: '2026-11-04T19:20:00Z'
-updated_date: '2026-11-04T19:21:00Z'
+updated_date: '2026-11-05T18:47:00Z'
 labels:
   - cli
   - documentation
-milestone: m-9
+milestone: m-4
 dependencies:
-  - TASK-46
+  - TASK-13
 priority: medium
 type: feature
-ordinal: 27000
+ordinal: 17400
 ---
 
 ## Description

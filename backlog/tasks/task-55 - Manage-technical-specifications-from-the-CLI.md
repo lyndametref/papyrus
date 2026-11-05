@@ -4,17 +4,16 @@ title: Manage technical specifications from the CLI
 status: To Do
 assignee: []
 created_date: '2026-11-04T19:21:00Z'
-updated_date: '2026-11-04T19:35:00Z'
+updated_date: '2026-11-05T18:47:00Z'
 labels:
   - cli
   - documentation
-milestone: m-11
+milestone: m-4
 dependencies:
-  - TASK-50
-  - TASK-21
+  - TASK-13
 priority: medium
 type: feature
-ordinal: 29000
+ordinal: 17500
 ---
 
 ## Description
