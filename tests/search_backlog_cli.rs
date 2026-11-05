@@ -193,3 +193,34 @@ fn limit_caps_combined() {
     let lines: Vec<&str> = out_stdout.lines().collect();
     assert_eq!(lines.len(), 2);
 }
+
+#[test]
+fn decision_search_basic() {
+    let d = tmpdir("decision");
+    init(&d);
+    run(
+        &d,
+        &[
+            "decision",
+            "create",
+            "Decision title",
+            "-d",
+            "needle decision",
+        ],
+    );
+
+    let out = search(&d, &["needle"]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout(&out);
+    assert!(s.contains("ADR-001 decision Decision title"));
+
+    let out = search(&d, &["needle", "--type", "decision"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("ADR-001 decision Decision title"));
+
+    // archived decision is hidden
+    run(&d, &["decision", "archive", "ADR-001"]);
+    let out = search(&d, &["needle", "--type", "decision"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(!stdout(&out).contains("ADR-001"));
+}

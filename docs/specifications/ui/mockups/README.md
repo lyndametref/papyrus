@@ -3,7 +3,7 @@
 Wireframe mockups for the Papyrus local browser (TASK-6). Layout only: grayscale, no brand palette, no technology or library references.
 
 - UI description: [`../browser-requirements-ui.md`](../browser-requirements-ui.md)
-- Status values: `pending` (awaiting explicit user approval), `approved` (user approved). A `pending` mockup must not be implemented as final UI.
+- Status values: `draft` (awaiting explicit user approval), `approved` (user approved). A `draft` mockup must not be implemented as final UI. (Project notes may also say `pending` for not-yet-approved mockups.)
 - One file is one MOCK id. MOCK-0001 is the only mockup for TASK-6: it contains the review landing, the design deck, and the web prototype, and its prototype navigation band exposes every view.
 
 ## Mockups
@@ -11,6 +11,7 @@ Wireframe mockups for the Papyrus local browser (TASK-6). Layout only: grayscale
 | ID | Type | Name | Slug | Artifact | Platform | Views | Status | Source |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | MOCK-0002 | scenario | Browser backlog records review package | browser-backlog-records-review | [`MOCK-0002-browser-backlog-records-review.html`](MOCK-0002-browser-backlog-records-review.html) | web | web:backlog, list-business, list-nonfunctional, list-empty-project, list-empty-type, list-long, view-task, view-milestone, view-release, view-task-unresolved, view-task-deps, edit-task, edit-milestone, edit-release, edit-task-dirty, edit-task-errors, edit-task-conflict, view-after-save, error-404-unknown, error-404-deprecated, error-400, error-405, error-415, error-500, responsive-list-320, responsive-edit-320 (26 views) | approved | browser-tasks-milestones-and-releases.md §3–§9 and UI design handoff; browser-requirements.md (baseline shell); TASK-11 |
+| MOCK-0003 | scenario | Browser decision records review package | browser-decision-records-review | [`MOCK-0003-browser-decision-records-review.html`](MOCK-0003-browser-decision-records-review.html) | web | web:list-decisions, list-decisions-empty, list-decisions-long, view-decision, view-decision-linked, view-decision-superseded, view-decision-after-save, edit-decision, edit-decision-dirty, edit-decision-errors, edit-decision-conflict, responsive-list-decisions-320, responsive-edit-decisions-320, error-404-unknown, error-404-deprecated, error-400, error-405, error-415, error-500 (19 views) | approved | browser-decision-records.md §3–§9 and UI design handoff; decision-records-management.md; TASK-15 |
 | MOCK-0001 | scenario | Browser requirement content review package | browser-requirements-review | [`MOCK-0001-browser-requirements-review.html`](MOCK-0001-browser-requirements-review.html) | web | web:list-business, list-nonfunctional, list-empty-project, list-empty-type, list-group-empty, list-long, view-req-business, view-req-nfr, view-group-business, view-group-nfr, view-unresolved, edit-business, edit-nonfunctional, edit-dirty, edit-errors, edit-conflict, view-after-save, error-404-unknown, error-404-deprecated, error-400, error-405, error-415, error-500, responsive-list-320, responsive-edit-320 (25 views) | approved | browser-requirements.md §4–§10; browser-requirements-ui.md; TASK-6 |
 
 ## Notes
@@ -23,3 +24,4 @@ Wireframe mockups for the Papyrus local browser (TASK-6). Layout only: grayscale
 - MOCK ids are global and assigned sequentially; they are never reused or renumbered.
 - MOCK-0001 was explicitly approved by the user on 2026-11-03 (UTC). Status: `approved`.
 - MOCK-0002 was explicitly approved by the user on 2026-11-04 (UTC) (TASK-11). Status: `approved`.
+- MOCK-0003 was revised by @ui-designer on 2026-11-05 (UTC) (TASK-15). Status: `approved` — explicitly approved by the user on 2026-11-05 (UTC). Revision: sidebar now lists all document-type entries (business requirements, non-functional requirements, backlog, decisions) as menu items; only decision entries have generated views; prior-type entries are non-clickable. Design deck removed per current mockup format. Added view-decision-linked (19 views).

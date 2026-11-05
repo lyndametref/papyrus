@@ -2653,3 +2653,483 @@ fn t11i_json_api_backlog() {
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
+
+// ---- T-15 decision scenarios ----
+
+fn create_decision(dir: &Path, title: &str) -> String {
+    run_ok(&["--dir", dir.to_str().unwrap(), "decision", "create", title])
+}
+
+fn create_decision_typed(dir: &Path, title: &str, dtype: &str) -> String {
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "decision",
+        "create",
+        title,
+        "-t",
+        dtype,
+    ])
+}
+
+fn create_decision_full(
+    dir: &Path,
+    title: &str,
+    dtype: Option<&str>,
+    decision: Option<&str>,
+    context: Option<&str>,
+    consequences: Option<&str>,
+) -> String {
+    let mut args: Vec<String> = vec![
+        "--dir".to_string(),
+        dir.to_str().unwrap().to_string(),
+        "decision".to_string(),
+        "create".to_string(),
+        title.to_string(),
+    ];
+    if let Some(t) = dtype {
+        args.push("-t".to_string());
+        args.push(t.to_string());
+    }
+    if let Some(d) = decision {
+        args.push("-d".to_string());
+        args.push(d.to_string());
+    }
+    if let Some(c) = context {
+        args.push("--context".to_string());
+        args.push(c.to_string());
+    }
+    if let Some(c) = consequences {
+        args.push("--consequences".to_string());
+        args.push(c.to_string());
+    }
+    let out = bin().args(&args).output().unwrap();
+    assert!(
+        out.status.success(),
+        "command failed: {:?}\nstderr: {}",
+        args,
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+fn decision_fixture(name: &str) -> PathBuf {
+    let dir = test_root(name);
+    init_project(&dir);
+    create_decision_full(
+        &dir,
+        "Decision One",
+        None,
+        Some("We will do X"),
+        Some("Because Y"),
+        Some("Z happens"),
+    );
+    create_decision(&dir, "Decision Two");
+    create_decision_typed(&dir, "Bdr Decision", "bdr");
+    dir
+}
+
+fn decision_record_path(dir: &Path, id: &str) -> PathBuf {
+    dir.join("decisions").join(format!("{}.md", id))
+}
+
+// T-15a
+#[test]
+fn t15a_list_decision_category() {
+    let dir = decision_fixture("t15a");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    let html = get(&server, "/?type=decision").text();
+    assert!(html.contains("ADR-001"), "missing ADR-001");
+    assert!(html.contains("ADR-002"), "missing ADR-002");
+    assert!(html.contains("BDR-001"), "missing BDR-001");
+    assert!(
+        html.contains("aria-current=\"page\""),
+        "sidebar aria-current"
+    );
+    let a = html.find("ADR-001").unwrap();
+    let b = html.find("ADR-002").unwrap();
+    let c = html.find("BDR-001").unwrap();
+    assert!(a < b && b < c, "decision order");
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-15b
+#[test]
+fn t15b_category_parameter_decision() {
+    let dir = decision_fixture("t15b");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    assert_eq!(get(&server, "/").status, 200);
+    for ty in ["req", "nfr", "task", "milestone", "release", "decision"] {
+        assert_eq!(
+            get(&server, &format!("/?type={}", ty)).status,
+            200,
+            "type={}",
+            ty
+        );
+    }
+    for ty in ["all", "x", "decisions"] {
+        assert_eq!(
+            get(&server, &format!("/?type={}", ty)).status,
+            400,
+            "type={}",
+            ty
+        );
+    }
+    let html = get(&server, "/?type=decision").text();
+    assert!(html.contains("ADR-001"));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-15c
+#[test]
+fn t15c_view_decision_fields() {
+    let dir = decision_fixture("t15c");
+    // make ADR-001 superseded by ADR-002
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "decision",
+        "edit",
+        "ADR-001",
+        "--superseded-by",
+        "ADR-002",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    let view = get(&server, "/doc/ADR-001").text();
+    for needle in [
+        "Decision type",
+        "Status",
+        "Decision",
+        "Context",
+        "Consequences",
+        "Supersession",
+        "We will do X",
+        "Because Y",
+        "Z happens",
+    ] {
+        assert!(view.contains(needle), "decision view missing {}", needle);
+    }
+    assert!(view.contains("/doc/ADR-002"));
+
+    let view2 = get(&server, "/doc/BDR-001").text();
+    assert!(view2.contains("Decision type"));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-15d
+#[test]
+fn t15d_edit_round_trip_decision() {
+    let dir = decision_fixture("t15d");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    let edit = get(&server, "/doc/ADR-002/edit").text();
+    let version = extract_version(&edit);
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Decision Two revised"),
+        ("status", "accepted"),
+        ("decision", "Revised decision"),
+        ("context", "Revised context"),
+        ("consequences", "Revised consequences"),
+        ("superseded-by", ""),
+    ]);
+    let response = post_form(&server, "/doc/ADR-002", &body);
+    assert_eq!(response.status, 303);
+    let view = get(&server, "/doc/ADR-002").text();
+    assert!(view.contains("Decision Two revised"));
+    assert!(view.contains("Revised decision"));
+    let cli = run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "decision",
+        "view",
+        "ADR-002",
+    ]);
+    assert!(cli.contains("Decision Two revised"));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-15e
+#[test]
+fn t15e_validation_decision() {
+    let dir = decision_fixture("t15e");
+    let path = decision_record_path(&dir, "ADR-001");
+    let before = fs::read(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/ADR-001/edit").text());
+
+    // empty title
+    let body = form_body(&[("version", &version), ("title", "")]);
+    let response = post_form(&server, "/doc/ADR-001", &body);
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // invalid status transition
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Valid"),
+        ("status", "deprecated"),
+    ]);
+    let response = post_form(&server, "/doc/ADR-001", &body);
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // unknown superseding
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Valid"),
+        ("superseded-by", "ADR-999"),
+    ]);
+    let response = post_form(&server, "/doc/ADR-001", &body);
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // type mismatch
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Valid"),
+        ("superseded-by", "BDR-001"),
+    ]);
+    let response = post_form(&server, "/doc/ADR-001", &body);
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // self-supersession
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Valid"),
+        ("superseded-by", "ADR-001"),
+    ]);
+    let response = post_form(&server, "/doc/ADR-001", &body);
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // both status + superseded-by
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Valid"),
+        ("status", "accepted"),
+        ("superseded-by", "ADR-002"),
+    ]);
+    let response = post_form(&server, "/doc/ADR-001", &body);
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // ## line in decision
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Valid"),
+        ("decision", "Line\n## Not allowed"),
+    ]);
+    let response = post_form(&server, "/doc/ADR-001", &body);
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-15f
+#[test]
+fn t15f_conflict_decision() {
+    let dir = decision_fixture("t15f");
+    let path = decision_record_path(&dir, "ADR-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/ADR-001/edit").text());
+    let original = fs::read_to_string(&path).unwrap();
+    fs::write(&path, format!("{}\n## Out of band\nchanged\n", original)).unwrap();
+    let body = form_body(&[("version", &version), ("title", "Should not save")]);
+    let response = post_form(&server, "/doc/ADR-001", &body);
+    assert_eq!(response.status, 409);
+    let html = response.text();
+    assert!(html.contains("This record changed on disk"));
+    let saved = fs::read_to_string(&path).unwrap();
+    assert!(!saved.contains("Should not save"));
+    assert!(saved.contains("## Out of band"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-15g
+#[test]
+fn t15g_archived_decision() {
+    let dir = decision_fixture("t15g");
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "decision",
+        "archive",
+        "ADR-001",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let list = get(&server, "/?type=decision").text();
+    assert!(!list.contains("ADR-001"));
+    assert_eq!(get(&server, "/doc/ADR-001").status, 404);
+    assert_eq!(get(&server, "/doc/ADR-001/edit").status, 404);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-15h
+#[test]
+fn t15h_atomic_and_symlink_decision() {
+    let dir = decision_fixture("t15h");
+    let path = decision_record_path(&dir, "ADR-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/ADR-001/edit").text());
+    let before: Vec<String> = fs::read_dir(path.parent().unwrap())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+        .collect();
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Atomic"),
+        ("status", "accepted"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/ADR-001", &body).status, 303);
+    let after: Vec<String> = fs::read_dir(path.parent().unwrap())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+        .collect();
+    assert_eq!(before, after);
+    assert!(!after.iter().any(|n| n.contains(".tmp")));
+
+    // rejected save leaves no temp
+    let body = form_body(&[("version", "1.2.3"), ("title", "Rejected")]);
+    assert_eq!(post_form(&server, "/doc/ADR-001", &body).status, 409);
+    let after: Vec<String> = fs::read_dir(path.parent().unwrap())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+        .collect();
+    assert_eq!(before, after);
+
+    drop(server);
+
+    // symlink escape (unix)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        let outside = test_root("t15h-outside");
+        let secret = outside.join("secret.md");
+        fs::write(&secret, "# ADR-001 SECRET CONTENT\n").unwrap();
+        let p = decision_record_path(&dir, "ADR-001");
+        let _ = fs::remove_file(&p);
+        symlink(&secret, &p).unwrap();
+        let server = Server::start(&dir, &["--no-open"], &[]);
+        assert_eq!(get(&server, "/doc/ADR-001").status, 404);
+        let list = get(&server, "/?type=decision").text();
+        assert!(!list.contains("ADR-001"));
+        let body = form_body(&[("version", "1.2.3"), ("title", "Attack")]);
+        assert_eq!(post_form(&server, "/doc/ADR-001", &body).status, 404);
+        assert!(
+            fs::read_to_string(&secret)
+                .unwrap()
+                .contains("SECRET CONTENT")
+        );
+        drop(server);
+        let _ = fs::remove_dir_all(&outside);
+    }
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-15i
+#[test]
+fn t15i_json_api_decision() {
+    let dir = decision_fixture("t15i");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    let decisions: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/decisions").text()).unwrap();
+    let arr = decisions.as_array().unwrap();
+    assert_eq!(arr.len(), 3);
+    assert!(arr[0].get("status").is_some());
+    assert!(arr[0].get("type").is_some());
+
+    let doc: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/doc/ADR-001").text()).unwrap();
+    assert_eq!(doc["id"], "ADR-001");
+    assert_eq!(doc["kind"], "decision");
+    assert_eq!(doc["form"], "decision");
+    assert!(doc["type"].is_string() || doc["type"].is_null());
+    assert!(doc["status"].is_string() || doc["status"].is_null());
+    assert!(doc["decision"].is_string() || doc["decision"].is_null());
+    assert!(doc["context"].is_string() || doc["context"].is_null());
+    assert!(doc["consequences"].is_string() || doc["consequences"].is_null());
+    assert!(doc["superseded_by"].is_object() || doc["superseded_by"].is_null());
+    assert!(doc["version"].is_string());
+
+    // BDR doc
+    let bdoc: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/doc/BDR-001").text()).unwrap();
+    assert_eq!(bdoc["kind"], "decision");
+
+    // POST update
+    let version = doc["version"].as_str().unwrap().to_string();
+    let body = format!(
+        "{{\"version\":\"{}\",\"title\":\"API Decision\",\"status\":\"accepted\"}}",
+        version
+    );
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/ADR-001", &body).text()).unwrap();
+    assert_eq!(updated["title"], "API Decision");
+    assert_eq!(updated["status"], "accepted");
+
+    // bad body
+    assert_eq!(
+        post_json(&server, "/api/doc/ADR-001", "{not json").status,
+        400
+    );
+    let version = updated["version"].as_str().unwrap().to_string();
+    assert_eq!(
+        post_json(
+            &server,
+            "/api/doc/ADR-001",
+            &format!("{{\"version\":\"{}\",\"title\":5}}", version)
+        )
+        .status,
+        400
+    );
+    // conflict
+    let conflict = post_json(
+        &server,
+        "/api/doc/ADR-001",
+        &format!("{{\"version\":\"{}\",\"title\":\"x\"}}", "1.2.3"),
+    );
+    assert_eq!(conflict.status, 409);
+    // invalid
+    let invalid = post_json(
+        &server,
+        "/api/doc/ADR-001",
+        &format!("{{\"version\":\"{}\",\"title\":\"\"}}", version),
+    );
+    assert_eq!(invalid.status, 422);
+    // missing
+    assert_eq!(get(&server, "/api/doc/ADR-404").status, 404);
+    // content-type
+    assert_eq!(
+        request(
+            server.port,
+            "POST",
+            "/api/doc/ADR-001",
+            &[("Content-Type", "text/plain")],
+            Some(b"x"),
+        )
+        .status,
+        415
+    );
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}

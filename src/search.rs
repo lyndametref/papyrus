@@ -58,6 +58,9 @@ pub fn run(
     if types.is_empty() || types.contains(&SearchType::Release) {
         collect_backlog_store(ctx, &cfg, "releases", "release", &needle, &mut hits)?;
     }
+    if types.is_empty() || types.contains(&SearchType::Decision) {
+        collect_decision_store(ctx, &cfg, &needle, &mut hits)?;
+    }
 
     hits.sort_by(|a, b| {
         a.id.cmp(&b.id)
@@ -188,6 +191,62 @@ fn collect_backlog_store(
         hits.push(Hit {
             id: id.to_string(),
             kind,
+            title,
+            path: safe,
+        });
+    }
+    Ok(())
+}
+
+fn collect_decision_store(
+    ctx: &Context,
+    cfg: &Config,
+    needle: &str,
+    hits: &mut Vec<Hit>,
+) -> Result<(), AppError> {
+    let dir_raw = ctx.project_dir.join(&cfg.decision_directory);
+    if !dir_raw.exists() {
+        return Ok(());
+    }
+    let dir = Context::ensure_within(&ctx.project_dir, &dir_raw)?;
+    let entries = fs::read_dir(&dir).map_err(|e| {
+        AppError::Runtime(format!("cannot read directory {}: {}", dir.display(), e))
+    })?;
+    for entry in entries {
+        let entry = entry.map_err(|e| AppError::Runtime(e.to_string()))?;
+        let path = entry.path();
+        if path.is_dir() {
+            continue;
+        }
+        if path.extension().and_then(|s| s.to_str()) != Some("md") {
+            continue;
+        }
+        let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        // Boundary check before any eligibility/read, so symlink escapes
+        // always surface as exit 1 regardless of type mapping.
+        let safe = Context::ensure_within(&ctx.project_dir, &path)?;
+        // Only enabled decision types (delegate to decision module for
+        // consistent prefix matching, including hyphenated prefixes).
+        let Some(_type_key) = crate::decision::type_key_for_id(cfg, id) else {
+            continue;
+        };
+        let Ok(content) = fs::read_to_string(&safe) else {
+            continue;
+        };
+        if !content.to_lowercase().contains(needle) {
+            continue;
+        }
+        let (_, title) = parse_heading(&content);
+        let title = if title.is_empty() {
+            id.to_string()
+        } else {
+            title
+        };
+        hits.push(Hit {
+            id: id.to_string(),
+            kind: "decision",
             title,
             path: safe,
         });

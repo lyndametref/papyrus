@@ -71,6 +71,7 @@ fn category_name(kind: Category) -> &'static str {
         Category::Task => "Tasks",
         Category::Milestone => "Milestones",
         Category::Release => "Releases",
+        Category::Decision => "Decisions",
     }
 }
 
@@ -81,6 +82,7 @@ fn category_short(kind: Category) -> &'static str {
         Category::Task => "tasks",
         Category::Milestone => "milestones",
         Category::Release => "releases",
+        Category::Decision => "decisions",
     }
 }
 
@@ -147,6 +149,16 @@ pub fn sidebar(selected: Option<Category>, cfg: &Config) -> String {
         "<li><a href=\"/?type=task\"{}>Backlog</a></li>",
         current
     ));
+    // Decisions (always available)
+    let current = if selected == Some(Category::Decision) {
+        " aria-current=\"page\""
+    } else {
+        ""
+    };
+    items.push_str(&format!(
+        "<li><a href=\"/?type=decision\"{}>Decisions</a></li>",
+        current
+    ));
     format!(
         "<aside class=\"sidebar\">\
 <button class=\"sidebar-toggle\" type=\"button\" aria-expanded=\"true\" aria-controls=\"type-list\">\
@@ -171,6 +183,7 @@ fn breadcrumb(
         Category::Task => ("Tasks", "task"),
         Category::Milestone => ("Milestones", "milestone"),
         Category::Release => ("Releases", "release"),
+        Category::Decision => ("Decisions", "decision"),
     };
     let mut items = String::new();
     items.push_str(&format!(
@@ -193,6 +206,7 @@ fn edit_breadcrumb(record: &Record, _resolved_group: Option<&Record>) -> String 
         Category::Task => ("Tasks", "task"),
         Category::Milestone => ("Milestones", "milestone"),
         Category::Release => ("Releases", "release"),
+        Category::Decision => ("Decisions", "decision"),
     };
     let mut items = String::new();
     items.push_str(&format!(
@@ -233,7 +247,7 @@ fn owning_group_dd(record: &Record, resolved_group: Option<&Record>) -> String {
             }
             (None, _) => "<dd class=\"link-muted\">None</dd>".to_string(),
         },
-        Form::Task | Form::Milestone | Form::Release => {
+        Form::Task | Form::Milestone | Form::Release | Form::Decision => {
             "<dd class=\"link-muted\">(none)</dd>".to_string()
         }
     }
@@ -255,7 +269,7 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
                 ),
                 (None, _) => "<dd class=\"link-muted\">None</dd>".to_string(),
             },
-            Form::Task | Form::Milestone | Form::Release => {
+            Form::Task | Form::Milestone | Form::Release | Form::Decision => {
                 "<dd class=\"link-muted\">(none)</dd>".to_string()
             }
         }
@@ -426,6 +440,7 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
             Category::Task => "task",
             Category::Milestone => "milestone",
             Category::Release => "release",
+            Category::Decision => "decision",
             _ => "record",
         };
         let plural_word = format!("{}s", singular);
@@ -465,6 +480,16 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
             }
             Category::Milestone => record.release_id.clone().unwrap_or_default(),
             Category::Release => String::new(),
+            Category::Decision => {
+                let mut parts = Vec::new();
+                if let Some(s) = &record.status {
+                    parts.push(s.clone());
+                }
+                if let Some(t) = &record.decision_type {
+                    parts.push(t.clone());
+                }
+                parts.join(" \u{b7} ")
+            }
             _ => String::new(),
         };
         if meta.is_empty() {
@@ -505,6 +530,7 @@ pub fn list_page(
         Category::Task => "Tasks",
         Category::Milestone => "Milestones",
         Category::Release => "Releases",
+        Category::Decision => "Decisions",
     };
     let subheading = match kind {
         Category::Req => "Business requirement records in this project.",
@@ -512,6 +538,7 @@ pub fn list_page(
         Category::Task => "Task records in this project.",
         Category::Milestone => "Milestone records in this project.",
         Category::Release => "Release records in this project.",
+        Category::Decision => "Decision records in this project.",
     };
     let title = format!("Papyrus \u{2014} {}", category_name(kind));
     render_template(
@@ -695,6 +722,55 @@ pub fn view_page(
             }
             content.push_str("</section>");
         }
+        Category::Decision => {
+            // Decision text
+            content.push_str("<section class=\"record-section\"><h2>Decision</h2>");
+            match &record.decision {
+                Some(t) if !t.trim().is_empty() => {
+                    content.push_str(&format!("<p class=\"text\">{}</p>", escape(t)))
+                }
+                _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
+            }
+            content.push_str("</section>");
+            // Context
+            content.push_str("<section class=\"record-section\"><h2>Context</h2>");
+            match &record.context {
+                Some(t) if !t.trim().is_empty() => {
+                    content.push_str(&format!("<p class=\"text\">{}</p>", escape(t)))
+                }
+                _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
+            }
+            content.push_str("</section>");
+            // Consequences
+            content.push_str("<section class=\"record-section\"><h2>Consequences</h2>");
+            match &record.consequences {
+                Some(t) if !t.trim().is_empty() => {
+                    content.push_str(&format!("<p class=\"text\">{}</p>", escape(t)))
+                }
+                _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
+            }
+            content.push_str("</section>");
+            // Supersession
+            content.push_str("<section class=\"record-section\"><h2>Supersession</h2>");
+            if let Some(sup_id) = &record.superseded_by {
+                if let Some(title) = &record.superseded_title {
+                    content.push_str(&format!(
+                        "<p class=\"text\">Superseded by <a href=\"/doc/{}\">{} {}</a></p>",
+                        escape(sup_id),
+                        escape(sup_id),
+                        escape(title)
+                    ));
+                } else {
+                    content.push_str(&format!(
+                        "<p class=\"text\">Superseded by {}</p>",
+                        escape(sup_id)
+                    ));
+                }
+            } else {
+                content.push_str("<p class=\"text empty-text\">(none)</p>");
+            }
+            content.push_str("</section>");
+        }
     }
 
     let page_head = format!(
@@ -780,6 +856,16 @@ fn metadata_block_backlog(
                 escape(&record.id),
                 escape(record.form.label()),
                 escape(&record.type_label()),
+            )
+        }
+        Category::Decision => {
+            format!(
+                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div><div><dt>Decision type</dt><dd>{}</dd></div><div><dt>Status</dt><dd>{}</dd></div></dl></div>",
+                escape(&record.id),
+                escape(record.form.label()),
+                escape(&record.type_label()),
+                escape(record.decision_type.as_deref().unwrap_or("(none)")),
+                escape(record.status.as_deref().unwrap_or("(none)")),
             )
         }
         _ => String::new(),
@@ -878,6 +964,37 @@ pub struct ReleaseFieldErrors {
 impl ReleaseFieldErrors {
     pub fn any(&self) -> bool {
         self.title.is_some() || self.description.is_some()
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct DecisionEditValues {
+    pub title: String,
+    pub status: String,
+    pub decision: String,
+    pub context: String,
+    pub consequences: String,
+    pub superseded_by: String,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct DecisionFieldErrors {
+    pub title: Option<String>,
+    pub status: Option<String>,
+    pub decision: Option<String>,
+    pub context: Option<String>,
+    pub consequences: Option<String>,
+    pub superseded_by: Option<String>,
+}
+
+impl DecisionFieldErrors {
+    pub fn any(&self) -> bool {
+        self.title.is_some()
+            || self.status.is_some()
+            || self.decision.is_some()
+            || self.context.is_some()
+            || self.consequences.is_some()
+            || self.superseded_by.is_some()
     }
 }
 
@@ -1238,6 +1355,107 @@ pub fn edit_page_release(
         "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
         escape(&record.id)
     ));
+    let page_head = format!(
+        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div><p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
+        escape(&record.id),
+        escape(&record.title)
+    );
+    let title = format!("Papyrus \u{2014} Edit {}", record.id);
+    render_template(
+        EDIT_TEMPLATE,
+        &[
+            ("title", &title),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("breadcrumb", &edit_breadcrumb(record, None)),
+            ("page_head", &page_head),
+            ("meta", &metadata_block_backlog(record, None, None)),
+            ("form", &form),
+        ],
+    )
+}
+
+pub fn edit_page_decision(
+    record: &Record,
+    values: &DecisionEditValues,
+    errors: &DecisionFieldErrors,
+    version: &str,
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    let mut form = String::new();
+    form.push_str(&format!(
+        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard><input type=\"hidden\" name=\"version\" value=\"{}\">",
+        escape(&record.id),
+        escape(version)
+    ));
+    if errors.any() {
+        form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
+        for (field, msg) in [
+            ("title", errors.title.as_deref()),
+            ("status", errors.status.as_deref()),
+            ("decision", errors.decision.as_deref()),
+            ("context", errors.context.as_deref()),
+            ("consequences", errors.consequences.as_deref()),
+            ("superseded-by", errors.superseded_by.as_deref()),
+        ] {
+            if let Some(m) = msg {
+                form.push_str(&format!(
+                    "<li><a href=\"#{}\">{}</a></li>",
+                    field,
+                    escape(m)
+                ));
+            }
+        }
+        form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
+    }
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"title\">Title <span class=\"req\">(required)</span></label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}><p class=\"help\">Required.</p>{}</div>",
+        escape(&values.title),
+        invalid_attrs("title", errors.title.as_deref()),
+        field_error("title", errors.title.as_deref())
+    ));
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"status\">Status</label><input class=\"input\" id=\"status\" name=\"status\" type=\"text\" value=\"{}\"{}><p class=\"help\">Optional status.</p>{}</div>",
+        escape(&values.status),
+        invalid_attrs("status", errors.status.as_deref()),
+        field_error("status", errors.status.as_deref())
+    ));
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"decision\">Decision</label><textarea class=\"textarea\" id=\"decision\" name=\"decision\" rows=\"6\"{}>{}</textarea><p class=\"help\">Optional.</p>{}</div>",
+        invalid_attrs("decision", errors.decision.as_deref()),
+        escape(&values.decision),
+        field_error("decision", errors.decision.as_deref())
+    ));
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"context\">Context</label><textarea class=\"textarea\" id=\"context\" name=\"context\" rows=\"6\"{}>{}</textarea><p class=\"help\">Optional.</p>{}</div>",
+        invalid_attrs("context", errors.context.as_deref()),
+        escape(&values.context),
+        field_error("context", errors.context.as_deref())
+    ));
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"consequences\">Consequences</label><textarea class=\"textarea\" id=\"consequences\" name=\"consequences\" rows=\"6\"{}>{}</textarea><p class=\"help\">Optional.</p>{}</div>",
+        invalid_attrs("consequences", errors.consequences.as_deref()),
+        escape(&values.consequences),
+        field_error("consequences", errors.consequences.as_deref())
+    ));
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"superseded-by\">Superseded by</label><input class=\"input\" id=\"superseded-by\" name=\"superseded-by\" type=\"text\" value=\"{}\"{}><p class=\"help\">Optional decision ID.</p>{}</div>",
+        escape(&values.superseded_by),
+        invalid_attrs("superseded-by", errors.superseded_by.as_deref()),
+        field_error("superseded-by", errors.superseded_by.as_deref())
+    ));
+    form.push_str(
+        "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
+    );
+    form.push_str(&format!(
+        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
+        escape(&record.id)
+    ));
+
     let page_head = format!(
         "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div><p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
         escape(&record.id),

@@ -30,6 +30,7 @@ pub enum Category {
     Task,
     Milestone,
     Release,
+    Decision,
 }
 
 impl Category {
@@ -40,6 +41,7 @@ impl Category {
             Category::Task => "task",
             Category::Milestone => "milestone",
             Category::Release => "release",
+            Category::Decision => "decision",
         }
     }
 
@@ -60,6 +62,7 @@ pub enum Form {
     Task,
     Milestone,
     Release,
+    Decision,
 }
 
 impl Form {
@@ -70,6 +73,7 @@ impl Form {
             Form::Task => "Task",
             Form::Milestone => "Milestone",
             Form::Release => "Release",
+            Form::Decision => "Decision",
         }
     }
 }
@@ -114,6 +118,12 @@ pub struct Record {
     pub comments: Vec<(String, String)>,
     pub release_id: Option<String>,
     pub release_title: Option<String>,
+    pub decision: Option<String>,
+    pub context: Option<String>,
+    pub consequences: Option<String>,
+    pub decision_type: Option<String>,
+    pub superseded_by: Option<String>,
+    pub superseded_title: Option<String>,
     pub doc: Doc,
     pub path: PathBuf,
     pub rel_path: String,
@@ -132,11 +142,12 @@ impl Record {
             Category::Task => "Task",
             Category::Milestone => "Milestone",
             Category::Release => "Release",
+            Category::Decision => "Decision",
         };
         match self.form {
             Form::Group => format!("{} group", base),
             Form::Requirement => base.to_string(),
-            Form::Task | Form::Milestone | Form::Release => base.to_string(),
+            Form::Task | Form::Milestone | Form::Release | Form::Decision => base.to_string(),
         }
     }
 }
@@ -312,6 +323,11 @@ fn active_entry(cfg: &Config, kind: Category) -> Option<crate::config::DocTypeEn
             directory: "releases".to_string(),
             enabled: true,
         }),
+        Category::Decision => Some(crate::config::DocTypeEntry {
+            prefix: String::new(),
+            directory: cfg.decision_directory.clone(),
+            enabled: true,
+        }),
     }
 }
 
@@ -322,6 +338,7 @@ fn active_dir(ctx: &Context, cfg: &Config, kind: Category) -> Option<PathBuf> {
         Category::Task | Category::Milestone | Category::Release => {
             ctx.project_dir.join(&cfg.backlog_directory)
         }
+        Category::Decision => ctx.project_dir.clone(),
     };
     let raw = base.join(&entry.directory);
     Context::ensure_within(&ctx.project_dir, &raw).ok()
@@ -542,7 +559,95 @@ fn load_backlog_record(
         comments,
         release_id,
         release_title,
+        decision: None,
+        context: None,
+        consequences: None,
+        decision_type: None,
+        superseded_by: None,
+        superseded_title: None,
         doc: parse_doc(&content),
+        path: safe.clone(),
+        rel_path: relative_path(&ctx.project_dir, &safe),
+        version: version_token(&meta),
+    }))
+}
+
+fn load_decision_record(ctx: &Context, path: &Path) -> Result<Option<Record>, AppError> {
+    let safe = match Context::ensure_within(&ctx.project_dir, path) {
+        Ok(safe) => safe,
+        Err(_) => return Ok(None),
+    };
+    let content = match fs::read_to_string(&safe) {
+        Ok(content) => content,
+        Err(_) => return Ok(None),
+    };
+    let meta = match fs::metadata(&safe) {
+        Ok(meta) => meta,
+        Err(_) => return Ok(None),
+    };
+    let Some(stem) = safe.file_stem().and_then(|s| s.to_str()) else {
+        return Ok(None);
+    };
+    if !valid_id(stem) {
+        return Ok(None);
+    }
+    let cfg = match crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir) {
+        Ok(c) => c,
+        Err(_) => return Ok(None),
+    };
+    if crate::decision::type_key_for_id(&cfg, stem).is_none() {
+        return Ok(None);
+    }
+    let dd = crate::decision::parse_decision(&content);
+    let title = if dd.title.is_empty() {
+        stem.to_string()
+    } else {
+        dd.title.clone()
+    };
+    let status = if dd.status.trim().is_empty() {
+        "proposed".to_string()
+    } else {
+        dd.status.trim().to_string()
+    };
+    let superseded_by = status
+        .strip_prefix("Superseded by ")
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let superseded_title =
+        superseded_by
+            .as_ref()
+            .and_then(|sid| match resolve_id(ctx, &cfg, sid) {
+                Ok(Some(r)) => Some(r.record.title),
+                _ => None,
+            });
+    let decision_type = crate::decision::type_key_for_id(&cfg, stem);
+    let doc = parse_doc(&content);
+    Ok(Some(Record {
+        id: stem.to_string(),
+        kind: Category::Decision,
+        form: Form::Decision,
+        title,
+        story: None,
+        group_id: None,
+        group_title: None,
+        description: None,
+        status: Some(status),
+        milestone_id: None,
+        milestone_title: None,
+        assignee: None,
+        labels: Vec::new(),
+        dependencies: Vec::new(),
+        acceptance_criteria: Vec::new(),
+        comments: Vec::new(),
+        release_id: None,
+        release_title: None,
+        decision: dd.decision.clone(),
+        context: dd.context.clone(),
+        consequences: dd.consequences.clone(),
+        decision_type,
+        superseded_by,
+        superseded_title,
+        doc,
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
         version: version_token(&meta),
@@ -554,9 +659,12 @@ fn load_record_from_path(
     kind: Category,
     path: &Path,
 ) -> Result<Option<Record>, AppError> {
+    if kind == Category::Decision {
+        return load_decision_record(ctx, path);
+    }
     if matches!(
         kind,
-        Category::Task | Category::Milestone | Category::Release
+        Category::Task | Category::Milestone | Category::Release | Category::Decision
     ) {
         return load_backlog_record(ctx, kind, path);
     }
@@ -647,6 +755,12 @@ fn load_record_from_path(
         comments,
         release_id,
         release_title: None,
+        decision: None,
+        context: None,
+        consequences: None,
+        decision_type: None,
+        superseded_by: None,
+        superseded_title: None,
         doc,
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
@@ -665,7 +779,7 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
     let mut index = Index::default();
     if matches!(
         kind,
-        Category::Task | Category::Milestone | Category::Release
+        Category::Task | Category::Milestone | Category::Release | Category::Decision
     ) {
         let Some(entry) = active_entry(cfg, kind) else {
             return index;
@@ -687,12 +801,18 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
             if !valid_id(stem) {
                 continue;
             }
-            let rest = match stem.strip_prefix(&format!("{}-", entry.prefix)) {
-                Some(r) => r,
-                None => continue,
-            };
-            if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
-                continue;
+            if kind == Category::Decision {
+                if crate::decision::type_key_for_id(cfg, stem).is_none() {
+                    continue;
+                }
+            } else {
+                let rest = match stem.strip_prefix(&format!("{}-", entry.prefix)) {
+                    Some(r) => r,
+                    None => continue,
+                };
+                if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+                    continue;
+                }
             }
             if let Ok(Some(record)) = load_record_from_path(ctx, kind, &path) {
                 index.records.push(record);
@@ -777,6 +897,7 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
         Category::Task,
         Category::Milestone,
         Category::Release,
+        Category::Decision,
     ] {
         let Some(entry) = active_entry(cfg, kind) else {
             continue;
@@ -795,7 +916,9 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
             if path.file_stem().and_then(|s| s.to_str()) != Some(id) {
                 continue;
             }
-            let valid = if kind.is_requirement() {
+            let valid = if kind == Category::Decision {
+                crate::decision::type_key_for_id(cfg, id).is_some()
+            } else if kind.is_requirement() {
                 form_for_stem(&entry.prefix, id).is_some()
             } else {
                 id.strip_prefix(&format!("{}-", entry.prefix))
@@ -960,6 +1083,7 @@ const TASK_KNOWN: &[&str] = &[
 ];
 const MILESTONE_KNOWN: &[&str] = &["## Description", "## Release"];
 const RELEASE_KNOWN: &[&str] = &["## Description"];
+const DECISION_KNOWN: &[&str] = &["## Status", "## Decision", "## Context", "## Consequences"];
 
 /// Serialize a document with a new title and optional story/description
 /// changes, preserving every unknown `## ` section content-identically.
@@ -1195,6 +1319,82 @@ pub fn apply_release_edit(doc: &Doc, id: &str, title: &str, description: FieldCh
     let mut output = lines.join("\n");
     output.push('\n');
     output
+}
+
+/// Serialize a decision document with title/status/field changes.
+pub fn apply_decision_edit(
+    doc: &Doc,
+    id: &str,
+    title: &str,
+    status: &str,
+    decision: FieldChange,
+    context: FieldChange,
+    consequences: FieldChange,
+) -> String {
+    let mut sections = doc.sections.clone();
+    // Status always set
+    set_section(
+        &mut sections,
+        "## Status",
+        Some(status.to_string()),
+        DECISION_KNOWN,
+    );
+    match decision {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## Decision", None, DECISION_KNOWN),
+        FieldChange::Set(value) => {
+            set_section(&mut sections, "## Decision", Some(value), DECISION_KNOWN)
+        }
+    }
+    match context {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## Context", None, DECISION_KNOWN),
+        FieldChange::Set(value) => {
+            set_section(&mut sections, "## Context", Some(value), DECISION_KNOWN)
+        }
+    }
+    match consequences {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## Consequences", None, DECISION_KNOWN),
+        FieldChange::Set(value) => set_section(
+            &mut sections,
+            "## Consequences",
+            Some(value),
+            DECISION_KNOWN,
+        ),
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    lines.push(format!("# {} {}", id, title));
+    lines.extend(doc.preamble.iter().cloned());
+    for section in sections {
+        lines.push(section.heading);
+        lines.extend(section.body);
+    }
+    while lines.last().is_some_and(|line| line.is_empty()) {
+        lines.pop();
+    }
+    let mut output = lines.join("\n");
+    output.push('\n');
+    output
+}
+
+/// Whether a decision ID exists in the active or archived store.
+pub fn decision_exists(ctx: &Context, cfg: &Config, id: &str) -> bool {
+    let Some(active) = active_dir(ctx, cfg, Category::Decision) else {
+        return false;
+    };
+    let active_path = active.join(format!("{}.md", id));
+    if Context::ensure_within(&ctx.project_dir, &active_path)
+        .map(|p| p.exists())
+        .unwrap_or(false)
+    {
+        return true;
+    }
+    let archived_path = active.join("archived").join(format!("{}.md", id));
+    Context::ensure_within(&ctx.project_dir, &archived_path)
+        .map(|p| p.exists())
+        .unwrap_or(false)
 }
 
 /// Write a record atomically in its own directory, preserving permissions and
