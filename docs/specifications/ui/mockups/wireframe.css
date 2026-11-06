@@ -41,11 +41,12 @@ body { min-height: 100vh; }
 .wf-modal-card { background: var(--wf-bg); border: 1px solid var(--wf-border); border-radius: var(--wf-radius); padding: 16px; max-width: 520px; width: 100%; }
 .wf-footer { margin-top: 16px; padding-top: 8px; border-top: 1px solid var(--wf-border); color: var(--wf-muted); font-size: 12px; }
 .wf-note { font-size: 12px; color: var(--wf-muted); font-style: italic; }
+.wf-group-preview { margin: 4px 0 0; color: var(--wf-muted); font-size: 13px; overflow-wrap: break-word; }
 
-/* Review landing + design deck. Scaffolding for reviewers, not part of the design. */
+/* Review landing. Scaffolding for reviewers, not part of the design. */
 .wf-review { display: none; }
 .wf-review.is-active { display: block; }
-.wf-index, .wf-deck { padding: 24px 16px; }
+.wf-index { padding: 24px 16px; }
 .wf-index .wf-container { max-width: 1100px; }
 .wf-eyebrow { margin: 0 0 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--wf-muted); }
 .wf-section-title { margin: 24px 0 10px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--wf-muted); }
@@ -57,17 +58,6 @@ body { min-height: 100vh; }
 .wf-card h3 { margin: 0; font-size: 15px; }
 .wf-card p { margin: 0; color: var(--wf-muted); flex: 1 1 auto; }
 .wf-card .wf-button, .wf-card .wf-link { align-self: flex-start; text-decoration: none; }
-
-.wf-deck { max-width: 980px; margin: 0 auto; }
-.wf-deck-stage { min-height: 55vh; padding: 24px; border: 1px solid var(--wf-border); border-radius: var(--wf-radius); background: var(--wf-fill-2); }
-.wf-slide { display: none; }
-.wf-slide.is-active { display: block; }
-.wf-slide-title { margin: 0 0 8px; font-size: 22px; }
-.wf-slide-lede { margin: 0 0 16px; font-size: 15px; }
-.wf-slide .wf-box { background: var(--wf-bg); }
-.wf-slide h3 { margin: 0 0 6px; font-size: 14px; }
-.wf-deck-controls { display: flex; align-items: center; justify-content: space-between; gap: var(--wf-gap); margin-top: var(--wf-gap); }
-.wf-deck-counter { color: var(--wf-muted); }
 
 /* Platform prototypes: one block per platform, each with its own clickable screens. */
 .wf-proto { display: none; padding: 16px; }
