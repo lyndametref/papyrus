@@ -581,6 +581,52 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
         Return a deprecated UI specification to its original folder. The ID is preserved.
 
+<b style="color: light-dark(#0969da, #58a6ff);">tech-spec</b>
+
+        Manage technical specifications (TECH-...).
+
+        <code style="font-weight: bold;">
+        papyrus tech-spec create &lt;title&gt; --description &lt;text&gt;
+        papyrus tech-spec list
+        papyrus tech-spec view &lt;id&gt;
+        papyrus tech-spec edit &lt;id&gt; [--title &lt;title&gt;] [--description &lt;text&gt;] [--editor]
+        papyrus tech-spec deprecate &lt;id&gt;
+        papyrus tech-spec restore &lt;id&gt;
+        </code>
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
+        Create a technical specification.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">&lt;title&gt;</b>
+           Technical specification title (required).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
+           Description of the technical specification (required).
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
+        List technical specifications.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
+        View a technical specification.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
+        Edit a technical specification.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
+           Update the title.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
+           Update the description.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
+           Open the document body in $VISUAL or $EDITOR.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
+         Move a technical specification to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
+         Return a deprecated technical specification to its original folder. The ID is preserved.
+
 <b style="color: light-dark(#0969da, #58a6ff);">rule</b>
 
        Manage business rules (RUL-...).
@@ -814,6 +860,13 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
         <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.audit.directory&gt;/deprecated/</b>
         Deprecated audit records, under the configured audit records folder.
 
+         <b style="color: light-dark(#8250df, #d2a8ff);">docs/technical/</b>
+         Technical specifications. Path is <b>doc_directory</b> plus
+         <b>document_types.tech-spec.directory</b>.
+
+         <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.tech-spec.directory&gt;/deprecated/</b>
+         Deprecated technical specifications, under the configured technical specifications folder.
+
 <b style="color: light-dark(#0969da, #58a6ff);">ENVIRONMENT</b>
 
        <b style="color: light-dark(#8250df, #d2a8ff);">PAPYRUS_DIR</b>
@@ -990,6 +1043,7 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
          glossary: { prefix: GLO, directory: glossary/,                    enabled: true }
          rule:     { prefix: RUL, directory: business-rules/,              enabled: true }
          ui-spec:  { prefix: UI,  directory: specifications/ui/,           enabled: true }
+         tech-spec: { prefix: TECH, directory: technical/, enabled: true }
          audit:    { prefix: AUD, directory: audit-records/,                enabled: true }
          deploy:   { prefix: DEP, directory: architecture/deployment/,     enabled: true }
        </code>
@@ -1033,6 +1087,7 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
          glossary: { prefix: GLO, directory: glossary/,                    enabled: true }
          rule:     { prefix: RUL, directory: business-rules/,              enabled: true }
          ui-spec:  { prefix: UI,  directory: specifications/ui/,           enabled: true }
+         tech-spec: { prefix: TECH, directory: technical/, enabled: true }
          audit:    { prefix: AUD, directory: audit-records/,                enabled: true }
          deploy:   { prefix: DEP, directory: architecture/deployment/,     enabled: true }
        # Deprecated documents live under each type directory's deprecated/ subfolder.

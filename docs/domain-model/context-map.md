@@ -32,4 +32,4 @@ Manages business requirements, non-functional requirements, and their type-speci
 
 ### Documentation Management
 
-Manages glossary terms, UI specifications, technical specifications, audit records, and business rules. Technical specifications are a recognized documentation type (REQ-05.009) and may reference non-functional requirements; their attributes, lifecycle, ID format, prefix, storage directory, and command behavior are unspecified (REQ-05.009).
+Manages glossary terms, UI specifications, technical specifications, audit records, and business rules. Technical specifications are a managed documentation type (REQ-05.009, BR-017) with a required title and description, ID format `TECH-xxx` (padded to `id_padding`), storage under `technical/` under `doc_directory`, and an active -> deprecated lifecycle; they are managed via the `tech-spec` command and may reference non-functional requirements (README line 438 / BR-010).
