@@ -87,6 +87,7 @@ impl Default for Config {
             ("ui-mockup", "MOCK", "specifications/ui/mockups/"),
             ("audit", "AUD", "audit-records/"),
             ("deploy", "DEP", "architecture/deployment/"),
+            ("tech-spec", "TECH", "technical/"),
         ];
         for (k, p, d) in docs {
             document_types.insert(

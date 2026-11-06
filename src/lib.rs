@@ -16,6 +16,7 @@ pub mod rule;
 pub mod sanitize;
 pub mod search;
 pub mod task;
+pub mod tech_spec;
 pub mod ui_mockup;
 pub mod ui_spec;
 
@@ -120,6 +121,11 @@ pub enum Commands {
     UiSpec {
         #[command(subcommand)]
         action: ui_spec::UiSpecCmd,
+    },
+    /// Manage technical specifications.
+    TechSpec {
+        #[command(subcommand)]
+        action: tech_spec::TechSpecCmd,
     },
     /// Manage business rules.
     Rule {
@@ -326,6 +332,10 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
         Commands::UiSpec { action } => {
             let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
             ui_spec::run(&ctx, action)
+        }
+        Commands::TechSpec { action } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            tech_spec::run(&ctx, action)
         }
         Commands::Rule { action } => {
             let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
