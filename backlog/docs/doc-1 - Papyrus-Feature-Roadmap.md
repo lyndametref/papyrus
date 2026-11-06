@@ -3,7 +3,7 @@ id: doc-1
 title: Papyrus Feature Roadmap
 type: specification
 created_date: '2026-11-04T19:22:00Z'
-updated_date: '2026-11-05T18:48:00Z'
+updated_date: '2026-11-06T08:05:00Z'
 ---
 # Papyrus Feature Roadmap
 
@@ -53,3 +53,10 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 ## Requirement coverage
 
 All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scope split into per-type CLI tasks. Deployment record types removed from scope (TASK-18/TASK-19 updated).
+
+
+## Requirement change update (2026-11-06)
+
+- REQ-05.009 now defines technical specifications as a managed documentation type with the `tech-spec` command (BR-017, README, domain model); REQ-05.007 includes technical specifications in the document lifecycle.
+- TASK-55 unblocked: `blocked` label removed; documented command contract now exists. No milestone, dependency, or ordering change: TASK-55 remains in m-4 at ordinal 17500 depending on TASK-13.
+- TASK-21 (m-11, Done) remains the domain-model/requirements definition task; TASK-55 does not depend on it to avoid a backward cross-milestone dependency.
