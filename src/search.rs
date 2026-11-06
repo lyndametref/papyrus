@@ -11,7 +11,7 @@ use std::fs;
 use std::path::PathBuf;
 
 const DOC_TYPE: &str = "doc";
-const DOC_KEYS: [&str; 2] = ["req", "nfr"];
+const DOC_KEYS: [&str; 3] = ["req", "nfr", "glossary"];
 
 pub fn sanitize_query(raw: &str) -> Result<String, AppError> {
     let trimmed = raw.trim();
