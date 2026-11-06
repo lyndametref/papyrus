@@ -490,3 +490,53 @@ with `papyrus 0.1.0`.
   decision records (default and `--type decision`, `--limit`), browser decision
   category (`/?type=decision`, `/doc/ADR-001`, JSON API `/api/decisions`), offline
   operation over loopback, and browser configuration keys all passed.
+
+## Verification results (TASK-62, CLI milestone)
+
+- Date: 2026-11-06 (UTC).
+- Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43, dpkg 1.23.11, cargo 1.99.1, clippy 0.1.99, fakeroot.
+- Isolation: fakeroot dpkg --instdir=./.tmp/inst --admindir=./.tmp/adm --force-depends; host package status unchanged.
+- Package: papyrus_0.1.0_amd64.deb built with cargo build --release then scripts/build-deb.sh.
+- Package contents: /usr/bin/papyrus (0755) and /usr/share/doc/papyrus/copyright only.
+- New test file: tests/cli_milestone_smoke.rs (2 tests), passing under cargo test.
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| cargo build --release | PASS |
+| cargo test | PASS — 254 tests (36 unit + 218 integration) |
+| cargo clippy --all-targets -- -D warnings | PASS — 0 warnings |
+| cargo fmt --check | PASS |
+
+### Install, uninstall, and smoke checks
+
+| Check | Result |
+|---|---|
+| Isolated dpkg -i | PASS (exit 0) |
+| Installed /usr/bin/papyrus root:root 0755 | PASS |
+| Isolated dpkg -r removes binary | PASS |
+| Isolated dpkg --purge | PASS |
+| Host package database unchanged | PASS |
+| --help lists glossary, ui-spec, ui-mockup, rule, audit, tech-spec | PASS |
+| --version prints papyrus 0.1.0 | PASS |
+| m-4 management lifecycles (create/list/view/edit/deprecate/restore) | PASS |
+| Disabled document types rejected | PASS |
+| Search regression over req/task/milestone/release/decision | PASS |
+| Browser regression over req/nfr/task/milestone/release/decision | PASS |
+| Offline (unshare -rn) search/browser over loopback | PASS |
+| Config keys list/get/set/unset | PASS |
+| Embedded assets from empty working directory | PASS |
+
+### Recorded limitations
+
+- OQ-1: no real-GUI browser run; markup-level verification only (NFR-05.001).
+- Forky only; no other Debian release verified (ADR-0003, NFR-03.002).
+- Packaging script does not force rebuild; mitigated by mandatory cargo build --release before packaging.
+
+### TASK-62 package artifact
+
+- File: `papyrus_0.1.0_amd64.deb`
+- Size: 858736 bytes
+- SHA-256: `e0d9da5f25f717d65dd194f68cba9ed0d487206bf92acf7ec108548ba3b43e92`
+- Test count: 254 (36 unit + 218 integration, including `cli_milestone_smoke` 2)
