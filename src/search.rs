@@ -119,7 +119,11 @@ fn collect_type(
     for dir_entry in entries {
         let dir_entry = dir_entry.map_err(|e| AppError::Runtime(e.to_string()))?;
         let path = dir_entry.path();
-        if path.extension().and_then(|s| s.to_str()) != Some("md") {
+        let allowed = match key {
+            "ui-mockup" => path.extension().and_then(|s| s.to_str()) == Some("html"),
+            _ => path.extension().and_then(|s| s.to_str()) == Some("md"),
+        };
+        if !allowed {
             continue;
         }
         let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
@@ -144,11 +148,27 @@ fn collect_type(
         if !content.to_lowercase().contains(needle) {
             continue;
         }
-        let (_, title) = parse_heading(&content);
-        let title = if title.is_empty() {
-            id.to_string()
+        let title = if key == "ui-mockup" {
+            // Mockup records are HTML documents; parse the <h1> heading.
+            content
+                .split_once("<h1>")
+                .map(|(_, rest)| rest)
+                .and_then(|rest| rest.split("</h1>").next())
+                .map(|inner| {
+                    let inner = inner.trim();
+                    let mut parts = inner.splitn(2, char::is_whitespace);
+                    let _ = parts.next();
+                    parts.next().unwrap_or("").trim().to_string()
+                })
+                .filter(|t| !t.is_empty())
+                .unwrap_or_else(|| id.to_string())
         } else {
-            title
+            let (_, title) = parse_heading(&content);
+            if title.is_empty() {
+                id.to_string()
+            } else {
+                title
+            }
         };
         hits.push(Hit {
             id: id.to_string(),
