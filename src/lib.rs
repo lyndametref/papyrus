@@ -14,6 +14,7 @@ pub mod requirement;
 pub mod sanitize;
 pub mod search;
 pub mod task;
+pub mod ui_spec;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -111,6 +112,11 @@ pub enum Commands {
     Glossary {
         #[command(subcommand)]
         action: glossary::GlossaryCmd,
+    },
+    /// Manage UI specifications.
+    UiSpec {
+        #[command(subcommand)]
+        action: ui_spec::UiSpecCmd,
     },
     /// Serve the local web interface.
     #[command(override_usage = "papyrus browser [--host <host>] [--port <port>] [--no-open]")]
@@ -298,6 +304,10 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
         Commands::Glossary { action } => {
             let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
             glossary::run(&ctx, action)
+        }
+        Commands::UiSpec { action } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            ui_spec::run(&ctx, action)
         }
         Commands::Browser {
             host,
