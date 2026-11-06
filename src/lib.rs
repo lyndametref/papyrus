@@ -14,6 +14,7 @@ pub mod requirement;
 pub mod sanitize;
 pub mod search;
 pub mod task;
+pub mod ui_mockup;
 pub mod ui_spec;
 
 use clap::{Parser, Subcommand};
@@ -117,6 +118,11 @@ pub enum Commands {
     UiSpec {
         #[command(subcommand)]
         action: ui_spec::UiSpecCmd,
+    },
+    /// Manage UI mockups.
+    UiMockup {
+        #[command(subcommand)]
+        action: ui_mockup::UiMockupCmd,
     },
     /// Serve the local web interface.
     #[command(override_usage = "papyrus browser [--host <host>] [--port <port>] [--no-open]")]
@@ -308,6 +314,10 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
         Commands::UiSpec { action } => {
             let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
             ui_spec::run(&ctx, action)
+        }
+        Commands::UiMockup { action } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            ui_mockup::run(&ctx, action)
         }
         Commands::Browser {
             host,

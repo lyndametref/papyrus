@@ -84,6 +84,7 @@ impl Default for Config {
             ("glossary", "GLO", "glossary/"),
             ("rule", "RUL", "business-rules/"),
             ("ui-spec", "UI", "specifications/ui/"),
+            ("ui-mockup", "MOCK", "specifications/ui/mockups/"),
             ("audit", "AUD", "audit-records/"),
             ("deploy", "DEP", "architecture/deployment/"),
         ];
