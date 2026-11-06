@@ -155,7 +155,7 @@ Deliver the `req` and `nfreq` commands so a project contributor can create, list
 | Requirement | REQ-05, REQ-05.001, REQ-05.002, REQ-05.007 |
 | Non-functional | NFR-02.002, NFR-04.001, NFR-04.002 |
 | Business rule | BR-009 (req), BR-010 (nfreq) |
-| ADR | ADR-0001 (Rust), ADR-0002 (amd64 .deb) |
+| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002) |
 | Ticket | TASK-3 |
 | UI mockups | none |
 | Related specification | docs/specifications/project-initialization-and-configuration.md (TASK-2) |

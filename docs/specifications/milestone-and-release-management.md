@@ -190,6 +190,6 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 | Business rule | BR-006 (milestone command behavior), BR-007 (release command behavior) |
 | Specification | `docs/specifications/release-lifecycle.md` (TASK-22) |
 | Task | TASK-22 (release lifecycle research), TASK-7 (packaging baseline) |
-| ADR | ADR-0001 (Rust), ADR-0002 (amd64 .deb), ADR-0003 (Forky-only) |
+| ADR | ADR-0001 (Rust), ADR-0003 (Forky-only) |
 | Ticket | TASK-8 |
 | UI mockups | none |

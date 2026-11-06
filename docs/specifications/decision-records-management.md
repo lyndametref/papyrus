@@ -166,7 +166,7 @@ Deliver the `decision` commands so a project contributor can create, list, view,
 | Requirement | REQ-04, REQ-04.001, REQ-04.002 |
 | Non-functional | NFR-02.002, NFR-04.001, NFR-04.002 |
 | Business rule | BR-008 |
-| ADR | ADR-0001 (Rust), ADR-0002 (amd64 .deb) |
+| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002) |
 | Ticket | TASK-13 |
 | UI mockups | none |
 | Related specification | docs/specifications/project-initialization-and-configuration.md (TASK-2) |

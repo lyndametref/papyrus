@@ -105,9 +105,11 @@ Documents
          nfr:      { prefix: NFR, directory: requirements/non-functional/, enabled: true }
          glossary: { prefix: GLO, directory: glossary/,                    enabled: true }
          rule:     { prefix: RUL, directory: business-rules/,              enabled: true }
-         ui-spec:  { prefix: UI,  directory: specifications/ui/,           enabled: true }
-         audit:    { prefix: AUD, directory: audit-records/,                enabled: true }
-         deploy:   { prefix: DEP, directory: architecture/deployment/,     enabled: true }
+         ui-spec:    { prefix: UI,  directory: specifications/ui/,           enabled: true }
+         ui-mockup:  { prefix: MOCK, directory: specifications/ui/mockups/,   enabled: true }
+         audit:      { prefix: AUD, directory: audit-records/,                enabled: true }
+         deploy:     { prefix: DEP, directory: architecture/deployment/,     enabled: true }
+         tech-spec:  { prefix: TECH, directory: technical/,                  enabled: true }
        
 
        The nfreq command uses the nfr type key. Additional types may

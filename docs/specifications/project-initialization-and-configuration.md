@@ -121,7 +121,7 @@ Deliver the `init` and `config` commands, plus project/configuration context sel
 | Requirement | REQ-01, REQ-01.001, REQ-01.002, REQ-01.003, REQ-01.004, REQ-01.005 |
 | Non-functional | NFR-02.001, NFR-02.002, NFR-04.001, NFR-04.002 |
 | Business rule | BR-002 (init), BR-003 (config), BR-016 (keys/precedence), BR-001 (command behavior) |
-| ADR | ADR-0001 (Rust), ADR-0002 (amd64 .deb) |
+| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002) |
 | Ticket | TASK-2 |
 | UI mockups | none |
 path: docs/specifications/project-initialization-and-configuration.md

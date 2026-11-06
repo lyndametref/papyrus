@@ -76,7 +76,7 @@ Establish the installable executable foundation for Papyrus: a Rust command-line
 |---|---|
 | NFR | NFR-01.001, NFR-03.001, NFR-03.002, NFR-06.001, NFR-06.002 |
 | Business rule | BR-001 (papyrus command behavior) |
-| ADR | ADR-0001 (Rust), ADR-0002 (amd64 .deb) |
+| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002) |
 | Ticket | TASK-1 |
 | UI mockups | none |
 path: docs/specifications/rust-cli-and-debian-package-baseline.md

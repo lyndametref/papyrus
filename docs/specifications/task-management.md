@@ -203,7 +203,7 @@ Deliver the `task` commands so a project contributor can create, inspect, update
 | Requirement | REQ-02, REQ-02.001, REQ-02.002, REQ-02.003, REQ-02.004 |
 | Non-functional | NFR-02.002, NFR-04.001, NFR-04.002 |
 | Business rule | BR-005 (task command behavior) |
-| ADR | ADR-0001 (Rust), ADR-0002 (amd64 .deb) |
+| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002) |
 | Ticket | TASK-9 |
 | UI mockups | none |
 | Related specification | docs/specifications/milestone-and-release-management.md (TASK-8) |

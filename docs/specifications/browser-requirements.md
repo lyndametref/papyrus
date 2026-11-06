@@ -519,7 +519,7 @@ Each item has a specified default in this document, so none blocks implementatio
 | Requirement | REQ-06, REQ-06.002, REQ-05.001, REQ-05.002, REQ-05.007, REQ-01.003 |
 | Non-functional | NFR-01.002, NFR-01.003, NFR-02.001, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001 |
 | Business rule | BR-004 (browser command behavior), BR-016 (configuration keys and precedence) |
-| ADR | ADR-0001 (Rust), ADR-0002 (amd64 .deb), ADR-0003 (Debian Forky), ADR-0004 (repository-root single crate) |
+| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky), ADR-0004 (repository-root single crate) |
 | Ticket | TASK-6 |
 | Increment boundary | REQ-06.002 covers both stores; this increment serves the documentation store only. Backlog-store browsing (tasks, milestones, releases) is delivered by TASK-11 under REQ-06.002, so the increment is not a requirement gap. |
 | UI mockups | MOCK-0001 — approved 2026-11-03 (UTC): [`docs/specifications/ui/mockups/MOCK-0001-browser-requirements-review.html`](ui/mockups/MOCK-0001-browser-requirements-review.html) (single self-contained review package: landing, design deck, 25-view web prototype) |

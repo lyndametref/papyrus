@@ -190,7 +190,7 @@ UI mockups are required before any UI implementation work and must be approved b
 | Requirement | REQ-06, REQ-06.002, REQ-04, REQ-04.001, REQ-04.002 |
 | Non-functional | NFR-01.002, NFR-01.003, NFR-02.001, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001 |
 | Business rule | BR-004 (browser command behavior), BR-008 (decision command behavior), BR-016 (configuration keys and precedence) |
-| ADR | ADR-0001, ADR-0002, ADR-0003, ADR-0004, ADR-0005, ADR-0006 |
+| ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006 |
 | Ticket | TASK-6 (baseline), TASK-11, TASK-13, TASK-15 |
 | Increment boundary | REQ-06.002 covers both stores; the documentation-store part (requirements) was delivered by TASK-6/TASK-7, the backlog-store part by TASK-11, the decisions-store part by this ticket. |
 | UI mockups | MOCK-0001 (approved baseline); MOCK-0002 (approved); MOCK-0003 (pending) — `docs/specifications/ui/mockups/MOCK-0003-browser-decision-records-review.html` |

@@ -219,7 +219,7 @@ Any other transition is a validation error (exit code 4). Setting the current st
 | Non-functional | NFR-02.002, NFR-04.001, NFR-04.002 |
 | Business rule | none dedicated (BR-016 for configuration) |
 | Domain | `docs/specifications/ui/mockups/README.md` (registry; status values pending/approved/deprecated) |
-| ADR | ADR-0001 (Rust), ADR-0002 (amd64 .deb), ADR-0004 (single-crate layout) |
+| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002), ADR-0004 (single-crate layout) |
 | Ticket | TASK-38 |
 | UI mockups | none |
 | Related specification | `docs/specifications/ui-specifications-management.md` (TASK-34 pattern), `docs/specifications/glossary-terms-management.md` (TASK-30 pattern), `docs/specifications/project-initialization-and-configuration.md` (TASK-2) |

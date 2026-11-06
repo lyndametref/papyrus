@@ -163,7 +163,7 @@ Deliver the `audit` commands so a project contributor can create, list, view, ed
 | Non-functional | NFR-02.002, NFR-04.001, NFR-04.002 |
 | Business rule | BR-014, BR-016 |
 | Domain | `docs/domain-model/business-glossary/audit-record.md` |
-| ADR | ADR-0001 (Rust), ADR-0002 (amd64 .deb), ADR-0004 (single-crate layout) |
+| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002), ADR-0004 (single-crate layout) |
 | Ticket | TASK-47 |
 | UI mockups | none |
 | Related specification | `docs/specifications/business-rules-management.md` (TASK-43 pattern), `docs/specifications/glossary-terms-management.md` (TASK-30 pattern), `docs/specifications/project-initialization-and-configuration.md` (TASK-2) |
