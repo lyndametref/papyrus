@@ -1,3 +1,4 @@
+pub mod audit;
 pub mod browser;
 pub mod commands;
 pub mod config;
@@ -129,6 +130,11 @@ pub enum Commands {
     UiMockup {
         #[command(subcommand)]
         action: ui_mockup::UiMockupCmd,
+    },
+    /// Manage audit records.
+    Audit {
+        #[command(subcommand)]
+        action: audit::AuditCmd,
     },
     /// Serve the local web interface.
     #[command(override_usage = "papyrus browser [--host <host>] [--port <port>] [--no-open]")]
@@ -328,6 +334,10 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
         Commands::UiMockup { action } => {
             let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
             ui_mockup::run(&ctx, action)
+        }
+        Commands::Audit { action } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            audit::run(&ctx, action)
         }
         Commands::Browser {
             host,
