@@ -588,3 +588,46 @@ with `papyrus 0.1.0`.
 - File: `papyrus_0.1.0_amd64.deb`
 - Size: 865788 bytes
 - Test count: 256 (including `glossary_terms_smoke` 2)
+
+## TASK-37 — UI Specifications milestone packaging and verification
+
+- Date: **2026-11-06 (UTC)**.
+- Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43, dpkg 1.23.11, `rustc`/`cargo` 1.99.1, `fakeroot`.
+- Isolation: `fakeroot dpkg --instdir=./.tmp/inst37 --admindir=./.tmp/adm37 --force-depends`; host unchanged.
+- Package: `papyrus_0.1.0_amd64.deb`, 869420 bytes.
+- Contents: `/usr/bin/papyrus` (0755) and copyright only; assets embedded.
+- New tests: `tests/ui_specifications_smoke.rs` (2 tests), passing.
+- No runtime dependencies added.
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| `cargo build --release` (Rust 1.99.1) | PASS |
+| `cargo test` | PASS — 258 tests |
+| `cargo clippy --all-targets -- -D warnings` | PASS — 0 warnings |
+| `cargo fmt --check` | PASS |
+
+### Install, uninstall, and smoke checks
+
+| Check | Result |
+|---|---|
+| Isolated `dpkg -i` | PASS |
+| Installed binary root:root 0755, on PATH | PASS |
+| Isolated `dpkg -r`/`--purge` | PASS |
+| UI spec lifecycle (create/list/view/edit/deprecate/restore) | PASS |
+| Search over UI specifications (quoted phrase, `--type doc`, `--limit`, `--json`, deprecated hidden) | PASS |
+| Browser `/?type=ui-spec`, view, edit, `/api/ui-specs`, assets, 320px hooks | PASS |
+| `ui_specifications_smoke` (2 tests) | PASS |
+
+### Recorded limitations
+
+- Offline namespace not verified via `unshare`; rests on loopback-only + no external refs.
+- No real-GUI browser run (markup/asset-level only).
+- Config keys verified on built binary (list/get/set/unset, invalid exits 4); installed-binary recheck deferred.
+
+### TASK-37 package artifact
+
+- File: `papyrus_0.1.0_amd64.deb`
+- Size: 869420 bytes
+- Test count: 258 (including `ui_specifications_smoke` 2)
