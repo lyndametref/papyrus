@@ -429,6 +429,7 @@ fn category_from_query(request: &Request) -> Result<Category, HttpError> {
         Some(value) if value == "decision" => Ok(Category::Decision),
         Some(value) if value == "glossary" => Ok(Category::Glossary),
         Some(value) if value == "ui-spec" => Ok(Category::UiSpec),
+        Some(value) if value == "ui-mockup" => Ok(Category::UiMockup),
         Some(_) => Err(HttpError::new(400)),
     }
 }
@@ -513,6 +514,12 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
     if path == "/api/ui-specs" || path == "/api/ui-specifications" || path == "/api/ui-spec" {
         return match method {
             Method::Get | Method::Head => api_ui_specs(state),
+            _ => Err(HttpError::new(405)),
+        };
+    }
+    if path == "/api/ui-mockups" || path == "/api/ui-mockup" || path == "/api/mockups" {
+        return match method {
+            Method::Get | Method::Head => api_ui_mockups(state),
             _ => Err(HttpError::new(405)),
         };
     }
@@ -797,6 +804,21 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
+        Category::UiMockup => {
+            let values = render::UiMockupEditValues {
+                title: record.title.clone(),
+                specs: record.specs.clone(),
+                refs: record.refs.clone(),
+            };
+            render::edit_page_ui_mockup(
+                &record,
+                &values,
+                &render::UiMockupFieldErrors::default(),
+                &record.version,
+                &cfg,
+                chrome,
+            )
+        }
     };
     Ok(Response::html(200, html))
 }
@@ -838,6 +860,17 @@ fn form_field<'a>(fields: &'a [(String, String)], name: &str) -> Option<&'a str>
         .map(|(_, value)| value.as_str())
 }
 
+/// All form occurrences for `name` in document order (tag fields). Unlike
+/// `form_field` (baseline last-value-wins), this collects every occurrence;
+/// empty occurrences are dropped by the validators.
+fn form_fields(fields: &[(String, String)], name: &str) -> Vec<String> {
+    fields
+        .iter()
+        .filter(|(key, _)| key == name)
+        .map(|(_, value)| value.clone())
+        .collect()
+}
+
 fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response, HttpError> {
     if media_type(&request) != "application/x-www-form-urlencoded" {
         return Err(HttpError::new(415));
@@ -856,6 +889,15 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
     };
 
     if version != record.version {
+        if record.kind == Category::UiMockup {
+            let title = form_field(&fields, "title").unwrap_or("").to_string();
+            let specs = records::submitted_tag_values(&form_fields(&fields, "specs"));
+            let refs = records::submitted_tag_values(&form_fields(&fields, "refs"));
+            return Ok(Response::html(
+                409,
+                render::conflict_page_ui_mockup(&record, &title, &specs, &refs, &cfg, chrome),
+            ));
+        }
         // Conflict page with submitted values (best-effort).
         let submitted = render::EditValues {
             title: form_field(&fields, "title").unwrap_or("").to_string(),
@@ -1426,6 +1468,62 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
+        Category::UiMockup => {
+            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
+            // Tag fields submit one occurrence per value; all occurrences are
+            // collected in order (section 6.7 overrides last-value-wins).
+            let raw_specs = form_fields(&fields, "specs");
+            let raw_refs = form_fields(&fields, "refs");
+
+            let mut errors = render::UiMockupFieldErrors::default();
+            let title = match records::validate_title(&raw_title) {
+                Ok(t) => Some(t),
+                Err(m) => {
+                    errors.title = Some(m);
+                    None
+                }
+            };
+            let specs = match records::validate_specs(&raw_specs) {
+                Ok(values) => Some(values),
+                Err(message) => {
+                    errors.specs = Some(message);
+                    None
+                }
+            };
+            let refs = match records::validate_refs(&raw_refs) {
+                Ok(values) => Some(values),
+                Err(message) => {
+                    errors.refs = Some(message);
+                    None
+                }
+            };
+            if errors.any() {
+                let values = render::UiMockupEditValues {
+                    title: raw_title.clone(),
+                    specs: records::submitted_tag_values(&raw_specs),
+                    refs: records::submitted_tag_values(&raw_refs),
+                };
+                return Ok(Response::html(
+                    422,
+                    render::edit_page_ui_mockup(
+                        &record,
+                        &values,
+                        &errors,
+                        &record.version,
+                        &cfg,
+                        chrome,
+                    ),
+                ));
+            }
+            let title = title.unwrap_or_default();
+            let specs = specs.unwrap_or_default();
+            let refs = refs.unwrap_or_default();
+            let original = std::fs::read_to_string(&record.path).unwrap_or_default();
+            let content =
+                records::apply_ui_mockup_edit(&original, &record.id, &title, &specs, &refs);
+            records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
+            Ok(Response::redirect(&format!("/doc/{}", record.id)))
+        }
     }
 }
 
@@ -1450,7 +1548,7 @@ fn record_json(
             serde_json::json!({
                 "id": record.id,
                 "kind": record.kind.key(),
-                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision", Form::Glossary => "glossary", Form::UiSpec => "ui-spec" },
+                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision", Form::Glossary => "glossary", Form::UiSpec => "ui-spec", Form::UiMockup => "ui-mockup" },
                 "title": record.title,
                 "group": group_value,
                 "story": story,
@@ -1555,6 +1653,21 @@ fn record_json(
                 "title": record.title,
                 "view": record.view,
                 "description": record.description,
+                "version": record.version,
+                "path": record.rel_path,
+            })
+        }
+        Category::UiMockup => {
+            serde_json::json!({
+                "id": record.id,
+                "kind": "ui-mockup",
+                "form": "ui-mockup",
+                "title": record.title,
+                "specs": record.specs,
+                "refs": record.refs,
+                "task": record.mockup_task,
+                "status": record.status.clone().unwrap_or_default(),
+                "superseded_by": record.superseded_by,
                 "version": record.version,
                 "path": record.rel_path,
             })
@@ -1670,6 +1783,22 @@ fn api_decisions(state: &ServerState) -> Result<Response, HttpError> {
 fn api_glossary(state: &ServerState) -> Result<Response, HttpError> {
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let index = records::build_index(&state.context(), &cfg, Category::Glossary);
+    let items: Vec<serde_json::Value> = index
+        .records
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "id": r.id,
+                "title": r.title,
+            })
+        })
+        .collect();
+    Ok(Response::json(200, serde_json::json!(items)))
+}
+
+fn api_ui_mockups(state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let index = records::build_index(&state.context(), &cfg, Category::UiMockup);
     let items: Vec<serde_json::Value> = index
         .records
         .iter()
@@ -2325,6 +2454,67 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
+        Category::UiMockup => {
+            // title: optional, required when present (section 10.3).
+            let title = match object.get("title") {
+                None => record.title.clone(),
+                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
+                    Ok(t) => t,
+                    Err(m) => return Ok(json_error(422, &m)),
+                },
+                Some(_) => return Err(HttpError::new(400)),
+            };
+            // specs: optional; null is 422, wrong types are 400.
+            let specs = match object.get("specs") {
+                None => record.specs.clone(),
+                Some(serde_json::Value::Null) => {
+                    return Ok(json_error(
+                        422,
+                        "At least one UI specification id is required.",
+                    ));
+                }
+                Some(serde_json::Value::Array(items)) => {
+                    let mut raw: Vec<String> = Vec::new();
+                    for item in items {
+                        match item.as_str() {
+                            Some(text) => raw.push(text.to_string()),
+                            None => return Err(HttpError::new(400)),
+                        }
+                    }
+                    match records::validate_specs(&raw) {
+                        Ok(values) => values,
+                        Err(message) => return Ok(json_error(422, &message)),
+                    }
+                }
+                Some(_) => return Err(HttpError::new(400)),
+            };
+            // refs: optional; null or [] clears (section 10.3).
+            let refs = match object.get("refs") {
+                None => record.refs.clone(),
+                Some(serde_json::Value::Null) => Vec::new(),
+                Some(serde_json::Value::Array(items)) => {
+                    let mut raw: Vec<String> = Vec::new();
+                    for item in items {
+                        match item.as_str() {
+                            Some(text) => raw.push(text.to_string()),
+                            None => return Err(HttpError::new(400)),
+                        }
+                    }
+                    match records::validate_refs(&raw) {
+                        Ok(values) => values,
+                        Err(message) => return Ok(json_error(422, &message)),
+                    }
+                }
+                Some(_) => return Err(HttpError::new(400)),
+            };
+            // Read-only task/status/superseded_by and unknown members ignored.
+            let original = std::fs::read_to_string(&record.path).unwrap_or_default();
+            let content =
+                records::apply_ui_mockup_edit(&original, &record.id, &title, &specs, &refs);
+            records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
+            let (updated, _updated_cfg) = resolve_record(id, state)?;
+            Ok(Response::json(200, record_json(&updated, None, None)))
+        }
     }
 }
 
@@ -2408,5 +2598,77 @@ mod tests {
         assert_eq!(display_host("::"), "127.0.0.1");
         assert_eq!(display_host("::1"), "[::1]");
         assert_eq!(display_host("localhost"), "localhost");
+    }
+
+    #[test]
+    fn ui_mockup_record_json_shape() {
+        let record = Record {
+            id: "MOCK-001".to_string(),
+            kind: Category::UiMockup,
+            form: Form::UiMockup,
+            title: "Login".to_string(),
+            story: None,
+            group_id: None,
+            group_title: None,
+            description: None,
+            definition: None,
+            view: None,
+            status: Some("pending".to_string()),
+            milestone_id: None,
+            milestone_title: None,
+            assignee: None,
+            labels: Vec::new(),
+            dependencies: Vec::new(),
+            acceptance_criteria: Vec::new(),
+            comments: Vec::new(),
+            release_id: None,
+            release_title: None,
+            decision: None,
+            context: None,
+            consequences: None,
+            decision_type: None,
+            superseded_by: None,
+            superseded_title: None,
+            specs: vec!["UI-001".to_string(), "UI-002".to_string()],
+            refs: vec!["docs/a.md".to_string()],
+            mockup_task: "TASK-1".to_string(),
+            doc: records::Doc {
+                id: "MOCK-001".to_string(),
+                title: "Login".to_string(),
+                heading: "# MOCK-001 Login".to_string(),
+                preamble: Vec::new(),
+                sections: Vec::new(),
+            },
+            path: std::path::PathBuf::from("docs/specifications/ui/mockups/MOCK-001.html"),
+            rel_path: "docs/specifications/ui/mockups/MOCK-001.html".to_string(),
+            version: "1.2.3".to_string(),
+        };
+        let json = record_json(&record, None, None);
+        assert_eq!(json["id"], "MOCK-001");
+        assert_eq!(json["kind"], "ui-mockup");
+        assert_eq!(json["form"], "ui-mockup");
+        assert_eq!(json["title"], "Login");
+        assert_eq!(json["specs"], serde_json::json!(["UI-001", "UI-002"]));
+        assert_eq!(json["refs"], serde_json::json!(["docs/a.md"]));
+        assert_eq!(json["task"], "TASK-1");
+        assert_eq!(json["status"], "pending");
+        assert!(json["superseded_by"].is_null());
+        assert_eq!(json["version"], "1.2.3");
+        assert_eq!(json["path"], "docs/specifications/ui/mockups/MOCK-001.html");
+    }
+
+    #[test]
+    fn ui_mockup_form_fields_collect_all_occurrences() {
+        let fields = vec![
+            ("version".to_string(), "1.2.3".to_string()),
+            ("specs".to_string(), "UI-001".to_string()),
+            ("title".to_string(), "T".to_string()),
+            ("specs".to_string(), "UI-002".to_string()),
+            ("specs".to_string(), "".to_string()),
+            ("refs".to_string(), "docs/a.md".to_string()),
+        ];
+        assert_eq!(form_fields(&fields, "specs"), vec!["UI-001", "UI-002", ""]);
+        assert_eq!(form_fields(&fields, "refs"), vec!["docs/a.md"]);
+        assert_eq!(form_fields(&fields, "missing"), Vec::<String>::new());
     }
 }

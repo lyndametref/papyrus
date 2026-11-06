@@ -3133,3 +3133,743 @@ fn t15i_json_api_decision() {
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
+
+// ---- T-40 UI mockups browser scenarios ----
+
+fn create_mockup(dir: &Path, title: &str, task: &str, specs: &[&str], refs: &[&str]) -> String {
+    let mut args: Vec<String> = vec![
+        "--dir".to_string(),
+        dir.to_str().unwrap().to_string(),
+        "ui-mockup".to_string(),
+        "create".to_string(),
+        title.to_string(),
+        "--task".to_string(),
+        task.to_string(),
+    ];
+    for spec in specs {
+        args.push("--spec".to_string());
+        args.push(spec.to_string());
+    }
+    for reference in refs {
+        args.push("--ref".to_string());
+        args.push(reference.to_string());
+    }
+    let out = bin().args(&args).output().unwrap();
+    assert!(
+        out.status.success(),
+        "create failed: {:?}\nstderr: {}",
+        args,
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+fn mockup_record_path(dir: &Path, id: &str) -> PathBuf {
+    dir.join("docs/specifications/ui/mockups")
+        .join(format!("{}.html", id))
+}
+
+fn mockup_dir(dir: &Path) -> PathBuf {
+    dir.join("docs/specifications/ui/mockups")
+}
+
+fn mockup_fixture(name: &str) -> PathBuf {
+    let dir = test_root(name);
+    init_project(&dir);
+    create_mockup(&dir, "First mockup", "TASK-41", &["UI-001"], &["a.md"]);
+    create_mockup(
+        &dir,
+        "Second mockup",
+        "TASK-42",
+        &["UI-002", "UI-003"],
+        &["b.md"],
+    );
+    dir
+}
+
+fn write_review_package(dir: &Path, id: &str) -> String {
+    let review = format!(
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>{} &mdash; Review {}</title>\n<style>body{{color:red}} .marker-style-40{{color:blue}}</style>\n<script>var markerScript40 = \"do not leak\";</script>\n</head>\n<body class=\"wf-package\">\n<h1>TASK-99 &mdash; Landing heading marker40</h1>\n<section><h1 class=\"wf-h1\">Prototype heading marker40</h1><p>Slide content marker40 must stay.</p></section>\n</body>\n</html>\n",
+        id, id
+    );
+    let path = mockup_record_path(dir, id);
+    fs::write(&path, &review).unwrap();
+    review
+}
+
+// T-40a
+#[test]
+fn t40a_list_ui_mockups_category() {
+    let dir = mockup_fixture("t40a");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=ui-mockup").text();
+    assert!(html.contains("<h2 class=\"h2\">UI Mockups</h2>"));
+    assert!(html.contains("2 UI mockups"));
+    assert!(html.contains("aria-current=\"page\""));
+    // Sidebar order: UI Specifications before UI Mockups.
+    let specs_at = html.find("href=\"/?type=ui-spec\"").unwrap();
+    let mockups_at = html.find("href=\"/?type=ui-mockup\"").unwrap();
+    assert!(specs_at < mockups_at, "sidebar order");
+    assert!(html.contains("MOCK-001"));
+    assert!(html.contains("First mockup"));
+    assert!(html.contains("MOCK-002"));
+    assert!(html.contains("Second mockup"));
+    let first = html.find("MOCK-001").unwrap();
+    let second = html.find("MOCK-002").unwrap();
+    assert!(first < second, "ascending ID order");
+    assert!(html.contains("href=\"/doc/MOCK-001\""));
+    assert!(html.contains("href=\"/doc/MOCK-002\""));
+    // Default stays req; unknown values are 400.
+    assert_eq!(get(&server, "/").status, 200);
+    assert_eq!(get(&server, "/?type=req").status, 200);
+    for ty in ["all", "x", "mockup", "ui-mockups"] {
+        assert_eq!(
+            get(&server, &format!("/?type={}", ty)).status,
+            400,
+            "type={}",
+            ty
+        );
+    }
+    // Long title still renders.
+    let long_title = "L".repeat(150);
+    create_mockup(&dir, &long_title, "TASK-43", &["UI-004"], &[]);
+    let html = get(&server, "/?type=ui-mockup").text();
+    assert!(html.contains(&long_title));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn t40a_disabled_ui_mockup_empty_state() {
+    let dir = mockup_fixture("t40a-disabled");
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "config",
+        "set",
+        "document_types.ui-mockup.enabled",
+        "false",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=ui-mockup").text();
+    assert_eq!(get(&server, "/?type=ui-mockup").status, 200);
+    // Entry omitted from the sidebar; empty state, not an error.
+    assert!(!html.contains("href=\"/?type=ui-mockup\""));
+    assert!(html.contains("UI Mockups"));
+    assert!(html.contains("No UI mockups"));
+    let api: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/ui-mockups").text()).unwrap();
+    assert!(api.as_array().unwrap().is_empty());
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-40b
+#[test]
+fn t40b_non_records_are_not_listed() {
+    let dir = mockup_fixture("t40b");
+    let mock_dir = mockup_dir(&dir);
+    fs::write(mock_dir.join("README.md"), "# registry").unwrap();
+    fs::write(mock_dir.join("wireframe.css"), "body{}").unwrap();
+    fs::write(mock_dir.join("index.html"), "<html></html>").unwrap();
+    fs::write(mock_dir.join("MOCK-ABC.html"), "<html></html>").unwrap();
+    fs::write(mock_dir.join("other.html"), "<html></html>").unwrap();
+    let deprecated = mock_dir.join("deprecated");
+    fs::create_dir_all(&deprecated).unwrap();
+    fs::write(
+        deprecated.join("MOCK-999.html"),
+        "<html><head><title>MOCK-999 — Hidden</title></head><body></body></html>",
+    )
+    .unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=ui-mockup").text();
+    assert!(html.contains("MOCK-001"));
+    assert!(html.contains("MOCK-002"));
+    for hidden in ["MOCK-999", "README", "wireframe", "index", "other.html"] {
+        assert!(!html.contains(hidden), "listed {}", hidden);
+    }
+    assert!(html.contains("2 UI mockups"));
+    let api: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/ui-mockups").text()).unwrap();
+    assert_eq!(api.as_array().unwrap().len(), 2);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-40c
+#[test]
+fn t40c_view_ui_mockup() {
+    let dir = mockup_fixture("t40c");
+    write_review_package(&dir, "MOCK-010");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/doc/MOCK-001").text();
+    assert!(html.contains("Record ID"));
+    assert!(html.contains("MOCK-001"));
+    assert!(html.contains("UI mockup"));
+    assert!(html.contains("UI Mockups"));
+    assert!(html.contains("<h1 class=\"h1\">First mockup</h1>"));
+    assert!(html.contains("<h2>UI specifications</h2>"));
+    assert!(html.contains("<h2>References</h2>"));
+    assert!(html.contains("UI-001"));
+    assert!(html.contains("a.md"));
+    assert!(html.contains("white-space: pre-wrap"));
+    // Breadcrumb UI Mockups > ID, single Edit action.
+    assert!(html.contains("href=\"/?type=ui-mockup\">UI Mockups</a></li><li><span aria-current=\"page\">MOCK-001</span>"));
+    assert_eq!(html.matches("href=\"/doc/MOCK-001/edit\"").count(), 1);
+    assert!(html.contains(">Edit</a>"));
+    // Empty refs still render (none) for the review package.
+    let empty_view = get(&server, "/doc/MOCK-010").text();
+    assert!(empty_view.contains("<h1 class=\"h1\">Review MOCK-010</h1>"));
+    assert!(empty_view.contains("(none)"));
+    // Stored package, scripts, and markup never appear in the response.
+    for path in ["/doc/MOCK-010", "/doc/MOCK-010/edit", "/?type=ui-mockup"] {
+        let body = get(&server, path).text();
+        assert!(!body.contains("markerScript40"), "leaked script {}", path);
+        assert!(!body.contains("marker-style-40"), "leaked style {}", path);
+        assert!(
+            !body.contains("Landing heading marker40"),
+            "leaked markup {}",
+            path
+        );
+        assert!(
+            !body.contains("Prototype heading marker40"),
+            "leaked markup {}",
+            path
+        );
+        assert!(
+            !body.contains("Slide content marker40"),
+            "leaked markup {}",
+            path
+        );
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-40d
+#[test]
+fn t40d_edit_round_trip() {
+    let dir = mockup_fixture("t40d");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let edit = get(&server, "/doc/MOCK-001/edit").text();
+    // Tag add/remove interaction (spec section 6.6).
+    assert!(edit.contains("name=\"specs\""));
+    assert!(edit.contains("name=\"refs\""));
+    assert!(edit.contains("aria-label=\"Remove UI-001\""));
+    assert!(edit.contains("aria-label=\"Remove a.md\""));
+    assert!(edit.contains(">Add</button>"));
+    assert!(edit.contains("for=\"specs-add\""));
+    assert!(edit.contains("for=\"refs-add\""));
+    assert!(edit.contains("Hidden field: version (optimistic-concurrency token)"));
+    assert!(edit.contains("Save changes"));
+    assert!(edit.contains("Cancel"));
+    assert!(edit.contains("data-dirty-status hidden>Unsaved changes</p>"));
+    assert!(
+        !edit.contains("<textarea"),
+        "tag fields must not be textareas"
+    );
+    let version = extract_version(&edit);
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Renamed mockup"),
+        ("specs", "UI-010"),
+        ("specs", "UI-011"),
+        ("refs", "docs/new.md"),
+        ("specs", ""),
+        ("refs", ""),
+    ]);
+    let response = post_form(&server, "/doc/MOCK-001", &body);
+    assert_eq!(response.status, 303);
+    assert_eq!(response.header("Location"), Some("/doc/MOCK-001"));
+    let view = get(&server, "/doc/MOCK-001").text();
+    assert!(view.contains("<h1 class=\"h1\">Renamed mockup</h1>"));
+    assert!(view.contains("UI-010 UI-011"));
+    assert!(view.contains("docs/new.md"));
+    let list = get(&server, "/?type=ui-mockup").text();
+    assert!(list.contains("MOCK-001"));
+    assert!(list.contains("Renamed mockup"));
+    // Visible through the CLI.
+    let cli = run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "ui-mockup",
+        "view",
+        "MOCK-001",
+    ]);
+    assert!(cli.contains("<title>MOCK-001 — Renamed mockup</title>"));
+    assert!(cli.contains("<!-- specs: UI-010 UI-011 -->"));
+    assert!(cli.contains("<!-- refs: docs/new.md -->"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-40e
+#[test]
+fn t40e_review_package_preserved() {
+    let dir = mockup_fixture("t40e");
+    let original = write_review_package(&dir, "MOCK-010");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/MOCK-010/edit").text());
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Edited review title"),
+        ("specs", "UI-020"),
+        ("refs", "docs/edited.md"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/MOCK-010", &body).status, 303);
+    let after = fs::read_to_string(mockup_record_path(&dir, "MOCK-010")).unwrap();
+    assert!(after.contains("<title>MOCK-010 &mdash; Edited review title</title>"));
+    assert!(after.contains("<!-- specs: UI-020 -->"));
+    assert!(after.contains("<!-- refs: docs/edited.md -->"));
+    // Every other byte is preserved: style, script, landing heading, slides.
+    for needle in [
+        "<style>body{color:red} .marker-style-40{color:blue}</style>",
+        "<script>var markerScript40 = \"do not leak\";</script>",
+        "<h1>TASK-99 &mdash; Landing heading marker40</h1>",
+        "<h1 class=\"wf-h1\">Prototype heading marker40</h1>",
+        "<p>Slide content marker40 must stay.</p>",
+        "<body class=\"wf-package\">",
+    ] {
+        assert!(after.contains(needle), "changed {}", needle);
+        assert!(original.contains(needle));
+    }
+    // No visible metadata lines are inserted into a review package.
+    assert!(!after.contains("<p>UI specifications:"));
+    assert!(!after.contains("<p>References:"));
+    // Only the title line and the inserted comment block differ.
+    // Insertion adds the two comment lines plus one separator blank line.
+    let before_lines: Vec<&str> = original.lines().collect();
+    let after_lines: Vec<&str> = after.lines().collect();
+    assert_eq!(after_lines.len(), before_lines.len() + 3);
+    let filtered: Vec<&str> = after_lines
+        .iter()
+        .copied()
+        .filter(|line| !line.contains("<!-- specs:") && !line.contains("<!-- refs:"))
+        .collect();
+    let stripped_before: Vec<&str> = before_lines
+        .iter()
+        .copied()
+        .filter(|line| !line.is_empty())
+        .collect();
+    let stripped_after: Vec<&str> = filtered
+        .iter()
+        .copied()
+        .filter(|line| !line.is_empty())
+        .collect();
+    assert_eq!(
+        stripped_after.len(),
+        stripped_before.len(),
+        "non-metadata lines changed"
+    );
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-40f
+#[test]
+fn t40f_repeated_fields_in_order() {
+    let dir = mockup_fixture("t40f");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/MOCK-002/edit").text());
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Order check"),
+        ("specs", "UI-003"),
+        ("specs", "UI-001"),
+        ("specs", "UI-002"),
+        ("refs", "z.md"),
+        ("refs", "a.md"),
+        ("specs", ""),
+        ("refs", ""),
+    ]);
+    assert_eq!(post_form(&server, "/doc/MOCK-002", &body).status, 303);
+    let file = fs::read_to_string(mockup_record_path(&dir, "MOCK-002")).unwrap();
+    assert!(file.contains("<!-- specs: UI-003 UI-001 UI-002 -->"));
+    assert!(file.contains("<!-- refs: z.md a.md -->"));
+    let api: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/doc/MOCK-002").text()).unwrap();
+    assert_eq!(
+        api["specs"],
+        serde_json::json!(["UI-003", "UI-001", "UI-002"])
+    );
+    assert_eq!(api["refs"], serde_json::json!(["z.md", "a.md"]));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-40g
+#[test]
+fn t40g_validation_422_no_write() {
+    let dir = mockup_fixture("t40g");
+    let path = mockup_record_path(&dir, "MOCK-001");
+    let before = fs::read(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/MOCK-001/edit").text());
+    let cases: Vec<(String, &str, &str)> = vec![
+        (
+            form_body(&[("version", &version), ("title", ""), ("specs", "UI-001")]),
+            "Title is required.",
+            "title",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", &"x".repeat(201)),
+                ("specs", "UI-001"),
+            ]),
+            "Title must be at most 200 characters.",
+            "title",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "a\tb"),
+                ("specs", "UI-001"),
+            ]),
+            "Title cannot contain control characters.",
+            "title",
+        ),
+        (
+            form_body(&[("version", &version), ("title", "Ok"), ("specs", "")]),
+            "At least one UI specification id is required.",
+            "specs",
+        ),
+        (
+            form_body(&[("version", &version), ("title", "Ok"), ("specs", "bad id")]),
+            "UI specification ids must be valid record IDs.",
+            "specs",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("specs", "UI-001"),
+                ("specs", "UI-001"),
+            ]),
+            "Duplicate UI specification id: UI-001.",
+            "specs",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("specs", "UI-001"),
+                ("refs", &"y".repeat(201)),
+            ]),
+            "References must be at most 200 characters.",
+            "refs",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("specs", "UI-001"),
+                ("refs", "a b"),
+            ]),
+            "References cannot contain whitespace.",
+            "refs",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("specs", "UI-001"),
+                ("refs", "a.md"),
+                ("refs", "a.md"),
+            ]),
+            "Duplicate reference: a.md.",
+            "refs",
+        ),
+    ];
+    for (body, message, field) in cases {
+        let response = post_form(&server, "/doc/MOCK-001", &body);
+        assert_eq!(response.status, 422, "body={}", body);
+        let html = response.text();
+        assert_eq!(summary_entry(&html, field), message);
+        assert_eq!(field_error(&html, field), message);
+        assert_eq!(fs::read(&path).unwrap(), before, "file changed {}", body);
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-40h
+#[test]
+fn t40h_stale_and_malformed_versions() {
+    let dir = mockup_fixture("t40h");
+    let path = mockup_record_path(&dir, "MOCK-001");
+    let before = fs::read(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let valid = form_body(&[
+        ("version", "1.2.3"),
+        ("title", "Stale"),
+        ("specs", "UI-001"),
+    ]);
+    let conflict = post_form(&server, "/doc/MOCK-001", &valid);
+    assert_eq!(conflict.status, 409);
+    assert!(
+        conflict
+            .text()
+            .contains("record changed on disk; reload the form")
+    );
+    assert_eq!(fs::read(&path).unwrap(), before);
+    // Missing version is 400.
+    let missing = form_body(&[("title", "Ok"), ("specs", "UI-001")]);
+    assert_eq!(post_form(&server, "/doc/MOCK-001", &missing).status, 400);
+    // Malformed version is 400.
+    let malformed = form_body(&[("version", "bad"), ("title", "Ok"), ("specs", "UI-001")]);
+    assert_eq!(post_form(&server, "/doc/MOCK-001", &malformed).status, 400);
+    assert_eq!(fs::read(&path).unwrap(), before);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-40i
+#[test]
+fn t40i_deprecated_hidden_and_404() {
+    let dir = mockup_fixture("t40i");
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "ui-mockup",
+        "deprecate",
+        "MOCK-002",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let list = get(&server, "/?type=ui-mockup").text();
+    assert!(list.contains("MOCK-001"));
+    assert!(!list.contains("MOCK-002"));
+    assert!(list.contains("1 UI mockup"));
+    assert_eq!(get(&server, "/doc/MOCK-002").status, 404);
+    assert_eq!(get(&server, "/doc/MOCK-002/edit").status, 404);
+    let version = "1.2.3";
+    let body = form_body(&[("version", version), ("title", "Ok"), ("specs", "UI-001")]);
+    assert_eq!(post_form(&server, "/doc/MOCK-002", &body).status, 404);
+    assert_eq!(get(&server, "/api/doc/MOCK-002").status, 404);
+    let json_body = format!("{{\"version\":\"{}\",\"title\":\"Ok\"}}", version);
+    assert_eq!(
+        post_json(&server, "/api/doc/MOCK-002", &json_body).status,
+        404
+    );
+    let api: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/ui-mockups").text()).unwrap();
+    assert_eq!(api.as_array().unwrap().len(), 1);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-40j
+#[test]
+fn t40j_json_api() {
+    let dir = mockup_fixture("t40j");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    // Summary list (and aliases) ascending.
+    for alias in ["/api/ui-mockups", "/api/ui-mockup", "/api/mockups"] {
+        let list: serde_json::Value = serde_json::from_str(&get(&server, alias).text()).unwrap();
+        let arr = list.as_array().unwrap();
+        assert_eq!(arr.len(), 2, "alias {}", alias);
+        assert_eq!(arr[0]["id"], "MOCK-001");
+        assert_eq!(arr[0]["title"], "First mockup");
+        assert_eq!(arr[1]["id"], "MOCK-002");
+    }
+    // Full record shape.
+    let doc: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/doc/MOCK-001").text()).unwrap();
+    assert_eq!(doc["id"], "MOCK-001");
+    assert_eq!(doc["kind"], "ui-mockup");
+    assert_eq!(doc["form"], "ui-mockup");
+    assert_eq!(doc["title"], "First mockup");
+    assert_eq!(doc["specs"], serde_json::json!(["UI-001"]));
+    assert_eq!(doc["refs"], serde_json::json!(["a.md"]));
+    assert_eq!(doc["task"], "TASK-41");
+    assert_eq!(doc["status"], "pending");
+    assert!(doc["superseded_by"].is_null());
+    assert!(doc["version"].is_string());
+    assert!(doc["path"].as_str().unwrap().ends_with("MOCK-001.html"));
+    // Omitted members unchanged; read-only members ignored.
+    let version = doc["version"].as_str().unwrap().to_string();
+    let body = format!(
+        "{{\"version\":\"{}\",\"refs\":[],\"task\":\"HACK\",\"status\":\"approved\",\"superseded_by\":\"MOCK-002\",\"unknown\":1}}",
+        version
+    );
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/MOCK-001", &body).text()).unwrap();
+    assert_eq!(updated["title"], "First mockup");
+    assert_eq!(updated["specs"], serde_json::json!(["UI-001"]));
+    assert_eq!(updated["refs"], serde_json::json!([]));
+    assert_eq!(updated["task"], "TASK-41");
+    assert_eq!(updated["status"], "pending");
+    assert!(updated["superseded_by"].is_null());
+    // Refs null clears; specs null is 422.
+    let version = updated["version"].as_str().unwrap().to_string();
+    let body = format!("{{\"version\":\"{}\",\"refs\":[\"x.md\"]}}", version);
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/MOCK-001", &body).text()).unwrap();
+    assert_eq!(updated["refs"], serde_json::json!(["x.md"]));
+    let version = updated["version"].as_str().unwrap().to_string();
+    let body = format!("{{\"version\":\"{}\",\"refs\":null}}", version);
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/MOCK-001", &body).text()).unwrap();
+    assert_eq!(updated["refs"], serde_json::json!([]));
+    let version = updated["version"].as_str().unwrap().to_string();
+    let body = format!("{{\"version\":\"{}\",\"specs\":null}}", version);
+    let response = post_json(&server, "/api/doc/MOCK-001", &body);
+    assert_eq!(response.status, 422);
+    // JSON validation uses the documented messages.
+    let body = format!("{{\"version\":\"{}\",\"specs\":[\"bad id\"]}}", version);
+    let response = post_json(&server, "/api/doc/MOCK-001", &body);
+    assert_eq!(response.status, 422);
+    let err: serde_json::Value = serde_json::from_str(&response.text()).unwrap();
+    assert_eq!(
+        err["error"]["message"],
+        "UI specification ids must be valid record IDs."
+    );
+    let body = format!("{{\"version\":\"{}\",\"refs\":[\"a b\"]}}", version);
+    assert_eq!(post_json(&server, "/api/doc/MOCK-001", &body).status, 422);
+    let version = updated["version"].as_str().unwrap().to_string();
+    let body = format!("{{\"version\":\"{}\",\"specs\":[]}}", version);
+    assert_eq!(post_json(&server, "/api/doc/MOCK-001", &body).status, 422);
+    // Empty title is 422; wrong types are 400.
+    let body = format!("{{\"version\":\"{}\",\"title\":\"\"}}", version);
+    assert_eq!(post_json(&server, "/api/doc/MOCK-001", &body).status, 422);
+    let body = format!("{{\"version\":\"{}\",\"title\":5}}", version);
+    assert_eq!(post_json(&server, "/api/doc/MOCK-001", &body).status, 400);
+    let body = format!("{{\"version\":\"{}\",\"specs\":\"UI-001\"}}", version);
+    assert_eq!(post_json(&server, "/api/doc/MOCK-001", &body).status, 400);
+    let body = format!("{{\"version\":\"{}\",\"specs\":[5]}}", version);
+    assert_eq!(post_json(&server, "/api/doc/MOCK-001", &body).status, 400);
+    let body = format!("{{\"version\":\"{}\",\"refs\":\"x\"}}", version);
+    assert_eq!(post_json(&server, "/api/doc/MOCK-001", &body).status, 400);
+    assert_eq!(
+        post_json(&server, "/api/doc/MOCK-001", "{not json").status,
+        400
+    );
+    assert_eq!(post_json(&server, "/api/doc/MOCK-001", "[]").status, 400);
+    // Missing/malformed/stale versions.
+    assert_eq!(
+        post_json(&server, "/api/doc/MOCK-001", "{\"title\":\"Ok\"}").status,
+        400
+    );
+    let body = "{\"version\":\"bad\"}";
+    assert_eq!(post_json(&server, "/api/doc/MOCK-001", body).status, 400);
+    let body = "{\"version\":\"1.2.3\",\"title\":\"Ok\"}";
+    assert_eq!(post_json(&server, "/api/doc/MOCK-001", body).status, 409);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-40k
+#[test]
+fn t40k_atomic_and_symlink() {
+    use std::os::unix::fs::symlink;
+    let dir = mockup_fixture("t40k");
+    let mock_dir = mockup_dir(&dir);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/MOCK-001/edit").text());
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Atomic title"),
+        ("specs", "UI-001"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/MOCK-001", &body).status, 303);
+    for entry in fs::read_dir(&mock_dir).unwrap().flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        assert!(!name.contains(".tmp"), "temp left {}", name);
+    }
+    // Failed requests also leave no temp.
+    let version = extract_version(&get(&server, "/doc/MOCK-001/edit").text());
+    let bad = form_body(&[("version", &version), ("title", ""), ("specs", "UI-001")]);
+    assert_eq!(post_form(&server, "/doc/MOCK-001", &bad).status, 422);
+    for entry in fs::read_dir(&mock_dir).unwrap().flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        assert!(!name.contains(".tmp"), "temp left {}", name);
+    }
+    drop(server);
+    // Symlink escape is 404.
+    let outside = test_root("t40k-outside");
+    let secret = outside.join("secret.html");
+    fs::write(&secret, "<html><head><title>SECRET40</title></head></html>").unwrap();
+    let target = mockup_record_path(&dir, "MOCK-001");
+    fs::remove_file(&target).unwrap();
+    symlink(&secret, &target).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let response = get(&server, "/doc/MOCK-001");
+    assert_eq!(response.status, 404);
+    assert!(!response.text().contains("SECRET40"));
+    let list = get(&server, "/?type=ui-mockup").text();
+    assert!(!list.contains("MOCK-001"));
+    assert_eq!(get(&server, "/api/doc/MOCK-001").status, 404);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+    let _ = fs::remove_dir_all(&outside);
+}
+
+// T-40l
+#[test]
+fn t40l_offline_asset_scan() {
+    let dir = mockup_fixture("t40l");
+    write_review_package(&dir, "MOCK-010");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let css = get(&server, "/assets/app.css");
+    assert_eq!(css.status, 200);
+    let js = get(&server, "/assets/app.js");
+    assert_eq!(js.status, 200);
+    for path in [
+        "/?type=ui-mockup",
+        "/doc/MOCK-001",
+        "/doc/MOCK-001/edit",
+        "/doc/MOCK-010",
+        "/doc/MOCK-010/edit",
+    ] {
+        let html = get(&server, path).text();
+        assert!(!html.contains("http://"), "external {}", path);
+        assert!(!html.contains("https://"), "external {}", path);
+        assert!(!html.contains("//cdn"), "external {}", path);
+        assert!(!html.contains("@import"), "external {}", path);
+    }
+    for asset in [css.text(), js.text()] {
+        assert!(!asset.contains("@import"));
+        assert!(!asset.contains("http://"));
+        assert!(!asset.contains("https://"));
+        assert!(!asset.contains("url("));
+    }
+    // Tag controls are labelled and keyboard operable (buttons, labels).
+    let edit = get(&server, "/doc/MOCK-001/edit").text();
+    assert!(edit.contains("<label for=\"specs-add\">"));
+    assert!(edit.contains("<label for=\"refs-add\">"));
+    assert!(edit.contains("aria-label=\"Remove UI-001\""));
+    assert!(edit.contains("type=\"button\""));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-40m: no new dependencies (build/clippy/fmt are quality gates run above).
+#[test]
+fn t40m_no_new_dependencies() {
+    let manifest = include_str!("../Cargo.toml");
+    for dependency in ["clap", "serde", "serde_json", "yaml_serde"] {
+        assert!(manifest.contains(dependency), "missing {}", dependency);
+    }
+    let dependency_index = manifest.find("[dependencies]").unwrap();
+    let dependencies = &manifest[dependency_index..];
+    // No web framework, async runtime, or templating engine was added.
+    for forbidden in [
+        "axum",
+        "actix",
+        "rocket",
+        "tokio",
+        "async-std",
+        "tera",
+        "handlebars",
+        "askama",
+        "rusqlite",
+        "reqwest",
+        "hyper",
+    ] {
+        assert!(
+            !dependencies.contains(forbidden),
+            "new dependency {}",
+            forbidden
+        );
+    }
+}

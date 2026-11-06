@@ -228,14 +228,14 @@ fn resolve_record(
 }
 
 #[derive(Clone, Debug, Default)]
-struct Mockup {
-    id: String,
-    title: String,
-    task: String,
-    specs: Vec<String>,
-    refs: Vec<String>,
-    status: String,
-    superseded_by: Option<String>,
+pub(crate) struct Mockup {
+    pub(crate) id: String,
+    pub(crate) title: String,
+    pub(crate) task: String,
+    pub(crate) specs: Vec<String>,
+    pub(crate) refs: Vec<String>,
+    pub(crate) status: String,
+    pub(crate) superseded_by: Option<String>,
 }
 
 fn parse_field_comment(content: &str, key: &str) -> Option<String> {
@@ -281,30 +281,157 @@ fn extract_between(content: &str, start: &str, end: &str) -> Option<String> {
     Some(rest[..j].trim().to_string())
 }
 
-fn parse_record(content: &str, fallback_id: &str) -> Mockup {
-    let mut id = String::new();
-    let mut title = String::new();
-    if let Some(val) = extract_between(content, "<h1>", "</h1>") {
-        let mut parts = val.splitn(2, char::is_whitespace);
-        id = parts.next().unwrap_or("").trim().to_string();
-        title = parts.next().unwrap_or("").trim().to_string();
+/// Decode the standard HTML character references named in the browser
+/// specification section 3.3. `&amp;` is decoded last so that an encoded
+/// `&amp;mdash;` stays a literal `&mdash;` instead of double-decoding.
+pub(crate) fn decode_entities(s: &str) -> String {
+    s.replace("&mdash;", "—")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&amp;", "&")
+}
+
+/// Raw inner text of the first `<title>` element, or `None` when absent.
+fn raw_title_text(content: &str) -> Option<String> {
+    let mut search = 0usize;
+    while let Some(rel) = content[search..].find("<title") {
+        let open_start = search + rel;
+        let after_open = open_start + "<title".len();
+        let after = &content[after_open..];
+        // The tag name must end at `>` or whitespace (attributes allowed).
+        let next = after.chars().next();
+        if next != Some('>') && !next.is_some_and(char::is_whitespace) {
+            search = open_start + "<title".len();
+            continue;
+        }
+        let gt = content[open_start..].find('>')?;
+        let inner_start = open_start + gt + 1;
+        let close_rel = content[inner_start..].find("</title>")?;
+        return Some(content[inner_start..inner_start + close_rel].to_string());
     }
-    if id.is_empty() {
-        id = parse_field_comment(content, "mockup-id").unwrap_or_default();
+    None
+}
+
+/// Derive the display title from raw `<title>` text (sections 3.2-3.3).
+fn title_from_raw(raw: &str, id: &str) -> String {
+    let text = raw.trim();
+    if text.is_empty() {
+        return id.to_string();
     }
-    if id.is_empty() {
-        id = fallback_id.to_string();
-    }
-    if title.is_empty()
-        && let Some(rest) = extract_between(content, "<title>", "</title>")
-    {
-        let rest = rest.trim();
-        if let Some(idx) = rest.find('—') {
-            title = rest[idx + '—'.len_utf8()..].trim().to_string();
+    let dash = text.find('—');
+    let entity = text.find("&mdash;");
+    let separator = match (dash, entity) {
+        (Some(d), Some(e)) => {
+            if d <= e {
+                Some((d, '—'.len_utf8()))
+            } else {
+                Some((e, "&mdash;".len()))
+            }
+        }
+        (Some(d), None) => Some((d, '—'.len_utf8())),
+        (None, Some(e)) => Some((e, "&mdash;".len())),
+        (None, None) => None,
+    };
+    if let Some((at, width)) = separator {
+        let rest = text[at + width..].trim();
+        if rest.is_empty() {
+            return id.to_string();
+        }
+        let decoded = decode_entities(rest);
+        return if decoded.trim().is_empty() {
+            id.to_string()
         } else {
-            let mut parts = rest.splitn(2, char::is_whitespace);
-            let _ = parts.next();
-            title = parts.next().unwrap_or("").trim().to_string();
+            decoded
+        };
+    }
+    let without_id = text.strip_prefix(id).and_then(|rest| {
+        if rest.is_empty() || !rest.chars().next().is_some_and(char::is_whitespace) {
+            None
+        } else {
+            Some(rest.trim())
+        }
+    });
+    let chosen = without_id.unwrap_or(text);
+    if chosen.is_empty() {
+        return id.to_string();
+    }
+    let decoded = decode_entities(chosen);
+    if decoded.trim().is_empty() {
+        id.to_string()
+    } else {
+        decoded
+    }
+}
+
+/// Strict browser title: from `<title>` only, falling back to the record ID.
+pub(crate) fn extract_title(content: &str, id: &str) -> String {
+    match raw_title_text(content) {
+        Some(raw) if !raw.trim().is_empty() => title_from_raw(&raw, id),
+        _ => id.to_string(),
+    }
+}
+
+/// Split a `specs`/`refs` comment value on Unicode whitespace (section 3.4).
+pub(crate) fn comment_list(content: &str, key: &str) -> Vec<String> {
+    match parse_field_comment(content, key) {
+        Some(raw) => split_list(&raw),
+        None => Vec::new(),
+    }
+}
+
+/// Browser metadata: file-stem ID, `<title>` title, comment-sourced lists.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct BrowserMetadata {
+    pub title: String,
+    pub specs: Vec<String>,
+    pub refs: Vec<String>,
+    pub task: String,
+    pub status: String,
+    pub superseded_by: Option<String>,
+}
+
+pub(crate) fn parse_browser_metadata(content: &str, id: &str) -> BrowserMetadata {
+    let title = extract_title(content, id);
+    let specs = comment_list(content, "specs");
+    let refs = comment_list(content, "refs");
+    let task = parse_field_comment(content, "task")
+        .map(|v| v.trim().to_string())
+        .unwrap_or_default();
+    let status = parse_field_comment(content, "status")
+        .map(|v| v.trim().to_string())
+        .unwrap_or_default();
+    let superseded_by = parse_field_comment(content, "superseded-by")
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty());
+    BrowserMetadata {
+        title,
+        specs,
+        refs,
+        task,
+        status,
+        superseded_by,
+    }
+}
+
+pub(crate) fn parse_record(content: &str, fallback_id: &str) -> Mockup {
+    // The record ID is always the file stem; the first <h1> of a review
+    // package is the landing heading, never the record identity.
+    let id = fallback_id.to_string();
+    // Title: prefer the <title> element (browser rule); only when it is
+    // absent do CLI files fall back to the stub <h1>. A present <title>
+    // always wins so review packages are not misread from the landing <h1>.
+    let mut title = String::new();
+    let has_title = raw_title_text(content).is_some_and(|raw| !raw.trim().is_empty());
+    if has_title {
+        title = extract_title(content, &id);
+    } else if let Some(val) = extract_between(content, "<h1>", "</h1>") {
+        let mut parts = val.splitn(2, char::is_whitespace);
+        let _first = parts.next().unwrap_or("").trim();
+        let rest = parts.next().unwrap_or("").trim();
+        if !rest.is_empty() {
+            title = decode_entities(rest);
         }
     }
     if title.is_empty() {
@@ -356,7 +483,7 @@ fn parse_record(content: &str, fallback_id: &str) -> Mockup {
     }
 }
 
-fn render_record(record: &Mockup) -> String {
+pub(crate) fn render_record(record: &Mockup) -> String {
     let specs_str = record.specs.join(" ");
     let refs_str = record.refs.join(" ");
     let superseded_str = record.superseded_by.clone().unwrap_or_default();
@@ -758,5 +885,140 @@ mod tests {
         assert!(!valid_transition("approved", "pending"));
         assert!(!valid_transition("deprecated", "pending"));
         assert!(!valid_transition("deprecated", "approved"));
+    }
+
+    #[test]
+    fn title_from_em_dash() {
+        let content = "<title>MOCK-001 — Login screen</title>";
+        assert_eq!(extract_title(content, "MOCK-001"), "Login screen");
+    }
+
+    #[test]
+    fn title_from_mdash_entity() {
+        let content = "<title>MOCK-006 &mdash; Browser UI mockups review package</title>";
+        assert_eq!(
+            extract_title(content, "MOCK-006"),
+            "Browser UI mockups review package"
+        );
+    }
+
+    #[test]
+    fn title_without_separator_uses_id_prefix_or_whole() {
+        assert_eq!(
+            extract_title("<title>MOCK-001 My Title</title>", "MOCK-001"),
+            "My Title"
+        );
+        assert_eq!(
+            extract_title("<title>Just Title</title>", "MOCK-001"),
+            "Just Title"
+        );
+        assert_eq!(
+            extract_title("<title>MOCK-001</title>", "MOCK-001"),
+            "MOCK-001"
+        );
+    }
+
+    #[test]
+    fn title_absent_or_empty_falls_back_to_id() {
+        assert_eq!(
+            extract_title("<html><body>hi</body></html>", "MOCK-002"),
+            "MOCK-002"
+        );
+        assert_eq!(extract_title("<title>   </title>", "MOCK-002"), "MOCK-002");
+        assert_eq!(extract_title("<title></title>", "MOCK-002"), "MOCK-002");
+    }
+
+    #[test]
+    fn title_decodes_standard_entities() {
+        assert_eq!(
+            extract_title(
+                "<title>MOCK-001 — A &amp; B &lt;tag&gt;</title>",
+                "MOCK-001"
+            ),
+            "A & B <tag>"
+        );
+        assert_eq!(
+            extract_title(
+                "<title>MOCK-001 — &quot;Hi&quot; &#39;x&#39;</title>",
+                "MOCK-001"
+            ),
+            "\"Hi\" 'x'"
+        );
+        assert_eq!(decode_entities("&amp;mdash;"), "&mdash;");
+    }
+
+    #[test]
+    fn title_first_separator_wins() {
+        assert_eq!(
+            extract_title("<title>MOCK-001 — First &mdash; Second</title>", "MOCK-001"),
+            "First — Second"
+        );
+        assert_eq!(
+            extract_title("<title>MOCK-001 &mdash; First — Second</title>", "MOCK-001"),
+            "First — Second"
+        );
+    }
+
+    #[test]
+    fn comment_lists_preserve_order_and_drop_empty() {
+        let content = "<!-- specs: UI-002 UI-001 -->\n<!-- refs: docs/a.md  docs/b.md -->";
+        assert_eq!(comment_list(content, "specs"), vec!["UI-002", "UI-001"]);
+        assert_eq!(
+            comment_list(content, "refs"),
+            vec!["docs/a.md", "docs/b.md"]
+        );
+        assert_eq!(comment_list("<html></html>", "specs"), Vec::<String>::new());
+        assert_eq!(
+            comment_list("<!-- specs:  -->", "specs"),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn browser_metadata_reads_comments_only_and_stem_id() {
+        let content = concat!(
+            "<title>MOCK-006 &mdash; Review package</title>",
+            "<body><!-- specs: UI-001 UI-002 --><!-- refs: docs/a.md -->",
+            "<!-- task: TASK-1 --><!-- status: approved --><!-- superseded-by: MOCK-002 -->",
+            "<p>UI specifications: WRONG</p>",
+            "<h1>TASK-41 Landing heading</h1></body>"
+        );
+        let meta = parse_browser_metadata(content, "MOCK-006");
+        assert_eq!(meta.title, "Review package");
+        assert_eq!(meta.specs, vec!["UI-001", "UI-002"]);
+        assert_eq!(meta.refs, vec!["docs/a.md"]);
+        assert_eq!(meta.task, "TASK-1");
+        assert_eq!(meta.status, "approved");
+        assert_eq!(meta.superseded_by, Some("MOCK-002".to_string()));
+        let clean = "<!-- task: TASK-41 -->";
+        let meta2 = parse_browser_metadata(clean, "MOCK-006");
+        assert_eq!(meta2.task, "TASK-41");
+        assert_eq!(meta2.status, "");
+        assert_eq!(meta2.superseded_by, None);
+        assert_eq!(meta2.title, "MOCK-006");
+    }
+
+    #[test]
+    fn parse_record_uses_stem_and_title_tag_not_landing_h1() {
+        let content = concat!(
+            "<title>MOCK-006 &mdash; Browser UI mockups review package</title>",
+            "<body><h1>TASK-41 Landing heading</h1></body>"
+        );
+        assert_eq!(
+            extract_title(content, "MOCK-006"),
+            "Browser UI mockups review package"
+        );
+        let record = parse_record(content, "MOCK-006");
+        assert_eq!(record.id, "MOCK-006");
+        assert_eq!(record.title, "Browser UI mockups review package");
+    }
+
+    #[test]
+    fn parse_record_falls_back_to_stub_h1_only_without_title() {
+        let record = parse_record("<h1>MOCK-010 Later</h1>", "MOCK-010");
+        assert_eq!(record.id, "MOCK-010");
+        assert_eq!(record.title, "Later");
+        let record = parse_record("<html><body>hi</body></html>", "MOCK-010");
+        assert_eq!(record.title, "MOCK-010");
     }
 }
