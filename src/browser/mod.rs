@@ -427,6 +427,7 @@ fn category_from_query(request: &Request) -> Result<Category, HttpError> {
         Some(value) if value == "milestone" => Ok(Category::Milestone),
         Some(value) if value == "release" => Ok(Category::Release),
         Some(value) if value == "decision" => Ok(Category::Decision),
+        Some(value) if value == "glossary" => Ok(Category::Glossary),
         Some(_) => Err(HttpError::new(400)),
     }
 }
@@ -499,6 +500,12 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
     if path == "/api/decisions" {
         return match method {
             Method::Get | Method::Head => api_decisions(state),
+            _ => Err(HttpError::new(405)),
+        };
+    }
+    if path == "/api/glossary" {
+        return match method {
+            Method::Get | Method::Head => api_glossary(state),
             _ => Err(HttpError::new(405)),
         };
     }
@@ -749,6 +756,20 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 &record,
                 &values,
                 &render::DecisionFieldErrors::default(),
+                &record.version,
+                &cfg,
+                chrome,
+            )
+        }
+        Category::Glossary => {
+            let values = render::GlossaryEditValues {
+                title: record.title.clone(),
+                definition: record.definition.clone().unwrap_or_default(),
+            };
+            render::edit_page_glossary(
+                &record,
+                &values,
+                &render::GlossaryFieldErrors::default(),
                 &record.version,
                 &cfg,
                 chrome,
@@ -1278,6 +1299,51 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
+        Category::Glossary => {
+            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
+            let raw_definition = form_field(&fields, "definition").unwrap_or("").to_string();
+
+            let mut errors = render::GlossaryFieldErrors::default();
+            let title = match records::validate_title(&raw_title) {
+                Ok(t) => Some(t),
+                Err(m) => {
+                    errors.title = Some(m);
+                    None
+                }
+            };
+
+            let mut definition_change = FieldChange::Keep;
+            if form_field(&fields, "definition").is_some() {
+                match records::validate_multiline("Definition", &raw_definition) {
+                    Ok(v) => definition_change = render::change(v),
+                    Err(m) => errors.definition = Some(m),
+                }
+            }
+
+            if errors.any() {
+                let values = render::GlossaryEditValues {
+                    title: raw_title.clone(),
+                    definition: raw_definition.clone(),
+                };
+                return Ok(Response::html(
+                    422,
+                    render::edit_page_glossary(
+                        &record,
+                        &values,
+                        &errors,
+                        &record.version,
+                        &cfg,
+                        chrome,
+                    ),
+                ));
+            }
+
+            let title = title.unwrap_or_default();
+            let content =
+                records::apply_glossary_edit(&record.doc, &record.id, &title, definition_change);
+            records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
+            Ok(Response::redirect(&format!("/doc/{}", record.id)))
+        }
     }
 }
 
@@ -1302,7 +1368,7 @@ fn record_json(
             serde_json::json!({
                 "id": record.id,
                 "kind": record.kind.key(),
-                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision" },
+                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision", Form::Glossary => "glossary" },
                 "title": record.title,
                 "group": group_value,
                 "story": story,
@@ -1384,6 +1450,17 @@ fn record_json(
                 "context": record.context,
                 "consequences": record.consequences,
                 "superseded_by": superseded_value,
+                "version": record.version,
+                "path": record.rel_path,
+            })
+        }
+        Category::Glossary => {
+            serde_json::json!({
+                "id": record.id,
+                "kind": "glossary",
+                "form": "glossary",
+                "title": record.title,
+                "definition": record.definition,
                 "version": record.version,
                 "path": record.rel_path,
             })
@@ -1490,6 +1567,22 @@ fn api_decisions(state: &ServerState) -> Result<Response, HttpError> {
                 "title": r.title,
                 "status": r.status,
                 "type": r.decision_type,
+            })
+        })
+        .collect();
+    Ok(Response::json(200, serde_json::json!(items)))
+}
+
+fn api_glossary(state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let index = records::build_index(&state.context(), &cfg, Category::Glossary);
+    let items: Vec<serde_json::Value> = index
+        .records
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "id": r.id,
+                "title": r.title,
             })
         })
         .collect();
@@ -2046,6 +2139,36 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                     .map(|r| r.record.title)
             });
             let _ = superseded_title;
+            Ok(Response::json(200, record_json(&updated, None, None)))
+        }
+        Category::Glossary => {
+            let title = match object.get("title") {
+                None => return Err(HttpError::new(400)),
+                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
+                    Ok(t) => t,
+                    Err(m) => return Ok(json_error(422, &m)),
+                },
+                Some(_) => return Err(HttpError::new(400)),
+            };
+
+            let mut definition_change = FieldChange::Keep;
+            if let Some(v) = object.get("definition") {
+                match v {
+                    serde_json::Value::Null => definition_change = FieldChange::Clear,
+                    serde_json::Value::String(raw) => {
+                        match records::validate_multiline("Definition", raw) {
+                            Ok(val) => definition_change = render::change(val),
+                            Err(m) => return Ok(json_error(422, &m)),
+                        }
+                    }
+                    _ => return Err(HttpError::new(400)),
+                }
+            }
+
+            let content =
+                records::apply_glossary_edit(&record.doc, &record.id, &title, definition_change);
+            records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
+            let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
     }
