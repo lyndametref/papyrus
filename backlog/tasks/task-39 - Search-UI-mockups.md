@@ -1,16 +1,18 @@
 ---
 id: TASK-39
 title: Search UI mockups
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-04T19:20:00Z'
-updated_date: '2026-11-04T19:21:00Z'
+updated_date: '2026-11-06T19:16:00Z'
 labels:
   - search
   - documentation
 milestone: m-7
 dependencies:
   - TASK-38
+documentation:
+  - docs/specifications/search-ui-mockups.md
 priority: medium
 type: task
 ordinal: 25100
