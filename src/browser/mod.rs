@@ -428,6 +428,7 @@ fn category_from_query(request: &Request) -> Result<Category, HttpError> {
         Some(value) if value == "release" => Ok(Category::Release),
         Some(value) if value == "decision" => Ok(Category::Decision),
         Some(value) if value == "glossary" => Ok(Category::Glossary),
+        Some(value) if value == "ui-spec" => Ok(Category::UiSpec),
         Some(_) => Err(HttpError::new(400)),
     }
 }
@@ -506,6 +507,12 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
     if path == "/api/glossary" {
         return match method {
             Method::Get | Method::Head => api_glossary(state),
+            _ => Err(HttpError::new(405)),
+        };
+    }
+    if path == "/api/ui-specs" || path == "/api/ui-specifications" || path == "/api/ui-spec" {
+        return match method {
+            Method::Get | Method::Head => api_ui_specs(state),
             _ => Err(HttpError::new(405)),
         };
     }
@@ -770,6 +777,21 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 &record,
                 &values,
                 &render::GlossaryFieldErrors::default(),
+                &record.version,
+                &cfg,
+                chrome,
+            )
+        }
+        Category::UiSpec => {
+            let values = render::UiSpecEditValues {
+                title: record.title.clone(),
+                view: record.view.clone().unwrap_or_default(),
+                description: record.description.clone().unwrap_or_default(),
+            };
+            render::edit_page_ui_spec(
+                &record,
+                &values,
+                &render::UiSpecFieldErrors::default(),
                 &record.version,
                 &cfg,
                 chrome,
@@ -1344,6 +1366,66 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
+        Category::UiSpec => {
+            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
+            let raw_view = form_field(&fields, "view").unwrap_or("").to_string();
+            let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
+
+            let mut errors = render::UiSpecFieldErrors::default();
+            let title = match records::validate_title(&raw_title) {
+                Ok(t) => Some(t),
+                Err(m) => {
+                    errors.title = Some(m);
+                    None
+                }
+            };
+            let view = match records::validate_title(&raw_view) {
+                Ok(t) => Some(t),
+                Err(m) => {
+                    errors.view = Some(m);
+                    None
+                }
+            };
+            let mut description_change = FieldChange::Keep;
+            if form_field(&fields, "description").is_some() {
+                match records::validate_multiline("Description", &raw_description) {
+                    Ok(v) => description_change = render::change(v),
+                    Err(m) => errors.description = Some(m),
+                }
+            }
+            if errors.any() {
+                let values = render::UiSpecEditValues {
+                    title: raw_title.clone(),
+                    view: raw_view.clone(),
+                    description: raw_description.clone(),
+                };
+                return Ok(Response::html(
+                    422,
+                    render::edit_page_ui_spec(
+                        &record,
+                        &values,
+                        &errors,
+                        &record.version,
+                        &cfg,
+                        chrome,
+                    ),
+                ));
+            }
+            let title = title.unwrap_or_default();
+            let view_change = match view {
+                Some(v) => render::change(Some(v)),
+                None => FieldChange::Keep,
+            };
+            let content = records::apply_ui_spec_edit(
+                &record.doc,
+                &record.id,
+                &title,
+                view_change,
+                description_change,
+            );
+            records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
+            Ok(Response::redirect(&format!("/doc/{}", record.id)))
+        }
     }
 }
 
@@ -1368,7 +1450,7 @@ fn record_json(
             serde_json::json!({
                 "id": record.id,
                 "kind": record.kind.key(),
-                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision", Form::Glossary => "glossary" },
+                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision", Form::Glossary => "glossary", Form::UiSpec => "ui-spec" },
                 "title": record.title,
                 "group": group_value,
                 "story": story,
@@ -1461,6 +1543,18 @@ fn record_json(
                 "form": "glossary",
                 "title": record.title,
                 "definition": record.definition,
+                "version": record.version,
+                "path": record.rel_path,
+            })
+        }
+        Category::UiSpec => {
+            serde_json::json!({
+                "id": record.id,
+                "kind": "ui-spec",
+                "form": "ui-spec",
+                "title": record.title,
+                "view": record.view,
+                "description": record.description,
                 "version": record.version,
                 "path": record.rel_path,
             })
@@ -1576,6 +1670,22 @@ fn api_decisions(state: &ServerState) -> Result<Response, HttpError> {
 fn api_glossary(state: &ServerState) -> Result<Response, HttpError> {
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let index = records::build_index(&state.context(), &cfg, Category::Glossary);
+    let items: Vec<serde_json::Value> = index
+        .records
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "id": r.id,
+                "title": r.title,
+            })
+        })
+        .collect();
+    Ok(Response::json(200, serde_json::json!(items)))
+}
+
+fn api_ui_specs(state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let index = records::build_index(&state.context(), &cfg, Category::UiSpec);
     let items: Vec<serde_json::Value> = index
         .records
         .iter()
@@ -2167,6 +2277,50 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
 
             let content =
                 records::apply_glossary_edit(&record.doc, &record.id, &title, definition_change);
+            records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
+            let (updated, _updated_cfg) = resolve_record(id, state)?;
+            Ok(Response::json(200, record_json(&updated, None, None)))
+        }
+        Category::UiSpec => {
+            let title = match object.get("title") {
+                None => return Err(HttpError::new(400)),
+                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
+                    Ok(t) => t,
+                    Err(m) => return Ok(json_error(422, &m)),
+                },
+                Some(_) => return Err(HttpError::new(400)),
+            };
+            let mut view_change = FieldChange::Keep;
+            if let Some(v) = object.get("view") {
+                match v {
+                    serde_json::Value::Null => view_change = FieldChange::Clear,
+                    serde_json::Value::String(raw) => match records::validate_title(raw) {
+                        Ok(val) => view_change = render::change(Some(val)),
+                        Err(m) => return Ok(json_error(422, &m)),
+                    },
+                    _ => return Err(HttpError::new(400)),
+                }
+            }
+            let mut description_change = FieldChange::Keep;
+            if let Some(v) = object.get("description") {
+                match v {
+                    serde_json::Value::Null => description_change = FieldChange::Clear,
+                    serde_json::Value::String(raw) => {
+                        match records::validate_multiline("Description", raw) {
+                            Ok(val) => description_change = render::change(val),
+                            Err(m) => return Ok(json_error(422, &m)),
+                        }
+                    }
+                    _ => return Err(HttpError::new(400)),
+                }
+            }
+            let content = records::apply_ui_spec_edit(
+                &record.doc,
+                &record.id,
+                &title,
+                view_change,
+                description_change,
+            );
             records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))

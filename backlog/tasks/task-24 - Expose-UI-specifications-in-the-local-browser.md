@@ -1,10 +1,10 @@
 ---
 id: TASK-24
 title: Expose UI specifications in the local browser
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-02T20:19:00Z'
-updated_date: '2026-11-04T19:40:00Z'
+updated_date: '2026-11-06T17:44:00Z'
 labels:
   - browser
   - documentation
