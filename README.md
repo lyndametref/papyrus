@@ -846,6 +846,13 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
         <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.ui-spec.directory&gt;/deprecated/</b>
         Deprecated UI specifications, under the configured UI specifications folder.
 
+        <b style="color: light-dark(#8250df, #d2a8ff);">docs/specifications/ui/mockups/</b>
+        UI mockups. Path is <b>doc_directory</b> plus
+        <b>document_types.ui-mockup.directory</b>.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.ui-mockup.directory&gt;/deprecated/</b>
+        Deprecated UI mockups, under the configured UI mockups folder.
+
         <b style="color: light-dark(#8250df, #d2a8ff);">docs/business-rules/</b>
         Business rules. Path is <b>doc_directory</b> plus
         <b>document_types.rule.directory</b>.
@@ -1043,6 +1050,7 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
          glossary: { prefix: GLO, directory: glossary/,                    enabled: true }
          rule:     { prefix: RUL, directory: business-rules/,              enabled: true }
          ui-spec:  { prefix: UI,  directory: specifications/ui/,           enabled: true }
+         ui-mockup: { prefix: MOCK, directory: specifications/ui/mockups/, enabled: true }
          tech-spec: { prefix: TECH, directory: technical/, enabled: true }
          audit:    { prefix: AUD, directory: audit-records/,                enabled: true }
          deploy:   { prefix: DEP, directory: architecture/deployment/,     enabled: true }
@@ -1087,6 +1095,7 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
          glossary: { prefix: GLO, directory: glossary/,                    enabled: true }
          rule:     { prefix: RUL, directory: business-rules/,              enabled: true }
          ui-spec:  { prefix: UI,  directory: specifications/ui/,           enabled: true }
+         ui-mockup: { prefix: MOCK, directory: specifications/ui/mockups/, enabled: true }
          tech-spec: { prefix: TECH, directory: technical/, enabled: true }
          audit:    { prefix: AUD, directory: audit-records/,                enabled: true }
          deploy:   { prefix: DEP, directory: architecture/deployment/,     enabled: true }
