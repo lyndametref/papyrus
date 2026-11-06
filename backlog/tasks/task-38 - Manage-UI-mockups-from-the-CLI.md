@@ -1,10 +1,10 @@
 ---
 id: TASK-38
 title: Manage UI mockups from the CLI
-status: Refined
+status: Done
 assignee: []
 created_date: '2026-11-04T19:20:00Z'
-updated_date: '2026-11-06T07:14:00Z'
+updated_date: '2026-11-06T07:23:00Z'
 labels:
   - cli
   - documentation
