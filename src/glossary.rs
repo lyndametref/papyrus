@@ -67,8 +67,14 @@ pub fn run(ctx: &Context, cmd: GlossaryCmd) -> Result<crate::CommandOutput, AppE
 }
 
 fn sanitize_text(input: &str) -> Result<String, AppError> {
-    sanitize::sanitize_name(input)
-        .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))
+    let value = sanitize::sanitize_name(input)
+        .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?;
+    if value.chars().any(char::is_control) {
+        return Err(AppError::Validation(
+            "input cannot be normalized".to_string(),
+        ));
+    }
+    Ok(value)
 }
 
 fn load_config(ctx: &Context) -> Result<Config, AppError> {
@@ -205,7 +211,7 @@ pub fn create(ctx: &Context, term_raw: &str, definition_raw: &str) -> Result<Str
     let active = active_dir(ctx, &cfg)?;
     let deprecated = deprecated_dir(ctx, &cfg)?;
     ensure_dirs(&active)?;
-    let _ = ensure_dirs(&deprecated);
+    ensure_dirs(&deprecated)?;
 
     let max = scan_max(&active, &deprecated, &entry.prefix);
     let next = max + 1;
@@ -349,28 +355,32 @@ pub fn edit(
         gd.definition = sanitize_text(d)?;
     }
 
+    let editor_cmd = if editor {
+        Some(
+            cfg.effective_editor()
+                .ok_or_else(|| AppError::Runtime("no editor configured".to_string()))?,
+        )
+    } else {
+        None
+    };
+
     let new_content = render_glossary(&gd);
     let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
     fs::write(&safe_write, new_content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
 
-    if editor {
-        let editor_cmd = cfg.effective_editor();
-        if let Some(cmd) = editor_cmd {
-            let mut parts = cmd.split_whitespace();
-            let prog = parts.next().unwrap_or("");
-            if prog.is_empty() {
-                return Err(AppError::Runtime("no editor configured".to_string()));
-            }
-            let status = std::process::Command::new(prog)
-                .args(parts)
-                .arg(&safe_write)
-                .status()
-                .map_err(|e| AppError::Runtime(e.to_string()))?;
-            if !status.success() {
-                return Err(AppError::Runtime(format!("editor exited with {}", status)));
-            }
-        } else {
+    if let Some(command) = editor_cmd {
+        let mut parts = command.split_whitespace();
+        let prog = parts.next().unwrap_or("");
+        if prog.is_empty() {
             return Err(AppError::Runtime("no editor configured".to_string()));
+        }
+        let status = std::process::Command::new(prog)
+            .args(parts)
+            .arg(&safe_write)
+            .status()
+            .map_err(|e| AppError::Runtime(e.to_string()))?;
+        if !status.success() {
+            return Err(AppError::Runtime(format!("editor exited with {}", status)));
         }
     }
 
