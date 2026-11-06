@@ -11,6 +11,7 @@ pub mod nfreq;
 pub mod release;
 pub mod req;
 pub mod requirement;
+pub mod rule;
 pub mod sanitize;
 pub mod search;
 pub mod task;
@@ -118,6 +119,11 @@ pub enum Commands {
     UiSpec {
         #[command(subcommand)]
         action: ui_spec::UiSpecCmd,
+    },
+    /// Manage business rules.
+    Rule {
+        #[command(subcommand)]
+        action: rule::RuleCmd,
     },
     /// Manage UI mockups.
     UiMockup {
@@ -314,6 +320,10 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
         Commands::UiSpec { action } => {
             let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
             ui_spec::run(&ctx, action)
+        }
+        Commands::Rule { action } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            rule::run(&ctx, action)
         }
         Commands::UiMockup { action } => {
             let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
