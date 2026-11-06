@@ -11,7 +11,7 @@ use std::fs;
 use std::path::PathBuf;
 
 const DOC_TYPE: &str = "doc";
-const DOC_KEYS: [&str; 3] = ["req", "nfr", "glossary"];
+const DOC_KEYS: [&str; 4] = ["req", "nfr", "glossary", "ui-spec"];
 
 pub fn sanitize_query(raw: &str) -> Result<String, AppError> {
     let trimmed = raw.trim();
@@ -116,15 +116,26 @@ fn collect_type(
     let entries = fs::read_dir(&dir).map_err(|e| {
         AppError::Runtime(format!("cannot read directory {}: {}", dir.display(), e))
     })?;
-    for entry in entries {
-        let entry = entry.map_err(|e| AppError::Runtime(e.to_string()))?;
-        let path = entry.path();
+    for dir_entry in entries {
+        let dir_entry = dir_entry.map_err(|e| AppError::Runtime(e.to_string()))?;
+        let path = dir_entry.path();
         if path.extension().and_then(|s| s.to_str()) != Some("md") {
             continue;
         }
         let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
+        // UI specifications share their directory with UI description documents
+        // and mockup indexes; only `<prefix>-<digits>` files are records (BR-012).
+        if key == "ui-spec" {
+            let prefix = format!("{}-", entry.prefix);
+            let Some(rest) = id.strip_prefix(&prefix) else {
+                continue;
+            };
+            if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+                continue;
+            }
+        }
         let safe = Context::ensure_within(&ctx.project_dir, &path)?;
         let Ok(content) = fs::read_to_string(&safe) else {
             continue;
@@ -166,9 +177,9 @@ fn collect_backlog_store(
     let entries = fs::read_dir(&dir).map_err(|e| {
         AppError::Runtime(format!("cannot read directory {}: {}", dir.display(), e))
     })?;
-    for entry in entries {
-        let entry = entry.map_err(|e| AppError::Runtime(e.to_string()))?;
-        let path = entry.path();
+    for dir_entry in entries {
+        let dir_entry = dir_entry.map_err(|e| AppError::Runtime(e.to_string()))?;
+        let path = dir_entry.path();
         if path.extension().and_then(|s| s.to_str()) != Some("md") {
             continue;
         }
@@ -212,9 +223,9 @@ fn collect_decision_store(
     let entries = fs::read_dir(&dir).map_err(|e| {
         AppError::Runtime(format!("cannot read directory {}: {}", dir.display(), e))
     })?;
-    for entry in entries {
-        let entry = entry.map_err(|e| AppError::Runtime(e.to_string()))?;
-        let path = entry.path();
+    for dir_entry in entries {
+        let dir_entry = dir_entry.map_err(|e| AppError::Runtime(e.to_string()))?;
+        let path = dir_entry.path();
         if path.is_dir() {
             continue;
         }
