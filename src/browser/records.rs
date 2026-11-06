@@ -33,6 +33,7 @@ pub enum Category {
     Decision,
     Glossary,
     UiSpec,
+    UiMockup,
 }
 
 impl Category {
@@ -46,6 +47,7 @@ impl Category {
             Category::Decision => "decision",
             Category::Glossary => "glossary",
             Category::UiSpec => "ui-spec",
+            Category::UiMockup => "ui-mockup",
         }
     }
 
@@ -69,6 +71,7 @@ pub enum Form {
     Decision,
     Glossary,
     UiSpec,
+    UiMockup,
 }
 
 impl Form {
@@ -82,6 +85,7 @@ impl Form {
             Form::Decision => "Decision",
             Form::Glossary => "Glossary term",
             Form::UiSpec => "UI specification",
+            Form::UiMockup => "UI mockup",
         }
     }
 }
@@ -134,6 +138,9 @@ pub struct Record {
     pub decision_type: Option<String>,
     pub superseded_by: Option<String>,
     pub superseded_title: Option<String>,
+    pub specs: Vec<String>,
+    pub refs: Vec<String>,
+    pub mockup_task: String,
     pub doc: Doc,
     pub path: PathBuf,
     pub rel_path: String,
@@ -155,6 +162,7 @@ impl Record {
             Category::Decision => "Decision",
             Category::Glossary => "Glossary",
             Category::UiSpec => "UI Specifications",
+            Category::UiMockup => "UI Mockups",
         };
         match self.form {
             Form::Group => format!("{} group", base),
@@ -164,7 +172,8 @@ impl Record {
             | Form::Release
             | Form::Decision
             | Form::Glossary
-            | Form::UiSpec => base.to_string(),
+            | Form::UiSpec
+            | Form::UiMockup => base.to_string(),
         }
     }
 }
@@ -355,15 +364,22 @@ fn active_entry(cfg: &Config, kind: Category) -> Option<crate::config::DocTypeEn
             .get("ui-spec")
             .cloned()
             .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
+        Category::UiMockup => cfg
+            .document_types
+            .get("ui-mockup")
+            .cloned()
+            .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
     }
 }
 
 fn active_dir(ctx: &Context, cfg: &Config, kind: Category) -> Option<PathBuf> {
     let entry = active_entry(cfg, kind)?;
     let base = match kind {
-        Category::Req | Category::Nfr | Category::Glossary | Category::UiSpec => {
-            ctx.project_dir.join(&cfg.doc_directory)
-        }
+        Category::Req
+        | Category::Nfr
+        | Category::Glossary
+        | Category::UiSpec
+        | Category::UiMockup => ctx.project_dir.join(&cfg.doc_directory),
         Category::Task | Category::Milestone | Category::Release => {
             ctx.project_dir.join(&cfg.backlog_directory)
         }
@@ -596,6 +612,9 @@ fn load_backlog_record(
         decision_type: None,
         superseded_by: None,
         superseded_title: None,
+        specs: Vec::new(),
+        refs: Vec::new(),
+        mockup_task: String::new(),
         doc: parse_doc(&content),
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
@@ -680,6 +699,9 @@ fn load_decision_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
         decision_type,
         superseded_by,
         superseded_title,
+        specs: Vec::new(),
+        refs: Vec::new(),
+        mockup_task: String::new(),
         doc,
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
@@ -755,6 +777,9 @@ fn load_glossary_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
         decision_type: None,
         superseded_by: None,
         superseded_title: None,
+        specs: Vec::new(),
+        refs: Vec::new(),
+        mockup_task: String::new(),
         doc,
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
@@ -831,7 +856,93 @@ fn load_ui_spec_record(ctx: &Context, path: &Path) -> Result<Option<Record>, App
         decision_type: None,
         superseded_by: None,
         superseded_title: None,
+        specs: Vec::new(),
+        refs: Vec::new(),
+        mockup_task: String::new(),
         doc,
+        path: safe.clone(),
+        rel_path: relative_path(&ctx.project_dir, &safe),
+        version: version_token(&meta),
+    }))
+}
+
+fn load_ui_mockup_record(ctx: &Context, path: &Path) -> Result<Option<Record>, AppError> {
+    let safe = match Context::ensure_within(&ctx.project_dir, path) {
+        Ok(safe) => safe,
+        Err(_) => return Ok(None),
+    };
+    let content = match fs::read_to_string(&safe) {
+        Ok(content) => content,
+        Err(_) => return Ok(None),
+    };
+    let meta = match fs::metadata(&safe) {
+        Ok(meta) => meta,
+        Err(_) => return Ok(None),
+    };
+    let Some(stem) = safe.file_stem().and_then(|s| s.to_str()) else {
+        return Ok(None);
+    };
+    if !valid_id(stem) {
+        return Ok(None);
+    }
+    let cfg = match crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir) {
+        Ok(c) => c,
+        Err(_) => return Ok(None),
+    };
+    let entry = match active_entry(&cfg, Category::UiMockup) {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+    let rest = match stem.strip_prefix(&format!("{}-", entry.prefix)) {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+    if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+        return Ok(None);
+    }
+    let meta_record = crate::ui_mockup::parse_browser_metadata(&content, stem);
+    let title = meta_record.title.clone();
+    Ok(Some(Record {
+        id: stem.to_string(),
+        kind: Category::UiMockup,
+        form: Form::UiMockup,
+        title: title.clone(),
+        story: None,
+        group_id: None,
+        group_title: None,
+        description: None,
+        definition: None,
+        view: None,
+        status: if meta_record.status.is_empty() {
+            None
+        } else {
+            Some(meta_record.status.clone())
+        },
+        milestone_id: None,
+        milestone_title: None,
+        assignee: None,
+        labels: Vec::new(),
+        dependencies: Vec::new(),
+        acceptance_criteria: Vec::new(),
+        comments: Vec::new(),
+        release_id: None,
+        release_title: None,
+        decision: None,
+        context: None,
+        consequences: None,
+        decision_type: None,
+        superseded_by: meta_record.superseded_by.clone(),
+        superseded_title: None,
+        specs: meta_record.specs.clone(),
+        refs: meta_record.refs.clone(),
+        mockup_task: meta_record.task.clone(),
+        doc: Doc {
+            id: stem.to_string(),
+            title: title.clone(),
+            heading: format!("# {} {}", stem, title),
+            preamble: Vec::new(),
+            sections: Vec::new(),
+        },
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
         version: version_token(&meta),
@@ -851,6 +962,9 @@ fn load_record_from_path(
     }
     if kind == Category::UiSpec {
         return load_ui_spec_record(ctx, path);
+    }
+    if kind == Category::UiMockup {
+        return load_ui_mockup_record(ctx, path);
     }
     if matches!(
         kind,
@@ -953,6 +1067,9 @@ fn load_record_from_path(
         decision_type: None,
         superseded_by: None,
         superseded_title: None,
+        specs: Vec::new(),
+        refs: Vec::new(),
+        mockup_task: String::new(),
         doc,
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
@@ -977,6 +1094,7 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
             | Category::Decision
             | Category::Glossary
             | Category::UiSpec
+            | Category::UiMockup
     ) {
         let Some(entry) = active_entry(cfg, kind) else {
             return index;
@@ -989,7 +1107,11 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
         };
         for dir_entry in read_dir.flatten() {
             let path = dir_entry.path();
-            if path.extension().and_then(|s| s.to_str()) != Some("md") {
+            let allowed = match kind {
+                Category::UiMockup => path.extension().and_then(|s| s.to_str()) == Some("html"),
+                _ => path.extension().and_then(|s| s.to_str()) == Some("md"),
+            };
+            if !allowed {
                 continue;
             }
             let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
@@ -1097,6 +1219,7 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
         Category::Decision,
         Category::Glossary,
         Category::UiSpec,
+        Category::UiMockup,
     ] {
         let Some(entry) = active_entry(cfg, kind) else {
             continue;
@@ -1109,7 +1232,11 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
         };
         for dir_entry in read_dir.flatten() {
             let path = dir_entry.path();
-            if path.extension().and_then(|s| s.to_str()) != Some("md") {
+            let allowed = match kind {
+                Category::UiMockup => path.extension().and_then(|s| s.to_str()) == Some("html"),
+                _ => path.extension().and_then(|s| s.to_str()) == Some("md"),
+            };
+            if !allowed {
                 continue;
             }
             if path.file_stem().and_then(|s| s.to_str()) != Some(id) {
@@ -1117,7 +1244,10 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
             }
             let valid = if kind == Category::Decision {
                 crate::decision::type_key_for_id(cfg, id).is_some()
-            } else if kind == Category::Glossary || kind == Category::UiSpec {
+            } else if kind == Category::Glossary
+                || kind == Category::UiSpec
+                || kind == Category::UiMockup
+            {
                 id.strip_prefix(&format!("{}-", entry.prefix))
                     .map(|r| !r.is_empty() && r.bytes().all(|b| b.is_ascii_digit()))
                     .unwrap_or(false)
@@ -1649,6 +1779,277 @@ pub fn apply_ui_spec_edit(
     output
 }
 
+fn html_escape_text(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for character in value.chars() {
+        match character {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+/// Inner span of the first `<title>` element: (start, end, uses `&mdash;`).
+fn title_inner_span(content: &str) -> Option<(usize, usize, bool)> {
+    let mut search = 0usize;
+    while let Some(rel) = content[search..].find("<title") {
+        let open_start = search + rel;
+        let after_open = open_start + "<title".len();
+        let after = &content[after_open..];
+        let next = after.chars().next();
+        if next != Some('>') && !next.is_some_and(|c| c.is_whitespace()) {
+            search = open_start + "<title".len();
+            continue;
+        }
+        let gt = content[open_start..].find('>')?;
+        let inner_start = open_start + gt + 1;
+        let close_rel = content[inner_start..].find("</title>")?;
+        let inner_end = inner_start + close_rel;
+        let raw = &content[inner_start..inner_end];
+        let dash = raw.find('—');
+        let entity = raw.find("&mdash;");
+        let uses_entity = match (dash, entity) {
+            (Some(d), Some(e)) => e < d,
+            (Some(_), None) => false,
+            (None, Some(_)) => true,
+            (None, None) => false,
+        };
+        return Some((inner_start, inner_end, uses_entity));
+    }
+    None
+}
+
+/// Inner span of the first `<h1>` whose text starts with `id` plus whitespace.
+fn stub_h1_inner_span(content: &str, id: &str) -> Option<(usize, usize)> {
+    let mut search = 0usize;
+    while let Some(rel) = content[search..].find("<h1") {
+        let open_start = search + rel;
+        let after_open = open_start + "<h1".len();
+        let after = &content[after_open..];
+        let next = after.chars().next();
+        if next != Some('>') && !next.is_some_and(|c| c.is_whitespace()) {
+            search = open_start + "<h1".len();
+            continue;
+        }
+        let gt_rel = content[open_start..].find('>')?;
+        let inner_start = open_start + gt_rel + 1;
+        let close_rel = content[inner_start..].find("</h1>")?;
+        let inner_end = inner_start + close_rel;
+        let inner = &content[inner_start..inner_end];
+        let follows = inner
+            .strip_prefix(id)
+            .and_then(|rest| rest.chars().next())
+            .is_some_and(|c| c.is_whitespace());
+        if follows {
+            return Some((inner_start, inner_end));
+        }
+        search = inner_end + "</h1>".len();
+    }
+    None
+}
+
+/// Full span of the first `<!-- key: ... -->` comment.
+fn comment_span(content: &str, key: &str) -> Option<(usize, usize)> {
+    let mut search = 0usize;
+    let prefix = format!("{}:", key);
+    while let Some(rel) = content[search..].find("<!--") {
+        let start = search + rel;
+        let end_rel = content[start..].find("-->")?;
+        let inner_start = start + "<!--".len();
+        let inner_end = start + end_rel;
+        let inner = content[inner_start..inner_end].trim();
+        if inner.starts_with(&prefix) {
+            return Some((start, inner_end + "-->".len()));
+        }
+        search = inner_end + "-->".len();
+    }
+    None
+}
+
+/// Inner span of the first `<p>` whose text starts with `label:`.
+fn visible_para_inner_span(content: &str, label: &str) -> Option<(usize, usize)> {
+    let mut search = 0usize;
+    let prefix = format!("{}:", label);
+    while let Some(rel) = content[search..].find("<p") {
+        let open_start = search + rel;
+        let after_open = open_start + "<p".len();
+        let after = &content[after_open..];
+        let next = after.chars().next();
+        if next != Some('>') && !next.is_some_and(|c| c.is_whitespace()) {
+            search = open_start + "<p".len();
+            continue;
+        }
+        let gt_rel = content[open_start..].find('>')?;
+        let inner_start = open_start + gt_rel + 1;
+        let close_rel = content[inner_start..].find("</p>")?;
+        let inner_end = inner_start + close_rel;
+        let inner = content[inner_start..inner_end].trim();
+        if inner.starts_with(&prefix) {
+            return Some((inner_start, inner_end));
+        }
+        search = inner_end + "</p>".len();
+    }
+    None
+}
+
+/// Byte index immediately after the opening `<body ...>` tag.
+fn body_open_end(content: &str) -> Option<usize> {
+    let mut search = 0usize;
+    while let Some(rel) = content[search..].find("<body") {
+        let open_start = search + rel;
+        let after_open = open_start + "<body".len();
+        let after = &content[after_open..];
+        let next = after.chars().next();
+        if next != Some('>') && !next.is_some_and(|c| c.is_whitespace()) {
+            search = open_start + "<body".len();
+            continue;
+        }
+        let gt = content[open_start..].find('>')?;
+        return Some(open_start + gt + 1);
+    }
+    None
+}
+
+/// Field-preserving serialization for UI mockups (specification section 8).
+///
+/// Only the `<title>` text, a stub `<h1>` starting with the record ID, the
+/// `specs`/`refs` comment lines, and existing visible metadata lines are
+/// rewritten. Every other byte — styles, scripts, slides, and body markup —
+/// is preserved content-identically. The CLI stub serializer is never used.
+pub fn apply_ui_mockup_edit(
+    original: &str,
+    id: &str,
+    title: &str,
+    specs: &[String],
+    refs: &[String],
+) -> String {
+    let mut edits: Vec<(usize, usize, String)> = Vec::new();
+    if let Some((start, end, uses_entity)) = title_inner_span(original) {
+        let separator = if uses_entity { "&mdash;" } else { "—" };
+        edits.push((
+            start,
+            end,
+            format!("{} {} {}", id, separator, html_escape_text(title)),
+        ));
+    }
+    if let Some((start, end)) = stub_h1_inner_span(original, id) {
+        edits.push((start, end, format!("{} {}", id, html_escape_text(title))));
+    }
+    let specs_comment = comment_span(original, "specs");
+    let refs_comment = comment_span(original, "refs");
+    if let Some((start, end)) = specs_comment {
+        edits.push((start, end, format!("<!-- specs: {} -->", specs.join(" "))));
+    }
+    if let Some((start, end)) = refs_comment {
+        edits.push((start, end, format!("<!-- refs: {} -->", refs.join(" "))));
+    }
+    if let Some((start, end)) = visible_para_inner_span(original, "UI specifications") {
+        edits.push((
+            start,
+            end,
+            format!("UI specifications: {}", html_escape_text(&specs.join(" "))),
+        ));
+    }
+    if let Some((start, end)) = visible_para_inner_span(original, "References") {
+        edits.push((
+            start,
+            end,
+            format!("References: {}", html_escape_text(&refs.join(" "))),
+        ));
+    }
+    let missing_specs = specs_comment.is_none();
+    let missing_refs = refs_comment.is_none();
+    if missing_specs || missing_refs {
+        let mut block = String::new();
+        if missing_specs {
+            block.push_str(&format!("<!-- specs: {} -->\n", specs.join(" ")));
+        }
+        if missing_refs {
+            block.push_str(&format!("<!-- refs: {} -->\n", refs.join(" ")));
+        }
+        match body_open_end(original) {
+            Some(pos) => edits.push((pos, pos, format!("\n{}", block))),
+            None => {
+                let separator = if original.is_empty() || original.ends_with('\n') {
+                    String::new()
+                } else {
+                    "\n".to_string()
+                };
+                edits.push((
+                    original.len(),
+                    original.len(),
+                    format!("{}{}", separator, block),
+                ));
+            }
+        }
+    }
+    edits.sort_by_key(|a| std::cmp::Reverse(a.0));
+    let mut output = original.to_string();
+    for (start, end, replacement) in edits {
+        output.replace_range(start..end, &replacement);
+    }
+    output
+}
+
+/// Trimmed, non-empty submitted tag values in order (for 422 preservation).
+pub fn submitted_tag_values(values: &[String]) -> Vec<String> {
+    values
+        .iter()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .collect()
+}
+
+/// Validate `specs` values (specification section 7.2).
+pub fn validate_specs(values: &[String]) -> Result<Vec<String>, String> {
+    let trimmed = submitted_tag_values(values);
+    if trimmed.is_empty() {
+        return Err("At least one UI specification id is required.".to_string());
+    }
+    for value in &trimmed {
+        if !valid_id(value) {
+            return Err("UI specification ids must be valid record IDs.".to_string());
+        }
+    }
+    let mut seen: Vec<String> = Vec::new();
+    for value in &trimmed {
+        if seen.contains(value) {
+            return Err(format!("Duplicate UI specification id: {}.", value));
+        }
+        seen.push(value.clone());
+    }
+    Ok(trimmed)
+}
+
+/// Validate `refs` values (specification section 7.3).
+pub fn validate_refs(values: &[String]) -> Result<Vec<String>, String> {
+    let trimmed = submitted_tag_values(values);
+    for value in &trimmed {
+        if value.chars().count() > 200 {
+            return Err("References must be at most 200 characters.".to_string());
+        }
+        if value.chars().any(|c| c.is_control()) {
+            return Err("References cannot contain control characters.".to_string());
+        }
+        if value.chars().any(|c| c.is_whitespace()) {
+            return Err("References cannot contain whitespace.".to_string());
+        }
+    }
+    let mut seen: Vec<String> = Vec::new();
+    for value in &trimmed {
+        if seen.contains(value) {
+            return Err(format!("Duplicate reference: {}.", value));
+        }
+        seen.push(value.clone());
+    }
+    Ok(trimmed)
+}
+
 /// Whether a decision ID exists in the active or archived store.
 pub fn decision_exists(ctx: &Context, cfg: &Config, id: &str) -> bool {
     let Some(active) = active_dir(ctx, cfg, Category::Decision) else {
@@ -1824,5 +2225,134 @@ mod tests {
         assert!(validate_multiline("Description", "a\n## Section\nb").is_err());
         assert!(validate_multiline("Description", "a\u{0007}b").is_err());
         assert!(validate_multiline("Description", "a\tb").is_ok());
+    }
+
+    #[test]
+    fn ui_mockup_specs_validation() {
+        assert_eq!(
+            validate_specs(&["UI-001".to_string(), " UI-002 ".to_string()]).unwrap(),
+            vec!["UI-001".to_string(), "UI-002".to_string()]
+        );
+        // Empty occurrences are dropped (no-JS trailing input).
+        assert_eq!(
+            validate_specs(&["UI-001".to_string(), "".to_string(), "  ".to_string()]).unwrap(),
+            vec!["UI-001".to_string()]
+        );
+        assert_eq!(
+            validate_specs(&[]).unwrap_err(),
+            "At least one UI specification id is required."
+        );
+        assert_eq!(
+            validate_specs(&["".to_string()]).unwrap_err(),
+            "At least one UI specification id is required."
+        );
+        assert_eq!(
+            validate_specs(&["bad id".to_string()]).unwrap_err(),
+            "UI specification ids must be valid record IDs."
+        );
+        assert_eq!(
+            validate_specs(&["../x".to_string()]).unwrap_err(),
+            "UI specification ids must be valid record IDs."
+        );
+        assert_eq!(
+            validate_specs(&["UI-001".to_string(), "UI-001".to_string()]).unwrap_err(),
+            "Duplicate UI specification id: UI-001."
+        );
+    }
+
+    #[test]
+    fn ui_mockup_refs_validation() {
+        assert_eq!(
+            validate_refs(&["docs/a.md".to_string()]).unwrap(),
+            vec!["docs/a.md".to_string()]
+        );
+        assert_eq!(
+            validate_refs(&["".to_string()]).unwrap(),
+            Vec::<String>::new()
+        );
+        assert_eq!(validate_refs(&[]).unwrap(), Vec::<String>::new());
+        assert_eq!(
+            validate_refs(&["x".repeat(201)]).unwrap_err(),
+            "References must be at most 200 characters."
+        );
+        assert_eq!(
+            validate_refs(&["a\u{0007}b".to_string()]).unwrap_err(),
+            "References cannot contain control characters."
+        );
+        assert_eq!(
+            validate_refs(&["a b".to_string()]).unwrap_err(),
+            "References cannot contain whitespace."
+        );
+        assert_eq!(
+            validate_refs(&["docs/a.md".to_string(), "docs/a.md".to_string()]).unwrap_err(),
+            "Duplicate reference: docs/a.md."
+        );
+    }
+
+    #[test]
+    fn ui_mockup_stub_round_trip() {
+        let original = "<!doctype html>\n<html><head><title>MOCK-001 — Old</title></head><body>\n<!-- mockup-id: MOCK-001 -->\n<!-- status: pending -->\n<!-- task: T -->\n<!-- specs: UI-001 -->\n<!-- refs: docs/old.md -->\n<h1>MOCK-001 Old</h1>\n<p>Status: pending</p>\n<p>Task: T</p>\n<p>UI specifications: UI-001</p>\n<p>References: docs/old.md</p>\n<p>Superseded by: </p>\n</body></html>\n";
+        let output = apply_ui_mockup_edit(
+            original,
+            "MOCK-001",
+            "New",
+            &["UI-002".to_string()],
+            &["docs/new.md".to_string()],
+        );
+        assert!(output.contains("<title>MOCK-001 — New</title>"));
+        assert!(output.contains("<h1>MOCK-001 New</h1>"));
+        assert!(output.contains("<!-- specs: UI-002 -->"));
+        assert!(output.contains("<!-- refs: docs/new.md -->"));
+        assert!(output.contains("<p>UI specifications: UI-002</p>"));
+        assert!(output.contains("<p>References: docs/new.md</p>"));
+        assert!(output.contains("<!-- mockup-id: MOCK-001 -->"));
+        assert!(output.contains("<!-- status: pending -->"));
+        assert!(output.contains("<!-- task: T -->"));
+        assert!(output.contains("<p>Superseded by: </p>"));
+    }
+
+    #[test]
+    fn ui_mockup_review_package_preserved() {
+        let original = "<!doctype html>\n<html><head><title>MOCK-003 &mdash; Old review</title><style>body{color:red}</style><script>var s=1;</script></head><body class=\"x\">\n<h1>TASK-99 Landing</h1>\n<section>Slides &amp; more</section>\n</body></html>\n";
+        let output = apply_ui_mockup_edit(
+            original,
+            "MOCK-003",
+            "New review",
+            &["UI-010".to_string()],
+            &["docs/x.md".to_string()],
+        );
+        assert!(output.contains("<title>MOCK-003 &mdash; New review</title>"));
+        assert!(output.contains("<style>body{color:red}</style>"));
+        assert!(output.contains("<script>var s=1;</script>"));
+        assert!(output.contains("<h1>TASK-99 Landing</h1>"));
+        assert!(output.contains("<section>Slides &amp; more</section>"));
+        assert!(output.contains("<!-- specs: UI-010 -->"));
+        assert!(output.contains("<!-- refs: docs/x.md -->"));
+        assert!(output.contains("<body class=\"x\">"));
+        assert!(!output.contains("<p>UI specifications:"));
+        assert!(!output.contains("<p>References:"));
+    }
+
+    #[test]
+    fn ui_mockup_no_title_never_created() {
+        let original = "<html><body>\n<h1>MOCK-001 Old</h1>\n</body></html>\n";
+        let output =
+            apply_ui_mockup_edit(original, "MOCK-001", "New", &["UI-001".to_string()], &[]);
+        assert!(!output.contains("<title>"));
+        assert!(output.contains("<h1>MOCK-001 New</h1>"));
+    }
+
+    #[test]
+    fn ui_mockup_escapes_title_and_visible_lines() {
+        let stub = "<title>MOCK-001 — Old</title><h1>MOCK-001 Old</h1><!-- specs: UI-001 --><!-- refs: a --><p>UI specifications: UI-001</p><p>References: a</p>";
+        let output = apply_ui_mockup_edit(
+            stub,
+            "MOCK-001",
+            "A & <B>",
+            &["UI-001".to_string()],
+            &["a&b".to_string()],
+        );
+        assert!(output.contains("A &amp; &lt;B&gt;"));
+        assert!(output.contains("<p>References: a&amp;b</p>"));
     }
 }

@@ -74,6 +74,7 @@ fn category_name(kind: Category) -> &'static str {
         Category::Decision => "Decisions",
         Category::Glossary => "Glossary",
         Category::UiSpec => "UI Specifications",
+        Category::UiMockup => "UI Mockups",
     }
 }
 
@@ -87,6 +88,7 @@ fn category_short(kind: Category) -> &'static str {
         Category::Decision => "decisions",
         Category::Glossary => "glossary terms",
         Category::UiSpec => "UI specifications",
+        Category::UiMockup => "UI mockups",
     }
 }
 
@@ -197,6 +199,23 @@ pub fn sidebar(selected: Option<Category>, cfg: &Config) -> String {
         "<li><a href=\"/?type=ui-spec\"{}>UI Specifications</a></li>",
         current
     ));
+    // UI Mockups (omitted when the document type is disabled)
+    let mockup_enabled = cfg
+        .document_types
+        .get(Category::UiMockup.key())
+        .map(|e| e.enabled)
+        .unwrap_or(false);
+    if mockup_enabled {
+        let current = if selected == Some(Category::UiMockup) {
+            " aria-current=\"page\""
+        } else {
+            ""
+        };
+        items.push_str(&format!(
+            "<li><a href=\"/?type=ui-mockup\"{}>UI Mockups</a></li>",
+            current
+        ));
+    }
     format!(
         "<aside class=\"sidebar\">\
 <button class=\"sidebar-toggle\" type=\"button\" aria-expanded=\"true\" aria-controls=\"type-list\">\
@@ -224,6 +243,7 @@ fn breadcrumb(
         Category::Decision => ("Decisions", "decision"),
         Category::Glossary => ("Glossary", "glossary"),
         Category::UiSpec => ("UI Specifications", "ui-spec"),
+        Category::UiMockup => ("UI Mockups", "ui-mockup"),
     };
     let mut items = String::new();
     items.push_str(&format!(
@@ -249,6 +269,7 @@ fn edit_breadcrumb(record: &Record, _resolved_group: Option<&Record>) -> String 
         Category::Decision => ("Decisions", "decision"),
         Category::Glossary => ("Glossary", "glossary"),
         Category::UiSpec => ("UI Specifications", "ui-spec"),
+        Category::UiMockup => ("UI Mockups", "ui-mockup"),
     };
     let mut items = String::new();
     items.push_str(&format!(
@@ -294,7 +315,8 @@ fn owning_group_dd(record: &Record, resolved_group: Option<&Record>) -> String {
         | Form::Release
         | Form::Decision
         | Form::Glossary
-        | Form::UiSpec => "<dd class=\"link-muted\">(none)</dd>".to_string(),
+        | Form::UiSpec
+        | Form::UiMockup => "<dd class=\"link-muted\">(none)</dd>".to_string(),
     }
 }
 
@@ -319,7 +341,8 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
             | Form::Release
             | Form::Decision
             | Form::Glossary
-            | Form::UiSpec => "<dd class=\"link-muted\">(none)</dd>".to_string(),
+            | Form::UiSpec
+            | Form::UiMockup => "<dd class=\"link-muted\">(none)</dd>".to_string(),
         }
     } else {
         owning_group_dd(record, resolved_group)
@@ -491,6 +514,7 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
             Category::Decision => "decision",
             Category::Glossary => "glossary term",
             Category::UiSpec => "UI specification",
+            Category::UiMockup => "UI mockup",
             _ => "record",
         };
         let plural_word = format!("{}s", singular);
@@ -542,6 +566,7 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
             }
             Category::Glossary => String::new(),
             Category::UiSpec => String::new(),
+            Category::UiMockup => String::new(),
             _ => String::new(),
         };
         if kind == Category::Glossary || kind == Category::UiSpec {
@@ -615,6 +640,7 @@ pub fn list_page(
         Category::Decision => "Decisions",
         Category::Glossary => "Glossary",
         Category::UiSpec => "UI Specifications",
+        Category::UiMockup => "UI Mockups",
     };
     let subheading = match kind {
         Category::Req => "Business requirement records in this project.",
@@ -625,6 +651,7 @@ pub fn list_page(
         Category::Decision => "Decision records in this project.",
         Category::Glossary => "Glossary terms in this project.",
         Category::UiSpec => "UI specifications in this project.",
+        Category::UiMockup => "UI mockups in this project.",
     };
     let title = format!("Papyrus \u{2014} {}", category_name(kind));
     render_template(
@@ -888,6 +915,32 @@ pub fn view_page(
             }
             content.push_str("</section>");
         }
+        Category::UiMockup => {
+            // Shared parser values loaded with the record (section 3);
+            // the stored package itself is never rendered or embedded.
+            let specs = record.specs.join(" ");
+            let refs = record.refs.join(" ");
+            content.push_str("<section class=\"record-section\"><h2>UI specifications</h2>");
+            if specs.is_empty() {
+                content.push_str("<p class=\"text empty-text\">(none)</p>");
+            } else {
+                content.push_str(&format!(
+                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
+                    escape(&specs)
+                ));
+            }
+            content.push_str("</section>");
+            content.push_str("<section class=\"record-section\"><h2>References</h2>");
+            if refs.is_empty() {
+                content.push_str("<p class=\"text empty-text\">(none)</p>");
+            } else {
+                content.push_str(&format!(
+                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
+                    escape(&refs)
+                ));
+            }
+            content.push_str("</section>");
+        }
     }
 
     let page_head = format!(
@@ -989,6 +1042,14 @@ fn metadata_block_backlog(
                 escape(&record.id),
                 escape(record.form.label()),
                 escape("UI Specifications"),
+            )
+        }
+        Category::UiMockup => {
+            format!(
+                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div></dl></div>",
+                escape(&record.id),
+                escape(record.form.label()),
+                escape("UI Mockups"),
             )
         }
         Category::Decision => {
@@ -1650,6 +1711,26 @@ pub fn edit_page_decision(
     )
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct UiMockupEditValues {
+    pub title: String,
+    pub specs: Vec<String>,
+    pub refs: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct UiMockupFieldErrors {
+    pub title: Option<String>,
+    pub specs: Option<String>,
+    pub refs: Option<String>,
+}
+
+impl UiMockupFieldErrors {
+    pub fn any(&self) -> bool {
+        self.title.is_some() || self.specs.is_some() || self.refs.is_some()
+    }
+}
+
 pub fn edit_page_glossary(
     record: &Record,
     values: &GlossaryEditValues,
@@ -1771,6 +1852,139 @@ pub fn edit_page_ui_spec(
         invalid_attrs("description", errors.description.as_deref()),
         escape(&values.description),
         field_error("description", errors.description.as_deref())
+    ));
+    form.push_str(
+        "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
+    );
+    form.push_str(&format!(
+        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
+        escape(&record.id)
+    ));
+
+    let page_head = format!(
+        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div><p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
+        escape(&record.id),
+        escape(&record.title)
+    );
+    let title = format!("Papyrus \u{2014} Edit {}", record.id);
+    render_template(
+        EDIT_TEMPLATE,
+        &[
+            ("title", &title),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("breadcrumb", &edit_breadcrumb(record, None)),
+            ("page_head", &page_head),
+            ("meta", &metadata_block_backlog(record, None, None)),
+            ("form", &form),
+        ],
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn tag_field(
+    field_id: &str,
+    add_id: &str,
+    label_html: &str,
+    values: &[String],
+    placeholder: &str,
+    help: &str,
+    error: Option<&str>,
+    value_noun: &str,
+) -> String {
+    let mut tags = String::new();
+    for (index, value) in values.iter().enumerate() {
+        tags.push_str(&format!(
+            "<span class=\"tag\"><input class=\"tag-input\" id=\"{}-tag-{}\" name=\"{}\" type=\"text\" value=\"{}\" aria-label=\"{} {}\"><button class=\"tag-remove\" type=\"button\" aria-label=\"Remove {}\" data-remove>&times;</button></span>",
+            field_id,
+            index,
+            field_id,
+            escape(value),
+            value_noun,
+            index + 1,
+            escape(value)
+        ));
+    }
+    let add_input = format!(
+        "<input class=\"tag-input tag-add\" id=\"{}\" name=\"{}\" type=\"text\" placeholder=\"{}\"{}>",
+        add_id,
+        field_id,
+        escape(placeholder),
+        invalid_attrs(field_id, error)
+    );
+    format!(
+        "<div class=\"field\" id=\"{}\"><label for=\"{}\">{}</label><div class=\"tagbox\" data-tagbox=\"{}\">{}{}</div><div class=\"add-line\"><button class=\"btn\" type=\"button\" data-add=\"{}\">Add</button></div><p class=\"help\">{}</p>{}</div>",
+        field_id,
+        add_id,
+        label_html,
+        field_id,
+        tags,
+        add_input,
+        field_id,
+        escape(help),
+        field_error(field_id, error)
+    )
+}
+
+pub fn edit_page_ui_mockup(
+    record: &Record,
+    values: &UiMockupEditValues,
+    errors: &UiMockupFieldErrors,
+    version: &str,
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    let mut form = String::new();
+    form.push_str(&format!(
+        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard><input type=\"hidden\" name=\"version\" value=\"{}\">",
+        escape(&record.id),
+        escape(version)
+    ));
+    if errors.any() {
+        form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
+        for (field, msg) in [
+            ("title", errors.title.as_deref()),
+            ("specs", errors.specs.as_deref()),
+            ("refs", errors.refs.as_deref()),
+        ] {
+            if let Some(m) = msg {
+                form.push_str(&format!(
+                    "<li><a href=\"#{}\">{}</a></li>",
+                    field,
+                    escape(m)
+                ));
+            }
+        }
+        form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
+    }
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"title\">Title <span class=\"req\">(required)</span></label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}><p class=\"help\">Required \u{b7} 1 to 200 characters \u{b7} shown in lists and headings.</p>{}</div>",
+        escape(&values.title),
+        invalid_attrs("title", errors.title.as_deref()),
+        field_error("title", errors.title.as_deref())
+    ));
+    form.push_str(&tag_field(
+        "specs",
+        "specs-add",
+        "UI specifications <span class=\"req\">(required)</span>",
+        &values.specs,
+        "Add UI specification id (e.g. UI-003)",
+        "Required \u{b7} one or more UI specification ids \u{b7} added one at a time.",
+        errors.specs.as_deref(),
+        "UI specification",
+    ));
+    form.push_str(&tag_field(
+        "refs",
+        "refs-add",
+        "References",
+        &values.refs,
+        "Add a reference (e.g. docs/specifications/ui-mockups-management.md)",
+        "Optional \u{b7} references to other documents.",
+        errors.refs.as_deref(),
+        "Reference",
     ));
     form.push_str(
         "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
@@ -1956,6 +2170,60 @@ pub fn conflict_page(
         EDIT_TEMPLATE,
         &[
             ("title", &title),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("breadcrumb", &edit_breadcrumb(record, None)),
+            ("page_head", &content),
+            ("meta", ""),
+            ("form", ""),
+        ],
+    )
+}
+
+/// Render the 409 conflict page for a UI mockup, showing the attempted
+/// title, UI specifications, and references read-only (MOCK-0006 conflict).
+pub fn conflict_page_ui_mockup(
+    record: &Record,
+    title: &str,
+    specs: &[String],
+    refs: &[String],
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    let mut content = String::new();
+    content.push_str(
+        "<h1 class=\"h1\">This record changed on disk</h1><p class=\"sub\">Your changes were not saved. The file was modified after this form was opened.</p><div class=\"conflict-box\"><p><strong>409 Conflict \u{2014} record changed on disk; reload the form.</strong></p><p>Reloading shows the current content and a new version token. Copy anything you need first.</p></div>",
+    );
+    content.push_str(&format!(
+        "<div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Reload the form</a><a class=\"link\" href=\"/doc/{}\">View current record</a><a class=\"link\" href=\"/?type={}\">Back to requirements</a></div>",
+        escape(&record.id),
+        escape(&record.id),
+        record.kind.key()
+    ));
+    content.push_str(
+        "<div class=\"readonly-block\"><h2>Your unsaved changes (read-only, not saved)</h2><dl>",
+    );
+    content.push_str(&format!("<dt>Title</dt><dd>{}</dd>", escape(title)));
+    content.push_str(&format!(
+        "<dt>UI specifications</dt><dd class=\"text\">{}</dd>",
+        escape(&specs.join(" "))
+    ));
+    content.push_str(&format!(
+        "<dt>References</dt><dd class=\"text\">{}</dd>",
+        escape(&refs.join(" "))
+    ));
+    content.push_str(
+        "</dl><p class=\"help\">Copy these values into the form after reloading if you want to keep them.</p></div>",
+    );
+
+    let title_text = format!("Papyrus \u{2014} Edit {}", record.id);
+    render_template(
+        EDIT_TEMPLATE,
+        &[
+            ("title", &title_text),
             ("project", chrome.project),
             ("bind_note", chrome.bind_note),
         ],
