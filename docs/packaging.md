@@ -540,3 +540,51 @@ with `papyrus 0.1.0`.
 - Size: 858736 bytes
 - SHA-256: `e0d9da5f25f717d65dd194f68cba9ed0d487206bf92acf7ec108548ba3b43e92`
 - Test count: 254 (36 unit + 218 integration, including `cli_milestone_smoke` 2)
+
+## TASK-33 — Glossary milestone packaging and verification
+
+- Date: **2026-11-06 (UTC)**.
+- Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43, dpkg 1.23.11, `rustc`/`cargo` 1.99.1, `fakeroot`.
+- Isolation: `fakeroot dpkg --instdir=./.tmp/inst --admindir=./.tmp/adm --force-depends`; the host package status was unchanged before and after the run. Scratch directories were removed after verification.
+- Package: `papyrus_0.1.0_amd64.deb`, 865788 bytes.
+- Package contents: `/usr/bin/papyrus` (0755) and `/usr/share/doc/papyrus/copyright` only; no asset, template, configuration, or man files.
+- New test file: `tests/glossary_terms_smoke.rs` (2 tests), passing under `cargo test`.
+- No runtime dependencies added; the TASK-1/TASK-4 runtime dependency license audit remains valid.
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| `cargo build --release` (Rust 1.99.1) | PASS |
+| `cargo test` | PASS — 256 tests |
+| `cargo clippy --all-targets -- -D warnings` | PASS — 0 warnings |
+| `cargo fmt --check` | PASS |
+
+### Install, uninstall, and smoke checks
+
+| Check | Result |
+|---|---|
+| Isolated `dpkg -i` | PASS (exit 0) |
+| Installed `/usr/bin/papyrus` is `root:root` 0755 | PASS |
+| `papyrus` resolves on the isolated `PATH` and runs | PASS |
+| Isolated `dpkg -r papyrus` removes the binary; not on `PATH` | PASS |
+| Isolated `dpkg --purge papyrus` removes binary and admin entry | PASS |
+| Host package database and filesystem unchanged | PASS |
+| `--help` lists `glossary`, `search`, and `browser`; `--version` prints `papyrus 0.1.0` | PASS |
+| Glossary lifecycle (create/list/view/edit/deprecate/restore) | PASS |
+| Search over glossary terms (quoted phrase, `--type doc`, `--limit`, `--json`, deprecated hidden) | PASS |
+| Browser glossary category (`/?type=glossary`, record view, edit round-trip, JSON API, embedded assets, 320 px hooks, no external references) | PASS |
+| `glossary_terms_smoke` (2 tests) | PASS |
+| Embedded assets from an empty working directory and asset-free project | PASS |
+
+### Recorded limitations
+
+- **Offline namespace not verified via `unshare`.** The offline claim rests on loopback-only binding, no external references in served content, and no outbound-connection code path; the `unshare -rn` namespace check was not run.
+- **No real-GUI browser run.** Markup- and asset-level verification only (NFR-05.001).
+- **Config keys not re-checked on the installed binary.** Browser configuration keys (`browser_host`, `browser_port`, `browser_open`) were not re-verified against the installed package in this run.
+
+### TASK-33 package artifact
+
+- File: `papyrus_0.1.0_amd64.deb`
+- Size: 865788 bytes
+- Test count: 256 (including `glossary_terms_smoke` 2)
