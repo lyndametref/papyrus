@@ -32,6 +32,7 @@ pub enum Category {
     Release,
     Decision,
     Glossary,
+    UiSpec,
 }
 
 impl Category {
@@ -44,6 +45,7 @@ impl Category {
             Category::Release => "release",
             Category::Decision => "decision",
             Category::Glossary => "glossary",
+            Category::UiSpec => "ui-spec",
         }
     }
 
@@ -66,6 +68,7 @@ pub enum Form {
     Release,
     Decision,
     Glossary,
+    UiSpec,
 }
 
 impl Form {
@@ -78,6 +81,7 @@ impl Form {
             Form::Release => "Release",
             Form::Decision => "Decision",
             Form::Glossary => "Glossary term",
+            Form::UiSpec => "UI specification",
         }
     }
 }
@@ -113,6 +117,7 @@ pub struct Record {
     pub group_title: Option<String>,
     pub description: Option<String>,
     pub definition: Option<String>,
+    pub view: Option<String>,
     pub status: Option<String>,
     pub milestone_id: Option<String>,
     pub milestone_title: Option<String>,
@@ -149,13 +154,17 @@ impl Record {
             Category::Release => "Release",
             Category::Decision => "Decision",
             Category::Glossary => "Glossary",
+            Category::UiSpec => "UI Specifications",
         };
         match self.form {
             Form::Group => format!("{} group", base),
             Form::Requirement => base.to_string(),
-            Form::Task | Form::Milestone | Form::Release | Form::Decision | Form::Glossary => {
-                base.to_string()
-            }
+            Form::Task
+            | Form::Milestone
+            | Form::Release
+            | Form::Decision
+            | Form::Glossary
+            | Form::UiSpec => base.to_string(),
         }
     }
 }
@@ -341,13 +350,18 @@ fn active_entry(cfg: &Config, kind: Category) -> Option<crate::config::DocTypeEn
             .get("glossary")
             .cloned()
             .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
+        Category::UiSpec => cfg
+            .document_types
+            .get("ui-spec")
+            .cloned()
+            .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
     }
 }
 
 fn active_dir(ctx: &Context, cfg: &Config, kind: Category) -> Option<PathBuf> {
     let entry = active_entry(cfg, kind)?;
     let base = match kind {
-        Category::Req | Category::Nfr | Category::Glossary => {
+        Category::Req | Category::Nfr | Category::Glossary | Category::UiSpec => {
             ctx.project_dir.join(&cfg.doc_directory)
         }
         Category::Task | Category::Milestone | Category::Release => {
@@ -565,6 +579,7 @@ fn load_backlog_record(
         group_title: None,
         description,
         definition: None,
+        view: None,
         status,
         milestone_id,
         milestone_title,
@@ -648,6 +663,7 @@ fn load_decision_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
         group_title: None,
         description: None,
         definition: None,
+        view: None,
         status: Some(status),
         milestone_id: None,
         milestone_title: None,
@@ -722,6 +738,83 @@ fn load_glossary_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
         group_title: None,
         description: None,
         definition,
+        view: None,
+        status: None,
+        milestone_id: None,
+        milestone_title: None,
+        assignee: None,
+        labels: Vec::new(),
+        dependencies: Vec::new(),
+        acceptance_criteria: Vec::new(),
+        comments: Vec::new(),
+        release_id: None,
+        release_title: None,
+        decision: None,
+        context: None,
+        consequences: None,
+        decision_type: None,
+        superseded_by: None,
+        superseded_title: None,
+        doc,
+        path: safe.clone(),
+        rel_path: relative_path(&ctx.project_dir, &safe),
+        version: version_token(&meta),
+    }))
+}
+
+fn load_ui_spec_record(ctx: &Context, path: &Path) -> Result<Option<Record>, AppError> {
+    let safe = match Context::ensure_within(&ctx.project_dir, path) {
+        Ok(safe) => safe,
+        Err(_) => return Ok(None),
+    };
+    let content = match fs::read_to_string(&safe) {
+        Ok(content) => content,
+        Err(_) => return Ok(None),
+    };
+    let meta = match fs::metadata(&safe) {
+        Ok(meta) => meta,
+        Err(_) => return Ok(None),
+    };
+    let Some(stem) = safe.file_stem().and_then(|s| s.to_str()) else {
+        return Ok(None);
+    };
+    if !valid_id(stem) {
+        return Ok(None);
+    }
+    let cfg = match crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir) {
+        Ok(c) => c,
+        Err(_) => return Ok(None),
+    };
+    let entry = match active_entry(&cfg, Category::UiSpec) {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+    let rest = match stem.strip_prefix(&format!("{}-", entry.prefix)) {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+    if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+        return Ok(None);
+    }
+    let doc = parse_doc(&content);
+    let title = if doc.title.is_empty() {
+        stem.to_string()
+    } else {
+        doc.title.clone()
+    };
+    let view = section_value(&doc, "## View");
+    let description = section_value(&doc, "## Description");
+    Ok(Some(Record {
+        id: stem.to_string(),
+        kind: Category::UiSpec,
+        form: Form::UiSpec,
+        title,
+        story: None,
+        group_id: None,
+        group_title: None,
+        description,
+        definition: None,
+        view,
         status: None,
         milestone_id: None,
         milestone_title: None,
@@ -755,6 +848,9 @@ fn load_record_from_path(
     }
     if kind == Category::Glossary {
         return load_glossary_record(ctx, path);
+    }
+    if kind == Category::UiSpec {
+        return load_ui_spec_record(ctx, path);
     }
     if matches!(
         kind,
@@ -840,6 +936,7 @@ fn load_record_from_path(
         group_title,
         description: section_value(&doc, "## Description"),
         definition: None,
+        view: None,
         status,
         milestone_id,
         milestone_title: None,
@@ -879,6 +976,7 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
             | Category::Release
             | Category::Decision
             | Category::Glossary
+            | Category::UiSpec
     ) {
         let Some(entry) = active_entry(cfg, kind) else {
             return index;
@@ -998,6 +1096,7 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
         Category::Release,
         Category::Decision,
         Category::Glossary,
+        Category::UiSpec,
     ] {
         let Some(entry) = active_entry(cfg, kind) else {
             continue;
@@ -1018,7 +1117,7 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
             }
             let valid = if kind == Category::Decision {
                 crate::decision::type_key_for_id(cfg, id).is_some()
-            } else if kind == Category::Glossary {
+            } else if kind == Category::Glossary || kind == Category::UiSpec {
                 id.strip_prefix(&format!("{}-", entry.prefix))
                     .map(|r| !r.is_empty() && r.bytes().all(|b| b.is_ascii_digit()))
                     .unwrap_or(false)
@@ -1189,6 +1288,7 @@ const MILESTONE_KNOWN: &[&str] = &["## Description", "## Release"];
 const RELEASE_KNOWN: &[&str] = &["## Description"];
 const DECISION_KNOWN: &[&str] = &["## Status", "## Decision", "## Context", "## Consequences"];
 const GLOSSARY_KNOWN: &[&str] = &["## Definition"];
+const UI_SPEC_KNOWN: &[&str] = &["## View", "## Description"];
 
 /// Serialize a document with a new title and optional story/description
 /// changes, preserving every unknown `## ` section content-identically.
@@ -1492,6 +1592,45 @@ pub fn apply_glossary_edit(doc: &Doc, id: &str, title: &str, definition: FieldCh
         FieldChange::Clear => set_section(&mut sections, "## Definition", None, GLOSSARY_KNOWN),
         FieldChange::Set(value) => {
             set_section(&mut sections, "## Definition", Some(value), GLOSSARY_KNOWN)
+        }
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    lines.push(format!("# {} {}", id, title));
+    lines.extend(doc.preamble.iter().cloned());
+    for section in sections {
+        lines.push(section.heading);
+        lines.extend(section.body);
+    }
+    while lines.last().is_some_and(|line| line.is_empty()) {
+        lines.pop();
+    }
+    let mut output = lines.join("\n");
+    output.push('\n');
+    output
+}
+
+/// Serialize a UI specification document with title, view, and description changes.
+pub fn apply_ui_spec_edit(
+    doc: &Doc,
+    id: &str,
+    title: &str,
+    view: FieldChange,
+    description: FieldChange,
+) -> String {
+    let mut sections = doc.sections.clone();
+    match view {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## View", None, UI_SPEC_KNOWN),
+        FieldChange::Set(value) => {
+            set_section(&mut sections, "## View", Some(value), UI_SPEC_KNOWN)
+        }
+    }
+    match description {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## Description", None, UI_SPEC_KNOWN),
+        FieldChange::Set(value) => {
+            set_section(&mut sections, "## Description", Some(value), UI_SPEC_KNOWN)
         }
     }
 
