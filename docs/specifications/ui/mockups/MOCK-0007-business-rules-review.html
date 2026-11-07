@@ -1,0 +1,1678 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' file: 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MOCK-0007 &mdash; Browser business rules review package</title>
+<link rel="stylesheet" href="wireframe.css">
+<style>
+
+/* Wireframe stylesheet for Papyrus browser mockups (TASK-6).
+   Layout only: grayscale, system fonts, no external resources.
+   Deliberately uses only widely supported CSS (flexbox, grid, custom properties). */
+
+:root {
+  --ink: #111827;
+  --muted: #6b7280;
+  --line: #d1d5db;
+  --soft: #f3f4f6;
+  --box: #fbfbfc;
+  --strong: #374151;
+  --white: #ffffff;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--white);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a { color: var(--ink); }
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.wf-app { max-width: 1040px; margin: 0 auto; padding: 0 24px 56px; }
+
+/* ---------- header ---------- */
+.wf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.wf-brand { display: flex; align-items: center; gap: 12px; }
+.wf-mark {
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--soft);
+  font-weight: 700;
+  font-size: 13px;
+}
+.wf-brand-name { display: block; font-size: 17px; font-weight: 700; line-height: 1.2; }
+.wf-project { display: block; font-size: 12px; color: var(--muted); }
+.wf-top-meta { text-align: right; font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+/* ---------- page head ---------- */
+.wf-main { padding-top: 26px; }
+.wf-breadcrumb { font-size: 13px; margin: 0 0 14px; }
+.wf-breadcrumb ol { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
+.wf-breadcrumb li + li::before { content: "›"; color: var(--muted); margin-right: 6px; }
+.wf-breadcrumb [aria-current="page"] { color: var(--muted); }
+
+.wf-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.wf-h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; }
+.wf-id { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 13px; color: var(--muted); margin: 0 0 4px; }
+.wf-sub { color: var(--muted); font-size: 14px; margin: 0 0 4px; }
+.wf-actions { display: flex; align-items: center; gap: 18px; padding-top: 6px; flex: none; }
+
+/* ---------- buttons and links ---------- */
+.wf-btn {
+  display: inline-block;
+  padding: 9px 18px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.wf-btn-primary { background: var(--strong); border-color: var(--strong); color: var(--white); }
+.wf-link { text-decoration: underline; }
+.wf-link-muted { color: var(--muted); }
+
+/* ---------- filter ---------- */
+.wf-filter { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 26px; margin: 14px 0 8px; }
+.wf-filter-label { font-size: 12px; color: var(--muted); margin-right: 4px; }
+.wf-filter ul { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 26px; margin: 0; padding: 0; }
+.wf-filter a { text-decoration: none; color: var(--strong); }
+.wf-filter a[aria-current="page"] { color: var(--ink); font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
+
+/* ---------- sections and groups ---------- */
+.wf-section { margin-top: 26px; }
+.wf-section-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--line);
+}
+.wf-h2 { font-size: 21px; margin: 0; }
+.wf-h3 { font-size: 17px; margin: 0; }
+.wf-count { font-size: 13px; color: var(--muted); flex: none; }
+
+.wf-group {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--white);
+  margin-top: 12px;
+  padding: 12px 20px 12px;
+}
+.wf-group-head { display: flex; align-items: baseline; gap: 14px; }
+.wf-group-id { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 15px; font-weight: 700; }
+.wf-group-title { margin: 0; font-size: 16px; font-weight: 400; line-height: 1.4; }
+.wf-group-count { margin-left: auto; font-size: 12px; color: var(--muted); flex: none; }
+.wf-req-list { list-style: none; margin: 6px 0 0; padding: 0 0 0 20px; }
+.wf-req-list li { padding: 3px 0; }
+.wf-req-id { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 13px; }
+.wf-empty-group { margin: 6px 0 0 20px; color: var(--muted); font-style: italic; font-size: 14px; }
+.wf-group-preview { margin: 4px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: break-word; }
+
+.wf-other { margin-top: 26px; }
+.wf-other-note { font-size: 12px; color: var(--muted); margin: 2px 0 8px; }
+.wf-other-list { list-style: none; margin: 0; padding: 0; }
+.wf-other-list li { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 4px 0; }
+.wf-other-ref { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+.wf-empty {
+  margin-top: 12px;
+  padding: 16px 20px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  background: var(--box);
+}
+.wf-empty p { margin: 0; }
+.wf-empty .wf-help { margin-top: 4px; }
+
+/* ---------- record view ---------- */
+.wf-meta {
+  max-width: 800px;
+  margin-top: 20px;
+  padding: 14px 20px 18px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--box);
+}
+.wf-dl { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px; margin: 0; }
+.wf-dl div { margin: 0; }
+.wf-dl dt { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 0 0 2px; }
+.wf-dl dd { margin: 0; font-size: 15px; }
+.wf-dl .wf-mono { font-family: ui-monospace, "DejaVu Sans Mono", monospace; }
+
+.wf-record-section { margin-top: 28px; }
+.wf-record-section h2 { font-size: 18px; margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.wf-text { white-space: pre-wrap; overflow-wrap: break-word; margin: 0 0 12px; max-width: 780px; }
+.wf-unresolved { color: var(--muted); font-size: 12px; }
+
+/* ---------- form ---------- */
+.wf-form { margin-top: 24px; max-width: 800px; }
+.wf-field { margin-bottom: 22px; }
+.wf-field label { display: block; font-weight: 700; margin-bottom: 6px; }
+.wf-field .wf-req { font-weight: 400; color: var(--muted); font-size: 12px; }
+.wf-input,
+.wf-textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+}
+.wf-textarea { min-height: 120px; resize: vertical; }
+.wf-input[aria-invalid="true"],
+.wf-textarea[aria-invalid="true"] { border: 2px solid var(--strong); }
+.wf-help { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+.wf-error { font-size: 13px; font-weight: 700; margin: 6px 0 0; }
+.wf-error::before { content: "! "; }
+
+.wf-alert {
+  border: 2px solid var(--strong);
+  border-radius: 5px;
+  background: var(--box);
+  padding: 14px 18px;
+  margin: 0 0 22px;
+}
+.wf-alert h2 { font-size: 16px; margin: 0 0 8px; }
+.wf-alert ul { margin: 0; padding-left: 20px; }
+.wf-alert li { margin: 2px 0; }
+.wf-alert p { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+
+.wf-form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; margin-top: 8px; }
+.wf-form-note { font-size: 12px; color: var(--muted); }
+.wf-hidden-field {
+  display: inline-block;
+  margin: 18px 0 14px;
+  padding: 4px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.wf-status { font-size: 13px; font-weight: 700; }
+.wf-status[hidden] { display: none; }
+
+/* ---------- conflict ---------- */
+.wf-conflict-box {
+  border: 2px solid var(--strong);
+  border-radius: 5px;
+  background: var(--box);
+  padding: 14px 18px;
+  margin: 18px 0 22px;
+  max-width: 800px;
+}
+.wf-conflict-box p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.wf-readonly-block { border: 1px solid var(--line); border-radius: 6px; padding: 16px 20px; max-width: 800px; }
+.wf-readonly-block h2 { font-size: 15px; margin: 0 0 12px; }
+.wf-readonly-block dl { margin: 0; }
+.wf-readonly-block dt { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-top: 10px; }
+.wf-readonly-block dd { margin: 2px 0 0; }
+
+/* ---------- error page ---------- */
+.wf-error-page { max-width: 800px; margin: 60px auto 0; }
+.wf-error-card { border: 1px solid var(--line); border-radius: 8px; background: var(--box); padding: 34px 40px 38px; }
+.wf-status-code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 60px; font-weight: 700; line-height: 1; margin: 0 0 14px; }
+.wf-error-card h1 { font-size: 26px; margin: 0 0 10px; }
+.wf-error-card p { margin: 0 0 8px; }
+.wf-error-card .wf-help { margin-bottom: 18px; }
+
+/* ---------- footer ---------- */
+.wf-footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+
+/* ---------- prototype chrome (not part of the designed UI) ---------- */
+.wf-proto {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--soft);
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  padding: 8px 16px;
+}
+.wf-proto-inner { max-width: 1320px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.wf-proto-title { font-weight: 700; }
+.wf-proto-note { color: var(--muted); }
+.wf-proto-nav ul { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 0; padding: 0; }
+.wf-proto-nav a {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  text-decoration: none;
+  color: var(--strong);
+}
+.wf-proto-nav a[aria-current="true"] { background: var(--strong); border-color: var(--strong); color: var(--white); }
+.wf-proto-sep { color: var(--muted); }
+
+.wf-screen[hidden] { display: none; }
+
+/* ---------- responsive frame used by the narrow screens ---------- */
+.wf-narrow-wrap { display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start; padding: 24px; }
+.wf-narrow {
+  width: 320px;
+  max-width: 100%;
+  border: 2px solid var(--strong);
+  border-radius: 18px;
+  padding: 10px;
+  background: var(--white);
+}
+.wf-narrow .wf-app { padding: 0 10px 24px; max-width: none; }
+.wf-narrow .wf-header { padding: 10px 0; }
+.wf-narrow .wf-top-meta { display: none; }
+.wf-narrow .wf-main { padding-top: 16px; }
+.wf-narrow .wf-h1 { font-size: 22px; }
+.wf-narrow .wf-h2 { font-size: 15px; }
+.wf-narrow .wf-filter ul { flex-direction: column; gap: 4px; }
+.wf-narrow .wf-filter { display: block; }
+.wf-narrow .wf-group { padding: 10px 12px; }
+.wf-narrow .wf-group-head { flex-wrap: wrap; gap: 2px 10px; }
+.wf-narrow .wf-group-title { width: 100%; }
+.wf-narrow .wf-group-count { margin-left: 0; width: 100%; }
+.wf-narrow .wf-req-list { padding-left: 10px; }
+.wf-narrow .wf-req-list a { display: inline-block; }
+.wf-narrow .wf-dl { grid-template-columns: 1fr 1fr; gap: 10px; }
+.wf-narrow .wf-form-actions { flex-direction: column; align-items: stretch; }
+.wf-narrow .wf-form-actions .wf-btn { width: 100%; text-align: center; }
+.wf-narrow .wf-actions { flex-direction: column; align-items: flex-start; gap: 6px; }
+.wf-narrow .wf-page-head { flex-direction: column; gap: 10px; }
+.wf-narrow .wf-breadcrumb ol { font-size: 12px; }
+
+/* ---------- accessibility annotation layer ---------- */
+.wf-anno {
+  display: none;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--strong);
+  color: var(--white);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+body.wf-annotate .wf-anno { display: inline-block; }
+.wf-legend {
+  display: none;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  background: var(--box);
+  padding: 14px 18px;
+  margin-top: 18px;
+  max-width: 620px;
+}
+body.wf-annotate .wf-legend { display: block; }
+.wf-legend h2 { font-size: 15px; margin: 0 0 8px; }
+.wf-legend ol { margin: 0; padding-left: 20px; }
+.wf-legend li { margin: 4px 0; font-size: 13px; }
+
+.wf-toggle { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+
+/* ---------- narrow-screen note ---------- */
+.wf-note { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
+
+@media (max-width: 720px) {
+  .wf-page-head { flex-direction: column; }
+  .wf-dl { grid-template-columns: 1fr; }
+  .wf-actions { flex-direction: row; flex-wrap: wrap; }
+}
+
+/* ---------- document-type sidebar (persistent) ---------- */
+.wf-sidebar {
+  float: left;
+  width: 190px;
+  margin: 0 24px 16px 0;
+  padding: 8px 12px 8px 0;
+  border-right: 1px solid var(--line);
+}
+.wf-sidebar-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.wf-sidebar ul { list-style: none; margin: 0; padding: 0; }
+.wf-sidebar li { margin: 4px 0; }
+.wf-sidebar a { text-decoration: none; color: var(--strong); display: block; }
+.wf-sidebar a[aria-current="page"] { color: var(--ink); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.wf-sidebar-toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  cursor: pointer;
+}
+.wf-main::after { content: ""; display: block; clear: both; }
+.wf-narrow .wf-sidebar { float: none; width: auto; border-right: 0; border-bottom: 1px solid var(--line); margin: 0 0 12px; padding: 0 0 8px; }
+.wf-narrow .wf-sidebar ul { display: none; }
+.wf-narrow .wf-sidebar ul[aria-expanded="true"] { display: block; }
+
+/* ==========================================================================
+   Review package scaffolding (single-file MOCK review)
+   Not part of the designed interface: chrome, landing, deck, prototype frame.
+   Scoped to body.wf-package so standalone view files keep their old layout.
+   ========================================================================== */
+
+body.wf-package { background: #e5e7eb; }
+
+.wf-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- reviewer chrome ---------- */
+body.wf-package .wf-chrome {
+  background: #1f2937;
+  color: #f9fafb;
+  padding: 8px 20px;
+  font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+body.wf-package .wf-chrome-title { font-weight: 700; }
+body.wf-package .wf-chrome-label {
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+body.wf-package .wf-chrome nav { display: flex; flex-wrap: wrap; gap: 6px; }
+body.wf-package .wf-chrome a {
+  color: #f9fafb;
+  text-decoration: none;
+  padding: 3px 10px;
+  border: 1px solid #4b5563;
+  border-radius: 999px;
+}
+body.wf-package .wf-chrome a[aria-current="page"] {
+  background: #f9fafb;
+  border-color: #f9fafb;
+  color: #111827;
+  font-weight: 700;
+}
+body.wf-package .wf-chrome-meta { margin-left: auto; color: #d1d5db; font-size: 12px; }
+
+/* ---------- review sections ---------- */
+body.wf-package .wf-review {
+  display: none;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 30px 24px 64px;
+}
+body.wf-package .wf-review.is-active { display: block; }
+
+/* ---------- landing ---------- */
+.wf-index-head { border-bottom: 1px solid var(--line); padding-bottom: 16px; }
+.wf-index-head h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; }
+.wf-index-head .wf-lede { font-size: 15px; color: var(--strong); margin: 0; max-width: 780px; }
+.wf-index-kicker {
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+.wf-meta-table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 13px; }
+.wf-meta-table th,
+.wf-meta-table td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.wf-meta-table th { width: 190px; font-weight: 700; color: var(--strong); }
+.wf-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+.wf-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 26px;
+}
+.wf-card {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  padding: 18px 20px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.wf-card:hover,
+.wf-card:focus-visible { border-color: var(--strong); }
+.wf-card-kind { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.wf-card h2 { font-size: 19px; margin: 4px 0 6px; }
+.wf-card p { margin: 0; font-size: 13px; color: var(--muted); }
+.wf-coverage { margin-top: 30px; }
+.wf-coverage h2 { font-size: 17px; margin: 0 0 8px; }
+.wf-coverage table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.wf-coverage th,
+.wf-coverage td { text-align: left; border-bottom: 1px solid var(--line); padding: 7px 8px 7px 0; vertical-align: top; }
+.wf-coverage th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.wf-coverage td.wf-count-cell { width: 70px; color: var(--muted); }
+
+/* ---------- design deck ---------- */
+body.wf-package .wf-deck-stage {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 26px 30px 24px;
+  min-height: 520px;
+}
+.wf-slide { display: none; }
+.wf-slide.is-active { display: block; }
+.wf-slide-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+.wf-slide-ref { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 12px; color: var(--muted); }
+.wf-slide h2 { font-size: 26px; line-height: 1.2; margin: 0 0 8px; }
+.wf-slide .wf-lede { font-size: 15px; color: var(--strong); margin: 0 0 4px; max-width: 820px; }
+.wf-slide-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 18px; }
+.wf-slide-cols h3 {
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.wf-slide-cols ul { margin: 0; padding-left: 18px; }
+.wf-slide-cols li { margin: 0 0 7px; font-size: 14px; line-height: 1.45; }
+.wf-slide-cols p { font-size: 14px; margin: 0 0 8px; }
+.wf-slide-links {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+  font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  align-items: baseline;
+}
+.wf-slide-links span { color: var(--muted); }
+.wf-deck-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }
+.wf-deck-bar .wf-counter { margin-left: auto; font-size: 13px; color: var(--muted); }
+.wf-deck-hint { font-size: 12px; color: var(--muted); }
+.wf-deck-list { margin: 14px 0 0; padding-left: 20px; columns: 2; column-gap: 32px; font-size: 13px; }
+.wf-deck-list li { margin: 0 0 6px; break-inside: avoid; }
+
+/* ---------- platform prototype ---------- */
+body.wf-package .wf-proto {
+  display: none;
+  position: static;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+}
+body.wf-package .wf-proto.is-active { display: block; }
+body.wf-package .wf-proto-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #f3f4f6;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 20px;
+  font-size: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+body.wf-package .wf-proto-nav .wf-proto-title { font-weight: 700; }
+body.wf-package .wf-proto-nav ul {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin: 0;
+  padding: 0;
+}
+body.wf-package .wf-proto-nav li { margin: 0; }
+body.wf-package .wf-proto-nav a {
+  display: inline-block;
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  text-decoration: none;
+  color: var(--strong);
+}
+body.wf-package .wf-proto-nav a[aria-current="true"] {
+  background: var(--strong);
+  border-color: var(--strong);
+  color: var(--white);
+  font-weight: 700;
+}
+body.wf-package .wf-proto-nav .wf-nav-group {
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-left: 4px;
+}
+.wf-frame-wrap { overflow: hidden; padding: 16px 0 24px; }
+.wf-frame-label {
+  max-width: 1440px;
+  margin: 0 auto 6px;
+  padding: 0 20px;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.wf-frame-label strong { color: var(--strong); }
+.wf-frame {
+  width: 1440px;
+  margin: 0 auto;
+  transform-origin: top left;
+  background: var(--white);
+  border: 1px solid #9ca3af;
+}
+body.wf-package .wf-screen {
+  padding: 0;
+  background: var(--white);
+  min-height: 900px;
+  display: flex;
+  flex-direction: column;
+}
+body.wf-package .wf-screen > .wf-app { flex: 1 0 auto; display: flex; flex-direction: column; width: 100%; }
+body.wf-package .wf-screen > .wf-app > .wf-footer { margin-top: auto; }
+body.wf-package .wf-screen > .wf-narrow-wrap { flex: 1 0 auto; }
+body.wf-package .wf-screen[hidden] { display: none; }
+
+/* desktop page layout: persistent sidebar column beside the page body */
+body.wf-package .wf-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 30px;
+  align-items: stretch;
+}
+body.wf-package .wf-layout > .wf-sidebar {
+  float: none;
+  width: auto;
+  margin: 0;
+  padding: 2px 20px 2px 0;
+  border-right: 0;
+}
+body.wf-package .wf-layout > .wf-main {
+  padding: 0 0 0 30px;
+  min-width: 0;
+  border-left: 1px solid var(--line);
+}
+body.wf-package .wf-main::after { content: none; }
+body.wf-package .wf-layout > .wf-main > .wf-error-page { margin-top: 30px; }
+
+/* 320 px screens live on the same 1440 canvas, beside their legend */
+body.wf-package .wf-narrow-wrap { padding: 24px; }
+body.wf-package .wf-narrow .wf-layout { display: block; }
+body.wf-package .wf-narrow .wf-layout > .wf-sidebar { border-right: 0; border-bottom: 1px solid var(--line); padding: 0 0 8px; margin: 0 0 12px; }
+body.wf-package .wf-narrow .wf-layout > .wf-main { border-left: 0; padding-left: 0; }
+body.wf-package .wf-narrow .wf-dl { grid-template-columns: 1fr; }
+body.wf-package .wf-readonly-block { margin-top: 20px; }
+body.wf-package .wf-narrow .wf-sidebar ul { display: block; }
+body.wf-package .wf-narrow .wf-sidebar ul[hidden] { display: none; }
+
+@media (max-width: 900px) {
+  .wf-slide-cols { grid-template-columns: 1fr; }
+  .wf-deck-list { columns: 1; }
+}
+
+/* Long, unbreakable titles wrap inside their row (list and record views). */
+body.wf-package .wf-group-title,
+body.wf-package .wf-group-title a,
+body.wf-package .wf-req-list a,
+body.wf-package .wf-other-list a,
+body.wf-package .wf-record-section .wf-text {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+body.wf-package .wf-btn[disabled] {
+  opacity: .45;
+  cursor: default;
+}
+
+
+.wf-form { width: 100%; }
+.wf-form .wf-field { width: 100%; }
+.wf-form input, .wf-form textarea, .wf-form select { width: 100%; }
+
+/* ---------- list (tag) fields ---------- */
+.wf-tagbox { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 6px; min-height: 36px; }
+.wf-tagbox:empty { border-style: dashed; }
+.wf-tag { display: inline-block; padding: 2px 8px; border: 1px solid var(--line); border-radius: 4px; font-size: 12px; background: var(--soft); max-width: 100%; overflow-wrap: anywhere; }
+.wf-tag button { border: none; background: none; cursor: pointer; font: inherit; margin-left: 4px; }
+.wf-add-line { display: flex; gap: 6px; margin-top: 6px; }
+.wf-add-line input { flex: 1; }
+.wf-annotation {
+  display: inline-block;
+  margin: 4px 0 14px;
+  padding: 4px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+</style>
+</head>
+<body class="wf-package wf-annotate" data-mock-id="MOCK-0007">
+
+<header class="wf-chrome">
+  <span class="wf-chrome-title">MOCK-0007 &middot; TASK-45</span>
+  <span class="wf-chrome-label">Review scaffolding &mdash; not part of the design</span>
+  <nav aria-label="Review contents">
+    <a href="#index" data-route="index">Overview</a>
+    <a href="#web" data-route="web">Web prototype</a>
+  </nav>
+  <span class="wf-chrome-meta">Status: draft &middot; web &middot; 17 views</span>
+</header>
+
+<!-- LANDING -->
+
+<section class="wf-review wf-index is-active" data-review="index" data-screen="index">
+  <div class="wf-index-head">
+    <p class="wf-index-kicker">MOCK-0007 &middot; Review package &middot; Status draft</p>
+    <h1>TASK-45 &mdash; Design review: business rules browser UI mockup</h1>
+    <p class="wf-lede">Layout review for the business rules browser increment: listing, viewing and editing business rules, plus recovery states, error pages, and 320 px / accessibility behaviour. Reuses the approved MOCK-0001 shell.</p>
+  </div>
+  <table class="wf-meta-table">
+    <caption class="wf-visually-hidden">Review package metadata</caption>
+    <tbody>
+      <tr><th scope="row">Ticket</th><td>TASK-45 &mdash; Design review: business rules browser UI mockup</td></tr>
+      <tr><th scope="row">Milestone</th><td>m-8</td></tr>
+      <tr><th scope="row">Specification</th><td><code>docs/specifications/business-rules-management.md</code>; <code>docs/specifications/browser-requirements.md</code> baseline</td></tr>
+      <tr><th scope="row">UI description</th><td><code>docs/specifications/ui/browser-business-rules-ui.md</code></td></tr>
+      <tr><th scope="row">Platform</th><td>web &mdash; desktop canvas 1440 &times; 900 CSS px, narrow review at 320 CSS px</td></tr>
+      <tr><th scope="row">Approval status</th><td><span class="wf-pill">draft</span> &mdash; awaiting explicit user approval.</td></tr>
+      <tr><th scope="row">Convention</th><td>Grayscale wireframe, layout and interaction only.</td></tr>
+    </tbody>
+  </table>
+  <div class="wf-cards">
+    <a class="wf-card" href="#web"><span class="wf-card-kind">Review content 1</span><h2>Web prototype</h2><p>17 clickable views.</p></a>
+  </div>
+  <div class="wf-coverage">
+    <h2>Views in the web prototype</h2>
+    <table>
+      <thead><tr><th scope="col">Group</th><th scope="col">Views</th><th scope="col">States drawn</th></tr></thead>
+      <tbody>
+        <tr><td><a href="#web/list-business-rules">Business rules lists</a></td><td class="wf-count-cell">3</td><td>Business rules, empty state, long titles</td></tr>
+        <tr><td><a href="#web/view-business-rule">Business rule</a></td><td class="wf-count-cell">2</td><td>View, after save</td></tr>
+        <tr><td><a href="#web/edit-business-rule">Business rule edits</a></td><td class="wf-count-cell">4</td><td>Pristine, dirty, 422 errors, 409 conflict</td></tr>
+        <tr><td><a href="#web/responsive-list-business-rules-320">Responsive / a11y</a></td><td class="wf-count-cell">2</td><td>320 px business rules list and edit form with annotations</td></tr>
+        <tr><td><a href="#web/error-404-unknown">Error pages</a></td><td class="wf-count-cell">6</td><td>404 unknown, 404 deprecated, 400, 405, 415, 500</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- PROTOTYPE -->
+
+<section class="wf-review wf-proto" data-review="web" data-screen="web" data-platform="web" aria-label="Web prototype">
+
+  <nav class="wf-proto-nav" aria-label="Web prototype views">
+    <span class="wf-proto-title">Web prototype &middot; 17 views</span>
+    <span class="wf-nav-group">business rules list</span>
+    <ul>
+      <li><a href="#web/list-business-rules" data-goto="list-business-rules" data-platform="web">List</a></li>
+      <li><a href="#web/list-business-rules-empty" data-goto="list-business-rules-empty" data-platform="web">Empty</a></li>
+      <li><a href="#web/list-business-rules-long" data-goto="list-business-rules-long" data-platform="web">Long</a></li>
+    </ul>
+    <span class="wf-nav-group">Business rule</span>
+    <ul>
+      <li><a href="#web/view-business-rule" data-goto="view-business-rule" data-platform="web">View</a></li>
+      <li><a href="#web/view-business-rule-after-save" data-goto="view-business-rule-after-save" data-platform="web">After save</a></li>
+    </ul>
+    <span class="wf-nav-group">business rules edit</span>
+    <ul>
+      <li><a href="#web/edit-business-rule" data-goto="edit-business-rule" data-platform="web">Edit</a></li>
+      <li><a href="#web/edit-business-rule-dirty" data-goto="edit-business-rule-dirty" data-platform="web">Dirty</a></li>
+      <li><a href="#web/edit-business-rule-errors" data-goto="edit-business-rule-errors" data-platform="web">422 errors</a></li>
+      <li><a href="#web/edit-business-rule-conflict" data-goto="edit-business-rule-conflict" data-platform="web">409 conflict</a></li>
+    </ul>
+    <span class="wf-nav-group">320 px</span>
+    <ul>
+      <li><a href="#web/responsive-list-business-rules-320" data-goto="responsive-list-business-rules-320" data-platform="web">List</a></li>
+      <li><a href="#web/responsive-edit-business-rules-320" data-goto="responsive-edit-business-rules-320" data-platform="web">Edit</a></li>
+    </ul>
+    <span class="wf-nav-group">Errors</span>
+    <ul>
+      <li><a href="#web/error-404-unknown" data-goto="error-404-unknown" data-platform="web">404 unknown</a></li>
+      <li><a href="#web/error-404-deprecated" data-goto="error-404-deprecated" data-platform="web">404 deprecated</a></li>
+      <li><a href="#web/error-400" data-goto="error-400" data-platform="web">400</a></li>
+      <li><a href="#web/error-405" data-goto="error-405" data-platform="web">405</a></li>
+      <li><a href="#web/error-415" data-goto="error-415" data-platform="web">415</a></li>
+      <li><a href="#web/error-500" data-goto="error-500" data-platform="web">500</a></li>
+    </ul>
+  </nav>
+
+  <p class="wf-frame-label"><strong>Web</strong><span>Desktop canvas 1440 &times; 900 CSS px</span><span>Review frame &mdash; scaled to fit the window</span></p>
+  <div class="wf-frame-wrap" id="wf-frame-wrap">
+    <div class="wf-frame" id="wf-frame">
+
+      <!-- mockup views -->
+      <!-- mockup lists -->
+      <section class="wf-screen" data-platform="web" data-screen="list-business-rules" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <h1 class="wf-h1">Business Rules</h1>
+              <p class="wf-sub">Business rules in this project.</p>
+              <section class="wf-section" aria-label="Business Rules">
+                <div class="wf-section-head"><h2 class="wf-h2">Business Rules</h2><p class="wf-count">3 business rules</p></div>
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-business-rule" data-goto="view-business-rule"><span class="wf-group-id">RUL-001</span> Require signed contracts</a></h3>
+                  </div>
+                  <p class="wf-group-preview">Every contract must be signed by both parties before work starts.</p>
+                </article>
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-business-rule" data-goto="view-business-rule"><span class="wf-group-id">RUL-002</span> Supplier onboarding checklist</a></h3>
+                  </div>
+                  <p class="wf-group-preview">New suppliers must complete the onboarding checklist.</p>
+                </article>
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-business-rule" data-goto="view-business-rule"><span class="wf-group-id">RUL-003</span> Data retention period</a></h3>
+                  </div>
+                  <p class="wf-group-preview">Personal data is retained for no longer than 30 days after account closure.</p>
+                </article>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <section class="wf-screen" data-platform="web" data-screen="list-business-rules-empty" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <h1 class="wf-h1">Business Rules</h1>
+              <p class="wf-sub">Business rules in this project.</p>
+              <section class="wf-section" aria-label="Business Rules">
+                <div class="wf-section-head"><h2 class="wf-h2">business rules</h2><p class="wf-count">0 business rules</p></div>
+                <p class="wf-empty">No business rules were found in the configured directory. Business rules are created from the command line; this browser does not create records. Deprecated business rules are hidden.</p>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <section class="wf-screen" data-platform="web" data-screen="list-business-rules-long" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <h1 class="wf-h1">Business Rules</h1>
+              <p class="wf-sub">Business rules in this project.</p>
+              <section class="wf-section" aria-label="Business Rules">
+                <div class="wf-section-head"><h2 class="wf-h2">business rules</h2><p class="wf-count">1 Business rule</p></div>
+                <article class="wf-group">
+                  <div class="wf-group-head">
+                    <h3 class="wf-group-title"><a href="#web/view-business-rule" data-goto="view-business-rule"><span class="wf-group-id">RUL-004</span> AnUnbreakableTitleTokenThatMustWrapInsideTheRowWithoutHorizontalScroll</a></h3>
+                  </div>
+                                  </article>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- mockup view -->
+      <section class="wf-screen" data-platform="web" data-screen="view-business-rule" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+                <li><a href="#web/list-business-rules" data-goto="list-business-rules">Business Rules</a></li>
+                <li aria-current="page">RUL-001</li>
+              </ol></nav>
+              <div class="wf-page-head">
+                <div>
+                  <p class="wf-id">RUL-001</p>
+                  <h1 class="wf-h1">Require signed contracts</h1>
+                </div>
+                <div class="wf-actions"><a class="wf-btn wf-btn-primary" href="#web/edit-business-rule" data-goto="edit-business-rule">Edit</a></div>
+              </div>
+              <div class="wf-meta">
+                <dl class="wf-dl">
+                  <div><dt>Record ID</dt><dd>RUL-001</dd></div>
+                  <div><dt>Record form</dt><dd>Business rule</dd></div>
+                  <div><dt>Category</dt><dd>Business Rules</dd></div>
+                </dl>
+              </div>
+              <section class="wf-record-section">
+                <h2 class="wf-h2">Description</h2>
+                <p class="wf-text">Every contract must be signed by both parties before work starts.</p>
+                <h2 class="wf-h2">Rationale</h2>
+                <p class="wf-text">Reduces disputes and clarifies obligations.</p>
+                <h2 class="wf-h2">Applicability</h2>
+                <p class="wf-text">Applies to all contracts with external suppliers.</p>
+                <h2 class="wf-h2">Requirements</h2>
+                <p class="wf-text"><code>REQ-05.005</code>, <code>REQ-05.007</code></p>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <section class="wf-screen" data-platform="web" data-screen="view-business-rule-after-save" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+                <li><a href="#web/list-business-rules" data-goto="list-business-rules">Business Rules</a></li>
+                <li aria-current="page">RUL-001</li>
+              </ol></nav>
+              <div class="wf-page-head">
+                <div>
+                  <p class="wf-id">RUL-001</p>
+                  <h1 class="wf-h1">Require signed contracts</h1>
+                </div>
+                <div class="wf-actions"><a class="wf-btn wf-btn-primary" href="#web/edit-business-rule" data-goto="edit-business-rule">Edit</a></div>
+              </div>
+              <div class="wf-meta">
+                <dl class="wf-dl">
+                  <div><dt>Record ID</dt><dd>RUL-001</dd></div>
+                  <div><dt>Record form</dt><dd>Business rule</dd></div>
+                  <div><dt>Category</dt><dd>Business Rules</dd></div>
+                </dl>
+              </div>
+              <section class="wf-record-section">
+                <h2 class="wf-h2">Description</h2>
+                <p class="wf-text">Every contract must be signed by both parties before work starts (updated).</p>
+                <h2 class="wf-h2">Rationale</h2>
+                <p class="wf-text">Reduces disputes and clarifies obligations.</p>
+                <h2 class="wf-h2">Applicability</h2>
+                <p class="wf-text">Applies to all contracts with external suppliers.</p>
+                <h2 class="wf-h2">Requirements</h2>
+                <p class="wf-text"><code>REQ-05.005</code>, <code>REQ-05.007</code>, <code>REQ-06.002</code></p>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- mockup edit -->
+      <section class="wf-screen" data-platform="web" data-screen="edit-business-rule" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+                <li><a href="#web/list-business-rules" data-goto="list-business-rules">Business Rules</a></li>
+                <li><a href="#web/view-business-rule" data-goto="view-business-rule">RUL-001</a></li>
+                <li aria-current="page">Edit</li>
+              </ol></nav>
+              <div class="wf-page-head">
+                <div>
+                  <p class="wf-id">RUL-001</p>
+                  <h1 class="wf-h1">Edit RUL-001</h1>
+                  <p class="wf-sub">Require signed contracts</p>
+                </div>
+                <div class="wf-actions"></div>
+              </div>
+              <div class="wf-meta">
+                <dl class="wf-dl">
+                  <div><dt>Record ID</dt><dd>RUL-001</dd></div>
+                  <div><dt>Record form</dt><dd>Business rule</dd></div>
+                  <div><dt>Category</dt><dd>Business Rules</dd></div>
+                </dl>
+              </div>
+              <form class="wf-form" action="#" method="post">
+                <div class="wf-field">
+                  <label for="m-title">Title (required)</label>
+                  <input id="m-title" name="title" type="text" required value="Require signed contracts">
+                  <p class="wf-help">Required &middot; 1 to 200 characters &middot; shown in lists and headings.</p>
+                </div>
+                <div class="wf-field">
+                  <label for="m-description">Description</label>
+                  <textarea id="m-description" name="description" rows="6">Every contract must be signed by both parties before work starts.</textarea>
+                  <p class="wf-help">Optional &middot; at most 20000 characters.</p>
+                </div>
+                <div class="wf-field">
+                  <label for="m-rationale">Rationale</label>
+                  <textarea id="m-rationale" name="rationale" rows="6">Reduces disputes and clarifies obligations.</textarea>
+                  <p class="wf-help">Optional &middot; at most 20000 characters.</p>
+                </div>
+                <div class="wf-field">
+                  <label for="m-applicability">Applicability</label>
+                  <textarea id="m-applicability" name="applicability" rows="6">Applies to all contracts with external suppliers.</textarea>
+                  <p class="wf-help">Optional &middot; at most 20000 characters.</p>
+                </div>
+                <div class="wf-field">
+                  <label for="m-req-add">Requirements (business requirement ids)</label>
+                  <div class="wf-tagbox">
+                    <span class="wf-tag">REQ-05.005 <button type="button" aria-label="Remove REQ-05.005">&times;</button></span>
+                  </div>
+                  <div class="wf-add-line">
+                    <input id="m-req-add" type="text" placeholder="Add requirement id (e.g. REQ-05.007)">
+                    <button type="button">Add</button>
+                  </div>
+                  <p class="wf-help">Optional &middot; zero or more business requirement ids &middot; added one at a time.</p>
+                </div>
+                <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+                <input type="hidden" name="version" value="1700000000.0.100">
+                <div class="wf-form-actions">
+                  <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+                  <a class="wf-link" href="#web/view-business-rule" data-goto="view-business-rule">Cancel</a>
+                </div>
+              </form>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <section class="wf-screen" data-platform="web" data-screen="edit-business-rule-dirty" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+                <li><a href="#web/list-business-rules" data-goto="list-business-rules">Business Rules</a></li>
+                <li><a href="#web/view-business-rule" data-goto="view-business-rule">RUL-001</a></li>
+                <li aria-current="page">Edit</li>
+              </ol></nav>
+              <div class="wf-page-head">
+                <div>
+                  <p class="wf-id">RUL-001</p>
+                  <h1 class="wf-h1">Edit RUL-001</h1>
+                  <p class="wf-sub">Require signed contracts</p>
+                </div>
+                <div class="wf-actions"><p class="wf-status">Unsaved changes</p></div>
+              </div>
+              <div class="wf-meta">
+                <dl class="wf-dl">
+                  <div><dt>Record ID</dt><dd>RUL-001</dd></div>
+                  <div><dt>Record form</dt><dd>Business rule</dd></div>
+                  <div><dt>Category</dt><dd>Business Rules</dd></div>
+                </dl>
+              </div>
+              <form class="wf-form" action="#" method="post">
+                <div class="wf-field">
+                  <label for="m-title">Title (required)</label>
+                  <input id="m-title" name="title" type="text" required value="Require signed contracts">
+                  <p class="wf-help">Required &middot; 1 to 200 characters &middot; shown in lists and headings.</p>
+                </div>
+                <div class="wf-field">
+                  <label for="m-description">Description</label>
+                  <textarea id="m-description" name="description" rows="6">Every contract must be signed by both parties before work starts.</textarea>
+                  <p class="wf-help">Optional &middot; at most 20000 characters.</p>
+                </div>
+                <div class="wf-field">
+                  <label for="m-rationale">Rationale</label>
+                  <textarea id="m-rationale" name="rationale" rows="6">Reduces disputes and clarifies obligations.</textarea>
+                  <p class="wf-help">Optional &middot; at most 20000 characters.</p>
+                </div>
+                <div class="wf-field">
+                  <label for="m-applicability">Applicability</label>
+                  <textarea id="m-applicability" name="applicability" rows="6">Applies to all contracts with external suppliers.</textarea>
+                  <p class="wf-help">Optional &middot; at most 20000 characters.</p>
+                </div>
+                <div class="wf-field">
+                  <label for="m-req-add">Requirements (business requirement ids)</label>
+                  <div class="wf-tagbox">
+                    <span class="wf-tag">REQ-05.005 <button type="button" aria-label="Remove REQ-05.005">&times;</button></span>
+                  </div>
+                  <div class="wf-add-line">
+                    <input id="m-req-add" type="text" placeholder="Add requirement id (e.g. REQ-05.007)">
+                    <button type="button">Add</button>
+                  </div>
+                  <p class="wf-help">Optional &middot; zero or more business requirement ids &middot; added one at a time.</p>
+                </div>
+                <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+                <input type="hidden" name="version" value="1700000000.0.100">
+                <div class="wf-form-actions">
+                  <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+                  <a class="wf-link" href="#web/view-business-rule" data-goto="view-business-rule">Cancel</a>
+                </div>
+              </form>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <section class="wf-screen" data-platform="web" data-screen="edit-business-rule-errors" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+                <li><a href="#web/list-business-rules" data-goto="list-business-rules">Business Rules</a></li>
+                <li><a href="#web/view-business-rule" data-goto="view-business-rule">RUL-001</a></li>
+                <li aria-current="page">Edit</li>
+              </ol></nav>
+              <div class="wf-page-head">
+                <div>
+                  <p class="wf-id">RUL-001</p>
+                  <h1 class="wf-h1">Edit RUL-001</h1>
+                </div>
+              </div>
+              <div role="alert" class="wf-alert">
+                <h2>There is a problem</h2>
+                <ul>
+                  <li><a href="#m-title">Title is required.</a></li>
+                  <li><a href="#m-description">Description contains a line starting with ## .</a></li>
+                </ul>
+                <p>Nothing was saved. Your typed values are kept below.</p>
+              </div>
+              <form class="wf-form" action="#" method="post">
+                <div class="wf-field wf-field-error">
+                  <label for="m-title">Title (required)</label>
+                  <input id="m-title" name="title" type="text" required value="" aria-invalid="true">
+                  <p class="wf-error">! Title is required.</p>
+                </div>
+                <div class="wf-field">
+                  <label for="m-description">Description</label>
+                  <textarea id="m-description" name="description" rows="4">## bad line</textarea>
+                  <p class="wf-error">! Description contains a line starting with ## .</p>
+                </div>
+                <div class="wf-field">
+                  <label for="m-rationale">Rationale</label>
+                  <textarea id="m-rationale" name="rationale" rows="4"></textarea>
+                </div>
+                <div class="wf-field">
+                  <label for="m-applicability">Applicability</label>
+                  <textarea id="m-applicability" name="applicability" rows="4"></textarea>
+                </div>
+                <div class="wf-field">
+                  <label for="m-req-add">Requirements (business requirement ids)</label>
+                  <div class="wf-tagbox">
+                    <span class="wf-tag">REQ-05.005 <button type="button" aria-label="Remove REQ-05.005">&times;</button></span>
+                  </div>
+                  <div class="wf-add-line">
+                    <input id="m-req-add" type="text" placeholder="Add requirement id (e.g. REQ-05.007)">
+                    <button type="button">Add</button>
+                  </div>
+                </div>
+                <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+                <input type="hidden" name="version" value="1700000000.0.100">
+                <div class="wf-form-actions">
+                  <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+                  <a class="wf-link" href="#web/view-business-rule" data-goto="view-business-rule">Cancel</a>
+                </div>
+              </form>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <section class="wf-screen" data-platform="web" data-screen="edit-business-rule-conflict" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <h1 class="wf-h1">This record changed on disk</h1>
+              <p class="wf-sub">Nothing was saved.</p>
+              <div class="wf-alert">409 Conflict &mdash; record changed on disk; reload the form.</div>
+              <p><a class="wf-btn wf-btn-primary" href="#web/edit-business-rule" data-goto="edit-business-rule">Reload the form</a> <a class="wf-link" href="#web/view-business-rule" data-goto="view-business-rule">View current record</a></p>
+              <section class="wf-record-section">
+                <h2 class="wf-h2">Your unsaved changes (read-only, not saved)</h2>
+                <p class="wf-text">Title: Require signed contracts (edited)
+Description: Every contract must be signed... (edited)
+Rationale: Reduces disputes... (edited)
+Applicability: Applies to all contracts... (edited)
+Requirements: REQ-05.005 (added)</p>
+              </section>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <!-- responsive -->
+      <section class="wf-screen" data-platform="web" data-screen="responsive-list-business-rules-320" hidden>
+        <div class="wf-narrow-wrap">
+          <div class="wf-narrow">
+            <div class="wf-app">
+              <header class="wf-header">
+                <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+              </header>
+              <div class="wf-layout">
+                <aside class="wf-sidebar" aria-label="Document types">
+                  <button class="wf-sidebar-toggle" type="button" data-type-toggle aria-expanded="false" aria-controls="mockup-sidebar-list-320">Document types</button>
+                  <ul id="mockup-sidebar-list-320" hidden>
+                    <li><span>Business requirements</span></li>
+                    <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+                    <li><span>Non-functional requirements</span></li>
+                    <li><span>Backlog</span></li>
+                    <li><span>Decisions</span></li>
+                    <li><span>Glossary</span></li>
+                    <li><span>UI Specifications</span></li>
+                    <li><span>UI Mockups</span></li>
+                  </ul>
+                </aside>
+                <main class="wf-main">
+                  <h1 class="wf-h1">Business Rules</h1>
+                  <p class="wf-sub">Narrow viewport with annotations.</p>
+                  <p class="wf-empty">320 CSS-px list: sidebar collapsed behind toggle, rows stack.</p>
+                  <ol class="wf-deck-list">
+                    <li>Landmarks: header, nav, main, footer.</li>
+                    <li>One h1 per page; sections h2.</li>
+                    <li>Sidebar collapses behind toggle labelled Document types.</li>
+                    <li>Row links read ID + title.</li>
+                                        <li>Focus order follows document order.</li>
+                    <li>Every form control has a label.</li>
+                    <li>Error summary role alert.</li>
+                    <li>Contrast at least 4.5:1.</li>
+                    <li>No JavaScript required.</li>
+                    <li>Version travels in hidden input.</li>
+                  </ol>
+                </main>
+              </div>
+              <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+            </div>
+          </div>
+          <div class="wf-narrow" style="width:260px;border-style:dashed">
+            <p class="wf-note">Legend (outside the 320 px frame)</p>
+            <ol class="wf-deck-list">
+              <li>Sidebar toggle.</li>
+              <li>Annotation legend.</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section class="wf-screen" data-platform="web" data-screen="responsive-edit-business-rules-320" hidden>
+        <div class="wf-narrow-wrap">
+          <div class="wf-narrow">
+            <div class="wf-app">
+              <header class="wf-header">
+                <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+              </header>
+              <div class="wf-layout">
+                <aside class="wf-sidebar" aria-label="Document types">
+                  <button class="wf-sidebar-toggle" type="button" data-type-toggle aria-expanded="false" aria-controls="mockup-sidebar-edit-320">Document types</button>
+                  <ul id="mockup-sidebar-edit-320" hidden>
+                    <li><span>Business requirements</span></li>
+                    <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+                    <li><span>Non-functional requirements</span></li>
+                    <li><span>Backlog</span></li>
+                    <li><span>Decisions</span></li>
+                    <li><span>Glossary</span></li>
+                    <li><span>UI Specifications</span></li>
+                    <li><span>UI Mockups</span></li>
+                  </ul>
+                </aside>
+                <main class="wf-main">
+                  <h1 class="wf-h1">Edit RUL-001</h1>
+                  <p class="wf-sub">Narrow viewport edit form.</p>
+                  <p class="wf-empty">320 CSS-px edit: fields full width, actions stack.</p>
+                  <ol class="wf-deck-list">
+                    <li>Landmarks and headings as above.</li>
+                    <li>Sidebar toggle.</li>
+                    <li>Form controls labelled.</li>
+                    <li>Error association.</li>
+                    <li>Contrast.</li>
+                    <li>No JS required.</li>
+                  </ol>
+                </main>
+              </div>
+              <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- errors -->
+      <section class="wf-screen" data-platform="web" data-screen="error-404-unknown" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <p class="wf-status-code">404</p>
+              <h1 class="wf-h1">Record not found</h1>
+              <p class="wf-sub">That record does not exist or is not available.</p>
+              <p><a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules">Back to business rules</a></p>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <section class="wf-screen" data-platform="web" data-screen="error-404-deprecated" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <p class="wf-status-code">404</p>
+              <h1 class="wf-h1">Record not available</h1>
+              <p class="wf-sub">That record is not available. Deprecated mockups are hidden.</p>
+              <p><a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules">Back to business rules</a></p>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <section class="wf-screen" data-platform="web" data-screen="error-400" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <p class="wf-status-code">400</p>
+              <h1 class="wf-h1">Bad request</h1>
+              <p class="wf-sub">The request could not be understood.</p>
+              <p><a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules">Back to business rules</a></p>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <section class="wf-screen" data-platform="web" data-screen="error-405" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <p class="wf-status-code">405</p>
+              <h1 class="wf-h1">Method not allowed</h1>
+              <p class="wf-sub">That action is not available on this address.</p>
+              <p><a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules">Back to business rules</a></p>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <section class="wf-screen" data-platform="web" data-screen="error-415" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <p class="wf-status-code">415</p>
+              <h1 class="wf-h1">Unsupported media type</h1>
+              <p class="wf-sub">That content type is not accepted.</p>
+              <p><a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules">Back to business rules</a></p>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <section class="wf-screen" data-platform="web" data-screen="error-500" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul>
+              <li><span>Business requirements</span></li>
+              <li><a href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page">Business Rules</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI Specifications</span></li>
+              <li><span>UI Mockups</span></li>
+            </ul></aside>
+            <main class="wf-main">
+              <p class="wf-status-code">500</p>
+              <h1 class="wf-h1">Something went wrong</h1>
+              <p class="wf-sub">The request could not be completed.</p>
+              <p><a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules">Back to business rules</a></p>
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section><script>
+/* Review scaffolding only */
+(function () {
+  "use strict";
+  var reviews = Array.prototype.slice.call(document.querySelectorAll(".wf-review"));
+  var protos = Array.prototype.slice.call(document.querySelectorAll(".wf-proto"));
+  var screens = Array.prototype.slice.call(document.querySelectorAll(".wf-screen"));
+  var routeLinks = Array.prototype.slice.call(document.querySelectorAll(".wf-chrome a[data-route]"));
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll(".wf-proto-nav a[data-goto]"));
+  var wrap = document.getElementById("wf-frame-wrap");
+  var frame = document.getElementById("wf-frame");
+  var activePlatform = "web";
+  function firstView(platform) {
+    var el = document.querySelector('.wf-screen[data-platform="' + platform + '"]');
+    return el ? el.getAttribute("data-screen") : null;
+  }
+  function fitFrame() {
+    if (!wrap || !frame) return;
+    var available = wrap.getBoundingClientRect().width - 4;
+    var scale = available < 1440 ? available / 1440 : 1;
+    frame.style.transform = scale < 1 ? "scale(" + scale + ")" : "none";
+    wrap.style.height = Math.round(frame.offsetHeight * scale + 40) + "px";
+  }
+  function setChrome(route) {
+    routeLinks.forEach(function (link) {
+      if (link.getAttribute("data-route") === route) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    });
+  }
+  function showIndex() {
+    reviews.forEach(function (s) { s.classList.toggle("is-active", s.getAttribute("data-review") === "index"); });
+    protos.forEach(function (b) { b.classList.remove("is-active"); });
+    setChrome("index");
+  }
+  function showView(platform, viewId, focusHeading) {
+    var target = viewId || firstView(platform);
+    if (!target) return;
+    activePlatform = platform;
+    reviews.forEach(function (s) { s.classList.remove("is-active"); });
+    protos.forEach(function (b) {
+      var active = b.getAttribute("data-platform") === platform;
+      b.classList.toggle("is-active", active);
+    });
+    screens.forEach(function (screen) {
+      var match = screen.getAttribute("data-platform") === platform && screen.getAttribute("data-screen") === target;
+      screen.hidden = !match;
+    });
+    navLinks.forEach(function (link) {
+      if (link.getAttribute("data-platform") === platform && link.getAttribute("data-goto") === target) link.setAttribute("aria-current", "true");
+      else link.removeAttribute("aria-current");
+    });
+    setChrome("web");
+    fitFrame();
+    if (focusHeading) {
+      var heading = document.querySelector('.wf-screen[data-platform="' + platform + '"][data-screen="' + target + '"] h1');
+      if (heading) { heading.setAttribute("tabindex", "-1"); heading.focus(); }
+    }
+  }
+  function applyHash() {
+    var raw = (window.location.hash || "").replace(/^#/, "");
+    var hash = raw;
+    try { hash = decodeURIComponent(raw); } catch (e) { hash = raw; }
+    if (!hash || hash === "index") { showIndex(); return; }
+    var viewMatch = /^([a-z0-9-]+)(?:\/([a-z0-9-]+))?$/.exec(hash);
+    if (viewMatch) { showView(viewMatch[1], viewMatch[2] || null, false); return; }
+    if (document.getElementById(hash)) return;
+    showIndex();
+  }
+  function go(hash, focusHeading) {
+    if (window.location.hash === "#" + hash) applyHash();
+    else window.location.hash = hash;
+    if (focusHeading) {
+      var parts = /^([a-z0-9-]+)\/([a-z0-9-]+)$/.exec(hash);
+      if (parts) showView(parts[1], parts[2], true);
+    }
+  }
+  document.addEventListener("click", function (event) {
+    var node = event.target;
+    while (node && node !== document) {
+      if (node.hasAttribute && node.hasAttribute("data-goto")) {
+        event.preventDefault();
+        var platform = node.getAttribute("data-platform") || activePlatform;
+        var viewId = node.getAttribute("data-goto");
+        go(platform + "/" + viewId, true);
+        return;
+      }
+      node = node.parentNode;
+    }
+  });
+  document.addEventListener("click", function (event) {
+    var node = event.target;
+    while (node && node !== document) {
+      if (node.hasAttribute && node.hasAttribute("data-type-toggle")) {
+        event.preventDefault();
+        var list = document.getElementById(node.getAttribute("aria-controls"));
+        var expanded = node.getAttribute("aria-expanded") === "true";
+        node.setAttribute("aria-expanded", expanded ? "false" : "true");
+        if (list) list.hidden = expanded;
+        return;
+      }
+      node = node.parentNode;
+    }
+  });
+  window.addEventListener("hashchange", applyHash);
+  window.addEventListener("resize", fitFrame);
+  applyHash();
+})();
+</script>
+</body>
+</html>
