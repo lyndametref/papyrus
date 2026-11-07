@@ -884,3 +884,160 @@ with `papyrus 0.1.0`.
   lifecycle smoke covers create/list/view/edit/deprecate/restore only.
 - **No requirements-tag interaction.** Audit records carry no requirements tags
   (that is business rules, BR-013); no such step is claimed.
+
+## TASK-59 — Technical specifications milestone packaging and verification
+
+- Date: **2026-11-07 (UTC)**.
+- Supported release: **Debian Forky only** (amd64), per ADR-0003 and NFR-03.002.
+  Debian Trixie and every other Debian release are **not claimed and not verified**.
+- Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43-7, dpkg 1.23.11,
+  `rustc`/`cargo` 1.99.1, clippy 0.1.99, `fakeroot` 2.1.4, `unshare -rn` with
+  `ip link set lo up` available.
+- Isolation: `fakeroot dpkg --instdir=./.tmp/task59/inst
+  --admindir=./.tmp/task59/adm --force-depends`; the host package status was
+  `install ok installed 0.1.0` before and after the run and was not modified.
+  Scratch directories were removed after verification.
+- Package: `papyrus_0.1.0_amd64.deb`, 918176 bytes,
+  SHA-256 `eaabd7cc16a2bce1ea1c3675d3e955d2abd33f7756fe67133ffa0a3c12eb3498`.
+- Package metadata: `Package: papyrus`, `Version: 0.1.0` (from `Cargo.toml`),
+  `Architecture: amd64`, `Depends: libc6 (>= 2.34)`, `Section: utils`,
+  `Priority: optional`, copyright `GPL-3.0-or-later`.
+- Package contents: `/usr/bin/papyrus` (0755, 2888128 bytes) and
+  `/usr/share/doc/papyrus/copyright` (0644, 865 bytes) only; no asset, template,
+  configuration, or man file. `/assets/app.css` and `/assets/app.js` are compiled
+  into the binary and served from memory.
+- Technical specifications have no supersede or delete command (BR-017); the
+  lifecycle covers create/list/view/edit/deprecate/restore only.
+- New test file: `tests/technical_specifications_smoke.rs` (2 tests), passing under
+  `cargo test`.
+- No runtime dependencies were added; the TASK-1/TASK-4 runtime dependency
+  license audit remains valid (NFR-06.002).
+
+### Build and package (TASK-59)
+
+```sh
+cargo build --release
+./target/release/papyrus --help        # must list tech-spec, search, and browser
+./scripts/build-deb.sh                 # unchanged; produces papyrus_0.1.0_amd64.deb
+dpkg-deb -I papyrus_0.1.0_amd64.deb
+dpkg-deb -c papyrus_0.1.0_amd64.deb
+dpkg-deb --fsys-tarfile papyrus_0.1.0_amd64.deb \
+  | tar -xO ./usr/share/doc/papyrus/copyright | grep GPL-3.0-or-later
+```
+
+### Isolated install and uninstall (TASK-59)
+
+Follow the isolated procedure documented above, using
+`./.tmp/task59/{inst,adm}`. Verify:
+
+```sh
+fakeroot stat -c '%U:%G %a %n' ./.tmp/task59/inst/usr/bin/papyrus   # root:root 755
+env PATH="$PWD/.tmp/task59/inst/usr/bin:$PATH" sh -c \
+  'command -v papyrus; papyrus --version'                            # papyrus 0.1.0
+fakeroot dpkg --instdir=./.tmp/task59/inst --admindir=./.tmp/task59/adm -r papyrus
+env -i PATH="$PWD/.tmp/task59/inst/usr/bin" /bin/sh -c \
+  'command -v papyrus || echo "not on isolated PATH"'
+fakeroot dpkg --instdir=./.tmp/task59/inst --admindir=./.tmp/task59/adm --purge papyrus
+rm -rf ./.tmp/task59
+```
+
+The host may already have `papyrus` installed from prior work; record that status
+before and after and confirm it is unchanged. Use an isolated-only `PATH` for the
+post-removal check when the host has the package installed.
+
+### Extended smoke-test checklist (TASK-59)
+
+Run every command against the installed binary (`./.tmp/task59/inst/usr/bin/papyrus`
+on `PATH`) with `--dir` pointing at a scratch project under `./.tmp/task59/`. Exit
+statuses follow the existing contract: `0` success, `1` IO/boundary, `2` usage,
+`3` not found, `4` validation.
+
+| Area | Checklist item |
+|---|---|
+| Baseline (3.1) | `--help` exits 0 and lists `tech-spec`, `search`, `browser`; `--version` prints `papyrus 0.1.0` |
+| Lifecycle (3.1) | `init`; `tech-spec create <title> --description <text>` prints `TECH-001` and writes `docs/technical/TECH-001.md` with heading, `## Description`, and one trailing newline |
+| Lifecycle (3.1) | `list` is active-only and ID-ordered; `view` prints the persisted text and still works for a deprecated ID |
+| Lifecycle (3.1) | `edit --title`/`--description` changes only the supplied field; IDs and paths are unchanged |
+| Lifecycle (3.1) | `deprecate` moves the file to `deprecated/`; `restore` returns it with the same ID and byte-identical content |
+| Lifecycle (3.1) | Missing required arguments exit 2; empty title, control characters, and path separators exit 4; unknown IDs exit 3; already-deprecated/already-active transitions exit 4; a disabled `document_types.tech-spec.enabled` rejects create/list with exit 4 |
+| Search (3.2) | Contiguous quoted phrase matches; split words do not match; `--type doc` includes technical specifications; other `--type` values exclude them; `--limit` caps results |
+| Search (3.2) | `--json` returns `{id,type,title,path}` objects and `[]` on no match; deprecated records are hidden until restored; a missing directory returns an empty success; `--type tech-spec` exits 2 |
+| Browser (3.3) | `browser --no-open --port <free>` prints exactly `Serving http://127.0.0.1:<port>/` |
+| Browser (3.3) | `/?type=tech-spec` renders the Technical Specifications category; the sidebar entry follows Audit Records and carries `aria-current="page"`; the count, ID-ordered rows, and first-paragraph preview render |
+| Browser (3.3) | `/doc/<id>` shows ID, form, category, title, and description as body text with `white-space: pre-wrap` (no Description heading; `(none)` when empty) and exactly one Edit action |
+| Browser (3.3) | Edit round-trip returns `303` to `/doc/<id>`, persists through both the UI and the CLI, and preserves the preamble and unknown sections byte-for-byte |
+| Browser (3.3) | `/api/tech-specs`, its `/api/tech-spec` alias, and `/api/doc/<id>` return the documented JSON; `/assets/app.css` and `/assets/app.js` are non-empty with `Cache-Control: no-store` |
+| Browser (3.3) | 320 px hooks are present (viewport meta, sidebar toggle with `aria-expanded`/`aria-controls`); served HTML/CSS/JS have no external references and HTML carries the CSP |
+| Deprecation (3.3, 3.4) | A deprecated specification is not listed or counted and returns `404` on view, edit, form POST, and API; HTML 404s are identical for deprecated and unknown IDs and carry the help text and one recovery link |
+| Offline (3.4) | Inside `unshare -rn` (loopback up), an outbound TCP connection fails; search and browser list/view/edit/assets pass over loopback |
+| Config keys (3.5) | `config list/get` expose `browser_host`, `browser_port`, `browser_open`; a configured port is used without `--port` and `--port` overrides it; `browser_open=false` suppresses opening; unset restores defaults; invalid values exit 4 with an unchanged file |
+| Assets (3.6) | From an empty working directory and an asset-free project, search and browser work and both embedded assets are non-empty |
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| `cargo build` (Rust 1.99.1) | PASS |
+| `cargo build --release` (Rust 1.99.1) | PASS |
+| `target/release/papyrus --help` lists `tech-spec`, `search`, `browser` | PASS |
+| `cargo test` | PASS — 383 tests (70 unit + 313 integration, including `technical_specifications_smoke` 2) |
+| `cargo clippy --all-targets -- -D warnings` | PASS — 0 warnings |
+| `cargo fmt --check` | PASS |
+
+### Install, uninstall, and smoke checks
+
+| Check | Result |
+|---|---|
+| Isolated `dpkg -i` | PASS (exit 0) |
+| Installed `/usr/bin/papyrus` is `root:root` 0755 | PASS |
+| `papyrus` resolves on the installed `PATH` and runs | PASS |
+| Isolated `dpkg -r papyrus` removes the binary; not on the isolated-only `PATH` | PASS |
+| Isolated `dpkg --purge papyrus` removes the admin entry; no papyrus files remain | PASS |
+| Host package database and filesystem unchanged | PASS |
+| `--help` lists `tech-spec`, `search`, `browser`; `--version` prints `papyrus 0.1.0` | PASS |
+| Technical-specification lifecycle: create/list/view/edit/deprecate/restore; IDs preserved | PASS |
+| Lifecycle exit codes: unknown ID 3; already-deprecated/already-active 4; missing arguments 2; sanitization 4; disabled type 4 | PASS |
+| Search: quoted phrase, split words no match, `--type doc`, other `--type` filters, `--limit`, `--json`, empty `[]`, deprecated hidden until restored | PASS |
+| Search: missing directory empty success; `--type tech-spec` exits 2 | PASS |
+| Browser: startup line, `?type=tech-spec` with `aria-current` and position after Audit Records, count/rows/preview | PASS |
+| Browser view: form, category, title, description body without a Description heading; `(none)` for empty; one Edit action | PASS |
+| Browser edit round-trip: `303`, `Location`, persisted through UI and CLI | PASS |
+| Browser field-preserving edit: preamble and unknown sections byte-identical | PASS |
+| Browser JSON API: `/api/tech-specs`, `/api/tech-spec`, `/api/doc/<id>` | PASS |
+| Embedded assets: `/assets/app.css`, `/assets/app.js`, non-empty, correct content type, `Cache-Control: no-store` | PASS |
+| 320 px markup hooks and narrow-viewport CSS | PASS |
+| No external references in served HTML/CSS/JS; CSP present on HTML | PASS |
+| Deprecated specification not listed or counted; `404` on view, edit, POST, and API; identical 404 page and single recovery link | PASS |
+| Offline (`unshare -rn`, outbound TCP fails): search, list, view, edit, assets over loopback | PASS |
+| Config keys: list/get/set/unset; configured port honored; `--port` overrides; `browser_open=false`; defaults restored; invalid values exit 4 with unchanged file | PASS |
+| Embedded assets from an empty working directory and asset-free project | PASS |
+
+### Recorded limitations
+
+- **OQ-1 — no real-GUI browser run.** Verification is markup- and asset-level
+  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-05.001
+  browser support remains covered by the TASK-57 contract tests and MOCK-0009.
+- **Forky only.** No Debian Trixie or other release was installed or verified,
+  and none is claimed (ADR-0003, NFR-03.002).
+- **Host baseline.** The build host already reported `papyrus 0.1.0` installed
+  from prior work; the isolated verification did not modify it. The post-removal
+  `PATH` check therefore uses the isolated root only.
+- **Packaging script precondition.** `scripts/build-deb.sh` was intentionally left
+  unchanged. The stale-binary hazard is mitigated by running
+  `cargo build --release` first and asserting `--help` lists `tech-spec` before
+  packaging.
+- **No supersede or delete.** Technical specifications have no supersede or delete
+  command (BR-017); the lifecycle smoke covers create/list/view/edit/deprecate/
+  restore only.
+- **No dedicated search type.** `--type tech-spec` is not part of the documented
+  vocabulary and exits 2; technical specifications are found through `--type doc`
+  and default search.
+- **`--editor` not exercised.** The multi-line editor route is environment
+  dependent and remains covered by `tests/technical_specifications_cli.rs`.
+
+### TASK-59 package artifact
+
+- File: `papyrus_0.1.0_amd64.deb`
+- Size: 918176 bytes
+- SHA-256: `eaabd7cc16a2bce1ea1c3675d3e955d2abd33f7756fe67133ffa0a3c12eb3498`
+- Test count: 383 (70 unit + 313 integration, including `technical_specifications_smoke` 2)
