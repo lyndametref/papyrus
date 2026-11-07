@@ -798,3 +798,89 @@ with `papyrus 0.1.0`.
 - Size: 903368 bytes
 - SHA-256: `a287e67143a4064d36fc66bcf191e8511c4e12cce95e5cf82e42184df8afd724`
 - Test count: 322 (59 unit + 263 integration, including `business_rules_smoke` 2)
+
+## TASK-50 — Audit records milestone packaging and verification
+
+- Date: **2026-11-07 (UTC)**.
+- Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43-7, dpkg 1.23.11,
+  `rustc`/`cargo` 1.99.1, clippy 0.1.99, `fakeroot` 2.1.4, `unshare -rn` with
+  `ip link set lo up` available.
+- Supported release: **Debian Forky only** (ADR-0003, NFR-03.002). Debian Trixie
+  and every other Debian release remain **not claimed and not verified**.
+- Isolation: `fakeroot dpkg --instdir=./.tmp/inst
+  --admindir=./.tmp/adm --force-depends`; the host package status was
+  `install ok installed 0.1.0` before and after the run and was not modified.
+  Scratch directories were removed after verification.
+- Package: `papyrus_0.1.0_amd64.deb`, 910548 bytes,
+  SHA-256 `fcc0fd05c9684ffc11a3b770af9f94eab2f7bb6928cff44335662407de7b605d`.
+- Package metadata: `Package: papyrus`, `Version: 0.1.0` (from `Cargo.toml`),
+  `Architecture: amd64`, `Depends: libc6 (>= 2.34)`, `Section: utils`,
+  `Priority: optional`, copyright `GPL-3.0-or-later`.
+- Package contents: `/usr/bin/papyrus` (0755, 2858256 bytes) and
+  `/usr/share/doc/papyrus/copyright` (0644, 865 bytes) only; no asset, template,
+  configuration, or man file. `/assets/app.css` and `/assets/app.js` are compiled
+  into the binary and served from memory.
+- Audit records have no supersede command (BR-014); lifecycle covers
+  create/list/view/edit/deprecate/restore only. No requirements-tag interaction
+  (that is business rules, BR-013). Audit type supports built-in
+  security/licence/architecture plus free-form sanitized values.
+- New test file: `tests/audit_records_smoke.rs` (2 tests), passing under `cargo test`.
+- No runtime dependencies were added; the TASK-1/TASK-4 runtime dependency
+  license audit remains valid (NFR-06.002).
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| `cargo build` (Rust 1.99.1) | PASS |
+| `cargo build --release` (Rust 1.99.1) | PASS |
+| `target/release/papyrus --help` lists `audit`, `search`, `browser` | PASS |
+| `cargo test` | PASS — 352 tests (64 unit + 288 integration, including `audit_records_smoke` 2) |
+| `cargo clippy --all-targets -- -D warnings` | PASS — 0 warnings |
+| `cargo fmt --check` | PASS |
+
+### Install, uninstall, and smoke checks
+
+| Check | Result |
+|---|---|
+| Isolated `dpkg -i` | PASS (exit 0) |
+| Installed `/usr/bin/papyrus` is `root:root` 0755 | PASS |
+| `papyrus` resolves on the isolated `PATH` and runs | PASS |
+| Isolated `dpkg -r papyrus` removes the binary; not on that `PATH` | PASS |
+| Isolated `dpkg --purge papyrus` removes binary and admin entry | PASS |
+| Host package database and filesystem unchanged | PASS |
+| `--help` lists `audit`, `search`, `browser`; `--version` prints `papyrus 0.1.0` | PASS |
+| Audit-record lifecycle: create/list/view/edit/deprecate/restore; IDs preserved | PASS |
+| Create supports `--title`, `--content`, `--audit-type` (default security; built-in + free-form sanitized) | PASS |
+| Edit preserves omitted fields; audit type shown on view; empty content clears section | PASS |
+| Lifecycle exit codes: unknown id 3, already-deprecated/already-active 4 | PASS |
+| Search: quoted phrase, split words no match, `--type doc`, `--limit`, `--json`, empty `[]`, deprecated hidden until restored | PASS |
+| Browser: startup line, `?type=audit-record` with `aria-current`, view, edit round-trip `303`/`Location`, persisted through UI and CLI | PASS |
+| Browser audit type shown (badge next to title/ID plus Audit type row); content as body text without a Content heading | PASS |
+| Browser field-preserving edit: unknown sections retained | PASS |
+| Browser JSON API: `/api/audit-records`, `/api/audit-record`, `/api/doc/<id>` shapes | PASS |
+| Embedded assets: `/assets/app.css`, `/assets/app.js`, non-empty, correct content type | PASS |
+| 320 px markup hooks and narrow-viewport CSS | PASS |
+| No external references in served HTML/CSS/JS; CSP present on HTML | PASS |
+| Deprecated audit not listed and `404` on view, edit, POST, and API | PASS |
+| Offline (`unshare -rn`, outbound TCP fails): search, list, view, edit, assets over loopback | PASS |
+| Config keys: list/get/set/unset for `browser_host`, `browser_port`, `browser_open`; configured port honored; `--port` overrides; defaults restored; invalid values exit 4 with unchanged file | PASS |
+| Embedded assets from an empty working directory and asset-free project | PASS |
+
+### Recorded limitations
+
+- **OQ-1 — no real-GUI browser run.** Verification is markup- and asset-level
+  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-05.001
+  browser support remains covered by the TASK-26 contract tests.
+- **Forky only.** No Debian Trixie or other release was installed or verified,
+  and none is claimed (ADR-0003, NFR-03.002).
+- **Host baseline.** The build host already reported `papyrus 0.1.0` installed
+  from prior work; the isolated verification did not modify it.
+- **Packaging script precondition.** `scripts/build-deb.sh` was intentionally left
+  unchanged. The stale-binary hazard is mitigated by running
+  `cargo build --release` first and asserting `--help` lists `audit` before
+  packaging.
+- **No supersede.** Audit records have no supersede command (BR-014); the
+  lifecycle smoke covers create/list/view/edit/deprecate/restore only.
+- **No requirements-tag interaction.** Audit records carry no requirements tags
+  (that is business rules, BR-013); no such step is claimed.
