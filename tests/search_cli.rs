@@ -1048,3 +1048,194 @@ fn audit_search_symlink_file_escape_exits_one() {
     assert_eq!(stdout(&out), "");
     assert!(!stderr(&out).contains("SECRETWORD"));
 }
+
+// ---------------------------------------------------------------------------
+// Technical specifications search (TASK-56)
+// ---------------------------------------------------------------------------
+
+fn create_tech_spec(project: &Path, title: &str, description: &str) -> String {
+    let out = assert_ok(run(
+        project,
+        &["tech-spec", "create", title, "--description", description],
+    ));
+    stdout(&out).trim().to_string()
+}
+
+#[test]
+fn tech_spec_search_default_and_doc_include_tech() {
+    let d = tmpdir("tech-spec-default");
+    init(&d);
+    let id = create_tech_spec(&d, "Tech Title", "quick brown fox");
+    assert_eq!(id, "TECH-001");
+
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("TECH-001 doc Tech Title"));
+
+    let out = search(&d, &["quick brown", "--type", "doc"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("TECH-001 doc Tech Title"));
+
+    for ty in ["task", "milestone", "release", "decision"] {
+        let out = search(&d, &["quick brown", "--type", ty]);
+        assert_eq!(out.status.code(), Some(0), "type={ty}");
+        assert_eq!(stdout(&out), "", "type={ty}");
+    }
+}
+
+#[test]
+fn tech_spec_search_quoted_phrase_and_limit() {
+    let d = tmpdir("tech-spec-phrase");
+    init(&d);
+    create_tech_spec(&d, "First Tech", "quick brown fox");
+    create_tech_spec(&d, "Second Tech", "quick brown fox");
+
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out).lines().count(), 2);
+
+    let out = search(&d, &["quick fox"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+
+    let out = search(&d, &["quick brown", "--limit", "1"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out).lines().count(), 1);
+}
+
+#[test]
+fn tech_spec_search_non_record_files_are_ignored() {
+    let d = tmpdir("tech-spec-ignore");
+    init(&d);
+    write_file(
+        &d.join("docs/technical/notes.md"),
+        "# notes with searchable phrase\n",
+    );
+    write_file(
+        &d.join("docs/technical/TECH-foo.md"),
+        "# TECH-foo bad with searchable phrase\n",
+    );
+    write_file(
+        &d.join("docs/technical/TECHSPEC-001.md"),
+        "# TECHSPEC-001 bad with searchable phrase\n",
+    );
+    create_tech_spec(&d, "Tech Title", "searchable phrase");
+
+    let out = search(&d, &["searchable phrase"]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout(&out);
+    assert!(s.contains("TECH-001"), "output={s}");
+    assert!(!s.contains("notes"), "output={s}");
+    assert!(!s.contains("TECH-foo"), "output={s}");
+    assert!(!s.contains("TECHSPEC-001"), "output={s}");
+}
+
+#[test]
+fn tech_spec_search_deprecated_excluded_restored_visible() {
+    let d = tmpdir("tech-spec-depr");
+    init(&d);
+    create_tech_spec(&d, "Tech Title", "quick brown fox");
+
+    assert_ok(run(&d, &["tech-spec", "deprecate", "TECH-001"]));
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+
+    assert_ok(run(&d, &["tech-spec", "restore", "TECH-001"]));
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("TECH-001 doc Tech Title"));
+}
+
+#[test]
+fn tech_spec_search_disabled_type_contributes_nothing() {
+    let d = tmpdir("tech-spec-disabled");
+    init(&d);
+    create_tech_spec(&d, "Tech Title", "quick brown fox");
+
+    assert_ok(run(
+        &d,
+        &["config", "set", "document_types.tech-spec.enabled", "false"],
+    ));
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+
+    assert_ok(run(
+        &d,
+        &["config", "set", "document_types.tech-spec.enabled", "true"],
+    ));
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("TECH-001 doc Tech Title"));
+}
+
+#[test]
+fn tech_spec_search_missing_dir_empty_success() {
+    let d = tmpdir("tech-spec-missing");
+    init(&d);
+    fs::remove_dir_all(d.join("docs/technical")).unwrap();
+    let out = search(&d, &["anything"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+}
+
+#[test]
+fn tech_spec_search_creates_no_files_or_directories() {
+    let d = tmpdir("tech-spec-nowrite");
+    init(&d);
+    fs::remove_dir_all(d.join("docs/technical")).unwrap();
+    let before = snapshot(&d);
+    let out = search(&d, &["anything"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+    assert_eq!(before, snapshot(&d));
+}
+
+#[cfg(unix)]
+#[test]
+fn tech_spec_search_symlink_dir_escape_exits_one() {
+    use std::os::unix::fs::symlink;
+
+    let root = tmpdir("tech-spec-symdir");
+    let proj = root.join("proj");
+    fs::create_dir_all(&proj).unwrap();
+    init(&proj);
+    let outside = root.join("outside");
+    fs::create_dir_all(&outside).unwrap();
+    write_file(&outside.join("secret.md"), "# SECRET SECRETWORD\n");
+
+    let active = proj.join("docs/technical");
+    fs::remove_dir_all(&active).unwrap();
+    symlink(&outside, &active).unwrap();
+
+    let out = search(&proj, &["secretword"]);
+    assert_eq!(out.status.code(), Some(1), "stderr={}", stderr(&out));
+    assert_eq!(stdout(&out), "");
+    assert!(!stderr(&out).contains("SECRETWORD"));
+}
+
+#[cfg(unix)]
+#[test]
+fn tech_spec_search_symlink_file_escape_exits_one() {
+    use std::os::unix::fs::symlink;
+
+    let root = tmpdir("tech-spec-symfile");
+    let proj = root.join("proj");
+    fs::create_dir_all(&proj).unwrap();
+    init(&proj);
+    create_tech_spec(&proj, "Tech Title", "placeholder");
+    let outside = root.join("outside");
+    fs::create_dir_all(&outside).unwrap();
+    let outside_file = outside.join("secret.md");
+    write_file(&outside_file, "# SECRET SECRETWORD\n");
+
+    let target = proj.join("docs/technical/TECH-001.md");
+    fs::remove_file(&target).unwrap();
+    symlink(&outside_file, &target).unwrap();
+
+    let out = search(&proj, &["secretword"]);
+    assert_eq!(out.status.code(), Some(1), "stderr={}", stderr(&out));
+    assert_eq!(stdout(&out), "");
+    assert!(!stderr(&out).contains("SECRETWORD"));
+}
