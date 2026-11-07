@@ -857,3 +857,194 @@ fn br_search_symlink_file_escape_exits_one() {
     assert_eq!(stdout(&out), "");
     assert!(!stderr(&out).contains("SECRETWORD"));
 }
+
+// ---------------------------------------------------------------------------
+// Audit records search (TASK-48)
+// ---------------------------------------------------------------------------
+
+fn create_audit(project: &Path, title: &str, content: &str) -> String {
+    let out = assert_ok(run(
+        project,
+        &["audit", "create", "--title", title, "--content", content],
+    ));
+    stdout(&out).trim().to_string()
+}
+
+#[test]
+fn audit_search_default_and_doc_include_aud() {
+    let d = tmpdir("audit-default");
+    init(&d);
+    let id = create_audit(&d, "Audit Title", "quick brown fox");
+    assert_eq!(id, "AUD-001");
+
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("AUD-001 doc Audit Title"));
+
+    let out = search(&d, &["quick brown", "--type", "doc"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("AUD-001 doc Audit Title"));
+
+    for ty in ["task", "milestone", "release", "decision"] {
+        let out = search(&d, &["quick brown", "--type", ty]);
+        assert_eq!(out.status.code(), Some(0), "type={ty}");
+        assert_eq!(stdout(&out), "", "type={ty}");
+    }
+}
+
+#[test]
+fn audit_search_quoted_phrase_and_limit() {
+    let d = tmpdir("audit-phrase");
+    init(&d);
+    create_audit(&d, "First Audit", "quick brown fox");
+    create_audit(&d, "Second Audit", "quick brown fox");
+
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out).lines().count(), 2);
+
+    let out = search(&d, &["quick fox"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+
+    let out = search(&d, &["quick brown", "--limit", "1"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out).lines().count(), 1);
+}
+
+#[test]
+fn audit_search_non_record_files_are_ignored() {
+    let d = tmpdir("audit-ignore");
+    init(&d);
+    write_file(
+        &d.join("docs/audit-records/notes.md"),
+        "# notes with searchable phrase\n",
+    );
+    write_file(
+        &d.join("docs/audit-records/AUD-foo.md"),
+        "# AUD-foo bad with searchable phrase\n",
+    );
+    write_file(
+        &d.join("docs/audit-records/AUDIT-001.md"),
+        "# AUDIT-001 bad with searchable phrase\n",
+    );
+    create_audit(&d, "Audit Title", "searchable phrase");
+
+    let out = search(&d, &["searchable phrase"]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout(&out);
+    assert!(s.contains("AUD-001"), "output={s}");
+    assert!(!s.contains("notes"), "output={s}");
+    assert!(!s.contains("AUD-foo"), "output={s}");
+    assert!(!s.contains("AUDIT-001"), "output={s}");
+}
+
+#[test]
+fn audit_search_deprecated_excluded_restored_visible() {
+    let d = tmpdir("audit-depr");
+    init(&d);
+    create_audit(&d, "Audit Title", "quick brown fox");
+
+    assert_ok(run(&d, &["audit", "deprecate", "AUD-001"]));
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+
+    assert_ok(run(&d, &["audit", "restore", "AUD-001"]));
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("AUD-001 doc Audit Title"));
+}
+
+#[test]
+fn audit_search_disabled_type_contributes_nothing() {
+    let d = tmpdir("audit-disabled");
+    init(&d);
+    create_audit(&d, "Audit Title", "quick brown fox");
+
+    assert_ok(run(
+        &d,
+        &["config", "set", "document_types.audit.enabled", "false"],
+    ));
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+
+    assert_ok(run(
+        &d,
+        &["config", "set", "document_types.audit.enabled", "true"],
+    ));
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("AUD-001 doc Audit Title"));
+}
+
+#[test]
+fn audit_search_missing_dir_empty_success() {
+    let d = tmpdir("audit-missing");
+    init(&d);
+    fs::remove_dir_all(d.join("docs/audit-records")).unwrap();
+    let out = search(&d, &["anything"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+}
+
+#[test]
+fn audit_search_creates_no_files_or_directories() {
+    let d = tmpdir("audit-nowrite");
+    init(&d);
+    fs::remove_dir_all(d.join("docs/audit-records")).unwrap();
+    let before = snapshot(&d);
+    let out = search(&d, &["anything"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+    assert_eq!(before, snapshot(&d));
+}
+
+#[cfg(unix)]
+#[test]
+fn audit_search_symlink_dir_escape_exits_one() {
+    use std::os::unix::fs::symlink;
+
+    let root = tmpdir("audit-symdir");
+    let proj = root.join("proj");
+    fs::create_dir_all(&proj).unwrap();
+    init(&proj);
+    let outside = root.join("outside");
+    fs::create_dir_all(&outside).unwrap();
+    write_file(&outside.join("secret.md"), "# SECRET SECRETWORD\n");
+
+    let active = proj.join("docs/audit-records");
+    fs::remove_dir_all(&active).unwrap();
+    symlink(&outside, &active).unwrap();
+
+    let out = search(&proj, &["secretword"]);
+    assert_eq!(out.status.code(), Some(1), "stderr={}", stderr(&out));
+    assert_eq!(stdout(&out), "");
+    assert!(!stderr(&out).contains("SECRETWORD"));
+}
+
+#[cfg(unix)]
+#[test]
+fn audit_search_symlink_file_escape_exits_one() {
+    use std::os::unix::fs::symlink;
+
+    let root = tmpdir("audit-symfile");
+    let proj = root.join("proj");
+    fs::create_dir_all(&proj).unwrap();
+    init(&proj);
+    create_audit(&proj, "Audit Title", "placeholder");
+    let outside = root.join("outside");
+    fs::create_dir_all(&outside).unwrap();
+    let outside_file = outside.join("secret.md");
+    write_file(&outside_file, "# SECRET SECRETWORD\n");
+
+    let target = proj.join("docs/audit-records/AUD-001.md");
+    fs::remove_file(&target).unwrap();
+    symlink(&outside_file, &target).unwrap();
+
+    let out = search(&proj, &["secretword"]);
+    assert_eq!(out.status.code(), Some(1), "stderr={}", stderr(&out));
+    assert_eq!(stdout(&out), "");
+    assert!(!stderr(&out).contains("SECRETWORD"));
+}
