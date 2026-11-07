@@ -655,3 +655,205 @@ fn t17_search_creates_no_files_or_directories() {
     assert_eq!(stdout(&out), "");
     assert_eq!(before, snapshot(&d2));
 }
+
+// ---------------------------------------------------------------------------
+// Business rules search (TASK-44)
+// ---------------------------------------------------------------------------
+
+fn create_rule(project: &Path, title: &str, description: &str) -> String {
+    let out = assert_ok(run(
+        project,
+        &[
+            "rule",
+            "create",
+            title,
+            "--description",
+            description,
+            "--rationale",
+            "rationale",
+            "--applicability",
+            "applies",
+        ],
+    ));
+    stdout(&out).trim().to_string()
+}
+
+#[test]
+fn br_search_default_and_doc_include_rul() {
+    let d = tmpdir("br-default");
+    init(&d);
+    let id = create_rule(&d, "Rule Title", "quick brown fox");
+    assert_eq!(id, "RUL-001");
+
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("RUL-001 doc Rule Title"));
+
+    let out = search(&d, &["quick brown", "--type", "doc"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("RUL-001 doc Rule Title"));
+
+    for ty in ["task", "milestone", "release", "decision"] {
+        let out = search(&d, &["quick brown", "--type", ty]);
+        assert_eq!(out.status.code(), Some(0), "type={ty}");
+        assert_eq!(stdout(&out), "", "type={ty}");
+    }
+}
+
+#[test]
+fn br_search_quoted_phrase_and_limit() {
+    let d = tmpdir("br-phrase");
+    init(&d);
+    create_rule(&d, "First Rule", "quick brown fox");
+    create_rule(&d, "Second Rule", "quick brown fox");
+
+    // contiguous phrase matches
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out).lines().count(), 2);
+
+    // non-contiguous words do not match as a phrase
+    let out = search(&d, &["quick fox"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+
+    // --limit caps combined result set
+    let out = search(&d, &["quick brown", "--limit", "1"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out).lines().count(), 1);
+}
+
+#[test]
+fn br_search_br_files_are_ignored() {
+    let d = tmpdir("br-ignore");
+    init(&d);
+    // A canonical BR-* document sharing the directory must never be a record.
+    write_file(
+        &d.join("docs/business-rules/BR-999.md"),
+        "# BR-999 canonical document with searchable phrase\n",
+    );
+    // Also a non <prefix>-<digits> file.
+    write_file(
+        &d.join("docs/business-rules/notes.md"),
+        "# notes with searchable phrase\n",
+    );
+    create_rule(&d, "Rule Title", "searchable phrase");
+
+    let out = search(&d, &["searchable phrase"]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout(&out);
+    assert!(s.contains("RUL-001"), "output={s}");
+    assert!(!s.contains("BR-999"), "output={s}");
+    assert!(!s.contains("notes"), "output={s}");
+}
+
+#[test]
+fn br_search_deprecated_excluded_restored_visible() {
+    let d = tmpdir("br-depr");
+    init(&d);
+    create_rule(&d, "Rule Title", "quick brown fox");
+
+    assert_ok(run(&d, &["rule", "deprecate", "RUL-001"]));
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+
+    assert_ok(run(&d, &["rule", "restore", "RUL-001"]));
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("RUL-001 doc Rule Title"));
+}
+
+#[test]
+fn br_search_disabled_type_contributes_nothing() {
+    let d = tmpdir("br-disabled");
+    init(&d);
+    create_rule(&d, "Rule Title", "quick brown fox");
+
+    assert_ok(run(
+        &d,
+        &["config", "set", "document_types.rule.enabled", "false"],
+    ));
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+
+    // Re-enable restores visibility.
+    assert_ok(run(
+        &d,
+        &["config", "set", "document_types.rule.enabled", "true"],
+    ));
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("RUL-001 doc Rule Title"));
+}
+
+#[test]
+fn br_search_missing_dir_empty_success() {
+    let d = tmpdir("br-missing");
+    init(&d);
+    fs::remove_dir_all(d.join("docs/business-rules")).unwrap();
+    let out = search(&d, &["anything"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+}
+
+#[test]
+fn br_search_creates_no_files_or_directories() {
+    let d = tmpdir("br-nowrite");
+    init(&d);
+    fs::remove_dir_all(d.join("docs/business-rules")).unwrap();
+    let before = snapshot(&d);
+    let out = search(&d, &["anything"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+    assert_eq!(before, snapshot(&d));
+}
+
+#[cfg(unix)]
+#[test]
+fn br_search_symlink_dir_escape_exits_one() {
+    use std::os::unix::fs::symlink;
+
+    let root = tmpdir("br-symdir");
+    let proj = root.join("proj");
+    fs::create_dir_all(&proj).unwrap();
+    init(&proj);
+    let outside = root.join("outside");
+    fs::create_dir_all(&outside).unwrap();
+    write_file(&outside.join("secret.md"), "# SECRET SECRETWORD\n");
+
+    let active = proj.join("docs/business-rules");
+    fs::remove_dir_all(&active).unwrap();
+    symlink(&outside, &active).unwrap();
+
+    let out = search(&proj, &["secretword"]);
+    assert_eq!(out.status.code(), Some(1), "stderr={}", stderr(&out));
+    assert_eq!(stdout(&out), "");
+    assert!(!stderr(&out).contains("SECRETWORD"));
+}
+
+#[cfg(unix)]
+#[test]
+fn br_search_symlink_file_escape_exits_one() {
+    use std::os::unix::fs::symlink;
+
+    let root = tmpdir("br-symfile");
+    let proj = root.join("proj");
+    fs::create_dir_all(&proj).unwrap();
+    init(&proj);
+    create_rule(&proj, "Rule Title", "placeholder");
+    let outside = root.join("outside");
+    fs::create_dir_all(&outside).unwrap();
+    let outside_file = outside.join("secret.md");
+    write_file(&outside_file, "# SECRET SECRETWORD\n");
+
+    let target = proj.join("docs/business-rules/RUL-001.md");
+    fs::remove_file(&target).unwrap();
+    symlink(&outside_file, &target).unwrap();
+
+    let out = search(&proj, &["secretword"]);
+    assert_eq!(out.status.code(), Some(1), "stderr={}", stderr(&out));
+    assert_eq!(stdout(&out), "");
+    assert!(!stderr(&out).contains("SECRETWORD"));
+}
