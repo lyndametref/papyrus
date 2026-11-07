@@ -232,13 +232,13 @@ fn active_or_deprecated(
 }
 
 #[derive(Clone, Debug, Default)]
-struct RuleRecord {
-    id: String,
-    title: String,
-    description: String,
-    rationale: String,
-    applicability: String,
-    requirements: Vec<String>,
+pub(crate) struct RuleRecord {
+    pub(crate) id: String,
+    pub(crate) title: String,
+    pub(crate) description: String,
+    pub(crate) rationale: String,
+    pub(crate) applicability: String,
+    pub(crate) requirements: Vec<String>,
 }
 
 fn parse_heading(content: &str) -> (String, String) {
@@ -250,7 +250,7 @@ fn parse_heading(content: &str) -> (String, String) {
     (id, title)
 }
 
-fn section_text(content: &str, name: &str) -> Option<String> {
+pub(crate) fn section_text(content: &str, name: &str) -> Option<String> {
     let lines: Vec<&str> = content.lines().collect();
     let header = format!("## {}", name);
     let mut i = 0usize;
@@ -306,7 +306,7 @@ fn parse_requirements(content: &str) -> Vec<String> {
     out
 }
 
-fn parse_record(content: &str, fallback_id: &str) -> RuleRecord {
+pub(crate) fn parse_record(content: &str, fallback_id: &str) -> RuleRecord {
     let (id, title) = parse_heading(content);
     RuleRecord {
         id: if id.is_empty() {
@@ -326,7 +326,7 @@ fn parse_record(content: &str, fallback_id: &str) -> RuleRecord {
     }
 }
 
-fn render_record(record: &RuleRecord) -> String {
+pub(crate) fn render_record(record: &RuleRecord) -> String {
     let mut parts: Vec<String> = Vec::new();
     parts.push(format!("# {} {}", record.id, record.title));
     parts.push(format!("## Description\n{}", record.description));

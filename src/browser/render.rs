@@ -75,6 +75,7 @@ fn category_name(kind: Category) -> &'static str {
         Category::Glossary => "Glossary",
         Category::UiSpec => "UI Specifications",
         Category::UiMockup => "UI Mockups",
+        Category::BusinessRule => "Business Rules",
     }
 }
 
@@ -89,6 +90,7 @@ fn category_short(kind: Category) -> &'static str {
         Category::Glossary => "glossary terms",
         Category::UiSpec => "UI specifications",
         Category::UiMockup => "UI mockups",
+        Category::BusinessRule => "business rules",
     }
 }
 
@@ -139,6 +141,23 @@ pub fn sidebar(selected: Option<Category>, cfg: &Config) -> String {
             "<li><a href=\"/?type=req\"{}>{}</a></li>",
             current,
             escape(category_name(Category::Req))
+        ));
+    }
+    // Business Rules (omitted when the document type is disabled)
+    let rule_enabled = cfg
+        .document_types
+        .get(Category::BusinessRule.config_key())
+        .map(|e| e.enabled)
+        .unwrap_or(false);
+    if rule_enabled {
+        let current = if selected == Some(Category::BusinessRule) {
+            " aria-current=\"page\""
+        } else {
+            ""
+        };
+        items.push_str(&format!(
+            "<li><a href=\"/?type=business-rule\"{}>Business Rules</a></li>",
+            current
         ));
     }
     // Non-functional requirements
@@ -244,6 +263,7 @@ fn breadcrumb(
         Category::Glossary => ("Glossary", "glossary"),
         Category::UiSpec => ("UI Specifications", "ui-spec"),
         Category::UiMockup => ("UI Mockups", "ui-mockup"),
+        Category::BusinessRule => ("Business Rules", "business-rule"),
     };
     let mut items = String::new();
     items.push_str(&format!(
@@ -270,6 +290,7 @@ fn edit_breadcrumb(record: &Record, _resolved_group: Option<&Record>) -> String 
         Category::Glossary => ("Glossary", "glossary"),
         Category::UiSpec => ("UI Specifications", "ui-spec"),
         Category::UiMockup => ("UI Mockups", "ui-mockup"),
+        Category::BusinessRule => ("Business Rules", "business-rule"),
     };
     let mut items = String::new();
     items.push_str(&format!(
@@ -316,7 +337,8 @@ fn owning_group_dd(record: &Record, resolved_group: Option<&Record>) -> String {
         | Form::Decision
         | Form::Glossary
         | Form::UiSpec
-        | Form::UiMockup => "<dd class=\"link-muted\">(none)</dd>".to_string(),
+        | Form::UiMockup
+        | Form::BusinessRule => "<dd class=\"link-muted\">(none)</dd>".to_string(),
     }
 }
 
@@ -342,7 +364,8 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
             | Form::Decision
             | Form::Glossary
             | Form::UiSpec
-            | Form::UiMockup => "<dd class=\"link-muted\">(none)</dd>".to_string(),
+            | Form::UiMockup
+            | Form::BusinessRule => "<dd class=\"link-muted\">(none)</dd>".to_string(),
         }
     } else {
         owning_group_dd(record, resolved_group)
@@ -515,6 +538,7 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
             Category::Glossary => "glossary term",
             Category::UiSpec => "UI specification",
             Category::UiMockup => "UI mockup",
+            Category::BusinessRule => "business rule",
             _ => "record",
         };
         let plural_word = format!("{}s", singular);
@@ -567,10 +591,12 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
             Category::Glossary => String::new(),
             Category::UiSpec => String::new(),
             Category::UiMockup => String::new(),
+            Category::BusinessRule => String::new(),
             _ => String::new(),
         };
-        if kind == Category::Glossary || kind == Category::UiSpec {
-            let preview = if kind == Category::UiSpec {
+        if kind == Category::Glossary || kind == Category::UiSpec || kind == Category::BusinessRule
+        {
+            let preview = if kind == Category::UiSpec || kind == Category::BusinessRule {
                 record
                     .description
                     .as_deref()
@@ -641,6 +667,7 @@ pub fn list_page(
         Category::Glossary => "Glossary",
         Category::UiSpec => "UI Specifications",
         Category::UiMockup => "UI Mockups",
+        Category::BusinessRule => "Business Rules",
     };
     let subheading = match kind {
         Category::Req => "Business requirement records in this project.",
@@ -652,6 +679,7 @@ pub fn list_page(
         Category::Glossary => "Glossary terms in this project.",
         Category::UiSpec => "UI specifications in this project.",
         Category::UiMockup => "UI mockups in this project.",
+        Category::BusinessRule => "Business rules in this project.",
     };
     let title = format!("Papyrus \u{2014} {}", category_name(kind));
     render_template(
@@ -679,6 +707,7 @@ pub fn view_page(
     related_milestone: Option<&Record>,
     related_release: Option<&Record>,
     resolved_dependencies: &[Option<Record>],
+    resolved_refs: &[Option<Record>],
     cfg: &Config,
     chrome: Chrome<'_>,
 ) -> String {
@@ -941,6 +970,58 @@ pub fn view_page(
             }
             content.push_str("</section>");
         }
+        Category::BusinessRule => {
+            // Description
+            content.push_str("<section class=\"record-section\"><h2>Description</h2>");
+            match &record.description {
+                Some(t) if !t.trim().is_empty() => content.push_str(&format!(
+                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
+                    escape(t)
+                )),
+                _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
+            }
+            content.push_str("</section>");
+            // Rationale
+            content.push_str("<section class=\"record-section\"><h2>Rationale</h2>");
+            match &record.rationale {
+                Some(t) if !t.trim().is_empty() => content.push_str(&format!(
+                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
+                    escape(t)
+                )),
+                _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
+            }
+            content.push_str("</section>");
+            // Applicability
+            content.push_str("<section class=\"record-section\"><h2>Applicability</h2>");
+            match &record.applicability {
+                Some(t) if !t.trim().is_empty() => content.push_str(&format!(
+                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
+                    escape(t)
+                )),
+                _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
+            }
+            content.push_str("</section>");
+            // Requirements
+            content.push_str("<section class=\"record-section\"><h2>Requirements</h2>");
+            if record.requirements.is_empty() {
+                content.push_str("<p class=\"text empty-text\">(none)</p>");
+            } else {
+                content.push_str("<ul class=\"req-list\">");
+                for (i, req) in record.requirements.iter().enumerate() {
+                    let resolved = resolved_refs.get(i).and_then(|r| r.as_ref());
+                    match resolved {
+                        Some(rel) => content.push_str(&format!(
+                            "<li><a href=\"/doc/{}\">{}</a></li>",
+                            escape(&rel.id),
+                            escape(req)
+                        )),
+                        None => content.push_str(&format!("<li>{}</li>", escape(req))),
+                    }
+                }
+                content.push_str("</ul>");
+            }
+            content.push_str("</section>");
+        }
     }
 
     let page_head = format!(
@@ -1050,6 +1131,14 @@ fn metadata_block_backlog(
                 escape(&record.id),
                 escape(record.form.label()),
                 escape("UI Mockups"),
+            )
+        }
+        Category::BusinessRule => {
+            format!(
+                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div></dl></div>",
+                escape(&record.id),
+                escape(record.form.label()),
+                escape("Business Rules"),
             )
         }
         Category::Decision => {
@@ -1731,6 +1820,34 @@ impl UiMockupFieldErrors {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct BusinessRuleEditValues {
+    pub title: String,
+    pub description: String,
+    pub rationale: String,
+    pub applicability: String,
+    pub requirements: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct BusinessRuleFieldErrors {
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub rationale: Option<String>,
+    pub applicability: Option<String>,
+    pub requirements: Option<String>,
+}
+
+impl BusinessRuleFieldErrors {
+    pub fn any(&self) -> bool {
+        self.title.is_some()
+            || self.description.is_some()
+            || self.rationale.is_some()
+            || self.applicability.is_some()
+            || self.requirements.is_some()
+    }
+}
+
 pub fn edit_page_glossary(
     record: &Record,
     values: &GlossaryEditValues,
@@ -2017,6 +2134,104 @@ pub fn edit_page_ui_mockup(
     )
 }
 
+pub fn edit_page_business_rule(
+    record: &Record,
+    values: &BusinessRuleEditValues,
+    errors: &BusinessRuleFieldErrors,
+    version: &str,
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    let mut form = String::new();
+    form.push_str(&format!(
+        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard><input type=\"hidden\" name=\"version\" value=\"{}\">",
+        escape(&record.id),
+        escape(version)
+    ));
+    if errors.any() {
+        form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
+        for (field, msg) in [
+            ("title", errors.title.as_deref()),
+            ("description", errors.description.as_deref()),
+            ("rationale", errors.rationale.as_deref()),
+            ("applicability", errors.applicability.as_deref()),
+            ("requirements", errors.requirements.as_deref()),
+        ] {
+            if let Some(m) = msg {
+                form.push_str(&format!(
+                    "<li><a href=\"#{}\">{}</a></li>",
+                    field,
+                    escape(m)
+                ));
+            }
+        }
+        form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
+    }
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"title\">Title <span class=\"req\">(required)</span></label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}><p class=\"help\">Required.</p>{}</div>",
+        escape(&values.title),
+        invalid_attrs("title", errors.title.as_deref()),
+        field_error("title", errors.title.as_deref())
+    ));
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"description\">Description</label><textarea class=\"textarea\" id=\"description\" name=\"description\" rows=\"6\"{}>{}</textarea><p class=\"help\">Optional.</p>{}</div>",
+        invalid_attrs("description", errors.description.as_deref()),
+        escape(&values.description),
+        field_error("description", errors.description.as_deref())
+    ));
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"rationale\">Rationale</label><textarea class=\"textarea\" id=\"rationale\" name=\"rationale\" rows=\"6\"{}>{}</textarea><p class=\"help\">Optional.</p>{}</div>",
+        invalid_attrs("rationale", errors.rationale.as_deref()),
+        escape(&values.rationale),
+        field_error("rationale", errors.rationale.as_deref())
+    ));
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"applicability\">Applicability</label><textarea class=\"textarea\" id=\"applicability\" name=\"applicability\" rows=\"6\"{}>{}</textarea><p class=\"help\">Optional.</p>{}</div>",
+        invalid_attrs("applicability", errors.applicability.as_deref()),
+        escape(&values.applicability),
+        field_error("applicability", errors.applicability.as_deref())
+    ));
+    form.push_str(&tag_field(
+        "requirements",
+        "requirements-add",
+        "Requirements",
+        &values.requirements,
+        "Add a requirement id (e.g. REQ-001.001)",
+        "Optional \\u{b7} business requirement ids.",
+        errors.requirements.as_deref(),
+        "Requirement",
+    ));
+    form.push_str(
+        "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
+    );
+    form.push_str(&format!(
+        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
+        escape(&record.id)
+    ));
+
+    let page_head = format!(
+        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div><p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
+        escape(&record.id),
+        escape(&record.title)
+    );
+    let title = format!("Papyrus \u{2014} Edit {}", record.id);
+    render_template(
+        EDIT_TEMPLATE,
+        &[
+            ("title", &title),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("breadcrumb", &edit_breadcrumb(record, None)),
+            ("page_head", &page_head),
+            ("meta", &metadata_block_backlog(record, None, None)),
+            ("form", &form),
+        ],
+    )
+}
+
 /// Error-page copy for a status code.
 pub fn error_copy(status: u16) -> (&'static str, &'static str, &'static str) {
     match status {
@@ -2233,6 +2448,75 @@ pub fn conflict_page_ui_mockup(
             ("page_head", &content),
             ("meta", ""),
             ("form", ""),
+        ],
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn conflict_page_business_rule(
+    record: &Record,
+    title: &str,
+    description: &str,
+    rationale: &str,
+    applicability: &str,
+    requirements: &[String],
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    let mut form = String::new();
+    form.push_str(&format!(
+        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard><input type=\"hidden\" name=\"version\" value=\"{}\">",
+        escape(&record.id),
+        escape(&record.version)
+    ));
+    form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><p>record changed on disk; reload the form</p></div>");
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"title\">Title</label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" value=\"{}\"></div>",
+        escape(title)
+    ));
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"description\">Description</label><textarea class=\"textarea\" id=\"description\" name=\"description\" rows=\"6\">{}</textarea></div>",
+        escape(description)
+    ));
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"rationale\">Rationale</label><textarea class=\"textarea\" id=\"rationale\" name=\"rationale\" rows=\"6\">{}</textarea></div>",
+        escape(rationale)
+    ));
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"applicability\">Applicability</label><textarea class=\"textarea\" id=\"applicability\" name=\"applicability\" rows=\"6\">{}</textarea></div>",
+        escape(applicability)
+    ));
+    // requirements tags
+    for (i, v) in requirements.iter().enumerate() {
+        form.push_str(&format!(
+            "<input type=\"hidden\" name=\"requirements\" value=\"{}\">",
+            escape(v)
+        ));
+        let _ = i;
+    }
+    form.push_str(&format!(
+        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
+        escape(&record.id)
+    ));
+
+    let content = format!(
+        "<div class=\"page-head\"><h1 class=\"h1\">Edit {}</h1></div>",
+        escape(&record.id)
+    );
+    let title_text = format!("Papyrus \u{2014} Edit {}", record.id);
+    render_template(
+        EDIT_TEMPLATE,
+        &[
+            ("title", &title_text),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("breadcrumb", &edit_breadcrumb(record, None)),
+            ("page_head", &content),
+            ("meta", &metadata_block_backlog(record, None, None)),
+            ("form", &form),
         ],
     )
 }
