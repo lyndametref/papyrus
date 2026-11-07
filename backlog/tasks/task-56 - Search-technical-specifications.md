@@ -4,7 +4,7 @@ title: Search technical specifications
 status: Done
 assignee: []
 created_date: '2026-11-04T19:21:00Z'
-updated_date: '2026-11-07T11:13:00Z'
+updated_date: '2026-11-07T17:49:00Z'
 labels:
   - search
   - documentation
@@ -63,11 +63,11 @@ Implementation notes:
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Implementation compiles and unit/integration tests pass.
-- [ ] #2 Tests cover active technical specifications in default and --type doc search, exclusion of other type filters, quoted phrases, --limit, deprecated exclusion, disabled type, missing directory, symlink escape, and read-only behavior.
-- [ ] #3 Feature specification docs/specifications/search-technical-specifications.md reviewed and aligned.
-- [ ] #4 Build, tests, clippy, and formatting pass with existing dependencies only.
-- [ ] #5 No direct backlog file edits; all changes via backlog CLI.
+- [x] #1 Implementation compiles and unit/integration tests pass.
+- [x] #2 Tests cover active technical specifications in default and --type doc search, exclusion of other type filters, quoted phrases, --limit, deprecated exclusion, disabled type, missing directory, symlink escape, and read-only behavior.
+- [x] #3 Feature specification docs/specifications/search-technical-specifications.md reviewed and aligned.
+- [x] #4 Build, tests, clippy, and formatting pass with existing dependencies only.
+- [x] #5 No direct backlog file edits; all changes via backlog CLI.
 <!-- DOD:END -->
 
 ## Implementation Notes
