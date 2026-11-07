@@ -241,7 +241,7 @@ pub(crate) struct RuleRecord {
     pub(crate) requirements: Vec<String>,
 }
 
-fn parse_heading(content: &str) -> (String, String) {
+pub(crate) fn parse_heading(content: &str) -> (String, String) {
     let first = content.lines().next().unwrap_or("");
     let rest = first.trim_start_matches('#').trim();
     let mut parts = rest.splitn(2, char::is_whitespace);

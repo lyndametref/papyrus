@@ -76,6 +76,7 @@ fn category_name(kind: Category) -> &'static str {
         Category::UiSpec => "UI Specifications",
         Category::UiMockup => "UI Mockups",
         Category::BusinessRule => "Business Rules",
+        Category::AuditRecord => "Audit Records",
     }
 }
 
@@ -91,6 +92,7 @@ fn category_short(kind: Category) -> &'static str {
         Category::UiSpec => "UI specifications",
         Category::UiMockup => "UI mockups",
         Category::BusinessRule => "business rules",
+        Category::AuditRecord => "audit records",
     }
 }
 
@@ -157,6 +159,24 @@ pub fn sidebar(selected: Option<Category>, cfg: &Config) -> String {
         };
         items.push_str(&format!(
             "<li><a href=\"/?type=business-rule\"{}>Business Rules</a></li>",
+            current
+        ));
+    }
+
+    // Audit Records (omitted when the document type is disabled)
+    let audit_enabled = cfg
+        .document_types
+        .get(Category::AuditRecord.config_key())
+        .map(|e| e.enabled)
+        .unwrap_or(false);
+    if audit_enabled {
+        let current = if selected == Some(Category::AuditRecord) {
+            " aria-current=\"page\""
+        } else {
+            ""
+        };
+        items.push_str(&format!(
+            "<li><a href=\"/?type=audit-record\"{}>Audit Records</a></li>",
             current
         ));
     }
@@ -264,6 +284,7 @@ fn breadcrumb(
         Category::UiSpec => ("UI Specifications", "ui-spec"),
         Category::UiMockup => ("UI Mockups", "ui-mockup"),
         Category::BusinessRule => ("Business Rules", "business-rule"),
+        Category::AuditRecord => ("Audit Records", "audit-record"),
     };
     let mut items = String::new();
     items.push_str(&format!(
@@ -291,6 +312,7 @@ fn edit_breadcrumb(record: &Record, _resolved_group: Option<&Record>) -> String 
         Category::UiSpec => ("UI Specifications", "ui-spec"),
         Category::UiMockup => ("UI Mockups", "ui-mockup"),
         Category::BusinessRule => ("Business Rules", "business-rule"),
+        Category::AuditRecord => ("Audit Records", "audit-record"),
     };
     let mut items = String::new();
     items.push_str(&format!(
@@ -338,7 +360,8 @@ fn owning_group_dd(record: &Record, resolved_group: Option<&Record>) -> String {
         | Form::Glossary
         | Form::UiSpec
         | Form::UiMockup
-        | Form::BusinessRule => "<dd class=\"link-muted\">(none)</dd>".to_string(),
+        | Form::BusinessRule
+        | Form::AuditRecord => "<dd class=\"link-muted\">(none)</dd>".to_string(),
     }
 }
 
@@ -365,7 +388,8 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
             | Form::Glossary
             | Form::UiSpec
             | Form::UiMockup
-            | Form::BusinessRule => "<dd class=\"link-muted\">(none)</dd>".to_string(),
+            | Form::BusinessRule
+            | Form::AuditRecord => "<dd class=\"link-muted\">(none)</dd>".to_string(),
         }
     } else {
         owning_group_dd(record, resolved_group)
@@ -539,6 +563,7 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
             Category::UiSpec => "UI specification",
             Category::UiMockup => "UI mockup",
             Category::BusinessRule => "business rule",
+            Category::AuditRecord => "audit record",
             _ => "record",
         };
         let plural_word = format!("{}s", singular);
@@ -592,11 +617,18 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
             Category::UiSpec => String::new(),
             Category::UiMockup => String::new(),
             Category::BusinessRule => String::new(),
+            Category::AuditRecord => String::new(),
             _ => String::new(),
         };
-        if kind == Category::Glossary || kind == Category::UiSpec || kind == Category::BusinessRule
+        if kind == Category::Glossary
+            || kind == Category::UiSpec
+            || kind == Category::BusinessRule
+            || kind == Category::AuditRecord
         {
-            let preview = if kind == Category::UiSpec || kind == Category::BusinessRule {
+            let preview = if kind == Category::UiSpec
+                || kind == Category::BusinessRule
+                || kind == Category::AuditRecord
+            {
                 record
                     .description
                     .as_deref()
@@ -668,6 +700,7 @@ pub fn list_page(
         Category::UiSpec => "UI Specifications",
         Category::UiMockup => "UI Mockups",
         Category::BusinessRule => "Business Rules",
+        Category::AuditRecord => "Audit Records",
     };
     let subheading = match kind {
         Category::Req => "Business requirement records in this project.",
@@ -680,6 +713,7 @@ pub fn list_page(
         Category::UiSpec => "UI specifications in this project.",
         Category::UiMockup => "UI mockups in this project.",
         Category::BusinessRule => "Business rules in this project.",
+        Category::AuditRecord => "Audit records in this project.",
     };
     let title = format!("Papyrus \u{2014} {}", category_name(kind));
     render_template(
@@ -1022,15 +1056,38 @@ pub fn view_page(
             }
             content.push_str("</section>");
         }
+        Category::AuditRecord => {
+            let content_text = record.description.as_deref().unwrap_or("");
+            if content_text.trim().is_empty() {
+                content.push_str("<p class=\"text empty-text\">(none)</p>");
+            } else {
+                content.push_str(&format!(
+                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
+                    escape(content_text)
+                ));
+            }
+        }
     }
 
-    let page_head = format!(
-        "<div class=\"page-head\"><div><p class=\"id\">{}</p><h1 class=\"h1\">{}</h1></div>\
+    let page_head = if record.kind == Category::AuditRecord {
+        let audit_type = record.audit_type.as_deref().unwrap_or("security");
+        format!(
+            "<div class=\"page-head\"><div><p class=\"id\">{} <span class=\"badge\">{}</span></p><h1 class=\"h1\">{}</h1></div>\
 <div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Edit</a></div></div>",
-        escape(&record.id),
-        escape(&record.title),
-        escape(&record.id)
-    );
+            escape(&record.id),
+            escape(audit_type),
+            escape(&record.title),
+            escape(&record.id)
+        )
+    } else {
+        format!(
+            "<div class=\"page-head\"><div><p class=\"id\">{}</p><h1 class=\"h1\">{}</h1></div>\
+<div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Edit</a></div></div>",
+            escape(&record.id),
+            escape(&record.title),
+            escape(&record.id)
+        )
+    };
     let title = format!("Papyrus \u{2014} {} {}", record.id, record.title);
     let breadcrumb_html = breadcrumb(record, resolved_group, related_milestone, related_release);
     let meta_html = if record.kind.is_requirement() {
@@ -1139,6 +1196,16 @@ fn metadata_block_backlog(
                 escape(&record.id),
                 escape(record.form.label()),
                 escape("Business Rules"),
+            )
+        }
+        Category::AuditRecord => {
+            let audit_type = record.audit_type.as_deref().unwrap_or("security");
+            format!(
+                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div><div><dt>Audit type</dt><dd>{}</dd></div></dl></div>",
+                escape(&record.id),
+                escape(record.form.label()),
+                escape("Audit Records"),
+                escape(audit_type),
             )
         }
         Category::Decision => {
@@ -2228,6 +2295,182 @@ pub fn edit_page_business_rule(
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", &form),
+        ],
+    )
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct AuditEditValues {
+    pub title: String,
+    pub audit_type: String,
+    pub content: String,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct AuditFieldErrors {
+    pub title: Option<String>,
+    pub audit_type: Option<String>,
+    pub content: Option<String>,
+}
+
+impl AuditFieldErrors {
+    pub fn any(&self) -> bool {
+        self.title.is_some() || self.audit_type.is_some() || self.content.is_some()
+    }
+}
+
+pub fn edit_page_audit_record(
+    record: &Record,
+    values: &AuditEditValues,
+    errors: &AuditFieldErrors,
+    version: &str,
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    let mut form = String::new();
+    form.push_str(&format!(
+        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard><input type=\"hidden\" name=\"version\" value=\"{}\">",
+        escape(&record.id),
+        escape(version)
+    ));
+    if errors.any() {
+        form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
+        for (field, msg) in [
+            ("title", errors.title.as_deref()),
+            ("audit_type", errors.audit_type.as_deref()),
+            ("content", errors.content.as_deref()),
+        ] {
+            if let Some(m) = msg {
+                form.push_str(&format!(
+                    "<li><a href=\"#{}\">{}</a></li>",
+                    field,
+                    escape(m)
+                ));
+            }
+        }
+        form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
+    }
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"title\">Title <span class=\"req\">(required)</span></label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}><p class=\"help\">Required \u{b7} 1 to 200 characters.</p>{}</div>",
+        escape(&values.title),
+        invalid_attrs("title", errors.title.as_deref()),
+        field_error("title", errors.title.as_deref())
+    ));
+    // audit type select
+    let mut select = String::new();
+    select.push_str(&format!(
+        "<div class=\"field\"><label for=\"audit_type\">Audit type <span class=\"req\">(required)</span></label><select class=\"select\" id=\"audit_type\" name=\"audit_type\"{}>",
+        invalid_attrs("audit_type", errors.audit_type.as_deref())
+    ));
+    for (val, label) in [
+        ("security", "security"),
+        ("licence", "licence"),
+        ("architecture", "architecture"),
+    ] {
+        let selected = if values.audit_type == val {
+            " selected"
+        } else {
+            ""
+        };
+        select.push_str(&format!(
+            "<option value=\"{}\"{}>{}</option>",
+            val, selected, label
+        ));
+    }
+    // allow custom stored value not in built-ins
+    if !values.audit_type.is_empty()
+        && !["security", "licence", "architecture"].contains(&values.audit_type.as_str())
+    {
+        select.push_str(&format!(
+            "<option value=\"{}\" selected>{}</option>",
+            escape(&values.audit_type),
+            escape(&values.audit_type)
+        ));
+    }
+    select.push_str("</select>");
+    select.push_str(&field_error("audit_type", errors.audit_type.as_deref()));
+    select.push_str("</div>");
+    form.push_str(&select);
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"content\">Content</label><textarea class=\"textarea\" id=\"content\" name=\"content\" rows=\"10\"{}>{}</textarea><p class=\"help\">Optional \u{b7} up to 20000 characters.</p>{}</div>",
+        invalid_attrs("content", errors.content.as_deref()),
+        escape(&values.content),
+        field_error("content", errors.content.as_deref())
+    ));
+    form.push_str(
+        "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
+    );
+    form.push_str(&format!(
+        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
+        escape(&record.id)
+    ));
+
+    let page_head = format!(
+        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div><p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
+        escape(&record.id),
+        escape(&record.title)
+    );
+    let title = format!("Papyrus \u{2014} Edit {}", record.id);
+    render_template(
+        EDIT_TEMPLATE,
+        &[
+            ("title", &title),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("breadcrumb", &edit_breadcrumb(record, None)),
+            ("page_head", &page_head),
+            ("meta", &metadata_block_backlog(record, None, None)),
+            ("form", &form),
+        ],
+    )
+}
+
+pub fn conflict_page_audit_record(
+    record: &Record,
+    title: &str,
+    audit_type: &str,
+    content: &str,
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    let mut body = String::new();
+    body.push_str(
+        "<h1 class=\"h1\">This record changed on disk</h1><p class=\"sub\">Your changes were not saved. The file was modified after this form was opened.</p><div class=\"conflict-box\"><p><strong>409 Conflict \u{2014} record changed on disk; reload the form.</strong></p></div>",
+    );
+    body.push_str(&format!(
+        "<div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Reload the form</a><a class=\"link\" href=\"/doc/{}\">View current record</a></div>",
+        escape(&record.id),
+        escape(&record.id)
+    ));
+    body.push_str("<div class=\"readonly-block\"><dl>");
+    body.push_str(&format!("<dt>Title</dt><dd>{}</dd>", escape(title)));
+    body.push_str(&format!(
+        "<dt>Audit type</dt><dd>{}</dd>",
+        escape(audit_type)
+    ));
+    body.push_str(&format!(
+        "<dt>Content</dt><dd class=\"text\">{}</dd>",
+        escape(content)
+    ));
+    body.push_str("</dl></div>");
+
+    let title_page = format!("Papyrus \u{2014} Edit {}", record.id);
+    render_template(
+        EDIT_TEMPLATE,
+        &[
+            ("title", &title_page),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("breadcrumb", &edit_breadcrumb(record, None)),
+            ("page_head", &body),
+            ("meta", &metadata_block_backlog(record, None, None)),
+            ("form", ""),
         ],
     )
 }

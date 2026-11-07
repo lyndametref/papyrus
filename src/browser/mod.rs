@@ -431,6 +431,7 @@ fn category_from_query(request: &Request) -> Result<Category, HttpError> {
         Some(value) if value == "ui-spec" => Ok(Category::UiSpec),
         Some(value) if value == "ui-mockup" => Ok(Category::UiMockup),
         Some(value) if value == "business-rule" => Ok(Category::BusinessRule),
+        Some(value) if value == "audit-record" => Ok(Category::AuditRecord),
         Some(_) => Err(HttpError::new(400)),
     }
 }
@@ -527,6 +528,12 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
     if path == "/api/business-rules" || path == "/api/business-rule" {
         return match method {
             Method::Get | Method::Head => api_business_rules(state),
+            _ => Err(HttpError::new(405)),
+        };
+    }
+    if path == "/api/audit-records" || path == "/api/audit-record" {
+        return match method {
+            Method::Get | Method::Head => api_audit_records(state),
             _ => Err(HttpError::new(405)),
         };
     }
@@ -859,6 +866,24 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
+        Category::AuditRecord => {
+            let values = render::AuditEditValues {
+                title: record.title.clone(),
+                audit_type: record
+                    .audit_type
+                    .clone()
+                    .unwrap_or_else(|| "security".to_string()),
+                content: record.description.clone().unwrap_or_default(),
+            };
+            render::edit_page_audit_record(
+                &record,
+                &values,
+                &render::AuditFieldErrors::default(),
+                &record.version,
+                &cfg,
+                chrome,
+            )
+        }
     };
     Ok(Response::html(200, html))
 }
@@ -955,6 +980,23 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                     &rationale,
                     &applicability,
                     &requirements,
+                    &cfg,
+                    chrome,
+                ),
+            ));
+        }
+
+        if record.kind == Category::AuditRecord {
+            let title = form_field(&fields, "title").unwrap_or("").to_string();
+            let audit_type = form_field(&fields, "audit_type").unwrap_or("").to_string();
+            let content = form_field(&fields, "content").unwrap_or("").to_string();
+            return Ok(Response::html(
+                409,
+                render::conflict_page_audit_record(
+                    &record,
+                    &title,
+                    &audit_type,
+                    &content,
                     &cfg,
                     chrome,
                 ),
@@ -1659,6 +1701,71 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
+        Category::AuditRecord => {
+            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
+            let raw_audit_type = form_field(&fields, "audit_type").unwrap_or("").to_string();
+            let raw_content = form_field(&fields, "content").unwrap_or("").to_string();
+
+            let mut errors = render::AuditFieldErrors::default();
+            let title = match records::validate_title(&raw_title) {
+                Ok(t) => Some(t),
+                Err(m) => {
+                    errors.title = Some(m);
+                    None
+                }
+            };
+            let audit_type_trimmed = raw_audit_type.trim();
+            let audit_type_value = if audit_type_trimmed.is_empty() {
+                errors.audit_type = Some("Audit type is required.".to_string());
+                audit_type_trimmed.to_string()
+            } else if !["security", "licence", "architecture"].contains(&audit_type_trimmed) {
+                errors.audit_type = Some(
+                    "Audit type must be one of security, licence, or architecture.".to_string(),
+                );
+                audit_type_trimmed.to_string()
+            } else {
+                audit_type_trimmed.to_string()
+            };
+            let mut content_change = FieldChange::Keep;
+            match records::validate_multiline("Content", &raw_content) {
+                Ok(v) => content_change = render::change(v),
+                Err(m) => errors.content = Some(m),
+            }
+
+            if errors.any() {
+                let values = render::AuditEditValues {
+                    title: raw_title.clone(),
+                    audit_type: raw_audit_type.clone(),
+                    content: raw_content.clone(),
+                };
+                return Ok(Response::html(
+                    422,
+                    render::edit_page_audit_record(
+                        &record,
+                        &values,
+                        &errors,
+                        &record.version,
+                        &cfg,
+                        chrome,
+                    ),
+                ));
+            }
+            let title = title.unwrap_or_default();
+            let final_audit_type = if audit_type_value.is_empty() {
+                "security".to_string()
+            } else {
+                audit_type_value
+            };
+            let content = records::apply_audit_edit(
+                &record.doc,
+                &record.id,
+                &title,
+                &final_audit_type,
+                content_change,
+            );
+            records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
+            Ok(Response::redirect(&format!("/doc/{}", record.id)))
+        }
     }
 }
 
@@ -1683,7 +1790,7 @@ fn record_json(
             serde_json::json!({
                 "id": record.id,
                 "kind": record.kind.key(),
-                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision", Form::Glossary => "glossary", Form::UiSpec => "ui-spec", Form::UiMockup => "ui-mockup", Form::BusinessRule => "business-rule" },
+                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision", Form::Glossary => "glossary", Form::UiSpec => "ui-spec", Form::UiMockup => "ui-mockup", Form::BusinessRule => "business-rule", Form::AuditRecord => "audit-record" },
                 "title": record.title,
                 "group": group_value,
                 "story": story,
@@ -1817,6 +1924,18 @@ fn record_json(
                 "rationale": record.rationale,
                 "applicability": record.applicability,
                 "requirements": record.requirements,
+                "version": record.version,
+                "path": record.rel_path,
+            })
+        }
+        Category::AuditRecord => {
+            serde_json::json!({
+                "id": record.id,
+                "kind": "audit-record",
+                "form": "audit-record",
+                "title": record.title,
+                "audit_type": record.audit_type.clone().unwrap_or_else(|| "security".to_string()),
+                "content": record.description,
                 "version": record.version,
                 "path": record.rel_path,
             })
@@ -1980,6 +2099,22 @@ fn api_ui_specs(state: &ServerState) -> Result<Response, HttpError> {
 fn api_business_rules(state: &ServerState) -> Result<Response, HttpError> {
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let index = records::build_index(&state.context(), &cfg, Category::BusinessRule);
+    let items: Vec<serde_json::Value> = index
+        .records
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "id": r.id,
+                "title": r.title,
+            })
+        })
+        .collect();
+    Ok(Response::json(200, serde_json::json!(items)))
+}
+
+fn api_audit_records(state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let index = records::build_index(&state.context(), &cfg, Category::AuditRecord);
     let items: Vec<serde_json::Value> = index
         .records
         .iter()
@@ -2781,6 +2916,76 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
+        Category::AuditRecord => {
+            let title = match object.get("title") {
+                None => record.title.clone(),
+                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
+                    Ok(t) => t,
+                    Err(m) => return Ok(json_error(422, &m)),
+                },
+                Some(_) => return Err(HttpError::new(400)),
+            };
+            // audit_type: optional string or null; null/omitted leaves unchanged; empty invalid
+            let mut audit_type_val = record
+                .audit_type
+                .clone()
+                .unwrap_or_else(|| "security".to_string());
+            let audit_type_change = match object.get("audit_type") {
+                None => None,
+                Some(serde_json::Value::Null) => None, // leave unchanged
+                Some(serde_json::Value::String(raw)) => {
+                    let trimmed = raw.trim();
+                    if trimmed.is_empty() {
+                        return Ok(json_error(422, "Audit type is required."));
+                    }
+                    if !["security", "licence", "architecture"].contains(&trimmed) {
+                        return Ok(json_error(
+                            422,
+                            "Audit type must be one of security, licence, or architecture.",
+                        ));
+                    }
+                    Some(trimmed.to_string())
+                }
+                Some(_) => return Err(HttpError::new(400)),
+            };
+            if let Some(v) = audit_type_change {
+                audit_type_val = v;
+            }
+            // content: optional string or null; null/empty clears
+            let mut content_change = FieldChange::Keep;
+            match object.get("content") {
+                None => {}
+                Some(serde_json::Value::Null) => content_change = FieldChange::Clear,
+                Some(serde_json::Value::String(raw)) => {
+                    match records::validate_multiline("Content", raw) {
+                        Ok(v) => content_change = render::change(v),
+                        Err(m) => return Ok(json_error(422, &m)),
+                    }
+                }
+                Some(_) => return Err(HttpError::new(400)),
+            }
+            // If audit_type omitted, leave unchanged: use record's current audit_type for section
+            let final_audit_type = if object.get("audit_type").is_none()
+                || object.get("audit_type") == Some(&serde_json::Value::Null)
+            {
+                record
+                    .audit_type
+                    .clone()
+                    .unwrap_or_else(|| "security".to_string())
+            } else {
+                audit_type_val
+            };
+            let content = records::apply_audit_edit(
+                &record.doc,
+                &record.id,
+                &title,
+                &final_audit_type,
+                content_change,
+            );
+            records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
+            let (updated, _updated_cfg) = resolve_record(id, state)?;
+            Ok(Response::json(200, record_json(&updated, None, None)))
+        }
     }
 }
 
@@ -2901,6 +3106,7 @@ mod tests {
             specs: vec!["UI-001".to_string(), "UI-002".to_string()],
             refs: vec!["docs/a.md".to_string()],
             mockup_task: "TASK-1".to_string(),
+            audit_type: None,
             doc: records::Doc {
                 id: "MOCK-001".to_string(),
                 title: "Login".to_string(),

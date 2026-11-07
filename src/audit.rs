@@ -206,14 +206,14 @@ fn active_or_deprecated(
 }
 
 #[derive(Clone, Debug, Default)]
-struct AuditData {
+pub(crate) struct AuditData {
     id: String,
     title: String,
     audit_type: String,
     content: String,
 }
 
-fn parse_heading(content: &str) -> (String, String) {
+pub(crate) fn parse_heading(content: &str) -> (String, String) {
     let first = content.lines().next().unwrap_or("");
     let rest = first.trim_start_matches('#').trim();
     let mut parts = rest.splitn(2, char::is_whitespace);
@@ -222,7 +222,7 @@ fn parse_heading(content: &str) -> (String, String) {
     (id, title)
 }
 
-fn section_text(content: &str, name: &str) -> Option<String> {
+pub(crate) fn section_text(content: &str, name: &str) -> Option<String> {
     let lines: Vec<&str> = content.lines().collect();
     let header = format!("## {}", name);
     let mut i = 0usize;
@@ -251,7 +251,7 @@ fn section_text(content: &str, name: &str) -> Option<String> {
     None
 }
 
-fn parse_record(content: &str, fallback_id: &str) -> AuditData {
+pub(crate) fn parse_record(content: &str, fallback_id: &str) -> AuditData {
     let (id, title) = parse_heading(content);
     AuditData {
         id: if id.is_empty() {
