@@ -34,6 +34,7 @@ pub enum Category {
     Glossary,
     UiSpec,
     UiMockup,
+    BusinessRule,
 }
 
 impl Category {
@@ -48,6 +49,15 @@ impl Category {
             Category::Glossary => "glossary",
             Category::UiSpec => "ui-spec",
             Category::UiMockup => "ui-mockup",
+            Category::BusinessRule => "business-rule",
+        }
+    }
+
+    /// Configuration key used in `document_types`.
+    pub fn config_key(self) -> &'static str {
+        match self {
+            Category::BusinessRule => "rule",
+            _ => self.key(),
         }
     }
 
@@ -72,6 +82,7 @@ pub enum Form {
     Glossary,
     UiSpec,
     UiMockup,
+    BusinessRule,
 }
 
 impl Form {
@@ -86,6 +97,7 @@ impl Form {
             Form::Glossary => "Glossary term",
             Form::UiSpec => "UI specification",
             Form::UiMockup => "UI mockup",
+            Form::BusinessRule => "Business rule",
         }
     }
 }
@@ -120,6 +132,9 @@ pub struct Record {
     pub group_id: Option<String>,
     pub group_title: Option<String>,
     pub description: Option<String>,
+    pub rationale: Option<String>,
+    pub applicability: Option<String>,
+    pub requirements: Vec<String>,
     pub definition: Option<String>,
     pub view: Option<String>,
     pub status: Option<String>,
@@ -163,6 +178,7 @@ impl Record {
             Category::Glossary => "Glossary",
             Category::UiSpec => "UI Specifications",
             Category::UiMockup => "UI Mockups",
+            Category::BusinessRule => "Business Rules",
         };
         match self.form {
             Form::Group => format!("{} group", base),
@@ -173,7 +189,8 @@ impl Record {
             | Form::Decision
             | Form::Glossary
             | Form::UiSpec
-            | Form::UiMockup => base.to_string(),
+            | Form::UiMockup
+            | Form::BusinessRule => base.to_string(),
         }
     }
 }
@@ -369,6 +386,11 @@ fn active_entry(cfg: &Config, kind: Category) -> Option<crate::config::DocTypeEn
             .get("ui-mockup")
             .cloned()
             .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
+        Category::BusinessRule => cfg
+            .document_types
+            .get("rule")
+            .cloned()
+            .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
     }
 }
 
@@ -379,7 +401,8 @@ fn active_dir(ctx: &Context, cfg: &Config, kind: Category) -> Option<PathBuf> {
         | Category::Nfr
         | Category::Glossary
         | Category::UiSpec
-        | Category::UiMockup => ctx.project_dir.join(&cfg.doc_directory),
+        | Category::UiMockup
+        | Category::BusinessRule => ctx.project_dir.join(&cfg.doc_directory),
         Category::Task | Category::Milestone | Category::Release => {
             ctx.project_dir.join(&cfg.backlog_directory)
         }
@@ -594,6 +617,9 @@ fn load_backlog_record(
         group_id: None,
         group_title: None,
         description,
+        rationale: None,
+        applicability: None,
+        requirements: Vec::new(),
         definition: None,
         view: None,
         status,
@@ -681,6 +707,9 @@ fn load_decision_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
         group_id: None,
         group_title: None,
         description: None,
+        rationale: None,
+        applicability: None,
+        requirements: Vec::new(),
         definition: None,
         view: None,
         status: Some(status),
@@ -759,6 +788,9 @@ fn load_glossary_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
         group_id: None,
         group_title: None,
         description: None,
+        rationale: None,
+        applicability: None,
+        requirements: Vec::new(),
         definition,
         view: None,
         status: None,
@@ -838,6 +870,9 @@ fn load_ui_spec_record(ctx: &Context, path: &Path) -> Result<Option<Record>, App
         group_id: None,
         group_title: None,
         description,
+        rationale: None,
+        applicability: None,
+        requirements: Vec::new(),
         definition: None,
         view,
         status: None,
@@ -911,6 +946,9 @@ fn load_ui_mockup_record(ctx: &Context, path: &Path) -> Result<Option<Record>, A
         group_id: None,
         group_title: None,
         description: None,
+        rationale: None,
+        applicability: None,
+        requirements: Vec::new(),
         definition: None,
         view: None,
         status: if meta_record.status.is_empty() {
@@ -949,6 +987,119 @@ fn load_ui_mockup_record(ctx: &Context, path: &Path) -> Result<Option<Record>, A
     }))
 }
 
+fn load_business_rule_record(ctx: &Context, path: &Path) -> Result<Option<Record>, AppError> {
+    let safe = match Context::ensure_within(&ctx.project_dir, path) {
+        Ok(safe) => safe,
+        Err(_) => return Ok(None),
+    };
+    let content = match fs::read_to_string(&safe) {
+        Ok(content) => content,
+        Err(_) => return Ok(None),
+    };
+    let meta = match fs::metadata(&safe) {
+        Ok(meta) => meta,
+        Err(_) => return Ok(None),
+    };
+    let Some(stem) = safe.file_stem().and_then(|s| s.to_str()) else {
+        return Ok(None);
+    };
+    if !valid_id(stem) {
+        return Ok(None);
+    }
+    let cfg = match crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir) {
+        Ok(c) => c,
+        Err(_) => return Ok(None),
+    };
+    let entry = match active_entry(&cfg, Category::BusinessRule) {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+    let rest = match stem.strip_prefix(&format!("{}-", entry.prefix)) {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+    if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+        return Ok(None);
+    }
+    let doc = parse_doc(&content);
+    let title = if doc.title.is_empty() {
+        stem.to_string()
+    } else {
+        doc.title.clone()
+    };
+    let description = section_value(&doc, "## Description");
+    let rationale = section_value(&doc, "## Rationale");
+    let applicability = section_value(&doc, "## Applicability");
+    // requirements from ## Requirements bullets
+    let requirements = parse_rule_requirements(&doc);
+    Ok(Some(Record {
+        id: stem.to_string(),
+        kind: Category::BusinessRule,
+        form: Form::BusinessRule,
+        title,
+        story: None,
+        group_id: None,
+        group_title: None,
+        description,
+        rationale,
+        applicability,
+        requirements,
+        definition: None,
+        view: None,
+        status: None,
+        milestone_id: None,
+        milestone_title: None,
+        assignee: None,
+        labels: Vec::new(),
+        dependencies: Vec::new(),
+        acceptance_criteria: Vec::new(),
+        comments: Vec::new(),
+        release_id: None,
+        release_title: None,
+        decision: None,
+        context: None,
+        consequences: None,
+        decision_type: None,
+        superseded_by: None,
+        superseded_title: None,
+        specs: Vec::new(),
+        refs: Vec::new(),
+        mockup_task: String::new(),
+        doc,
+        path: safe.clone(),
+        rel_path: relative_path(&ctx.project_dir, &safe),
+        version: version_token(&meta),
+    }))
+}
+
+fn parse_rule_requirements(doc: &Doc) -> Vec<String> {
+    let Some(section) = doc.sections.iter().find(|s| s.heading == "## Requirements") else {
+        return Vec::new();
+    };
+    let body = section.body.join("\n");
+    let mut out = Vec::new();
+    for line in body.lines() {
+        let t = line.trim();
+        if t.is_empty() {
+            continue;
+        }
+        let item = if let Some(rest) = t.strip_prefix("- ") {
+            rest.trim()
+        } else if let Some(rest) = t.strip_prefix('-') {
+            rest.trim()
+        } else {
+            t
+        };
+        if item.is_empty() {
+            continue;
+        }
+        if !out.contains(&item.to_string()) {
+            out.push(item.to_string());
+        }
+    }
+    out
+}
+
 fn load_record_from_path(
     ctx: &Context,
     kind: Category,
@@ -965,6 +1116,9 @@ fn load_record_from_path(
     }
     if kind == Category::UiMockup {
         return load_ui_mockup_record(ctx, path);
+    }
+    if kind == Category::BusinessRule {
+        return load_business_rule_record(ctx, path);
     }
     if matches!(
         kind,
@@ -1049,6 +1203,9 @@ fn load_record_from_path(
         group_id,
         group_title,
         description: section_value(&doc, "## Description"),
+        rationale: None,
+        applicability: None,
+        requirements: Vec::new(),
         definition: None,
         view: None,
         status,
@@ -1095,6 +1252,7 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
             | Category::Glossary
             | Category::UiSpec
             | Category::UiMockup
+            | Category::BusinessRule
     ) {
         let Some(entry) = active_entry(cfg, kind) else {
             return index;
@@ -1220,6 +1378,7 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
         Category::Glossary,
         Category::UiSpec,
         Category::UiMockup,
+        Category::BusinessRule,
     ] {
         let Some(entry) = active_entry(cfg, kind) else {
             continue;
@@ -1247,6 +1406,7 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
             } else if kind == Category::Glossary
                 || kind == Category::UiSpec
                 || kind == Category::UiMockup
+                || kind == Category::BusinessRule
             {
                 id.strip_prefix(&format!("{}-", entry.prefix))
                     .map(|r| !r.is_empty() && r.bytes().all(|b| b.is_ascii_digit()))
@@ -1419,6 +1579,12 @@ const RELEASE_KNOWN: &[&str] = &["## Description"];
 const DECISION_KNOWN: &[&str] = &["## Status", "## Decision", "## Context", "## Consequences"];
 const GLOSSARY_KNOWN: &[&str] = &["## Definition"];
 const UI_SPEC_KNOWN: &[&str] = &["## View", "## Description"];
+const RULE_KNOWN: &[&str] = &[
+    "## Description",
+    "## Rationale",
+    "## Applicability",
+    "## Requirements",
+];
 
 /// Serialize a document with a new title and optional story/description
 /// changes, preserving every unknown `## ` section content-identically.
@@ -1779,6 +1945,64 @@ pub fn apply_ui_spec_edit(
     output
 }
 
+/// Serialize a business-rule document with title and field changes.
+pub fn apply_business_rule_edit(
+    doc: &Doc,
+    id: &str,
+    title: &str,
+    description: FieldChange,
+    rationale: FieldChange,
+    applicability: FieldChange,
+    requirements: Vec<String>,
+) -> String {
+    let mut sections = doc.sections.clone();
+    match description {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## Description", None, RULE_KNOWN),
+        FieldChange::Set(value) => {
+            set_section(&mut sections, "## Description", Some(value), RULE_KNOWN)
+        }
+    }
+    match rationale {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## Rationale", None, RULE_KNOWN),
+        FieldChange::Set(value) => {
+            set_section(&mut sections, "## Rationale", Some(value), RULE_KNOWN)
+        }
+    }
+    match applicability {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## Applicability", None, RULE_KNOWN),
+        FieldChange::Set(value) => {
+            set_section(&mut sections, "## Applicability", Some(value), RULE_KNOWN)
+        }
+    }
+    if requirements.is_empty() {
+        set_section(&mut sections, "## Requirements", None, RULE_KNOWN);
+    } else {
+        let body = requirements
+            .iter()
+            .map(|r| format!("- {}", r))
+            .collect::<Vec<_>>()
+            .join("\n");
+        set_section(&mut sections, "## Requirements", Some(body), RULE_KNOWN);
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    lines.push(format!("# {} {}", id, title));
+    lines.extend(doc.preamble.iter().cloned());
+    for section in sections {
+        lines.push(section.heading);
+        lines.extend(section.body);
+    }
+    while lines.last().is_some_and(|line| line.is_empty()) {
+        lines.pop();
+    }
+    let mut output = lines.join("\n");
+    output.push('\n');
+    output
+}
+
 fn html_escape_text(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for character in value.chars() {
@@ -2048,6 +2272,23 @@ pub fn validate_refs(values: &[String]) -> Result<Vec<String>, String> {
         seen.push(value.clone());
     }
     Ok(trimmed)
+}
+
+/// Validate requirement references for business rules.
+pub fn validate_requirement_refs(values: &[String]) -> Result<Vec<String>, String> {
+    let trimmed = submitted_tag_values(values);
+    for value in &trimmed {
+        if !valid_id(value) {
+            return Err("Requirement references must be valid record IDs.".to_string());
+        }
+    }
+    let mut out: Vec<String> = Vec::new();
+    for value in trimmed {
+        if !out.contains(&value) {
+            out.push(value);
+        }
+    }
+    Ok(out)
 }
 
 /// Whether a decision ID exists in the active or archived store.
@@ -2354,5 +2595,123 @@ mod tests {
         );
         assert!(output.contains("A &amp; &lt;B&gt;"));
         assert!(output.contains("<p>References: a&amp;b</p>"));
+    }
+
+    #[test]
+    fn business_rule_parse_preserve_and_requirements() {
+        let input = "# RUL-001 Title\n\npreamble line\n\n## Description\nBody\n\n## Unknown\nKeep me\n\n## Requirements\n- REQ-001\n- REQ-002\n\n## Rationale\nWhy\n";
+        let doc = parse_doc(input);
+        assert_eq!(doc.id, "RUL-001");
+        assert_eq!(doc.title, "Title");
+        assert_eq!(
+            section_value(&doc, "## Description").as_deref(),
+            Some("Body")
+        );
+        assert_eq!(section_value(&doc, "## Rationale").as_deref(), Some("Why"));
+        assert_eq!(section_value(&doc, "## Applicability"), None);
+        assert_eq!(
+            parse_rule_requirements(&doc),
+            vec!["REQ-001".to_string(), "REQ-002".to_string()]
+        );
+        let output = apply_business_rule_edit(
+            &doc,
+            "RUL-001",
+            "New title",
+            FieldChange::Set("New body".to_string()),
+            FieldChange::Keep,
+            FieldChange::Clear,
+            vec!["REQ-003".to_string()],
+        );
+        assert!(output.starts_with("# RUL-001 New title\n"));
+        assert!(output.contains("preamble line"));
+        assert!(output.contains("## Unknown\nKeep me\n"));
+        assert!(output.contains("## Description\nNew body\n"));
+        assert!(!output.contains("## Applicability"));
+        assert!(output.contains("## Requirements\n- REQ-003\n"));
+        assert!(output.ends_with('\n'));
+    }
+
+    #[test]
+    fn business_rule_field_validation() {
+        assert!(validate_title("  Title  ").is_ok());
+        assert!(validate_title("").is_err());
+        assert_eq!(validate_title("").unwrap_err(), "Title is required.");
+        assert!(validate_title(&"x".repeat(201)).is_err());
+        assert!(validate_title("a\tb").is_err());
+        assert_eq!(
+            validate_multiline("Description", "  a\r\nb  ").unwrap(),
+            Some("a\nb".to_string())
+        );
+        assert_eq!(validate_multiline("Description", "   ").unwrap(), None);
+        assert!(validate_multiline("Description", "a\n## Section\nb").is_err());
+        assert!(validate_multiline("Description", "a\u{0007}b").is_err());
+        assert!(validate_multiline("Description", "a\tb").is_ok());
+        assert_eq!(
+            validate_requirement_refs(&["REQ-001".to_string(), " REQ-002 ".to_string()]).unwrap(),
+            vec!["REQ-001".to_string(), "REQ-002".to_string()]
+        );
+        assert_eq!(
+            validate_requirement_refs(&["REQ-001".to_string(), "REQ-001".to_string()]).unwrap(),
+            vec!["REQ-001".to_string()]
+        );
+        assert_eq!(
+            validate_requirement_refs(&["".to_string(), "  ".to_string()]).unwrap(),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            validate_requirement_refs(&[]).unwrap(),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            validate_requirement_refs(&["bad id".to_string()]).unwrap_err(),
+            "Requirement references must be valid record IDs."
+        );
+        assert_eq!(
+            validate_requirement_refs(&["../x".to_string()]).unwrap_err(),
+            "Requirement references must be valid record IDs."
+        );
+    }
+
+    #[test]
+    fn business_rule_duplicate_collapse_in_apply() {
+        let input = "# RUL-001 Title\n";
+        let doc = parse_doc(input);
+        let output = apply_business_rule_edit(
+            &doc,
+            "RUL-001",
+            "Title",
+            FieldChange::Keep,
+            FieldChange::Keep,
+            FieldChange::Keep,
+            vec![
+                "REQ-001".to_string(),
+                "REQ-002".to_string(),
+                "REQ-001".to_string(),
+            ],
+        );
+        assert!(output.contains("## Requirements\n- REQ-001\n- REQ-002\n"));
+    }
+
+    #[test]
+    fn business_rule_empty_requirements_removes_section() {
+        let input = "# RUL-001 Title\n\n## Requirements\n- REQ-001\n";
+        let doc = parse_doc(input);
+        let output = apply_business_rule_edit(
+            &doc,
+            "RUL-001",
+            "Title",
+            FieldChange::Keep,
+            FieldChange::Keep,
+            FieldChange::Keep,
+            Vec::new(),
+        );
+        assert!(!output.contains("## Requirements"));
+    }
+
+    #[test]
+    fn business_rule_version_token_shape() {
+        assert!(valid_version_token("1762000000.123456789.412"));
+        assert!(!valid_version_token("1.2"));
+        assert!(!valid_version_token("a.b.c"));
     }
 }

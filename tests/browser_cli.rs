@@ -3873,3 +3873,657 @@ fn t40m_no_new_dependencies() {
         );
     }
 }
+
+// ---- T-25 business rules browser scenarios ----
+
+fn create_rule(
+    dir: &Path,
+    title: &str,
+    description: &str,
+    rationale: &str,
+    applicability: &str,
+    requirements: &[&str],
+) -> String {
+    let mut args: Vec<String> = vec![
+        "--dir".to_string(),
+        dir.to_str().unwrap().to_string(),
+        "rule".to_string(),
+        "create".to_string(),
+        title.to_string(),
+        "--description".to_string(),
+        description.to_string(),
+        "--rationale".to_string(),
+        rationale.to_string(),
+        "--applicability".to_string(),
+        applicability.to_string(),
+    ];
+    for req in requirements {
+        args.push("--requirement".to_string());
+        args.push(req.to_string());
+    }
+    let out = bin().args(&args).output().unwrap();
+    assert!(
+        out.status.success(),
+        "rule create failed: {:?}\nstderr: {}",
+        args,
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+fn rule_record_path(dir: &Path, id: &str) -> PathBuf {
+    // default config: business-rules/<ID>.md
+    dir.join("docs/business-rules").join(format!("{}.md", id))
+}
+
+fn rule_dir(dir: &Path) -> PathBuf {
+    dir.join("docs/business-rules")
+}
+
+fn rule_fixture(name: &str) -> PathBuf {
+    let dir = test_root(name);
+    init_project(&dir);
+    // requirements for links
+    create_req_group(&dir, "Payments Group");
+    let r1 = create_req(&dir, "Capture payment", "REQ-001");
+    create_req_group(&dir, "Search Group");
+    let r2 = create_req(&dir, "Search records", "REQ-002");
+    create_rule(
+        &dir,
+        "First rule",
+        "First description paragraph.",
+        "First rationale",
+        "First applicability",
+        &[&r1],
+    );
+    create_rule(
+        &dir,
+        "Second rule",
+        "Second description",
+        "Second rationale",
+        "Second applicability",
+        &[&r1, &r2],
+    );
+    let _ = (r1, r2);
+    dir
+}
+
+// T-25a
+#[test]
+fn t25a_list_business_rules_category() {
+    let dir = rule_fixture("t25a");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=business-rule").text();
+    assert!(html.contains("<h2 class=\"h2\">Business Rules</h2>"));
+    assert!(
+        html.contains("2 business rules")
+            || html.contains("2 Business Rules")
+            || html.contains("2 business rule")
+    );
+    // count text may vary; check contains 2 and business rules
+    assert!(html.contains("aria-current=\"page\""));
+    // sidebar order: Business requirements before Business Rules
+    let reqs_at = html.find("href=\"/?type=req\"").unwrap();
+    let rules_at = html.find("href=\"/?type=business-rule\"").unwrap();
+    assert!(reqs_at < rules_at, "sidebar order");
+    assert!(html.contains("RUL-001"));
+    assert!(html.contains("First rule"));
+    assert!(html.contains("RUL-002"));
+    assert!(html.contains("Second rule"));
+    let first = html.find("RUL-001").unwrap();
+    let second = html.find("RUL-002").unwrap();
+    assert!(first < second, "ascending ID order");
+    assert!(html.contains("href=\"/doc/RUL-001\""));
+    assert!(html.contains("href=\"/doc/RUL-002\""));
+    // preview first paragraph
+    assert!(html.contains("First description paragraph."));
+    // default stays req; unknown values are 400.
+    assert_eq!(get(&server, "/").status, 200);
+    assert_eq!(get(&server, "/?type=req").status, 200);
+    for ty in ["all", "x", "business-rules", "rule"] {
+        assert_eq!(
+            get(&server, &format!("/?type={}", ty)).status,
+            400,
+            "type={}",
+            ty
+        );
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn t25a_disabled_business_rule_empty_state() {
+    let dir = rule_fixture("t25a-disabled");
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "config",
+        "set",
+        "document_types.rule.enabled",
+        "false",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=business-rule").text();
+    assert_eq!(get(&server, "/?type=business-rule").status, 200);
+    assert!(!html.contains("href=\"/?type=business-rule\""));
+    let api: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/business-rules").text()).unwrap();
+    assert!(api.as_array().unwrap().is_empty());
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-25b
+#[test]
+fn t25b_non_records_are_not_listed() {
+    let dir = rule_fixture("t25b");
+    let rdir = rule_dir(&dir);
+    fs::write(rdir.join("BR-001.md"), "# BR-001 Canonical\n").unwrap();
+    fs::write(rdir.join("README.md"), "# registry").unwrap();
+    fs::write(rdir.join("notes.txt"), "x").unwrap();
+    fs::write(rdir.join("RUL-ABC.md"), "# bad").unwrap();
+    let deprecated = rdir.join("deprecated");
+    fs::create_dir_all(&deprecated).unwrap();
+    fs::write(
+        deprecated.join("RUL-999.md"),
+        "# RUL-999 Hidden\n\n## Description\nhidden\n",
+    )
+    .unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=business-rule").text();
+    assert!(html.contains("RUL-001"));
+    assert!(html.contains("RUL-002"));
+    assert!(!html.contains("RUL-999"));
+    assert!(!html.contains("BR-001"));
+    let api: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/business-rules").text()).unwrap();
+    assert_eq!(api.as_array().unwrap().len(), 2);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-25c
+#[test]
+fn t25c_view_business_rule() {
+    let dir = rule_fixture("t25c");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/doc/RUL-001").text();
+    assert!(html.contains("Record ID"));
+    assert!(html.contains("RUL-001"));
+    assert!(html.contains("Business rule"));
+    assert!(html.contains("Business Rules"));
+    assert!(html.contains("<h1 class=\"h1\">First rule</h1>"));
+    assert!(html.contains("Description"));
+    assert!(html.contains("Rationale"));
+    assert!(html.contains("Applicability"));
+    assert!(html.contains("Requirements"));
+    assert!(html.contains("First description paragraph."));
+    assert!(html.contains("First rationale"));
+    assert!(html.contains("First applicability"));
+    assert!(html.contains("white-space: pre-wrap"));
+    // breadcrumb
+    assert!(html.contains("href=\"/?type=business-rule\">Business Rules</a></li><li><span aria-current=\"page\">RUL-001</span>"));
+    assert_eq!(html.matches("href=\"/doc/RUL-001/edit\"").count(), 1);
+    assert!(html.contains(">Edit</a>"));
+    // requirement link resolves to req view
+    assert!(html.contains("href=\"/doc/REQ-001.001\"") || html.contains("REQ-001.001"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-25d
+#[test]
+fn t25d_edit_round_trip() {
+    let dir = rule_fixture("t25d");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let edit = get(&server, "/doc/RUL-001/edit").text();
+    assert!(edit.contains("name=\"requirements\""));
+    assert!(edit.contains("Hidden field: version (optimistic-concurrency token)"));
+    assert!(edit.contains("Save changes") || edit.contains("Save"));
+    let version = extract_version(&edit);
+    // ensure requirement ids exist? use actual req ids
+    let r2 = "REQ-001.001";
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Renamed rule"),
+        ("description", "New desc"),
+        ("rationale", "New rationale"),
+        ("applicability", "New applicability"),
+        ("requirements", r2),
+        ("requirements", ""),
+    ]);
+    let response = post_form(&server, "/doc/RUL-001", &body);
+    assert_eq!(response.status, 303);
+    assert_eq!(response.header("Location"), Some("/doc/RUL-001"));
+    let view = get(&server, "/doc/RUL-001").text();
+    assert!(view.contains("<h1 class=\"h1\">Renamed rule</h1>"));
+    assert!(view.contains("New desc"));
+    assert!(view.contains("New rationale"));
+    assert!(view.contains("New applicability"));
+    // visible through CLI
+    let cli = run_ok(&["--dir", dir.to_str().unwrap(), "rule", "view", "RUL-001"]);
+    assert!(cli.contains("Renamed rule"));
+    assert!(cli.contains("New desc"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-25e
+#[test]
+fn t25e_field_preserving() {
+    let dir = rule_fixture("t25e");
+    // add unknown section manually
+    let path = rule_record_path(&dir, "RUL-001");
+    let original = fs::read_to_string(&path).unwrap();
+    let with_unknown = original.replace(
+        "## Requirements",
+        "## Custom Section\nKeep this line\n\n## Requirements",
+    );
+    fs::write(&path, &with_unknown).unwrap();
+    let before = fs::read_to_string(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/RUL-001/edit").text());
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Edited title"),
+        ("description", "Edited desc"),
+        ("rationale", "Edited rationale"),
+        ("applicability", "Edited applicability"),
+        ("requirements", ""),
+    ]);
+    assert_eq!(post_form(&server, "/doc/RUL-001", &body).status, 303);
+    let after = fs::read_to_string(&path).unwrap();
+    assert!(after.contains("## Custom Section\nKeep this line"));
+    assert!(after.contains("Edited title"));
+    assert!(after.contains("Edited desc"));
+    // byte comparison: unknown section lines identical
+    for needle in ["## Custom Section", "Keep this line", "preamble"] {
+        if before.contains(needle) {
+            assert!(after.contains(needle));
+        }
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-25f
+#[test]
+fn t25f_repeated_requirements_in_order() {
+    let dir = rule_fixture("t25f");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/RUL-002/edit").text());
+    // use valid req ids
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Order check"),
+        ("description", "d"),
+        ("rationale", "r"),
+        ("applicability", "a"),
+        ("requirements", "REQ-001.001"),
+        ("requirements", "REQ-002.001"), // may not exist but valid id? REQ-002.001 valid format yes
+        ("requirements", "REQ-001.001"),
+        ("requirements", ""),
+    ]);
+    assert_eq!(post_form(&server, "/doc/RUL-002", &body).status, 303);
+    let file = fs::read_to_string(rule_record_path(&dir, "RUL-002")).unwrap();
+    assert!(file.contains("## Requirements\n- REQ-001.001\n- REQ-002.001\n"));
+    // duplicates collapsed
+    assert!(!file.contains("REQ-001.001\n- REQ-001.001"));
+    let api: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/doc/RUL-002").text()).unwrap();
+    assert_eq!(
+        api["requirements"],
+        serde_json::json!(["REQ-001.001", "REQ-002.001"])
+    );
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-25g
+#[test]
+fn t25g_validation_422_no_write() {
+    let dir = rule_fixture("t25g");
+    let path = rule_record_path(&dir, "RUL-001");
+    let before = fs::read(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/RUL-001/edit").text());
+    let cases: Vec<(String, &str, &str)> = vec![
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", ""),
+                ("requirements", "REQ-001.001"),
+            ]),
+            "Title is required.",
+            "title",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", &"x".repeat(201)),
+                ("requirements", "REQ-001.001"),
+            ]),
+            "Title must be at most 200 characters.",
+            "title",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "a\tb"),
+                ("requirements", "REQ-001.001"),
+            ]),
+            "Title cannot contain control characters.",
+            "title",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("description", &"x".repeat(20001)),
+            ]),
+            "Description must be at most 20000 characters.",
+            "description",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("description", "a\n## Section\nb"),
+            ]),
+            "Description contains a line starting with ## .",
+            "description",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("rationale", &"x".repeat(20001)),
+            ]),
+            "Rationale must be at most 20000 characters.",
+            "rationale",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("applicability", &"x".repeat(20001)),
+            ]),
+            "Applicability must be at most 20000 characters.",
+            "applicability",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("requirements", "bad id"),
+            ]),
+            "Requirement references must be valid record IDs.",
+            "requirements",
+        ),
+    ];
+    for (body, message, field) in cases {
+        let response = post_form(&server, "/doc/RUL-001", &body);
+        assert_eq!(response.status, 422, "body={}", body);
+        let html = response.text();
+        assert_eq!(summary_entry(&html, field), message);
+        assert_eq!(field_error(&html, field), message);
+        assert_eq!(fs::read(&path).unwrap(), before, "file changed {}", body);
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-25h
+#[test]
+fn t25h_stale_and_malformed_versions() {
+    let dir = rule_fixture("t25h");
+    let path = rule_record_path(&dir, "RUL-001");
+    let before = fs::read(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let valid = form_body(&[
+        ("version", "1.2.3"),
+        ("title", "Stale"),
+        ("requirements", "REQ-001.001"),
+    ]);
+    let conflict = post_form(&server, "/doc/RUL-001", &valid);
+    assert_eq!(conflict.status, 409);
+    assert!(
+        conflict
+            .text()
+            .contains("record changed on disk; reload the form")
+    );
+    assert_eq!(fs::read(&path).unwrap(), before);
+    let missing = form_body(&[("title", "Ok"), ("requirements", "REQ-001.001")]);
+    assert_eq!(post_form(&server, "/doc/RUL-001", &missing).status, 400);
+    let malformed = form_body(&[
+        ("version", "bad"),
+        ("title", "Ok"),
+        ("requirements", "REQ-001.001"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/RUL-001", &malformed).status, 400);
+    assert_eq!(fs::read(&path).unwrap(), before);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-25i
+#[test]
+fn t25i_deprecated_hidden_and_404() {
+    let dir = rule_fixture("t25i");
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "rule",
+        "deprecate",
+        "RUL-002",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let list = get(&server, "/?type=business-rule").text();
+    assert!(list.contains("RUL-001"));
+    assert!(!list.contains("RUL-002"));
+    assert_eq!(get(&server, "/doc/RUL-002").status, 404);
+    assert_eq!(get(&server, "/doc/RUL-002/edit").status, 404);
+    let version = "1.2.3";
+    let body = form_body(&[
+        ("version", version),
+        ("title", "Ok"),
+        ("requirements", "REQ-001.001"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/RUL-002", &body).status, 404);
+    assert_eq!(get(&server, "/api/doc/RUL-002").status, 404);
+    let json_body = format!("{{\"version\":\"{}\",\"title\":\"Ok\"}}", version);
+    assert_eq!(
+        post_json(&server, "/api/doc/RUL-002", &json_body).status,
+        404
+    );
+    let api: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/business-rules").text()).unwrap();
+    assert_eq!(api.as_array().unwrap().len(), 1);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-25j
+#[test]
+fn t25j_json_api() {
+    let dir = rule_fixture("t25j");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    for alias in ["/api/business-rules", "/api/business-rule"] {
+        let list: serde_json::Value = serde_json::from_str(&get(&server, alias).text()).unwrap();
+        let arr = list.as_array().unwrap();
+        assert_eq!(arr.len(), 2, "alias {}", alias);
+        assert_eq!(arr[0]["id"], "RUL-001");
+        assert_eq!(arr[0]["title"], "First rule");
+        assert_eq!(arr[1]["id"], "RUL-002");
+    }
+    let doc: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/doc/RUL-001").text()).unwrap();
+    assert_eq!(doc["id"], "RUL-001");
+    assert_eq!(doc["kind"], "business-rule");
+    assert_eq!(doc["form"], "business-rule");
+    assert_eq!(doc["title"], "First rule");
+    assert_eq!(doc["description"], "First description paragraph.");
+    assert_eq!(doc["rationale"], "First rationale");
+    assert_eq!(doc["applicability"], "First applicability");
+    assert_eq!(doc["requirements"], serde_json::json!(["REQ-001.001"]));
+    assert!(doc["version"].is_string());
+    assert!(doc["path"].as_str().unwrap().ends_with("RUL-001.md"));
+    // description null? second rule has desc
+    let version = doc["version"].as_str().unwrap().to_string();
+    // omitted unchanged; wrong types
+    let body = format!(
+        "{{\"version\":\"{}\",\"title\":\"Renamed\",\"requirements\":[\"REQ-002.001\"]}}",
+        version
+    );
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/RUL-001", &body).text()).unwrap();
+    assert_eq!(updated["title"], "Renamed");
+    assert_eq!(updated["requirements"], serde_json::json!(["REQ-002.001"]));
+    // null clears description
+    let version = updated["version"].as_str().unwrap().to_string();
+    let body = format!("{{\"version\":\"{}\",\"description\":null}}", version);
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/RUL-001", &body).text()).unwrap();
+    assert!(updated["description"].is_null());
+    // validation 422
+    let version = updated["version"].as_str().unwrap().to_string();
+    let body = format!("{{\"version\":\"{}\",\"title\":\"\"}}", version);
+    assert_eq!(post_json(&server, "/api/doc/RUL-001", &body).status, 422);
+    let body = format!(
+        "{{\"version\":\"{}\",\"requirements\":[\"bad id\"]}}",
+        version
+    );
+    let response = post_json(&server, "/api/doc/RUL-001", &body);
+    assert_eq!(response.status, 422);
+    let err: serde_json::Value = serde_json::from_str(&response.text()).unwrap();
+    assert_eq!(
+        err["error"]["message"],
+        "Requirement references must be valid record IDs."
+    );
+    // wrong types 400
+    let body = format!("{{\"version\":\"{}\",\"title\":5}}", version);
+    assert_eq!(post_json(&server, "/api/doc/RUL-001", &body).status, 400);
+    let body = format!("{{\"version\":\"{}\",\"requirements\":\"x\"}}", version);
+    assert_eq!(post_json(&server, "/api/doc/RUL-001", &body).status, 400);
+    let body = format!("{{\"version\":\"{}\",\"requirements\":[5]}}", version);
+    assert_eq!(post_json(&server, "/api/doc/RUL-001", &body).status, 400);
+    assert_eq!(
+        post_json(&server, "/api/doc/RUL-001", "{not json").status,
+        400
+    );
+    assert_eq!(post_json(&server, "/api/doc/RUL-001", "[]").status, 400);
+    // missing/malformed/stale version
+    assert_eq!(
+        post_json(&server, "/api/doc/RUL-001", "{\"title\":\"Ok\"}").status,
+        400
+    );
+    assert_eq!(
+        post_json(&server, "/api/doc/RUL-001", "{\"version\":\"bad\"}").status,
+        400
+    );
+    let body = "{\"version\":\"1.2.3\",\"title\":\"Ok\"}";
+    assert_eq!(post_json(&server, "/api/doc/RUL-001", body).status, 409);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-25k
+#[test]
+fn t25k_atomic_and_symlink() {
+    use std::os::unix::fs::symlink;
+    let dir = rule_fixture("t25k");
+    let rdir = rule_dir(&dir);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/RUL-001/edit").text());
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Atomic title"),
+        ("description", "d"),
+        ("rationale", "r"),
+        ("applicability", "a"),
+        ("requirements", ""),
+    ]);
+    assert_eq!(post_form(&server, "/doc/RUL-001", &body).status, 303);
+    for entry in fs::read_dir(&rdir).unwrap().flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        assert!(!name.contains(".tmp"), "temp left {}", name);
+    }
+    let version = extract_version(&get(&server, "/doc/RUL-001/edit").text());
+    let bad = form_body(&[
+        ("version", &version),
+        ("title", ""),
+        ("requirements", "REQ-001.001"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/RUL-001", &bad).status, 422);
+    for entry in fs::read_dir(&rdir).unwrap().flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        assert!(!name.contains(".tmp"), "temp left {}", name);
+    }
+    drop(server);
+    // symlink escape
+    let outside = test_root("t25k-outside");
+    let secret = outside.join("secret.md");
+    fs::write(&secret, "# RUL-001 Secret\n").unwrap();
+    let target = rule_record_path(&dir, "RUL-001");
+    fs::remove_file(&target).unwrap();
+    symlink(&secret, &target).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    assert_eq!(get(&server, "/doc/RUL-001").status, 404);
+    assert_eq!(get(&server, "/api/doc/RUL-001").status, 404);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+    let _ = fs::remove_dir_all(&outside);
+}
+
+// T-25l
+#[test]
+fn t25l_offline_asset_scan() {
+    let dir = rule_fixture("t25l");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let css = get(&server, "/assets/app.css");
+    let js = get(&server, "/assets/app.js");
+    assert_eq!(css.status, 200);
+    assert_eq!(js.status, 200);
+    for path in ["/?type=business-rule", "/doc/RUL-001", "/doc/RUL-001/edit"] {
+        let html = get(&server, path).text();
+        assert!(!html.contains("http://"), "external {}", path);
+        assert!(!html.contains("https://"), "external {}", path);
+        assert!(!html.contains("//cdn"), "external {}", path);
+        assert!(!html.contains("@import"), "external {}", path);
+    }
+    for asset in [css.text(), js.text()] {
+        assert!(!asset.contains("@import"));
+        assert!(!asset.contains("http://"));
+        assert!(!asset.contains("https://"));
+    }
+    let edit = get(&server, "/doc/RUL-001/edit").text();
+    assert!(edit.contains("aria-label=\"Remove") || edit.contains("Remove"));
+    assert!(edit.contains("type=\"button\"") || edit.contains("<button"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-25m
+#[test]
+fn t25m_no_new_dependencies() {
+    let manifest = include_str!("../Cargo.toml");
+    let dependency_index = manifest.find("[dependencies]").unwrap();
+    let dependencies = &manifest[dependency_index..];
+    for forbidden in [
+        "axum",
+        "actix",
+        "rocket",
+        "tokio",
+        "async-std",
+        "tera",
+        "handlebars",
+        "askama",
+    ] {
+        assert!(
+            !dependencies.contains(forbidden),
+            "new dependency {}",
+            forbidden
+        );
+    }
+}

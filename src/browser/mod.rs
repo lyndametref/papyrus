@@ -430,6 +430,7 @@ fn category_from_query(request: &Request) -> Result<Category, HttpError> {
         Some(value) if value == "glossary" => Ok(Category::Glossary),
         Some(value) if value == "ui-spec" => Ok(Category::UiSpec),
         Some(value) if value == "ui-mockup" => Ok(Category::UiMockup),
+        Some(value) if value == "business-rule" => Ok(Category::BusinessRule),
         Some(_) => Err(HttpError::new(400)),
     }
 }
@@ -520,6 +521,12 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
     if path == "/api/ui-mockups" || path == "/api/ui-mockup" || path == "/api/mockups" {
         return match method {
             Method::Get | Method::Head => api_ui_mockups(state),
+            _ => Err(HttpError::new(405)),
+        };
+    }
+    if path == "/api/business-rules" || path == "/api/business-rule" {
+        return match method {
+            Method::Get | Method::Head => api_business_rules(state),
             _ => Err(HttpError::new(405)),
         };
     }
@@ -661,6 +668,21 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
     } else {
         Vec::new()
     };
+    let resolved_refs: Vec<Option<records::Record>> = if record.kind == Category::BusinessRule {
+        record
+            .requirements
+            .iter()
+            .map(|rid| {
+                records::resolve_id(&ctx, &cfg, rid)
+                    .ok()
+                    .flatten()
+                    .filter(|r| matches!(r.kind, Category::Req | Category::Nfr))
+                    .map(|r| r.record)
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
     let (project, bind_note) = chrome_for(&cfg, state);
     let chrome = render::Chrome {
         project: &project,
@@ -675,6 +697,7 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
             related_milestone.as_ref(),
             related_release.as_ref(),
             &resolved_deps,
+            &resolved_refs,
             &cfg,
             chrome,
         ),
@@ -819,6 +842,23 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
+        Category::BusinessRule => {
+            let values = render::BusinessRuleEditValues {
+                title: record.title.clone(),
+                description: record.description.clone().unwrap_or_default(),
+                rationale: record.rationale.clone().unwrap_or_default(),
+                applicability: record.applicability.clone().unwrap_or_default(),
+                requirements: record.requirements.clone(),
+            };
+            render::edit_page_business_rule(
+                &record,
+                &values,
+                &render::BusinessRuleFieldErrors::default(),
+                &record.version,
+                &cfg,
+                chrome,
+            )
+        }
     };
     Ok(Response::html(200, html))
 }
@@ -896,6 +936,28 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             return Ok(Response::html(
                 409,
                 render::conflict_page_ui_mockup(&record, &title, &specs, &refs, &cfg, chrome),
+            ));
+        }
+        if record.kind == Category::BusinessRule {
+            let title = form_field(&fields, "title").unwrap_or("").to_string();
+            let description = form_field(&fields, "description").unwrap_or("").to_string();
+            let rationale = form_field(&fields, "rationale").unwrap_or("").to_string();
+            let applicability = form_field(&fields, "applicability")
+                .unwrap_or("")
+                .to_string();
+            let requirements = records::submitted_tag_values(&form_fields(&fields, "requirements"));
+            return Ok(Response::html(
+                409,
+                render::conflict_page_business_rule(
+                    &record,
+                    &title,
+                    &description,
+                    &rationale,
+                    &applicability,
+                    &requirements,
+                    &cfg,
+                    chrome,
+                ),
             ));
         }
         // Conflict page with submitted values (best-effort).
@@ -1524,6 +1586,79 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
+        Category::BusinessRule => {
+            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
+            let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
+            let raw_rationale = form_field(&fields, "rationale").unwrap_or("").to_string();
+            let raw_applicability = form_field(&fields, "applicability")
+                .unwrap_or("")
+                .to_string();
+            let raw_requirements = form_fields(&fields, "requirements");
+
+            let mut errors = render::BusinessRuleFieldErrors::default();
+            let title = match records::validate_title(&raw_title) {
+                Ok(t) => Some(t),
+                Err(m) => {
+                    errors.title = Some(m);
+                    None
+                }
+            };
+            let mut description_change = FieldChange::Keep;
+            match records::validate_multiline("Description", &raw_description) {
+                Ok(v) => description_change = render::change(v),
+                Err(m) => errors.description = Some(m),
+            }
+            let mut rationale_change = FieldChange::Keep;
+            match records::validate_multiline("Rationale", &raw_rationale) {
+                Ok(v) => rationale_change = render::change(v),
+                Err(m) => errors.rationale = Some(m),
+            }
+            let mut applicability_change = FieldChange::Keep;
+            match records::validate_multiline("Applicability", &raw_applicability) {
+                Ok(v) => applicability_change = render::change(v),
+                Err(m) => errors.applicability = Some(m),
+            }
+            let requirements = match records::validate_requirement_refs(&raw_requirements) {
+                Ok(v) => Some(v),
+                Err(m) => {
+                    errors.requirements = Some(m);
+                    None
+                }
+            };
+            if errors.any() {
+                let values = render::BusinessRuleEditValues {
+                    title: raw_title.clone(),
+                    description: raw_description.clone(),
+                    rationale: raw_rationale.clone(),
+                    applicability: raw_applicability.clone(),
+                    requirements: records::submitted_tag_values(&raw_requirements),
+                };
+                return Ok(Response::html(
+                    422,
+                    render::edit_page_business_rule(
+                        &record,
+                        &values,
+                        &errors,
+                        &record.version,
+                        &cfg,
+                        chrome,
+                    ),
+                ));
+            }
+            let title = title.unwrap_or_default();
+            let requirements = requirements.unwrap_or_default();
+            let content = records::apply_business_rule_edit(
+                &record.doc,
+                &record.id,
+                &title,
+                description_change,
+                rationale_change,
+                applicability_change,
+                requirements,
+            );
+            records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
+            Ok(Response::redirect(&format!("/doc/{}", record.id)))
+        }
     }
 }
 
@@ -1548,7 +1683,7 @@ fn record_json(
             serde_json::json!({
                 "id": record.id,
                 "kind": record.kind.key(),
-                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision", Form::Glossary => "glossary", Form::UiSpec => "ui-spec", Form::UiMockup => "ui-mockup" },
+                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision", Form::Glossary => "glossary", Form::UiSpec => "ui-spec", Form::UiMockup => "ui-mockup", Form::BusinessRule => "business-rule" },
                 "title": record.title,
                 "group": group_value,
                 "story": story,
@@ -1668,6 +1803,20 @@ fn record_json(
                 "task": record.mockup_task,
                 "status": record.status.clone().unwrap_or_default(),
                 "superseded_by": record.superseded_by,
+                "version": record.version,
+                "path": record.rel_path,
+            })
+        }
+        Category::BusinessRule => {
+            serde_json::json!({
+                "id": record.id,
+                "kind": "business-rule",
+                "form": "business-rule",
+                "title": record.title,
+                "description": record.description,
+                "rationale": record.rationale,
+                "applicability": record.applicability,
+                "requirements": record.requirements,
                 "version": record.version,
                 "path": record.rel_path,
             })
@@ -1815,6 +1964,22 @@ fn api_ui_mockups(state: &ServerState) -> Result<Response, HttpError> {
 fn api_ui_specs(state: &ServerState) -> Result<Response, HttpError> {
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let index = records::build_index(&state.context(), &cfg, Category::UiSpec);
+    let items: Vec<serde_json::Value> = index
+        .records
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "id": r.id,
+                "title": r.title,
+            })
+        })
+        .collect();
+    Ok(Response::json(200, serde_json::json!(items)))
+}
+
+fn api_business_rules(state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let index = records::build_index(&state.context(), &cfg, Category::BusinessRule);
     let items: Vec<serde_json::Value> = index
         .records
         .iter()
@@ -2515,6 +2680,107 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
+        Category::BusinessRule => {
+            // title: optional, required when present
+            let title = match object.get("title") {
+                None => record.title.clone(),
+                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
+                    Ok(t) => t,
+                    Err(m) => return Ok(json_error(422, &m)),
+                },
+                Some(_) => return Err(HttpError::new(400)),
+            };
+            // description/rationale/applicability: optional string or null; null/empty clears
+            let mut description_change = FieldChange::Keep;
+            match object.get("description") {
+                None => {}
+                Some(serde_json::Value::Null) => description_change = FieldChange::Clear,
+                Some(serde_json::Value::String(raw)) => {
+                    match records::validate_multiline("Description", raw) {
+                        Ok(v) => description_change = render::change(v),
+                        Err(m) => return Ok(json_error(422, &m)),
+                    }
+                }
+                Some(_) => return Err(HttpError::new(400)),
+            }
+            let mut rationale_change = FieldChange::Keep;
+            match object.get("rationale") {
+                None => {}
+                Some(serde_json::Value::Null) => rationale_change = FieldChange::Clear,
+                Some(serde_json::Value::String(raw)) => {
+                    match records::validate_multiline("Rationale", raw) {
+                        Ok(v) => rationale_change = render::change(v),
+                        Err(m) => return Ok(json_error(422, &m)),
+                    }
+                }
+                Some(_) => return Err(HttpError::new(400)),
+            }
+            let mut applicability_change = FieldChange::Keep;
+            match object.get("applicability") {
+                None => {}
+                Some(serde_json::Value::Null) => applicability_change = FieldChange::Clear,
+                Some(serde_json::Value::String(raw)) => {
+                    match records::validate_multiline("Applicability", raw) {
+                        Ok(v) => applicability_change = render::change(v),
+                        Err(m) => return Ok(json_error(422, &m)),
+                    }
+                }
+                Some(_) => return Err(HttpError::new(400)),
+            }
+            // requirements: optional array of strings or null; replaces whole list
+            let requirements = match object.get("requirements") {
+                None => record.requirements.clone(),
+                Some(serde_json::Value::Null) => Vec::new(),
+                Some(serde_json::Value::Array(items)) => {
+                    let mut raw: Vec<String> = Vec::new();
+                    for item in items {
+                        match item.as_str() {
+                            Some(text) => raw.push(text.to_string()),
+                            None => return Err(HttpError::new(400)),
+                        }
+                    }
+                    match records::validate_requirement_refs(&raw) {
+                        Ok(v) => v,
+                        Err(m) => return Ok(json_error(422, &m)),
+                    }
+                }
+                Some(_) => return Err(HttpError::new(400)),
+            };
+            // apply. Need convert FieldChange to values for apply_business_rule_edit which takes FieldChange for desc/rationale/applicability and Vec requirements.
+            // But apply_business_rule_edit expects description FieldChange; we have. requirements vec empty clears. Good.
+            // However if omitted, FieldChange::Keep leaves section unchanged; requirements set to record.requirements (unchanged) but apply writes bullets same. Fine.
+            // But requirements omitted should leave unchanged; passing record.requirements rewrites same. OK.
+            let content = if description_change == FieldChange::Keep
+                && rationale_change == FieldChange::Keep
+                && applicability_change == FieldChange::Keep
+                && requirements == record.requirements
+                && title == record.title
+            {
+                // no changes; still write? spec success returns reread; writing same content okay.
+                records::apply_business_rule_edit(
+                    &record.doc,
+                    &record.id,
+                    &title,
+                    description_change,
+                    rationale_change,
+                    applicability_change,
+                    requirements,
+                )
+            } else {
+                records::apply_business_rule_edit(
+                    &record.doc,
+                    &record.id,
+                    &title,
+                    description_change,
+                    rationale_change,
+                    applicability_change,
+                    requirements,
+                )
+            };
+            records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
+            let (updated, _updated_cfg) = resolve_record(id, state)?;
+            Ok(Response::json(200, record_json(&updated, None, None)))
+        }
     }
 }
 
@@ -2611,6 +2877,9 @@ mod tests {
             group_id: None,
             group_title: None,
             description: None,
+            rationale: None,
+            applicability: None,
+            requirements: Vec::new(),
             definition: None,
             view: None,
             status: Some("pending".to_string()),
