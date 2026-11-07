@@ -5123,3 +5123,621 @@ fn t26m_quality_gates() {
         );
     }
 }
+
+// ---- T-57 technical specifications browser scenarios ----
+
+fn create_tech_spec(dir: &Path, title: &str, description: &str) -> String {
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "tech-spec",
+        "create",
+        title,
+        "--description",
+        description,
+    ])
+}
+
+fn tech_spec_path(dir: &Path, id: &str) -> PathBuf {
+    dir.join("docs/technical").join(format!("{}.md", id))
+}
+
+fn tech_spec_dir(dir: &Path) -> PathBuf {
+    dir.join("docs/technical")
+}
+
+fn tech_spec_fixture(name: &str) -> PathBuf {
+    let dir = test_root(name);
+    init_project(&dir);
+    create_tech_spec(&dir, "Offline architecture", "Defines the local browser.");
+    create_tech_spec(&dir, "Storage model", "Second description.");
+    dir
+}
+
+// T-57a
+#[test]
+fn t57a_list_category_and_sidebar() {
+    let dir = tech_spec_fixture("t57a");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=tech-spec").text();
+    assert!(html.contains("<h2 class=\"h2\">Technical Specifications</h2>"));
+    assert!(html.contains("2 technical specifications"));
+    assert!(html.contains("href=\"/?type=tech-spec\" aria-current=\"page\""));
+    let audit_at = html.find("href=\"/?type=audit-record\"").unwrap();
+    let tech_at = html.find("href=\"/?type=tech-spec\"").unwrap();
+    let nfr_at = html.find("href=\"/?type=nfr\"").unwrap();
+    assert!(audit_at < tech_at);
+    assert!(tech_at < nfr_at);
+    assert!(html.contains("TECH-001"));
+    assert!(html.contains("Offline architecture"));
+    assert!(html.contains("TECH-002"));
+    assert!(html.contains("Storage model"));
+    assert!(html.find("TECH-001").unwrap() < html.find("TECH-002").unwrap());
+    assert!(html.contains("href=\"/doc/TECH-001\""));
+    assert!(html.contains("Defines the local browser."));
+    assert_eq!(get(&server, "/").status, 200);
+    assert_eq!(get(&server, "/?type=req").status, 200);
+    for ty in ["all", "x", "tech-specs", "tech_spec"] {
+        assert_eq!(
+            get(&server, &format!("/?type={}", ty)).status,
+            400,
+            "type={}",
+            ty
+        );
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn t57a_disabled_tech_spec_empty_state() {
+    let dir = tech_spec_fixture("t57a-disabled");
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "config",
+        "set",
+        "document_types.tech-spec.enabled",
+        "false",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=tech-spec").text();
+    assert_eq!(get(&server, "/?type=tech-spec").status, 200);
+    assert!(!html.contains("href=\"/?type=tech-spec\""));
+    assert!(html.contains("No technical specifications"));
+    let api: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/tech-specs").text()).unwrap();
+    assert!(api.as_array().unwrap().is_empty());
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-57b
+#[test]
+fn t57b_list_excludes_non_records_and_deprecated() {
+    let dir = tech_spec_fixture("t57b");
+    let rdir = tech_spec_dir(&dir);
+    fs::write(rdir.join("REQ-001.md"), "# REQ-001 Not a technical spec\n").unwrap();
+    fs::write(rdir.join("README.md"), "# registry").unwrap();
+    fs::write(rdir.join("notes.txt"), "x").unwrap();
+    fs::write(rdir.join("TECH-ABC.md"), "# bad").unwrap();
+    let deprecated = rdir.join("deprecated");
+    fs::create_dir_all(&deprecated).unwrap();
+    fs::write(
+        deprecated.join("TECH-999.md"),
+        "# TECH-999 Hidden\n\n## Description\nHidden.\n",
+    )
+    .unwrap();
+    let long_title = "X".repeat(180);
+    let long = create_tech_spec(&dir, &long_title, "Long token description.");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=tech-spec").text();
+    assert!(html.contains("TECH-001"));
+    assert!(html.contains("TECH-002"));
+    assert!(html.contains(&long));
+    assert!(html.contains(&long_title));
+    assert!(!html.contains("TECH-999"));
+    assert!(!html.contains("REQ-001"));
+    assert!(html.contains("3 technical specifications"));
+    let api: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/tech-specs").text()).unwrap();
+    assert_eq!(api.as_array().unwrap().len(), 3);
+    drop(server);
+    // empty state
+    let empty_dir = test_root("t57b-empty");
+    init_project(&empty_dir);
+    let server = Server::start(&empty_dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=tech-spec").text();
+    assert!(html.contains("0 technical specifications"));
+    assert!(!html.contains("No records"));
+    assert!(html.contains("No technical specifications were found in the configured directory."));
+    assert!(html.contains("Deprecated technical specifications are hidden."));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+    let _ = fs::remove_dir_all(&empty_dir);
+}
+
+// T-57c
+#[test]
+fn t57c_view_technical_specification() {
+    let dir = tech_spec_fixture("t57c");
+    // On-disk record with an empty description section for the (none) state.
+    fs::write(
+        tech_spec_path(&dir, "TECH-003"),
+        "# TECH-003 Empty description\n",
+    )
+    .unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/doc/TECH-001").text();
+    assert!(html.contains("Record ID"));
+    assert!(html.contains("TECH-001"));
+    assert!(html.contains("Technical specification"));
+    assert!(html.contains("Technical Specifications"));
+    assert!(html.contains("<h1 class=\"h1\">Offline architecture</h1>"));
+    assert!(html.contains("Defines the local browser."));
+    assert!(html.contains("<p class=\"text\">Defines the local browser.</p>"));
+    assert!(!html.contains("style=\"white-space: pre-wrap\""));
+    assert!(!html.contains("Description</h"));
+    assert!(html.contains("href=\"/?type=tech-spec\">Technical Specifications</a></li><li><span aria-current=\"page\">TECH-001</span>"));
+    assert_eq!(html.matches("href=\"/doc/TECH-001/edit\"").count(), 1);
+    assert!(html.contains(">Edit</a>"));
+    let empty = get(&server, "/doc/TECH-003").text();
+    assert!(empty.contains("(none)"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-57d
+#[test]
+fn t57d_edit_round_trip() {
+    let dir = tech_spec_fixture("t57d");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let edit = get(&server, "/doc/TECH-001/edit").text();
+    assert!(edit.contains("Hidden field: version (optimistic-concurrency token)"));
+    assert!(edit.contains(
+        "Required \u{b7} whitespace is trimmed \u{b7} line breaks and control characters are not allowed."
+    ));
+    assert!(
+        edit.contains("Required \u{b7} multi-line \u{b7} line breaks are preserved when saved.")
+    );
+    assert!(edit.contains("Save changes"));
+    assert!(edit.contains("Cancel"));
+    let version = extract_version(&edit);
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Renamed specification"),
+        ("description", "Line one\nLine two"),
+    ]);
+    let response = post_form(&server, "/doc/TECH-001", &body);
+    assert_eq!(response.status, 303);
+    assert_eq!(response.header("Location"), Some("/doc/TECH-001"));
+    let view = get(&server, "/doc/TECH-001").text();
+    assert!(view.contains("<h1 class=\"h1\">Renamed specification</h1>"));
+    assert!(view.contains("Line one\nLine two"));
+    let list = get(&server, "/?type=tech-spec").text();
+    assert!(list.contains("Renamed specification"));
+    let cli = run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "tech-spec",
+        "view",
+        "TECH-001",
+    ]);
+    assert!(cli.contains("Renamed specification"));
+    assert!(cli.contains("Line one"));
+    assert!(cli.contains("Line two"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-57e
+#[test]
+fn t57e_field_preserving_write() {
+    let dir = tech_spec_fixture("t57e");
+    let path = tech_spec_path(&dir, "TECH-001");
+    let original = "# TECH-001 Original\n\nPreamble kept.\n\n## Description\nOld body\n\n## Editor Notes\nKeep this line\n\n## Unknown\nAnd this\n";
+    fs::write(&path, original).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/TECH-001/edit").text());
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Edited title"),
+        ("description", "New body\nsecond line"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/TECH-001", &body).status, 303);
+    let after = fs::read_to_string(&path).unwrap();
+    let expected = "# TECH-001 Edited title\n\nPreamble kept.\n\n## Description\nNew body\nsecond line\n\n## Editor Notes\nKeep this line\n\n## Unknown\nAnd this\n";
+    assert_eq!(after, expected);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-57f
+#[test]
+fn t57f_validation_422_no_write() {
+    let dir = tech_spec_fixture("t57f");
+    let path = tech_spec_path(&dir, "TECH-001");
+    let before = fs::read(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/TECH-001/edit").text());
+    let cases: Vec<(String, &str, &str)> = vec![
+        (
+            form_body(&[("version", &version), ("title", ""), ("description", "ok")]),
+            "Title is required.",
+            "title",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", &"x".repeat(201)),
+                ("description", "ok"),
+            ]),
+            "Title must be at most 200 characters.",
+            "title",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "a\tb"),
+                ("description", "ok"),
+            ]),
+            "Title cannot contain control characters.",
+            "title",
+        ),
+        (
+            form_body(&[("version", &version), ("title", "Ok"), ("description", "")]),
+            "Description is required.",
+            "description",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("description", &"x".repeat(20001)),
+            ]),
+            "Description must be at most 20000 characters.",
+            "description",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("description", "a\u{0007}b"),
+            ]),
+            "Description cannot contain control characters.",
+            "description",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("description", "a\n## Section\nb"),
+            ]),
+            "Description contains a line starting with ## .",
+            "description",
+        ),
+    ];
+    for (body, message, field) in cases {
+        let response = post_form(&server, "/doc/TECH-001", &body);
+        assert_eq!(response.status, 422, "body={}", body);
+        let html = response.text();
+        assert_eq!(summary_entry(&html, field), message);
+        assert_eq!(field_error(&html, field), message);
+        assert_eq!(fs::read(&path).unwrap(), before, "file changed {}", body);
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-57g
+#[test]
+fn t57g_stale_and_malformed_versions() {
+    let dir = tech_spec_fixture("t57g");
+    let path = tech_spec_path(&dir, "TECH-001");
+    let before = fs::read(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let valid = form_body(&[
+        ("version", "1.2.3"),
+        ("title", "Stale"),
+        ("description", "ok"),
+    ]);
+    let conflict = post_form(&server, "/doc/TECH-001", &valid);
+    assert_eq!(conflict.status, 409);
+    let html = conflict.text();
+    assert!(html.contains("record changed on disk; reload the form"));
+    assert!(html.contains("This record changed on disk"));
+    assert!(html.contains("Nothing was saved."));
+    assert!(html.contains("Reload the form"));
+    assert!(html.contains("View current record"));
+    assert!(html.contains("Stale"));
+    assert_eq!(fs::read(&path).unwrap(), before);
+    let missing = form_body(&[("title", "Ok"), ("description", "ok")]);
+    assert_eq!(post_form(&server, "/doc/TECH-001", &missing).status, 400);
+    let malformed = form_body(&[("version", "bad"), ("title", "Ok"), ("description", "ok")]);
+    assert_eq!(post_form(&server, "/doc/TECH-001", &malformed).status, 400);
+    assert_eq!(fs::read(&path).unwrap(), before);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-57h
+#[test]
+fn t57h_deprecated_hidden_and_404() {
+    const HELP: &str = "Deprecated technical specifications are not listed and cannot be opened. The same page is used for an unknown address.";
+    let dir = tech_spec_fixture("t57h");
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "tech-spec",
+        "deprecate",
+        "TECH-002",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let list = get(&server, "/?type=tech-spec").text();
+    assert!(list.contains("TECH-001"));
+    assert!(!list.contains("TECH-002"));
+    assert!(list.contains("1 technical specification"));
+
+    // The same technical-specifications 404 page is rendered for a deprecated
+    // and an unknown ID, and for view, edit, and POST.
+    let deprecated = get(&server, "/doc/TECH-002");
+    assert_eq!(deprecated.status, 404);
+    let not_found = deprecated.text();
+    assert!(not_found.contains("Record not found"));
+    assert!(not_found.contains(HELP));
+    assert!(not_found.contains("href=\"/?type=tech-spec\""));
+    assert_eq!(
+        not_found
+            .matches(">Back to technical specifications</a>")
+            .count(),
+        1
+    );
+    let unknown = get(&server, "/doc/TECH-404");
+    assert_eq!(unknown.status, 404);
+    assert_eq!(not_found, unknown.text());
+    let deprecated_edit = get(&server, "/doc/TECH-002/edit");
+    assert_eq!(deprecated_edit.status, 404);
+    assert_eq!(not_found, deprecated_edit.text());
+    let unknown_edit = get(&server, "/doc/TECH-404/edit");
+    assert_eq!(unknown_edit.status, 404);
+    assert_eq!(not_found, unknown_edit.text());
+    let body = form_body(&[("version", "1.2.3"), ("title", "Ok"), ("description", "ok")]);
+    let deprecated_post = post_form(&server, "/doc/TECH-002", &body);
+    assert_eq!(deprecated_post.status, 404);
+    assert_eq!(not_found, deprecated_post.text());
+    let unknown_post = post_form(&server, "/doc/TECH-404", &body);
+    assert_eq!(unknown_post.status, 404);
+    assert_eq!(not_found, unknown_post.text());
+
+    // A non-technical-specification ID keeps the baseline 404 page.
+    let baseline = get(&server, "/doc/REQ-404").text();
+    assert!(baseline.contains("Back to requirements"));
+    assert!(!baseline.contains(HELP));
+
+    // JSON 404 responses keep the baseline JSON error object.
+    let deprecated_json = get(&server, "/api/doc/TECH-002");
+    assert_eq!(deprecated_json.status, 404);
+    assert!(
+        deprecated_json
+            .header("Content-Type")
+            .unwrap()
+            .starts_with("application/json")
+    );
+    let json: serde_json::Value = serde_json::from_str(&deprecated_json.text()).unwrap();
+    assert_eq!(json["error"]["code"], 404);
+    assert!(json["error"]["message"].is_string());
+    let json_body = "{\"version\":\"1.2.3\",\"title\":\"Ok\"}";
+    let deprecated_json_post = post_json(&server, "/api/doc/TECH-002", json_body);
+    assert_eq!(deprecated_json_post.status, 404);
+    let json: serde_json::Value = serde_json::from_str(&deprecated_json_post.text()).unwrap();
+    assert_eq!(json["error"]["code"], 404);
+
+    let api: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/tech-specs").text()).unwrap();
+    assert_eq!(api.as_array().unwrap().len(), 1);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-57i
+#[test]
+fn t57i_json_api() {
+    let dir = tech_spec_fixture("t57i");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    for alias in ["/api/tech-specs", "/api/tech-spec"] {
+        let list: serde_json::Value = serde_json::from_str(&get(&server, alias).text()).unwrap();
+        let arr = list.as_array().unwrap();
+        assert_eq!(arr.len(), 2, "alias {}", alias);
+        assert_eq!(arr[0]["id"], "TECH-001");
+        assert_eq!(arr[0]["title"], "Offline architecture");
+        assert_eq!(arr[1]["id"], "TECH-002");
+    }
+    let doc: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/doc/TECH-001").text()).unwrap();
+    assert_eq!(doc["id"], "TECH-001");
+    assert_eq!(doc["kind"], "tech-spec");
+    assert_eq!(doc["form"], "tech-spec");
+    assert_eq!(doc["title"], "Offline architecture");
+    assert_eq!(doc["description"], "Defines the local browser.");
+    assert!(doc["version"].is_string());
+    let path = doc["path"].as_str().unwrap();
+    assert!(path.ends_with("TECH-001.md"));
+    assert!(!path.starts_with('/'));
+    let version = doc["version"].as_str().unwrap().to_string();
+    let body = format!(
+        r#"{{"version":"{}","title":"Renamed","description":"New body"}}"#,
+        version
+    );
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/TECH-001", &body).text()).unwrap();
+    assert_eq!(updated["title"], "Renamed");
+    assert_eq!(updated["description"], "New body");
+    // Omitted members stay unchanged.
+    let version = updated["version"].as_str().unwrap().to_string();
+    let body = format!(r#"{{"version":"{}","title":"Second"}}"#, version);
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/TECH-001", &body).text()).unwrap();
+    assert_eq!(updated["title"], "Second");
+    assert_eq!(updated["description"], "New body");
+    let version = updated["version"].as_str().unwrap().to_string();
+    let body = format!(r#"{{"version":"{}","description":"Third"}}"#, version);
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/TECH-001", &body).text()).unwrap();
+    assert_eq!(updated["title"], "Second");
+    assert_eq!(updated["description"], "Third");
+    let version = updated["version"].as_str().unwrap().to_string();
+    // Description null or empty is invalid.
+    let body = format!(r#"{{"version":"{}","description":null}}"#, version);
+    assert_eq!(post_json(&server, "/api/doc/TECH-001", &body).status, 422);
+    let body = format!(r#"{{"version":"{}","description":""}}"#, version);
+    assert_eq!(post_json(&server, "/api/doc/TECH-001", &body).status, 422);
+    // Invalid values.
+    let body = format!(r#"{{"version":"{}","title":""}}"#, version);
+    assert_eq!(post_json(&server, "/api/doc/TECH-001", &body).status, 422);
+    let body = format!(
+        r#"{{"version":"{}","description":"a\n## Section\nb"}}"#,
+        version
+    );
+    assert_eq!(post_json(&server, "/api/doc/TECH-001", &body).status, 422);
+    // Wrong types.
+    let body = format!(r#"{{"version":"{}","title":5}}"#, version);
+    assert_eq!(post_json(&server, "/api/doc/TECH-001", &body).status, 400);
+    let body = format!(r#"{{"version":"{}","description":5}}"#, version);
+    assert_eq!(post_json(&server, "/api/doc/TECH-001", &body).status, 400);
+    // Missing/malformed/stale version.
+    assert_eq!(
+        post_json(&server, "/api/doc/TECH-001", "{\"title\":\"Ok\"}").status,
+        400
+    );
+    assert_eq!(
+        post_json(&server, "/api/doc/TECH-001", "{\"version\":\"bad\"}").status,
+        400
+    );
+    let body = "{\"version\":\"1.2.3\",\"title\":\"Ok\"}";
+    assert_eq!(post_json(&server, "/api/doc/TECH-001", body).status, 409);
+    assert_eq!(
+        post_json(&server, "/api/doc/TECH-001", "{not json").status,
+        400
+    );
+    assert_eq!(post_json(&server, "/api/doc/TECH-001", "[]").status, 400);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-57j
+#[test]
+fn t57j_atomic_and_symlink() {
+    use std::os::unix::fs::symlink;
+    let dir = tech_spec_fixture("t57j");
+    let rdir = tech_spec_dir(&dir);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/TECH-001/edit").text());
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Atomic title"),
+        ("description", "d"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/TECH-001", &body).status, 303);
+    for entry in fs::read_dir(&rdir).unwrap().flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        assert!(!name.contains(".tmp"), "temp left {}", name);
+    }
+    let version = extract_version(&get(&server, "/doc/TECH-001/edit").text());
+    let bad = form_body(&[("version", &version), ("title", ""), ("description", "ok")]);
+    assert_eq!(post_form(&server, "/doc/TECH-001", &bad).status, 422);
+    for entry in fs::read_dir(&rdir).unwrap().flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        assert!(!name.contains(".tmp"), "temp left {}", name);
+    }
+    drop(server);
+    let outside = test_root("t57j-outside");
+    let secret = outside.join("secret.md");
+    fs::write(&secret, "# TECH-001 Secret\n").unwrap();
+    let target = tech_spec_path(&dir, "TECH-001");
+    fs::remove_file(&target).unwrap();
+    symlink(&secret, &target).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    assert_eq!(get(&server, "/doc/TECH-001").status, 404);
+    assert_eq!(get(&server, "/api/doc/TECH-001").status, 404);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+    let _ = fs::remove_dir_all(&outside);
+}
+
+// T-57k
+#[test]
+fn t57k_offline_asset_scan() {
+    let dir = tech_spec_fixture("t57k");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let css = get(&server, "/assets/app.css");
+    let js = get(&server, "/assets/app.js");
+    assert_eq!(css.status, 200);
+    assert_eq!(js.status, 200);
+    for path in ["/?type=tech-spec", "/doc/TECH-001", "/doc/TECH-001/edit"] {
+        let html = get(&server, path).text();
+        assert!(!html.contains("http://"), "external {}", path);
+        assert!(!html.contains("https://"), "external {}", path);
+        assert!(!html.contains("//cdn"), "external {}", path);
+        assert!(!html.contains("@import"), "external {}", path);
+    }
+    for asset in [css.text(), js.text()] {
+        assert!(!asset.contains("@import"));
+        assert!(!asset.contains("http://"));
+        assert!(!asset.contains("https://"));
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-57l
+#[test]
+fn t57l_no_js_and_narrow_layout() {
+    let dir = tech_spec_fixture("t57l");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let edit = get(&server, "/doc/TECH-001/edit").text();
+    assert!(edit.contains("<label for=\"title\">"));
+    assert!(edit.contains("<label for=\"description\">"));
+    assert!(edit.contains("name=\"description\""));
+    assert!(edit.contains("required"));
+    assert!(edit.contains("Save changes"));
+    assert!(edit.contains("<a class=\"link\" href=\"/doc/TECH-001\">Cancel</a>"));
+    // No inline handlers or scripts carry behaviour: the form is a plain POST.
+    assert!(edit.contains("method=\"post\" action=\"/doc/TECH-001\""));
+    assert!(!edit.contains("onsubmit="));
+    let list = get(&server, "/?type=tech-spec").text();
+    assert!(list.contains("Technical Specifications"));
+    let css = get(&server, "/assets/app.css").text();
+    assert!(css.contains("@media (max-width: 480px)"));
+    // MOCK-0009 keeps the version annotation visible at 320 px for tech specs.
+    assert!(css.contains(".hidden-field.version-note { display: inline-block; }"));
+    assert!(edit.contains("class=\"hidden-field version-note\""));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-57m
+#[test]
+fn t57m_quality_gates() {
+    let manifest = include_str!("../Cargo.toml");
+    let dependency_index = manifest.find("[dependencies]").unwrap();
+    let dependencies = &manifest[dependency_index..];
+    for forbidden in [
+        "axum",
+        "actix",
+        "rocket",
+        "tokio",
+        "async-std",
+        "tera",
+        "handlebars",
+        "askama",
+        "rusqlite",
+        "reqwest",
+        "hyper",
+    ] {
+        assert!(
+            !dependencies.contains(forbidden),
+            "new dependency {}",
+            forbidden
+        );
+    }
+}

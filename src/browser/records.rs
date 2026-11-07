@@ -36,6 +36,7 @@ pub enum Category {
     UiMockup,
     BusinessRule,
     AuditRecord,
+    TechSpec,
 }
 
 impl Category {
@@ -52,6 +53,7 @@ impl Category {
             Category::UiMockup => "ui-mockup",
             Category::BusinessRule => "business-rule",
             Category::AuditRecord => "audit-record",
+            Category::TechSpec => "tech-spec",
         }
     }
 
@@ -87,6 +89,7 @@ pub enum Form {
     UiMockup,
     BusinessRule,
     AuditRecord,
+    TechSpec,
 }
 
 impl Form {
@@ -103,6 +106,7 @@ impl Form {
             Form::UiMockup => "UI mockup",
             Form::BusinessRule => "Business rule",
             Form::AuditRecord => "Audit record",
+            Form::TechSpec => "Technical specification",
         }
     }
 }
@@ -186,6 +190,7 @@ impl Record {
             Category::UiMockup => "UI Mockups",
             Category::BusinessRule => "Business Rules",
             Category::AuditRecord => "Audit Records",
+            Category::TechSpec => "Technical Specifications",
         };
         match self.form {
             Form::Group => format!("{} group", base),
@@ -198,7 +203,8 @@ impl Record {
             | Form::UiSpec
             | Form::UiMockup
             | Form::BusinessRule
-            | Form::AuditRecord => base.to_string(),
+            | Form::AuditRecord
+            | Form::TechSpec => base.to_string(),
         }
     }
 }
@@ -333,6 +339,17 @@ pub fn valid_id(id: &str) -> bool {
         .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
 }
 
+/// Whether `id` matches the configured technical-specification ID pattern
+/// (`<prefix>-<digits>`), regardless of whether the document type is enabled.
+pub fn matches_tech_spec_id(cfg: &Config, id: &str) -> bool {
+    let Some(entry) = cfg.document_types.get(Category::TechSpec.config_key()) else {
+        return false;
+    };
+    id.strip_prefix(&format!("{}-", entry.prefix))
+        .map(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit()))
+        .unwrap_or(false)
+}
+
 fn form_for_stem(prefix: &str, stem: &str) -> Option<Form> {
     let rest = stem.strip_prefix(prefix)?.strip_prefix('-')?;
     if rest.is_empty() {
@@ -404,6 +421,11 @@ fn active_entry(cfg: &Config, kind: Category) -> Option<crate::config::DocTypeEn
             .get("audit")
             .cloned()
             .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
+        Category::TechSpec => cfg
+            .document_types
+            .get("tech-spec")
+            .cloned()
+            .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
     }
 }
 
@@ -416,7 +438,8 @@ fn active_dir(ctx: &Context, cfg: &Config, kind: Category) -> Option<PathBuf> {
         | Category::UiSpec
         | Category::UiMockup
         | Category::BusinessRule
-        | Category::AuditRecord => ctx.project_dir.join(&cfg.doc_directory),
+        | Category::AuditRecord
+        | Category::TechSpec => ctx.project_dir.join(&cfg.doc_directory),
         Category::Task | Category::Milestone | Category::Release => {
             ctx.project_dir.join(&cfg.backlog_directory)
         }
@@ -1209,6 +1232,88 @@ fn load_audit_record(ctx: &Context, path: &Path) -> Result<Option<Record>, AppEr
     }))
 }
 
+fn load_tech_spec_record(ctx: &Context, path: &Path) -> Result<Option<Record>, AppError> {
+    let safe = match Context::ensure_within(&ctx.project_dir, path) {
+        Ok(safe) => safe,
+        Err(_) => return Ok(None),
+    };
+    let content = match fs::read_to_string(&safe) {
+        Ok(content) => content,
+        Err(_) => return Ok(None),
+    };
+    let meta = match fs::metadata(&safe) {
+        Ok(meta) => meta,
+        Err(_) => return Ok(None),
+    };
+    let Some(stem) = safe.file_stem().and_then(|s| s.to_str()) else {
+        return Ok(None);
+    };
+    if !valid_id(stem) {
+        return Ok(None);
+    }
+    let cfg = match crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir) {
+        Ok(c) => c,
+        Err(_) => return Ok(None),
+    };
+    let entry = match active_entry(&cfg, Category::TechSpec) {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+    let rest = match stem.strip_prefix(&format!("{}-", entry.prefix)) {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+    if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+        return Ok(None);
+    }
+    let doc = parse_doc(&content);
+    let title = if doc.title.is_empty() {
+        stem.to_string()
+    } else {
+        doc.title.clone()
+    };
+    let description = section_value(&doc, "## Description");
+    Ok(Some(Record {
+        id: stem.to_string(),
+        kind: Category::TechSpec,
+        form: Form::TechSpec,
+        title,
+        story: None,
+        group_id: None,
+        group_title: None,
+        description,
+        rationale: None,
+        applicability: None,
+        requirements: Vec::new(),
+        definition: None,
+        view: None,
+        status: None,
+        milestone_id: None,
+        milestone_title: None,
+        assignee: None,
+        labels: Vec::new(),
+        dependencies: Vec::new(),
+        acceptance_criteria: Vec::new(),
+        comments: Vec::new(),
+        release_id: None,
+        release_title: None,
+        decision: None,
+        context: None,
+        consequences: None,
+        decision_type: None,
+        superseded_by: None,
+        superseded_title: None,
+        specs: Vec::new(),
+        refs: Vec::new(),
+        mockup_task: String::new(),
+        audit_type: None,
+        doc,
+        path: safe.clone(),
+        rel_path: relative_path(&ctx.project_dir, &safe),
+        version: version_token(&meta),
+    }))
+}
+
 fn load_record_from_path(
     ctx: &Context,
     kind: Category,
@@ -1231,6 +1336,9 @@ fn load_record_from_path(
     }
     if kind == Category::AuditRecord {
         return load_audit_record(ctx, path);
+    }
+    if kind == Category::TechSpec {
+        return load_tech_spec_record(ctx, path);
     }
     if matches!(
         kind,
@@ -1367,6 +1475,7 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
             | Category::UiMockup
             | Category::BusinessRule
             | Category::AuditRecord
+            | Category::TechSpec
     ) {
         let Some(entry) = active_entry(cfg, kind) else {
             return index;
@@ -1494,6 +1603,7 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
         Category::UiMockup,
         Category::BusinessRule,
         Category::AuditRecord,
+        Category::TechSpec,
     ] {
         let Some(entry) = active_entry(cfg, kind) else {
             continue;
@@ -1523,6 +1633,7 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
                 || kind == Category::UiMockup
                 || kind == Category::BusinessRule
                 || kind == Category::AuditRecord
+                || kind == Category::TechSpec
             {
                 id.strip_prefix(&format!("{}-", entry.prefix))
                     .map(|r| !r.is_empty() && r.bytes().all(|b| b.is_ascii_digit()))
@@ -1742,6 +1853,61 @@ const RULE_KNOWN: &[&str] = &[
 ];
 
 const AUDIT_KNOWN: &[&str] = &["## Audit Type", "## Content"];
+
+/// Serialize a technical-specification document with title and description
+/// changes. Only the heading and the `## Description` section are rewritten;
+/// the preamble and every other section are preserved content-identically.
+pub fn apply_tech_spec_edit(doc: &Doc, id: &str, title: &str, description: FieldChange) -> String {
+    let mut sections = doc.sections.clone();
+    match description {
+        FieldChange::Keep => {}
+        FieldChange::Clear => {
+            if let Some(index) = sections.iter().position(|s| s.heading == "## Description") {
+                sections.remove(index);
+            }
+        }
+        FieldChange::Set(value) => {
+            if let Some(index) = sections.iter().position(|s| s.heading == "## Description") {
+                let trailing = trailing_empty_lines(&sections[index].body);
+                let mut body: Vec<String> =
+                    value.split('\n').map(|line| line.to_string()).collect();
+                for _ in 0..trailing {
+                    body.push(String::new());
+                }
+                sections[index].body = body;
+            } else {
+                // Insert immediately after the preamble, before the first
+                // section; when no section exists this is after the heading.
+                let mut body: Vec<String> =
+                    value.split('\n').map(|line| line.to_string()).collect();
+                if !sections.is_empty() {
+                    body.push(String::new());
+                }
+                sections.insert(
+                    0,
+                    Section {
+                        heading: "## Description".to_string(),
+                        body,
+                    },
+                );
+            }
+        }
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    lines.push(format!("# {} {}", id, title));
+    lines.extend(doc.preamble.iter().cloned());
+    for section in sections {
+        lines.push(section.heading);
+        lines.extend(section.body);
+    }
+    while lines.last().is_some_and(|line| line.is_empty()) {
+        lines.pop();
+    }
+    let mut output = lines.join("\n");
+    output.push('\n');
+    output
+}
 
 /// Serialize a document with a new title and optional story/description
 /// changes, preserving every unknown `## ` section content-identically.
@@ -2964,5 +3130,145 @@ mod tests {
         for value in ["security", "licence", "architecture"] {
             assert!(["security", "licence", "architecture"].contains(&value));
         }
+    }
+
+    #[test]
+    fn tech_spec_category_and_form_labels() {
+        assert_eq!(Category::TechSpec.key(), "tech-spec");
+        assert_eq!(Category::TechSpec.config_key(), "tech-spec");
+        assert_eq!(Form::TechSpec.label(), "Technical specification");
+        assert_eq!(
+            Record {
+                id: "TECH-001".to_string(),
+                kind: Category::TechSpec,
+                form: Form::TechSpec,
+                title: "Title".to_string(),
+                story: None,
+                group_id: None,
+                group_title: None,
+                description: None,
+                rationale: None,
+                applicability: None,
+                requirements: Vec::new(),
+                definition: None,
+                view: None,
+                status: None,
+                milestone_id: None,
+                milestone_title: None,
+                assignee: None,
+                labels: Vec::new(),
+                dependencies: Vec::new(),
+                acceptance_criteria: Vec::new(),
+                comments: Vec::new(),
+                release_id: None,
+                release_title: None,
+                decision: None,
+                context: None,
+                consequences: None,
+                decision_type: None,
+                superseded_by: None,
+                superseded_title: None,
+                specs: Vec::new(),
+                refs: Vec::new(),
+                mockup_task: String::new(),
+                audit_type: None,
+                doc: parse_doc("# TECH-001 Title\n"),
+                path: PathBuf::new(),
+                rel_path: String::new(),
+                version: String::new(),
+            }
+            .type_label(),
+            "Technical Specifications"
+        );
+    }
+
+    #[test]
+    fn tech_spec_parse_title_and_description() {
+        let input = "# TECH-001 Offline browser\n\n## Description\nDefines the local browser.\n\nSecond paragraph.\n\n## Notes\nKeep me\n";
+        let doc = parse_doc(input);
+        assert_eq!(doc.id, "TECH-001");
+        assert_eq!(doc.title, "Offline browser");
+        assert_eq!(
+            section_value(&doc, "## Description").as_deref(),
+            Some("Defines the local browser.\n\nSecond paragraph.")
+        );
+        let heading_only = parse_doc("# TECH-002\n\n## Description\n\n");
+        assert_eq!(heading_only.title, "");
+        assert_eq!(section_value(&heading_only, "## Description"), None);
+    }
+
+    #[test]
+    fn tech_spec_field_preserving_round_trip() {
+        let input = "# TECH-001 Old\n\npreamble line\n\n## Description\nOld body\n\n## Editor Notes\nDo not touch\n\n## Description Extra\nkeep\n";
+        let doc = parse_doc(input);
+        let output = apply_tech_spec_edit(
+            &doc,
+            "TECH-001",
+            "New",
+            FieldChange::Set("New body".to_string()),
+        );
+        assert!(output.starts_with("# TECH-001 New\n"));
+        assert!(output.contains("preamble line\n"));
+        assert!(output.contains("## Description\nNew body\n"));
+        assert!(output.contains("## Editor Notes\nDo not touch\n"));
+        assert!(output.contains("## Description Extra\nkeep\n"));
+        // Everything outside the heading and the Description body is unchanged.
+        let before_other: Vec<&str> = input
+            .lines()
+            .filter(|line| *line != "# TECH-001 Old" && *line != "Old body" && !line.is_empty())
+            .collect();
+        let after_other: Vec<&str> = output
+            .lines()
+            .filter(|line| *line != "# TECH-001 New" && *line != "New body" && !line.is_empty())
+            .collect();
+        assert_eq!(before_other, after_other);
+        assert!(output.ends_with('\n'));
+    }
+
+    #[test]
+    fn tech_spec_missing_description_inserted_after_heading() {
+        let doc = parse_doc("# TECH-001 Title\n\n## Notes\nnote\n");
+        let output = apply_tech_spec_edit(
+            &doc,
+            "TECH-001",
+            "Title",
+            FieldChange::Set("Body".to_string()),
+        );
+        assert!(output.contains("## Description\nBody\n"));
+        assert!(output.contains("## Notes\nnote\n"));
+        let description_at = output.find("## Description").unwrap();
+        let notes_at = output.find("## Notes").unwrap();
+        assert!(description_at < notes_at);
+    }
+
+    #[test]
+    fn tech_spec_field_validation_messages() {
+        assert_eq!(validate_title("").unwrap_err(), "Title is required.");
+        assert_eq!(
+            validate_title(&"x".repeat(201)).unwrap_err(),
+            "Title must be at most 200 characters."
+        );
+        assert_eq!(
+            validate_title("a\tb").unwrap_err(),
+            "Title cannot contain control characters."
+        );
+        assert_eq!(validate_multiline("Description", "   ").unwrap(), None);
+        assert_eq!(
+            validate_multiline("Description", &"x".repeat(20001)).unwrap_err(),
+            "Description must be at most 20000 characters."
+        );
+        assert_eq!(
+            validate_multiline("Description", "a\u{0007}b").unwrap_err(),
+            "Description cannot contain control characters."
+        );
+        assert_eq!(
+            validate_multiline("Description", "a\n## Section\nb").unwrap_err(),
+            "Description contains a line starting with ## ."
+        );
+        assert_eq!(
+            validate_multiline("Description", "  a\r\nb  ").unwrap(),
+            Some("a\nb".to_string())
+        );
+        assert!(validate_multiline("Description", "a\tb").is_ok());
     }
 }
