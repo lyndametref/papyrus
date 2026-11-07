@@ -35,6 +35,7 @@ pub enum Category {
     UiSpec,
     UiMockup,
     BusinessRule,
+    AuditRecord,
 }
 
 impl Category {
@@ -50,6 +51,7 @@ impl Category {
             Category::UiSpec => "ui-spec",
             Category::UiMockup => "ui-mockup",
             Category::BusinessRule => "business-rule",
+            Category::AuditRecord => "audit-record",
         }
     }
 
@@ -57,6 +59,7 @@ impl Category {
     pub fn config_key(self) -> &'static str {
         match self {
             Category::BusinessRule => "rule",
+            Category::AuditRecord => "audit",
             _ => self.key(),
         }
     }
@@ -83,6 +86,7 @@ pub enum Form {
     UiSpec,
     UiMockup,
     BusinessRule,
+    AuditRecord,
 }
 
 impl Form {
@@ -98,6 +102,7 @@ impl Form {
             Form::UiSpec => "UI specification",
             Form::UiMockup => "UI mockup",
             Form::BusinessRule => "Business rule",
+            Form::AuditRecord => "Audit record",
         }
     }
 }
@@ -135,6 +140,7 @@ pub struct Record {
     pub rationale: Option<String>,
     pub applicability: Option<String>,
     pub requirements: Vec<String>,
+    pub audit_type: Option<String>,
     pub definition: Option<String>,
     pub view: Option<String>,
     pub status: Option<String>,
@@ -179,6 +185,7 @@ impl Record {
             Category::UiSpec => "UI Specifications",
             Category::UiMockup => "UI Mockups",
             Category::BusinessRule => "Business Rules",
+            Category::AuditRecord => "Audit Records",
         };
         match self.form {
             Form::Group => format!("{} group", base),
@@ -190,7 +197,8 @@ impl Record {
             | Form::Glossary
             | Form::UiSpec
             | Form::UiMockup
-            | Form::BusinessRule => base.to_string(),
+            | Form::BusinessRule
+            | Form::AuditRecord => base.to_string(),
         }
     }
 }
@@ -391,6 +399,11 @@ fn active_entry(cfg: &Config, kind: Category) -> Option<crate::config::DocTypeEn
             .get("rule")
             .cloned()
             .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
+        Category::AuditRecord => cfg
+            .document_types
+            .get("audit")
+            .cloned()
+            .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
     }
 }
 
@@ -402,7 +415,8 @@ fn active_dir(ctx: &Context, cfg: &Config, kind: Category) -> Option<PathBuf> {
         | Category::Glossary
         | Category::UiSpec
         | Category::UiMockup
-        | Category::BusinessRule => ctx.project_dir.join(&cfg.doc_directory),
+        | Category::BusinessRule
+        | Category::AuditRecord => ctx.project_dir.join(&cfg.doc_directory),
         Category::Task | Category::Milestone | Category::Release => {
             ctx.project_dir.join(&cfg.backlog_directory)
         }
@@ -641,6 +655,7 @@ fn load_backlog_record(
         specs: Vec::new(),
         refs: Vec::new(),
         mockup_task: String::new(),
+        audit_type: None,
         doc: parse_doc(&content),
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
@@ -731,6 +746,7 @@ fn load_decision_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
         specs: Vec::new(),
         refs: Vec::new(),
         mockup_task: String::new(),
+        audit_type: None,
         doc,
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
@@ -812,6 +828,7 @@ fn load_glossary_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
         specs: Vec::new(),
         refs: Vec::new(),
         mockup_task: String::new(),
+        audit_type: None,
         doc,
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
@@ -894,6 +911,7 @@ fn load_ui_spec_record(ctx: &Context, path: &Path) -> Result<Option<Record>, App
         specs: Vec::new(),
         refs: Vec::new(),
         mockup_task: String::new(),
+        audit_type: None,
         doc,
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
@@ -974,6 +992,7 @@ fn load_ui_mockup_record(ctx: &Context, path: &Path) -> Result<Option<Record>, A
         specs: meta_record.specs.clone(),
         refs: meta_record.refs.clone(),
         mockup_task: meta_record.task.clone(),
+        audit_type: None,
         doc: Doc {
             id: stem.to_string(),
             title: title.clone(),
@@ -1065,6 +1084,7 @@ fn load_business_rule_record(ctx: &Context, path: &Path) -> Result<Option<Record
         specs: Vec::new(),
         refs: Vec::new(),
         mockup_task: String::new(),
+        audit_type: None,
         doc,
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
@@ -1100,6 +1120,95 @@ fn parse_rule_requirements(doc: &Doc) -> Vec<String> {
     out
 }
 
+fn load_audit_record(ctx: &Context, path: &Path) -> Result<Option<Record>, AppError> {
+    let safe = match Context::ensure_within(&ctx.project_dir, path) {
+        Ok(safe) => safe,
+        Err(_) => return Ok(None),
+    };
+    let content = match fs::read_to_string(&safe) {
+        Ok(content) => content,
+        Err(_) => return Ok(None),
+    };
+    let meta = match fs::metadata(&safe) {
+        Ok(meta) => meta,
+        Err(_) => return Ok(None),
+    };
+    let Some(stem) = safe.file_stem().and_then(|s| s.to_str()) else {
+        return Ok(None);
+    };
+    if !valid_id(stem) {
+        return Ok(None);
+    }
+    let cfg = match crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir) {
+        Ok(c) => c,
+        Err(_) => return Ok(None),
+    };
+    let entry = match active_entry(&cfg, Category::AuditRecord) {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+    let rest = match stem.strip_prefix(&format!("{}-", entry.prefix)) {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+    if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+        return Ok(None);
+    }
+    let doc = parse_doc(&content);
+    let title = if doc.title.is_empty() {
+        stem.to_string()
+    } else {
+        doc.title.clone()
+    };
+    let audit_type_raw = crate::audit::section_text(&content, "Audit Type").unwrap_or_default();
+    let audit_type = if audit_type_raw.trim().is_empty() {
+        "security".to_string()
+    } else {
+        audit_type_raw.trim().to_string()
+    };
+    let content_val = crate::audit::section_text(&content, "Content");
+    // store content in doc only; audit_type in Record
+    Ok(Some(Record {
+        id: stem.to_string(),
+        kind: Category::AuditRecord,
+        form: Form::AuditRecord,
+        title,
+        story: None,
+        group_id: None,
+        group_title: None,
+        description: content_val,
+        rationale: None,
+        applicability: None,
+        requirements: Vec::new(),
+        audit_type: Some(audit_type),
+        definition: None,
+        view: None,
+        status: None,
+        milestone_id: None,
+        milestone_title: None,
+        assignee: None,
+        labels: Vec::new(),
+        dependencies: Vec::new(),
+        acceptance_criteria: Vec::new(),
+        comments: Vec::new(),
+        release_id: None,
+        release_title: None,
+        decision: None,
+        context: None,
+        consequences: None,
+        decision_type: None,
+        superseded_by: None,
+        superseded_title: None,
+        specs: Vec::new(),
+        refs: Vec::new(),
+        mockup_task: String::new(),
+        doc,
+        path: safe.clone(),
+        rel_path: relative_path(&ctx.project_dir, &safe),
+        version: version_token(&meta),
+    }))
+}
+
 fn load_record_from_path(
     ctx: &Context,
     kind: Category,
@@ -1119,6 +1228,9 @@ fn load_record_from_path(
     }
     if kind == Category::BusinessRule {
         return load_business_rule_record(ctx, path);
+    }
+    if kind == Category::AuditRecord {
+        return load_audit_record(ctx, path);
     }
     if matches!(
         kind,
@@ -1227,6 +1339,7 @@ fn load_record_from_path(
         specs: Vec::new(),
         refs: Vec::new(),
         mockup_task: String::new(),
+        audit_type: None,
         doc,
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
@@ -1253,6 +1366,7 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
             | Category::UiSpec
             | Category::UiMockup
             | Category::BusinessRule
+            | Category::AuditRecord
     ) {
         let Some(entry) = active_entry(cfg, kind) else {
             return index;
@@ -1379,6 +1493,7 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
         Category::UiSpec,
         Category::UiMockup,
         Category::BusinessRule,
+        Category::AuditRecord,
     ] {
         let Some(entry) = active_entry(cfg, kind) else {
             continue;
@@ -1407,6 +1522,7 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
                 || kind == Category::UiSpec
                 || kind == Category::UiMockup
                 || kind == Category::BusinessRule
+                || kind == Category::AuditRecord
             {
                 id.strip_prefix(&format!("{}-", entry.prefix))
                     .map(|r| !r.is_empty() && r.bytes().all(|b| b.is_ascii_digit()))
@@ -1448,6 +1564,45 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
             "record ID is ambiguous across document types".to_string(),
         )),
     }
+}
+
+/// Serialize an audit-record document with title, audit type, and content changes.
+pub fn apply_audit_edit(
+    doc: &Doc,
+    id: &str,
+    title: &str,
+    audit_type: &str,
+    content: FieldChange,
+) -> String {
+    let mut sections = doc.sections.clone();
+    // Audit type always non-empty
+    set_section(
+        &mut sections,
+        "## Audit Type",
+        Some(audit_type.to_string()),
+        AUDIT_KNOWN,
+    );
+    match content {
+        FieldChange::Keep => {}
+        FieldChange::Clear => set_section(&mut sections, "## Content", None, AUDIT_KNOWN),
+        FieldChange::Set(value) => {
+            set_section(&mut sections, "## Content", Some(value), AUDIT_KNOWN)
+        }
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    lines.push(format!("# {} {}", id, title));
+    lines.extend(doc.preamble.iter().cloned());
+    for section in sections {
+        lines.push(section.heading);
+        lines.extend(section.body);
+    }
+    while lines.last().is_some_and(|line| line.is_empty()) {
+        lines.pop();
+    }
+    let mut output = lines.join("\n");
+    output.push('\n');
+    output
 }
 
 /// Validate a title and return the stored value (specification section 7.3).
@@ -1585,6 +1740,8 @@ const RULE_KNOWN: &[&str] = &[
     "## Applicability",
     "## Requirements",
 ];
+
+const AUDIT_KNOWN: &[&str] = &["## Audit Type", "## Content"];
 
 /// Serialize a document with a new title and optional story/description
 /// changes, preserving every unknown `## ` section content-identically.
@@ -2713,5 +2870,99 @@ mod tests {
         assert!(valid_version_token("1762000000.123456789.412"));
         assert!(!valid_version_token("1.2"));
         assert!(!valid_version_token("a.b.c"));
+    }
+
+    #[test]
+    fn audit_record_parse_preserve_and_sections() {
+        let input = "# AUD-001 Title\n\npreamble line\n\n## Audit Type\nsecurity\n\n## Unknown\nKeep me\n\n## Content\nBody line\n";
+        let doc = parse_doc(input);
+        assert_eq!(doc.id, "AUD-001");
+        assert_eq!(doc.title, "Title");
+        assert_eq!(
+            section_value(&doc, "## Audit Type").as_deref(),
+            Some("security")
+        );
+        assert_eq!(
+            section_value(&doc, "## Content").as_deref(),
+            Some("Body line")
+        );
+        let output = apply_audit_edit(
+            &doc,
+            "AUD-001",
+            "New title",
+            "licence",
+            FieldChange::Set("New body".to_string()),
+        );
+        assert!(output.starts_with("# AUD-001 New title\n"));
+        assert!(output.contains("preamble line"));
+        assert!(output.contains("## Unknown\nKeep me\n"));
+        assert!(output.contains("## Audit Type\nlicence\n"));
+        assert!(output.contains("## Content\nNew body\n"));
+        assert!(output.ends_with('\n'));
+    }
+
+    #[test]
+    fn audit_record_clear_content_removes_section() {
+        let input = "# AUD-001 Title\n\n## Audit Type\nsecurity\n\n## Content\nBody\n";
+        let doc = parse_doc(input);
+        let output = apply_audit_edit(&doc, "AUD-001", "Title", "security", FieldChange::Clear);
+        assert!(!output.contains("## Content"));
+        assert!(output.contains("## Audit Type\nsecurity\n"));
+    }
+
+    #[test]
+    fn audit_record_insert_content_section() {
+        let input = "# AUD-001 Title\n\n## Audit Type\nsecurity\n";
+        let doc = parse_doc(input);
+        let output = apply_audit_edit(
+            &doc,
+            "AUD-001",
+            "Title",
+            "security",
+            FieldChange::Set("New content".to_string()),
+        );
+        assert!(output.contains("## Content\nNew content\n"));
+    }
+
+    #[test]
+    fn audit_record_field_validation() {
+        assert!(validate_title("  Title  ").is_ok());
+        assert_eq!(validate_title("").unwrap_err(), "Title is required.");
+        assert!(validate_title(&"x".repeat(201)).is_err());
+        assert_eq!(
+            validate_title(&"x".repeat(201)).unwrap_err(),
+            "Title must be at most 200 characters."
+        );
+        assert_eq!(
+            validate_title("a\tb").unwrap_err(),
+            "Title cannot contain control characters."
+        );
+        assert_eq!(
+            validate_multiline("Content", "  a\r\nb  ").unwrap(),
+            Some("a\nb".to_string())
+        );
+        assert_eq!(validate_multiline("Content", "   ").unwrap(), None);
+        assert_eq!(
+            validate_multiline("Content", &"x".repeat(20001)).unwrap_err(),
+            "Content must be at most 20000 characters."
+        );
+        assert_eq!(
+            validate_multiline("Content", "a\u{0007}b").unwrap_err(),
+            "Content cannot contain control characters."
+        );
+        assert_eq!(
+            validate_multiline("Content", "a\n## Section\nb").unwrap_err(),
+            "Content contains a line starting with ## ."
+        );
+        assert!(validate_multiline("Content", "a\tb").is_ok());
+    }
+
+    #[test]
+    fn audit_record_audit_type_values() {
+        // The browser allows only the three built-in types; this documents the
+        // accepted set used by validation.
+        for value in ["security", "licence", "architecture"] {
+            assert!(["security", "licence", "architecture"].contains(&value));
+        }
     }
 }

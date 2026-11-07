@@ -4527,3 +4527,599 @@ fn t25m_no_new_dependencies() {
         );
     }
 }
+
+// ---- T-26 audit records browser scenarios ----
+
+fn create_audit(dir: &Path, title: &str, content: &str, audit_type: Option<&str>) -> String {
+    let mut args = vec![
+        "--dir".to_string(),
+        dir.to_str().unwrap().to_string(),
+        "audit".to_string(),
+        "create".to_string(),
+        "--title".to_string(),
+        title.to_string(),
+        "--content".to_string(),
+        content.to_string(),
+    ];
+    if let Some(t) = audit_type {
+        args.push("--audit-type".to_string());
+        args.push(t.to_string());
+    }
+    let out = bin().args(&args).output().unwrap();
+    assert!(
+        out.status.success(),
+        "audit create failed: {:?}\nstderr: {}",
+        args,
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+fn audit_record_path(dir: &Path, id: &str) -> PathBuf {
+    dir.join("docs/audit-records").join(format!("{}.md", id))
+}
+
+fn audit_dir(dir: &Path) -> PathBuf {
+    dir.join("docs/audit-records")
+}
+
+fn audit_fixture(name: &str) -> PathBuf {
+    let dir = test_root(name);
+    init_project(&dir);
+    create_audit(
+        &dir,
+        "First audit",
+        "First content paragraph.",
+        Some("security"),
+    );
+    create_audit(&dir, "Second audit", "Second content", Some("licence"));
+    dir
+}
+
+// T-26a
+#[test]
+fn t26a_list_audit_records_category() {
+    let dir = audit_fixture("t26a");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=audit-record").text();
+    assert!(html.contains("<h2 class=\"h2\">Audit Records</h2>"));
+    assert!(html.contains("2 audit records"));
+    assert!(html.contains("aria-current=\"page\""));
+    let rules_at = html.find("href=\"/?type=business-rule\"").unwrap();
+    let audit_at = html.find("href=\"/?type=audit-record\"").unwrap();
+    assert!(rules_at < audit_at);
+    assert!(html.contains("AUD-001"));
+    assert!(html.contains("First audit"));
+    assert!(html.contains("AUD-002"));
+    assert!(html.contains("Second audit"));
+    let first = html.find("AUD-001").unwrap();
+    let second = html.find("AUD-002").unwrap();
+    assert!(first < second);
+    assert!(html.contains("href=\"/doc/AUD-001\""));
+    assert!(html.contains("First content paragraph."));
+    assert_eq!(get(&server, "/").status, 200);
+    assert_eq!(get(&server, "/?type=req").status, 200);
+    for ty in ["all", "x", "audit-records", "audit"] {
+        assert_eq!(
+            get(&server, &format!("/?type={}", ty)).status,
+            400,
+            "type={}",
+            ty
+        );
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn t26a_disabled_audit_record_empty_state() {
+    let dir = audit_fixture("t26a-disabled");
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "config",
+        "set",
+        "document_types.audit.enabled",
+        "false",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=audit-record").text();
+    assert_eq!(get(&server, "/?type=audit-record").status, 200);
+    assert!(!html.contains("href=\"/?type=audit-record\""));
+    let api: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/audit-records").text()).unwrap();
+    assert!(api.as_array().unwrap().is_empty());
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-26b
+#[test]
+fn t26b_non_records_are_not_listed() {
+    let dir = audit_fixture("t26b");
+    let rdir = audit_dir(&dir);
+    fs::write(rdir.join("BR-001.md"), "# BR-001 Canonical\n").unwrap();
+    fs::write(rdir.join("README.md"), "# registry").unwrap();
+    fs::write(rdir.join("notes.txt"), "x").unwrap();
+    fs::write(rdir.join("AUD-ABC.md"), "# bad").unwrap();
+    let deprecated = rdir.join("deprecated");
+    fs::create_dir_all(&deprecated).unwrap();
+    fs::write(
+        deprecated.join("AUD-999.md"),
+        "# AUD-999 Hidden\n\n## Audit Type\nsecurity\n",
+    )
+    .unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=audit-record").text();
+    assert!(html.contains("AUD-001"));
+    assert!(html.contains("AUD-002"));
+    assert!(!html.contains("AUD-999"));
+    assert!(!html.contains("BR-001"));
+    let api: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/audit-records").text()).unwrap();
+    assert_eq!(api.as_array().unwrap().len(), 2);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-26c
+#[test]
+fn t26c_view_audit_record() {
+    let dir = audit_fixture("t26c");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/doc/AUD-001").text();
+    assert!(html.contains("Record ID"));
+    assert!(html.contains("AUD-001"));
+    assert!(html.contains("Audit record"));
+    assert!(html.contains("Audit Records"));
+    assert!(html.contains("<h1 class=\"h1\">First audit</h1>"));
+    assert!(html.contains("<span class=\"badge\">security</span>"));
+    assert!(html.contains("Audit type"));
+    assert!(html.contains("First content paragraph."));
+    assert!(html.contains("white-space: pre-wrap"));
+    assert!(html.contains("href=\"/?type=audit-record\">Audit Records</a></li><li><span aria-current=\"page\">AUD-001</span>"));
+    assert_eq!(html.matches("href=\"/doc/AUD-001/edit\"").count(), 1);
+    assert!(html.contains(">Edit</a>"));
+    assert!(!html.contains("Content</h"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-26d
+#[test]
+fn t26d_edit_round_trip() {
+    let dir = audit_fixture("t26d");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let edit = get(&server, "/doc/AUD-001/edit").text();
+    assert!(edit.contains("Hidden field: version (optimistic-concurrency token)"));
+    assert!(edit.contains("Save") || edit.contains("Save changes"));
+    let version = extract_version(&edit);
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Renamed audit"),
+        ("audit_type", "licence"),
+        ("content", "New content"),
+    ]);
+    let response = post_form(&server, "/doc/AUD-001", &body);
+    assert_eq!(response.status, 303);
+    assert_eq!(response.header("Location"), Some("/doc/AUD-001"));
+    let view = get(&server, "/doc/AUD-001").text();
+    assert!(view.contains("<h1 class=\"h1\">Renamed audit</h1>"));
+    assert!(view.contains("New content"));
+    let cli = run_ok(&["--dir", dir.to_str().unwrap(), "audit", "view", "AUD-001"]);
+    assert!(cli.contains("Renamed audit"));
+    assert!(cli.contains("New content"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-26e
+#[test]
+fn t26e_field_preserving() {
+    let dir = audit_fixture("t26e");
+    let path = audit_record_path(&dir, "AUD-001");
+    let original = fs::read_to_string(&path).unwrap();
+    let with_unknown = original.replace(
+        "## Content",
+        "## Custom Section\nKeep this line\n\n## Content",
+    );
+    fs::write(&path, &with_unknown).unwrap();
+    let before = fs::read_to_string(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/AUD-001/edit").text());
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Edited title"),
+        ("audit_type", "architecture"),
+        ("content", "Edited content"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/AUD-001", &body).status, 303);
+    let after = fs::read_to_string(&path).unwrap();
+    assert!(after.contains("## Custom Section\nKeep this line"));
+    assert!(after.contains("Edited title"));
+    assert!(after.contains("Edited content"));
+    for needle in ["## Custom Section", "Keep this line"] {
+        if before.contains(needle) {
+            assert!(after.contains(needle));
+        }
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-26f
+#[test]
+fn t26f_validation_422_no_write() {
+    let dir = audit_fixture("t26f");
+    let path = audit_record_path(&dir, "AUD-001");
+    let before = fs::read(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/AUD-001/edit").text());
+    let cases: Vec<(String, &str, &str)> = vec![
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", ""),
+                ("audit_type", "security"),
+                ("content", "ok"),
+            ]),
+            "Title is required.",
+            "title",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", &"x".repeat(201)),
+                ("audit_type", "security"),
+                ("content", "ok"),
+            ]),
+            "Title must be at most 200 characters.",
+            "title",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "a\tb"),
+                ("audit_type", "security"),
+                ("content", "ok"),
+            ]),
+            "Title cannot contain control characters.",
+            "title",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("audit_type", ""),
+                ("content", "ok"),
+            ]),
+            "Audit type is required.",
+            "audit_type",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("audit_type", "foo"),
+                ("content", "ok"),
+            ]),
+            "Audit type must be one of security, licence, or architecture.",
+            "audit_type",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("audit_type", "security"),
+                ("content", &"x".repeat(20001)),
+            ]),
+            "Content must be at most 20000 characters.",
+            "content",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("audit_type", "security"),
+                ("content", "a\u{0007}b"),
+            ]),
+            "Content cannot contain control characters.",
+            "content",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("audit_type", "security"),
+                ("content", "a\n## Section\nb"),
+            ]),
+            "Content contains a line starting with ## .",
+            "content",
+        ),
+    ];
+    for (body, message, field) in cases {
+        let response = post_form(&server, "/doc/AUD-001", &body);
+        assert_eq!(response.status, 422, "body={}", body);
+        let html = response.text();
+        assert_eq!(summary_entry(&html, field), message);
+        assert_eq!(field_error(&html, field), message);
+        assert_eq!(fs::read(&path).unwrap(), before, "file changed {}", body);
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-26g
+#[test]
+fn t26g_stale_and_malformed_versions() {
+    let dir = audit_fixture("t26g");
+    let path = audit_record_path(&dir, "AUD-001");
+    let before = fs::read(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let valid = form_body(&[
+        ("version", "1.2.3"),
+        ("title", "Stale"),
+        ("audit_type", "security"),
+        ("content", "ok"),
+    ]);
+    let conflict = post_form(&server, "/doc/AUD-001", &valid);
+    assert_eq!(conflict.status, 409);
+    assert!(
+        conflict
+            .text()
+            .contains("record changed on disk; reload the form")
+    );
+    assert_eq!(fs::read(&path).unwrap(), before);
+    let missing = form_body(&[
+        ("title", "Ok"),
+        ("audit_type", "security"),
+        ("content", "ok"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/AUD-001", &missing).status, 400);
+    let malformed = form_body(&[
+        ("version", "bad"),
+        ("title", "Ok"),
+        ("audit_type", "security"),
+        ("content", "ok"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/AUD-001", &malformed).status, 400);
+    assert_eq!(fs::read(&path).unwrap(), before);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-26h
+#[test]
+fn t26h_deprecated_hidden_and_404() {
+    let dir = audit_fixture("t26h");
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "audit",
+        "deprecate",
+        "AUD-002",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let list = get(&server, "/?type=audit-record").text();
+    assert!(list.contains("AUD-001"));
+    assert!(!list.contains("AUD-002"));
+    assert_eq!(get(&server, "/doc/AUD-002").status, 404);
+    assert_eq!(get(&server, "/doc/AUD-002/edit").status, 404);
+    let version = "1.2.3";
+    let body = form_body(&[
+        ("version", version),
+        ("title", "Ok"),
+        ("audit_type", "security"),
+        ("content", "ok"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/AUD-002", &body).status, 404);
+    assert_eq!(get(&server, "/api/doc/AUD-002").status, 404);
+    let json_body = format!("{{\"version\":\"{}\",\"title\":\"Ok\"}}", version);
+    assert_eq!(
+        post_json(&server, "/api/doc/AUD-002", &json_body).status,
+        404
+    );
+    let api: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/audit-records").text()).unwrap();
+    assert_eq!(api.as_array().unwrap().len(), 1);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-26i
+#[test]
+fn t26i_json_api() {
+    let dir = audit_fixture("t26i");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    for alias in ["/api/audit-records", "/api/audit-record"] {
+        let list: serde_json::Value = serde_json::from_str(&get(&server, alias).text()).unwrap();
+        let arr = list.as_array().unwrap();
+        assert_eq!(arr.len(), 2, "alias {}", alias);
+        assert_eq!(arr[0]["id"], "AUD-001");
+        assert_eq!(arr[0]["title"], "First audit");
+        assert_eq!(arr[1]["id"], "AUD-002");
+    }
+    let doc: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/doc/AUD-001").text()).unwrap();
+    assert_eq!(doc["id"], "AUD-001");
+    assert_eq!(doc["kind"], "audit-record");
+    assert_eq!(doc["form"], "audit-record");
+    assert_eq!(doc["title"], "First audit");
+    assert_eq!(doc["audit_type"], "security");
+    assert_eq!(doc["content"], "First content paragraph.");
+    assert!(doc["version"].is_string());
+    assert!(doc["path"].as_str().unwrap().ends_with("AUD-001.md"));
+    let version = doc["version"].as_str().unwrap().to_string();
+    let body = format!(
+        r#"{{"version":"{}","title":"Renamed","audit_type":"licence","content":"New content"}}"#,
+        version
+    );
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/AUD-001", &body).text()).unwrap();
+    assert_eq!(updated["title"], "Renamed");
+    assert_eq!(updated["audit_type"], "licence");
+    assert_eq!(updated["content"], "New content");
+    let version = updated["version"].as_str().unwrap().to_string();
+    let body = format!(r#"{{"version":"{}","content":null}}"#, version);
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/AUD-001", &body).text()).unwrap();
+    assert!(updated["content"].is_null());
+    let version = updated["version"].as_str().unwrap().to_string();
+    let body = format!(r#"{{"version":"{}","title":""}}"#, version);
+    assert_eq!(post_json(&server, "/api/doc/AUD-001", &body).status, 422);
+    let body = format!(r#"{{"version":"{}","audit_type":"foo"}}"#, version);
+    assert_eq!(post_json(&server, "/api/doc/AUD-001", &body).status, 422);
+    let body = format!(
+        r#"{{"version":"{}","content":"a\n## Section\nb"}}"#,
+        version
+    );
+    assert_eq!(post_json(&server, "/api/doc/AUD-001", &body).status, 422);
+    // wrong types 400
+    let body = format!(r#"{{"version":"{}","title":5}}"#, version);
+    assert_eq!(post_json(&server, "/api/doc/AUD-001", &body).status, 400);
+    let body = format!(r#"{{"version":"{}","audit_type":5}}"#, version);
+    assert_eq!(post_json(&server, "/api/doc/AUD-001", &body).status, 400);
+    let body = format!(r#"{{"version":"{}","content":5}}"#, version);
+    assert_eq!(post_json(&server, "/api/doc/AUD-001", &body).status, 400);
+    assert_eq!(
+        post_json(&server, "/api/doc/AUD-001", "{not json").status,
+        400
+    );
+    assert_eq!(post_json(&server, "/api/doc/AUD-001", "[]").status, 400);
+    // missing/malformed/stale version
+    assert_eq!(
+        post_json(&server, "/api/doc/AUD-001", "{\"title\":\"Ok\"}").status,
+        400
+    );
+    assert_eq!(
+        post_json(&server, "/api/doc/AUD-001", "{\"version\":\"bad\"}").status,
+        400
+    );
+    let body = "{\"version\":\"1.2.3\",\"title\":\"Ok\"}";
+    assert_eq!(post_json(&server, "/api/doc/AUD-001", body).status, 409);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-26j
+#[test]
+fn t26j_atomic_and_symlink() {
+    use std::os::unix::fs::symlink;
+    let dir = audit_fixture("t26j");
+    let rdir = audit_dir(&dir);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/AUD-001/edit").text());
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Atomic title"),
+        ("audit_type", "security"),
+        ("content", "d"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/AUD-001", &body).status, 303);
+    for entry in fs::read_dir(&rdir).unwrap().flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        assert!(!name.contains(".tmp"), "temp left {}", name);
+    }
+    let version = extract_version(&get(&server, "/doc/AUD-001/edit").text());
+    let bad = form_body(&[
+        ("version", &version),
+        ("title", ""),
+        ("audit_type", "security"),
+        ("content", "ok"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/AUD-001", &bad).status, 422);
+    for entry in fs::read_dir(&rdir).unwrap().flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        assert!(!name.contains(".tmp"), "temp left {}", name);
+    }
+    drop(server);
+    // symlink escape
+    let outside = test_root("t26j-outside");
+    let secret = outside.join("secret.md");
+    fs::write(&secret, "# AUD-001 Secret\n").unwrap();
+    let target = audit_record_path(&dir, "AUD-001");
+    fs::remove_file(&target).unwrap();
+    symlink(&secret, &target).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    assert_eq!(get(&server, "/doc/AUD-001").status, 404);
+    assert_eq!(get(&server, "/api/doc/AUD-001").status, 404);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+    let _ = fs::remove_dir_all(&outside);
+}
+
+// T-26k
+#[test]
+fn t26k_offline_asset_scan() {
+    let dir = audit_fixture("t26k");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let css = get(&server, "/assets/app.css");
+    let js = get(&server, "/assets/app.js");
+    assert_eq!(css.status, 200);
+    assert_eq!(js.status, 200);
+    for path in ["/?type=audit-record", "/doc/AUD-001", "/doc/AUD-001/edit"] {
+        let html = get(&server, path).text();
+        assert!(!html.contains("http://"), "external {}", path);
+        assert!(!html.contains("https://"), "external {}", path);
+        assert!(!html.contains("//cdn"), "external {}", path);
+        assert!(!html.contains("@import"), "external {}", path);
+    }
+    for asset in [css.text(), js.text()] {
+        assert!(!asset.contains("@import"));
+        assert!(!asset.contains("http://"));
+        assert!(!asset.contains("https://"));
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-26l
+#[test]
+fn t26l_no_new_dependencies() {
+    let manifest = include_str!("../Cargo.toml");
+    let dependency_index = manifest.find("[dependencies]").unwrap();
+    let dependencies = &manifest[dependency_index..];
+    for forbidden in [
+        "axum",
+        "actix",
+        "rocket",
+        "tokio",
+        "async-std",
+        "tera",
+        "handlebars",
+        "askama",
+    ] {
+        assert!(
+            !dependencies.contains(forbidden),
+            "new dependency {}",
+            forbidden
+        );
+    }
+}
+
+// T-26m
+#[test]
+fn t26m_quality_gates() {
+    let manifest = include_str!("../Cargo.toml");
+    let dependency_index = manifest.find("[dependencies]").unwrap();
+    let dependencies = &manifest[dependency_index..];
+    for forbidden in [
+        "axum",
+        "actix",
+        "rocket",
+        "tokio",
+        "async-std",
+        "tera",
+        "handlebars",
+        "askama",
+        "rusqlite",
+        "reqwest",
+        "hyper",
+    ] {
+        assert!(
+            !dependencies.contains(forbidden),
+            "new dependency {}",
+            forbidden
+        );
+    }
+}
