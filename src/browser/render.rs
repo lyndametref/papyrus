@@ -77,6 +77,7 @@ fn category_name(kind: Category) -> &'static str {
         Category::UiMockup => "UI Mockups",
         Category::BusinessRule => "Business Rules",
         Category::AuditRecord => "Audit Records",
+        Category::TechSpec => "Technical Specifications",
     }
 }
 
@@ -93,6 +94,7 @@ fn category_short(kind: Category) -> &'static str {
         Category::UiMockup => "UI mockups",
         Category::BusinessRule => "business rules",
         Category::AuditRecord => "audit records",
+        Category::TechSpec => "technical specifications",
     }
 }
 
@@ -177,6 +179,23 @@ pub fn sidebar(selected: Option<Category>, cfg: &Config) -> String {
         };
         items.push_str(&format!(
             "<li><a href=\"/?type=audit-record\"{}>Audit Records</a></li>",
+            current
+        ));
+    }
+    // Technical Specifications (omitted when the document type is disabled)
+    let tech_spec_enabled = cfg
+        .document_types
+        .get(Category::TechSpec.config_key())
+        .map(|e| e.enabled)
+        .unwrap_or(false);
+    if tech_spec_enabled {
+        let current = if selected == Some(Category::TechSpec) {
+            " aria-current=\"page\""
+        } else {
+            ""
+        };
+        items.push_str(&format!(
+            "<li><a href=\"/?type=tech-spec\"{}>Technical Specifications</a></li>",
             current
         ));
     }
@@ -285,6 +304,7 @@ fn breadcrumb(
         Category::UiMockup => ("UI Mockups", "ui-mockup"),
         Category::BusinessRule => ("Business Rules", "business-rule"),
         Category::AuditRecord => ("Audit Records", "audit-record"),
+        Category::TechSpec => ("Technical Specifications", "tech-spec"),
     };
     let mut items = String::new();
     items.push_str(&format!(
@@ -313,6 +333,7 @@ fn edit_breadcrumb(record: &Record, _resolved_group: Option<&Record>) -> String 
         Category::UiMockup => ("UI Mockups", "ui-mockup"),
         Category::BusinessRule => ("Business Rules", "business-rule"),
         Category::AuditRecord => ("Audit Records", "audit-record"),
+        Category::TechSpec => ("Technical Specifications", "tech-spec"),
     };
     let mut items = String::new();
     items.push_str(&format!(
@@ -361,7 +382,8 @@ fn owning_group_dd(record: &Record, resolved_group: Option<&Record>) -> String {
         | Form::UiSpec
         | Form::UiMockup
         | Form::BusinessRule
-        | Form::AuditRecord => "<dd class=\"link-muted\">(none)</dd>".to_string(),
+        | Form::AuditRecord
+        | Form::TechSpec => "<dd class=\"link-muted\">(none)</dd>".to_string(),
     }
 }
 
@@ -389,7 +411,8 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
             | Form::UiSpec
             | Form::UiMockup
             | Form::BusinessRule
-            | Form::AuditRecord => "<dd class=\"link-muted\">(none)</dd>".to_string(),
+            | Form::AuditRecord
+            | Form::TechSpec => "<dd class=\"link-muted\">(none)</dd>".to_string(),
         }
     } else {
         owning_group_dd(record, resolved_group)
@@ -551,7 +574,9 @@ fn list_section(kind: Category, index: &Index, other_has_records: bool) -> Strin
 /// Render the category list page.
 fn backlog_list_section(kind: Category, index: &Index) -> String {
     let total = index.records.len();
-    let count = if total == 0 {
+    // MOCK-0009's empty list still shows a count ("0 technical specifications"),
+    // unlike the other categories' "No records" summary.
+    let count = if total == 0 && kind != Category::TechSpec {
         "No records".to_string()
     } else {
         let singular = match kind {
@@ -564,6 +589,7 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
             Category::UiMockup => "UI mockup",
             Category::BusinessRule => "business rule",
             Category::AuditRecord => "audit record",
+            Category::TechSpec => "technical specification",
             _ => "record",
         };
         let plural_word = format!("{}s", singular);
@@ -577,6 +603,12 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
         escape(&count)
     ));
     if total == 0 {
+        if kind == Category::TechSpec {
+            body.push_str(
+                "<div class=\"empty\"><p>No technical specifications were found in the configured directory.</p><p class=\"help\">Technical specifications are created from the command line; this browser does not create records. Deprecated technical specifications are hidden.</p></div></section>",
+            );
+            return body;
+        }
         let message = format!("No {} in this project.", category_short(kind));
         body.push_str(&format!(
             "<div class=\"empty\"><p>{}</p><p class=\"help\">Records are created from the command line; this browser does not create records.</p></div>",
@@ -624,10 +656,12 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
             || kind == Category::UiSpec
             || kind == Category::BusinessRule
             || kind == Category::AuditRecord
+            || kind == Category::TechSpec
         {
             let preview = if kind == Category::UiSpec
                 || kind == Category::BusinessRule
                 || kind == Category::AuditRecord
+                || kind == Category::TechSpec
             {
                 record
                     .description
@@ -701,6 +735,7 @@ pub fn list_page(
         Category::UiMockup => "UI Mockups",
         Category::BusinessRule => "Business Rules",
         Category::AuditRecord => "Audit Records",
+        Category::TechSpec => "Technical Specifications",
     };
     let subheading = match kind {
         Category::Req => "Business requirement records in this project.",
@@ -714,6 +749,7 @@ pub fn list_page(
         Category::UiMockup => "UI mockups in this project.",
         Category::BusinessRule => "Business rules in this project.",
         Category::AuditRecord => "Audit records in this project.",
+        Category::TechSpec => "Technical specifications in this project.",
     };
     let title = format!("Papyrus \u{2014} {}", category_name(kind));
     render_template(
@@ -1067,6 +1103,16 @@ pub fn view_page(
                 ));
             }
         }
+        Category::TechSpec => {
+            // The description is body text: no "Description" heading. The
+            // shared `.text` class already applies `white-space: pre-wrap`.
+            let content_text = record.description.as_deref().unwrap_or("");
+            if content_text.trim().is_empty() {
+                content.push_str("<p class=\"text empty-text\">(none)</p>");
+            } else {
+                content.push_str(&format!("<p class=\"text\">{}</p>", escape(content_text)));
+            }
+        }
     }
 
     let page_head = if record.kind == Category::AuditRecord {
@@ -1206,6 +1252,14 @@ fn metadata_block_backlog(
                 escape(record.form.label()),
                 escape("Audit Records"),
                 escape(audit_type),
+            )
+        }
+        Category::TechSpec => {
+            format!(
+                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div></dl></div>",
+                escape(&record.id),
+                escape(record.form.label()),
+                escape("Technical Specifications"),
             )
         }
         Category::Decision => {
@@ -2475,6 +2529,139 @@ pub fn conflict_page_audit_record(
     )
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct TechSpecEditValues {
+    pub title: String,
+    pub description: String,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct TechSpecFieldErrors {
+    pub title: Option<String>,
+    pub description: Option<String>,
+}
+
+impl TechSpecFieldErrors {
+    pub fn any(&self) -> bool {
+        self.title.is_some() || self.description.is_some()
+    }
+}
+
+pub fn edit_page_tech_spec(
+    record: &Record,
+    values: &TechSpecEditValues,
+    errors: &TechSpecFieldErrors,
+    version: &str,
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    let mut form = String::new();
+    form.push_str(&format!(
+        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard><input type=\"hidden\" name=\"version\" value=\"{}\">",
+        escape(&record.id),
+        escape(version)
+    ));
+    if errors.any() {
+        form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
+        for (field, msg) in [
+            ("title", errors.title.as_deref()),
+            ("description", errors.description.as_deref()),
+        ] {
+            if let Some(m) = msg {
+                form.push_str(&format!(
+                    "<li><a href=\"#{}\">{}</a></li>",
+                    field,
+                    escape(m)
+                ));
+            }
+        }
+        form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
+    }
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"title\">Title <span class=\"req\">(required)</span></label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}><p class=\"help\">Required \u{b7} whitespace is trimmed \u{b7} line breaks and control characters are not allowed.</p>{}</div>",
+        escape(&values.title),
+        invalid_attrs("title", errors.title.as_deref()),
+        field_error("title", errors.title.as_deref())
+    ));
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"description\">Description <span class=\"req\">(required)</span></label><textarea class=\"textarea\" id=\"description\" name=\"description\" rows=\"12\" required{}>{}</textarea><p class=\"help\">Required \u{b7} multi-line \u{b7} line breaks are preserved when saved.</p>{}</div>",
+        invalid_attrs("description", errors.description.as_deref()),
+        escape(&values.description),
+        field_error("description", errors.description.as_deref())
+    ));
+    form.push_str(
+        "<p class=\"hidden-field version-note\">Hidden field: version (optimistic-concurrency token)</p>",
+    );
+    form.push_str(&format!(
+        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
+        escape(&record.id)
+    ));
+
+    let page_head = format!(
+        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div><p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
+        escape(&record.id),
+        escape(&record.title)
+    );
+    let title = format!("Papyrus \u{2014} Edit {}", record.id);
+    render_template(
+        EDIT_TEMPLATE,
+        &[
+            ("title", &title),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("breadcrumb", &edit_breadcrumb(record, None)),
+            ("page_head", &page_head),
+            ("meta", &metadata_block_backlog(record, None, None)),
+            ("form", &form),
+        ],
+    )
+}
+
+pub fn conflict_page_tech_spec(
+    record: &Record,
+    title: &str,
+    description: &str,
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    let mut body = String::new();
+    body.push_str(
+        "<h1 class=\"h1\">This record changed on disk</h1><p class=\"sub\">Nothing was saved. The file was modified after this form was opened.</p><div class=\"conflict-box\"><p><strong>409 Conflict \u{2014} record changed on disk; reload the form.</strong></p></div>",
+    );
+    body.push_str(&format!(
+        "<div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Reload the form</a><a class=\"link\" href=\"/doc/{}\">View current record</a></div>",
+        escape(&record.id),
+        escape(&record.id)
+    ));
+    body.push_str("<div class=\"readonly-block\"><dl>");
+    body.push_str(&format!("<dt>Title</dt><dd>{}</dd>", escape(title)));
+    body.push_str(&format!(
+        "<dt>Description</dt><dd class=\"text\">{}</dd>",
+        escape(description)
+    ));
+    body.push_str("</dl></div>");
+
+    let title_page = format!("Papyrus \u{2014} Edit {}", record.id);
+    render_template(
+        EDIT_TEMPLATE,
+        &[
+            ("title", &title_page),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("breadcrumb", &edit_breadcrumb(record, None)),
+            ("page_head", &body),
+            ("meta", &metadata_block_backlog(record, None, None)),
+            ("form", ""),
+        ],
+    )
+}
+
 /// Error-page copy for a status code.
 pub fn error_copy(status: u16) -> (&'static str, &'static str, &'static str) {
     match status {
@@ -2576,6 +2763,35 @@ pub fn error_page(status: u16, cfg: &Config, chrome: Chrome<'_>, actions: Option
             ("hint", hint),
         ],
         &[("sidebar", &sidebar(None, cfg)), ("actions", actions)],
+    )
+}
+
+/// Render the technical-specifications `404` page.
+///
+/// The same page is returned for a deprecated and an unknown technical
+/// specification so the response never reveals whether a hidden record exists.
+pub fn tech_spec_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
+    let actions =
+        "<a class=\"link\" href=\"/?type=tech-spec\">Back to technical specifications</a>";
+    render_template(
+        ERROR_TEMPLATE,
+        &[
+            ("title", "Papyrus \u{2014} Record not found"),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+            ("status_code", "404"),
+            ("heading", "Record not found"),
+            ("message", "That record does not exist or is not available."),
+            (
+                "hint",
+                "Deprecated technical specifications are not listed and cannot be opened. \
+The same page is used for an unknown address.",
+            ),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(Category::TechSpec), cfg)),
+            ("actions", actions),
+        ],
     )
 }
 

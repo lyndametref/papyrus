@@ -432,6 +432,7 @@ fn category_from_query(request: &Request) -> Result<Category, HttpError> {
         Some(value) if value == "ui-mockup" => Ok(Category::UiMockup),
         Some(value) if value == "business-rule" => Ok(Category::BusinessRule),
         Some(value) if value == "audit-record" => Ok(Category::AuditRecord),
+        Some(value) if value == "tech-spec" => Ok(Category::TechSpec),
         Some(_) => Err(HttpError::new(400)),
     }
 }
@@ -443,12 +444,41 @@ fn chrome_for(cfg: &Config, state: &ServerState) -> (String, String) {
     )
 }
 
+/// The record ID addressed by an HTML document route, if any.
+fn html_doc_id(path: &str) -> Option<&str> {
+    let rest = path.strip_prefix("/doc/")?;
+    let id = rest.strip_suffix("/edit").unwrap_or(rest);
+    if id.is_empty() || id.contains('/') {
+        return None;
+    }
+    Some(id)
+}
+
 fn handle_request(request: Request, state: &ServerState) -> Response {
     let api = request.target.path.starts_with("/api/");
+    let path = request.target.path.clone();
     let result = route(request, state);
     match result {
         Ok(response) => response,
-        Err(error) => error_response(error.status, api, state),
+        Err(error) => {
+            // A missing technical specification always renders the same
+            // technical-specifications 404 page, whether the ID is deprecated
+            // or unknown. JSON responses keep the baseline error object.
+            if error.status == 404
+                && !api
+                && let Some(id) = html_doc_id(&path)
+                && let Ok(cfg) = state.config()
+                && records::matches_tech_spec_id(&cfg, id)
+            {
+                let (project, bind_note) = chrome_for(&cfg, state);
+                let chrome = render::Chrome {
+                    project: &project,
+                    bind_note: &bind_note,
+                };
+                return Response::html(404, render::tech_spec_not_found_page(&cfg, chrome));
+            }
+            error_response(error.status, api, state)
+        }
     }
 }
 
@@ -534,6 +564,12 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
     if path == "/api/audit-records" || path == "/api/audit-record" {
         return match method {
             Method::Get | Method::Head => api_audit_records(state),
+            _ => Err(HttpError::new(405)),
+        };
+    }
+    if path == "/api/tech-specs" || path == "/api/tech-spec" {
+        return match method {
+            Method::Get | Method::Head => api_tech_specs(state),
             _ => Err(HttpError::new(405)),
         };
     }
@@ -866,6 +902,20 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
+        Category::TechSpec => {
+            let values = render::TechSpecEditValues {
+                title: record.title.clone(),
+                description: record.description.clone().unwrap_or_default(),
+            };
+            render::edit_page_tech_spec(
+                &record,
+                &values,
+                &render::TechSpecFieldErrors::default(),
+                &record.version,
+                &cfg,
+                chrome,
+            )
+        }
         Category::AuditRecord => {
             let values = render::AuditEditValues {
                 title: record.title.clone(),
@@ -1000,6 +1050,14 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                     &cfg,
                     chrome,
                 ),
+            ));
+        }
+        if record.kind == Category::TechSpec {
+            let title = form_field(&fields, "title").unwrap_or("").to_string();
+            let description = form_field(&fields, "description").unwrap_or("").to_string();
+            return Ok(Response::html(
+                409,
+                render::conflict_page_tech_spec(&record, &title, &description, &cfg, chrome),
             ));
         }
         // Conflict page with submitted values (best-effort).
@@ -1701,6 +1759,49 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
+        Category::TechSpec => {
+            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
+            let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
+
+            let mut errors = render::TechSpecFieldErrors::default();
+            let title = match records::validate_title(&raw_title) {
+                Ok(t) => Some(t),
+                Err(m) => {
+                    errors.title = Some(m);
+                    None
+                }
+            };
+            let mut description_change = FieldChange::Keep;
+            match records::validate_multiline("Description", &raw_description) {
+                Ok(Some(value)) => description_change = FieldChange::Set(value),
+                Ok(None) => {
+                    errors.description = Some("Description is required.".to_string());
+                }
+                Err(m) => errors.description = Some(m),
+            }
+            if errors.any() {
+                let values = render::TechSpecEditValues {
+                    title: raw_title.clone(),
+                    description: raw_description.clone(),
+                };
+                return Ok(Response::html(
+                    422,
+                    render::edit_page_tech_spec(
+                        &record,
+                        &values,
+                        &errors,
+                        &record.version,
+                        &cfg,
+                        chrome,
+                    ),
+                ));
+            }
+            let title = title.unwrap_or_default();
+            let content =
+                records::apply_tech_spec_edit(&record.doc, &record.id, &title, description_change);
+            records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
+            Ok(Response::redirect(&format!("/doc/{}", record.id)))
+        }
         Category::AuditRecord => {
             let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
             let raw_audit_type = form_field(&fields, "audit_type").unwrap_or("").to_string();
@@ -1790,7 +1891,7 @@ fn record_json(
             serde_json::json!({
                 "id": record.id,
                 "kind": record.kind.key(),
-                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision", Form::Glossary => "glossary", Form::UiSpec => "ui-spec", Form::UiMockup => "ui-mockup", Form::BusinessRule => "business-rule", Form::AuditRecord => "audit-record" },
+                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision", Form::Glossary => "glossary", Form::UiSpec => "ui-spec", Form::UiMockup => "ui-mockup", Form::BusinessRule => "business-rule", Form::AuditRecord => "audit-record", Form::TechSpec => "tech-spec" },
                 "title": record.title,
                 "group": group_value,
                 "story": story,
@@ -1924,6 +2025,17 @@ fn record_json(
                 "rationale": record.rationale,
                 "applicability": record.applicability,
                 "requirements": record.requirements,
+                "version": record.version,
+                "path": record.rel_path,
+            })
+        }
+        Category::TechSpec => {
+            serde_json::json!({
+                "id": record.id,
+                "kind": "tech-spec",
+                "form": "tech-spec",
+                "title": record.title,
+                "description": record.description,
                 "version": record.version,
                 "path": record.rel_path,
             })
@@ -2099,6 +2211,22 @@ fn api_ui_specs(state: &ServerState) -> Result<Response, HttpError> {
 fn api_business_rules(state: &ServerState) -> Result<Response, HttpError> {
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let index = records::build_index(&state.context(), &cfg, Category::BusinessRule);
+    let items: Vec<serde_json::Value> = index
+        .records
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "id": r.id,
+                "title": r.title,
+            })
+        })
+        .collect();
+    Ok(Response::json(200, serde_json::json!(items)))
+}
+
+fn api_tech_specs(state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let index = records::build_index(&state.context(), &cfg, Category::TechSpec);
     let items: Vec<serde_json::Value> = index
         .records
         .iter()
@@ -2916,6 +3044,36 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
+        Category::TechSpec => {
+            let title = match object.get("title") {
+                None => record.title.clone(),
+                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
+                    Ok(t) => t,
+                    Err(m) => return Ok(json_error(422, &m)),
+                },
+                Some(_) => return Err(HttpError::new(400)),
+            };
+            let mut description_change = FieldChange::Keep;
+            match object.get("description") {
+                None => {}
+                Some(serde_json::Value::Null) => {
+                    return Ok(json_error(422, "Description is required."));
+                }
+                Some(serde_json::Value::String(raw)) => {
+                    match records::validate_multiline("Description", raw) {
+                        Ok(Some(value)) => description_change = FieldChange::Set(value),
+                        Ok(None) => return Ok(json_error(422, "Description is required.")),
+                        Err(m) => return Ok(json_error(422, &m)),
+                    }
+                }
+                Some(_) => return Err(HttpError::new(400)),
+            }
+            let content =
+                records::apply_tech_spec_edit(&record.doc, &record.id, &title, description_change);
+            records::write_atomic(&ctx, &record.path, &content).map_err(|_| HttpError::new(500))?;
+            let (updated, _updated_cfg) = resolve_record(id, state)?;
+            Ok(Response::json(200, record_json(&updated, None, None)))
+        }
         Category::AuditRecord => {
             let title = match object.get("title") {
                 None => record.title.clone(),
@@ -3145,5 +3303,67 @@ mod tests {
         assert_eq!(form_fields(&fields, "specs"), vec!["UI-001", "UI-002", ""]);
         assert_eq!(form_fields(&fields, "refs"), vec!["docs/a.md"]);
         assert_eq!(form_fields(&fields, "missing"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn tech_spec_record_json_shape() {
+        let record = Record {
+            id: "TECH-001".to_string(),
+            kind: Category::TechSpec,
+            form: Form::TechSpec,
+            title: "Offline architecture".to_string(),
+            story: None,
+            group_id: None,
+            group_title: None,
+            description: Some("Defines the local browser.".to_string()),
+            rationale: None,
+            applicability: None,
+            requirements: Vec::new(),
+            definition: None,
+            view: None,
+            status: None,
+            milestone_id: None,
+            milestone_title: None,
+            assignee: None,
+            labels: Vec::new(),
+            dependencies: Vec::new(),
+            acceptance_criteria: Vec::new(),
+            comments: Vec::new(),
+            release_id: None,
+            release_title: None,
+            decision: None,
+            context: None,
+            consequences: None,
+            decision_type: None,
+            superseded_by: None,
+            superseded_title: None,
+            specs: Vec::new(),
+            refs: Vec::new(),
+            mockup_task: String::new(),
+            audit_type: None,
+            doc: records::Doc {
+                id: "TECH-001".to_string(),
+                title: "Offline architecture".to_string(),
+                heading: "# TECH-001 Offline architecture".to_string(),
+                preamble: Vec::new(),
+                sections: Vec::new(),
+            },
+            path: std::path::PathBuf::from("docs/technical/TECH-001.md"),
+            rel_path: "docs/technical/TECH-001.md".to_string(),
+            version: "1.2.3".to_string(),
+        };
+        let json = record_json(&record, None, None);
+        assert_eq!(json["id"], "TECH-001");
+        assert_eq!(json["kind"], "tech-spec");
+        assert_eq!(json["form"], "tech-spec");
+        assert_eq!(json["title"], "Offline architecture");
+        assert_eq!(json["description"], "Defines the local browser.");
+        assert_eq!(json["version"], "1.2.3");
+        assert_eq!(json["path"], "docs/technical/TECH-001.md");
+        assert_eq!(json.as_object().unwrap().len(), 7);
+        // A missing description is serialized as JSON null.
+        let mut empty = record;
+        empty.description = None;
+        assert!(record_json(&empty, None, None)["description"].is_null());
     }
 }

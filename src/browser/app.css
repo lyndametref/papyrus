@@ -305,8 +305,10 @@ textarea:focus-visible {
   .req-list { padding-left: 10px; }
   .form-actions { flex-direction: column; align-items: stretch; }
   .form-actions .btn { width: 100%; text-align: center; }
-  /* At 320 px the edit form draws only the hidden version input. */
+  /* Other edit forms hide the version annotation at 320 px; the technical
+     specifications form keeps it visible (MOCK-0009 320 px edit state). */
   .hidden-field { display: none; }
+  .hidden-field.version-note { display: inline-block; }
   .actions { flex-direction: column; align-items: flex-start; gap: 6px; }
   .error-card { padding: 22px 20px 26px; }
   .status-code { font-size: 44px; }
