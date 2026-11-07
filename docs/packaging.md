@@ -712,3 +712,89 @@ with `papyrus 0.1.0`.
 - Size: 886836 bytes
 - SHA-256: `1294fd25ab5fe0081d6970d52670e97159ac17e368adff6776fc62bacf50c216`
 - Test count: 292 (54 unit + 238 integration, including `ui_mockups_smoke` 2)
+
+## TASK-46 — Business rules milestone packaging and verification
+
+- Date: **2026-11-07 (CET, +0100)**.
+- Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43-7, dpkg 1.23.11,
+  `rustc`/`cargo` 1.99.1, clippy 0.1.99, `fakeroot` 2.1.4, `unshare -rn` with
+  `ip link set lo up` available.
+- Supported release: **Debian Forky only** (ADR-0003, NFR-03.002). Debian Trixie
+  and every other Debian release remain **not claimed and not verified**.
+- Isolation: `fakeroot dpkg --instdir=./.tmp/task46/inst
+  --admindir=./.tmp/task46/adm --force-depends`; the host package status was
+  not modified. Scratch directories were removed after verification.
+- Package: `papyrus_0.1.0_amd64.deb`, 903368 bytes,
+  SHA-256 `a287e67143a4064d36fc66bcf191e8511c4e12cce95e5cf82e42184df8afd724`.
+- Package metadata: `Package: papyrus`, `Version: 0.1.0` (from `Cargo.toml`),
+  `Architecture: amd64`, `Depends: libc6 (>= 2.34)`, `Section: utils`,
+  `Priority: optional`, copyright `GPL-3.0-or-later`.
+- Package contents: `/usr/bin/papyrus` (0755, 2828536 bytes) and
+  `/usr/share/doc/papyrus/copyright` (0644, 865 bytes) only; no asset, template,
+  configuration, or man file. `/assets/app.css` and `/assets/app.js` are compiled
+  into the binary and served from memory.
+- Business rules have no supersede command (BR-013); lifecycle covers
+  create/list/view/edit/deprecate/restore only.
+- New test file: `tests/business_rules_smoke.rs` (2 tests), passing under `cargo test`.
+- No runtime dependencies were added; the TASK-1/TASK-4 runtime dependency
+  license audit remains valid (NFR-06.002).
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| `cargo build` (Rust 1.99.1) | PASS |
+| `cargo build --release` (Rust 1.99.1) | PASS |
+| `target/release/papyrus --help` lists `rule`, `search`, `browser` | PASS |
+| `cargo test` | PASS — 322 tests (59 unit + 263 integration, including `business_rules_smoke` 2) |
+| `cargo clippy --all-targets -- -D warnings` | PASS — 0 warnings |
+| `cargo fmt --check` | PASS |
+
+### Install, uninstall, and smoke checks
+
+| Check | Result |
+|---|---|
+| Isolated `dpkg -i` | PASS (exit 0) |
+| Installed `/usr/bin/papyrus` is `root:root` 0755 | PASS |
+| `papyrus` resolves on the isolated `PATH` and runs | PASS |
+| Isolated `dpkg -r papyrus` removes the binary; not on that `PATH` | PASS |
+| Isolated `dpkg --purge papyrus` removes binary and admin entry | PASS (verified via separate purge run) |
+| Host package database and filesystem unchanged | PASS |
+| `--help` lists `rule`, `search`, `browser`; `--version` prints `papyrus 0.1.0` | PASS |
+| Business-rule lifecycle: create/list/view/edit/deprecate/restore; IDs preserved | PASS |
+| Lifecycle exit codes: unknown id 3, already-deprecated/already-active 4 | PASS |
+| Requirements-tag interaction: `--requirement` add, `--no-requirement` remove/all | PASS |
+| Search: quoted phrase, split words no match, `--type doc`, `--limit`, `--json`, empty `[]`, deprecated hidden until restored | PASS |
+| Browser: startup line, `?type=business-rule` with `aria-current`, view, edit round-trip `303`/`Location`, persisted through UI and CLI | PASS |
+| Browser field-preserving edit: unknown sections retained | PASS |
+| Browser JSON API: `/api/business-rules`, `/api/business-rule`, `/api/doc/<id>` shapes | PASS |
+| Embedded assets: `/assets/app.css`, `/assets/app.js`, non-empty, correct content type | PASS |
+| 320 px markup hooks and narrow-viewport CSS | PASS |
+| No external references in served HTML/CSS/JS; CSP present on HTML | PASS |
+| Deprecated rule not listed and `404` on view, edit, POST, and API | PASS |
+| Offline (`unshare -rn`, outbound TCP fails): search over loopback | PASS |
+| Config keys: list/get/set/unset for `browser_host`, `browser_port`, `browser_open`; configured port honored; `--port` overrides; defaults restored; invalid values exit 4 with unchanged file | PASS |
+| Embedded assets from an empty working directory and asset-free project | PASS |
+
+### Recorded limitations
+
+- **OQ-1 — no real-GUI browser run.** Verification is markup- and asset-level
+  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-05.001
+  browser support remains covered by the TASK-25 contract tests.
+- **Forky only.** No Debian Trixie or other release was installed or verified,
+  and none is claimed (ADR-0003, NFR-03.002).
+- **Host baseline.** The build host already reported `papyrus 0.1.0` installed
+  from prior work; the isolated verification did not modify it.
+- **Packaging script precondition.** `scripts/build-deb.sh` was intentionally left
+  unchanged. The stale-binary hazard is mitigated by running
+  `cargo build --release` first and asserting `--help` lists `rule` before
+  packaging.
+- **No supersede.** Business rules have no supersede command (BR-013); the
+  lifecycle smoke covers create/list/view/edit/deprecate/restore only.
+
+### TASK-46 package artifact
+
+- File: `papyrus_0.1.0_amd64.deb`
+- Size: 903368 bytes
+- SHA-256: `a287e67143a4064d36fc66bcf191e8511c4e12cce95e5cf82e42184df8afd724`
+- Test count: 322 (59 unit + 263 integration, including `business_rules_smoke` 2)
