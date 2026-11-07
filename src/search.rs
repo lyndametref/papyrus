@@ -11,7 +11,15 @@ use std::fs;
 use std::path::PathBuf;
 
 const DOC_TYPE: &str = "doc";
-const DOC_KEYS: [&str; 6] = ["req", "nfr", "glossary", "ui-spec", "ui-mockup", "rule"];
+const DOC_KEYS: [&str; 7] = [
+    "req",
+    "nfr",
+    "glossary",
+    "ui-spec",
+    "ui-mockup",
+    "rule",
+    "audit",
+];
 
 pub fn sanitize_query(raw: &str) -> Result<String, AppError> {
     let trimmed = raw.trim();
@@ -132,7 +140,7 @@ fn collect_type(
         // UI specifications and UI mockups share their directories with other
         // documents (UI descriptions, HTML review packages); only `<prefix>-<digits>`
         // files are records (BR-012, BR-016).
-        if key == "ui-spec" || key == "ui-mockup" || key == "rule" {
+        if key == "ui-spec" || key == "ui-mockup" || key == "rule" || key == "audit" {
             let prefix = format!("{}-", entry.prefix);
             let Some(rest) = id.strip_prefix(&prefix) else {
                 continue;
