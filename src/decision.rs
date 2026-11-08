@@ -536,7 +536,7 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
         return Err(AppError::NotFound(format!("not found: {}", id)));
     };
 
-    let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
     let text = content.clone();
     let json = if ctx.json {
         Some(serde_json::json!({"id": id, "path": path.display().to_string(), "content": content}))
@@ -581,7 +581,7 @@ pub fn edit(
         return Err(AppError::NotFound(format!("not found: {}", id)));
     };
 
-    let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
     let mut dd = parse_decision(&content);
     if dd.id.is_empty() {
         dd.id = id.clone();

@@ -28,7 +28,7 @@ pub fn read_document(ctx: &Context, target: &Path) -> Result<(Document, String),
             target.display()
         )));
     }
-    let content = fs::read_to_string(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let content = crate::record::migrate::ensure_front_matter(ctx, &safe)?;
     let doc = document::parse(&content)?;
     let meta = fs::metadata(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
     let token = version_token(&meta);
@@ -49,6 +49,28 @@ pub fn version_token(meta: &fs::Metadata) -> String {
 }
 
 pub fn write_atomic(ctx: &Context, target: &Path, content: &str) -> Result<(), AppError> {
+    // Lazy migration on first write: if the target is a managed document record
+    // lacking front matter, add front matter before writing.
+    let mut content = content.to_string();
+    if !crate::record::frontmatter::has_front_matter(&content) {
+        let safe_check = resolve_path(ctx, target).ok();
+        if let Some(safe) = safe_check
+            && crate::record::migrate::is_managed_path(&ctx.project_dir, &safe)
+        {
+            let (new_content, changed, action, keys) =
+                crate::record::migrate::migrate_content(ctx, &safe, &content, false)?;
+            if changed {
+                content = new_content;
+                let rel = safe
+                    .strip_prefix(&ctx.project_dir)
+                    .unwrap_or(&safe)
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                println!("{}\t{}\t{}", rel, action, keys.join(","));
+            }
+        }
+    }
+
     let safe_target = resolve_path(ctx, target).map_err(|_| {
         AppError::Runtime(format!(
             "path resolves outside project directory: {}",

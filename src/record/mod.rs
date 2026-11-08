@@ -5,6 +5,7 @@ pub mod descriptors;
 pub mod document;
 pub mod frontmatter;
 pub mod identity;
+pub mod migrate;
 pub mod patch;
 pub mod store;
 

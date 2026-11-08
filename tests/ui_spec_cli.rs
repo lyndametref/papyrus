@@ -397,7 +397,7 @@ fn ui_spec_editor_rewrites_without_renaming() {
 
     assert!(record(&d, "UI-001").exists());
     let content = fs::read_to_string(record(&d, "UI-001")).unwrap();
-    assert!(content.starts_with("# UI-001 Edited title"));
+    assert!(content.starts_with("---\n"));
     assert!(content.contains("## View\nv-edited"));
     assert!(content.contains("## Description\nd-edited"));
 

@@ -457,7 +457,7 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
     let _ = ensure_dirs(&deprecated);
     let path = active_or_deprecated(ctx, &active, &deprecated, &id)?;
 
-    let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
     let json = if ctx.json {
         Some(serde_json::json!({
             "id": id,
@@ -505,7 +505,16 @@ pub fn edit(
     let _ = ensure_dirs(&deprecated);
     let path = active_or_deprecated(ctx, &active, &deprecated, &id)?;
 
-    let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let editor_cmd = if editor {
+        Some(
+            cfg.effective_editor()
+                .ok_or_else(|| AppError::Runtime("no editor configured".to_string()))?,
+        )
+    } else {
+        None
+    };
+
+    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
     let mut record = parse_record(&content, &id);
 
     if let Some(t) = title_raw {
@@ -517,15 +526,6 @@ pub fn edit(
     if let Some(a) = audit_type_raw {
         record.audit_type = sanitize_field(a)?;
     }
-
-    let editor_cmd = if editor {
-        Some(
-            cfg.effective_editor()
-                .ok_or_else(|| AppError::Runtime("no editor configured".to_string()))?,
-        )
-    } else {
-        None
-    };
 
     let mut ops: Vec<crate::record::patch::PatchOp> = Vec::new();
     if title_raw.is_some() {
