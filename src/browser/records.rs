@@ -128,6 +128,12 @@ pub struct Doc {
     /// Lines between the heading and the first section (usually a blank line).
     pub preamble: Vec<String>,
     pub sections: Vec<Section>,
+    /// The verbatim leading YAML front-matter block (including delimiters and
+    /// trailing newline), if present.
+    pub front_matter: Option<String>,
+    /// The original document text, used to return byte-identical output for
+    /// no-op saves.
+    pub source: String,
 }
 
 /// A loaded record with its metadata.
@@ -242,17 +248,36 @@ fn normalize_newlines(input: &str) -> String {
 /// starts a section and every following line belongs to that section.
 pub fn parse_doc(content: &str) -> Doc {
     let normalized = normalize_newlines(content);
-    let mut lines: Vec<&str> = normalized.split('\n').collect();
-    // A trailing newline produces one empty final element; drop it so section
-    // bodies do not gain a synthetic blank line at the end of the file.
+    // Preserve a leading YAML front-matter block verbatim.
+    let (front_matter, body) =
+        if let Some((_, _, bs)) = crate::record::frontmatter::find_block(&normalized) {
+            (Some(normalized[..bs].to_string()), &normalized[bs..])
+        } else {
+            (None, normalized.as_str())
+        };
+    let mut lines: Vec<&str> = body.split('\n').collect();
     if lines.last() == Some(&"") {
         lines.pop();
     }
-    let heading = lines.first().copied().unwrap_or("").to_string();
+    // skip leading blank lines
+    let mut start = 0usize;
+    let mut preamble: Vec<String> = Vec::new();
+    while start < lines.len() && lines[start].trim().is_empty() {
+        preamble.push(lines[start].to_string());
+        start += 1;
+    }
+    let heading = if start < lines.len() {
+        lines[start].to_string()
+    } else {
+        String::new()
+    };
     let (id, title) = parse_heading(&heading);
     let mut sections: Vec<Section> = Vec::new();
-    let mut preamble: Vec<String> = Vec::new();
-    let mut i = 1usize;
+    let mut i = if start < lines.len() {
+        start + 1
+    } else {
+        start
+    };
     while i < lines.len() {
         if let Some(rest) = lines[i].strip_prefix("## ") {
             let heading_line = format!("## {}", rest);
@@ -283,6 +308,8 @@ pub fn parse_doc(content: &str) -> Doc {
         heading,
         preamble,
         sections,
+        front_matter,
+        source: normalized,
     }
 }
 
@@ -1022,6 +1049,8 @@ fn load_ui_mockup_record(ctx: &Context, path: &Path) -> Result<Option<Record>, A
             heading: format!("# {} {}", stem, title),
             preamble: Vec::new(),
             sections: Vec::new(),
+            front_matter: None,
+            source: String::new(),
         },
         path: safe.clone(),
         rel_path: relative_path(&ctx.project_dir, &safe),
@@ -1919,6 +1948,14 @@ pub fn apply_edit(
     description: FieldChange,
     supports_story: bool,
 ) -> String {
+    // No-op byte identity: if nothing changes, return the original document.
+    let no_change = title == doc.title
+        && matches!(story, FieldChange::Keep)
+        && matches!(description, FieldChange::Keep);
+    if no_change && !doc.source.is_empty() {
+        return doc.source.clone();
+    }
+
     let mut sections = doc.sections.clone();
     if supports_story {
         match story {
@@ -1949,6 +1986,9 @@ pub fn apply_edit(
     }
     let mut output = lines.join("\n");
     output.push('\n');
+    if let Some(block) = &doc.front_matter {
+        output = format!("{}{}", block, output);
+    }
     output
 }
 
@@ -2729,6 +2769,27 @@ mod tests {
         assert_eq!(form_for_stem("REQ", "REQ-001.x"), None);
         assert_eq!(form_for_stem("REQ", "NFR-001"), None);
         assert_eq!(form_for_stem("REQ", "REQ-001.001.002"), None);
+    }
+
+    #[test]
+    fn apply_edit_preserves_front_matter_and_noop() {
+        let input = "---\nid: X\ntitle: T\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\n---\n# X T\n\n## Description\nBody\n";
+        let doc = parse_doc(input);
+        let out = apply_edit(&doc, "X", "T", FieldChange::Keep, FieldChange::Keep, false);
+        assert_eq!(out, input);
+        let out2 = apply_edit(
+            &doc,
+            "X",
+            "New",
+            FieldChange::Keep,
+            FieldChange::Set("New body".to_string()),
+            false,
+        );
+        assert!(out2.starts_with("---\n"));
+        assert!(out2.contains("id: X"));
+        assert!(out2.contains("created_date: '2026-01-01T00:00:00Z'"));
+        assert!(out2.contains("# X New"));
+        assert!(out2.contains("## Description\nNew body"));
     }
 
     #[test]

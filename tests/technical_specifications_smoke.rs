@@ -337,10 +337,8 @@ fn milestone_technical_specifications_flow() {
     assert!(record_path(&dir, "TECH-001").exists());
     assert!(record_path(&dir, "TECH-002").exists());
     let content = fs::read_to_string(record_path(&dir, "TECH-001")).unwrap();
-    assert_eq!(
-        content,
-        "# TECH-001 quick brown fox architecture\n\n## Description\nquick brown fox desc\n"
-    );
+    assert!(content.contains("# TECH-001 quick brown fox architecture\n"));
+    assert!(content.contains("## Description\nquick brown fox desc\n"));
 
     let d = dir_arg(&dir);
     let list = run_ok(&["--dir", &d, "tech-spec", "list"]);

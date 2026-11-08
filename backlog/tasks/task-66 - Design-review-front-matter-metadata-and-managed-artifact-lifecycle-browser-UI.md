@@ -19,7 +19,7 @@ references:
   - docs/specifications/ui/mockups/README.md
 priority: medium
 type: task
-ordinal: 30040
+ordinal: 30092.5
 ---
 
 ## Description

@@ -30,8 +30,16 @@ pub enum TaskCmd {
         milestone: Option<String>,
         #[arg(long = "label")]
         label: Vec<String>,
-        #[arg(long = "assignee")]
-        assignee: Option<String>,
+        #[arg(long = "reference")]
+        reference: Vec<String>,
+        #[arg(long = "documentation")]
+        documentation: Vec<String>,
+        #[arg(long = "type")]
+        r#type: Option<String>,
+        #[arg(long = "ordinal")]
+        ordinal: Option<String>,
+        #[arg(long = "assignee", num_args = 1..)]
+        assignee: Vec<String>,
     },
     List {
         #[arg(short = 's', long = "status")]
@@ -78,8 +86,16 @@ pub enum TaskCmd {
         no_milestone: Option<Option<String>>,
         #[arg(long = "label")]
         label: Vec<String>,
-        #[arg(long = "assignee")]
-        assignee: Option<String>,
+        #[arg(long = "reference")]
+        reference: Vec<String>,
+        #[arg(long = "documentation")]
+        documentation: Vec<String>,
+        #[arg(long = "type")]
+        r#type: Option<String>,
+        #[arg(long = "ordinal")]
+        ordinal: Option<String>,
+        #[arg(long = "assignee", num_args = 1..)]
+        assignee: Vec<String>,
         #[arg(long = "editor")]
         editor: bool,
     },
@@ -105,6 +121,10 @@ pub fn run(ctx: &Context, cmd: TaskCmd) -> Result<crate::CommandOutput, AppError
             depends_on,
             milestone,
             label,
+            reference,
+            documentation,
+            r#type,
+            ordinal,
             assignee,
         } => {
             let id = create(
@@ -115,7 +135,11 @@ pub fn run(ctx: &Context, cmd: TaskCmd) -> Result<crate::CommandOutput, AppError
                 &depends_on,
                 milestone.as_deref(),
                 &label,
-                assignee.as_deref(),
+                &reference,
+                &documentation,
+                r#type.as_deref(),
+                ordinal.as_deref(),
+                &assignee,
             )?;
             let text = id.clone();
             let json = if ctx.json {
@@ -160,6 +184,10 @@ pub fn run(ctx: &Context, cmd: TaskCmd) -> Result<crate::CommandOutput, AppError
             milestone,
             no_milestone,
             label,
+            reference,
+            documentation,
+            r#type,
+            ordinal,
             assignee,
             editor,
         } => edit(
@@ -175,7 +203,11 @@ pub fn run(ctx: &Context, cmd: TaskCmd) -> Result<crate::CommandOutput, AppError
             milestone.as_deref(),
             no_milestone,
             &label,
-            assignee.as_deref(),
+            &reference,
+            &documentation,
+            r#type.as_deref(),
+            ordinal.as_deref(),
+            &assignee,
             editor,
         ),
         TaskCmd::Archive { id } => archive(ctx, &id),
@@ -187,6 +219,35 @@ pub fn run(ctx: &Context, cmd: TaskCmd) -> Result<crate::CommandOutput, AppError
 fn sanitize_text(input: &str) -> Result<String, AppError> {
     sanitize::sanitize_name(input)
         .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))
+}
+
+fn scan_max_ordinal(active: &std::path::Path, archived: &std::path::Path) -> i64 {
+    let mut max: Option<i64> = None;
+    for dir in [active, archived] {
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            for e in rd.flatten() {
+                let path = e.path();
+                if path.extension().and_then(|s| s.to_str()) != Some("md") {
+                    continue;
+                }
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    if let Some(fm) = crate::record::frontmatter::parse(&content).ok().flatten() {
+                        if let Some(v) =
+                            crate::record::frontmatter::current_value_string(&fm.raw, "ordinal")
+                        {
+                            if let Ok(n) = v.parse::<i64>() {
+                                max = Some(max.map_or(n, |m: i64| m.max(n)));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    match max {
+        Some(m) => m + 1,
+        None => 0,
+    }
 }
 
 fn load_config(ctx: &Context) -> Result<Config, AppError> {
@@ -341,7 +402,16 @@ pub(crate) struct TaskData {
 }
 
 fn parse_heading(content: &str) -> (String, String) {
-    let first = content.lines().next().unwrap_or("");
+    let body = if let Some((_, _, bs)) = crate::record::frontmatter::find_block(content) {
+        &content[bs..]
+    } else {
+        content
+    };
+    let first = body
+        .lines()
+        .skip_while(|l| l.trim().is_empty())
+        .next()
+        .unwrap_or("");
     let rest = first.trim_start_matches('#').trim();
     let mut parts = rest.splitn(2, char::is_whitespace);
     let id = parts.next().unwrap_or("").trim().to_string();
@@ -531,6 +601,22 @@ pub(crate) fn render_task(td: &TaskData) -> String {
     parts.join("\n\n") + "\n"
 }
 
+fn frontmatter_list(content: &str, key: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Ok(Some(fm)) = crate::record::frontmatter::parse(content) {
+        if let Some(yaml_serde::Value::Sequence(seq)) =
+            fm.data.get(yaml_serde::Value::String(key.to_string()))
+        {
+            for v in seq {
+                if let yaml_serde::Value::String(s) = v {
+                    out.push(s.clone());
+                }
+            }
+        }
+    }
+    out
+}
+
 fn unique_push(vec: &mut Vec<String>, val: String) {
     if !vec.contains(&val) {
         vec.push(val);
@@ -545,7 +631,11 @@ pub fn create(
     deps_raw: &[String],
     milestone_raw: Option<&str>,
     labels_raw: &[String],
-    assignee_raw: Option<&str>,
+    references_raw: &[String],
+    documentation_raw: &[String],
+    type_raw: Option<&str>,
+    ordinal_raw: Option<&str>,
+    assignee_raw: &[String],
 ) -> Result<String, AppError> {
     let cfg = load_config(ctx)?;
     let title = sanitize_text(title_raw)?;
@@ -579,9 +669,48 @@ pub fn create(
     for l in labels_raw {
         unique_push(&mut labels, sanitize_text(l)?);
     }
-    let assignee = match assignee_raw {
+    let mut references: Vec<String> = Vec::new();
+    for r in references_raw {
+        unique_push(
+            &mut references,
+            sanitize::sanitize_path_string(r)
+                .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?,
+        );
+    }
+    let mut documentation: Vec<String> = Vec::new();
+    for d in documentation_raw {
+        unique_push(
+            &mut documentation,
+            sanitize::sanitize_path_string(d)
+                .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?,
+        );
+    }
+    let type_val = match type_raw {
         Some(s) => Some(sanitize_text(s)?),
         None => None,
+    };
+    let ordinal_val: Option<i64> = match ordinal_raw {
+        Some(s) => {
+            let n: i64 = s
+                .trim()
+                .parse()
+                .map_err(|_| AppError::Validation("invalid ordinal".to_string()))?;
+            if n < 0 {
+                return Err(AppError::Validation("invalid ordinal".to_string()));
+            }
+            Some(n)
+        }
+        None => None,
+    };
+
+    let mut assignee_list: Vec<String> = Vec::new();
+    for a in assignee_raw {
+        unique_push(&mut assignee_list, sanitize_text(a)?);
+    }
+    let assignee = if assignee_list.is_empty() {
+        None
+    } else {
+        Some(assignee_list)
     };
 
     let active = active_dir(ctx, &cfg)?;
@@ -600,21 +729,149 @@ pub fn create(
 
     let td = TaskData {
         id: id.clone(),
-        title,
-        description: desc,
+        title: title.clone(),
+        description: desc.clone(),
         status: cfg.default_status.clone(),
-        milestone,
-        assignee,
-        labels,
-        deps,
-        acs,
+        milestone: milestone.clone(),
+        assignee: assignee
+            .clone()
+            .and_then(|v| v.into_iter().next())
+            .map(|s| s),
+        labels: labels.clone(),
+        deps: deps.clone(),
+        acs: acs.clone(),
         comments: Vec::new(),
     };
 
-    let content = render_task(&td);
+    // ordinal default
+    let ordinal_final = match ordinal_val {
+        Some(n) => n,
+        None => scan_max_ordinal(&active, &archived),
+    };
+
+    let now = crate::record::frontmatter::utc_now();
+    let assignee_yaml = match &assignee {
+        Some(v) => v.clone(),
+        None => Vec::new(),
+    };
+    let mut fm = String::new();
+    fm.push_str(&format!("id: {}\n", id));
+    fm.push_str(&format!(
+        "title: {}\n",
+        crate::record::frontmatter::format_scalar_pub(&title)
+    ));
+    fm.push_str(&format!("created_date: '{}'\n", now));
+    fm.push_str(&format!("updated_date: '{}'\n", now));
+    fm.push_str(&format!("labels:\n"));
+    if labels.is_empty() {
+        // keep empty list marker
+    }
+    // labels list
+    let mut labels_raw_str = String::new();
+    if labels.is_empty() {
+        labels_raw_str.push_str("[]");
+        fm = fm.replace("labels:\n", "labels: []\n");
+    } else {
+        for l in &labels {
+            labels_raw_str.push_str(&format!("  - {}\n", l));
+        }
+        // remove placeholder line already? We inserted "labels:\n"
+    }
+    // Rebuild cleanly:
+    let mut fm = String::new();
+    fm.push_str(&format!("id: {}\n", id));
+    fm.push_str(&format!(
+        "title: {}\n",
+        crate::record::frontmatter::format_scalar_pub(&title)
+    ));
+    fm.push_str(&format!("created_date: '{}'\n", now));
+    fm.push_str(&format!("updated_date: '{}'\n", now));
+    // labels
+    if labels.is_empty() {
+        fm.push_str("labels: []\n");
+    } else {
+        fm.push_str("labels:\n");
+        for l in &labels {
+            fm.push_str(&format!(
+                "  - {}\n",
+                crate::record::frontmatter::format_scalar_pub(l)
+            ));
+        }
+    }
+    // references
+    if references.is_empty() {
+        fm.push_str("references: []\n");
+    } else {
+        fm.push_str("references:\n");
+        for r in &references {
+            fm.push_str(&format!(
+                "  - {}\n",
+                crate::record::frontmatter::format_scalar_pub(r)
+            ));
+        }
+    }
+    fm.push_str(&format!(
+        "status: {}\n",
+        crate::record::frontmatter::format_scalar_pub(&cfg.default_status)
+    ));
+    // assignee list
+    if assignee_yaml.is_empty() {
+        fm.push_str("assignee: []\n");
+    } else {
+        fm.push_str("assignee:\n");
+        for a in &assignee_yaml {
+            fm.push_str(&format!(
+                "  - {}\n",
+                crate::record::frontmatter::format_scalar_pub(a)
+            ));
+        }
+    }
+    if let Some(m) = &milestone {
+        fm.push_str(&format!(
+            "milestone: {}\n",
+            crate::record::frontmatter::format_scalar_pub(m)
+        ));
+    } else {
+        fm.push_str("milestone: null\n");
+    }
+    if deps.is_empty() {
+        fm.push_str("dependencies: []\n");
+    } else {
+        fm.push_str("dependencies:\n");
+        for d in &deps {
+            fm.push_str(&format!(
+                "  - {}\n",
+                crate::record::frontmatter::format_scalar_pub(d)
+            ));
+        }
+    }
+    fm.push_str(&format!("ordinal: {}\n", ordinal_final));
+    if documentation.is_empty() {
+        fm.push_str("documentation: []\n");
+    } else {
+        fm.push_str("documentation:\n");
+        for d in &documentation {
+            fm.push_str(&format!(
+                "  - {}\n",
+                crate::record::frontmatter::format_scalar_pub(d)
+            ));
+        }
+    }
+    if let Some(t) = &type_val {
+        fm.push_str(&format!(
+            "type: {}\n",
+            crate::record::frontmatter::format_scalar_pub(t)
+        ));
+    } else {
+        fm.push_str("type: null\n");
+    }
+
+    let body = render_task(&td);
+    let content = crate::record::frontmatter::wrap(&fm, &body);
+
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    fs::write(&safe_path, content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::write_atomic(ctx, &safe_path, &content)?;
     Ok(id)
 }
 
@@ -662,7 +919,11 @@ pub fn edit(
     milestone_raw: Option<&str>,
     no_milestone: Option<Option<String>>,
     labels_raw: &[String],
-    assignee_raw: Option<&str>,
+    references_raw: &[String],
+    documentation_raw: &[String],
+    type_raw: Option<&str>,
+    ordinal_raw: Option<&str>,
+    assignee_raw: &[String],
     editor: bool,
 ) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
@@ -722,7 +983,7 @@ pub fn edit(
         }
         td.milestone = Some(mid);
     }
-    if let Some(no) = no_milestone {
+    if let Some(no) = &no_milestone {
         match no {
             Some(rid_raw) => {
                 let rid = sanitize_text(&rid_raw)?;
@@ -757,8 +1018,14 @@ pub fn edit(
     for l in labels_raw {
         unique_push(&mut td.labels, sanitize_text(l)?);
     }
-    if let Some(a) = assignee_raw {
-        td.assignee = Some(sanitize_text(a)?);
+    // references/documentation/type/ordinal handled via front-matter patch below
+
+    if !assignee_raw.is_empty() {
+        let mut cleaned = Vec::new();
+        for a in assignee_raw {
+            cleaned.push(sanitize_text(a)?);
+        }
+        td.assignee = cleaned.first().cloned();
     }
     if !comments_raw.is_empty() {
         let author = match comment_author_raw {
@@ -770,10 +1037,266 @@ pub fn edit(
         }
     }
 
-    let new_content = render_task(&td);
-    let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
-    fs::write(&safe_write, new_content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
+    // Build patch ops instead of re-rendering.
+    let mut ops: Vec<crate::record::patch::PatchOp> = Vec::new();
 
+    if let Some(t) = title_raw {
+        let tv = sanitize_text(t)?;
+        td.title = tv.clone();
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "title".into(),
+            tv.clone(),
+        ));
+        ops.push(crate::record::patch::PatchOp::SetHeadingTitle(tv));
+    }
+    if let Some(d) = desc_raw {
+        let dv = sanitize::sanitize_path_string(d)
+            .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?;
+        td.description = Some(dv.clone());
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## Description".into(),
+            dv,
+        ));
+    }
+    if let Some(s) = status_raw {
+        let st = sanitize_text(s)?;
+        if !cfg.statuses.contains(&st) {
+            return Err(AppError::Validation(format!("unknown status: {}", st)));
+        }
+        td.status = st.clone();
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "status".into(),
+            st.clone(),
+        ));
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## Status".into(),
+            st,
+        ));
+    }
+    if let Some(m) = milestone_raw {
+        let mid = sanitize_text(m)?;
+        if !milestone_exists(ctx, &cfg, &mid) {
+            return Err(AppError::NotFound(format!("milestone not found: {}", mid)));
+        }
+        td.milestone = Some(mid.clone());
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "milestone".into(),
+            mid.clone(),
+        ));
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## Milestone".into(),
+            mid,
+        ));
+    }
+    if let Some(no) = &no_milestone {
+        match no {
+            Some(_rid_raw) => {
+                ops.push(crate::record::patch::PatchOp::ClearFrontMatter(
+                    "milestone".into(),
+                ));
+                ops.push(crate::record::patch::PatchOp::ClearSection(
+                    "## Milestone".into(),
+                ));
+            }
+            None => {
+                td.milestone = None;
+                ops.push(crate::record::patch::PatchOp::ClearFrontMatter(
+                    "milestone".into(),
+                ));
+                ops.push(crate::record::patch::PatchOp::ClearSection(
+                    "## Milestone".into(),
+                ));
+            }
+        }
+    }
+    if !deps_raw.is_empty() {
+        let mut new_deps = td.deps.clone();
+        for d in deps_raw {
+            let did = sanitize_text(d)?;
+            if did == id {
+                return Err(AppError::Validation(
+                    "task cannot depend on itself".to_string(),
+                ));
+            }
+            if !task_exists(ctx, &cfg, &did) {
+                return Err(AppError::NotFound(format!("task not found: {}", did)));
+            }
+            unique_push(&mut new_deps, did);
+        }
+        td.deps = new_deps.clone();
+        let val = new_deps.join("\n");
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "dependencies".into(),
+            val,
+        ));
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## Dependencies".into(),
+            td.deps
+                .iter()
+                .map(|d| format!("- {}", d))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        ));
+    }
+    if !ac_raw.is_empty() {
+        for a in ac_raw {
+            unique_push(&mut td.acs, sanitize_text(a)?);
+        }
+        let body = td
+            .acs
+            .iter()
+            .map(|a| format!("- [ ] {}", a))
+            .collect::<Vec<_>>()
+            .join("\n");
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## Acceptance Criteria".into(),
+            body,
+        ));
+    }
+    if !labels_raw.is_empty() {
+        for l in labels_raw {
+            unique_push(&mut td.labels, sanitize_text(l)?);
+        }
+        // front-matter labels append unique
+        let mut fm_labels = frontmatter_list(&content, "labels");
+        for l in labels_raw {
+            let lv = sanitize_text(l)?;
+            if !fm_labels.contains(&lv) {
+                fm_labels.push(lv);
+            }
+        }
+        let val = fm_labels.join("\n");
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "labels".into(),
+            val,
+        ));
+        let body = td
+            .labels
+            .iter()
+            .map(|l| format!("- {}", l))
+            .collect::<Vec<_>>()
+            .join("\n");
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## Labels".into(),
+            body,
+        ));
+    }
+    // references append
+    if !references_raw.is_empty() {
+        let mut fm_refs = frontmatter_list(&content, "references");
+        for r in references_raw {
+            let rv = sanitize::sanitize_path_string(r)
+                .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?;
+            if !fm_refs.contains(&rv) {
+                fm_refs.push(rv);
+            }
+        }
+        let val = fm_refs.join("\n");
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "references".into(),
+            val,
+        ));
+    }
+    // documentation append
+    if !documentation_raw.is_empty() {
+        let mut fm_docs = frontmatter_list(&content, "documentation");
+        for d in documentation_raw {
+            let dv = sanitize::sanitize_path_string(d)
+                .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?;
+            if !fm_docs.contains(&dv) {
+                fm_docs.push(dv);
+            }
+        }
+        let val = fm_docs.join("\n");
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "documentation".into(),
+            val,
+        ));
+    }
+    // type
+    if let Some(t) = type_raw {
+        let tv = sanitize_text(t)?;
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "type".into(),
+            tv,
+        ));
+    }
+    // ordinal
+    if let Some(o) = ordinal_raw {
+        let n: i64 = o
+            .trim()
+            .parse()
+            .map_err(|_| AppError::Validation("invalid ordinal".to_string()))?;
+        if n < 0 {
+            return Err(AppError::Validation("invalid ordinal".to_string()));
+        }
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "ordinal".into(),
+            n.to_string(),
+        ));
+    }
+    // assignee replace
+    if !assignee_raw.is_empty() {
+        let mut cleaned = Vec::new();
+        for a in assignee_raw {
+            cleaned.push(sanitize_text(a)?);
+        }
+        td.assignee = cleaned.first().cloned();
+        let val = cleaned.join("\n");
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "assignee".into(),
+            val,
+        ));
+        if let Some(a) = &td.assignee {
+            ops.push(crate::record::patch::PatchOp::SetSection(
+                "## Assignee".into(),
+                a.clone(),
+            ));
+        }
+    }
+    if !comments_raw.is_empty() {
+        let author = match comment_author_raw {
+            Some(a) => sanitize_text(a)?,
+            None => "unknown".to_string(),
+        };
+        for c in comments_raw {
+            td.comments.push((author.clone(), sanitize_text(c)?));
+        }
+        let body = td
+            .comments
+            .iter()
+            .map(|(a, t)| format!("- **{}**: {}", a, t))
+            .collect::<Vec<_>>()
+            .join("\n");
+        // append to existing comments? Current render all comments. SetSection replaces.
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## Comments".into(),
+            body,
+        ));
+    }
+
+    // parse doc
+    let doc = crate::record::document::parse(&content)?;
+    let base_new = crate::record::patch::apply_patch(&doc, &ops)?;
+    let new_content = if ops.is_empty() || base_new == content {
+        content.clone()
+    } else {
+        // refresh updated_date
+        let mut ops2 = ops.clone();
+        let now = crate::record::frontmatter::utc_now();
+        ops2.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "updated_date".into(),
+            now,
+        ));
+        crate::record::patch::apply_patch(&doc, &ops2)?
+    };
+
+    if new_content != content {
+        let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
+        crate::record::store::write_atomic(ctx, &safe_write, &new_content)?;
+    }
+
+    let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
     if editor {
         if let Some(ed) = cfg.effective_editor() {
             let mut parts: Vec<&str> = ed.split_whitespace().collect();

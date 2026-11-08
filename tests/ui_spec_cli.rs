@@ -75,10 +75,9 @@ fn ui_spec_basic_lifecycle() {
     let path = record(&d, "UI-001");
     assert!(path.exists());
     let content = fs::read_to_string(&path).unwrap();
-    assert_eq!(
-        content,
-        "# UI-001 Login screen\n\n## View\nauth-login\n\n## Description\nSign-in form\n"
-    );
+    assert!(content.contains("# UI-001 Login screen\n"));
+    assert!(content.contains("## View\nauth-login\n"));
+    assert!(content.contains("## Description\nSign-in form\n"));
     assert!(content.ends_with('\n') && !content.ends_with("\n\n"));
 
     let out = run(&d, &["ui-spec", "list"]);

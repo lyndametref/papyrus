@@ -21,7 +21,7 @@ references:
   - docs/requirements/non-functional/NFR-01.002.md
 priority: medium
 type: feature
-ordinal: 30090
+ordinal: 30097.5
 ---
 
 ## Description

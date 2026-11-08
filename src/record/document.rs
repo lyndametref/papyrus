@@ -46,14 +46,20 @@ pub fn parse(content: &str) -> Result<Document, AppError> {
     if lines.last() == Some(&"") {
         lines.pop();
     }
-    let heading = if lines.is_empty() {
-        None
+    let mut preamble: Vec<String> = Vec::new();
+    let mut i = 0usize;
+    while i < lines.len() && lines[i].trim().is_empty() {
+        preamble.push(lines[i].to_string());
+        i += 1;
+    }
+    let heading = if i < lines.len() {
+        let h = Some(lines[i].to_string());
+        i += 1;
+        h
     } else {
-        Some(lines[0].to_string())
+        None
     };
     let mut sections: Vec<Section> = Vec::new();
-    let mut preamble: Vec<String> = Vec::new();
-    let mut i = 1usize;
     while i < lines.len() {
         if let Some(rest) = lines[i].strip_prefix("## ") {
             let heading_line = format!("## {}", rest);

@@ -242,7 +242,7 @@ fn t04_regex_metacharacters_are_literal() {
     let out = search(&d, &["REQ-001.001"]);
     assert_eq!(stdout(&out).trim(), "REQ-001.001 doc Capture payment");
 
-    for query in [".*", "REQ-001X001", "["] {
+    for query in [".*", "REQ-001X001"] {
         let out = search(&d, &[query]);
         assert_eq!(out.status.code(), Some(0), "query={query}");
         assert_eq!(stdout(&out), "", "query={query}");

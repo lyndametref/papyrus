@@ -50,10 +50,21 @@ pub fn apply_patch(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> 
                     });
                 }
                 let f = fm.as_mut().unwrap();
-                let current = frontmatter::current_value_string(&f.raw, key);
-                if current.as_deref() != Some(value.as_str())
-                    || !frontmatter::contains_key(&f.raw, key)
-                {
+                let noop = if frontmatter::contains_key(&f.raw, key) {
+                    // scalar no-op
+                    if frontmatter::current_value_string(&f.raw, key).as_deref()
+                        == Some(value.as_str())
+                    {
+                        true
+                    } else if let Some(block) = frontmatter::current_key_block(&f.raw, key) {
+                        block == frontmatter::format_kv_pub(key, value)
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+                if !noop {
                     let (new_raw, _) = frontmatter::patch_raw(&f.raw, key, Some(value));
                     let new_value: yaml_serde::Value =
                         yaml_serde::from_str(&new_raw).unwrap_or_else(|_| f.value.clone());
