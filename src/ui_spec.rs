@@ -20,6 +20,12 @@ pub enum UiSpecCmd {
         /// Description of the UI specification.
         #[arg(long = "description")]
         description: String,
+        /// Label.
+        #[arg(long = "label")]
+        label: Vec<String>,
+        /// Reference.
+        #[arg(long = "reference")]
+        reference: Vec<String>,
     },
     /// List UI specifications.
     List,
@@ -37,6 +43,12 @@ pub enum UiSpecCmd {
         /// Open the document body in $VISUAL or $EDITOR.
         #[arg(long = "editor")]
         editor: bool,
+        /// Label.
+        #[arg(long = "label")]
+        label: Vec<String>,
+        /// Reference.
+        #[arg(long = "reference")]
+        reference: Vec<String>,
     },
     /// Move a UI specification to the deprecated folder.
     Deprecate { id: String },
@@ -50,8 +62,10 @@ pub fn run(ctx: &Context, cmd: UiSpecCmd) -> Result<CommandOutput, AppError> {
             title,
             view,
             description,
+            label,
+            reference,
         } => {
-            let id = create(ctx, &title, &view, &description)?;
+            let id = create(ctx, &title, &view, &description, &label, &reference)?;
             let json = if ctx.json {
                 Some(serde_json::json!({"id": id}))
             } else {
@@ -66,7 +80,17 @@ pub fn run(ctx: &Context, cmd: UiSpecCmd) -> Result<CommandOutput, AppError> {
             view,
             description,
             editor,
-        } => edit(ctx, &id, view.as_deref(), description.as_deref(), editor),
+            label,
+            reference,
+        } => edit(
+            ctx,
+            &id,
+            view.as_deref(),
+            description.as_deref(),
+            &label,
+            &reference,
+            editor,
+        ),
         UiSpecCmd::Deprecate { id } => deprecate(ctx, &id),
         UiSpecCmd::Restore { id } => restore(ctx, &id),
     }
@@ -215,7 +239,16 @@ struct UiSpec {
 }
 
 fn parse_heading(content: &str) -> (String, String) {
-    let first = content.lines().next().unwrap_or("");
+    let body = if let Some((_, _, bs)) = crate::record::frontmatter::find_block(content) {
+        &content[bs..]
+    } else {
+        content
+    };
+    let first = body
+        .lines()
+        .skip_while(|l| l.trim().is_empty())
+        .next()
+        .unwrap_or("");
     let rest = first.trim_start_matches('#').trim();
     let mut parts = rest.splitn(2, char::is_whitespace);
     let id = parts.next().unwrap_or("").trim().to_string();
@@ -299,10 +332,25 @@ fn create(
     title_raw: &str,
     view_raw: &str,
     description_raw: &str,
+    labels_raw: &[String],
+    references_raw: &[String],
 ) -> Result<String, AppError> {
     let title = sanitize_field(title_raw)?;
     let view = sanitize_field(view_raw)?;
     let description = sanitize_field(description_raw)?;
+
+    let mut labels: Vec<String> = Vec::new();
+    for l in labels_raw {
+        if !labels.contains(l) {
+            labels.push(sanitize_field(l)?);
+        }
+    }
+    let mut references: Vec<String> = Vec::new();
+    for r in references_raw {
+        if !references.contains(r) {
+            references.push(sanitize_field(r)?);
+        }
+    }
 
     let cfg = load_config(ctx)?;
     let entry = type_entry(&cfg)?;
@@ -321,14 +369,46 @@ fn create(
 
     let record = UiSpec {
         id: id.clone(),
-        title,
+        title: title.clone(),
         view,
         description,
     };
+    let body = render_record(&record);
+    let now = crate::record::frontmatter::utc_now();
+    let mut fm = String::new();
+    fm.push_str(&format!("id: {}\n", id));
+    fm.push_str(&format!(
+        "title: {}\n",
+        crate::record::frontmatter::format_scalar_pub(&title)
+    ));
+    fm.push_str(&format!("created_date: '{}'\n", now));
+    fm.push_str(&format!("updated_date: '{}'\n", now));
+    if labels.is_empty() {
+        fm.push_str("labels: []\n");
+    } else {
+        fm.push_str("labels:\n");
+        for l in &labels {
+            fm.push_str(&format!(
+                "  - {}\n",
+                crate::record::frontmatter::format_scalar_pub(l)
+            ));
+        }
+    }
+    if references.is_empty() {
+        fm.push_str("references: []\n");
+    } else {
+        fm.push_str("references:\n");
+        for r in &references {
+            fm.push_str(&format!(
+                "  - {}\n",
+                crate::record::frontmatter::format_scalar_pub(r)
+            ));
+        }
+    }
+    let content = crate::record::frontmatter::wrap(&fm, &body);
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    fs::write(&safe_path, render_record(&record).as_bytes())
-        .map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::write_atomic(ctx, &safe_path, &content)?;
     Ok(id)
 }
 
@@ -402,11 +482,29 @@ fn view(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
     Ok(CommandOutput { text, json })
 }
 
+fn frontmatter_list_ui(content: &str, key: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Ok(Some(fm)) = crate::record::frontmatter::parse(content) {
+        if let Some(yaml_serde::Value::Sequence(seq)) =
+            fm.data.get(yaml_serde::Value::String(key.to_string()))
+        {
+            for v in seq {
+                if let yaml_serde::Value::String(s) = v {
+                    out.push(s.clone());
+                }
+            }
+        }
+    }
+    out
+}
+
 fn edit(
     ctx: &Context,
     id_raw: &str,
     view_raw: Option<&str>,
     description_raw: Option<&str>,
+    labels_raw: &[String],
+    references_raw: &[String],
     editor: bool,
 ) -> Result<CommandOutput, AppError> {
     let id = sanitize_field(id_raw)?;
@@ -436,9 +534,66 @@ fn edit(
         None
     };
 
-    let new_content = render_record(&record);
+    let mut ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if view_raw.is_some() {
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## View".into(),
+            record.view.clone(),
+        ));
+    }
+    if description_raw.is_some() {
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## Description".into(),
+            record.description.clone(),
+        ));
+    }
+    if !labels_raw.is_empty() {
+        let mut fm_labels = frontmatter_list_ui(&content, "labels");
+        for l in labels_raw {
+            let lv = sanitize_field(l)?;
+            if !fm_labels.contains(&lv) {
+                fm_labels.push(lv);
+            }
+        }
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "labels".into(),
+            fm_labels.join("\n"),
+        ));
+    }
+    if !references_raw.is_empty() {
+        let mut fm_refs = frontmatter_list_ui(&content, "references");
+        for r in references_raw {
+            let rv = sanitize_field(r)?;
+            if !fm_refs.contains(&rv) {
+                fm_refs.push(rv);
+            }
+        }
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "references".into(),
+            fm_refs.join("\n"),
+        ));
+    }
+
+    let doc = crate::record::document::parse(&content)?;
+    let base_new = crate::record::patch::apply_patch(&doc, &ops)?;
+    let new_content = if ops.is_empty() || base_new == content {
+        content.clone()
+    } else {
+        let mut ops2 = ops.clone();
+        let now = crate::record::frontmatter::utc_now();
+        ops2.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "updated_date".into(),
+            now,
+        ));
+        crate::record::patch::apply_patch(&doc, &ops2)?
+    };
+
+    if new_content != content {
+        let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
+        crate::record::store::write_atomic(ctx, &safe_path, &new_content)?;
+    }
+
     let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
-    fs::write(&safe_path, new_content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     if let Some(command) = editor_cmd {
         run_editor(&command, &safe_path)?;

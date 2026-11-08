@@ -175,7 +175,7 @@ pub fn create_group(
 
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    fs::write(&safe_path, content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::write_atomic(ctx, &safe_path, &content)?;
     Ok(id)
 }
 
@@ -187,6 +187,8 @@ pub fn create(
     story_raw: Option<&str>,
     desc_raw: Option<&str>,
     group_raw: &str,
+    labels_raw: &[String],
+    references_raw: &[String],
 ) -> Result<String, AppError> {
     let title_string = match (title_raw, title_flag_raw) {
         (Some(a), Some(b)) => {
@@ -218,6 +220,22 @@ pub fn create(
         Some(s) => Some(sanitize_text(s)?),
         None => None,
     };
+    let mut labels: Vec<String> = Vec::new();
+    for l in labels_raw {
+        if !labels.contains(l) {
+            labels.push(sanitize_text(l)?);
+        }
+    }
+    let mut references: Vec<String> = Vec::new();
+    for r in references_raw {
+        if !references.contains(r) {
+            references.push(
+                sanitize::sanitize_path_string(r).ok_or_else(|| {
+                    AppError::Validation("input cannot be normalized".to_string())
+                })?,
+            );
+        }
+    }
     let group_id = sanitize_text(group_raw)?;
 
     if !is_group_id(&group_id, &entry.prefix) {
@@ -293,7 +311,7 @@ pub fn create(
         width = cfg.id_padding as usize
     );
 
-    let content = render_requirement(
+    let body = render_requirement(
         kind,
         &req_id,
         &title_string,
@@ -303,9 +321,43 @@ pub fn create(
         &group_title,
     );
 
+    let now = crate::record::frontmatter::utc_now();
+    let mut fm = String::new();
+    fm.push_str(&format!("id: {}\n", req_id));
+    fm.push_str(&format!(
+        "title: {}\n",
+        crate::record::frontmatter::format_scalar_pub(&title_string)
+    ));
+    fm.push_str(&format!("created_date: '{}'\n", now));
+    fm.push_str(&format!("updated_date: '{}'\n", now));
+    if labels.is_empty() {
+        fm.push_str("labels: []\n");
+    } else {
+        fm.push_str("labels:\n");
+        for l in &labels {
+            fm.push_str(&format!(
+                "  - {}\n",
+                crate::record::frontmatter::format_scalar_pub(l)
+            ));
+        }
+    }
+    if references.is_empty() {
+        fm.push_str("references: []\n");
+    } else {
+        fm.push_str("references:\n");
+        for r in &references {
+            fm.push_str(&format!(
+                "  - {}\n",
+                crate::record::frontmatter::format_scalar_pub(r)
+            ));
+        }
+    }
+
+    let content = crate::record::frontmatter::wrap(&fm, &body);
+
     let file_path = active.join(format!("{}.md", req_id));
     let safe_file = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    fs::write(&safe_file, content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::write_atomic(ctx, &safe_file, &content)?;
     Ok(req_id)
 }
 
@@ -356,7 +408,16 @@ pub fn list(ctx: &Context, kind: Kind) -> Result<crate::CommandOutput, AppError>
 }
 
 pub(crate) fn parse_heading(content: &str) -> (String, String) {
-    let first = content.lines().next().unwrap_or("");
+    let body = if let Some((_, _, bs)) = crate::record::frontmatter::find_block(content) {
+        &content[bs..]
+    } else {
+        content
+    };
+    let first = body
+        .lines()
+        .skip_while(|l| l.trim().is_empty())
+        .next()
+        .unwrap_or("");
     let rest = first.trim_start_matches('#').trim();
     let mut parts = rest.splitn(2, char::is_whitespace);
     let id = parts.next().unwrap_or("").trim().to_string();
@@ -456,6 +517,22 @@ pub fn view(ctx: &Context, kind: Kind, id_raw: &str) -> Result<crate::CommandOut
     Ok(crate::CommandOutput { text, json })
 }
 
+fn frontmatter_list_req(content: &str, key: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Ok(Some(fm)) = crate::record::frontmatter::parse(content) {
+        if let Some(yaml_serde::Value::Sequence(seq)) =
+            fm.data.get(yaml_serde::Value::String(key.to_string()))
+        {
+            for v in seq {
+                if let yaml_serde::Value::String(s) = v {
+                    out.push(s.clone());
+                }
+            }
+        }
+    }
+    out
+}
+
 pub fn edit(
     ctx: &Context,
     kind: Kind,
@@ -463,6 +540,8 @@ pub fn edit(
     title_raw: Option<&str>,
     story_raw: Option<&str>,
     desc_raw: Option<&str>,
+    labels_raw: &[String],
+    references_raw: &[String],
     editor: bool,
 ) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
@@ -499,28 +578,80 @@ pub fn edit(
         parsed.description = Some(sanitize_text(d)?);
     }
 
-    let new_content = if parsed.group_id.is_some() {
-        render_requirement(
-            kind,
-            &parsed.id,
-            &parsed.title,
-            parsed.story.as_deref(),
-            parsed.description.as_deref(),
-            parsed.group_id.as_deref().unwrap(),
-            parsed.group_title.as_deref().unwrap_or(""),
-        )
+    let mut ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if title_raw.is_some() {
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "title".into(),
+            parsed.title.clone(),
+        ));
+        ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
+            parsed.title.clone(),
+        ));
+    }
+    if kind.supports_story() && story_raw.is_some() {
+        if let Some(s) = &parsed.story {
+            ops.push(crate::record::patch::PatchOp::SetSection(
+                "## User Story".into(),
+                s.clone(),
+            ));
+        }
+    }
+    if desc_raw.is_some() {
+        if let Some(d) = &parsed.description {
+            ops.push(crate::record::patch::PatchOp::SetSection(
+                "## Description".into(),
+                d.clone(),
+            ));
+        }
+    }
+    if !labels_raw.is_empty() {
+        let mut fm_labels = frontmatter_list_req(&content, "labels");
+        for l in labels_raw {
+            let lv = sanitize_text(l)?;
+            if !fm_labels.contains(&lv) {
+                fm_labels.push(lv);
+            }
+        }
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "labels".into(),
+            fm_labels.join("\n"),
+        ));
+    }
+    if !references_raw.is_empty() {
+        let mut fm_refs = frontmatter_list_req(&content, "references");
+        for r in references_raw {
+            let rv = sanitize::sanitize_path_string(r)
+                .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?;
+            if !fm_refs.contains(&rv) {
+                fm_refs.push(rv);
+            }
+        }
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "references".into(),
+            fm_refs.join("\n"),
+        ));
+    }
+
+    let doc = crate::record::document::parse(&content)?;
+    let base_new = crate::record::patch::apply_patch(&doc, &ops)?;
+    let new_content = if ops.is_empty() || base_new == content {
+        content.clone()
     } else {
-        render_group(
-            kind,
-            &parsed.id,
-            &parsed.title,
-            parsed.story.as_deref(),
-            parsed.description.as_deref(),
-        )
+        let mut ops2 = ops.clone();
+        let now = crate::record::frontmatter::utc_now();
+        ops2.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "updated_date".into(),
+            now,
+        ));
+        crate::record::patch::apply_patch(&doc, &ops2)?
     };
 
+    if new_content != content {
+        let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
+        crate::record::store::write_atomic(ctx, &safe_write, &new_content)?;
+    }
+
     let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
-    fs::write(&safe_write, new_content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     if editor {
         let editor_cmd = cfg.effective_editor();

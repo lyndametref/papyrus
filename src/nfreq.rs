@@ -16,6 +16,12 @@ pub enum NfreqCmd {
         /// Owning non-functional-requirement group.
         #[arg(long = "group")]
         group: String,
+        /// Label.
+        #[arg(long = "label")]
+        label: Vec<String>,
+        /// Reference.
+        #[arg(long = "reference")]
+        reference: Vec<String>,
     },
     /// Create a non-functional-requirement group.
     CreateGroup {
@@ -42,6 +48,12 @@ pub enum NfreqCmd {
         /// Open the document body in $VISUAL or $EDITOR.
         #[arg(long = "editor")]
         editor: bool,
+        /// Label.
+        #[arg(long = "label")]
+        label: Vec<String>,
+        /// Reference.
+        #[arg(long = "reference")]
+        reference: Vec<String>,
     },
     /// Deprecate a non-functional requirement.
     Deprecate { id: String },
@@ -56,6 +68,8 @@ pub fn run(ctx: &Context, cmd: NfreqCmd) -> Result<crate::CommandOutput, AppErro
             title,
             description,
             group,
+            label,
+            reference,
         } => {
             let id = requirement::create(
                 ctx,
@@ -65,6 +79,8 @@ pub fn run(ctx: &Context, cmd: NfreqCmd) -> Result<crate::CommandOutput, AppErro
                 None,
                 description.as_deref(),
                 &group,
+                &label,
+                &reference,
             )?;
             let text = id.clone();
             let json = if ctx.json {
@@ -91,6 +107,8 @@ pub fn run(ctx: &Context, cmd: NfreqCmd) -> Result<crate::CommandOutput, AppErro
             title,
             description,
             editor,
+            label,
+            reference,
         } => requirement::edit(
             ctx,
             kind,
@@ -98,6 +116,8 @@ pub fn run(ctx: &Context, cmd: NfreqCmd) -> Result<crate::CommandOutput, AppErro
             title.as_deref(),
             None,
             description.as_deref(),
+            &label,
+            &reference,
             editor,
         ),
         NfreqCmd::Deprecate { id } => requirement::deprecate(ctx, kind, &id),

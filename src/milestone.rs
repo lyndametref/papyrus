@@ -21,6 +21,12 @@ pub enum MilestoneCmd {
         /// Assign the milestone to a release.
         #[arg(long = "release")]
         release: Option<String>,
+        /// Label.
+        #[arg(long = "label")]
+        label: Vec<String>,
+        /// Reference.
+        #[arg(long = "reference")]
+        reference: Vec<String>,
     },
     /// List milestones.
     List,
@@ -41,6 +47,12 @@ pub enum MilestoneCmd {
         /// Remove the release assignment.
         #[arg(long = "no-release", num_args = 0..=1)]
         no_release: Option<Option<String>>,
+        /// Label.
+        #[arg(long = "label")]
+        label: Vec<String>,
+        /// Reference.
+        #[arg(long = "reference")]
+        reference: Vec<String>,
     },
     /// Archive a milestone.
     Archive { id: String },
@@ -59,8 +71,17 @@ pub fn run(ctx: &Context, cmd: MilestoneCmd) -> Result<crate::CommandOutput, App
             title,
             description,
             release,
+            label,
+            reference,
         } => {
-            let id = create(ctx, &title, description.as_deref(), release.as_deref())?;
+            let id = create(
+                ctx,
+                &title,
+                description.as_deref(),
+                release.as_deref(),
+                &label,
+                &reference,
+            )?;
             let text = id.clone();
             let json = if ctx.json {
                 Some(serde_json::json!({"id": id}))
@@ -77,6 +98,8 @@ pub fn run(ctx: &Context, cmd: MilestoneCmd) -> Result<crate::CommandOutput, App
             description,
             release,
             no_release,
+            label,
+            reference,
         } => edit(
             ctx,
             &id,
@@ -84,6 +107,8 @@ pub fn run(ctx: &Context, cmd: MilestoneCmd) -> Result<crate::CommandOutput, App
             description.as_deref(),
             release.as_deref(),
             no_release,
+            &label,
+            &reference,
         ),
         MilestoneCmd::Archive { id } => archive(ctx, &id),
         MilestoneCmd::Delete { id, force } => delete(ctx, &id, force),
@@ -93,6 +118,12 @@ pub fn run(ctx: &Context, cmd: MilestoneCmd) -> Result<crate::CommandOutput, App
 fn sanitize_text(input: &str) -> Result<String, AppError> {
     sanitize::sanitize_name(input)
         .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))
+}
+
+fn unique_push_ms(vec: &mut Vec<String>, val: String) {
+    if !vec.contains(&val) {
+        vec.push(val);
+    }
 }
 
 fn load_config(ctx: &Context) -> Result<Config, AppError> {
@@ -162,8 +193,33 @@ fn release_exists(ctx: &Context, cfg: &Config, id: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn frontmatter_list_ms(content: &str, key: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Ok(Some(fm)) = crate::record::frontmatter::parse(content) {
+        if let Some(yaml_serde::Value::Sequence(seq)) =
+            fm.data.get(yaml_serde::Value::String(key.to_string()))
+        {
+            for v in seq {
+                if let yaml_serde::Value::String(s) = v {
+                    out.push(s.clone());
+                }
+            }
+        }
+    }
+    out
+}
+
 fn parse_heading(content: &str) -> (String, String) {
-    let first = content.lines().next().unwrap_or("");
+    let body = if let Some((_, _, bs)) = crate::record::frontmatter::find_block(content) {
+        &content[bs..]
+    } else {
+        content
+    };
+    let first = body
+        .lines()
+        .skip_while(|l| l.trim().is_empty())
+        .next()
+        .unwrap_or("");
     let rest = first.trim_start_matches('#').trim();
     let mut parts = rest.splitn(2, char::is_whitespace);
     let id = parts.next().unwrap_or("").trim().to_string();
@@ -236,6 +292,8 @@ pub fn create(
     title_raw: &str,
     desc_raw: Option<&str>,
     release_raw: Option<&str>,
+    labels_raw: &[String],
+    references_raw: &[String],
 ) -> Result<String, AppError> {
     let cfg = load_config(ctx)?;
     let title = sanitize_text(title_raw)?;
@@ -254,6 +312,19 @@ pub fn create(
         None => None,
     };
 
+    let mut labels: Vec<String> = Vec::new();
+    for l in labels_raw {
+        unique_push_ms(&mut labels, sanitize_text(l)?);
+    }
+    let mut references: Vec<String> = Vec::new();
+    for r in references_raw {
+        unique_push_ms(
+            &mut references,
+            sanitize::sanitize_path_string(r)
+                .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?,
+        );
+    }
+
     let active = active_dir(ctx, &cfg)?;
     let archived = archived_dir(ctx, &cfg)?;
     ensure_dir(&active, &ctx.project_dir)?;
@@ -268,11 +339,52 @@ pub fn create(
         width = cfg.id_padding as usize
     );
 
-    let content = render_milestone(&id, &title, desc.as_deref(), release.as_deref());
+    let now = crate::record::frontmatter::utc_now();
+    let mut fm = String::new();
+    fm.push_str(&format!("id: {}\n", id));
+    fm.push_str(&format!(
+        "title: {}\n",
+        crate::record::frontmatter::format_scalar_pub(&title)
+    ));
+    fm.push_str(&format!("created_date: '{}'\n", now));
+    fm.push_str(&format!("updated_date: '{}'\n", now));
+    if labels.is_empty() {
+        fm.push_str("labels: []\n");
+    } else {
+        fm.push_str("labels:\n");
+        for l in &labels {
+            fm.push_str(&format!(
+                "  - {}\n",
+                crate::record::frontmatter::format_scalar_pub(l)
+            ));
+        }
+    }
+    if references.is_empty() {
+        fm.push_str("references: []\n");
+    } else {
+        fm.push_str("references:\n");
+        for r in &references {
+            fm.push_str(&format!(
+                "  - {}\n",
+                crate::record::frontmatter::format_scalar_pub(r)
+            ));
+        }
+    }
+    if let Some(r) = &release {
+        fm.push_str(&format!(
+            "release: {}\n",
+            crate::record::frontmatter::format_scalar_pub(r)
+        ));
+    } else {
+        fm.push_str("release: null\n");
+    }
+
+    let body = render_milestone(&id, &title, desc.as_deref(), release.as_deref());
+    let content = crate::record::frontmatter::wrap(&fm, &body);
 
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    fs::write(&safe_path, content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::write_atomic(ctx, &safe_path, &content)?;
     Ok(id)
 }
 
@@ -360,6 +472,8 @@ pub fn edit(
     desc_raw: Option<&str>,
     release_raw: Option<&str>,
     no_release: Option<Option<String>>,
+    labels_raw: &[String],
+    references_raw: &[String],
 ) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
     if release_raw.is_some() && no_release.is_some() {
@@ -411,7 +525,7 @@ pub fn edit(
         }
         release_val = Some(rid);
     }
-    if let Some(no) = no_release {
+    if let Some(no) = &no_release {
         match no {
             Some(rid_raw) => {
                 let rid = sanitize_text(&rid_raw)?;
@@ -434,15 +548,98 @@ pub fn edit(
     } else {
         parsed_id
     };
-    let new_content = render_milestone(
-        &new_id,
-        &title_val,
-        desc_val.as_deref(),
-        release_val.as_deref(),
-    );
+    let mut ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if title_raw.is_some() {
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "title".into(),
+            title_val.clone(),
+        ));
+        ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
+            title_val.clone(),
+        ));
+    }
+    if desc_raw.is_some() {
+        if let Some(d) = &desc_val {
+            ops.push(crate::record::patch::PatchOp::SetSection(
+                "## Description".into(),
+                d.clone(),
+            ));
+        } else {
+            ops.push(crate::record::patch::PatchOp::ClearSection(
+                "## Description".into(),
+            ));
+        }
+    }
+    if release_raw.is_some() {
+        if let Some(r) = &release_val {
+            ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "release".into(),
+                r.clone(),
+            ));
+            ops.push(crate::record::patch::PatchOp::SetSection(
+                "## Release".into(),
+                r.clone(),
+            ));
+        } else {
+            // no release provided but release_raw Some None? handled below
+        }
+    }
+    if no_release.is_some() {
+        ops.push(crate::record::patch::PatchOp::ClearFrontMatter(
+            "release".into(),
+        ));
+        ops.push(crate::record::patch::PatchOp::ClearSection(
+            "## Release".into(),
+        ));
+    }
+    if !labels_raw.is_empty() {
+        let mut fm_labels = frontmatter_list_ms(&content, "labels");
+        for l in labels_raw {
+            let lv = sanitize_text(l)?;
+            if !fm_labels.contains(&lv) {
+                fm_labels.push(lv);
+            }
+        }
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "labels".into(),
+            fm_labels.join("\n"),
+        ));
+    }
+    if !references_raw.is_empty() {
+        let mut fm_refs = frontmatter_list_ms(&content, "references");
+        for r in references_raw {
+            let rv = sanitize::sanitize_path_string(r)
+                .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?;
+            if !fm_refs.contains(&rv) {
+                fm_refs.push(rv);
+            }
+        }
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "references".into(),
+            fm_refs.join("\n"),
+        ));
+    }
+
+    let doc = crate::record::document::parse(&content)?;
+    let base_new = crate::record::patch::apply_patch(&doc, &ops)?;
+    let new_content = if ops.is_empty() || base_new == content {
+        content.clone()
+    } else {
+        let mut ops2 = ops.clone();
+        let now = crate::record::frontmatter::utc_now();
+        ops2.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "updated_date".into(),
+            now,
+        ));
+        crate::record::patch::apply_patch(&doc, &ops2)?
+    };
+
+    if new_content != content {
+        let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
+        crate::record::store::write_atomic(ctx, &safe_write, &new_content)?;
+    }
 
     let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
-    fs::write(&safe_write, new_content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": new_id}))

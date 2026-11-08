@@ -22,6 +22,12 @@ pub enum ReqCmd {
         /// Owning business-requirement group.
         #[arg(long = "group")]
         group: String,
+        /// Label.
+        #[arg(long = "label")]
+        label: Vec<String>,
+        /// Reference.
+        #[arg(long = "reference")]
+        reference: Vec<String>,
     },
     /// Create a business-requirement group.
     CreateGroup {
@@ -54,6 +60,12 @@ pub enum ReqCmd {
         /// Open the document body in $VISUAL or $EDITOR.
         #[arg(long = "editor")]
         editor: bool,
+        /// Label.
+        #[arg(long = "label")]
+        label: Vec<String>,
+        /// Reference.
+        #[arg(long = "reference")]
+        reference: Vec<String>,
     },
     /// Deprecate a business requirement.
     Deprecate { id: String },
@@ -70,6 +82,8 @@ pub fn run(ctx: &Context, cmd: ReqCmd) -> Result<crate::CommandOutput, AppError>
             story,
             description,
             group,
+            label,
+            reference,
         } => {
             let id = requirement::create(
                 ctx,
@@ -79,6 +93,8 @@ pub fn run(ctx: &Context, cmd: ReqCmd) -> Result<crate::CommandOutput, AppError>
                 story.as_deref(),
                 description.as_deref(),
                 &group,
+                &label,
+                &reference,
             )?;
             let text = id.clone();
             let json = if ctx.json {
@@ -116,6 +132,8 @@ pub fn run(ctx: &Context, cmd: ReqCmd) -> Result<crate::CommandOutput, AppError>
             story,
             description,
             editor,
+            label,
+            reference,
         } => requirement::edit(
             ctx,
             kind,
@@ -123,6 +141,8 @@ pub fn run(ctx: &Context, cmd: ReqCmd) -> Result<crate::CommandOutput, AppError>
             title.as_deref(),
             story.as_deref(),
             description.as_deref(),
+            &label,
+            &reference,
             editor,
         ),
         ReqCmd::Deprecate { id } => requirement::deprecate(ctx, kind, &id),

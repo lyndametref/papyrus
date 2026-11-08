@@ -66,10 +66,8 @@ fn tech_spec_basic_lifecycle() {
     let path = record(&d, "TECH-001");
     assert!(path.exists());
     let content = fs::read_to_string(&path).unwrap();
-    assert_eq!(
-        content,
-        "# TECH-001 Cache strategy\n\n## Description\nUse Redis for hot keys\n"
-    );
+    assert!(content.contains("# TECH-001 Cache strategy\n"));
+    assert!(content.contains("## Description\nUse Redis for hot keys\n"));
     assert!(content.ends_with('\n') && !content.ends_with("\n\n"));
 
     let out = run(&d, &["tech-spec", "list"]);

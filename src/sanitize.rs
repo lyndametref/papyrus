@@ -52,3 +52,49 @@ pub fn sanitize_path(input: &Path) -> Option<PathBuf> {
     }
     Some(out)
 }
+
+/// Sanitize a reference or documentation path, allowing path separators while
+/// rejecting traversal segments and control characters.
+pub fn sanitize_path_string(input: &str) -> Option<String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if trimmed.contains('\0') || trimmed.contains('\n') || trimmed.contains('\r') {
+        return None;
+    }
+    // Reject backslashes to keep a single canonical separator.
+    if trimmed.contains('\\') {
+        return None;
+    }
+    let path = std::path::Path::new(trimmed);
+    for comp in path.components() {
+        match comp {
+            std::path::Component::ParentDir => return None,
+            std::path::Component::Normal(s) => {
+                let name = s.to_str()?;
+                if name.is_empty() || name.contains('\0') {
+                    return None;
+                }
+            }
+            std::path::Component::Prefix(_) | std::path::Component::RootDir => return None,
+            std::path::Component::CurDir => {}
+        }
+    }
+    Some(trimmed.to_string())
+}
+
+/// Alias for callers that think in terms of references.
+pub fn sanitize_reference(input: &str) -> Option<String> {
+    sanitize_path_string(input)
+}
+
+/// Alias for callers that think in terms of documentation paths.
+pub fn sanitize_documentation(input: &str) -> Option<String> {
+    sanitize_path_string(input)
+}
+
+/// Alias matching the path-safe sanitizer wording.
+pub fn sanitize_path_value(input: &str) -> Option<String> {
+    sanitize_path_string(input)
+}

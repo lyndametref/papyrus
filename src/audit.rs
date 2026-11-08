@@ -17,6 +17,10 @@ pub enum AuditCmd {
         content: String,
         #[arg(long = "audit-type")]
         audit_type: Option<String>,
+        #[arg(long = "label")]
+        label: Vec<String>,
+        #[arg(long = "reference")]
+        reference: Vec<String>,
     },
     List,
     View {
@@ -32,6 +36,10 @@ pub enum AuditCmd {
         audit_type: Option<String>,
         #[arg(long = "editor")]
         editor: bool,
+        #[arg(long = "label")]
+        label: Vec<String>,
+        #[arg(long = "reference")]
+        reference: Vec<String>,
     },
     Deprecate {
         id: String,
@@ -47,8 +55,17 @@ pub fn run(ctx: &Context, cmd: AuditCmd) -> Result<CommandOutput, AppError> {
             title,
             content,
             audit_type,
+            label,
+            reference,
         } => {
-            let id = create(ctx, &title, &content, audit_type.as_deref())?;
+            let id = create(
+                ctx,
+                &title,
+                &content,
+                audit_type.as_deref(),
+                &label,
+                &reference,
+            )?;
             let json = if ctx.json {
                 Some(serde_json::json!({"id": id}))
             } else {
@@ -64,12 +81,16 @@ pub fn run(ctx: &Context, cmd: AuditCmd) -> Result<CommandOutput, AppError> {
             content,
             audit_type,
             editor,
+            label,
+            reference,
         } => edit(
             ctx,
             &id,
             title.as_deref(),
             content.as_deref(),
             audit_type.as_deref(),
+            &label,
+            &reference,
             editor,
         ),
         AuditCmd::Deprecate { id } => deprecate(ctx, &id),
@@ -214,7 +235,16 @@ pub(crate) struct AuditData {
 }
 
 pub(crate) fn parse_heading(content: &str) -> (String, String) {
-    let first = content.lines().next().unwrap_or("");
+    let body = if let Some((_, _, bs)) = crate::record::frontmatter::find_block(content) {
+        &content[bs..]
+    } else {
+        content
+    };
+    let first = body
+        .lines()
+        .skip_while(|l| l.trim().is_empty())
+        .next()
+        .unwrap_or("");
     let rest = first.trim_start_matches('#').trim();
     let mut parts = rest.splitn(2, char::is_whitespace);
     let id = parts.next().unwrap_or("").trim().to_string();
@@ -282,6 +312,8 @@ pub fn create(
     title_raw: &str,
     content_raw: &str,
     audit_type_raw: Option<&str>,
+    labels_raw: &[String],
+    references_raw: &[String],
 ) -> Result<String, AppError> {
     let title = sanitize_field(title_raw)?;
     let content = sanitize_field(content_raw)?;
@@ -289,6 +321,19 @@ pub fn create(
         Some(v) => sanitize_field(v)?,
         None => "security".to_string(),
     };
+
+    let mut labels: Vec<String> = Vec::new();
+    for l in labels_raw {
+        if !labels.contains(l) {
+            labels.push(sanitize_field(l)?);
+        }
+    }
+    let mut references: Vec<String> = Vec::new();
+    for r in references_raw {
+        if !references.contains(r) {
+            references.push(sanitize_field(r)?);
+        }
+    }
 
     let cfg = load_config(ctx)?;
     let entry = type_entry(&cfg)?;
@@ -307,14 +352,51 @@ pub fn create(
 
     let record = AuditData {
         id: id.clone(),
-        title,
-        audit_type,
+        title: title.clone(),
+        audit_type: audit_type.clone(),
         content,
     };
+    let body = render_record(&record);
+    let now = crate::record::frontmatter::utc_now();
+    let mut fm = String::new();
+    fm.push_str(&format!("id: {}\n", id));
+    fm.push_str(&format!(
+        "title: {}\n",
+        crate::record::frontmatter::format_scalar_pub(&title)
+    ));
+    fm.push_str(&format!("created_date: '{}'\n", now));
+    fm.push_str(&format!("updated_date: '{}'\n", now));
+    if labels.is_empty() {
+        fm.push_str("labels: []\n");
+    } else {
+        fm.push_str("labels:\n");
+        for l in &labels {
+            fm.push_str(&format!(
+                "  - {}\n",
+                crate::record::frontmatter::format_scalar_pub(l)
+            ));
+        }
+    }
+    if references.is_empty() {
+        fm.push_str("references: []\n");
+    } else {
+        fm.push_str("references:\n");
+        for r in &references {
+            fm.push_str(&format!(
+                "  - {}\n",
+                crate::record::frontmatter::format_scalar_pub(r)
+            ));
+        }
+    }
+    // audit type front-matter key "type"
+    fm.push_str(&format!(
+        "type: {}\n",
+        crate::record::frontmatter::format_scalar_pub(&audit_type)
+    ));
+    let content = crate::record::frontmatter::wrap(&fm, &body);
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    fs::write(&safe_path, render_record(&record).as_bytes())
-        .map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::write_atomic(ctx, &safe_path, &content)?;
     Ok(id)
 }
 
@@ -389,12 +471,30 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
     Ok(CommandOutput { text, json })
 }
 
+fn frontmatter_list_audit(content: &str, key: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Ok(Some(fm)) = crate::record::frontmatter::parse(content) {
+        if let Some(yaml_serde::Value::Sequence(seq)) =
+            fm.data.get(yaml_serde::Value::String(key.to_string()))
+        {
+            for v in seq {
+                if let yaml_serde::Value::String(s) = v {
+                    out.push(s.clone());
+                }
+            }
+        }
+    }
+    out
+}
+
 pub fn edit(
     ctx: &Context,
     id_raw: &str,
     title_raw: Option<&str>,
     content_raw: Option<&str>,
     audit_type_raw: Option<&str>,
+    labels_raw: &[String],
+    references_raw: &[String],
     editor: bool,
 ) -> Result<CommandOutput, AppError> {
     let id = sanitize_field(id_raw)?;
@@ -427,9 +527,79 @@ pub fn edit(
         None
     };
 
-    let new_content = render_record(&record);
+    let mut ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if title_raw.is_some() {
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "title".into(),
+            record.title.clone(),
+        ));
+        ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
+            record.title.clone(),
+        ));
+    }
+    if content_raw.is_some() {
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## Content".into(),
+            record.content.clone(),
+        ));
+    }
+    if audit_type_raw.is_some() {
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "type".into(),
+            record.audit_type.clone(),
+        ));
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## Audit Type".into(),
+            record.audit_type.clone(),
+        ));
+    }
+    if !labels_raw.is_empty() {
+        let mut fm_labels = frontmatter_list_audit(&content, "labels");
+        for l in labels_raw {
+            let lv = sanitize_field(l)?;
+            if !fm_labels.contains(&lv) {
+                fm_labels.push(lv);
+            }
+        }
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "labels".into(),
+            fm_labels.join("\n"),
+        ));
+    }
+    if !references_raw.is_empty() {
+        let mut fm_refs = frontmatter_list_audit(&content, "references");
+        for r in references_raw {
+            let rv = sanitize_field(r)?;
+            if !fm_refs.contains(&rv) {
+                fm_refs.push(rv);
+            }
+        }
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "references".into(),
+            fm_refs.join("\n"),
+        ));
+    }
+
+    let doc = crate::record::document::parse(&content)?;
+    let base_new = crate::record::patch::apply_patch(&doc, &ops)?;
+    let new_content = if ops.is_empty() || base_new == content {
+        content.clone()
+    } else {
+        let mut ops2 = ops.clone();
+        let now = crate::record::frontmatter::utc_now();
+        ops2.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "updated_date".into(),
+            now,
+        ));
+        crate::record::patch::apply_patch(&doc, &ops2)?
+    };
+
+    if new_content != content {
+        let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
+        crate::record::store::write_atomic(ctx, &safe_path, &new_content)?;
+    }
+
     let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
-    fs::write(&safe_path, new_content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     if let Some(command) = editor_cmd {
         run_editor(&command, &safe_path)?;

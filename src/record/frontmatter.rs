@@ -126,15 +126,20 @@ pub fn split(content: &str) -> Result<(Option<FrontMatter>, String), AppError> {
 /// Returns (new_raw, changed).
 pub fn patch_raw(raw: &str, key: &str, value: Option<&str>) -> (String, bool) {
     // unchanged check
-    let current = current_value_string(raw, key);
     if value.is_none() && !contains_key(raw, key) {
         return (raw.to_string(), false);
     }
     if let Some(v) = value
         && contains_key(raw, key)
-        && current.as_deref() == Some(v)
     {
-        return (raw.to_string(), false);
+        // Scalar no-op.
+        if current_value_string(raw, key).as_deref() == Some(v) {
+            return (raw.to_string(), false);
+        }
+        // List no-op: compare the fully formatted key block.
+        if current_key_block(raw, key).as_deref() == Some(format_kv(key, v).as_str()) {
+            return (raw.to_string(), false);
+        }
     }
 
     let lines: Vec<&str> = raw.split('\n').collect();
@@ -199,6 +204,34 @@ pub fn contains_key(raw: &str, key: &str) -> bool {
     false
 }
 
+pub fn current_key_block(raw: &str, key: &str) -> Option<String> {
+    let lines: Vec<&str> = raw.split('\n').collect();
+    let mut start_idx: Option<usize> = None;
+    for (i, line) in lines.iter().enumerate() {
+        if line.starts_with(char::is_whitespace) || line.trim().is_empty() {
+            continue;
+        }
+        if let Some((k, _)) = line.split_once(':')
+            && k.trim() == key
+        {
+            start_idx = Some(i);
+            break;
+        }
+    }
+    let si = start_idx?;
+    let mut ei = si + 1;
+    while ei < lines.len() {
+        if lines[ei].trim().is_empty() {
+            break;
+        }
+        if !lines[ei].starts_with(char::is_whitespace) {
+            break;
+        }
+        ei += 1;
+    }
+    Some(lines[si..ei].join("\n"))
+}
+
 pub fn current_value_string(raw: &str, key: &str) -> Option<String> {
     if let Ok(yaml_serde::Value::Mapping(m)) = yaml_serde::from_str::<yaml_serde::Value>(raw)
         && let Some(v) = m.get(yaml_serde::Value::String(key.to_string()))
@@ -254,9 +287,34 @@ fn is_timestamp(v: &str) -> bool {
         && v.as_bytes()[19] == b'Z'
 }
 
+fn is_list_key(key: &str) -> bool {
+    matches!(
+        key,
+        "labels" | "references" | "documentation" | "dependencies" | "assignee"
+    )
+}
+
 fn format_kv(key: &str, value: &str) -> String {
     let v = value.trim_end_matches('\n');
-    if v.contains('\n') {
+    if is_list_key(key) {
+        // Empty list marker passed through as-is.
+        if v.trim() == "[]" {
+            return format!("{}: []", key);
+        }
+        let items: Vec<&str> = v
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect();
+        if items.is_empty() {
+            return format!("{}: []", key);
+        }
+        let mut s = format!("{}:", key);
+        for item in items {
+            s.push_str(&format!("\n  - {}", format_scalar(item)));
+        }
+        s
+    } else if v.contains('\n') {
         let mut s = format!("{}:", key);
         for line in v.lines() {
             let item = line.trim();
@@ -268,6 +326,69 @@ fn format_kv(key: &str, value: &str) -> String {
     } else {
         format!("{}: {}", key, format_scalar(v))
     }
+}
+
+/// Format a single front-matter key/value pair (scalar or list) into raw YAML text.
+pub fn format_kv_pub(key: &str, value: &str) -> String {
+    format_kv(key, value)
+}
+
+/// Wrap a raw front-matter block and a body into a complete document.
+pub fn wrap(front_matter_raw: &str, body: &str) -> String {
+    let mut out = String::new();
+    out.push_str("---\n");
+    out.push_str(front_matter_raw);
+    if !front_matter_raw.ends_with('\n') {
+        out.push('\n');
+    }
+    out.push_str("---\n");
+    if !body.is_empty() {
+        if !body.starts_with('\n') {
+            out.push('\n');
+        }
+        out.push_str(body);
+        if !body.ends_with('\n') {
+            out.push('\n');
+        }
+    } else {
+        out.push('\n');
+    }
+    out
+}
+
+/// Current UTC time as quoted ISO-8601 string payload (without quotes).
+pub fn utc_now() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+    let (y, mo, d, h, mi, se) = civil_from_unix(secs);
+    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, mo, d, h, mi, se)
+}
+
+fn civil_from_unix(secs: i64) -> (i64, u32, u32, u32, u32, u32) {
+    let days = secs.div_euclid(86400);
+    let rem = secs.rem_euclid(86400);
+    let h = (rem / 3600) as u32;
+    let mi = ((rem % 3600) / 60) as u32;
+    let se = (rem % 60) as u32;
+    // Howard Hinnant algorithm
+    let z = days + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = z - era * 146097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m, d, h, mi, se)
+}
+
+/// Expose format_scalar for timestamp quoting.
+pub fn format_scalar_pub(v: &str) -> String {
+    format_scalar(v)
 }
 
 #[cfg(test)]
@@ -310,6 +431,21 @@ mod tests {
     fn has_front_matter_requires_byte_zero_delimiter() {
         let content = "intro\n---\nid: X\n---\n";
         assert!(!has_front_matter(content));
+    }
+
+    #[test]
+    fn single_list_item_serializes_as_sequence() {
+        let raw = "id: X";
+        let (out, _) = patch_raw(raw, "labels", Some("foo"));
+        assert!(out.contains("labels:\n  - foo"), "got: {}", out);
+    }
+
+    #[test]
+    fn list_no_op_byte_identical() {
+        let raw = "id: X\nlabels:\n  - foo";
+        let (out, changed) = patch_raw(raw, "labels", Some("foo"));
+        assert!(!changed);
+        assert_eq!(out, raw);
     }
 
     #[test]
