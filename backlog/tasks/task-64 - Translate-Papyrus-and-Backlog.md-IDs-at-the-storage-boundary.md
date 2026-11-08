@@ -1,9 +1,10 @@
 ---
 id: TASK-64
 title: Translate Papyrus and Backlog.md IDs at the storage boundary
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-08T15:06:00Z'
+updated_date: '2026-11-08T17:19:00Z'
 labels:
   - front-matter
   - record-identity
@@ -19,6 +20,9 @@ references:
     docs/architecture/adr/ADR-0008-adopt-backlog-md-on-disk-layout-for-tasks-and-milestones.md
   - >-
     docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md
+documentation:
+  - >-
+    docs/specifications/translate-papyrus-and-backlog-md-ids-at-the-storage-boundary.md
 priority: high
 type: feature
 ordinal: 30020

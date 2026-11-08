@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn patch_op_variants_exist() {
-        let ops = vec![
+        let ops = [
             PatchOp::SetFrontMatter("k".into(), "v".into()),
             PatchOp::ClearFrontMatter("k".into()),
             PatchOp::SetSection("## S".into(), "v".into()),

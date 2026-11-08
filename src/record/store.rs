@@ -177,9 +177,9 @@ mod tests {
         base
     }
 
-    fn ctx(dir: &PathBuf) -> Context {
+    fn ctx(dir: &std::path::Path) -> Context {
         Context {
-            project_dir: dir.clone(),
+            project_dir: dir.to_path_buf(),
             config_path: dir.join("papyrus.config.yml"),
             json: false,
             no_color: true,
