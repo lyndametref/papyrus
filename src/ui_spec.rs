@@ -466,7 +466,7 @@ fn view(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
     let deprecated = deprecated_dir(ctx, &cfg)?;
     let path = active_or_deprecated(ctx, &active, &deprecated, &id)?;
 
-    let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
     let json = if ctx.json {
         Some(serde_json::json!({
             "id": id,
@@ -513,7 +513,11 @@ fn edit(
     let deprecated = deprecated_dir(ctx, &cfg)?;
     let path = active_or_deprecated(ctx, &active, &deprecated, &id)?;
 
-    let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    if editor && cfg.effective_editor().is_none() {
+        return Err(AppError::Runtime("no editor configured".to_string()));
+    }
+
+    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
     let mut record = parse_record(&content, &id);
 
     if let Some(view) = view_raw {
@@ -597,6 +601,7 @@ fn edit(
 
     if let Some(command) = editor_cmd {
         run_editor(&command, &safe_path)?;
+        crate::record::migrate::ensure_front_matter(ctx, &safe_path)?;
     }
 
     let json = if ctx.json {

@@ -1213,7 +1213,26 @@ fn load_audit_record(ctx: &Context, path: &Path) -> Result<Option<Record>, AppEr
         doc.title.clone()
     };
     let audit_type_raw = crate::audit::section_text(&content, "Audit Type").unwrap_or_default();
-    let audit_type = if audit_type_raw.trim().is_empty() {
+    let fm_type = crate::record::frontmatter::parse(&content)
+        .ok()
+        .flatten()
+        .and_then(|fm| {
+            fm.data
+                .get(yaml_serde::Value::String("type".to_string()))
+                .cloned()
+        })
+        .and_then(|v| match v {
+            yaml_serde::Value::String(s) => Some(s),
+            other => Some(
+                yaml_serde::to_string(&other)
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string(),
+            ),
+        });
+    let audit_type = if let Some(t) = fm_type.filter(|t| !t.trim().is_empty()) {
+        t.trim().to_string()
+    } else if audit_type_raw.trim().is_empty() {
         "security".to_string()
     } else {
         audit_type_raw.trim().to_string()

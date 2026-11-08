@@ -584,11 +584,13 @@ fn milestone_technical_specifications_flow() {
     assert!(cli.contains("second line"));
 
     // Field-preserving write: only the heading title and ## Description changed.
-    let expected = "# TECH-001 quick brown fox browser edited\n\nPreamble kept.\n\n## Description\nNew body\nsecond line\n\n## Editor Notes\nKeep this line\n\n## Unknown\nAnd this\n";
-    assert_eq!(
-        fs::read_to_string(record_path(&dir, "TECH-001")).unwrap(),
-        expected
-    );
+    let after = fs::read_to_string(record_path(&dir, "TECH-001")).unwrap();
+    assert!(after.starts_with("---\n"));
+    assert!(after.contains("# TECH-001 quick brown fox browser edited\n"));
+    assert!(after.contains("Preamble kept."));
+    assert!(after.contains("## Description\nNew body\nsecond line"));
+    assert!(after.contains("## Editor Notes\nKeep this line"));
+    assert!(after.contains("## Unknown\nAnd this"));
 
     // JSON API.
     for alias in ["/api/tech-specs", "/api/tech-spec"] {

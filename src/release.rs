@@ -347,7 +347,7 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
     if !path.exists() {
         return Err(AppError::NotFound(format!("not found: {}", id)));
     }
-    let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
 
     let text = content.clone();
     let json = if ctx.json {
@@ -377,7 +377,7 @@ pub fn edit(
         return Err(AppError::NotFound(format!("not found: {}", id)));
     }
 
-    let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
     let (parsed_id, parsed_title, parsed_desc) = parse_release(&content);
     let mut title_val = if parsed_title.is_empty() {
         id.clone()

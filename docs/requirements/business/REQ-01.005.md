@@ -14,6 +14,8 @@ Papyrus generates record IDs automatically. IDs remain stable across archive/res
 
 Papyrus keeps this documented ID format and treats it as the ID space it displays and accepts, even where Backlog.md stores the same record under its own ID format. The two ID spaces are: Papyrus IDs (`TASK-001`, `MS-001`, configured prefix with `id_padding`) and Backlog.md IDs (for example `task-18`, `m-0`, and front-matter `id: TASK-18`, unpadded and with Backlog.md's own casing). Papyrus maps between them at the Backlog.md storage boundary: the record file and its front matter carry the Backlog.md ID, while CLI and browser output show the Papyrus ID. Command input uses only the Papyrus display format: a Backlog.md storage ID is internal to the `backlog/` store, is translated at that boundary, and is rejected as command input with a hint naming the equivalent Papyrus ID. The mapping is bidirectional and bijective over the record sequence, so a record keeps one identity in both tools; it normalizes prefix casing and zero-padding and reconciles the different numbering start of each tool (Backlog.md numbers milestones from `m-0`, Papyrus milestone IDs start at `MS-001`). Reference values in `milestone:` and `dependencies:` are translated with the same rule, so a milestone or dependency reference resolves in both Papyrus and Backlog.md after translation.
 
+The `id_padding` configuration is constrained to 1-6 characters (REQ-09). Values outside this range error out during configuration validation.
+
 ## Acceptance Criteria
 - Creating a supported record automatically assigns it an ID.
 - Archiving and restoring a record, or deprecating and restoring a document, does not change its ID.
@@ -23,6 +25,7 @@ Papyrus keeps this documented ID format and treats it as the ID space it display
 - A task or milestone file written by Papyrus carries the Backlog.md ID in its filename and front-matter `id` (for example `task-18`, `m-0`) while the same record is shown by Papyrus as `TASK-001` or `MS-001`.
 - The bidirectional mapping is stable: translating a Papyrus ID to the Backlog.md ID and back yields the original Papyrus ID for every existing record.
 - `milestone:` and `dependencies:` reference values are translated in both directions and resolve in both Papyrus and Backlog.md.
+- `id_padding` must be between 1 and 6 inclusive; values outside this range are rejected with clear error messages (REQ-09).
 
 ## Traceability
 - README.md, `papyrus(1)` → DESCRIPTION (line 33), command record sections and FILES (lines 109–844)
@@ -31,3 +34,4 @@ Papyrus keeps this documented ID format and treats it as the ID space it display
 - User decision 2026-11-08 (CLI ID input): commands accept only the Papyrus display format (`TASK-018`, `MS-013`); Backlog.md storage IDs (`task-18`, `m-0`) are internal to the `backlog/` store, translated at that boundary, and rejected as command input with a hint.
 - ADR-0008 — Adopt the Backlog.md On-Disk Layout for Task and Milestone Records (Backlog.md filename, stem, and ID conventions)
 - REQ-05.010 — Record Metadata in YAML Front Matter (`id` in front matter)
+- REQ-09 — ID Padding Constraint for File IDs

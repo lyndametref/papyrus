@@ -366,6 +366,15 @@ pub fn utc_now() -> String {
     format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, mo, d, h, mi, se)
 }
 
+pub fn utc_from_unix(secs: i64) -> String {
+    let (y, mo, d, h, mi, se) = civil_from_unix(secs);
+    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, mo, d, h, mi, se)
+}
+
+pub fn is_timestamp_pub(v: &str) -> bool {
+    is_timestamp(v)
+}
+
 fn civil_from_unix(secs: i64) -> (i64, u32, u32, u32, u32, u32) {
     let days = secs.div_euclid(86400);
     let rem = secs.rem_euclid(86400);
