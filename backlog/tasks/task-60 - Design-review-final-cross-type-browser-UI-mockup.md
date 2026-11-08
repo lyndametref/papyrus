@@ -5,16 +5,22 @@ status: To Do
 assignee:
   - '@ui-designer'
 created_date: '2026-11-04T19:21:00Z'
-updated_date: '2026-11-04T19:23:00Z'
+updated_date: '2026-11-08T15:06:00Z'
 labels:
   - design-review
   - ui-design
 milestone: m-12
 dependencies:
   - TASK-59
+  - TASK-66
+references:
+  - >-
+    docs/architecture/adr/ADR-0007-yaml-front-matter-as-single-record-metadata-source.md
+  - >-
+    docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md
 priority: medium
 type: task
-ordinal: 30000
+ordinal: 30095
 ---
 
 ## Description

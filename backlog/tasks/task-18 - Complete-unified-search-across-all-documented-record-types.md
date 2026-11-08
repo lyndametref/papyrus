@@ -4,17 +4,18 @@ title: Complete unified search across all documented record types
 status: To Do
 assignee: []
 created_date: '2026-10-31T22:26:00Z'
-updated_date: '2026-11-04T19:35:00Z'
+updated_date: '2026-11-08T15:06:00Z'
 labels: []
 milestone: m-12
 dependencies:
+  - TASK-14
   - TASK-31
   - TASK-35
   - TASK-39
   - TASK-44
   - TASK-48
   - TASK-56
-  - TASK-14
+  - TASK-68
 references:
   - docs/requirements/business/REQ-06.001.md
   - docs/requirements/business/REQ-05.001.md
@@ -28,6 +29,8 @@ references:
   - docs/requirements/business/REQ-03.001.md
   - docs/requirements/business/REQ-04.001.md
   - docs/business-rules/BR-015-search-command-behavior.md
+  - >-
+    docs/architecture/adr/ADR-0007-yaml-front-matter-as-single-record-metadata-source.md
 ordinal: 30100
 ---
 
