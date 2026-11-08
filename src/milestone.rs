@@ -147,6 +147,64 @@ fn archived_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
     Context::ensure_within(&ctx.project_dir, &raw)
 }
 
+fn backlog_archive_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
+    let base = backlog_dir(ctx, cfg)?;
+    let raw = base.join("archive/milestones");
+    fs::create_dir_all(&raw).map_err(|e| AppError::Runtime(e.to_string()))?;
+    Context::ensure_within(&ctx.project_dir, &raw)
+}
+
+fn resolve_milestone_path(ctx: &Context, cfg: &Config, id: &str) -> Result<PathBuf, AppError> {
+    let storage_id =
+        crate::record::identity::milestone_to_storage_id(id).unwrap_or_else(|_| id.to_lowercase());
+    for dir in [
+        active_dir(ctx, cfg),
+        archived_dir(ctx, cfg),
+        backlog_archive_dir(ctx, cfg),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if let Some(path) = find_milestone_file(&dir, &storage_id) {
+            return Ok(path);
+        }
+    }
+    Err(AppError::NotFound(format!("not found: {}", id)))
+}
+
+fn resolve_milestone_path_migrated(
+    ctx: &Context,
+    cfg: &Config,
+    id: &str,
+) -> Result<PathBuf, AppError> {
+    let path = resolve_milestone_path(ctx, cfg, id)?;
+    crate::record::migrate::ensure_front_matter_canonical(ctx, &path)
+}
+
+pub(crate) fn find_milestone_file(dir: &std::path::Path, storage_id: &str) -> Option<PathBuf> {
+    if !dir.exists() {
+        return None;
+    }
+    let rd = fs::read_dir(dir).ok()?;
+    for e in rd.flatten() {
+        let path = e.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("md") {
+            continue;
+        }
+        let stem = path.file_stem().and_then(|s| s.to_str())?;
+        let base = stem.split(" - ").next().unwrap_or(stem).trim();
+        if base.eq_ignore_ascii_case(storage_id) {
+            return Some(path);
+        }
+        if let Ok(sid) = crate::record::identity::milestone_to_storage_id(base)
+            && sid.eq_ignore_ascii_case(storage_id)
+        {
+            return Some(path);
+        }
+    }
+    None
+}
+
 fn releases_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
     let base = backlog_dir(ctx, cfg)?;
     let raw = base.join("releases");
@@ -158,20 +216,29 @@ fn ensure_dir(dir: &std::path::Path, project_dir: &std::path::Path) -> Result<()
     fs::create_dir_all(&safe).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
-fn scan_max(active: &std::path::Path, archived: &std::path::Path, prefix: &str) -> u32 {
+fn milestone_number_from_stem(stem: &str) -> Option<u32> {
+    let base = stem.split(" - ").next()?.trim();
+    let storage_id = crate::record::identity::milestone_to_storage_id(base)
+        .unwrap_or_else(|_| base.to_lowercase());
+    let num = storage_id.strip_prefix("m-")?;
+    num.parse::<u32>().ok().map(|n| n + 1)
+}
+
+fn scan_max(
+    active: &std::path::Path,
+    archived: &std::path::Path,
+    archive: &std::path::Path,
+) -> u32 {
     let mut max = 0u32;
-    for dir in [active, archived] {
+    for dir in [active, archived, archive] {
         if let Ok(rd) = fs::read_dir(dir) {
             for e in rd.flatten() {
                 let path = e.path();
                 if path.extension().and_then(|s| s.to_str()) != Some("md") {
                     continue;
                 }
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
-                    && let Some(rest) = stem.strip_prefix(&format!("{}-", prefix))
-                    && !rest.is_empty()
-                    && rest.chars().all(|c| c.is_ascii_digit())
-                    && let Ok(n) = rest.parse::<u32>()
+                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                if let Some(n) = milestone_number_from_stem(stem)
                     && n > max
                 {
                     max = n;
@@ -195,14 +262,13 @@ fn release_exists(ctx: &Context, cfg: &Config, id: &str) -> bool {
 
 fn frontmatter_list_ms(content: &str, key: &str) -> Vec<String> {
     let mut out = Vec::new();
-    if let Ok(Some(fm)) = crate::record::frontmatter::parse(content) {
-        if let Some(yaml_serde::Value::Sequence(seq)) =
+    if let Ok(Some(fm)) = crate::record::frontmatter::parse(content)
+        && let Some(yaml_serde::Value::Sequence(seq)) =
             fm.data.get(yaml_serde::Value::String(key.to_string()))
-        {
-            for v in seq {
-                if let yaml_serde::Value::String(s) = v {
-                    out.push(s.clone());
-                }
+    {
+        for v in seq {
+            if let yaml_serde::Value::String(s) = v {
+                out.push(s.clone());
             }
         }
     }
@@ -215,15 +281,19 @@ fn parse_heading(content: &str) -> (String, String) {
     } else {
         content
     };
-    let first = body
-        .lines()
-        .skip_while(|l| l.trim().is_empty())
-        .next()
-        .unwrap_or("");
+    let first = body.lines().find(|l| !l.trim().is_empty()).unwrap_or("");
     let rest = first.trim_start_matches('#').trim();
     let mut parts = rest.splitn(2, char::is_whitespace);
     let id = parts.next().unwrap_or("").trim().to_string();
     let title = parts.next().unwrap_or("").trim().to_string();
+    // Prefer the canonical title from front matter when present.
+    let title = if let Ok(Some(fm)) = crate::record::frontmatter::parse(content) {
+        crate::record::frontmatter::current_value_string(&fm.raw, "title")
+            .filter(|t| !t.is_empty())
+            .unwrap_or(title)
+    } else {
+        title
+    };
     (id, title)
 }
 
@@ -327,10 +397,11 @@ pub fn create(
 
     let active = active_dir(ctx, &cfg)?;
     let archived = archived_dir(ctx, &cfg)?;
+    let archive = backlog_archive_dir(ctx, &cfg)?;
     ensure_dir(&active, &ctx.project_dir)?;
     let _ = ensure_dir(&archived, &ctx.project_dir);
 
-    let max = scan_max(&active, &archived, &cfg.milestone_prefix);
+    let max = scan_max(&active, &archived, &archive);
     let next = max + 1;
     let id = format!(
         "{}-{:0width$}",
@@ -435,24 +506,7 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
 pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
-    let archived = archived_dir(ctx, &cfg)?;
-    let _ = ensure_dir(&active, &ctx.project_dir);
-    let _ = ensure_dir(&archived, &ctx.project_dir);
-
-    let active_path = active.join(format!("{}.md", id));
-    let archived_path = archived.join(format!("{}.md", id));
-
-    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
-    let archived_safe = Context::ensure_within(&ctx.project_dir, &archived_path)?;
-
-    let path = if active_safe.exists() {
-        active_safe
-    } else if archived_safe.exists() {
-        archived_safe
-    } else {
-        return Err(AppError::NotFound(format!("not found: {}", id)));
-    };
+    let path = resolve_milestone_path_migrated(ctx, &cfg, &id)?;
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
 
@@ -465,6 +519,7 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
     Ok(crate::CommandOutput { text, json })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn edit(
     ctx: &Context,
     id_raw: &str,
@@ -483,24 +538,7 @@ pub fn edit(
     }
 
     let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
-    let archived = archived_dir(ctx, &cfg)?;
-    let _ = ensure_dir(&active, &ctx.project_dir);
-    let _ = ensure_dir(&archived, &ctx.project_dir);
-
-    let active_path = active.join(format!("{}.md", id));
-    let archived_path = archived.join(format!("{}.md", id));
-
-    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
-    let archived_safe = Context::ensure_within(&ctx.project_dir, &archived_path)?;
-
-    let path = if active_safe.exists() {
-        active_safe
-    } else if archived_safe.exists() {
-        archived_safe
-    } else {
-        return Err(AppError::NotFound(format!("not found: {}", id)));
-    };
+    let path = resolve_milestone_path_migrated(ctx, &cfg, &id)?;
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let (parsed_id, parsed_title, parsed_desc, parsed_release) = parse_milestone(&content);
@@ -528,7 +566,7 @@ pub fn edit(
     if let Some(no) = &no_release {
         match no {
             Some(rid_raw) => {
-                let rid = sanitize_text(&rid_raw)?;
+                let rid = sanitize_text(rid_raw)?;
                 if release_val.as_deref() != Some(rid.as_str()) {
                     return Err(AppError::Validation(format!(
                         "milestone is not assigned to release: {}",
@@ -639,8 +677,6 @@ pub fn edit(
         crate::record::store::write_atomic(ctx, &safe_write, &new_content)?;
     }
 
-    let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
-
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": new_id}))
     } else {
@@ -655,28 +691,23 @@ pub fn edit(
 pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
+    let path = resolve_milestone_path(ctx, &cfg, &id)?;
     let archived = archived_dir(ctx, &cfg)?;
-    let _ = ensure_dir(&active, &ctx.project_dir);
     ensure_dir(&archived, &ctx.project_dir)?;
 
-    let active_path = active.join(format!("{}.md", id));
-    let archived_path = archived.join(format!("{}.md", id));
-
-    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
+    let archived_path = archived.join(
+        path.file_name()
+            .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?,
+    );
     let archived_safe = Context::ensure_within(&ctx.project_dir, &archived_path)?;
-
-    if !active_safe.exists() {
-        if archived_safe.exists() {
-            return Err(AppError::Validation(format!("already archived: {}", id)));
-        }
-        return Err(AppError::NotFound(format!("not found: {}", id)));
+    if archived_safe == path {
+        return Err(AppError::Validation(format!("already archived: {}", id)));
     }
     if archived_safe.exists() {
         return Err(AppError::Validation(format!("already archived: {}", id)));
     }
 
-    fs::rename(&active_safe, &archived_safe).map_err(|e| AppError::Runtime(e.to_string()))?;
+    fs::rename(&path, &archived_safe).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))
@@ -692,24 +723,7 @@ pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
 pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
-    let archived = archived_dir(ctx, &cfg)?;
-    let _ = ensure_dir(&active, &ctx.project_dir);
-    let _ = ensure_dir(&archived, &ctx.project_dir);
-
-    let active_path = active.join(format!("{}.md", id));
-    let archived_path = archived.join(format!("{}.md", id));
-
-    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
-    let archived_safe = Context::ensure_within(&ctx.project_dir, &archived_path)?;
-
-    let path = if active_safe.exists() {
-        active_safe
-    } else if archived_safe.exists() {
-        archived_safe
-    } else {
-        return Err(AppError::NotFound(format!("not found: {}", id)));
-    };
+    let path = resolve_milestone_path_migrated(ctx, &cfg, &id)?;
 
     if !force {
         print!("Delete {}? [y/N] ", id);

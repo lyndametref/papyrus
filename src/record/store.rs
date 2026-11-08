@@ -55,8 +55,23 @@ pub fn write_atomic(ctx: &Context, target: &Path, content: &str) -> Result<(), A
     if !crate::record::frontmatter::has_front_matter(&content) {
         let safe_check = resolve_path(ctx, target).ok();
         if let Some(safe) = safe_check
-            && crate::record::migrate::is_managed_path(&ctx.project_dir, &safe)
+            && let Some(desc) = crate::record::migrate::managed_descriptor(&ctx.project_dir, &safe)
         {
+            // Conflict detection before lazy migration on the write path.
+            let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
+            if let Some(reason) = crate::record::migrate::check_conflicts_for_path(
+                ctx, &safe, desc, &content, &conflicts,
+            ) {
+                let rel = safe
+                    .strip_prefix(&ctx.project_dir)
+                    .unwrap_or(&safe)
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                return Err(AppError::Validation(format!(
+                    "migration conflict at {}: {}",
+                    rel, reason
+                )));
+            }
             let (new_content, changed, action, keys) =
                 crate::record::migrate::migrate_content(ctx, &safe, &content, false)?;
             if changed {
