@@ -991,7 +991,7 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
        Release ID prefix. Default: <b>REL</b>.
 
         <b style="color: light-dark(#8250df, #d2a8ff);">id_padding</b>
-        Positive integer for ID zero-padding width. Default: <b>3</b> (for example <b>TASK-001</b>). IDs wider than the padding are not truncated.
+        ID zero-padding width from <b>1</b> to <b>6</b>. Default: <b>3</b> (for example <b>TASK-001</b>). IDs wider than the padding are not truncated.
 
        <b style="color: light-dark(#8250df, #d2a8ff);">date_format</b>
        Date format. Default: <b>yyyy-mm-dd</b>.

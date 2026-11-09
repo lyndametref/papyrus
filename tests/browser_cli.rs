@@ -1970,6 +1970,124 @@ fn config_get_set_unset_validate_merged_browser_config() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+// AC #7 / TASK-74 (load-time rejection of out-of-range id_padding)
+#[test]
+fn id_padding_config_file_load_is_rejected() {
+    let dir = test_root("id-padding-load");
+    init_project(&dir);
+    let original = fs::read_to_string(dir.join("papyrus.config.yml")).unwrap();
+    for value in ["0", "7"] {
+        fs::write(dir.join("papyrus.config.yml"), &original).unwrap();
+        set_config_value(&dir, "id_padding", value);
+        let out = bin()
+            .arg("--dir")
+            .arg(&dir)
+            .args(["config", "list"])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(4), "id_padding={}", value);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            stderr.contains("id_padding: must be between 1 and 6"),
+            "id_padding={} stderr: {}",
+            value,
+            stderr
+        );
+        assert!(
+            !stderr.contains("value cannot be normalized"),
+            "id_padding={} stderr: {}",
+            value,
+            stderr
+        );
+    }
+    fs::write(dir.join("papyrus.config.yml"), &original).unwrap();
+    let list = run_ok(&["--dir", dir.to_str().unwrap(), "config", "list"]);
+    assert!(list.contains("id_padding: 3"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// AC #7 / TASK-74 (config set validates the merged effective configuration)
+#[test]
+fn id_padding_config_set_out_of_range_is_rejected_and_file_unchanged() {
+    let dir = test_root("id-padding-set");
+    init_project(&dir);
+    let config_path = dir.join("papyrus.config.yml");
+    for value in ["0", "7"] {
+        let before = fs::read_to_string(&config_path).unwrap();
+        let out = bin()
+            .arg("--dir")
+            .arg(&dir)
+            .args(["config", "set", "id_padding", value])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(4), "id_padding={}", value);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            stderr.contains("id_padding: must be between 1 and 6"),
+            "id_padding={} stderr: {}",
+            value,
+            stderr
+        );
+        assert_eq!(
+            fs::read_to_string(&config_path).unwrap(),
+            before,
+            "file must be unchanged after rejected set id_padding={}",
+            value
+        );
+    }
+    for value in ["1", "6"] {
+        run_ok(&[
+            "--dir",
+            dir.to_str().unwrap(),
+            "config",
+            "set",
+            "id_padding",
+            value,
+        ]);
+        assert_eq!(
+            run_ok(&[
+                "--dir",
+                dir.to_str().unwrap(),
+                "config",
+                "get",
+                "id_padding"
+            ]),
+            value
+        );
+    }
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// AC #7 / TASK-74 (config unset validates the merged effective configuration)
+#[test]
+fn id_padding_config_unset_validates_merged_config() {
+    let dir = test_root("id-padding-unset");
+    init_project(&dir);
+    set_config_value(&dir, "id_padding", "7");
+    let config_path = dir.join("papyrus.config.yml");
+    let before = fs::read_to_string(&config_path).unwrap();
+    // Unsetting an unrelated key is rejected while the merged effective
+    // configuration still has an out-of-range id_padding (mirrors the
+    // browser_port merged-config test). Unsetting id_padding itself removes
+    // the invalid value and heals the configuration, so the rejected case is
+    // an unrelated unset whose merged result remains out of range.
+    let out = bin()
+        .arg("--dir")
+        .arg(&dir)
+        .args(["config", "unset", "task_prefix"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(4), "config unset");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("id_padding: must be between 1 and 6"),
+        "{}",
+        stderr
+    );
+    assert_eq!(fs::read_to_string(&config_path).unwrap(), before);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 // AC #19 / T-28 (approved MOCK-0001 shell, 320 px states)
 #[test]
 fn ui_matches_approved_mock_0001_layout() {

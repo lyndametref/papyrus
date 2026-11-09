@@ -259,7 +259,7 @@ General
        Release ID prefix. Default: REL.
 
         id_padding
-        Positive integer for ID zero-padding width. Default: 3 (for example TASK-001). IDs wider than the padding are not truncated.
+        ID zero-padding width from 1 to 6. Default: 3 (for example TASK-001). IDs wider than the padding are not truncated.
 
        date_format
        Date format. Default: yyyy-mm-dd.
