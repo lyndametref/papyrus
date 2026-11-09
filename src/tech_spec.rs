@@ -144,45 +144,12 @@ fn ensure_dirs(dir: &Path) -> Result<(), AppError> {
     fs::create_dir_all(dir).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
-/// Return the numeric part of a record file stem (`<prefix>-<digits>`),
-/// or `None` when the stem is not a record identifier.
-fn id_number(stem: &str, prefix: &str) -> Option<u32> {
-    let rest = stem.strip_prefix(prefix)?.strip_prefix('-')?;
-    if rest.is_empty() || !rest.chars().all(|c| c.is_ascii_digit()) {
-        return None;
-    }
-    rest.parse::<u32>().ok()
-}
-
 fn is_record_path(path: &Path, prefix: &str) -> bool {
     path.extension().and_then(|s| s.to_str()) == Some("md")
         && path
             .file_stem()
             .and_then(|s| s.to_str())
-            .and_then(|stem| id_number(stem, prefix))
-            .is_some()
-}
-
-fn scan_max(active: &Path, deprecated: &Path, prefix: &str) -> u32 {
-    let mut max = 0u32;
-    for dir in [active, deprecated] {
-        let Ok(rd) = fs::read_dir(dir) else {
-            continue;
-        };
-        for e in rd.flatten() {
-            let path = e.path();
-            if !path.is_file() {
-                continue;
-            }
-            if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
-                && let Some(n) = id_number(stem, prefix)
-                && n > max
-            {
-                max = n;
-            }
-        }
-    }
-    max
+            .is_some_and(|stem| crate::record::identity::is_record_stem(stem, prefix))
 }
 
 /// Resolve an identifier to an existing record path by exact, case-sensitive
@@ -227,61 +194,15 @@ fn active_or_deprecated(
 }
 
 #[derive(Clone, Debug, Default)]
+#[allow(dead_code)]
 struct TechSpec {
     id: String,
     title: String,
     description: String,
 }
 
-fn parse_heading(content: &str) -> (String, String) {
-    let body = if let Some((_, _, bs)) = crate::record::frontmatter::find_block(content) {
-        &content[bs..]
-    } else {
-        content
-    };
-    let first = body
-        .lines()
-        .skip_while(|l| l.trim().is_empty())
-        .next()
-        .unwrap_or("");
-    let rest = first.trim_start_matches('#').trim();
-    let mut parts = rest.splitn(2, char::is_whitespace);
-    let id = parts.next().unwrap_or("").trim().to_string();
-    let title = parts.next().unwrap_or("").trim().to_string();
-    (id, title)
-}
-
-fn section_text(content: &str, name: &str) -> Option<String> {
-    let lines: Vec<&str> = content.lines().collect();
-    let header = format!("## {}", name);
-    let mut i = 0usize;
-    while i < lines.len() {
-        if lines[i].trim() == header {
-            i += 1;
-            let mut buf: Vec<&str> = Vec::new();
-            while i < lines.len() && !lines[i].starts_with("## ") {
-                buf.push(lines[i]);
-                i += 1;
-            }
-            while buf.first().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                buf.remove(0);
-            }
-            while buf.last().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                buf.pop();
-            }
-            let text = buf.join("\n");
-            if text.trim().is_empty() {
-                return None;
-            }
-            return Some(text);
-        }
-        i += 1;
-    }
-    None
-}
-
-fn parse_record(content: &str, fallback_id: &str) -> TechSpec {
-    let (id, title) = parse_heading(content);
+fn record_from_document(doc: &crate::record::document::Document, fallback_id: &str) -> TechSpec {
+    let (id, title) = crate::record::document::heading_id_title(doc);
     TechSpec {
         id: if id.is_empty() {
             fallback_id.to_string()
@@ -293,15 +214,22 @@ fn parse_record(content: &str, fallback_id: &str) -> TechSpec {
         } else {
             title
         },
-        description: section_text(content, "Description").unwrap_or_default(),
+        description: crate::record::document::section_text(doc, "Description").unwrap_or_default(),
     }
 }
 
-fn render_record(record: &TechSpec) -> String {
-    format!(
-        "# {} {}\n\n## Description\n{}\n",
-        record.id, record.title, record.description
-    )
+fn body_document(id: &str, title: &str, description: &str) -> crate::record::document::Document {
+    crate::record::document::Document {
+        source: String::new(),
+        front_matter: None,
+        frontmatter: None,
+        heading: Some(format!("# {id} {title}")),
+        preamble: vec![String::new()],
+        sections: vec![crate::record::document::Section {
+            heading: "## Description".to_string(),
+            body: vec![description.to_string()],
+        }],
+    }
 }
 
 fn run_editor(command: &str, path: &Path) -> Result<(), AppError> {
@@ -351,55 +279,48 @@ fn create(
     ensure_dirs(&active)?;
     ensure_dirs(&deprecated)?;
 
-    let next = scan_max(&active, &deprecated, &entry.prefix) + 1;
-    let id = format!(
-        "{}-{:0width$}",
-        entry.prefix,
-        next,
-        width = cfg.id_padding as usize
-    );
+    let next = crate::record::identity::next_number(&active, &deprecated, &entry.prefix);
+    let id =
+        crate::record::identity::format_id(&entry.prefix, next as i64, cfg.id_padding as usize);
 
-    let record = TechSpec {
-        id: id.clone(),
-        title: title.clone(),
-        description,
-    };
-    let body = render_record(&record);
+    let body_doc = body_document(&id, &title, &description);
+    let body = crate::record::document::render(&body_doc);
+    let parsed = crate::record::document::parse(&body)?;
     let now = crate::record::frontmatter::utc_now();
-    let mut fm = String::new();
-    fm.push_str(&format!("id: {}\n", id));
-    fm.push_str(&format!(
-        "title: {}\n",
-        crate::record::frontmatter::format_scalar_pub(&title)
-    ));
-    fm.push_str(&format!("created_date: '{}'\n", now));
-    fm.push_str(&format!("updated_date: '{}'\n", now));
-    if labels.is_empty() {
-        fm.push_str("labels: []\n");
+    let labels_value = if labels.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("labels:\n");
-        for l in &labels {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(l)
-            ));
-        }
-    }
-    if references.is_empty() {
-        fm.push_str("references: []\n");
+        crate::record::frontmatter::FrontMatterValue::String(labels.join("\n"))
+    };
+    let refs_value = if references.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("references:\n");
-        for r in &references {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(r)
-            ));
-        }
-    }
-    let content = crate::record::frontmatter::wrap(&fm, &body);
+        crate::record::frontmatter::FrontMatterValue::String(references.join("\n"))
+    };
+    let ops = vec![
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "id".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(id.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "title".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(title.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "created_date".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(now.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "updated_date".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(now),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue("labels".to_string(), labels_value),
+        crate::record::patch::PatchOp::SetFrontMatterValue("references".to_string(), refs_value),
+    ];
+    let file_content = crate::record::patch::apply_patch(&parsed, &ops)?;
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    crate::record::store::write_atomic(ctx, &safe_path, &content)?;
+    crate::record::store::write_atomic(ctx, &safe_path, &file_content)?;
     Ok(id)
 }
 
@@ -422,7 +343,10 @@ fn list(ctx: &Context) -> Result<CommandOutput, AppError> {
             let safe = Context::ensure_within(&ctx.project_dir, &path)?;
             let content =
                 fs::read_to_string(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
-            let (_, title) = parse_heading(&content);
+            let title = crate::record::document::parse(&content)
+                .ok()
+                .map(|d| crate::record::document::heading_id_title(&d).1)
+                .unwrap_or_default();
             let title = if title.is_empty() {
                 id.to_string()
             } else {
@@ -511,8 +435,9 @@ fn edit(
     let deprecated = deprecated_dir(ctx, &cfg)?;
     let path = active_or_deprecated(ctx, &active, &deprecated, &id)?;
 
-    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
-    let mut record = parse_record(&content, &id);
+    let (doc, _token) = crate::record::store::read_document(ctx, &path)?;
+    let content = doc.source.clone();
+    let mut record = record_from_document(&doc, &id);
 
     if let Some(title) = title_raw {
         record.title = sanitize_field(title)?;
@@ -573,7 +498,6 @@ fn edit(
         ));
     }
 
-    let doc = crate::record::document::parse(&content)?;
     let base_new = crate::record::patch::apply_patch(&doc, &ops)?;
     let new_content = if ops.is_empty() || base_new == content {
         content.clone()

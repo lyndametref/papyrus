@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::net::IpAddr;
@@ -415,6 +416,13 @@ pub fn yaml_unset(root: &mut yaml_serde::Value, key: &str) -> Result<(), String>
 
 pub fn validate_key_path(key: &str) -> bool {
     !key.is_empty() && !key.split('.').any(|p| p.is_empty())
+}
+
+pub fn write_config_file(path: &Path, content: &str) -> Result<(), AppError> {
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    std::fs::write(path, content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
 #[cfg(test)]

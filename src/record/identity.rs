@@ -1,6 +1,7 @@
 //! Bidirectional translation between Papyrus display IDs and Backlog.md storage IDs.
 
 use std::fmt;
+use std::path::Path;
 
 pub const TASK_OFFSET: i64 = 0;
 pub const MILESTONE_OFFSET: i64 = 1;
@@ -242,7 +243,7 @@ fn parse_number(number: &str) -> Result<i64, IdentityError> {
         .map_err(|_| IdentityError::OutOfRange(number.to_string()))
 }
 
-fn pad_number(n: i64, padding: usize) -> String {
+pub fn pad_number(n: i64, padding: usize) -> String {
     let s = n.to_string();
     if s.len() >= padding {
         s
@@ -609,6 +610,302 @@ pub fn detect_duplicate_ids(kind: RecordKind, entries: &[(String, String)]) -> V
 
 pub fn detect_duplicates(kind: RecordKind, entries: &[(String, String)]) -> Vec<Conflict> {
     detect_duplicate_ids(kind, entries)
+}
+
+pub fn format_id(prefix: &str, number: i64, padding: usize) -> String {
+    format!("{}-{}", prefix, pad_number(number, padding))
+}
+
+pub fn format_seq_id(group: &str, number: i64, padding: usize) -> String {
+    format!("{}.{}", group, pad_number(number, padding))
+}
+
+pub fn id_number(stem: &str, prefix: &str) -> Option<u32> {
+    let rest = strip_prefix_number(stem, prefix)?;
+    if rest.is_empty() || !rest.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    rest.parse::<u32>().ok()
+}
+
+pub fn strip_prefix_number<'a>(stem: &'a str, prefix: &str) -> Option<&'a str> {
+    stem.strip_prefix(prefix)?.strip_prefix('-')
+}
+
+pub fn is_record_stem(stem: &str, prefix: &str) -> bool {
+    id_number(stem, prefix).is_some()
+}
+
+pub fn observed_numbers_in_dirs(dirs: &[&Path], prefix: &str) -> Vec<i64> {
+    let mut observed = Vec::new();
+    for dir in dirs {
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            continue;
+        };
+        for e in rd.flatten() {
+            let path = e.path();
+            if !path.is_file() {
+                continue;
+            }
+            if path.extension().and_then(|s| s.to_str()) != Some("md") {
+                continue;
+            }
+            if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+                && let Some(n) = id_number(stem, prefix)
+            {
+                observed.push(n as i64);
+            }
+        }
+    }
+    observed
+}
+
+pub fn next_number_in_dirs(dirs: &[&Path], prefix: &str) -> u32 {
+    let observed = observed_numbers_in_dirs(dirs, prefix);
+    allocate_next_storage_number(&observed, 1) as u32
+}
+
+pub fn scan_max_in_dirs(dirs: &[&Path], prefix: &str) -> u32 {
+    observed_numbers_in_dirs(dirs, prefix)
+        .into_iter()
+        .map(|n| n as u32)
+        .max()
+        .unwrap_or(0)
+}
+
+pub fn scan_max(active: &Path, deprecated: &Path, prefix: &str) -> u32 {
+    observed_numbers_in_dirs(&[active, deprecated], prefix)
+        .into_iter()
+        .map(|n| n as u32)
+        .max()
+        .unwrap_or(0)
+}
+
+pub fn scan_max_single(dir: &Path, prefix: &str) -> u32 {
+    observed_numbers_in_dirs(&[dir], prefix)
+        .into_iter()
+        .map(|n| n as u32)
+        .max()
+        .unwrap_or(0)
+}
+
+pub fn scan_max_task(active: &Path, archived: &Path, archive: &Path) -> u32 {
+    let mut max = 0u32;
+    for dir in [active, archived, archive] {
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            for e in rd.flatten() {
+                let path = e.path();
+                if path.extension().and_then(|s| s.to_str()) != Some("md") {
+                    continue;
+                }
+                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                if let Some(n) = task_number_from_stem(stem)
+                    && n > max
+                {
+                    max = n;
+                }
+            }
+        }
+    }
+    max
+}
+
+pub fn scan_max_milestone(active: &Path, archived: &Path, archive: &Path) -> u32 {
+    let mut max = 0u32;
+    for dir in [active, archived, archive] {
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            for e in rd.flatten() {
+                let path = e.path();
+                if path.extension().and_then(|s| s.to_str()) != Some("md") {
+                    continue;
+                }
+                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                if let Some(n) = milestone_number_from_stem(stem)
+                    && n > max
+                {
+                    max = n;
+                }
+            }
+        }
+    }
+    max
+}
+
+pub fn task_number_from_stem(stem: &str) -> Option<u32> {
+    let base = stem.split(" - ").next()?.trim();
+    let storage_id = task_to_storage_id(base).unwrap_or_else(|_| base.to_lowercase());
+    let num = storage_id.strip_prefix("task-")?;
+    num.parse::<u32>().ok()
+}
+
+pub fn milestone_number_from_stem(stem: &str) -> Option<u32> {
+    let base = stem.split(" - ").next()?.trim();
+    let storage_id = milestone_to_storage_id(base).unwrap_or_else(|_| base.to_lowercase());
+    let num = storage_id.strip_prefix("m-")?;
+    num.parse::<u32>().ok().map(|n| n + 1)
+}
+
+pub fn scan_max_ordinal(active: &Path, archived: &Path) -> i64 {
+    let mut max: Option<i64> = None;
+    for dir in [active, archived] {
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            for e in rd.flatten() {
+                let path = e.path();
+                if path.extension().and_then(|s| s.to_str()) != Some("md") {
+                    continue;
+                }
+                if let Ok(content) = std::fs::read_to_string(&path)
+                    && let Ok(Some(fm)) = crate::record::frontmatter::parse(&content)
+                    && let Some(v) =
+                        crate::record::frontmatter::current_value_string(&fm.raw, "ordinal")
+                    && let Ok(n) = v.parse::<i64>()
+                {
+                    max = Some(max.map_or(n, |m: i64| m.max(n)));
+                }
+            }
+        }
+    }
+    max.map_or(0, |m| m + 1)
+}
+
+pub fn scan_max_group(active: &Path, deprecated: &Path, prefix: &str) -> u32 {
+    scan_max(active, deprecated, prefix)
+}
+
+pub fn scan_max_seq(active: &Path, deprecated: &Path, group_id: &str) -> u32 {
+    let mut max = 0u32;
+    let prefix = format!("{group_id}.");
+    for dir in [active, deprecated] {
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            for e in rd.flatten() {
+                let path = e.path();
+                if path.extension().and_then(|s| s.to_str()) != Some("md") {
+                    continue;
+                }
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+                    && let Some(rest) = stem.strip_prefix(&prefix)
+                    && !rest.is_empty()
+                    && rest.chars().all(|c| c.is_ascii_digit())
+                    && let Ok(n) = rest.parse::<u32>()
+                    && n > max
+                {
+                    max = n;
+                }
+            }
+        }
+    }
+    max
+}
+
+pub fn is_group_id(id: &str, prefix: &str) -> bool {
+    if let Some(rest) = id.strip_prefix(&format!("{prefix}-")) {
+        !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit())
+    } else {
+        false
+    }
+}
+
+pub fn observed_numbers_in_dirs_ext(dirs: &[&Path], prefix: &str, extension: &str) -> Vec<i64> {
+    let mut observed = Vec::new();
+    for dir in dirs {
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            continue;
+        };
+        for e in rd.flatten() {
+            let path = e.path();
+            if !path.is_file() {
+                continue;
+            }
+            if path.extension().and_then(|s| s.to_str()) != Some(extension) {
+                continue;
+            }
+            if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+                && let Some(n) = id_number(stem, prefix)
+            {
+                observed.push(n as i64);
+            }
+        }
+    }
+    observed
+}
+
+pub fn scan_max_in_dirs_ext(dirs: &[&Path], prefix: &str, extension: &str) -> u32 {
+    observed_numbers_in_dirs_ext(dirs, prefix, extension)
+        .into_iter()
+        .map(|n| n as u32)
+        .max()
+        .unwrap_or(0)
+}
+
+pub fn next_number(active: &Path, deprecated: &Path, prefix: &str) -> u32 {
+    next_number_in_dirs(&[active, deprecated], prefix)
+}
+
+pub fn next_task_number(active: &Path, archived: &Path, archive: &Path) -> u32 {
+    let mut observed: Vec<i64> = Vec::new();
+    for dir in [active, archived, archive] {
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            for e in rd.flatten() {
+                let path = e.path();
+                if path.extension().and_then(|s| s.to_str()) != Some("md") {
+                    continue;
+                }
+                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                if let Some(n) = task_number_from_stem(stem) {
+                    observed.push(n as i64);
+                }
+            }
+        }
+    }
+    allocate_next_storage_number(&observed, 1) as u32
+}
+
+pub fn next_milestone_number(active: &Path, archived: &Path, archive: &Path) -> u32 {
+    let mut observed: Vec<i64> = Vec::new();
+    for dir in [active, archived, archive] {
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            for e in rd.flatten() {
+                let path = e.path();
+                if path.extension().and_then(|s| s.to_str()) != Some("md") {
+                    continue;
+                }
+                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                if let Some(n) = milestone_number_from_stem(stem) {
+                    observed.push(n as i64);
+                }
+            }
+        }
+    }
+    allocate_next_storage_number(&observed, 1) as u32
+}
+
+pub fn next_seq_number(active: &Path, deprecated: &Path, group_id: &str) -> u32 {
+    let prefix = format!("{group_id}.");
+    let mut observed: Vec<i64> = Vec::new();
+    for dir in [active, deprecated] {
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            for e in rd.flatten() {
+                let path = e.path();
+                if path.extension().and_then(|s| s.to_str()) != Some("md") {
+                    continue;
+                }
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+                    && let Some(rest) = stem.strip_prefix(&prefix)
+                    && !rest.is_empty()
+                    && rest.chars().all(|c| c.is_ascii_digit())
+                    && let Ok(n) = rest.parse::<u32>()
+                {
+                    observed.push(n as i64);
+                }
+            }
+        }
+    }
+    allocate_next_storage_number(&observed, 1) as u32
+}
+
+pub fn next_html_number(active: &Path, deprecated: &Path, prefix: &str) -> u32 {
+    let observed = observed_numbers_in_dirs_ext(&[active, deprecated], prefix, "html");
+    allocate_next_storage_number(&observed, 1) as u32
 }
 
 #[cfg(test)]

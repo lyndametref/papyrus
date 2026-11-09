@@ -400,6 +400,16 @@ pub fn format_kv_pub(key: &str, value: &str) -> String {
     format_kv(key, value)
 }
 
+/// Build a front-matter raw block from ordered typed entries via the shared patch path.
+pub fn build_raw(entries: &[(&str, FrontMatterValue)]) -> String {
+    let mut raw = String::new();
+    for (key, value) in entries {
+        let (next, _) = patch_raw_value(&raw, key, value);
+        raw = next;
+    }
+    raw
+}
+
 /// Wrap a raw front-matter block and a body into a complete document.
 pub fn wrap(front_matter_raw: &str, body: &str) -> String {
     let mut out = String::new();

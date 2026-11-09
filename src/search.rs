@@ -6,7 +6,6 @@ use crate::commands::load_effective_config;
 use crate::config::{Config, DocTypeEntry};
 use crate::context::Context;
 use crate::error::AppError;
-use crate::requirement::parse_heading;
 use std::fs;
 use std::path::PathBuf;
 
@@ -177,12 +176,15 @@ fn collect_type(
                 .filter(|t| !t.is_empty())
                 .unwrap_or_else(|| id.to_string())
         } else {
-            let (_, title) = parse_heading(&content);
-            if title.is_empty() {
-                id.to_string()
-            } else {
-                title
-            }
+            let heading = crate::record::document::parse(&content)
+                .ok()
+                .and_then(|d| d.heading)
+                .unwrap_or_default();
+            let rest = heading.trim_start_matches('#').trim();
+            let mut parts = rest.splitn(2, char::is_whitespace);
+            let _ = parts.next();
+            let t = parts.next().unwrap_or("").trim().to_string();
+            if t.is_empty() { id.to_string() } else { t }
         };
         hits.push(Hit {
             id: id.to_string(),
@@ -228,7 +230,14 @@ fn collect_backlog_store(
         if !content.to_lowercase().contains(needle) {
             continue;
         }
-        let (_, title) = parse_heading(&content);
+        let heading = crate::record::document::parse(&content)
+            .ok()
+            .and_then(|d| d.heading)
+            .unwrap_or_default();
+        let rest = heading.trim_start_matches('#').trim();
+        let mut parts = rest.splitn(2, char::is_whitespace);
+        let _ = parts.next();
+        let title = parts.next().unwrap_or("").trim().to_string();
         let title = if title.is_empty() {
             id.to_string()
         } else {
@@ -284,7 +293,14 @@ fn collect_decision_store(
         if !content.to_lowercase().contains(needle) {
             continue;
         }
-        let (_, title) = parse_heading(&content);
+        let heading = crate::record::document::parse(&content)
+            .ok()
+            .and_then(|d| d.heading)
+            .unwrap_or_default();
+        let rest = heading.trim_start_matches('#').trim();
+        let mut parts = rest.splitn(2, char::is_whitespace);
+        let _ = parts.next();
+        let title = parts.next().unwrap_or("").trim().to_string();
         let title = if title.is_empty() {
             id.to_string()
         } else {

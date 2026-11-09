@@ -175,30 +175,6 @@ pub fn type_key_for_id(cfg: &Config, id: &str) -> Option<String> {
     None
 }
 
-fn scan_max(active: &std::path::Path, archived: &std::path::Path, prefix: &str) -> u32 {
-    let mut max = 0u32;
-    for dir in [active, archived] {
-        if let Ok(rd) = fs::read_dir(dir) {
-            for e in rd.flatten() {
-                let path = e.path();
-                if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                    continue;
-                }
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
-                    && let Some(rest) = stem.strip_prefix(&format!("{}-", prefix))
-                    && !rest.is_empty()
-                    && rest.chars().all(|c| c.is_ascii_digit())
-                    && let Ok(n) = rest.parse::<u32>()
-                    && n > max
-                {
-                    max = n;
-                }
-            }
-        }
-    }
-    max
-}
-
 #[derive(Clone, Debug, Default)]
 pub(crate) struct DecisionData {
     pub(crate) id: String,
@@ -211,76 +187,28 @@ pub(crate) struct DecisionData {
 
 fn frontmatter_list_dec(content: &str, key: &str) -> Vec<String> {
     let mut out = Vec::new();
-    if let Ok(Some(fm)) = crate::record::frontmatter::parse(content) {
-        if let Some(yaml_serde::Value::Sequence(seq)) =
+    if let Ok(Some(fm)) = crate::record::frontmatter::parse(content)
+        && let Some(yaml_serde::Value::Sequence(seq)) =
             fm.data.get(yaml_serde::Value::String(key.to_string()))
-        {
-            for v in seq {
-                if let yaml_serde::Value::String(s) = v {
-                    out.push(s.clone());
-                }
+    {
+        for v in seq {
+            if let yaml_serde::Value::String(s) = v {
+                out.push(s.clone());
             }
         }
     }
     out
 }
 
-fn parse_heading(content: &str) -> (String, String) {
-    let body = if let Some((_, _, bs)) = crate::record::frontmatter::find_block(content) {
-        &content[bs..]
-    } else {
-        content
-    };
-    let first = body
-        .lines()
-        .skip_while(|l| l.trim().is_empty())
-        .next()
-        .unwrap_or("");
-    let rest = first.trim_start_matches('#').trim();
-    let mut parts = rest.splitn(2, char::is_whitespace);
-    let id = parts.next().unwrap_or("").trim().to_string();
-    let title = parts.next().unwrap_or("").trim().to_string();
-    (id, title)
-}
-
-fn section_text(content: &str, name: &str) -> Option<String> {
-    let lines: Vec<&str> = content.lines().collect();
-    let header = format!("## {}", name);
-    let mut i = 0usize;
-    while i < lines.len() {
-        if lines[i].trim() == header {
-            i += 1;
-            let mut buf: Vec<&str> = Vec::new();
-            while i < lines.len() && !lines[i].starts_with("## ") {
-                buf.push(lines[i]);
-                i += 1;
-            }
-            while buf.first().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                buf.remove(0);
-            }
-            while buf.last().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                buf.pop();
-            }
-            let text = buf.join("\n");
-            if text.trim().is_empty() {
-                return None;
-            }
-            return Some(text);
-        }
-        i += 1;
-    }
-    None
-}
-
-pub(crate) fn parse_decision(content: &str) -> DecisionData {
-    let (id, title) = parse_heading(content);
-    let status = section_text(content, "Status")
+fn record_from_document(doc: &crate::record::document::Document) -> DecisionData {
+    let (id, title) = crate::record::document::heading_id_title(doc);
+    let status = crate::record::document::section_text(doc, "Status")
         .unwrap_or_default()
         .trim()
         .to_string();
-    let decision = section_text(content, "Decision");
-    let context = section_text(content, "Context");
-    let consequences = section_text(content, "Consequences");
+    let decision = crate::record::document::section_text(doc, "Decision");
+    let context = crate::record::document::section_text(doc, "Context");
+    let consequences = crate::record::document::section_text(doc, "Consequences");
     DecisionData {
         id,
         title,
@@ -291,31 +219,48 @@ pub(crate) fn parse_decision(content: &str) -> DecisionData {
     }
 }
 
-fn render_decision(dd: &DecisionData) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    parts.push(format!("# {} {}", dd.id, dd.title));
+fn body_document(dd: &DecisionData) -> crate::record::document::Document {
     let status = if dd.status.trim().is_empty() {
         "proposed".to_string()
     } else {
         dd.status.clone()
     };
-    parts.push(format!("## Status\n{}", status));
+    let mut sections = vec![crate::record::document::Section {
+        heading: "## Status".to_string(),
+        body: vec![status, String::new()],
+    }];
     if let Some(d) = &dd.decision
         && !d.trim().is_empty()
     {
-        parts.push(format!("## Decision\n{}", d));
+        sections.push(crate::record::document::Section {
+            heading: "## Decision".to_string(),
+            body: vec![d.clone(), String::new()],
+        });
     }
     if let Some(c) = &dd.context
         && !c.trim().is_empty()
     {
-        parts.push(format!("## Context\n{}", c));
+        sections.push(crate::record::document::Section {
+            heading: "## Context".to_string(),
+            body: vec![c.clone(), String::new()],
+        });
     }
     if let Some(c) = &dd.consequences
         && !c.trim().is_empty()
     {
-        parts.push(format!("## Consequences\n{}", c));
+        sections.push(crate::record::document::Section {
+            heading: "## Consequences".to_string(),
+            body: vec![c.clone()],
+        });
     }
-    parts.join("\n\n") + "\n"
+    crate::record::document::Document {
+        source: String::new(),
+        front_matter: None,
+        frontmatter: None,
+        heading: Some(format!("# {} {}", dd.id, dd.title)),
+        preamble: vec![String::new()],
+        sections,
+    }
 }
 
 pub const ALLOWED_STATUSES: &[&str] = &[
@@ -388,14 +333,9 @@ pub fn create(
     let archived = archived_dir(ctx, &cfg)?;
     ensure_dir(&active, &ctx.project_dir)?;
 
-    let max = scan_max(&active, &archived, &entry.prefix);
-    let next = max + 1;
-    let id = format!(
-        "{}-{:0width$}",
-        entry.prefix,
-        next,
-        width = cfg.id_padding as usize
-    );
+    let next = crate::record::identity::next_number(&active, &archived, &entry.prefix);
+    let id =
+        crate::record::identity::format_id(&entry.prefix, next as i64, cfg.id_padding as usize);
 
     let dd = DecisionData {
         id: id.clone(),
@@ -405,47 +345,48 @@ pub fn create(
         context,
         consequences,
     };
+    let body_doc = body_document(&dd);
+    let body = crate::record::document::render(&body_doc);
+    let parsed = crate::record::document::parse(&body)?;
     let now = crate::record::frontmatter::utc_now();
-    let mut fm = String::new();
-    fm.push_str(&format!("id: {}\n", id));
-    fm.push_str(&format!(
-        "title: {}\n",
-        crate::record::frontmatter::format_scalar_pub(&dd.title)
-    ));
-    fm.push_str(&format!("created_date: '{}'\n", now));
-    fm.push_str(&format!("updated_date: '{}'\n", now));
-    if labels.is_empty() {
-        fm.push_str("labels: []\n");
+    let labels_value = if labels.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("labels:\n");
-        for l in &labels {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(l)
-            ));
-        }
-    }
-    if references.is_empty() {
-        fm.push_str("references: []\n");
+        crate::record::frontmatter::FrontMatterValue::String(labels.join("\n"))
+    };
+    let refs_value = if references.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("references:\n");
-        for r in &references {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(r)
-            ));
-        }
-    }
-    // superseded_by optional; default null
-    fm.push_str("superseded_by: null\n");
-    // type? decision has no type front matter (type is adr/bdr derived). general only.
-
-    let body = render_decision(&dd);
-    let content = crate::record::frontmatter::wrap(&fm, &body);
-
+        crate::record::frontmatter::FrontMatterValue::String(references.join("\n"))
+    };
+    let ops = vec![
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "id".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(id.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "title".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(dd.title.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "created_date".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(now.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "updated_date".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(now),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue("labels".to_string(), labels_value),
+        crate::record::patch::PatchOp::SetFrontMatterValue("references".to_string(), refs_value),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "superseded_by".to_string(),
+            crate::record::frontmatter::FrontMatterValue::Null,
+        ),
+    ];
+    let file_content = crate::record::patch::apply_patch(&parsed, &ops)?;
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    crate::record::store::write_atomic(ctx, &safe_path, &content)?;
+    crate::record::store::write_atomic(ctx, &safe_path, &file_content)?;
     Ok(id)
 }
 
@@ -487,7 +428,10 @@ pub fn list(
             }
             let safe = Context::ensure_within(&ctx.project_dir, &path)?;
             let content = fs::read_to_string(&safe).unwrap_or_default();
-            let (_, title) = parse_heading(&content);
+            let title = crate::record::document::parse(&content)
+                .ok()
+                .map(|d| crate::record::document::heading_id_title(&d).1)
+                .unwrap_or_default();
             let title = if title.is_empty() { id.clone() } else { title };
             items.push((id, title, content));
         }
@@ -594,8 +538,9 @@ pub fn edit(
         return Err(AppError::NotFound(format!("not found: {}", id)));
     };
 
-    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
-    let mut dd = parse_decision(&content);
+    let (doc, _token) = crate::record::store::read_document(ctx, &path)?;
+    let content = doc.source.clone();
+    let mut dd = record_from_document(&doc);
     if dd.id.is_empty() {
         dd.id = id.clone();
     }
@@ -679,29 +624,29 @@ pub fn edit(
             dd.title.clone(),
         ));
     }
-    if decision_raw.is_some() {
-        if let Some(d) = &dd.decision {
-            ops.push(crate::record::patch::PatchOp::SetSection(
-                "## Decision".into(),
-                d.clone(),
-            ));
-        }
+    if decision_raw.is_some()
+        && let Some(d) = &dd.decision
+    {
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## Decision".into(),
+            d.clone(),
+        ));
     }
-    if context_raw.is_some() {
-        if let Some(c) = &dd.context {
-            ops.push(crate::record::patch::PatchOp::SetSection(
-                "## Context".into(),
-                c.clone(),
-            ));
-        }
+    if context_raw.is_some()
+        && let Some(c) = &dd.context
+    {
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## Context".into(),
+            c.clone(),
+        ));
     }
-    if consequences_raw.is_some() {
-        if let Some(c) = &dd.consequences {
-            ops.push(crate::record::patch::PatchOp::SetSection(
-                "## Consequences".into(),
-                c.clone(),
-            ));
-        }
+    if consequences_raw.is_some()
+        && let Some(c) = &dd.consequences
+    {
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## Consequences".into(),
+            c.clone(),
+        ));
     }
     if status_raw.is_some() {
         ops.push(crate::record::patch::PatchOp::SetSection(
@@ -754,7 +699,6 @@ pub fn edit(
         ));
     }
 
-    let doc = crate::record::document::parse(&content)?;
     let base_new = crate::record::patch::apply_patch(&doc, &ops)?;
     let new_content = if ops.is_empty() || base_new == content {
         content.clone()
@@ -773,7 +717,7 @@ pub fn edit(
         crate::record::store::write_atomic(ctx, &safe_write, &new_content)?;
     }
 
-    let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
+    let _safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))
@@ -826,7 +770,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_render_roundtrip() {
+    fn document_roundtrip() {
         let dd = DecisionData {
             id: "ADR-001".to_string(),
             title: "T".to_string(),
@@ -835,8 +779,10 @@ mod tests {
             context: None,
             consequences: Some("c".to_string()),
         };
-        let content = render_decision(&dd);
-        let parsed = parse_decision(&content);
+        let body_doc = body_document(&dd);
+        let content = crate::record::document::render(&body_doc);
+        let parsed_doc = crate::record::document::parse(&content).unwrap();
+        let parsed = record_from_document(&parsed_doc);
         assert_eq!(parsed.id, "ADR-001");
         assert_eq!(parsed.title, "T");
         assert_eq!(parsed.status, "proposed");

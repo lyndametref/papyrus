@@ -119,6 +119,55 @@ pub fn render(doc: &Document) -> String {
     output
 }
 
+pub fn heading_id_title(doc: &Document) -> (String, String) {
+    let heading = doc.heading.as_deref().unwrap_or("");
+    let rest = heading.trim_start_matches('#').trim();
+    let mut parts = rest.splitn(2, char::is_whitespace);
+    let id = parts.next().unwrap_or("").trim().to_string();
+    let title = parts.next().unwrap_or("").trim().to_string();
+    (id, title)
+}
+
+pub fn heading_id_title_with_frontmatter(doc: &Document) -> (String, String) {
+    let (id, title) = heading_id_title(doc);
+    let title = if let Some(fm) = &doc.front_matter {
+        crate::record::frontmatter::current_value_string(&fm.raw, "title")
+            .filter(|t| !t.is_empty())
+            .unwrap_or(title)
+    } else {
+        title
+    };
+    (id, title)
+}
+
+pub fn section_text(doc: &Document, name: &str) -> Option<String> {
+    let header = format!("## {name}");
+    for section in &doc.sections {
+        if section.heading.trim() == header {
+            let mut buf: Vec<String> = section.body.clone();
+            while buf.first().is_some_and(|s| s.trim().is_empty()) {
+                buf.remove(0);
+            }
+            while buf.last().is_some_and(|s| s.trim().is_empty()) {
+                buf.pop();
+            }
+            let text = buf.join("\n");
+            if text.trim().is_empty() {
+                return None;
+            }
+            return Some(text);
+        }
+    }
+    None
+}
+
+pub fn section_lines(doc: &Document, name: &str) -> Vec<String> {
+    match section_text(doc, name) {
+        Some(text) => text.lines().map(|s| s.to_string()).collect(),
+        None => Vec::new(),
+    }
+}
+
 // Convenience aliases
 pub fn to_text(doc: &Document) -> String {
     render(doc)

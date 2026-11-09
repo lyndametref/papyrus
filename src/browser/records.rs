@@ -8,7 +8,6 @@
 use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
-use crate::requirement::parse_heading;
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
@@ -244,70 +243,37 @@ fn normalize_newlines(input: &str) -> String {
     input.replace("\r\n", "\n").replace('\r', "\n")
 }
 
-/// Parse a record document. The first line is the heading; every `## ` line
-/// starts a section and every following line belongs to that section.
+/// Thin adapter over the shared envelope: delegate all parsing to
+/// `record::document` and only reshape the result into the browser `Doc`.
 pub fn parse_doc(content: &str) -> Doc {
     let normalized = normalize_newlines(content);
-    // Preserve a leading YAML front-matter block verbatim.
-    let (front_matter, body) =
-        if let Some((_, _, bs)) = crate::record::frontmatter::find_block(&normalized) {
-            (Some(normalized[..bs].to_string()), &normalized[bs..])
-        } else {
-            (None, normalized.as_str())
+    let front_matter = crate::record::frontmatter::find_block(&normalized)
+        .map(|(_, _, bs)| normalized[..bs].to_string());
+    let Ok(shared) = crate::record::document::parse(&normalized) else {
+        return Doc {
+            id: String::new(),
+            title: String::new(),
+            heading: String::new(),
+            preamble: Vec::new(),
+            sections: Vec::new(),
+            front_matter,
+            source: normalized,
         };
-    let mut lines: Vec<&str> = body.split('\n').collect();
-    if lines.last() == Some(&"") {
-        lines.pop();
-    }
-    // skip leading blank lines
-    let mut start = 0usize;
-    let mut preamble: Vec<String> = Vec::new();
-    while start < lines.len() && lines[start].trim().is_empty() {
-        preamble.push(lines[start].to_string());
-        start += 1;
-    }
-    let heading = if start < lines.len() {
-        lines[start].to_string()
-    } else {
-        String::new()
     };
-    let (id, title) = parse_heading(&heading);
-    let mut sections: Vec<Section> = Vec::new();
-    let mut i = if start < lines.len() {
-        start + 1
-    } else {
-        start
-    };
-    while i < lines.len() {
-        if let Some(rest) = lines[i].strip_prefix("## ") {
-            let heading_line = format!("## {}", rest);
-            let mut body: Vec<String> = Vec::new();
-            i += 1;
-            while i < lines.len() && !lines[i].starts_with("## ") {
-                body.push(lines[i].to_string());
-                i += 1;
-            }
-            sections.push(Section {
-                heading: heading_line,
-                body,
-            });
-        } else if sections.is_empty() {
-            preamble.push(lines[i].to_string());
-            i += 1;
-        } else {
-            // Content between sections is part of the previous section body.
-            if let Some(last) = sections.last_mut() {
-                last.body.push(lines[i].to_string());
-            }
-            i += 1;
-        }
-    }
+    let (id, title) = crate::record::document::heading_id_title(&shared);
     Doc {
         id,
         title,
-        heading,
-        preamble,
-        sections,
+        heading: shared.heading.unwrap_or_default(),
+        preamble: shared.preamble,
+        sections: shared
+            .sections
+            .into_iter()
+            .map(|s| Section {
+                heading: s.heading,
+                body: s.body,
+            })
+            .collect(),
         front_matter,
         source: normalized,
     }
@@ -566,7 +532,17 @@ fn load_backlog_record(
         description,
     ) = match kind {
         Category::Task => {
-            let td = crate::task::parse_task(&content);
+            let task_doc = crate::record::document::parse(&content).unwrap_or_else(|_| {
+                crate::record::document::Document {
+                    source: content.clone(),
+                    front_matter: None,
+                    frontmatter: None,
+                    heading: None,
+                    preamble: Vec::new(),
+                    sections: Vec::new(),
+                }
+            });
+            let td = crate::task::task_from_document(&task_doc);
             let title = if td.title.is_empty() {
                 stem.to_string()
             } else {
@@ -590,7 +566,21 @@ fn load_backlog_record(
             )
         }
         Category::Milestone => {
-            let (_id, title, desc, release) = crate::milestone::parse_milestone(&content);
+            let parsed_doc = crate::record::document::parse(&content).unwrap_or_else(|_| {
+                crate::record::document::Document {
+                    source: content.clone(),
+                    front_matter: None,
+                    frontmatter: None,
+                    heading: None,
+                    preamble: Vec::new(),
+                    sections: Vec::new(),
+                }
+            });
+            let (_id, title) =
+                crate::record::document::heading_id_title_with_frontmatter(&parsed_doc);
+            let desc = crate::record::document::section_text(&parsed_doc, "Description");
+            let release = crate::record::document::section_text(&parsed_doc, "Release")
+                .map(|s| s.trim().to_string());
             let title = if title.is_empty() {
                 stem.to_string()
             } else {
@@ -610,7 +600,18 @@ fn load_backlog_record(
             )
         }
         Category::Release => {
-            let (_id, title, desc) = crate::release::parse_release(&content);
+            let parsed_doc = crate::record::document::parse(&content).unwrap_or_else(|_| {
+                crate::record::document::Document {
+                    source: content.clone(),
+                    front_matter: None,
+                    frontmatter: None,
+                    heading: None,
+                    preamble: Vec::new(),
+                    sections: Vec::new(),
+                }
+            });
+            let (_id, title) = crate::record::document::heading_id_title(&parsed_doc);
+            let desc = crate::record::document::section_text(&parsed_doc, "Description");
             let title = if title.is_empty() {
                 stem.to_string()
             } else {
@@ -643,7 +644,8 @@ fn load_backlog_record(
                 return None;
             }
             let c = fs::read_to_string(&safe).ok()?;
-            let (_, t, _, _) = crate::milestone::parse_milestone(&c);
+            let d = crate::record::document::parse(&c).ok()?;
+            let (_, t) = crate::record::document::heading_id_title_with_frontmatter(&d);
             if t.is_empty() { None } else { Some(t) }
         })
     } else {
@@ -658,7 +660,8 @@ fn load_backlog_record(
                 return None;
             }
             let c = fs::read_to_string(&safe).ok()?;
-            let (_, t, _) = crate::release::parse_release(&c);
+            let d = crate::record::document::parse(&c).ok()?;
+            let (_, t) = crate::record::document::heading_id_title(&d);
             if t.is_empty() { None } else { Some(t) }
         })
     } else {
@@ -739,16 +742,28 @@ fn load_decision_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
     if crate::decision::type_key_for_id(&cfg, stem).is_none() {
         return Ok(None);
     }
-    let dd = crate::decision::parse_decision(&content);
-    let title = if dd.title.is_empty() {
+    let parsed_doc = crate::record::document::parse(&content).unwrap_or_else(|_| {
+        crate::record::document::Document {
+            source: content.clone(),
+            front_matter: None,
+            frontmatter: None,
+            heading: None,
+            preamble: Vec::new(),
+            sections: Vec::new(),
+        }
+    });
+    let (_, parsed_title) = crate::record::document::heading_id_title(&parsed_doc);
+    let title = if parsed_title.is_empty() {
         stem.to_string()
     } else {
-        dd.title.clone()
+        parsed_title.clone()
     };
-    let status = if dd.status.trim().is_empty() {
+    let parsed_status =
+        crate::record::document::section_text(&parsed_doc, "Status").unwrap_or_default();
+    let status = if parsed_status.trim().is_empty() {
         "proposed".to_string()
     } else {
-        dd.status.trim().to_string()
+        parsed_status.trim().to_string()
     };
     let superseded_by = status
         .strip_prefix("Superseded by ")
@@ -787,9 +802,9 @@ fn load_decision_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
         comments: Vec::new(),
         release_id: None,
         release_title: None,
-        decision: dd.decision.clone(),
-        context: dd.context.clone(),
-        consequences: dd.consequences.clone(),
+        decision: crate::record::document::section_text(&parsed_doc, "Decision"),
+        context: crate::record::document::section_text(&parsed_doc, "Context"),
+        consequences: crate::record::document::section_text(&parsed_doc, "Consequences"),
         decision_type,
         superseded_by,
         superseded_title,
@@ -1212,7 +1227,10 @@ fn load_audit_record(ctx: &Context, path: &Path) -> Result<Option<Record>, AppEr
     } else {
         doc.title.clone()
     };
-    let audit_type_raw = crate::audit::section_text(&content, "Audit Type").unwrap_or_default();
+    let audit_type_raw = crate::record::document::parse(&content)
+        .ok()
+        .and_then(|d| crate::record::document::section_text(&d, "Audit Type"))
+        .unwrap_or_default();
     let fm_type = crate::record::frontmatter::parse(&content)
         .ok()
         .flatten()
@@ -1237,7 +1255,9 @@ fn load_audit_record(ctx: &Context, path: &Path) -> Result<Option<Record>, AppEr
     } else {
         audit_type_raw.trim().to_string()
     };
-    let content_val = crate::audit::section_text(&content, "Content");
+    let content_val = crate::record::document::parse(&content)
+        .ok()
+        .and_then(|d| crate::record::document::section_text(&d, "Content"));
     // store content in doc only; audit_type in Record
     Ok(Some(Record {
         id: stem.to_string(),

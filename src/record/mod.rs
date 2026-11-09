@@ -1,7 +1,6 @@
 //! Shared record envelope: front matter, document, patch, store.
 
 pub mod descriptor;
-pub mod descriptors;
 pub mod document;
 pub mod frontmatter;
 pub mod identity;

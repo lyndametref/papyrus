@@ -58,7 +58,7 @@ Extend `papyrus search` so that decision records are searched in addition to tas
 
 ### 3. Searchable text and matching
 
-1. The searchable text of a decision record is its entire persisted file text: the top-level heading (ID and title) plus every body section, including `## Status`, `## Decision`, `## Context`, and `## Consequences`, as well as any editor-added sections.
+1. The searchable text of a decision record is its entire persisted record text, including front matter, so metadata values are searchable: the top-level heading (ID and title) plus every body section, including `## Status`, `## Decision`, `## Context`, and `## Consequences`, as well as any editor-added sections.
 2. Matching is case-insensitive substring matching over that text, using Unicode-aware lowercasing of both the query and the record text.
 3. The query is trimmed of leading and trailing whitespace before matching. Internal whitespace is preserved exactly; a quoted phrase is matched as one contiguous substring, including its internal spaces.
 4. There is no tokenization, word splitting, stemming, fuzzy matching, ranking, boolean syntax, field-qualified syntax, or regular-expression interpretation. Characters such as `.`, `*`, `(`, `[`, and `?` are literal.

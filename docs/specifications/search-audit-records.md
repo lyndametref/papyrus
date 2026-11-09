@@ -15,7 +15,7 @@ Active audit-record records only: files directly inside the configured active di
 
 ## Behavior
 
-Same as `search-business-rules.md` with `audit` / `AUD` prefix / `audit-records/` directory: no new `--type` value is added; audit records are returned whenever `doc` is selected. Record ID is the file stem; title is the text after the ID on the first heading line, or the ID when that text is empty. Matching is case-insensitive substring matching over the whole persisted record text; quoted phrases are matched as one contiguous substring; results are ordered by record ID; `--limit` caps the combined result set; missing configured directory yields empty success; symlink escape exits 1; `search` performs no writes.
+Same as `search-business-rules.md` with `audit` / `AUD` prefix / `audit-records/` directory: no new `--type` value is added; audit records are returned whenever `doc` is selected. Record ID is the file stem; title is the text after the ID on the first heading line, or the ID when that text is empty. Matching is case-insensitive substring matching over the whole persisted record text, including front matter, so metadata values are searchable; quoted phrases are matched as one contiguous substring; results are ordered by record ID; `--limit` caps the combined result set; missing configured directory yields empty success; symlink escape exits 1; `search` performs no writes.
 
 ## Acceptance criteria mapping
 
