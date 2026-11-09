@@ -81,63 +81,6 @@ fn ensure_dirs(dir: &Path) -> Result<(), AppError> {
     fs::create_dir_all(dir).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
-fn scan_max_group(active: &Path, deprecated: &Path, prefix: &str) -> u32 {
-    let mut max = 0u32;
-    for dir in [active, deprecated] {
-        if let Ok(rd) = fs::read_dir(dir) {
-            for e in rd.flatten() {
-                let path = e.path();
-                if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                    continue;
-                }
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
-                    && let Some(rest) = stem.strip_prefix(&format!("{}-", prefix))
-                    && !rest.is_empty()
-                    && rest.chars().all(|c| c.is_ascii_digit())
-                    && let Ok(n) = rest.parse::<u32>()
-                    && n > max
-                {
-                    max = n;
-                }
-            }
-        }
-    }
-    max
-}
-
-fn scan_max_seq(active: &Path, deprecated: &Path, group_id: &str) -> u32 {
-    let mut max = 0u32;
-    let prefix = format!("{}.", group_id);
-    for dir in [active, deprecated] {
-        if let Ok(rd) = fs::read_dir(dir) {
-            for e in rd.flatten() {
-                let path = e.path();
-                if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                    continue;
-                }
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
-                    && let Some(rest) = stem.strip_prefix(&prefix)
-                    && !rest.is_empty()
-                    && rest.chars().all(|c| c.is_ascii_digit())
-                    && let Ok(n) = rest.parse::<u32>()
-                    && n > max
-                {
-                    max = n;
-                }
-            }
-        }
-    }
-    max
-}
-
-fn is_group_id(id: &str, prefix: &str) -> bool {
-    if let Some(rest) = id.strip_prefix(&format!("{}-", prefix)) {
-        !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit())
-    } else {
-        false
-    }
-}
-
 pub fn create_group(
     ctx: &Context,
     kind: Kind,
@@ -162,16 +105,12 @@ pub fn create_group(
     ensure_dirs(&active)?;
     ensure_dirs(&deprecated)?;
 
-    let max = scan_max_group(&active, &deprecated, &entry.prefix);
-    let next = max + 1;
-    let id = format!(
-        "{}-{:0width$}",
-        entry.prefix,
-        next,
-        width = cfg.id_padding as usize
-    );
+    let next = crate::record::identity::next_number(&active, &deprecated, &entry.prefix);
+    let id =
+        crate::record::identity::format_id(&entry.prefix, next as i64, cfg.id_padding as usize);
 
-    let content = render_group(kind, &id, &title, story.as_deref(), desc.as_deref());
+    let body_doc = body_document_group(kind, &id, &title, story.as_deref(), desc.as_deref());
+    let content = crate::record::document::render(&body_doc);
 
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
@@ -238,14 +177,16 @@ pub fn create(
     }
     let group_id = sanitize_text(group_raw)?;
 
-    if !is_group_id(&group_id, &entry.prefix) {
+    if !crate::record::identity::is_group_id(&group_id, &entry.prefix) {
         let other_kind = match kind {
             Kind::Req => Kind::Nfr,
             Kind::Nfr => Kind::Req,
         };
         let mismatch = type_entry(&cfg, other_kind.key())
             .ok()
-            .filter(|other_entry| is_group_id(&group_id, &other_entry.prefix))
+            .filter(|other_entry| {
+                crate::record::identity::is_group_id(&group_id, &other_entry.prefix)
+            })
             .map(|_| {
                 let other_active = active_dir(ctx, &cfg, other_kind.key()).ok();
                 let other_deprecated = deprecated_dir(ctx, &cfg, other_kind.key()).ok();
@@ -291,9 +232,8 @@ pub fn create(
         )));
     }
 
-    let group_content =
-        fs::read_to_string(&group_active_safe).map_err(|e| AppError::Runtime(e.to_string()))?;
-    let group_parsed = parse_document(&group_content);
+    let (group_doc, _token) = crate::record::store::read_document(ctx, &group_active_safe)?;
+    let group_parsed = parsed_from_document(&group_doc);
     let group_title = group_parsed.title.clone();
     if group_title.is_empty() {
         return Err(AppError::Runtime(format!(
@@ -302,16 +242,11 @@ pub fn create(
         )));
     }
 
-    let max_seq = scan_max_seq(&active, &deprecated, &group_id);
-    let next_seq = max_seq + 1;
-    let req_id = format!(
-        "{}.{:0width$}",
-        group_id,
-        next_seq,
-        width = cfg.id_padding as usize
-    );
+    let next_seq = crate::record::identity::next_seq_number(&active, &deprecated, &group_id);
+    let req_id =
+        crate::record::identity::format_seq_id(&group_id, next_seq as i64, cfg.id_padding as usize);
 
-    let body = render_requirement(
+    let body_doc = body_document_requirement(
         kind,
         &req_id,
         &title_string,
@@ -320,44 +255,43 @@ pub fn create(
         &group_id,
         &group_title,
     );
-
+    let body = crate::record::document::render(&body_doc);
+    let parsed = crate::record::document::parse(&body)?;
     let now = crate::record::frontmatter::utc_now();
-    let mut fm = String::new();
-    fm.push_str(&format!("id: {}\n", req_id));
-    fm.push_str(&format!(
-        "title: {}\n",
-        crate::record::frontmatter::format_scalar_pub(&title_string)
-    ));
-    fm.push_str(&format!("created_date: '{}'\n", now));
-    fm.push_str(&format!("updated_date: '{}'\n", now));
-    if labels.is_empty() {
-        fm.push_str("labels: []\n");
+    let labels_value = if labels.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("labels:\n");
-        for l in &labels {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(l)
-            ));
-        }
-    }
-    if references.is_empty() {
-        fm.push_str("references: []\n");
+        crate::record::frontmatter::FrontMatterValue::String(labels.join("\n"))
+    };
+    let refs_value = if references.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("references:\n");
-        for r in &references {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(r)
-            ));
-        }
-    }
-
-    let content = crate::record::frontmatter::wrap(&fm, &body);
-
+        crate::record::frontmatter::FrontMatterValue::String(references.join("\n"))
+    };
+    let ops = vec![
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "id".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(req_id.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "title".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(title_string.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "created_date".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(now.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "updated_date".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(now),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue("labels".to_string(), labels_value),
+        crate::record::patch::PatchOp::SetFrontMatterValue("references".to_string(), refs_value),
+    ];
+    let file_content = crate::record::patch::apply_patch(&parsed, &ops)?;
     let file_path = active.join(format!("{}.md", req_id));
     let safe_file = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    crate::record::store::write_atomic(ctx, &safe_file, &content)?;
+    crate::record::store::write_atomic(ctx, &safe_file, &file_content)?;
     Ok(req_id)
 }
 
@@ -380,7 +314,10 @@ pub fn list(ctx: &Context, kind: Kind) -> Result<crate::CommandOutput, AppError>
             };
             let safe = Context::ensure_within(&ctx.project_dir, &path)?;
             let content = fs::read_to_string(&safe).unwrap_or_default();
-            let (_, title) = parse_heading(&content);
+            let title = crate::record::document::parse(&content)
+                .ok()
+                .map(|d| crate::record::document::heading_id_title(&d).1)
+                .unwrap_or_default();
             let title = if title.is_empty() { id.clone() } else { title };
             items.push((id, title, content));
         }
@@ -415,82 +352,100 @@ pub fn list(ctx: &Context, kind: Kind) -> Result<crate::CommandOutput, AppError>
     Ok(crate::CommandOutput { text, json })
 }
 
-pub(crate) fn parse_heading(content: &str) -> (String, String) {
-    let body = if let Some((_, _, bs)) = crate::record::frontmatter::find_block(content) {
-        &content[bs..]
-    } else {
-        content
-    };
-    let first = body
-        .lines()
-        .skip_while(|l| l.trim().is_empty())
-        .next()
-        .unwrap_or("");
-    let rest = first.trim_start_matches('#').trim();
-    let mut parts = rest.splitn(2, char::is_whitespace);
-    let id = parts.next().unwrap_or("").trim().to_string();
-    let title = parts.next().unwrap_or("").trim().to_string();
-    (id, title)
-}
-
-pub fn parse_document(content: &str) -> ParsedDoc {
-    let (id, title) = parse_heading(content);
-    let mut story: Option<String> = None;
+pub fn parsed_from_document(doc: &crate::record::document::Document) -> ParsedDoc {
+    let (id, title) = crate::record::document::heading_id_title(doc);
+    let story = crate::record::document::section_text(doc, "User Story");
     let mut group_id: Option<String> = None;
     let mut group_title: Option<String> = None;
-    let mut desc: Option<String> = None;
-    let lines: Vec<&str> = content.lines().collect();
-    let mut i = 0usize;
-    while i < lines.len() {
-        if lines[i].starts_with("## ") {
-            let section = lines[i].trim().to_string();
-            i += 1;
-            let mut buf: Vec<&str> = Vec::new();
-            while i < lines.len() && !lines[i].starts_with("## ") {
-                buf.push(lines[i]);
-                i += 1;
-            }
-            while buf.first().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                buf.remove(0);
-            }
-            while buf.last().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                buf.pop();
-            }
-            let text = buf.join("\n");
-            let val = if text.trim().is_empty() {
-                None
-            } else {
-                Some(text)
-            };
-            match section.as_str() {
-                "## User Story" => story = val,
-                "## Group" => {
-                    if let Some(t) = val {
-                        let mut parts = t.splitn(2, char::is_whitespace);
-                        group_id = parts
-                            .next()
-                            .map(|s| s.trim().to_string())
-                            .filter(|s| !s.is_empty());
-                        group_title = parts
-                            .next()
-                            .map(|s| s.trim().to_string())
-                            .filter(|s| !s.is_empty());
-                    }
-                }
-                "## Description" => desc = val,
-                _ => {}
-            }
-        } else {
-            i += 1;
-        }
+    if let Some(text) = crate::record::document::section_text(doc, "Group") {
+        let mut parts = text.splitn(2, char::is_whitespace);
+        group_id = parts
+            .next()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+        group_title = parts
+            .next()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
     }
+    let description = crate::record::document::section_text(doc, "Description");
     ParsedDoc {
         id,
         title,
         story,
         group_id,
         group_title,
-        description: desc,
+        description,
+    }
+}
+
+fn body_document_group(
+    kind: Kind,
+    id: &str,
+    title: &str,
+    story: Option<&str>,
+    desc: Option<&str>,
+) -> crate::record::document::Document {
+    let mut sections = Vec::new();
+    if kind.supports_story()
+        && let Some(s) = story
+    {
+        sections.push(crate::record::document::Section {
+            heading: "## User Story".to_string(),
+            body: vec![s.to_string(), String::new()],
+        });
+    }
+    if let Some(d) = desc {
+        sections.push(crate::record::document::Section {
+            heading: "## Description".to_string(),
+            body: vec![d.to_string()],
+        });
+    }
+    crate::record::document::Document {
+        source: String::new(),
+        front_matter: None,
+        frontmatter: None,
+        heading: Some(format!("# {id} {title}")),
+        preamble: vec![String::new()],
+        sections,
+    }
+}
+
+fn body_document_requirement(
+    kind: Kind,
+    id: &str,
+    title: &str,
+    story: Option<&str>,
+    desc: Option<&str>,
+    group_id: &str,
+    group_title: &str,
+) -> crate::record::document::Document {
+    let mut sections = Vec::new();
+    if kind.supports_story()
+        && let Some(s) = story
+    {
+        sections.push(crate::record::document::Section {
+            heading: "## User Story".to_string(),
+            body: vec![s.to_string(), String::new()],
+        });
+    }
+    sections.push(crate::record::document::Section {
+        heading: "## Group".to_string(),
+        body: vec![group_id.to_string() + " " + group_title, String::new()],
+    });
+    if let Some(d) = desc {
+        sections.push(crate::record::document::Section {
+            heading: "## Description".to_string(),
+            body: vec![d.to_string()],
+        });
+    }
+    crate::record::document::Document {
+        source: String::new(),
+        front_matter: None,
+        frontmatter: None,
+        heading: Some(format!("# {id} {title}")),
+        preamble: vec![String::new()],
+        sections,
     }
 }
 
@@ -576,8 +531,9 @@ pub fn edit(
         return Err(AppError::NotFound(format!("not found: {}", id)));
     };
 
-    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
-    let mut parsed = parse_document(&content);
+    let (doc_read, _token) = crate::record::store::read_document(ctx, &path)?;
+    let content = doc_read.source.clone();
+    let mut parsed = parsed_from_document(&doc_read);
 
     if let Some(t) = title_raw {
         parsed.title = sanitize_text(t)?;
@@ -645,7 +601,7 @@ pub fn edit(
         ));
     }
 
-    let doc = crate::record::document::parse(&content)?;
+    let doc = doc_read;
     let base_new = crate::record::patch::apply_patch(&doc, &ops)?;
     let new_content = if ops.is_empty() || base_new == content {
         content.clone()
@@ -768,47 +724,4 @@ pub fn restore(ctx: &Context, kind: Kind, id_raw: &str) -> Result<crate::Command
         text: String::new(),
         json,
     })
-}
-
-fn render_group(
-    kind: Kind,
-    id: &str,
-    title: &str,
-    story: Option<&str>,
-    desc: Option<&str>,
-) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    parts.push(format!("# {} {}", id, title));
-    if kind.supports_story()
-        && let Some(s) = story
-    {
-        parts.push(format!("## User Story\n{}", s));
-    }
-    if let Some(d) = desc {
-        parts.push(format!("## Description\n{}", d));
-    }
-    parts.join("\n\n") + "\n"
-}
-
-fn render_requirement(
-    kind: Kind,
-    id: &str,
-    title: &str,
-    story: Option<&str>,
-    desc: Option<&str>,
-    group_id: &str,
-    group_title: &str,
-) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    parts.push(format!("# {} {}", id, title));
-    if kind.supports_story()
-        && let Some(s) = story
-    {
-        parts.push(format!("## User Story\n{}", s));
-    }
-    parts.push(format!("## Group\n{} {}", group_id, group_title));
-    if let Some(d) = desc {
-        parts.push(format!("## Description\n{}", d));
-    }
-    parts.join("\n\n") + "\n"
 }

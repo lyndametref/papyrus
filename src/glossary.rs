@@ -143,30 +143,6 @@ fn ensure_dirs(dir: &std::path::Path) -> Result<(), AppError> {
     fs::create_dir_all(dir).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
-fn scan_max(active: &std::path::Path, deprecated: &std::path::Path, prefix: &str) -> u32 {
-    let mut max = 0u32;
-    for dir in [active, deprecated] {
-        if let Ok(rd) = fs::read_dir(dir) {
-            for e in rd.flatten() {
-                let path = e.path();
-                if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                    continue;
-                }
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
-                    && let Some(rest) = stem.strip_prefix(&format!("{}-", prefix))
-                    && !rest.is_empty()
-                    && rest.chars().all(|c| c.is_ascii_digit())
-                    && let Ok(n) = rest.parse::<u32>()
-                    && n > max
-                {
-                    max = n;
-                }
-            }
-        }
-    }
-    max
-}
-
 #[derive(Clone, Debug, Default)]
 struct GlossaryData {
     id: String,
@@ -174,56 +150,9 @@ struct GlossaryData {
     definition: String,
 }
 
-fn parse_heading(content: &str) -> (String, String) {
-    let body = if let Some((_, _, bs)) = crate::record::frontmatter::find_block(content) {
-        &content[bs..]
-    } else {
-        content
-    };
-    let first = body
-        .lines()
-        .skip_while(|l| l.trim().is_empty())
-        .next()
-        .unwrap_or("");
-    let rest = first.trim_start_matches('#').trim();
-    let mut parts = rest.splitn(2, char::is_whitespace);
-    let id = parts.next().unwrap_or("").trim().to_string();
-    let term = parts.next().unwrap_or("").trim().to_string();
-    (id, term)
-}
-
-fn section_text(content: &str, name: &str) -> Option<String> {
-    let lines: Vec<&str> = content.lines().collect();
-    let header = format!("## {}", name);
-    let mut i = 0usize;
-    while i < lines.len() {
-        if lines[i].trim() == header {
-            i += 1;
-            let mut buf: Vec<&str> = Vec::new();
-            while i < lines.len() && !lines[i].starts_with("## ") {
-                buf.push(lines[i]);
-                i += 1;
-            }
-            while buf.first().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                buf.remove(0);
-            }
-            while buf.last().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                buf.pop();
-            }
-            let text = buf.join("\n");
-            if text.trim().is_empty() {
-                return None;
-            }
-            return Some(text);
-        }
-        i += 1;
-    }
-    None
-}
-
-fn parse_glossary(content: &str) -> GlossaryData {
-    let (id, term) = parse_heading(content);
-    let definition = section_text(content, "Definition").unwrap_or_default();
+fn record_from_document(doc: &crate::record::document::Document) -> GlossaryData {
+    let (id, term) = crate::record::document::heading_id_title(doc);
+    let definition = crate::record::document::section_text(doc, "Definition").unwrap_or_default();
     GlossaryData {
         id,
         term,
@@ -231,11 +160,18 @@ fn parse_glossary(content: &str) -> GlossaryData {
     }
 }
 
-fn render_glossary(gd: &GlossaryData) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    parts.push(format!("# {} {}", gd.id, gd.term));
-    parts.push(format!("## Definition\n{}", gd.definition));
-    parts.join("\n\n") + "\n"
+fn body_document(id: &str, term: &str, definition: &str) -> crate::record::document::Document {
+    crate::record::document::Document {
+        source: String::new(),
+        front_matter: None,
+        frontmatter: None,
+        heading: Some(format!("# {id} {term}")),
+        preamble: vec![String::new()],
+        sections: vec![crate::record::document::Section {
+            heading: "## Definition".to_string(),
+            body: vec![definition.to_string()],
+        }],
+    }
 }
 
 pub fn create(
@@ -272,56 +208,48 @@ pub fn create(
     ensure_dirs(&active)?;
     ensure_dirs(&deprecated)?;
 
-    let max = scan_max(&active, &deprecated, &entry.prefix);
-    let next = max + 1;
-    let id = format!(
-        "{}-{:0width$}",
-        entry.prefix,
-        next,
-        width = cfg.id_padding as usize
-    );
+    let next = crate::record::identity::next_number(&active, &deprecated, &entry.prefix);
+    let id =
+        crate::record::identity::format_id(&entry.prefix, next as i64, cfg.id_padding as usize);
 
-    let gd = GlossaryData {
-        id: id.clone(),
-        term: term.clone(),
-        definition: definition.clone(),
-    };
-    let body = render_glossary(&gd);
+    let body_doc = body_document(&id, &term, &definition);
+    let body = crate::record::document::render(&body_doc);
+    let parsed = crate::record::document::parse(&body)?;
     let now = crate::record::frontmatter::utc_now();
-    let mut fm = String::new();
-    fm.push_str(&format!("id: {}\n", id));
-    fm.push_str(&format!(
-        "title: {}\n",
-        crate::record::frontmatter::format_scalar_pub(&term)
-    ));
-    fm.push_str(&format!("created_date: '{}'\n", now));
-    fm.push_str(&format!("updated_date: '{}'\n", now));
-    if labels.is_empty() {
-        fm.push_str("labels: []\n");
+    let labels_value = if labels.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("labels:\n");
-        for l in &labels {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(l)
-            ));
-        }
-    }
-    if references.is_empty() {
-        fm.push_str("references: []\n");
+        crate::record::frontmatter::FrontMatterValue::String(labels.join("\n"))
+    };
+    let refs_value = if references.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("references:\n");
-        for r in &references {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(r)
-            ));
-        }
-    }
-    let content = crate::record::frontmatter::wrap(&fm, &body);
+        crate::record::frontmatter::FrontMatterValue::String(references.join("\n"))
+    };
+    let ops = vec![
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "id".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(id.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "title".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(term.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "created_date".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(now.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "updated_date".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(now),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue("labels".to_string(), labels_value),
+        crate::record::patch::PatchOp::SetFrontMatterValue("references".to_string(), refs_value),
+    ];
+    let file_content = crate::record::patch::apply_patch(&parsed, &ops)?;
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    crate::record::store::write_atomic(ctx, &safe_path, &content)?;
+    crate::record::store::write_atomic(ctx, &safe_path, &file_content)?;
     Ok(id)
 }
 
@@ -345,7 +273,10 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
             };
             let safe = Context::ensure_within(&ctx.project_dir, &path)?;
             let content = fs::read_to_string(&safe).unwrap_or_default();
-            let (_, term) = parse_heading(&content);
+            let term = crate::record::document::parse(&content)
+                .ok()
+                .map(|d| crate::record::document::heading_id_title(&d).1)
+                .unwrap_or_default();
             let term = if term.is_empty() { id.clone() } else { term };
             items.push((id, term, content));
         }
@@ -462,8 +393,9 @@ pub fn edit(
         return Err(AppError::NotFound(format!("not found: {}", id)));
     };
 
-    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
-    let mut gd = parse_glossary(&content);
+    let (doc, _token) = crate::record::store::read_document(ctx, &path)?;
+    let content = doc.source.clone();
+    let mut gd = record_from_document(&doc);
     if gd.id.is_empty() {
         gd.id = id.clone();
     }
@@ -531,7 +463,6 @@ pub fn edit(
         ));
     }
 
-    let doc = crate::record::document::parse(&content)?;
     let base_new = crate::record::patch::apply_patch(&doc, &ops)?;
     let new_content = if ops.is_empty() || base_new == content {
         content.clone()

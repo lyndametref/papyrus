@@ -1677,7 +1677,7 @@ fn convert_task(
     let backlog = cfg.backlog_directory.trim_end_matches('/');
     let active_dir = ctx.project_dir.join(backlog).join("tasks");
     let archived_dir = active_dir.join("archived");
-    let ordinal_final = scan_max_ordinal_tasks(&active_dir, &archived_dir);
+    let ordinal_final = crate::record::identity::scan_max_ordinal(&active_dir, &archived_dir);
 
     let created = file_created_date(path);
     let updated = frontmatter::utc_now();
@@ -1872,32 +1872,6 @@ fn convert_milestone(
     .collect();
     let _ = cfg;
     Ok((new_content, keys))
-}
-
-fn scan_max_ordinal_tasks(active: &Path, archived: &Path) -> i64 {
-    let mut max: Option<i64> = None;
-    for dir in [active, archived] {
-        if let Ok(rd) = fs::read_dir(dir) {
-            for e in rd.flatten() {
-                let path = e.path();
-                if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                    continue;
-                }
-                if let Ok(content) = fs::read_to_string(&path)
-                    && let Some(fm) = crate::record::frontmatter::parse(&content).ok().flatten()
-                    && let Some(v) =
-                        crate::record::frontmatter::current_value_string(&fm.raw, "ordinal")
-                    && let Ok(n) = v.parse::<i64>()
-                {
-                    max = Some(max.map_or(n, |m: i64| m.max(n)));
-                }
-            }
-        }
-    }
-    match max {
-        Some(m) => m + 1,
-        None => 0,
-    }
 }
 
 #[cfg(test)]

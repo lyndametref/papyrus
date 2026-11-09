@@ -146,46 +146,12 @@ fn ensure_dirs(dir: &Path) -> Result<(), AppError> {
     fs::create_dir_all(dir).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
-fn id_number(stem: &str, prefix: &str) -> Option<u32> {
-    let rest = stem.strip_prefix(prefix)?.strip_prefix('-')?;
-    if rest.is_empty() || !rest.chars().all(|c| c.is_ascii_digit()) {
-        return None;
-    }
-    rest.parse::<u32>().ok()
-}
-
 fn is_record_path(path: &Path, prefix: &str) -> bool {
     path.extension().and_then(|s| s.to_str()) == Some("html")
         && path
             .file_stem()
             .and_then(|s| s.to_str())
-            .and_then(|stem| id_number(stem, prefix))
-            .is_some()
-}
-
-fn scan_max(active: &Path, deprecated: &Path, prefix: &str) -> u32 {
-    let mut max = 0u32;
-    for dir in [active, deprecated] {
-        let Ok(rd) = fs::read_dir(dir) else {
-            continue;
-        };
-        for e in rd.flatten() {
-            let path = e.path();
-            if !path.is_file() {
-                continue;
-            }
-            if path.extension().and_then(|s| s.to_str()) != Some("html") {
-                continue;
-            }
-            if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
-                && let Some(n) = id_number(stem, prefix)
-                && n > max
-            {
-                max = n;
-            }
-        }
-    }
-    max
+            .is_some_and(|stem| crate::record::identity::is_record_stem(stem, prefix))
 }
 
 fn find_record(ctx: &Context, dir: &Path, id: &str) -> Result<Option<PathBuf>, AppError> {
@@ -560,13 +526,9 @@ fn create(
     ensure_dirs(&active)?;
     ensure_dirs(&deprecated)?;
 
-    let next = scan_max(&active, &deprecated, &entry.prefix) + 1;
-    let id = format!(
-        "{}-{:0width$}",
-        entry.prefix,
-        next,
-        width = cfg.id_padding as usize
-    );
+    let next = crate::record::identity::next_html_number(&active, &deprecated, &entry.prefix);
+    let id =
+        crate::record::identity::format_id(&entry.prefix, next as i64, cfg.id_padding as usize);
 
     let record = Mockup {
         id: id.clone(),
@@ -579,7 +541,7 @@ fn create(
     };
     let file_path = active.join(format!("{}.html", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    fs::write(&safe_path, render_record(&record).as_bytes())
+    crate::record::store::write_atomic(ctx, &safe_path, &render_record(&record))
         .map_err(|e| AppError::Runtime(e.to_string()))?;
     Ok(id)
 }
@@ -765,7 +727,8 @@ fn edit(
     }
 
     let new_content = render_record(&record);
-    fs::write(&safe_dest, new_content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::write_atomic(ctx, &safe_dest, &new_content)
+        .map_err(|e| AppError::Runtime(e.to_string()))?;
 
     if let Some(command) = editor_cmd {
         run_editor(&command, &safe_dest)?;
@@ -820,7 +783,8 @@ fn deprecate(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
     }
     record.status = "deprecated".to_string();
     let new_content = render_record(&record);
-    fs::write(&safe_dest, new_content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::write_atomic(ctx, &safe_dest, &new_content)
+        .map_err(|e| AppError::Runtime(e.to_string()))?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))
@@ -871,7 +835,8 @@ fn restore(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
     }
     record.status = "pending".to_string();
     let new_content = render_record(&record);
-    fs::write(&safe_dest, new_content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::write_atomic(ctx, &safe_dest, &new_content)
+        .map_err(|e| AppError::Runtime(e.to_string()))?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))

@@ -267,39 +267,6 @@ fn ensure_dir(dir: &std::path::Path, project_dir: &std::path::Path) -> Result<()
     fs::create_dir_all(&safe).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
-fn milestone_number_from_stem(stem: &str) -> Option<u32> {
-    let base = stem.split(" - ").next()?.trim();
-    let storage_id = crate::record::identity::milestone_to_storage_id(base)
-        .unwrap_or_else(|_| base.to_lowercase());
-    let num = storage_id.strip_prefix("m-")?;
-    num.parse::<u32>().ok().map(|n| n + 1)
-}
-
-fn scan_max(
-    active: &std::path::Path,
-    archived: &std::path::Path,
-    archive: &std::path::Path,
-) -> u32 {
-    let mut max = 0u32;
-    for dir in [active, archived, archive] {
-        if let Ok(rd) = fs::read_dir(dir) {
-            for e in rd.flatten() {
-                let path = e.path();
-                if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                    continue;
-                }
-                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                if let Some(n) = milestone_number_from_stem(stem)
-                    && n > max
-                {
-                    max = n;
-                }
-            }
-        }
-    }
-    max
-}
-
 fn release_exists(ctx: &Context, cfg: &Config, id: &str) -> bool {
     let dir = match releases_dir(ctx, cfg) {
         Ok(d) => d,
@@ -326,86 +293,43 @@ fn frontmatter_list_ms(content: &str, key: &str) -> Vec<String> {
     out
 }
 
-fn parse_heading(content: &str) -> (String, String) {
-    let body = if let Some((_, _, bs)) = crate::record::frontmatter::find_block(content) {
-        &content[bs..]
-    } else {
-        content
-    };
-    let first = body.lines().find(|l| !l.trim().is_empty()).unwrap_or("");
-    let rest = first.trim_start_matches('#').trim();
-    let mut parts = rest.splitn(2, char::is_whitespace);
-    let id = parts.next().unwrap_or("").trim().to_string();
-    let title = parts.next().unwrap_or("").trim().to_string();
-    // Prefer the canonical title from front matter when present.
-    let title = if let Ok(Some(fm)) = crate::record::frontmatter::parse(content) {
-        crate::record::frontmatter::current_value_string(&fm.raw, "title")
-            .filter(|t| !t.is_empty())
-            .unwrap_or(title)
-    } else {
-        title
-    };
-    (id, title)
-}
-
-pub(crate) fn parse_milestone(content: &str) -> (String, String, Option<String>, Option<String>) {
-    let (id, title) = parse_heading(content);
-    let mut desc: Option<String> = None;
-    let mut release: Option<String> = None;
-    let lines: Vec<&str> = content.lines().collect();
-    let mut i = 0usize;
-    while i < lines.len() {
-        if lines[i].starts_with("## ") {
-            let section = lines[i].trim().to_string();
-            i += 1;
-            let mut buf: Vec<&str> = Vec::new();
-            while i < lines.len() && !lines[i].starts_with("## ") {
-                buf.push(lines[i]);
-                i += 1;
-            }
-            while buf.first().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                buf.remove(0);
-            }
-            while buf.last().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                buf.pop();
-            }
-            let text = buf.join("\n");
-            let val = if text.trim().is_empty() {
-                None
-            } else {
-                Some(text)
-            };
-            match section.as_str() {
-                "## Description" => desc = val,
-                "## Release" => {
-                    if let Some(t) = val {
-                        release = Some(t.trim().to_string());
-                    }
-                }
-                _ => {}
-            }
-        } else {
-            i += 1;
-        }
-    }
+fn milestone_from_document(
+    doc: &crate::record::document::Document,
+) -> (String, String, Option<String>, Option<String>) {
+    let (id, title) = crate::record::document::heading_id_title_with_frontmatter(doc);
+    let desc = crate::record::document::section_text(doc, "Description");
+    let release =
+        crate::record::document::section_text(doc, "Release").map(|s| s.trim().to_string());
     (id, title, desc, release)
 }
 
-pub(crate) fn render_milestone(
+fn body_document(
     id: &str,
     title: &str,
     desc: Option<&str>,
     release: Option<&str>,
-) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    parts.push(format!("# {} {}", id, title));
+) -> crate::record::document::Document {
+    let mut sections = Vec::new();
     if let Some(d) = desc {
-        parts.push(format!("## Description\n{}", d));
+        sections.push(crate::record::document::Section {
+            heading: "## Description".to_string(),
+            body: vec![d.to_string(), String::new()],
+        });
     }
     if let Some(r) = release {
-        parts.push(format!("## Release\n{}", r));
+        sections.push(crate::record::document::Section {
+            heading: "## Release".to_string(),
+            body: vec![r.to_string()],
+        });
     }
-    parts.join("\n\n") + "\n"
+    crate::record::document::Document {
+        source: String::new(),
+        front_matter: None,
+        frontmatter: None,
+        heading: Some(format!("# {id} {title}")),
+        preamble: vec![String::new()],
+        sections,
+    }
 }
 
 pub fn create(
@@ -452,61 +376,57 @@ pub fn create(
     ensure_dir(&active, &ctx.project_dir)?;
     let _ = ensure_dir(&archived, &ctx.project_dir);
 
-    let max = scan_max(&active, &archived, &archive);
-    let next = max + 1;
-    let id = format!(
-        "{}-{:0width$}",
-        cfg.milestone_prefix,
-        next,
-        width = cfg.id_padding as usize
+    let next = crate::record::identity::next_milestone_number(&active, &archived, &archive);
+    let id = crate::record::identity::format_id(
+        &cfg.milestone_prefix,
+        next as i64,
+        cfg.id_padding as usize,
     );
 
+    let body_doc = body_document(&id, &title, desc.as_deref(), release.as_deref());
+    let body = crate::record::document::render(&body_doc);
+    let parsed = crate::record::document::parse(&body)?;
     let now = crate::record::frontmatter::utc_now();
-    let mut fm = String::new();
-    fm.push_str(&format!("id: {}\n", id));
-    fm.push_str(&format!(
-        "title: {}\n",
-        crate::record::frontmatter::format_scalar_pub(&title)
-    ));
-    fm.push_str(&format!("created_date: '{}'\n", now));
-    fm.push_str(&format!("updated_date: '{}'\n", now));
-    if labels.is_empty() {
-        fm.push_str("labels: []\n");
+    let labels_value = if labels.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("labels:\n");
-        for l in &labels {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(l)
-            ));
-        }
-    }
-    if references.is_empty() {
-        fm.push_str("references: []\n");
+        crate::record::frontmatter::FrontMatterValue::String(labels.join("\n"))
+    };
+    let refs_value = if references.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("references:\n");
-        for r in &references {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(r)
-            ));
-        }
-    }
-    if let Some(r) = &release {
-        fm.push_str(&format!(
-            "release: {}\n",
-            crate::record::frontmatter::format_scalar_pub(r)
-        ));
+        crate::record::frontmatter::FrontMatterValue::String(references.join("\n"))
+    };
+    let release_value = if let Some(r) = &release {
+        crate::record::frontmatter::FrontMatterValue::String(r.clone())
     } else {
-        fm.push_str("release: null\n");
-    }
-
-    let body = render_milestone(&id, &title, desc.as_deref(), release.as_deref());
-    let content = crate::record::frontmatter::wrap(&fm, &body);
-
+        crate::record::frontmatter::FrontMatterValue::Null
+    };
+    let ops = vec![
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "id".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(id.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "title".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(title.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "created_date".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(now.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "updated_date".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(now),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue("labels".to_string(), labels_value),
+        crate::record::patch::PatchOp::SetFrontMatterValue("references".to_string(), refs_value),
+        crate::record::patch::PatchOp::SetFrontMatterValue("release".to_string(), release_value),
+    ];
+    let file_content = crate::record::patch::apply_patch(&parsed, &ops)?;
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    crate::record::store::write_atomic(ctx, &safe_path, &content)?;
+    crate::record::store::write_atomic(ctx, &safe_path, &file_content)?;
     Ok(id)
 }
 
@@ -536,7 +456,10 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
                 eprintln!("warning: {}", conflict);
                 continue;
             }
-            let (_, title) = parse_heading(&content);
+            let title = crate::record::document::parse(&content)
+                .ok()
+                .map(|d| crate::record::document::heading_id_title_with_frontmatter(&d).1)
+                .unwrap_or_default();
             let title = if title.is_empty() { id.clone() } else { title };
             items.push((id, title, content));
         }
@@ -626,7 +549,7 @@ pub fn edit(
         )));
     }
 
-    let (parsed_id, parsed_title, parsed_desc, parsed_release) = parse_milestone(&content);
+    let (parsed_id, parsed_title, parsed_desc, parsed_release) = milestone_from_document(&doc);
     let mut title_val = if parsed_title.is_empty() {
         id.clone()
     } else {

@@ -15,7 +15,7 @@ Active business-rule records only: files directly inside the configured active d
 
 ## Behavior
 
-Same as `search-ui-mockups.md`/`search-ui-specifications.md` with `rule` / `RUL` prefix / `business-rules/` directory: no new `--type` value is added; business rules are returned whenever `doc` is selected. Record ID is the file stem; title is the text after the ID on the first heading line, or the ID when that text is empty. Matching is case-insensitive substring matching over the whole persisted record text; quoted phrases are matched as one contiguous substring; results are ordered by record ID; `--limit` caps the combined result set; missing configured directory yields empty success; symlink escape exits 1; `search` performs no writes.
+Same as `search-ui-mockups.md`/`search-ui-specifications.md` with `rule` / `RUL` prefix / `business-rules/` directory: no new `--type` value is added; business rules are returned whenever `doc` is selected. Record ID is the file stem; title is the text after the ID on the first heading line, or the ID when that text is empty. Matching is case-insensitive substring matching over the whole persisted record text, including front matter, so metadata values are searchable; quoted phrases are matched as one contiguous substring; results are ordered by record ID; `--limit` caps the combined result set; missing configured directory yields empty success; symlink escape exits 1; `search` performs no writes.
 
 ## Acceptance criteria mapping
 

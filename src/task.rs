@@ -221,32 +221,6 @@ fn sanitize_text(input: &str) -> Result<String, AppError> {
         .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))
 }
 
-fn scan_max_ordinal(active: &std::path::Path, archived: &std::path::Path) -> i64 {
-    let mut max: Option<i64> = None;
-    for dir in [active, archived] {
-        if let Ok(rd) = std::fs::read_dir(dir) {
-            for e in rd.flatten() {
-                let path = e.path();
-                if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                    continue;
-                }
-                if let Ok(content) = std::fs::read_to_string(&path)
-                    && let Some(fm) = crate::record::frontmatter::parse(&content).ok().flatten()
-                    && let Some(v) =
-                        crate::record::frontmatter::current_value_string(&fm.raw, "ordinal")
-                    && let Ok(n) = v.parse::<i64>()
-                {
-                    max = Some(max.map_or(n, |m: i64| m.max(n)));
-                }
-            }
-        }
-    }
-    match max {
-        Some(m) => m + 1,
-        None => 0,
-    }
-}
-
 fn load_config(ctx: &Context) -> Result<Config, AppError> {
     load_effective_config(&ctx.config_path, &ctx.project_dir)
 }
@@ -399,39 +373,6 @@ fn ensure_dir(dir: &std::path::Path, project_dir: &std::path::Path) -> Result<()
     fs::create_dir_all(&safe).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
-fn task_number_from_stem(stem: &str) -> Option<u32> {
-    let base = stem.split(" - ").next()?.trim();
-    let storage_id =
-        crate::record::identity::task_to_storage_id(base).unwrap_or_else(|_| base.to_lowercase());
-    let num = storage_id.strip_prefix("task-")?;
-    num.parse::<u32>().ok()
-}
-
-fn scan_max(
-    active: &std::path::Path,
-    archived: &std::path::Path,
-    archive: &std::path::Path,
-) -> u32 {
-    let mut max = 0u32;
-    for dir in [active, archived, archive] {
-        if let Ok(rd) = fs::read_dir(dir) {
-            for e in rd.flatten() {
-                let path = e.path();
-                if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                    continue;
-                }
-                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                if let Some(n) = task_number_from_stem(stem)
-                    && n > max
-                {
-                    max = n;
-                }
-            }
-        }
-    }
-    max
-}
-
 fn milestone_exists(ctx: &Context, cfg: &Config, id: &str) -> bool {
     let storage_id =
         crate::record::identity::milestone_to_storage_id(id).unwrap_or_else(|_| id.to_lowercase());
@@ -522,103 +463,54 @@ pub(crate) struct TaskData {
     pub(crate) comments: Vec<(String, String)>,
 }
 
-fn parse_heading(content: &str) -> (String, String) {
-    let body = if let Some((_, _, bs)) = crate::record::frontmatter::find_block(content) {
-        &content[bs..]
-    } else {
-        content
-    };
-    let first = body.lines().find(|l| !l.trim().is_empty()).unwrap_or("");
-    let rest = first.trim_start_matches('#').trim();
-    let mut parts = rest.splitn(2, char::is_whitespace);
-    let id = parts.next().unwrap_or("").trim().to_string();
-    let title = parts.next().unwrap_or("").trim().to_string();
-    // Prefer the canonical title from front matter when present.
-    let title = if let Ok(Some(fm)) = crate::record::frontmatter::parse(content) {
-        crate::record::frontmatter::current_value_string(&fm.raw, "title")
-            .filter(|t| !t.is_empty())
-            .unwrap_or(title)
-    } else {
-        title
-    };
-    (id, title)
-}
-
-fn section_text(content: &str, name: &str) -> Option<String> {
-    let lines: Vec<&str> = content.lines().collect();
-    let header = format!("## {}", name);
-    let mut i = 0usize;
-    while i < lines.len() {
-        if lines[i].trim() == header {
-            i += 1;
-            let mut buf: Vec<&str> = Vec::new();
-            while i < lines.len() && !lines[i].starts_with("## ") {
-                buf.push(lines[i]);
-                i += 1;
-            }
-            while buf.first().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                buf.remove(0);
-            }
-            while buf.last().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                buf.pop();
-            }
-            let text = buf.join("\n");
-            if text.trim().is_empty() {
-                return None;
-            }
-            return Some(text);
-        }
-        i += 1;
-    }
-    None
-}
-
-fn section_lines(content: &str, name: &str) -> Vec<String> {
-    match section_text(content, name) {
-        Some(t) => t.lines().map(|s| s.to_string()).collect(),
-        None => Vec::new(),
-    }
-}
-
-pub(crate) fn parse_task(content: &str) -> TaskData {
-    let (id, title) = parse_heading(content);
-    let desc = section_text(content, "Description");
-    let status = section_text(content, "Status")
+pub(crate) fn task_from_document(doc: &crate::record::document::Document) -> TaskData {
+    let (id, title) = crate::record::document::heading_id_title_with_frontmatter(doc);
+    let desc = crate::record::document::section_text(doc, "Description");
+    let status = crate::record::document::section_text(doc, "Status")
         .unwrap_or_default()
         .trim()
         .to_string();
-    let milestone = section_text(content, "Milestone").map(|s| s.trim().to_string());
-    let assignee = section_text(content, "Assignee").map(|s| s.trim().to_string());
-
+    let milestone =
+        crate::record::document::section_text(doc, "Milestone").map(|s| s.trim().to_string());
+    let assignee =
+        crate::record::document::section_text(doc, "Assignee").map(|s| s.trim().to_string());
     let mut labels = Vec::new();
-    for l in section_lines(content, "Labels") {
-        let t = l.trim();
-        if t.is_empty() {
+    for line in crate::record::document::section_lines(doc, "Labels") {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
             continue;
         }
-        let item = t.strip_prefix("- ").unwrap_or(t).trim().to_string();
+        let item = trimmed
+            .strip_prefix("- ")
+            .unwrap_or(trimmed)
+            .trim()
+            .to_string();
         if !item.is_empty() {
             labels.push(item);
         }
     }
     let mut deps = Vec::new();
-    for l in section_lines(content, "Dependencies") {
-        let t = l.trim();
-        if t.is_empty() {
+    for line in crate::record::document::section_lines(doc, "Dependencies") {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
             continue;
         }
-        let item = t.strip_prefix("- ").unwrap_or(t).trim().to_string();
+        let item = trimmed
+            .strip_prefix("- ")
+            .unwrap_or(trimmed)
+            .trim()
+            .to_string();
         if !item.is_empty() {
             deps.push(item);
         }
     }
     let mut acs = Vec::new();
-    for l in section_lines(content, "Acceptance Criteria") {
-        let t = l.trim();
-        if t.is_empty() {
+    for line in crate::record::document::section_lines(doc, "Acceptance Criteria") {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
             continue;
         }
-        let mut item = t.to_string();
+        let mut item = trimmed.to_string();
         if let Some(rest) = item.strip_prefix("- ") {
             item = rest.trim().to_string();
         }
@@ -633,12 +525,12 @@ pub(crate) fn parse_task(content: &str) -> TaskData {
         }
     }
     let mut comments = Vec::new();
-    for l in section_lines(content, "Comments") {
-        let t = l.trim();
-        if t.is_empty() {
+    for line in crate::record::document::section_lines(doc, "Comments") {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
             continue;
         }
-        let mut item = t.to_string();
+        let mut item = trimmed.to_string();
         if let Some(rest) = item.strip_prefix("- ") {
             item = rest.trim().to_string();
         }
@@ -653,7 +545,6 @@ pub(crate) fn parse_task(content: &str) -> TaskData {
         }
         comments.push(("unknown".to_string(), item));
     }
-
     TaskData {
         id,
         title,
@@ -668,62 +559,106 @@ pub(crate) fn parse_task(content: &str) -> TaskData {
     }
 }
 
-pub(crate) fn render_task(td: &TaskData) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    parts.push(format!("# {} {}", td.id, td.title));
+fn body_document(td: &TaskData) -> crate::record::document::Document {
+    let mut sections = Vec::new();
     if let Some(d) = &td.description
         && !d.trim().is_empty()
     {
-        parts.push(format!("## Description\n{}", d));
+        sections.push(crate::record::document::Section {
+            heading: "## Description".to_string(),
+            body: vec![d.clone(), String::new()],
+        });
     }
-    parts.push(format!("## Status\n{}", td.status));
+    sections.push(crate::record::document::Section {
+        heading: "## Status".to_string(),
+        body: vec![td.status.clone(), String::new()],
+    });
     if let Some(m) = &td.milestone
         && !m.trim().is_empty()
     {
-        parts.push(format!("## Milestone\n{}", m));
+        sections.push(crate::record::document::Section {
+            heading: "## Milestone".to_string(),
+            body: vec![m.clone(), String::new()],
+        });
     }
     if let Some(a) = &td.assignee
         && !a.trim().is_empty()
     {
-        parts.push(format!("## Assignee\n{}", a));
+        sections.push(crate::record::document::Section {
+            heading: "## Assignee".to_string(),
+            body: vec![a.clone(), String::new()],
+        });
     }
     if !td.labels.is_empty() {
-        let body = td
-            .labels
-            .iter()
-            .map(|l| format!("- {}", l))
-            .collect::<Vec<_>>()
-            .join("\n");
-        parts.push(format!("## Labels\n{}", body));
+        sections.push(crate::record::document::Section {
+            heading: "## Labels".to_string(),
+            body: td
+                .labels
+                .iter()
+                .map(|l| format!("- {l}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+                .split('\n')
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>(),
+        });
+        let last = sections.last_mut().unwrap();
+        last.body.push(String::new());
     }
     if !td.deps.is_empty() {
-        let body = td
-            .deps
-            .iter()
-            .map(|d| format!("- {}", d))
-            .collect::<Vec<_>>()
-            .join("\n");
-        parts.push(format!("## Dependencies\n{}", body));
+        sections.push(crate::record::document::Section {
+            heading: "## Dependencies".to_string(),
+            body: td
+                .deps
+                .iter()
+                .map(|d| format!("- {d}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+                .split('\n')
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>(),
+        });
+        let last = sections.last_mut().unwrap();
+        last.body.push(String::new());
     }
     if !td.acs.is_empty() {
-        let body = td
-            .acs
-            .iter()
-            .map(|a| format!("- [ ] {}", a))
-            .collect::<Vec<_>>()
-            .join("\n");
-        parts.push(format!("## Acceptance Criteria\n{}", body));
+        sections.push(crate::record::document::Section {
+            heading: "## Acceptance Criteria".to_string(),
+            body: td
+                .acs
+                .iter()
+                .map(|a| format!("- [ ] {a}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+                .split('\n')
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>(),
+        });
+        let last = sections.last_mut().unwrap();
+        last.body.push(String::new());
     }
     if !td.comments.is_empty() {
-        let body = td
-            .comments
-            .iter()
-            .map(|(a, t)| format!("- **{}**: {}", a, t))
-            .collect::<Vec<_>>()
-            .join("\n");
-        parts.push(format!("## Comments\n{}", body));
+        sections.push(crate::record::document::Section {
+            heading: "## Comments".to_string(),
+            body: td
+                .comments
+                .iter()
+                .map(|(a, t)| format!("- **{a}**: {t}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+                .split('\n')
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>(),
+        });
     }
-    parts.join("\n\n") + "\n"
+    crate::record::document::Document {
+        source: String::new(),
+        front_matter: None,
+        frontmatter: None,
+        heading: Some(format!("# {} {}", td.id, td.title)),
+        preamble: vec![String::new()],
+        sections,
+    }
 }
 
 fn frontmatter_list(content: &str, key: &str) -> Vec<String> {
@@ -843,14 +778,9 @@ pub fn create(
     ensure_dir(&active, &ctx.project_dir)?;
     let _ = ensure_dir(&archived, &ctx.project_dir);
 
-    let max = scan_max(&active, &archived, &archive);
-    let next = max + 1;
-    let id = format!(
-        "{}-{:0width$}",
-        cfg.task_prefix,
-        next,
-        width = cfg.id_padding as usize
-    );
+    let next = crate::record::identity::next_task_number(&active, &archived, &archive);
+    let id =
+        crate::record::identity::format_id(&cfg.task_prefix, next as i64, cfg.id_padding as usize);
 
     let td = TaskData {
         id: id.clone(),
@@ -868,7 +798,7 @@ pub fn create(
     // ordinal default
     let ordinal_final = match ordinal_val {
         Some(n) => n,
-        None => scan_max_ordinal(&active, &archived),
+        None => crate::record::identity::scan_max_ordinal(&active, &archived),
     };
 
     let now = crate::record::frontmatter::utc_now();
@@ -876,100 +806,84 @@ pub fn create(
         Some(v) => v.clone(),
         None => Vec::new(),
     };
-    let mut fm = String::new();
-    fm.push_str(&format!("id: {}\n", id));
-    fm.push_str(&format!(
-        "title: {}\n",
-        crate::record::frontmatter::format_scalar_pub(&title)
-    ));
-    fm.push_str(&format!("created_date: '{}'\n", now));
-    fm.push_str(&format!("updated_date: '{}'\n", now));
-    // labels
-    if labels.is_empty() {
-        fm.push_str("labels: []\n");
+    let body_doc = body_document(&td);
+    let body = crate::record::document::render(&body_doc);
+    let parsed = crate::record::document::parse(&body)?;
+    let labels_value = if labels.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("labels:\n");
-        for l in &labels {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(l)
-            ));
-        }
-    }
-    // references
-    if references.is_empty() {
-        fm.push_str("references: []\n");
+        crate::record::frontmatter::FrontMatterValue::String(labels.join("\n"))
+    };
+    let refs_value = if references.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("references:\n");
-        for r in &references {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(r)
-            ));
-        }
-    }
-    fm.push_str(&format!(
-        "status: {}\n",
-        crate::record::frontmatter::format_scalar_pub(&cfg.default_status)
-    ));
-    // assignee list
-    if assignee_yaml.is_empty() {
-        fm.push_str("assignee: []\n");
+        crate::record::frontmatter::FrontMatterValue::String(references.join("\n"))
+    };
+    let assignee_value = if assignee_yaml.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("assignee:\n");
-        for a in &assignee_yaml {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(a)
-            ));
-        }
-    }
-    if let Some(m) = &milestone {
-        fm.push_str(&format!(
-            "milestone: {}\n",
-            crate::record::frontmatter::format_scalar_pub(m)
-        ));
+        crate::record::frontmatter::FrontMatterValue::String(assignee_yaml.join("\n"))
+    };
+    let milestone_value = if let Some(m) = &milestone {
+        crate::record::frontmatter::FrontMatterValue::String(m.clone())
     } else {
-        fm.push_str("milestone: null\n");
-    }
-    if deps.is_empty() {
-        fm.push_str("dependencies: []\n");
+        crate::record::frontmatter::FrontMatterValue::Null
+    };
+    let deps_value = if deps.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("dependencies:\n");
-        for d in &deps {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(d)
-            ));
-        }
-    }
-    fm.push_str(&format!("ordinal: {}\n", ordinal_final));
-    if documentation.is_empty() {
-        fm.push_str("documentation: []\n");
+        crate::record::frontmatter::FrontMatterValue::String(deps.join("\n"))
+    };
+    let doc_value = if documentation.is_empty() {
+        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
     } else {
-        fm.push_str("documentation:\n");
-        for d in &documentation {
-            fm.push_str(&format!(
-                "  - {}\n",
-                crate::record::frontmatter::format_scalar_pub(d)
-            ));
-        }
-    }
-    if let Some(t) = &type_val {
-        fm.push_str(&format!(
-            "type: {}\n",
-            crate::record::frontmatter::format_scalar_pub(t)
-        ));
+        crate::record::frontmatter::FrontMatterValue::String(documentation.join("\n"))
+    };
+    let type_value = if let Some(t) = &type_val {
+        crate::record::frontmatter::FrontMatterValue::String(t.clone())
     } else {
-        fm.push_str("type: null\n");
-    }
-
-    let body = render_task(&td);
-    let content = crate::record::frontmatter::wrap(&fm, &body);
-
+        crate::record::frontmatter::FrontMatterValue::Null
+    };
+    let ops = vec![
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "id".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(id.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "title".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(title.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "created_date".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(now.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "updated_date".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(now),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue("labels".to_string(), labels_value),
+        crate::record::patch::PatchOp::SetFrontMatterValue("references".to_string(), refs_value),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "status".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String(cfg.default_status.clone()),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue("assignee".to_string(), assignee_value),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "milestone".to_string(),
+            milestone_value,
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue("dependencies".to_string(), deps_value),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "ordinal".to_string(),
+            crate::record::frontmatter::FrontMatterValue::Integer(ordinal_final),
+        ),
+        crate::record::patch::PatchOp::SetFrontMatterValue("documentation".to_string(), doc_value),
+        crate::record::patch::PatchOp::SetFrontMatterValue("type".to_string(), type_value),
+    ];
+    let file_content = crate::record::patch::apply_patch(&parsed, &ops)?;
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    crate::record::store::write_atomic(ctx, &safe_path, &content)?;
+    crate::record::store::write_atomic(ctx, &safe_path, &file_content)?;
     Ok(id)
 }
 
@@ -1008,7 +922,7 @@ fn frontmatter_scalar(content: &str, key: &str) -> Option<String> {
         .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, key))
 }
 
-fn parse_ac_items(doc: &crate::record::document::Document) -> Vec<String> {
+fn ac_items_from_document(doc: &crate::record::document::Document) -> Vec<String> {
     let mut out = Vec::new();
     if let Some(sec) = doc
         .sections
@@ -1042,7 +956,7 @@ fn parse_ac_items(doc: &crate::record::document::Document) -> Vec<String> {
     out
 }
 
-fn parse_comments(doc: &crate::record::document::Document) -> Vec<(String, String)> {
+fn comments_from_document(doc: &crate::record::document::Document) -> Vec<(String, String)> {
     let mut out = Vec::new();
     if let Some(sec) = doc.sections.iter().find(|s| s.heading == "## Comments") {
         for l in &sec.body {
@@ -1132,7 +1046,7 @@ pub fn edit(
         )));
     }
 
-    let mut td = parse_task(&content);
+    let mut td = task_from_document(&doc);
     if td.id.is_empty() {
         td.id = id.clone();
     }
@@ -1327,7 +1241,7 @@ pub fn edit(
         }
     }
     if !ac_raw.is_empty() {
-        let mut items = parse_ac_items(&doc);
+        let mut items = ac_items_from_document(&doc);
         for a in ac_raw {
             unique_push(&mut items, sanitize_text(a)?);
         }
@@ -1456,7 +1370,7 @@ pub fn edit(
             Some(a) => sanitize_text(a)?,
             None => "unknown".to_string(),
         };
-        let mut items = parse_comments(&doc);
+        let mut items = comments_from_document(&doc);
         for c in comments_raw {
             items.push((author.clone(), sanitize_text(c)?));
         }
@@ -1670,7 +1584,9 @@ pub fn list(
                     eprintln!("warning: {}", conflict);
                     continue;
                 }
-                let td = parse_task(&content);
+                let td = crate::record::document::parse(&content)
+                    .map(|d| task_from_document(&d))
+                    .unwrap_or_default();
 
                 if let Some(sf) = &status_f
                     && td.status != *sf

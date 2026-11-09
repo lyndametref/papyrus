@@ -28,3 +28,5 @@ OQ-1 no dedicated `--type mockup` value (recommended no); OQ-2 whole-record text
 ## Traceability
 
 REQ-06.001, REQ-05, REQ-05.009; BR-015; ADR-0001, ADR-0004; TASK-38 (management), TASK-39.
+
+Matching runs over the whole persisted record text, including front matter, so metadata values are searchable.

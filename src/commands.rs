@@ -285,13 +285,8 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
 
     // boundary check for config path? skip
     // write
-    let parent = ctx.config_path.parent();
-    if let Some(p) = parent {
-        let _ = std::fs::create_dir_all(p);
-    }
     let out_str = yaml_serde::to_string(&file_val).map_err(|e| AppError::Runtime(e.to_string()))?;
-    std::fs::write(&ctx.config_path, out_str.as_bytes())
-        .map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::config::write_config_file(&ctx.config_path, &out_str)?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status":"ok"}))
@@ -337,8 +332,7 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
     } else {
         let out_str =
             yaml_serde::to_string(&file_val).map_err(|e| AppError::Runtime(e.to_string()))?;
-        std::fs::write(&ctx.config_path, out_str.as_bytes())
-            .map_err(|e| AppError::Runtime(e.to_string()))?;
+        crate::config::write_config_file(&ctx.config_path, &out_str)?;
     }
 
     let json = if ctx.json {
