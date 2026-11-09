@@ -165,8 +165,8 @@ impl Config {
     }
 
     pub fn validate(&self) -> Result<(), String> {
-        if self.id_padding == 0 {
-            return Err("id_padding must be a positive integer".to_string());
+        if !(1..=6).contains(&self.id_padding) {
+            return Err("id_padding: must be between 1 and 6".to_string());
         }
         // uniqueness of statuses
         let mut seen = std::collections::HashSet::new();
@@ -464,7 +464,36 @@ mod tests {
             id_padding: 0,
             ..Config::default()
         };
-        assert!(c.validate().is_err());
+        let err = c.validate().unwrap_err();
+        assert_eq!(err, "id_padding: must be between 1 and 6");
+    }
+
+    #[test]
+    fn id_padding_seven_invalid() {
+        let c = Config {
+            id_padding: 7,
+            ..Config::default()
+        };
+        let err = c.validate().unwrap_err();
+        assert_eq!(err, "id_padding: must be between 1 and 6");
+    }
+
+    #[test]
+    fn id_padding_one_valid() {
+        let c = Config {
+            id_padding: 1,
+            ..Config::default()
+        };
+        assert!(c.validate().is_ok());
+    }
+
+    #[test]
+    fn id_padding_six_valid() {
+        let c = Config {
+            id_padding: 6,
+            ..Config::default()
+        };
+        assert!(c.validate().is_ok());
     }
 
     #[test]
