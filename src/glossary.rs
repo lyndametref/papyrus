@@ -332,7 +332,7 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
     let deprecated = deprecated_dir(ctx, &cfg)?;
     let _ = deprecated;
 
-    let mut items: Vec<(String, String)> = Vec::new();
+    let mut items: Vec<(String, String, String)> = Vec::new();
     if let Ok(rd) = fs::read_dir(&active) {
         for e in rd.flatten() {
             let path = e.path();
@@ -347,20 +347,29 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
             let content = fs::read_to_string(&safe).unwrap_or_default();
             let (_, term) = parse_heading(&content);
             let term = if term.is_empty() { id.clone() } else { term };
-            items.push((id, term));
+            items.push((id, term, content));
         }
     }
     items.sort_by(|a, b| a.0.cmp(&b.0));
 
     let text = items
         .iter()
-        .map(|(id, term)| format!("{} {}", id, term))
+        .map(|(id, term, content)| {
+            crate::record::view::RecordView::lenient(content, id).list_line(term)
+        })
         .collect::<Vec<_>>()
         .join("\n");
     let json = if ctx.json {
         let arr: Vec<serde_json::Value> = items
             .iter()
-            .map(|(id, term)| serde_json::json!({"id": id, "term": term, "title": term}))
+            .map(|(id, term, content)| {
+                serde_json::json!({
+                    "id": id,
+                    "term": term,
+                    "title": term,
+                    "metadata": crate::record::view::RecordView::lenient(content, id).metadata_json(),
+                })
+            })
             .collect();
         Some(serde_json::Value::Array(arr))
     } else {
@@ -395,7 +404,12 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
     let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
     let text = content.clone();
     let json = if ctx.json {
-        Some(serde_json::json!({"id": id, "path": path.display().to_string(), "content": content}))
+        Some(serde_json::json!({
+            "id": id,
+            "path": path.display().to_string(),
+            "content": content,
+            "metadata": crate::record::view::RecordView::lenient(&content, &id).metadata_json(),
+        }))
     } else {
         None
     };

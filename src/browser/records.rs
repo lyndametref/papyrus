@@ -1726,13 +1726,110 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
 }
 
 /// Serialize an audit-record document with title, audit type, and content changes.
+/// Emit patch operations that turn the document's sections into
+/// `final_sections`. When no new section was inserted, only changed
+/// sections are rewritten in place and every other byte of the file is
+/// preserved. When a new section was inserted, all existing sections are
+/// first cleared and then re-emitted in final order so the insertion
+/// lands at the exact position the legacy serializer computed.
+fn section_ops(doc: &Doc, final_sections: &[Section]) -> Vec<crate::record::patch::PatchOp> {
+    use crate::record::patch::PatchOp;
+    let orig = &doc.sections;
+    let inserted = final_sections
+        .iter()
+        .any(|s| !orig.iter().any(|o| o.heading == s.heading));
+    let mut ops = Vec::new();
+    if inserted {
+        for o in orig {
+            ops.push(PatchOp::ClearSection(o.heading.clone()));
+        }
+        for s in final_sections {
+            ops.push(PatchOp::SetSection(s.heading.clone(), s.body.join("\n")));
+        }
+        return ops;
+    }
+    for o in orig {
+        if !final_sections.iter().any(|s| s.heading == o.heading) {
+            ops.push(PatchOp::ClearSection(o.heading.clone()));
+        }
+    }
+    for s in final_sections {
+        match orig.iter().find(|o| o.heading == s.heading) {
+            None => ops.push(PatchOp::SetSection(s.heading.clone(), s.body.join("\n"))),
+            Some(o) if o.body != s.body => {
+                ops.push(PatchOp::SetSection(s.heading.clone(), s.body.join("\n")));
+            }
+            Some(_) => {}
+        }
+    }
+    ops
+}
+
+/// Route a browser save through the shared patcher (TASK-67): apply the
+/// front-matter and section operations to the original document, refresh
+/// `updated_date` only when the content actually changed, and never copy
+/// metadata into the body. A no-op save returns the source byte-identical
+/// and does not refresh `updated_date`.
+pub fn finish_patch(
+    doc: &Doc,
+    fm_ops: &mut Vec<crate::record::patch::PatchOp>,
+    final_sections: &[Section],
+) -> String {
+    use crate::record::patch::PatchOp;
+    let source = &doc.source;
+    let mut ops = std::mem::take(fm_ops);
+    ops.extend(section_ops(doc, final_sections));
+    if ops.is_empty() {
+        return source.clone();
+    }
+    let Ok(rdoc) = crate::record::document::parse(source) else {
+        return source.clone();
+    };
+    let Ok(base) = crate::record::patch::apply_patch(&rdoc, &ops) else {
+        return source.clone();
+    };
+    if base == *source {
+        return source.clone();
+    }
+    if crate::record::frontmatter::has_front_matter(source) {
+        let mut ops2 = ops;
+        ops2.push(PatchOp::SetFrontMatter(
+            "updated_date".into(),
+            crate::record::frontmatter::utc_now(),
+        ));
+        if let Ok(with_date) = crate::record::patch::apply_patch(&rdoc, &ops2) {
+            return with_date;
+        }
+    }
+    base
+}
+
 pub fn apply_audit_edit(
     doc: &Doc,
-    id: &str,
+    _id: &str,
     title: &str,
     audit_type: &str,
     content: FieldChange,
 ) -> String {
+    let has_fm = doc.front_matter.is_some();
+    let mut fm_ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if title != doc.title {
+        if has_fm {
+            fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "title".into(),
+                title.to_string(),
+            ));
+        }
+        fm_ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
+            title.to_string(),
+        ));
+    }
+    if has_fm {
+        fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "type".into(),
+            audit_type.to_string(),
+        ));
+    }
     let mut sections = doc.sections.clone();
     // Audit type always non-empty
     set_section(
@@ -1749,19 +1846,7 @@ pub fn apply_audit_edit(
         }
     }
 
-    let mut lines: Vec<String> = Vec::new();
-    lines.push(format!("# {} {}", id, title));
-    lines.extend(doc.preamble.iter().cloned());
-    for section in sections {
-        lines.push(section.heading);
-        lines.extend(section.body);
-    }
-    while lines.last().is_some_and(|line| line.is_empty()) {
-        lines.pop();
-    }
-    let mut output = lines.join("\n");
-    output.push('\n');
-    output
+    finish_patch(doc, &mut fm_ops, &sections)
 }
 
 /// Validate a title and return the stored value (specification section 7.3).
@@ -1905,7 +1990,20 @@ const AUDIT_KNOWN: &[&str] = &["## Audit Type", "## Content"];
 /// Serialize a technical-specification document with title and description
 /// changes. Only the heading and the `## Description` section are rewritten;
 /// the preamble and every other section are preserved content-identically.
-pub fn apply_tech_spec_edit(doc: &Doc, id: &str, title: &str, description: FieldChange) -> String {
+pub fn apply_tech_spec_edit(doc: &Doc, _id: &str, title: &str, description: FieldChange) -> String {
+    let has_fm = doc.front_matter.is_some();
+    let mut fm_ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if title != doc.title {
+        if has_fm {
+            fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "title".into(),
+                title.to_string(),
+            ));
+        }
+        fm_ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
+            title.to_string(),
+        ));
+    }
     let mut sections = doc.sections.clone();
     match description {
         FieldChange::Keep => {}
@@ -1942,31 +2040,32 @@ pub fn apply_tech_spec_edit(doc: &Doc, id: &str, title: &str, description: Field
         }
     }
 
-    let mut lines: Vec<String> = Vec::new();
-    lines.push(format!("# {} {}", id, title));
-    lines.extend(doc.preamble.iter().cloned());
-    for section in sections {
-        lines.push(section.heading);
-        lines.extend(section.body);
-    }
-    while lines.last().is_some_and(|line| line.is_empty()) {
-        lines.pop();
-    }
-    let mut output = lines.join("\n");
-    output.push('\n');
-    output
+    finish_patch(doc, &mut fm_ops, &sections)
 }
 
 /// Serialize a document with a new title and optional story/description
 /// changes, preserving every unknown `## ` section content-identically.
 pub fn apply_edit(
     doc: &Doc,
-    id: &str,
+    _id: &str,
     title: &str,
     story: FieldChange,
     description: FieldChange,
     supports_story: bool,
 ) -> String {
+    let has_fm = doc.front_matter.is_some();
+    let mut fm_ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if title != doc.title {
+        if has_fm {
+            fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "title".into(),
+                title.to_string(),
+            ));
+        }
+        fm_ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
+            title.to_string(),
+        ));
+    }
     // No-op byte identity: if nothing changes, return the original document.
     let no_change = title == doc.title
         && matches!(story, FieldChange::Keep)
@@ -1993,22 +2092,7 @@ pub fn apply_edit(
         }
     }
 
-    let mut lines: Vec<String> = Vec::new();
-    lines.push(format!("# {} {}", id, title));
-    lines.extend(doc.preamble.iter().cloned());
-    for section in sections {
-        lines.push(section.heading);
-        lines.extend(section.body);
-    }
-    while lines.last().is_some_and(|line| line.is_empty()) {
-        lines.pop();
-    }
-    let mut output = lines.join("\n");
-    output.push('\n');
-    if let Some(block) = &doc.front_matter {
-        output = format!("{}{}", block, output);
-    }
-    output
+    finish_patch(doc, &mut fm_ops, &sections)
 }
 
 /// Validate a list field (one value per line) and return the parsed items.
@@ -2048,7 +2132,7 @@ fn render_list_items(items: &[String], prefix: &str) -> String {
 #[allow(clippy::too_many_arguments)]
 pub fn apply_task_edit(
     doc: &Doc,
-    id: &str,
+    _id: &str,
     title: &str,
     description: FieldChange,
     status: &str,
@@ -2058,6 +2142,56 @@ pub fn apply_task_edit(
     dependencies: Vec<String>,
     acceptance_criteria: Vec<String>,
 ) -> String {
+    let has_fm = doc.front_matter.is_some();
+    let mut fm_ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if title != doc.title {
+        if has_fm {
+            fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "title".into(),
+                title.to_string(),
+            ));
+        }
+        fm_ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
+            title.to_string(),
+        ));
+    }
+    if has_fm {
+        fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "status".into(),
+            status.to_string(),
+        ));
+        match &milestone {
+            FieldChange::Clear => fm_ops.push(crate::record::patch::PatchOp::SetFrontMatterValue(
+                "milestone".into(),
+                crate::record::frontmatter::FrontMatterValue::Null,
+            )),
+            FieldChange::Set(value) => fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "milestone".into(),
+                value.clone(),
+            )),
+            FieldChange::Keep => {}
+        }
+        // Canonical empty assignee is the empty list (`assignee: []`).
+        match &assignee {
+            FieldChange::Clear => fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "assignee".into(),
+                String::new(),
+            )),
+            FieldChange::Set(value) => fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "assignee".into(),
+                value.clone(),
+            )),
+            FieldChange::Keep => {}
+        }
+        fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "labels".into(),
+            labels.join("\n"),
+        ));
+        fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "dependencies".into(),
+            dependencies.join("\n"),
+        ));
+    }
     let mut sections = doc.sections.clone();
     // Status always set (required)
     set_section(
@@ -2123,28 +2257,42 @@ pub fn apply_task_edit(
         );
     }
 
-    let mut lines: Vec<String> = Vec::new();
-    lines.push(format!("# {} {}", id, title));
-    lines.extend(doc.preamble.iter().cloned());
-    for section in sections {
-        lines.push(section.heading);
-        lines.extend(section.body);
-    }
-    while lines.last().is_some_and(|line| line.is_empty()) {
-        lines.pop();
-    }
-    let mut output = lines.join("\n");
-    output.push('\n');
-    output
+    finish_patch(doc, &mut fm_ops, &sections)
 }
 
 pub fn apply_milestone_edit(
     doc: &Doc,
-    id: &str,
+    _id: &str,
     title: &str,
     description: FieldChange,
     release: FieldChange,
 ) -> String {
+    let has_fm = doc.front_matter.is_some();
+    let mut fm_ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if title != doc.title {
+        if has_fm {
+            fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "title".into(),
+                title.to_string(),
+            ));
+        }
+        fm_ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
+            title.to_string(),
+        ));
+    }
+    if has_fm {
+        match &release {
+            FieldChange::Clear => fm_ops.push(crate::record::patch::PatchOp::SetFrontMatterValue(
+                "release".into(),
+                crate::record::frontmatter::FrontMatterValue::Null,
+            )),
+            FieldChange::Set(value) => fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "release".into(),
+                value.clone(),
+            )),
+            FieldChange::Keep => {}
+        }
+    }
     let mut sections = doc.sections.clone();
     match description {
         FieldChange::Keep => {}
@@ -2164,22 +2312,23 @@ pub fn apply_milestone_edit(
         }
     }
 
-    let mut lines: Vec<String> = Vec::new();
-    lines.push(format!("# {} {}", id, title));
-    lines.extend(doc.preamble.iter().cloned());
-    for section in sections {
-        lines.push(section.heading);
-        lines.extend(section.body);
-    }
-    while lines.last().is_some_and(|line| line.is_empty()) {
-        lines.pop();
-    }
-    let mut output = lines.join("\n");
-    output.push('\n');
-    output
+    finish_patch(doc, &mut fm_ops, &sections)
 }
 
-pub fn apply_release_edit(doc: &Doc, id: &str, title: &str, description: FieldChange) -> String {
+pub fn apply_release_edit(doc: &Doc, _id: &str, title: &str, description: FieldChange) -> String {
+    let has_fm = doc.front_matter.is_some();
+    let mut fm_ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if title != doc.title {
+        if has_fm {
+            fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "title".into(),
+                title.to_string(),
+            ));
+        }
+        fm_ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
+            title.to_string(),
+        ));
+    }
     let mut sections = doc.sections.clone();
     match description {
         FieldChange::Keep => {}
@@ -2189,31 +2338,32 @@ pub fn apply_release_edit(doc: &Doc, id: &str, title: &str, description: FieldCh
         }
     }
 
-    let mut lines: Vec<String> = Vec::new();
-    lines.push(format!("# {} {}", id, title));
-    lines.extend(doc.preamble.iter().cloned());
-    for section in sections {
-        lines.push(section.heading);
-        lines.extend(section.body);
-    }
-    while lines.last().is_some_and(|line| line.is_empty()) {
-        lines.pop();
-    }
-    let mut output = lines.join("\n");
-    output.push('\n');
-    output
+    finish_patch(doc, &mut fm_ops, &sections)
 }
 
 /// Serialize a decision document with title/status/field changes.
 pub fn apply_decision_edit(
     doc: &Doc,
-    id: &str,
+    _id: &str,
     title: &str,
     status: &str,
     decision: FieldChange,
     context: FieldChange,
     consequences: FieldChange,
 ) -> String {
+    let has_fm = doc.front_matter.is_some();
+    let mut fm_ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if title != doc.title {
+        if has_fm {
+            fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "title".into(),
+                title.to_string(),
+            ));
+        }
+        fm_ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
+            title.to_string(),
+        ));
+    }
     let mut sections = doc.sections.clone();
     // Status always set
     set_section(
@@ -2247,23 +2397,24 @@ pub fn apply_decision_edit(
         ),
     }
 
-    let mut lines: Vec<String> = Vec::new();
-    lines.push(format!("# {} {}", id, title));
-    lines.extend(doc.preamble.iter().cloned());
-    for section in sections {
-        lines.push(section.heading);
-        lines.extend(section.body);
-    }
-    while lines.last().is_some_and(|line| line.is_empty()) {
-        lines.pop();
-    }
-    let mut output = lines.join("\n");
-    output.push('\n');
-    output
+    finish_patch(doc, &mut fm_ops, &sections)
 }
 
 /// Serialize a glossary document with title and definition changes.
-pub fn apply_glossary_edit(doc: &Doc, id: &str, title: &str, definition: FieldChange) -> String {
+pub fn apply_glossary_edit(doc: &Doc, _id: &str, title: &str, definition: FieldChange) -> String {
+    let has_fm = doc.front_matter.is_some();
+    let mut fm_ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if title != doc.title {
+        if has_fm {
+            fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "title".into(),
+                title.to_string(),
+            ));
+        }
+        fm_ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
+            title.to_string(),
+        ));
+    }
     let mut sections = doc.sections.clone();
     match definition {
         FieldChange::Keep => {}
@@ -2273,29 +2424,30 @@ pub fn apply_glossary_edit(doc: &Doc, id: &str, title: &str, definition: FieldCh
         }
     }
 
-    let mut lines: Vec<String> = Vec::new();
-    lines.push(format!("# {} {}", id, title));
-    lines.extend(doc.preamble.iter().cloned());
-    for section in sections {
-        lines.push(section.heading);
-        lines.extend(section.body);
-    }
-    while lines.last().is_some_and(|line| line.is_empty()) {
-        lines.pop();
-    }
-    let mut output = lines.join("\n");
-    output.push('\n');
-    output
+    finish_patch(doc, &mut fm_ops, &sections)
 }
 
 /// Serialize a UI specification document with title, view, and description changes.
 pub fn apply_ui_spec_edit(
     doc: &Doc,
-    id: &str,
+    _id: &str,
     title: &str,
     view: FieldChange,
     description: FieldChange,
 ) -> String {
+    let has_fm = doc.front_matter.is_some();
+    let mut fm_ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if title != doc.title {
+        if has_fm {
+            fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "title".into(),
+                title.to_string(),
+            ));
+        }
+        fm_ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
+            title.to_string(),
+        ));
+    }
     let mut sections = doc.sections.clone();
     match view {
         FieldChange::Keep => {}
@@ -2312,31 +2464,32 @@ pub fn apply_ui_spec_edit(
         }
     }
 
-    let mut lines: Vec<String> = Vec::new();
-    lines.push(format!("# {} {}", id, title));
-    lines.extend(doc.preamble.iter().cloned());
-    for section in sections {
-        lines.push(section.heading);
-        lines.extend(section.body);
-    }
-    while lines.last().is_some_and(|line| line.is_empty()) {
-        lines.pop();
-    }
-    let mut output = lines.join("\n");
-    output.push('\n');
-    output
+    finish_patch(doc, &mut fm_ops, &sections)
 }
 
 /// Serialize a business-rule document with title and field changes.
 pub fn apply_business_rule_edit(
     doc: &Doc,
-    id: &str,
+    _id: &str,
     title: &str,
     description: FieldChange,
     rationale: FieldChange,
     applicability: FieldChange,
     requirements: Vec<String>,
 ) -> String {
+    let has_fm = doc.front_matter.is_some();
+    let mut fm_ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if title != doc.title {
+        if has_fm {
+            fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "title".into(),
+                title.to_string(),
+            ));
+        }
+        fm_ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
+            title.to_string(),
+        ));
+    }
     let mut sections = doc.sections.clone();
     match description {
         FieldChange::Keep => {}
@@ -2370,19 +2523,7 @@ pub fn apply_business_rule_edit(
         set_section(&mut sections, "## Requirements", Some(body), RULE_KNOWN);
     }
 
-    let mut lines: Vec<String> = Vec::new();
-    lines.push(format!("# {} {}", id, title));
-    lines.extend(doc.preamble.iter().cloned());
-    for section in sections {
-        lines.push(section.heading);
-        lines.extend(section.body);
-    }
-    while lines.last().is_some_and(|line| line.is_empty()) {
-        lines.pop();
-    }
-    let mut output = lines.join("\n");
-    output.push('\n');
-    output
+    finish_patch(doc, &mut fm_ops, &sections)
 }
 
 fn html_escape_text(value: &str) -> String {

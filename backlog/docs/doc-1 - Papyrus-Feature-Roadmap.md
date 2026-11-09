@@ -3,7 +3,7 @@ id: doc-1
 title: Papyrus Feature Roadmap
 type: specification
 created_date: '2026-11-04T19:22:00Z'
-updated_date: '2026-11-08T16:10:00Z'
+updated_date: '2026-11-09T18:52:00Z'
 ---
 # Papyrus Feature Roadmap
 
@@ -22,7 +22,7 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 - m-8: Business Rules — search (TASK-44), browser (TASK-25), design review (TASK-45), packaging (TASK-46).
 - m-9: Audit Records — search (TASK-48), browser (TASK-26), design review (TASK-49), packaging (TASK-50).
 - m-11: Technical Specifications — domain model (TASK-21), search (TASK-56), browser (TASK-57), design review (TASK-58), packaging (TASK-59).
-- m-12: Final Cross-Type Integration and Record Metadata — shared record envelope (TASK-63), identity translation (TASK-64), CLI front-matter options (TASK-65), design review (TASK-66), metadata projection (TASK-67), document-record migration (TASK-68), task/milestone migration (TASK-69), legacy removal (TASK-70), Backlog.md round-trip gate (TASK-71), lifecycle page (TASK-72), final cross-type design review (TASK-60), unified search (TASK-18), cross-type browser (TASK-19), packaging (TASK-20).
+- m-12: Final Cross-Type Integration and Record Metadata — shared record envelope (TASK-63), identity translation (TASK-64), CLI front-matter options (TASK-65), design review (TASK-66), metadata projection (TASK-67), document-record migration (TASK-68), task/milestone migration (TASK-69), legacy removal (TASK-70), Backlog.md round-trip gate (TASK-71), lifecycle page (TASK-72), final cross-type design review (TASK-60), unified search (TASK-18), cross-type browser (TASK-19), packaging (TASK-20), id_padding constraint (TASK-74), interactive init walkthrough (TASK-75), browser skills design review (TASK-76), browser skills page (TASK-77).
 - m-14: Release 1.0 — release ticket (TASK-73); closes only after TASK-20 is Done, build/tests pass, and the security audit is complete.
 
 ## Removed
@@ -48,9 +48,9 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 - m-8 search/design/browser/packaging -> TASK-43 (CLI).
 - m-9 search/design/browser/packaging -> TASK-47 (CLI).
 - m-11 search/design/browser/packaging -> TASK-55 (CLI); TASK-21 -> TASK-1 (foundation, completed).
-- m-12 TASK-66 -> TASK-59 (m-11); TASK-60 -> TASK-66; TASK-18 -> search tasks (TASK-31, TASK-35, TASK-39, TASK-44, TASK-48, TASK-56) plus TASK-14 (m-3) and TASK-68; TASK-19 -> TASK-60 plus browser tasks (TASK-23, TASK-24, TASK-25, TASK-26), TASK-67, and TASK-72; TASK-20 -> TASK-18, TASK-19, TASK-60, TASK-59, TASK-69, TASK-70, TASK-71, TASK-72.
+- m-12 TASK-66 -> TASK-59 (m-11); TASK-60 -> TASK-66 and TASK-76; TASK-18 -> search tasks (TASK-31, TASK-35, TASK-39, TASK-44, TASK-48, TASK-56) plus TASK-14 (m-3) and TASK-68; TASK-19 -> TASK-60 plus browser tasks (TASK-23, TASK-24, TASK-25, TASK-26), TASK-67, TASK-72, and TASK-77; TASK-74 -> (none); TASK-75 -> TASK-74; TASK-76 -> TASK-66; TASK-77 -> TASK-76, TASK-72, TASK-67; TASK-20 -> TASK-18, TASK-19, TASK-60, TASK-59, TASK-69, TASK-70, TASK-71, TASK-72, TASK-74, TASK-75, TASK-77.
 - m-14 TASK-73 -> TASK-20 (m-12). No task depends on a later milestone.
-- New m-12 internal order: TASK-63 -> TASK-64 -> TASK-65 -> TASK-67; TASK-63/TASK-65 -> TASK-68 -> TASK-69; TASK-67/TASK-69 -> TASK-70 -> TASK-71; TASK-66 -> TASK-67, TASK-72, TASK-60; TASK-60/TASK-67/TASK-72 -> TASK-19; TASK-20 last.
+- New m-12 internal order: TASK-63 -> TASK-64 -> TASK-65 -> TASK-67; TASK-63/TASK-65 -> TASK-68 -> TASK-69; TASK-67/TASK-69 -> TASK-70 -> TASK-71; TASK-66 -> TASK-67, TASK-72, TASK-60, TASK-76; TASK-74 -> TASK-75; TASK-76 -> TASK-77; TASK-60/TASK-67/TASK-72/TASK-77 -> TASK-19; TASK-20 last.
 
 ## Requirement coverage
 
@@ -66,6 +66,14 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 - NFR-04.003 — Backlog.md task and milestone interoperability: TASK-64 (identity), TASK-69 (layout and additive keys), TASK-71 (two-direction round-trip gate), TASK-20 (packaged verification).
 - REQ-05.008 — UI mockup metadata stays in HTML: TASK-63 and TASK-68 exclude HTML/mockups; no front matter is written to mockups.
 
+### Project setup and configuration (2026-11-09)
+
+- REQ-01.001 — Initialize a Papyrus Project: TASK-2 (baseline, done), TASK-75 (interactive walkthrough).
+- REQ-01.005 — Stable Record IDs and two ID spaces: TASK-64 (translation), TASK-67 (display ID in every projection), TASK-74 (id_padding constraint).
+- REQ-01.006 — Interactive Init Walkthrough: TASK-75.
+- REQ-01.007 — ID Padding Constraint for File IDs: TASK-74.
+- REQ-06.005 — Browser Skills Page for Agent Workflow Configuration: TASK-76 (design review), TASK-77 (implementation).
+
 ## Requirement change update (2026-11-06)
 
 - REQ-05.009 now defines technical specifications as a managed documentation type with the `tech-spec` command (BR-017, README, domain model); REQ-05.007 includes technical specifications in the document lifecycle.
@@ -79,3 +87,14 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 - Reorder within m-12: TASK-60 (final cross-type design review) moves from ordinal 30000 to 30095 and now depends on TASK-66, so the final review covers the front-matter and lifecycle UI. TASK-18 gains TASK-68; TASK-19 gains TASK-67 and TASK-72; TASK-20 gains TASK-69, TASK-70, TASK-71, and TASK-72. No task was moved across a milestone and no in-progress task was reordered.
 - Release decision: m-14 `Release 1.0` with release ticket TASK-73, depending on TASK-20. Version 1.0 is a planning assumption; rename the milestone and ticket if the user selects another version.
 - Specification prerequisite: `business-analyst`/`tech-writer` correct the browser specification pages that currently claim front-matter preservation before TASK-67/TASK-70 complete; this is noted inside those tasks, not a separate backlog task.
+
+
+## Requirement change update (2026-11-09)
+
+- New requirements REQ-01.006, REQ-01.007, and REQ-06.005 are validated; REQ-01.001, REQ-01.005, and the REQ-06 group were updated; REQ-07/08/09 were removed (canonicalized).
+- Placement decision: merge into m-12 rather than a post-final milestone, consistent with the 2026-11-08 front-matter decision. Adding a milestone after m-12 would invalidate TASK-20 packaging and TASK-60 final design review and require a second packaging pass; TASK-20 and TASK-73 already gate the release.
+- REQ-01.007 (TASK-74) and REQ-01.006 (TASK-75) are foundational and scheduled early in m-12 (ordinals 30005, 30006); TASK-75 depends on TASK-74. They do not reopen archived TASK-2 scope beyond the new behavior.
+- REQ-06.005 is a browser surface: TASK-76 (design review, ordinal 30093) precedes TASK-60 so the final design review covers it; TASK-77 (implementation, ordinal 30098.5) depends on TASK-76, TASK-72, and TASK-67; TASK-19 gains TASK-77 and TASK-60 gains TASK-76.
+- Deferred TASK-69 gaps (active relocation, no-drift, interop) remain tracked by TASK-70 and TASK-71 and are not reopened; new tasks do not duplicate them.
+- TASK-67 is refined and in progress on branch task/TASK-67 and is not modified; new tasks depend on it rather than changing it.
+- Release decision: m-14 `Release 1.0` (TASK-73) remains gated on TASK-20, which now includes TASK-74, TASK-75, and TASK-77; no new release ticket is required.

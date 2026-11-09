@@ -980,8 +980,17 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let text = content.clone();
+    let version = fs::metadata(&path)
+        .map(|m| crate::record::store::version_token(&m))
+        .unwrap_or_default();
+    let view = crate::record::view::RecordView::from_content(&content, &id, &version).ok();
+    let metadata = view
+        .map(|v| v.metadata_json())
+        .unwrap_or(serde_json::json!({}));
     let json = if ctx.json {
-        Some(serde_json::json!({"id": id, "path": path.display().to_string(), "content": content}))
+        Some(
+            serde_json::json!({"id": id, "path": path.display().to_string(), "content": content, "metadata": metadata}),
+        )
     } else {
         None
     };
@@ -1636,6 +1645,7 @@ pub fn list(
             Option<String>,
             Option<String>,
             SystemTime,
+            String,
         )> = Vec::new();
         let desc = crate::record::descriptor::descriptor_for("task").unwrap();
         let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
@@ -1709,7 +1719,15 @@ pub fn list(
                 } else {
                     td.title
                 };
-                items.push((id, title, td.status, td.milestone, td.assignee, created));
+                items.push((
+                    id,
+                    title,
+                    td.status,
+                    td.milestone,
+                    td.assignee,
+                    created,
+                    content,
+                ));
             }
         }
 
@@ -1730,13 +1748,21 @@ pub fn list(
 
         let text = items
             .iter()
-            .map(|(id, title, ..)| format!("{} {}", id, title))
+            .map(|(id, title, .., content)| {
+                crate::record::view::RecordView::lenient(content, id).list_line(title)
+            })
             .collect::<Vec<_>>()
             .join("\n");
         let json = if ctx.json {
             let arr: Vec<serde_json::Value> = items
                 .iter()
-                .map(|(id, title, ..)| serde_json::json!({"id": id, "title": title}))
+                .map(|(id, title, .., content)| {
+                    serde_json::json!({
+                        "id": id,
+                        "title": title,
+                        "metadata": crate::record::view::RecordView::lenient(content, id).metadata_json(),
+                    })
+                })
                 .collect();
             Some(serde_json::Value::Array(arr))
         } else {

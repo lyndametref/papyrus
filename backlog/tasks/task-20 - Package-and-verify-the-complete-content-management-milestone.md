@@ -4,18 +4,21 @@ title: Package and verify the complete content-management milestone
 status: To Do
 assignee: []
 created_date: '2026-10-31T22:26:00Z'
-updated_date: '2026-11-08T15:06:00Z'
+updated_date: '2026-11-09T18:51:00Z'
 labels: []
 milestone: m-12
 dependencies:
   - TASK-18
   - TASK-19
-  - TASK-60
   - TASK-59
+  - TASK-60
   - TASK-69
   - TASK-70
   - TASK-71
   - TASK-72
+  - TASK-74
+  - TASK-75
+  - TASK-77
 references:
   - docs/requirements/business/REQ-01.md
   - docs/requirements/business/REQ-02.md
@@ -38,6 +41,9 @@ references:
   - docs/business-rules/BR-010-nfreq-command-behavior.md
   - docs/requirements/business/REQ-05.010.md
   - docs/requirements/non-functional/NFR-04.003.md
+  - docs/requirements/business/REQ-01.006.md
+  - docs/requirements/business/REQ-01.007.md
+  - docs/requirements/business/REQ-06.005.md
 ordinal: 30500
 ---
 

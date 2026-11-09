@@ -387,6 +387,110 @@ fn owning_group_dd(record: &Record, resolved_group: Option<&Record>) -> String {
     }
 }
 
+fn record_view(record: &Record) -> Option<crate::record::view::RecordView> {
+    crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version)
+        .ok()
+        .filter(|view| !view.metadata.is_empty())
+}
+
+fn metadata_dt(key: &str) -> String {
+    match key {
+        "title" => "Title".to_string(),
+        "created_date" => "Created date".to_string(),
+        "updated_date" => "Updated date".to_string(),
+        "labels" => "Labels".to_string(),
+        "references" => "References".to_string(),
+        other => other.to_string(),
+    }
+}
+
+/// Extra detail-page metadata rows rendered from the shared
+/// [`crate::record::view::RecordView`] (TASK-67).
+fn record_view_extra_rows(record: &Record, skip: &[&str]) -> String {
+    let Some(view) = record_view(record) else {
+        return String::new();
+    };
+    let mut rows = String::new();
+    for (key, _) in &view.metadata {
+        if key == "id" || skip.contains(&key.as_str()) {
+            continue;
+        }
+        let value = view.value_text(key);
+        let value = if value.is_empty() {
+            "(none)"
+        } else {
+            value.as_str()
+        };
+        rows.push_str(&format!(
+            "<div><dt>{}</dt><dd>{}</dd></div>",
+            escape(&metadata_dt(key)),
+            escape(value)
+        ));
+    }
+    rows
+}
+
+fn with_extra_rows(block: String, record: &Record, skip: &[&str]) -> String {
+    let extra = record_view_extra_rows(record, skip);
+    if extra.is_empty() {
+        return block;
+    }
+    block.replacen("</dl></div>", &format!("{}</dl></div>", extra), 1)
+}
+
+/// List-row metadata line rendered from the shared `RecordView` (TASK-67).
+fn record_view_list_meta(record: &Record, skip: &[&str]) -> String {
+    let Some(view) = record_view(record) else {
+        return String::new();
+    };
+    let mut parts = vec![
+        format!("created {}", view.value_text("created_date")),
+        format!("updated {}", view.value_text("updated_date")),
+        format!("labels {}", view.list_value("labels").join(",")),
+        format!("references {}", view.list_value("references").join(",")),
+    ];
+    for (key, _) in &view.metadata {
+        if [
+            "id",
+            "title",
+            "created_date",
+            "updated_date",
+            "labels",
+            "references",
+        ]
+        .contains(&key.as_str())
+            || skip.contains(&key.as_str())
+        {
+            continue;
+        }
+        parts.push(format!("{}={}", key, view.value_text(key)));
+    }
+    format!(
+        "<span class=\"row-meta\">{}</span>",
+        escape(&parts.join(" \u{b7} "))
+    )
+}
+
+/// Read-only `created_date` / `updated_date` fields for edit forms (TASK-67).
+/// The inputs are disabled so browsers never submit them; browser saves
+/// ignore these fields even when a client sends them.
+fn read_only_timestamps(record: &Record) -> String {
+    let view = record_view(record);
+    let created = view
+        .as_ref()
+        .and_then(|v| v.str_value("created_date"))
+        .unwrap_or_default();
+    let updated = view
+        .as_ref()
+        .and_then(|v| v.str_value("updated_date"))
+        .unwrap_or_default();
+    format!(
+        "<div class=\"field\"><label for=\"created_date\">Created date (read-only)</label><input class=\"input\" id=\"created_date\" name=\"created_date\" type=\"text\" value=\"{}\" disabled readonly><p class=\"help\">(read-only)</p></div><div class=\"field\"><label for=\"updated_date\">Updated date (read-only)</label><input class=\"input\" id=\"updated_date\" name=\"updated_date\" type=\"text\" value=\"{}\" disabled readonly><p class=\"help\">(read-only)</p></div>",
+        escape(&created),
+        escape(&updated)
+    )
+}
+
 fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_only: bool) -> String {
     let owning = if group_id_only {
         match record.form {
@@ -417,7 +521,7 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
     } else {
         owning_group_dd(record, resolved_group)
     };
-    format!(
+    let block = format!(
         "<div class=\"meta\"><dl class=\"dl\">\
 <div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div>\
 <div><dt>Record form</dt><dd>{}</dd></div>\
@@ -428,15 +532,17 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
         escape(record.form.label()),
         escape(&record.type_label()),
         owning
-    )
+    );
+    with_extra_rows(block, record, &[])
 }
 
 fn requirement_link(record: &Record) -> String {
     format!(
-        "<li><a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a></li>",
+        "<li><a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>{}</li>",
         escape(&record.id),
         escape(&record.id),
-        escape(&record.title)
+        escape(&record.title),
+        record_view_list_meta(record, &[])
     )
 }
 
@@ -707,9 +813,26 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
                 escape(&meta)
             ));
         }
+        let record_meta = record_view_backlog_row_meta(record);
+        if !record_meta.is_empty()
+            && let Some(li_end) = body.rfind("</li>")
+        {
+            body.insert_str(li_end, &record_meta);
+        }
     }
     body.push_str("</ul></section>");
     body
+}
+
+/// Backlog list-row metadata line from the shared `RecordView` (TASK-67).
+fn record_view_backlog_row_meta(record: &Record) -> String {
+    let skip: &[&str] = match record.kind {
+        Category::Task => &["status", "milestone", "assignee"],
+        Category::Milestone => &["release"],
+        Category::Decision => &["status"],
+        _ => &[],
+    };
+    record_view_list_meta(record, skip)
 }
 
 pub fn list_page(
@@ -1163,6 +1286,21 @@ fn metadata_block_backlog(
     related_milestone: Option<&Record>,
     related_release: Option<&Record>,
 ) -> String {
+    let block = metadata_block_backlog_inner(record, related_milestone, related_release);
+    let skip: &[&str] = match record.kind {
+        Category::Task => &["status", "milestone", "assignee"],
+        Category::Milestone => &["release"],
+        Category::AuditRecord => &["type"],
+        _ => &[],
+    };
+    with_extra_rows(block, record, skip)
+}
+
+fn metadata_block_backlog_inner(
+    record: &Record,
+    related_milestone: Option<&Record>,
+    related_release: Option<&Record>,
+) -> String {
     match record.kind {
         Category::Task => {
             let ms = match (&record.milestone_id, related_milestone) {
@@ -1523,6 +1661,7 @@ pub fn edit_page(
         field_error("description", errors.description.as_deref())
     ));
 
+    form.push_str(&read_only_timestamps(record));
     form.push_str(
         "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
     );
@@ -1638,6 +1777,7 @@ pub fn edit_page_task(
         escape(&values.description),
         field_error("description", errors.description.as_deref())
     ));
+    form.push_str(&read_only_timestamps(record));
     form.push_str(
         "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
     );
@@ -1718,6 +1858,7 @@ pub fn edit_page_milestone(
         escape(&values.description),
         field_error("description", errors.description.as_deref())
     ));
+    form.push_str(&read_only_timestamps(record));
     form.push_str(
         "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
     );
@@ -1790,6 +1931,7 @@ pub fn edit_page_release(
         escape(&values.description),
         field_error("description", errors.description.as_deref())
     ));
+    form.push_str(&read_only_timestamps(record));
     form.push_str(
         "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
     );
@@ -1890,6 +2032,7 @@ pub fn edit_page_decision(
         invalid_attrs("superseded-by", errors.superseded_by.as_deref()),
         field_error("superseded-by", errors.superseded_by.as_deref())
     ));
+    form.push_str(&read_only_timestamps(record));
     form.push_str(
         "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
     );
@@ -2011,6 +2154,7 @@ pub fn edit_page_glossary(
         escape(&values.definition),
         field_error("definition", errors.definition.as_deref())
     ));
+    form.push_str(&read_only_timestamps(record));
     form.push_str(
         "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
     );
@@ -2091,6 +2235,7 @@ pub fn edit_page_ui_spec(
         escape(&values.description),
         field_error("description", errors.description.as_deref())
     ));
+    form.push_str(&read_only_timestamps(record));
     form.push_str(
         "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
     );
@@ -2224,6 +2369,7 @@ pub fn edit_page_ui_mockup(
         errors.refs.as_deref(),
         "Reference",
     ));
+    form.push_str(&read_only_timestamps(record));
     form.push_str(
         "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
     );
@@ -2322,6 +2468,7 @@ pub fn edit_page_business_rule(
         errors.requirements.as_deref(),
         "Requirement",
     ));
+    form.push_str(&read_only_timestamps(record));
     form.push_str(
         "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
     );
@@ -2451,6 +2598,7 @@ pub fn edit_page_audit_record(
         escape(&values.content),
         field_error("content", errors.content.as_deref())
     ));
+    form.push_str(&read_only_timestamps(record));
     form.push_str(
         "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
     );
@@ -2589,6 +2737,7 @@ pub fn edit_page_tech_spec(
         escape(&values.description),
         field_error("description", errors.description.as_deref())
     ));
+    form.push_str(&read_only_timestamps(record));
     form.push_str(
         "<p class=\"hidden-field version-note\">Hidden field: version (optimistic-concurrency token)</p>",
     );

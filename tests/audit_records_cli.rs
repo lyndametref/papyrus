@@ -355,7 +355,7 @@ fn audit_json_output() {
     assert!(out.status.success());
     assert_eq!(
         String::from_utf8_lossy(&out.stdout).trim(),
-        r#"{"id":"AUD-001","status":"ok"}"#
+        r#"{"status":"ok","id":"AUD-001"}"#
     );
 
     let out = bin()
@@ -365,7 +365,7 @@ fn audit_json_output() {
     assert!(out.status.success());
     assert_eq!(
         String::from_utf8_lossy(&out.stdout).trim(),
-        r#"{"id":"AUD-001","status":"ok"}"#
+        r#"{"status":"ok","id":"AUD-001"}"#
     );
 
     let out = bin()
@@ -375,7 +375,7 @@ fn audit_json_output() {
     assert!(out.status.success());
     assert_eq!(
         String::from_utf8_lossy(&out.stdout).trim(),
-        r#"{"id":"AUD-001","status":"ok"}"#
+        r#"{"status":"ok","id":"AUD-001"}"#
     );
 
     let _ = fs::remove_dir_all(&d);

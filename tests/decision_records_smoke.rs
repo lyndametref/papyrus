@@ -183,9 +183,10 @@ fn parse_response(bytes: &[u8]) -> HttpResponse {
 fn decision_lifecycle_cli() {
     let dir = test_root("lifecycle");
     decision_fixture(&dir);
-    assert_eq!(
-        run_ok(&["--dir", &dir_arg(&dir), "decision", "list"]).trim(),
-        "ADR-001 Decision One"
+    let list = run_ok(&["--dir", &dir_arg(&dir), "decision", "list"]);
+    assert!(
+        list.trim().starts_with("ADR-001 Decision One"),
+        "list line identity: {list}"
     );
     let view = run_ok(&["--dir", &dir_arg(&dir), "decision", "view", "ADR-001"]);
     assert!(view.contains("## Status"));
