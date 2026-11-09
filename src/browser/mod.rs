@@ -584,7 +584,46 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
         };
     }
 
+    if path == "/lifecycle" {
+        return match method {
+            Method::Get | Method::Head => lifecycle_page(state),
+            _ => {
+                let cfg = state.config().unwrap_or_default();
+                let (project, bind_note) = chrome_for(&cfg, state);
+                let chrome = render::Chrome {
+                    project: &project,
+                    bind_note: &bind_note,
+                };
+                let mut response = Response::html(405, render::error_page(405, &cfg, chrome, None));
+                response = response.with_header("Allow", "GET, HEAD");
+                Ok(response)
+            }
+        };
+    }
     if path == "/" {
+        // Alias: /?type=lifecycle serves the managed artifacts and lifecycles page.
+        if http::query_param(&request.target.query, "type")
+            .ok()
+            .flatten()
+            .as_deref()
+            == Some("lifecycle")
+        {
+            return match method {
+                Method::Get | Method::Head => lifecycle_page(state),
+                _ => {
+                    let cfg = state.config().unwrap_or_default();
+                    let (project, bind_note) = chrome_for(&cfg, state);
+                    let chrome = render::Chrome {
+                        project: &project,
+                        bind_note: &bind_note,
+                    };
+                    let mut response =
+                        Response::html(405, render::error_page(405, &cfg, chrome, None));
+                    response = response.with_header("Allow", "GET, HEAD");
+                    Ok(response)
+                }
+            };
+        }
         return match method {
             Method::Get | Method::Head => list_page(&request, state),
             _ => Err(HttpError::new(405)),
@@ -655,6 +694,16 @@ fn resolved_group<'a>(record: &Record, index: &'a records::Index) -> Option<&'a 
     }
     let group_id = record.group_id.as_deref()?;
     index.groups.iter().find(|group| group.id == group_id)
+}
+
+fn lifecycle_page(state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let (project, bind_note) = chrome_for(&cfg, state);
+    let chrome = render::Chrome {
+        project: &project,
+        bind_note: &bind_note,
+    };
+    Ok(Response::html(200, render::lifecycle_page(&cfg, chrome)))
 }
 
 fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
