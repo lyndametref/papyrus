@@ -300,8 +300,14 @@ fn ui_spec_list_is_non_recursive_and_filters_non_records() {
         .map(|l| l.to_string())
         .filter(|l| !l.is_empty())
         .collect();
+    // Lines start with the display id + title and carry RecordView
+    // metadata for front-matter-backed records (TASK-67).
+    let identities: Vec<String> = lines
+        .iter()
+        .map(|l| l.split(" | ").next().unwrap().to_string())
+        .collect();
     assert_eq!(
-        lines,
+        identities,
         vec![
             "UI-001 One".to_string(),
             "UI-002 Two".to_string(),

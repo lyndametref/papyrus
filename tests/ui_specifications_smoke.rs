@@ -191,9 +191,10 @@ fn milestone_ui_specifications_flow() {
     ui_spec_fixture(&dir);
 
     // lifecycle
-    assert_eq!(
-        run_ok(&["--dir", &dir_arg(&dir), "ui-spec", "list"]).trim(),
-        "UI-001 Alpha Spec"
+    let list = run_ok(&["--dir", &dir_arg(&dir), "ui-spec", "list"]);
+    assert!(
+        list.trim().starts_with("UI-001 Alpha Spec"),
+        "list line identity: {list}"
     );
     let view = run_ok(&["--dir", &dir_arg(&dir), "ui-spec", "view", "UI-001"]);
     assert!(view.contains("# UI-001 Alpha Spec"));

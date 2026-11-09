@@ -2479,11 +2479,13 @@ fn t11g_archived_backlog() {
     ]);
     let server = Server::start(&dir, &["--no-open"], &[]);
     let list = get(&server, "/?type=task").text();
-    assert!(!list.contains("TASK-001"));
+    // The archived task has no list row (TASK-67: remaining rows may
+    // still name it inside RecordView dependency metadata, e.g. TASK-002).
+    assert!(!list.contains("href=\"/doc/TASK-001\""));
     assert_eq!(get(&server, "/doc/TASK-001").status, 404);
     assert_eq!(get(&server, "/doc/TASK-001/edit").status, 404);
     let list = get(&server, "/?type=milestone").text();
-    assert!(!list.contains("MS-001"));
+    assert!(!list.contains("href=\"/doc/MS-001\""));
     assert_eq!(get(&server, "/doc/MS-001").status, 404);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
@@ -2537,7 +2539,7 @@ fn t11h_atomic_and_symlink_backlog() {
         let server = Server::start(&dir, &["--no-open"], &[]);
         assert_eq!(get(&server, "/doc/TASK-001").status, 404);
         let list = get(&server, "/?type=task").text();
-        assert!(!list.contains("TASK-001"));
+        assert!(!list.contains("href=\"/doc/TASK-001\""));
         let body = form_body(&[("version", "1.2.3"), ("title", "Attack")]);
         assert_eq!(post_form(&server, "/doc/TASK-001", &body).status, 404);
         assert!(

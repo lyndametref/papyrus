@@ -8,6 +8,7 @@ pub mod identity;
 pub mod migrate;
 pub mod patch;
 pub mod store;
+pub mod view;
 
 // Convenience re-exports (non-ambiguous).
 pub use descriptor::DESCRIPTORS as RECORD_DESCRIPTORS;
@@ -17,3 +18,4 @@ pub use frontmatter::FrontMatter;
 pub use identity::*;
 pub use patch::{Patch, PatchOp, apply_patch};
 pub use store::{Store, read as read_record, read_document, resolve_path, write_atomic};
+pub use view::RecordView;

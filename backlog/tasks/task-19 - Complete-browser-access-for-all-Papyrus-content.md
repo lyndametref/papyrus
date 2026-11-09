@@ -4,17 +4,18 @@ title: Complete browser access for all Papyrus content
 status: To Do
 assignee: []
 created_date: '2026-10-31T22:26:00Z'
-updated_date: '2026-11-08T15:06:00Z'
+updated_date: '2026-11-09T18:51:00Z'
 labels: []
 milestone: m-12
 dependencies:
-  - TASK-60
   - TASK-23
   - TASK-24
   - TASK-25
   - TASK-26
+  - TASK-60
   - TASK-67
   - TASK-72
+  - TASK-77
 references:
   - docs/requirements/business/REQ-06.002.md
   - docs/requirements/non-functional/NFR-01.002.md

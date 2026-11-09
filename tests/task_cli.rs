@@ -145,7 +145,10 @@ fn task_basic_lifecycle() {
         .unwrap();
     assert!(out.status.success());
     let out = bin().args(["--dir", p, "task", "list"]).output().unwrap();
-    assert!(!String::from_utf8_lossy(&out.stdout).contains("TASK-001"));
+    // TASK-001 is archived: no list entry starts with it. TASK-002's
+    // metadata line still names it as a dependency (TASK-67).
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(!s.lines().any(|line| line.starts_with("TASK-001 ")));
     let out = bin()
         .args(["--dir", p, "task", "view", "TASK-001"])
         .output()
@@ -166,7 +169,8 @@ fn task_basic_lifecycle() {
         .unwrap();
     assert!(out.status.success());
     let out = bin().args(["--dir", p, "task", "list"]).output().unwrap();
-    assert!(!String::from_utf8_lossy(&out.stdout).contains("TASK-001"));
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(!s.lines().any(|line| line.starts_with("TASK-001 ")));
 
     let _ = fs::remove_dir_all(&d);
 }

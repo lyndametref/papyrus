@@ -466,7 +466,7 @@ pub fn list(
     let active = active_dir(ctx, &cfg)?;
     let _ = ensure_dir(&active, &ctx.project_dir);
 
-    let mut items: Vec<(String, String)> = Vec::new();
+    let mut items: Vec<(String, String, String)> = Vec::new();
     if let Ok(rd) = fs::read_dir(&active) {
         for e in rd.flatten() {
             let path = e.path();
@@ -489,20 +489,28 @@ pub fn list(
             let content = fs::read_to_string(&safe).unwrap_or_default();
             let (_, title) = parse_heading(&content);
             let title = if title.is_empty() { id.clone() } else { title };
-            items.push((id, title));
+            items.push((id, title, content));
         }
     }
     items.sort_by(|a, b| a.0.cmp(&b.0));
 
     let text = items
         .iter()
-        .map(|(id, title)| format!("{} {}", id, title))
+        .map(|(id, title, content)| {
+            crate::record::view::RecordView::lenient(content, id).list_line(title)
+        })
         .collect::<Vec<_>>()
         .join("\n");
     let json = if ctx.json {
         let arr: Vec<serde_json::Value> = items
             .iter()
-            .map(|(id, title)| serde_json::json!({"id": id, "title": title}))
+            .map(|(id, title, content)| {
+                serde_json::json!({
+                    "id": id,
+                    "title": title,
+                    "metadata": crate::record::view::RecordView::lenient(content, id).metadata_json(),
+                })
+            })
             .collect();
         Some(serde_json::Value::Array(arr))
     } else {
@@ -539,7 +547,12 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
     let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
     let text = content.clone();
     let json = if ctx.json {
-        Some(serde_json::json!({"id": id, "path": path.display().to_string(), "content": content}))
+        Some(serde_json::json!({
+            "id": id,
+            "path": path.display().to_string(),
+            "content": content,
+            "metadata": crate::record::view::RecordView::lenient(&content, &id).metadata_json(),
+        }))
     } else {
         None
     };

@@ -190,9 +190,10 @@ fn milestone_glossary_terms_flow() {
     glossary_fixture(&dir);
 
     // lifecycle
-    assert_eq!(
-        run_ok(&["--dir", &dir_arg(&dir), "glossary", "list"]).trim(),
-        "GLO-001 Alpha Term"
+    let list = run_ok(&["--dir", &dir_arg(&dir), "glossary", "list"]);
+    assert!(
+        list.trim().starts_with("GLO-001 Alpha Term"),
+        "list line identity: {list}"
     );
     let view = run_ok(&["--dir", &dir_arg(&dir), "glossary", "view", "GLO-001"]);
     assert!(view.contains("# GLO-001 Alpha Term"));
