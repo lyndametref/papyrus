@@ -298,25 +298,78 @@ fn resolve_task_path_migrated(ctx: &Context, cfg: &Config, id: &str) -> Result<P
     crate::record::migrate::ensure_front_matter_canonical(ctx, &path)
 }
 
+fn task_frontmatter_storage_id(content: &str) -> Option<String> {
+    if !crate::record::frontmatter::has_front_matter(content) {
+        return None;
+    }
+    let fm = crate::record::frontmatter::parse(content).ok().flatten()?;
+    let id = crate::record::frontmatter::current_value_string(&fm.raw, "id")?;
+    let id = id.trim();
+    if id.is_empty() {
+        return None;
+    }
+    if let Ok(sid) = crate::record::identity::task_to_storage_id(id) {
+        return Some(sid);
+    }
+    let spec = crate::record::identity::IdSpec::default_task();
+    spec.parse_storage_number(id).ok()?;
+    Some(id.to_lowercase())
+}
+
+fn reject_task_write_conflict(ctx: &Context, path: &std::path::Path) -> Result<(), AppError> {
+    let content = fs::read_to_string(path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let desc = crate::record::descriptor::descriptor_for("task").unwrap();
+    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
+    if let Some(reason) =
+        crate::record::migrate::check_conflicts_for_path(ctx, path, desc, &content, &conflicts)
+    {
+        return Err(AppError::Validation(format!(
+            "migration conflict at {}: {}",
+            crate::record::migrate::rel_path(&ctx.project_dir, path),
+            reason
+        )));
+    }
+    Ok(())
+}
+
 fn find_task_file(dir: &std::path::Path, storage_id: &str) -> Option<PathBuf> {
     if !dir.exists() {
         return None;
     }
     let rd = fs::read_dir(dir).ok()?;
+    let mut entries: Vec<PathBuf> = Vec::new();
     for e in rd.flatten() {
         let path = e.path();
         if path.extension().and_then(|s| s.to_str()) != Some("md") {
             continue;
         }
+        entries.push(path);
+    }
+    // First pass: filename stem.
+    for path in &entries {
         let stem = path.file_stem().and_then(|s| s.to_str())?;
         let base = stem.split(" - ").next().unwrap_or(stem).trim();
         if base.eq_ignore_ascii_case(storage_id) {
-            return Some(path);
+            return Some(path.clone());
         }
         if let Ok(sid) = crate::record::identity::task_to_storage_id(base)
             && sid.eq_ignore_ascii_case(storage_id)
         {
-            return Some(path);
+            return Some(path.clone());
+        }
+    }
+    // Second pass (ADR-0008 decision 3/9): front-matter id is canonical on
+    // mismatch, so a record addressed by its front-matter ID must resolve
+    // even when the filename disagrees. Reads succeed; writes refuse via
+    // check_conflicts_for_path at the mutation call sites.
+    for path in &entries {
+        let Ok(content) = fs::read_to_string(path) else {
+            continue;
+        };
+        if let Some(sid) = task_frontmatter_storage_id(&content)
+            && sid.eq_ignore_ascii_case(storage_id)
+        {
+            return Some(path.clone());
         }
     }
     None
@@ -935,6 +988,98 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
     Ok(crate::CommandOutput { text, json })
 }
 
+fn has_doc_section(doc: &crate::record::document::Document, heading: &str) -> bool {
+    doc.sections.iter().any(|s| s.heading == heading)
+}
+
+fn frontmatter_scalar(content: &str, key: &str) -> Option<String> {
+    crate::record::frontmatter::parse(content)
+        .ok()
+        .flatten()
+        .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, key))
+}
+
+fn parse_ac_items(doc: &crate::record::document::Document) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Some(sec) = doc
+        .sections
+        .iter()
+        .find(|s| s.heading == "## Acceptance Criteria")
+    {
+        for l in &sec.body {
+            let t = l.trim();
+            if t.is_empty() || t.starts_with("<!--") {
+                continue;
+            }
+            let mut item = t.strip_prefix("- ").unwrap_or(t).trim().to_string();
+            for pref in ["[ ] ", "[x] ", "[X] "] {
+                if let Some(rest) = item.strip_prefix(pref) {
+                    item = rest.trim().to_string();
+                    break;
+                }
+            }
+            if let Some(rest) = item.strip_prefix('#') {
+                if let Some(sp) = rest.find(' ') {
+                    if rest[..sp].chars().all(|c| c.is_ascii_digit()) {
+                        item = rest[sp + 1..].trim().to_string();
+                    }
+                }
+            }
+            if !item.is_empty() {
+                out.push(item);
+            }
+        }
+    }
+    out
+}
+
+fn parse_comments(doc: &crate::record::document::Document) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    if let Some(sec) = doc.sections.iter().find(|s| s.heading == "## Comments") {
+        for l in &sec.body {
+            let t = l.trim();
+            if t.is_empty() || t.starts_with("<!--") {
+                continue;
+            }
+            let item = t.strip_prefix("- ").unwrap_or(t).trim().to_string();
+            if let Some(inner) = item.strip_prefix("**")
+                && let Some(end) = inner.find("**")
+            {
+                let author = inner[..end].trim().to_string();
+                let after = inner[end + 2..].trim();
+                let text = after.trim_start_matches(':').trim().to_string();
+                out.push((author, text));
+                continue;
+            }
+            out.push(("unknown".to_string(), item));
+        }
+    }
+    out
+}
+
+fn rebuild_marker_section(
+    doc: &crate::record::document::Document,
+    heading: &str,
+    begin: &str,
+    end: &str,
+    inner: Vec<String>,
+) -> Option<String> {
+    let sec = doc.sections.iter().find(|s| s.heading == heading)?;
+    let b = sec.body.iter().position(|l| l.trim() == begin);
+    let e = sec.body.iter().position(|l| l.trim() == end);
+    let mut lines: Vec<String> = Vec::new();
+    if let (Some(bi), Some(ei)) = (b, e) {
+        lines.extend(sec.body[..bi].iter().cloned());
+        lines.push(begin.to_string());
+        lines.extend(inner);
+        lines.push(end.to_string());
+        lines.extend(sec.body[ei + 1..].iter().cloned());
+    } else {
+        lines.extend(inner);
+    }
+    Some(lines.join("\n"))
+}
+
 pub fn edit(
     ctx: &Context,
     id_raw: &str,
@@ -965,6 +1110,19 @@ pub fn edit(
     let path = resolve_task_path_migrated(ctx, &cfg, &id)?;
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let doc = crate::record::document::parse(&content)?;
+    let desc = crate::record::descriptor::descriptor_for("task").unwrap();
+    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
+    if let Some(reason) =
+        crate::record::migrate::check_conflicts_for_path(ctx, &path, desc, &content, &conflicts)
+    {
+        return Err(AppError::Validation(format!(
+            "migration conflict at {}: {}",
+            crate::record::migrate::rel_path(&ctx.project_dir, &path),
+            reason
+        )));
+    }
+
     let mut td = parse_task(&content);
     if td.id.is_empty() {
         td.id = id.clone();
@@ -1000,7 +1158,8 @@ pub fn edit(
         match no {
             Some(rid_raw) => {
                 let rid = sanitize_text(rid_raw)?;
-                if td.milestone.as_deref() != Some(rid.as_str()) {
+                let current = frontmatter_scalar(&content, "milestone").or(td.milestone.clone());
+                if current.as_deref() != Some(rid.as_str()) {
                     return Err(AppError::Validation(format!(
                         "task is not assigned to milestone: {}",
                         rid
@@ -1031,7 +1190,6 @@ pub fn edit(
     for l in labels_raw {
         unique_push(&mut td.labels, sanitize_text(l)?);
     }
-    // references/documentation/type/ordinal handled via front-matter patch below
 
     if !assignee_raw.is_empty() {
         let mut cleaned = Vec::new();
@@ -1040,17 +1198,8 @@ pub fn edit(
         }
         td.assignee = cleaned.first().cloned();
     }
-    if !comments_raw.is_empty() {
-        let author = match comment_author_raw {
-            Some(a) => sanitize_text(a)?,
-            None => "unknown".to_string(),
-        };
-        for c in comments_raw {
-            td.comments.push((author.clone(), sanitize_text(c)?));
-        }
-    }
 
-    // Build patch ops instead of re-rendering.
+    // Build patch ops.
     let mut ops: Vec<crate::record::patch::PatchOp> = Vec::new();
 
     if let Some(t) = title_raw {
@@ -1066,9 +1215,17 @@ pub fn edit(
         let dv = sanitize::sanitize_path_string(d)
             .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?;
         td.description = Some(dv.clone());
+        let body = rebuild_marker_section(
+            &doc,
+            "## Description",
+            "<!-- SECTION:DESCRIPTION:BEGIN -->",
+            "<!-- SECTION:DESCRIPTION:END -->",
+            dv.lines().map(String::from).collect(),
+        )
+        .unwrap_or(dv);
         ops.push(crate::record::patch::PatchOp::SetSection(
             "## Description".into(),
-            dv,
+            body,
         ));
     }
     if let Some(s) = status_raw {
@@ -1081,10 +1238,12 @@ pub fn edit(
             "status".into(),
             st.clone(),
         ));
-        ops.push(crate::record::patch::PatchOp::SetSection(
-            "## Status".into(),
-            st,
-        ));
+        if has_doc_section(&doc, "## Status") {
+            ops.push(crate::record::patch::PatchOp::SetSection(
+                "## Status".into(),
+                st,
+            ));
+        }
     }
     if let Some(m) = milestone_raw {
         let mid = sanitize_text(m)?;
@@ -1096,10 +1255,12 @@ pub fn edit(
             "milestone".into(),
             mid.clone(),
         ));
-        ops.push(crate::record::patch::PatchOp::SetSection(
-            "## Milestone".into(),
-            mid,
-        ));
+        if has_doc_section(&doc, "## Milestone") {
+            ops.push(crate::record::patch::PatchOp::SetSection(
+                "## Milestone".into(),
+                mid,
+            ));
+        }
     }
     if let Some(no) = &no_milestone {
         match no {
@@ -1107,23 +1268,27 @@ pub fn edit(
                 ops.push(crate::record::patch::PatchOp::ClearFrontMatter(
                     "milestone".into(),
                 ));
-                ops.push(crate::record::patch::PatchOp::ClearSection(
-                    "## Milestone".into(),
-                ));
+                if has_doc_section(&doc, "## Milestone") {
+                    ops.push(crate::record::patch::PatchOp::ClearSection(
+                        "## Milestone".into(),
+                    ));
+                }
             }
             None => {
                 td.milestone = None;
                 ops.push(crate::record::patch::PatchOp::ClearFrontMatter(
                     "milestone".into(),
                 ));
-                ops.push(crate::record::patch::PatchOp::ClearSection(
-                    "## Milestone".into(),
-                ));
+                if has_doc_section(&doc, "## Milestone") {
+                    ops.push(crate::record::patch::PatchOp::ClearSection(
+                        "## Milestone".into(),
+                    ));
+                }
             }
         }
     }
     if !deps_raw.is_empty() {
-        let mut new_deps = td.deps.clone();
+        let mut new_deps = frontmatter_list(&content, "dependencies");
         for d in deps_raw {
             let did = sanitize_text(d)?;
             if did == id {
@@ -1137,40 +1302,51 @@ pub fn edit(
             unique_push(&mut new_deps, did);
         }
         td.deps = new_deps.clone();
-        let val = new_deps.join("\n");
         ops.push(crate::record::patch::PatchOp::SetFrontMatter(
             "dependencies".into(),
-            val,
+            new_deps.join("\n"),
         ));
-        ops.push(crate::record::patch::PatchOp::SetSection(
-            "## Dependencies".into(),
-            td.deps
-                .iter()
-                .map(|d| format!("- {}", d))
-                .collect::<Vec<_>>()
-                .join("\n"),
-        ));
+        if has_doc_section(&doc, "## Dependencies") {
+            ops.push(crate::record::patch::PatchOp::SetSection(
+                "## Dependencies".into(),
+                td.deps
+                    .iter()
+                    .map(|d| format!("- {}", d))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ));
+        }
     }
     if !ac_raw.is_empty() {
+        let mut items = parse_ac_items(&doc);
         for a in ac_raw {
-            unique_push(&mut td.acs, sanitize_text(a)?);
+            unique_push(&mut items, sanitize_text(a)?);
         }
-        let body = td
-            .acs
-            .iter()
-            .map(|a| format!("- [ ] {}", a))
-            .collect::<Vec<_>>()
-            .join("\n");
+        td.acs = items.clone();
+        let body = rebuild_marker_section(
+            &doc,
+            "## Acceptance Criteria",
+            "<!-- AC:BEGIN -->",
+            "<!-- AC:END -->",
+            items
+                .iter()
+                .enumerate()
+                .map(|(i, a)| format!("- [ ] #{} {}", i + 1, a))
+                .collect(),
+        )
+        .unwrap_or_else(|| {
+            items
+                .iter()
+                .map(|a| format!("- [ ] {}", a))
+                .collect::<Vec<_>>()
+                .join("\n")
+        });
         ops.push(crate::record::patch::PatchOp::SetSection(
             "## Acceptance Criteria".into(),
             body,
         ));
     }
     if !labels_raw.is_empty() {
-        for l in labels_raw {
-            unique_push(&mut td.labels, sanitize_text(l)?);
-        }
-        // front-matter labels append unique
         let mut fm_labels = frontmatter_list(&content, "labels");
         for l in labels_raw {
             let lv = sanitize_text(l)?;
@@ -1178,21 +1354,21 @@ pub fn edit(
                 fm_labels.push(lv);
             }
         }
-        let val = fm_labels.join("\n");
+        td.labels = fm_labels.clone();
         ops.push(crate::record::patch::PatchOp::SetFrontMatter(
             "labels".into(),
-            val,
+            fm_labels.join("\n"),
         ));
-        let body = td
-            .labels
-            .iter()
-            .map(|l| format!("- {}", l))
-            .collect::<Vec<_>>()
-            .join("\n");
-        ops.push(crate::record::patch::PatchOp::SetSection(
-            "## Labels".into(),
-            body,
-        ));
+        if has_doc_section(&doc, "## Labels") {
+            ops.push(crate::record::patch::PatchOp::SetSection(
+                "## Labels".into(),
+                td.labels
+                    .iter()
+                    .map(|l| format!("- {}", l))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ));
+        }
     }
     // references append
     if !references_raw.is_empty() {
@@ -1204,10 +1380,9 @@ pub fn edit(
                 fm_refs.push(rv);
             }
         }
-        let val = fm_refs.join("\n");
         ops.push(crate::record::patch::PatchOp::SetFrontMatter(
             "references".into(),
-            val,
+            fm_refs.join("\n"),
         ));
     }
     // documentation append
@@ -1220,10 +1395,9 @@ pub fn edit(
                 fm_docs.push(dv);
             }
         }
-        let val = fm_docs.join("\n");
         ops.push(crate::record::patch::PatchOp::SetFrontMatter(
             "documentation".into(),
-            val,
+            fm_docs.join("\n"),
         ));
     }
     // type
@@ -1255,16 +1429,17 @@ pub fn edit(
             cleaned.push(sanitize_text(a)?);
         }
         td.assignee = cleaned.first().cloned();
-        let val = cleaned.join("\n");
         ops.push(crate::record::patch::PatchOp::SetFrontMatter(
             "assignee".into(),
-            val,
+            cleaned.join("\n"),
         ));
-        if let Some(a) = &td.assignee {
-            ops.push(crate::record::patch::PatchOp::SetSection(
-                "## Assignee".into(),
-                a.clone(),
-            ));
+        if has_doc_section(&doc, "## Assignee") {
+            if let Some(a) = &td.assignee {
+                ops.push(crate::record::patch::PatchOp::SetSection(
+                    "## Assignee".into(),
+                    a.clone(),
+                ));
+            }
         }
     }
     if !comments_raw.is_empty() {
@@ -1272,24 +1447,34 @@ pub fn edit(
             Some(a) => sanitize_text(a)?,
             None => "unknown".to_string(),
         };
+        let mut items = parse_comments(&doc);
         for c in comments_raw {
-            td.comments.push((author.clone(), sanitize_text(c)?));
+            items.push((author.clone(), sanitize_text(c)?));
         }
-        let body = td
-            .comments
-            .iter()
-            .map(|(a, t)| format!("- **{}**: {}", a, t))
-            .collect::<Vec<_>>()
-            .join("\n");
-        // append to existing comments? Current render all comments. SetSection replaces.
+        td.comments = items.clone();
+        let body = rebuild_marker_section(
+            &doc,
+            "## Comments",
+            "<!-- COMMENTS:BEGIN -->",
+            "<!-- COMMENTS:END -->",
+            items
+                .iter()
+                .map(|(a, t)| format!("- **{}**: {}", a, t))
+                .collect(),
+        )
+        .unwrap_or_else(|| {
+            items
+                .iter()
+                .map(|(a, t)| format!("- **{}**: {}", a, t))
+                .collect::<Vec<_>>()
+                .join("\n")
+        });
         ops.push(crate::record::patch::PatchOp::SetSection(
             "## Comments".into(),
             body,
         ));
     }
 
-    // parse doc
-    let doc = crate::record::document::parse(&content)?;
     let base_new = crate::record::patch::apply_patch(&doc, &ops)?;
     let new_content = if ops.is_empty() || base_new == content {
         content.clone()
@@ -1452,6 +1637,8 @@ pub fn list(
             Option<String>,
             SystemTime,
         )> = Vec::new();
+        let desc = crate::record::descriptor::descriptor_for("task").unwrap();
+        let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
         if let Ok(rd) = fs::read_dir(active) {
             for e in rd.flatten() {
                 let path = e.path();
@@ -1467,6 +1654,12 @@ pub fn list(
                     Err(_) => continue,
                 };
                 let content = fs::read_to_string(&safe).unwrap_or_default();
+                if let Some(conflict) = crate::record::migrate::path_migration_conflict(
+                    ctx, &safe, desc, &content, &conflicts,
+                ) {
+                    eprintln!("warning: {}", conflict);
+                    continue;
+                }
                 let td = parse_task(&content);
 
                 if let Some(sf) = &status_f
@@ -1601,6 +1794,8 @@ pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
     let id = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
     let path = resolve_task_path(ctx, &cfg, &id)?;
+    reject_task_write_conflict(ctx, &path)?;
+    let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
     let archived = archived_dir(ctx, &cfg)?;
     ensure_dir(&archived, &ctx.project_dir)?;
 
@@ -1632,6 +1827,8 @@ pub fn restore(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
     let id = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
     let path = resolve_task_path(ctx, &cfg, &id)?;
+    reject_task_write_conflict(ctx, &path)?;
+    let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
     let active = active_dir(ctx, &cfg)?;
     let _ = ensure_dir(&active, &ctx.project_dir);
 
@@ -1662,7 +1859,9 @@ pub fn restore(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
 pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
-    let path = resolve_task_path_migrated(ctx, &cfg, &id)?;
+    let path = resolve_task_path(ctx, &cfg, &id)?;
+    reject_task_write_conflict(ctx, &path)?;
+    let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
 
     if !force {
         print!("Delete {}? [y/N] ", id);
@@ -1766,5 +1965,213 @@ mod tests {
         )
         .unwrap_or_else(|e| panic!("create failed: {}", e));
         assert_eq!(id, "TASK-002", "got: {}", id);
+    }
+
+    #[test]
+    fn view_succeeds_via_canonical_frontmatter_id_on_mismatch() {
+        let dir = tmpdir("mismatch-canonical-view");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
+        let content = "---\nid: TASK-99\ntitle: Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
+        fs::write(dir.join("backlog/tasks/task-5 - Title.md"), content).unwrap();
+        let out = view(&c, "TASK-099").unwrap_or_else(|e| panic!("canonical view failed: {}", e));
+        assert!(out.text.contains("id: TASK-99"), "got: {}", out.text);
+        let out2 = view(&c, "TASK-005").unwrap_or_else(|e| panic!("filename view failed: {}", e));
+        assert!(out2.text.contains("id: TASK-99"), "got: {}", out2.text);
+    }
+
+    #[test]
+    fn edit_refuses_mismatch_via_canonical_id() {
+        let dir = tmpdir("mismatch-canonical-edit");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
+        let content = "---\nid: TASK-99\ntitle: Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
+        fs::write(dir.join("backlog/tasks/task-5 - Title.md"), content).unwrap();
+        let err = edit(
+            &c,
+            "TASK-099",
+            Some("NewTitle"),
+            None,
+            &[],
+            &[],
+            None,
+            None,
+            &[],
+            None,
+            None,
+            &[],
+            &[],
+            &[],
+            None,
+            None,
+            &[],
+            false,
+        )
+        .err()
+        .expect("expected error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("migration conflict"),
+            "expected conflict, got: {}",
+            msg
+        );
+        assert_eq!(
+            fs::read_to_string(dir.join("backlog/tasks/task-5 - Title.md")).unwrap(),
+            content
+        );
+    }
+
+    #[test]
+    fn archive_refuses_mismatch() {
+        let dir = tmpdir("mismatch-archive");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
+        let content = "---\nid: TASK-99\ntitle: Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
+        fs::write(dir.join("backlog/tasks/task-5 - Title.md"), content).unwrap();
+        let err = archive(&c, "TASK-005").err().expect("expected error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("migration conflict"),
+            "expected conflict, got: {}",
+            msg
+        );
+        assert!(
+            dir.join("backlog/tasks/task-5 - Title.md").exists(),
+            "file must not move on refusal"
+        );
+    }
+
+    #[test]
+    fn backlog_md_dropped_keys_are_readded_on_view() {
+        let dir = tmpdir("interop-readd");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
+        let body = "\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
+        let content = format!(
+            "---\nid: TASK-6\ntitle: Interop\nstatus: To Do\n---\n{}",
+            body
+        );
+        let path = dir.join("backlog/tasks/task-6 - Interop.md");
+        fs::write(&path, &content).unwrap();
+        let out = view(&c, "TASK-006").unwrap();
+        for key in [
+            "created_date:",
+            "updated_date:",
+            "labels:",
+            "references:",
+            "assignee:",
+            "milestone:",
+            "dependencies:",
+            "ordinal:",
+            "documentation:",
+            "type:",
+        ] {
+            assert!(
+                out.text.contains(key),
+                "missing {} after re-add: {}",
+                key,
+                out.text
+            );
+        }
+        let (_, out_body) = crate::record::frontmatter::split(&out.text).unwrap();
+        assert_eq!(out_body, body, "body changed: {:?} vs {:?}", out_body, body);
+        let on_disk = fs::read_to_string(&path).unwrap();
+        for key in ["ordinal:", "documentation:", "type:"] {
+            assert!(
+                on_disk.contains(key),
+                "missing {} on disk: {}",
+                key,
+                on_disk
+            );
+        }
+    }
+
+    #[test]
+    fn title_edit_preserves_body_bytes_when_title_changes() {
+        let dir = tmpdir("title-edit-preserve");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
+        let body = "\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody UNIQUE\n<!-- SECTION:DESCRIPTION:END -->\n\n## Unknown Section\nkeep me verbatim\n";
+        let content = format!(
+            "---\nid: TASK-5\ntitle: OldTitle\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n{}",
+            body
+        );
+        let path = dir.join("backlog/tasks/task-5 - OldTitle.md");
+        fs::write(&path, &content).unwrap();
+        edit(
+            &c,
+            "TASK-005",
+            Some("NewTitle"),
+            None,
+            &[],
+            &[],
+            None,
+            None,
+            &[],
+            None,
+            None,
+            &[],
+            &[],
+            &[],
+            None,
+            None,
+            &[],
+            false,
+        )
+        .unwrap();
+        let after = fs::read_to_string(&path).unwrap();
+        assert!(after.contains("title: NewTitle"), "got: {}", after);
+        let (_, after_body) = crate::record::frontmatter::split(&after).unwrap();
+        assert_eq!(
+            after_body, body,
+            "body must stay byte-identical on title-only edit"
+        );
+        assert!(
+            !after_body.contains("# NewTitle"),
+            "body heading injected: {:?}",
+            after_body
+        );
+    }
+
+    #[test]
+    fn edit_without_title_change_preserves_body_bytes() {
+        let dir = tmpdir("title-unchanged-preserve");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
+        let body = "\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody UNIQUE\n<!-- SECTION:DESCRIPTION:END -->\n\n## Unknown Section\nkeep me verbatim\n";
+        let content = format!(
+            "---\nid: TASK-5\ntitle: OldTitle\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n{}",
+            body
+        );
+        let path = dir.join("backlog/tasks/task-5 - OldTitle.md");
+        fs::write(&path, &content).unwrap();
+        edit(
+            &c,
+            "TASK-005",
+            None,
+            None,
+            &[],
+            &[],
+            None,
+            Some("Initiated"),
+            &[],
+            None,
+            None,
+            &[],
+            &[],
+            &[],
+            None,
+            None,
+            &[],
+            false,
+        )
+        .unwrap();
+        let after = fs::read_to_string(&path).unwrap();
+        assert!(after.contains("status: Initiated"), "got: {}", after);
+        let (_, after_body) = crate::record::frontmatter::split(&after).unwrap();
+        assert_eq!(
+            after_body, body,
+            "body must stay byte-identical when title unchanged"
+        );
     }
 }

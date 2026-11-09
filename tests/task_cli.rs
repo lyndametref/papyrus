@@ -128,11 +128,15 @@ fn task_basic_lifecycle() {
         .output()
         .unwrap();
     let s = String::from_utf8_lossy(&out.stdout);
-    assert!(s.contains("# TASK-001 T1b"));
-    assert!(s.contains("## Status\nInitiated"));
-    assert!(s.contains("- [ ] ac2"));
-    assert!(s.contains("- **bob**: hi"));
-    assert!(s.contains("- x"));
+    assert!(s.contains("title: T1b"), "missing title: {}", s);
+    assert!(s.contains("status: Initiated"), "missing status: {}", s);
+    assert!(s.contains("- [ ] #2 ac2"), "missing ac2: {}", s);
+    assert!(s.contains("- **bob**: hi"), "missing comment: {}", s);
+    assert!(
+        s.contains("labels:") && s.contains("- x"),
+        "missing label: {}",
+        s
+    );
 
     // archive/restore
     let out = bin()

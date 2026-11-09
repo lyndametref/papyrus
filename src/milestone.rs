@@ -181,25 +181,76 @@ fn resolve_milestone_path_migrated(
     crate::record::migrate::ensure_front_matter_canonical(ctx, &path)
 }
 
+fn milestone_frontmatter_storage_id(content: &str) -> Option<String> {
+    if !crate::record::frontmatter::has_front_matter(content) {
+        return None;
+    }
+    let fm = crate::record::frontmatter::parse(content).ok().flatten()?;
+    let id = crate::record::frontmatter::current_value_string(&fm.raw, "id")?;
+    let id = id.trim();
+    if id.is_empty() {
+        return None;
+    }
+    if let Ok(sid) = crate::record::identity::milestone_to_storage_id(id) {
+        return Some(sid);
+    }
+    let spec = crate::record::identity::IdSpec::default_milestone();
+    spec.parse_storage_number(id).ok()?;
+    Some(id.to_lowercase())
+}
+
+fn reject_milestone_write_conflict(ctx: &Context, path: &std::path::Path) -> Result<(), AppError> {
+    let content = fs::read_to_string(path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let desc = crate::record::descriptor::descriptor_for("milestone").unwrap();
+    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
+    if let Some(reason) =
+        crate::record::migrate::check_conflicts_for_path(ctx, path, desc, &content, &conflicts)
+    {
+        return Err(AppError::Validation(format!(
+            "migration conflict at {}: {}",
+            crate::record::migrate::rel_path(&ctx.project_dir, path),
+            reason
+        )));
+    }
+    Ok(())
+}
+
 pub(crate) fn find_milestone_file(dir: &std::path::Path, storage_id: &str) -> Option<PathBuf> {
     if !dir.exists() {
         return None;
     }
     let rd = fs::read_dir(dir).ok()?;
+    let mut entries: Vec<PathBuf> = Vec::new();
     for e in rd.flatten() {
         let path = e.path();
         if path.extension().and_then(|s| s.to_str()) != Some("md") {
             continue;
         }
+        entries.push(path);
+    }
+    for path in &entries {
         let stem = path.file_stem().and_then(|s| s.to_str())?;
         let base = stem.split(" - ").next().unwrap_or(stem).trim();
         if base.eq_ignore_ascii_case(storage_id) {
-            return Some(path);
+            return Some(path.clone());
         }
         if let Ok(sid) = crate::record::identity::milestone_to_storage_id(base)
             && sid.eq_ignore_ascii_case(storage_id)
         {
-            return Some(path);
+            return Some(path.clone());
+        }
+    }
+    // ADR-0008 decision 3/9: front-matter id is canonical; resolve a record
+    // addressed by its front-matter ID even on mismatch. Reads succeed;
+    // writes refuse via reject_milestone_write_conflict.
+    for path in &entries {
+        let Ok(content) = fs::read_to_string(path) else {
+            continue;
+        };
+        if let Some(sid) = milestone_frontmatter_storage_id(&content)
+            && sid.eq_ignore_ascii_case(storage_id)
+        {
+            return Some(path.clone());
         }
     }
     None
@@ -465,6 +516,8 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
     let _ = ensure_dir(&active, &ctx.project_dir);
 
     let mut items: Vec<(String, String)> = Vec::new();
+    let desc = crate::record::descriptor::descriptor_for("milestone").unwrap();
+    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
     if let Ok(rd) = fs::read_dir(&active) {
         for e in rd.flatten() {
             let path = e.path();
@@ -477,6 +530,12 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
             };
             let safe = Context::ensure_within(&ctx.project_dir, &path)?;
             let content = fs::read_to_string(&safe).unwrap_or_default();
+            if let Some(conflict) = crate::record::migrate::path_migration_conflict(
+                ctx, &safe, desc, &content, &conflicts,
+            ) {
+                eprintln!("warning: {}", conflict);
+                continue;
+            }
             let (_, title) = parse_heading(&content);
             let title = if title.is_empty() { id.clone() } else { title };
             items.push((id, title));
@@ -541,6 +600,19 @@ pub fn edit(
     let path = resolve_milestone_path_migrated(ctx, &cfg, &id)?;
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let doc = crate::record::document::parse(&content)?;
+    let desc = crate::record::descriptor::descriptor_for("milestone").unwrap();
+    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
+    if let Some(reason) =
+        crate::record::migrate::check_conflicts_for_path(ctx, &path, desc, &content, &conflicts)
+    {
+        return Err(AppError::Validation(format!(
+            "migration conflict at {}: {}",
+            crate::record::migrate::rel_path(&ctx.project_dir, &path),
+            reason
+        )));
+    }
+
     let (parsed_id, parsed_title, parsed_desc, parsed_release) = parse_milestone(&content);
     let mut title_val = if parsed_title.is_empty() {
         id.clone()
@@ -548,7 +620,8 @@ pub fn edit(
         parsed_title
     };
     let mut desc_val = parsed_desc;
-    let mut release_val = parsed_release;
+    let mut release_val = parsed_release
+        .or_else(|| crate::record::frontmatter::current_value_string(&content, "release"));
 
     if let Some(t) = title_raw {
         title_val = sanitize_text(t)?;
@@ -614,21 +687,23 @@ pub fn edit(
                 "release".into(),
                 r.clone(),
             ));
-            ops.push(crate::record::patch::PatchOp::SetSection(
-                "## Release".into(),
-                r.clone(),
-            ));
-        } else {
-            // no release provided but release_raw Some None? handled below
+            if doc.sections.iter().any(|s| s.heading == "## Release") {
+                ops.push(crate::record::patch::PatchOp::SetSection(
+                    "## Release".into(),
+                    r.clone(),
+                ));
+            }
         }
     }
     if no_release.is_some() {
         ops.push(crate::record::patch::PatchOp::ClearFrontMatter(
             "release".into(),
         ));
-        ops.push(crate::record::patch::PatchOp::ClearSection(
-            "## Release".into(),
-        ));
+        if doc.sections.iter().any(|s| s.heading == "## Release") {
+            ops.push(crate::record::patch::PatchOp::ClearSection(
+                "## Release".into(),
+            ));
+        }
     }
     if !labels_raw.is_empty() {
         let mut fm_labels = frontmatter_list_ms(&content, "labels");
@@ -642,6 +717,17 @@ pub fn edit(
             "labels".into(),
             fm_labels.join("\n"),
         ));
+        if doc.sections.iter().any(|s| s.heading == "## Labels") {
+            let body = fm_labels
+                .iter()
+                .map(|l| format!("- {}", l))
+                .collect::<Vec<_>>()
+                .join("\n");
+            ops.push(crate::record::patch::PatchOp::SetSection(
+                "## Labels".into(),
+                body,
+            ));
+        }
     }
     if !references_raw.is_empty() {
         let mut fm_refs = frontmatter_list_ms(&content, "references");
@@ -658,7 +744,6 @@ pub fn edit(
         ));
     }
 
-    let doc = crate::record::document::parse(&content)?;
     let base_new = crate::record::patch::apply_patch(&doc, &ops)?;
     let new_content = if ops.is_empty() || base_new == content {
         content.clone()
@@ -692,6 +777,8 @@ pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
     let id = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
     let path = resolve_milestone_path(ctx, &cfg, &id)?;
+    reject_milestone_write_conflict(ctx, &path)?;
+    let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
     let archived = archived_dir(ctx, &cfg)?;
     ensure_dir(&archived, &ctx.project_dir)?;
 
@@ -723,7 +810,9 @@ pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
 pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
-    let path = resolve_milestone_path_migrated(ctx, &cfg, &id)?;
+    let path = resolve_milestone_path(ctx, &cfg, &id)?;
+    reject_milestone_write_conflict(ctx, &path)?;
+    let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
 
     if !force {
         print!("Delete {}? [y/N] ", id);
@@ -757,4 +846,131 @@ pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<crate::Command
         text: String::new(),
         json,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::context::Context;
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn tmpdir(name: &str) -> PathBuf {
+        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join(format!("milestone-{}", name));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        base
+    }
+
+    fn ctx(dir: &std::path::Path) -> Context {
+        Context {
+            project_dir: dir.to_path_buf(),
+            config_path: dir.join("papyrus.config.yml"),
+            json: false,
+            no_color: true,
+        }
+    }
+
+    #[test]
+    fn view_succeeds_via_canonical_frontmatter_id_on_mismatch() {
+        let dir = tmpdir("mismatch-canonical-view");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
+        let content = "---\nid: m-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
+        fs::write(dir.join("backlog/milestones/m-2 - MileTwo.md"), content).unwrap();
+        // Canonical front-matter id m-99 -> display MS-100.
+        let out = view(&c, "MS-100").unwrap_or_else(|e| panic!("canonical view failed: {}", e));
+        assert!(out.text.contains("id: m-99"), "got: {}", out.text);
+        let out2 = view(&c, "MS-003").unwrap_or_else(|e| panic!("filename view failed: {}", e));
+        assert!(out2.text.contains("id: m-99"), "got: {}", out2.text);
+    }
+
+    #[test]
+    fn edit_refuses_mismatch_via_canonical_id() {
+        let dir = tmpdir("mismatch-canonical-edit");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
+        let content = "---\nid: m-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
+        fs::write(dir.join("backlog/milestones/m-2 - MileTwo.md"), content).unwrap();
+        let err = edit(&c, "MS-100", Some("NewMile"), None, None, None, &[], &[])
+            .err()
+            .expect("expected error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("migration conflict"),
+            "expected conflict, got: {}",
+            msg
+        );
+        assert_eq!(
+            fs::read_to_string(dir.join("backlog/milestones/m-2 - MileTwo.md")).unwrap(),
+            content
+        );
+    }
+
+    #[test]
+    fn archive_refuses_mismatch() {
+        let dir = tmpdir("mismatch-archive");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
+        let content = "---\nid: m-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
+        fs::write(dir.join("backlog/milestones/m-2 - MileTwo.md"), content).unwrap();
+        let err = archive(&c, "MS-003").err().expect("expected error");
+        assert!(
+            err.to_string().contains("migration conflict"),
+            "got: {}",
+            err
+        );
+        assert!(dir.join("backlog/milestones/m-2 - MileTwo.md").exists());
+    }
+
+    #[test]
+    fn backlog_md_dropped_keys_are_readded_on_view() {
+        let dir = tmpdir("interop-readd");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
+        let body = "\n## Description\n\nMile body\n";
+        let content = format!("---\nid: m-2\ntitle: MileTwo\n---\n{}", body);
+        let path = dir.join("backlog/milestones/m-2 - MileTwo.md");
+        fs::write(&path, &content).unwrap();
+        let out = view(&c, "MS-003").unwrap();
+        for key in [
+            "created_date:",
+            "updated_date:",
+            "labels:",
+            "references:",
+            "release:",
+        ] {
+            assert!(
+                out.text.contains(key),
+                "missing {} after re-add: {}",
+                key,
+                out.text
+            );
+        }
+        let (_, out_body) = crate::record::frontmatter::split(&out.text).unwrap();
+        assert_eq!(out_body, body);
+        let on_disk = fs::read_to_string(&path).unwrap();
+        assert!(on_disk.contains("release:"), "got: {}", on_disk);
+    }
+
+    #[test]
+    fn title_edit_preserves_body_bytes() {
+        let dir = tmpdir("title-edit-preserve");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
+        let body = "\n## Description\n\nMile body UNIQUE-M\n";
+        let content = format!(
+            "---\nid: m-2\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n{}",
+            body
+        );
+        let path = dir.join("backlog/milestones/m-2 - MileTwo.md");
+        fs::write(&path, &content).unwrap();
+        edit(&c, "MS-003", Some("NewMile"), None, None, None, &[], &[]).unwrap();
+        let after = fs::read_to_string(&path).unwrap();
+        assert!(after.contains("title: NewMile"), "got: {}", after);
+        let (_, after_body) = crate::record::frontmatter::split(&after).unwrap();
+        assert_eq!(after_body, body);
+    }
 }

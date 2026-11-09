@@ -1,10 +1,10 @@
 ---
 id: TASK-69
 title: Migrate tasks and milestones to the Backlog.md layout
-status: Refined
+status: Done
 assignee: []
 created_date: '2026-11-08T15:06:00Z'
-updated_date: '2026-11-08T21:35:00Z'
+updated_date: '2026-11-09T18:11:00Z'
 labels:
   - front-matter
   - migration

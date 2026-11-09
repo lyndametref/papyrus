@@ -39,11 +39,6 @@ pub enum MigrationConflict {
         filename_id: String,
         frontmatter_id: String,
     },
-    SameTitleDifferentNumber {
-        title: String,
-        paths: Vec<String>,
-        ids: Vec<String>,
-    },
     UnknownId {
         path: String,
         id: String,
@@ -65,13 +60,6 @@ impl std::fmt::Display for MigrationConflict {
                     f,
                     "front-matter/filename mismatch at {}: filename {} vs front matter {}",
                     path, filename_id, frontmatter_id
-                )
-            }
-            MigrationConflict::SameTitleDifferentNumber { title, paths, ids } => {
-                write!(
-                    f,
-                    "same title {:?} on distinct records: paths {:?} ids {:?}",
-                    title, paths, ids
                 )
             }
             MigrationConflict::UnknownId { path, id } => {
@@ -252,7 +240,8 @@ fn ensure_front_matter_internal(ctx: &Context, path: &Path) -> Result<(String, P
             // Conflict detection for already-front-mattered records (covers
             // list/view/write paths that read through this helper).
             let conflicts = scan_migration_conflicts(ctx, desc);
-            if let Some(reason) = check_conflicts_for_path(ctx, &safe, desc, &content, &conflicts) {
+            if let Some(reason) = blocking_conflict_for_path(ctx, &safe, desc, &content, &conflicts)
+            {
                 return Err(AppError::Validation(format!(
                     "migration conflict at {}: {}",
                     rel_path(&ctx.project_dir, &safe),
@@ -293,7 +282,7 @@ fn ensure_front_matter_internal(ctx: &Context, path: &Path) -> Result<(String, P
 
     // Conflict detection before migration.
     let conflicts = scan_migration_conflicts(ctx, desc);
-    if let Some(reason) = check_conflicts_for_path(ctx, &safe, desc, &content, &conflicts) {
+    if let Some(reason) = blocking_conflict_for_path(ctx, &safe, desc, &content, &conflicts) {
         return Err(AppError::Validation(format!(
             "migration conflict at {}: {}",
             rel_path(&ctx.project_dir, &safe),
@@ -330,7 +319,7 @@ fn ensure_front_matter_internal(ctx: &Context, path: &Path) -> Result<(String, P
     Ok((new_content, target))
 }
 
-fn rel_path(project_dir: &Path, path: &Path) -> String {
+pub fn rel_path(project_dir: &Path, path: &Path) -> String {
     path.strip_prefix(project_dir)
         .unwrap_or(path)
         .to_string_lossy()
@@ -697,7 +686,6 @@ struct Candidate {
     path: PathBuf,
     rel: String,
     storage_id: Option<String>,
-    title: Option<String>,
     frontmatter_id: Option<String>,
     filename_id: Option<String>,
 }
@@ -741,17 +729,6 @@ fn candidate_filename_id(desc: &RecordDescriptor, path: &Path) -> Option<String>
     } else {
         Some(base.to_lowercase())
     }
-}
-
-fn candidate_title(content: &str) -> Option<String> {
-    if let Some(fm) = frontmatter::parse(content).ok().flatten()
-        && let Some(t) = frontmatter::current_value_string(&fm.raw, "title")
-        && !t.is_empty()
-    {
-        return Some(t);
-    }
-    let (_, title) = extract_id_title(content, Path::new(""));
-    if !title.is_empty() { Some(title) } else { None }
 }
 
 fn collect_candidates(ctx: &Context, desc: &RecordDescriptor) -> Vec<Candidate> {
@@ -817,7 +794,6 @@ fn collect_candidates_dir(
             path,
             rel,
             storage_id,
-            title: candidate_title(&content),
             frontmatter_id: fm_id,
             filename_id: fn_id,
         });
@@ -863,32 +839,6 @@ pub fn scan_migration_conflicts(ctx: &Context, desc: &RecordDescriptor) -> Vec<M
                 storage_id: sid,
                 paths,
             });
-        }
-    }
-
-    // Same title, different number.
-    let mut title_groups: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
-    for c in &candidates {
-        if let (Some(title), Some(sid)) = (&c.title, &c.storage_id) {
-            title_groups
-                .entry(title.clone())
-                .or_default()
-                .push((c.rel.clone(), sid.clone()));
-        }
-    }
-    for (title, mut entries) in title_groups {
-        entries.sort();
-        entries.dedup();
-        if entries.len() > 1 {
-            let ids: Vec<String> = entries.iter().map(|(_, id)| id.clone()).collect();
-            let unique_ids: HashSet<_> = ids.iter().cloned().collect();
-            if unique_ids.len() > 1 {
-                conflicts.push(MigrationConflict::SameTitleDifferentNumber {
-                    title,
-                    paths: entries.iter().map(|(p, _)| p.clone()).collect(),
-                    ids,
-                });
-            }
         }
     }
 
@@ -957,15 +907,6 @@ pub(crate) fn check_conflicts_for_path(
                     ));
                 }
             }
-            MigrationConflict::SameTitleDifferentNumber {
-                title: _,
-                paths,
-                ids: _,
-            } => {
-                if paths.iter().any(|p| p == &rel) {
-                    return Some(c.to_string());
-                }
-            }
             MigrationConflict::UnknownId { path: p, id } => {
                 if p == &rel {
                     return Some(format!("unknown id: {}", id));
@@ -978,6 +919,60 @@ pub(crate) fn check_conflicts_for_path(
 
 fn candidate_storage_id_for(desc: &RecordDescriptor, content: &str, path: &Path) -> Option<String> {
     candidate_frontmatter_id(desc, content).or(candidate_filename_id(desc, path))
+}
+
+/// Conflicts that must block a read or write of a single record. A
+/// front-matter/filename mismatch is intentionally not blocking on the read
+/// path: the front-matter ID is canonical (ADR-0008 decision 9).
+pub(crate) fn blocking_conflict_for_path(
+    ctx: &Context,
+    path: &Path,
+    _desc: &RecordDescriptor,
+    _content: &str,
+    conflicts: &[MigrationConflict],
+) -> Option<String> {
+    let rel = rel_path(&ctx.project_dir, path);
+    for c in conflicts {
+        match c {
+            MigrationConflict::DuplicateStorageId {
+                storage_id: _,
+                paths,
+            } => {
+                if paths.iter().any(|p| p == &rel) {
+                    return Some(c.to_string());
+                }
+            }
+            MigrationConflict::FrontmatterFilenameMismatch { .. } => {
+                // Non-blocking on read; writes check separately.
+            }
+            MigrationConflict::UnknownId { path: p, id } => {
+                if p == &rel {
+                    return Some(format!("unknown id: {}", id));
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Return the migration conflict that involves `path`, if any. Used by list
+/// commands to flag invalid records without silently listing duplicates.
+pub fn path_migration_conflict(
+    ctx: &Context,
+    path: &Path,
+    _desc: &RecordDescriptor,
+    _content: &str,
+    conflicts: &[MigrationConflict],
+) -> Option<MigrationConflict> {
+    let rel = rel_path(&ctx.project_dir, path);
+    conflicts
+        .iter()
+        .find(|c| match c {
+            MigrationConflict::DuplicateStorageId { paths, .. } => paths.iter().any(|p| p == &rel),
+            MigrationConflict::FrontmatterFilenameMismatch { path: p, .. } => p == &rel,
+            MigrationConflict::UnknownId { path: p, .. } => p == &rel,
+        })
+        .cloned()
 }
 
 // Diff helpers.
@@ -2049,6 +2044,63 @@ mod tests {
             }
             _ => panic!("expected duplicate storage id conflict"),
         }
+    }
+
+    #[test]
+    fn same_title_distinct_numbers_are_not_conflicts() {
+        let dir = tmpdir("same-title-distinct");
+        let c = ctx(&dir);
+        let a = dir.join("backlog/tasks/task-8 - SameTitle.md");
+        let b = dir.join("backlog/tasks/task-9 - SameTitle.md");
+        let tpl = "---\nid: TASK-{n}\ntitle: SameTitle\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: {n}\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
+        write(&a, &tpl.replace("{n}", "8"));
+        write(&b, &tpl.replace("{n}", "9"));
+        let desc = crate::record::descriptor::descriptor_for("task").unwrap();
+        let conflicts = scan_migration_conflicts(&c, desc);
+        assert!(
+            conflicts.is_empty(),
+            "same title distinct numbers must not conflict: {:?}",
+            conflicts
+        );
+        // Views for both distinct records succeed.
+        assert!(ensure_front_matter(&c, &a).is_ok());
+        assert!(ensure_front_matter(&c, &b).is_ok());
+    }
+
+    #[test]
+    fn dropped_task_keys_are_readded_on_next_read() {
+        // Simulate Backlog.md editing a migrated file and dropping additive keys.
+        let dir = tmpdir("dropped-keys-task");
+        let c = ctx(&dir);
+        let body = "## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
+        let minimal = format!(
+            "---\nid: TASK-6\ntitle: Interop\nstatus: To Do\n---\n\n{}",
+            body
+        );
+        let path = dir.join("backlog/tasks/task-6 - Interop.md");
+        write(&path, &minimal);
+        let result = ensure_front_matter(&c, &path).unwrap();
+        for key in [
+            "created_date:",
+            "updated_date:",
+            "labels:",
+            "references:",
+            "assignee:",
+            "milestone:",
+            "dependencies:",
+            "ordinal:",
+            "documentation:",
+            "type:",
+        ] {
+            assert!(result.contains(key), "missing {} in: {}", key, result);
+        }
+        assert!(result.contains("## Description"));
+        assert!(result.contains("Body"));
+        let on_disk = fs::read_to_string(&path).unwrap();
+        assert_eq!(on_disk, result);
+        // Body byte-identical apart from front matter.
+        let (_, out_body) = frontmatter::split(&result).unwrap();
+        assert_eq!(out_body, format!("\n{}", body));
     }
 
     #[test]
