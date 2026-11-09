@@ -456,12 +456,22 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
                 eprintln!("warning: {}", conflict);
                 continue;
             }
-            let title = crate::record::document::parse(&content)
+            let (fm_id, parsed_title) = crate::record::document::parse(&content)
                 .ok()
-                .map(|d| crate::record::document::heading_id_title_with_frontmatter(&d).1)
+                .map(|d| crate::record::document::heading_id_title_with_frontmatter(&d))
                 .unwrap_or_default();
-            let title = if title.is_empty() { id.clone() } else { title };
-            items.push((id, title, content));
+            let has_id_shape = fm_id.rsplit_once('-').is_some_and(|(prefix, suffix)| {
+                !prefix.is_empty()
+                    && !suffix.is_empty()
+                    && suffix.chars().all(|c| c.is_ascii_digit())
+            });
+            let display_id = if has_id_shape { fm_id } else { id.clone() };
+            let title = if parsed_title.is_empty() {
+                display_id.clone()
+            } else {
+                parsed_title
+            };
+            items.push((display_id, title, content));
         }
     }
     items.sort_by(|a, b| a.0.cmp(&b.0));

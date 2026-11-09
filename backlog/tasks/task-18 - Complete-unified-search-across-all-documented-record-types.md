@@ -32,6 +32,8 @@ references:
   - >-
     docs/architecture/adr/ADR-0007-yaml-front-matter-as-single-record-metadata-source.md
 ordinal: 30100
+documentation: []
+type: null
 ---
 
 ## Description
