@@ -122,6 +122,15 @@ fn plural(count: usize, singular: &str, plural: &str) -> String {
 
 /// Sidebar fragment. Only enabled document types are listed.
 pub fn sidebar(selected: Option<Category>, cfg: &Config) -> String {
+    sidebar_with_lifecycle(selected, cfg, false)
+}
+
+/// Sidebar fragment with optional lifecycle-page active state.
+pub fn sidebar_with_lifecycle(
+    selected: Option<Category>,
+    cfg: &Config,
+    lifecycle_active: bool,
+) -> String {
     let mut items = String::new();
     // Three sidebar entries: Business requirements, Non-functional requirements, Backlog.
     // The Backlog entry covers task, milestone, and release records.
@@ -274,6 +283,16 @@ pub fn sidebar(selected: Option<Category>, cfg: &Config) -> String {
             current
         ));
     }
+    // Managed artifacts & lifecycles (always present, not gated by document_types)
+    let lifecycle_current = if lifecycle_active {
+        " aria-current=\"page\""
+    } else {
+        ""
+    };
+    items.push_str(&format!(
+        "<li><a href=\"/lifecycle\"{}>Managed artifacts &amp; lifecycles</a></li>",
+        lifecycle_current
+    ));
     format!(
         "<aside class=\"sidebar\">\
 <button class=\"sidebar-toggle\" type=\"button\" aria-expanded=\"true\" aria-controls=\"type-list\">\
@@ -3157,4 +3176,92 @@ mod tests {
     fn unknown_placeholders_are_left_untouched() {
         assert_eq!(render_template("a{{unknown}}b", &[], &[]), "a{{unknown}}b");
     }
+}
+
+/// Render the managed artifacts and lifecycles page.
+pub fn lifecycle_page(cfg: &Config, chrome: Chrome<'_>) -> String {
+    let statuses = if cfg.statuses.is_empty() || !cfg.statuses.contains(&cfg.default_status) {
+        Config::default().statuses
+    } else {
+        cfg.statuses.clone()
+    };
+    let chain = statuses
+        .iter()
+        .map(|s| escape(s))
+        .collect::<Vec<_>>()
+        .join(" \u{2192} ");
+    let mut sections = String::new();
+    sections.push_str(&format!(
+        "<section><h2>Tasks</h2><p>States: {}. States and transitions are derived from the configured task statuses (REQ-01.002). Task lifecycle operations are CLI-only.</p></section>",
+        chain
+    ));
+    let others: [(&str, &str); 11] = [
+        (
+            "Milestones",
+            "Lifecycle: active \u{2192} archived. Archiving a milestone is separate from task workflow status.",
+        ),
+        (
+            "Releases",
+            "Lifecycle: active \u{2192} released. released is delivery completion, distinct from archiving; releases are not archived. The transition is performed explicitly via the documented release status command.",
+        ),
+        (
+            "Decisions",
+            "Lifecycle: proposed \u{2192} accepted | rejected; accepted \u{2192} deprecated | superseded.",
+        ),
+        (
+            "Business requirements",
+            "Lifecycle: active \u{2192} deprecated (restored via restore).",
+        ),
+        (
+            "Non-functional requirements",
+            "Lifecycle: active \u{2192} deprecated (restored via restore).",
+        ),
+        (
+            "Glossary terms",
+            "Lifecycle: active \u{2192} deprecated (restored via restore).",
+        ),
+        (
+            "UI specifications",
+            "Lifecycle: active \u{2192} deprecated (restored via restore).",
+        ),
+        (
+            "Technical specifications",
+            "Lifecycle: active \u{2192} deprecated (restored via restore).",
+        ),
+        (
+            "UI mockups",
+            "Lifecycle: pending \u{2192} approved \u{2192} deprecated (restored via restore; supersession via ui-mockup supersede).",
+        ),
+        (
+            "Business rules",
+            "Lifecycle: active \u{2192} deprecated (restored via restore).",
+        ),
+        (
+            "Audit records",
+            "Lifecycle: active \u{2192} deprecated (restored via restore).",
+        ),
+    ];
+    for (heading, sentence) in others {
+        sections.push_str(&format!(
+            "<section><h2>{}</h2><p>{}</p></section>",
+            escape(heading),
+            escape(sentence)
+        ));
+    }
+    let title = "Papyrus \u{2014} Managed artifacts and lifecycles".to_string();
+    let subheading = "One section per managed record type. Backlog.md docs, drafts, and project configuration files are not covered.";
+    render_template(
+        LIST_TEMPLATE,
+        &[
+            ("title", &title),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+            ("heading", "Managed artifacts and lifecycles"),
+            ("subheading", subheading),
+        ],
+        &[
+            ("sidebar", &sidebar_with_lifecycle(None, cfg, true)),
+            ("section", &sections),
+        ],
+    )
 }

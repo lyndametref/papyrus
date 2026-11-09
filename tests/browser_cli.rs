@@ -124,6 +124,37 @@ fn set_config_value(dir: &Path, key: &str, value: &str) {
     fs::write(&path, out).unwrap();
 }
 
+/// Replace the configured task-status list (and default status) in the
+/// project configuration file. `config set` only accepts scalars, so the
+/// `statuses` list is rewritten directly.
+fn set_statuses(dir: &Path, statuses: &[&str], default_status: &str) {
+    let path = dir.join("papyrus.config.yml");
+    let text = fs::read_to_string(&path).unwrap();
+    let mut out = String::new();
+    let mut in_statuses = false;
+    for line in text.lines() {
+        if line == "statuses:" {
+            in_statuses = true;
+            out.push_str("statuses:\n");
+            for status in statuses {
+                out.push_str(&format!("- {}\n", status));
+            }
+            continue;
+        }
+        if in_statuses {
+            if line.starts_with("default_status:") {
+                in_statuses = false;
+                out.push_str(&format!("default_status: {}\n", default_status));
+            }
+            // Drop the old list items.
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    fs::write(&path, out).unwrap();
+}
+
 fn free_port() -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -5860,4 +5891,102 @@ fn t57m_quality_gates() {
             forbidden
         );
     }
+}
+
+// TASK-72 / spec §7: the twelve lifecycle section headings, in order.
+fn assert_twelve_sections_in_order(body: &str) {
+    const HEADINGS: [&str; 12] = [
+        "Tasks",
+        "Milestones",
+        "Releases",
+        "Decisions",
+        "Business requirements",
+        "Non-functional requirements",
+        "Glossary terms",
+        "UI specifications",
+        "Technical specifications",
+        "UI mockups",
+        "Business rules",
+        "Audit records",
+    ];
+    assert_eq!(body.matches("<section>").count(), 12, "section count");
+    let mut previous = 0usize;
+    for (index, heading) in HEADINGS.iter().enumerate() {
+        let marker = format!("<h2>{}</h2>", heading);
+        let position = body
+            .find(&marker)
+            .unwrap_or_else(|| panic!("missing section heading {}", heading));
+        if index > 0 {
+            assert!(
+                position > previous,
+                "section heading {} is out of order",
+                heading
+            );
+        }
+        previous = position;
+    }
+}
+
+// TASK-72 / spec §7.1-7.3: GET /lifecycle, alias route, method handling
+#[test]
+fn t72a_lifecycle_page_route_alias_and_method() {
+    let dir = fixture("lifecycle");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    let response = get(&server, "/lifecycle");
+    assert_eq!(response.status, 200);
+    assert_eq!(
+        response.header("Content-Type"),
+        Some("text/html; charset=utf-8")
+    );
+    let body = response.text();
+    assert!(body.contains("<h1 class=\"h1\">Managed artifacts and lifecycles</h1>"));
+    assert_twelve_sections_in_order(&body);
+    assert!(body.contains("ToDo → Initiated → Refined → Implemented → Validated → Done"));
+    assert!(body.contains(
+        "One section per managed record type. Backlog.md docs, drafts, and project configuration files are not covered."
+    ));
+    assert!(body.contains("Managed artifacts &amp; lifecycles"));
+    assert!(body.contains(
+        "<a href=\"/lifecycle\" aria-current=\"page\">Managed artifacts &amp; lifecycles</a>"
+    ));
+    assert!(!body.contains("http://"), "external reference");
+    assert!(!body.contains("https://"), "external reference");
+
+    // Alias route serves the same page.
+    let alias = get(&server, "/?type=lifecycle");
+    assert_eq!(alias.status, 200);
+    assert_eq!(
+        alias.header("Content-Type"),
+        Some("text/html; charset=utf-8")
+    );
+    let alias_body = alias.text();
+    assert!(alias_body.contains("<h1 class=\"h1\">Managed artifacts and lifecycles</h1>"));
+    assert_twelve_sections_in_order(&alias_body);
+    assert!(alias_body.contains("ToDo → Initiated → Refined → Implemented → Validated → Done"));
+
+    // Non-GET methods are rejected with an Allow header.
+    let post = request(server.port, "POST", "/lifecycle", &[], Some(b""));
+    assert_eq!(post.status, 405);
+    assert_eq!(post.header("Allow"), Some("GET, HEAD"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-72 / spec §7.4: custom task-status list renders the configured chain
+#[test]
+fn t72b_lifecycle_custom_status_list() {
+    let dir = test_root("lifecycle-custom");
+    init_project(&dir);
+    set_statuses(&dir, &["Backlog", "Doing", "Done"], "Backlog");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let body = get(&server, "/lifecycle").text();
+    assert_twelve_sections_in_order(&body);
+    assert!(body.contains("States: Backlog → Doing → Done."));
+    assert!(
+        !body.contains("ToDo → Initiated"),
+        "default chain must not render with custom statuses"
+    );
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
 }
