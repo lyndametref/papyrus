@@ -41,7 +41,6 @@ body { min-height: 100vh; }
 .wf-modal-card { background: var(--wf-bg); border: 1px solid var(--wf-border); border-radius: var(--wf-radius); padding: 16px; max-width: 520px; width: 100%; }
 .wf-footer { margin-top: 16px; padding-top: 8px; border-top: 1px solid var(--wf-border); color: var(--wf-muted); font-size: 12px; }
 .wf-note { font-size: 12px; color: var(--wf-muted); font-style: italic; }
-.wf-group-preview { margin: 4px 0 0; color: var(--wf-muted); font-size: 13px; overflow-wrap: break-word; }
 
 /* Review landing. Scaffolding for reviewers, not part of the design. */
 .wf-review { display: none; }
