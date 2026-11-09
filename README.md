@@ -62,6 +62,8 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        </code>
        <b>&lt;name&gt;</b> is the project name stored in the configuration.
 
+       In an interactive terminal, <b>papyrus init</b> walks through all available artifacts (task, milestone, release, decision types, and document types), lets you choose which to activate, and prompts for the ID prefix and storage folder of each activated artifact. Core artifacts (task, milestone, release) are always activated. Non-interactive or CI environments (no TTY) use default selections and defaults without prompting. Invalid prefixes or folders are rejected and re-prompted with hints naming the default equivalent value.
+
        <b style="color: light-dark(#1a7f37, #3fb950);">--no-git</b>
        Do not initialize a Git repository.
 
