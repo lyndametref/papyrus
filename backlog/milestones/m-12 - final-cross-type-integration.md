@@ -1,6 +1,11 @@
 ---
 id: m-12
 title: "Final Cross-Type Integration"
+created_date: '2026-11-09T20:37:17Z'
+updated_date: '2026-11-09T20:52:26Z'
+labels: []
+references: []
+release: null
 ---
 
 ## Description

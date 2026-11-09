@@ -898,9 +898,37 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
         .map(|m| crate::record::store::version_token(&m))
         .unwrap_or_default();
     let view = crate::record::view::RecordView::from_content(&content, &id, &version).ok();
-    let metadata = view
+    let mut metadata = view
         .map(|v| v.metadata_json())
         .unwrap_or(serde_json::json!({}));
+    if let Some(obj) = metadata.as_object_mut() {
+        if let Some(deps) = obj.get_mut("dependencies") {
+            match deps {
+                serde_json::Value::Array(items) => {
+                    for item in items.iter_mut() {
+                        if let serde_json::Value::String(s) = item
+                            && let Ok(display) = crate::record::identity::to_display_id(s)
+                        {
+                            *s = display;
+                        }
+                    }
+                }
+                serde_json::Value::String(s) => {
+                    if let Ok(display) = crate::record::identity::to_display_id(s) {
+                        *s = display;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if let Some(milestone) = obj.get_mut("milestone")
+            && let serde_json::Value::String(s) = milestone
+            && !s.trim().is_empty()
+            && let Ok(display) = crate::record::identity::to_display_id(s)
+        {
+            *s = display;
+        }
+    }
     let json = if ctx.json {
         Some(
             serde_json::json!({"id": id, "path": path.display().to_string(), "content": content, "metadata": metadata}),
@@ -1630,13 +1658,23 @@ pub fn list(
                     .ok()
                     .and_then(|m| m.created().ok())
                     .unwrap_or(SystemTime::UNIX_EPOCH);
-                let title = if td.title.is_empty() {
+                let has_id_shape = td.id.rsplit_once('-').is_some_and(|(prefix, suffix)| {
+                    !prefix.is_empty()
+                        && !suffix.is_empty()
+                        && suffix.chars().all(|c| c.is_ascii_digit())
+                });
+                let display_id = if has_id_shape {
+                    td.id.clone()
+                } else {
                     id.clone()
+                };
+                let title = if td.title.is_empty() {
+                    display_id.clone()
                 } else {
                     td.title
                 };
                 items.push((
-                    id,
+                    display_id,
                     title,
                     td.status,
                     td.milestone,
