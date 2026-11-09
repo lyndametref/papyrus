@@ -3,6 +3,14 @@
 use crate::error::AppError;
 use std::str;
 
+/// Typed front-matter value for unambiguous serialization.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FrontMatterValue {
+    Null,
+    Integer(i64),
+    String(String),
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct FrontMatter {
     pub raw: String,
@@ -325,6 +333,65 @@ fn format_kv(key: &str, value: &str) -> String {
         s
     } else {
         format!("{}: {}", key, format_scalar(v))
+    }
+}
+
+/// Format a typed front-matter key/value pair into raw YAML text.
+pub fn format_kv_value(key: &str, value: &FrontMatterValue) -> String {
+    match value {
+        FrontMatterValue::Null => format!("{}: null", key),
+        FrontMatterValue::Integer(n) => format!("{}: {}", key, n),
+        FrontMatterValue::String(s) => format_kv(key, s),
+    }
+}
+
+/// Patch a single key in the raw front-matter text using a typed value.
+/// Returns (new_raw, changed).
+pub fn patch_raw_value(raw: &str, key: &str, value: &FrontMatterValue) -> (String, bool) {
+    let text = format_kv_value(key, value);
+    // No-op if the existing block already matches.
+    if let Some(block) = current_key_block(raw, key)
+        && block == text
+    {
+        return (raw.to_string(), false);
+    }
+
+    let lines: Vec<&str> = raw.split('\n').collect();
+    let mut start_idx: Option<usize> = None;
+    for (i, line) in lines.iter().enumerate() {
+        if line.starts_with(char::is_whitespace) || line.trim().is_empty() {
+            continue;
+        }
+        if let Some((k, _)) = line.split_once(':')
+            && k.trim() == key
+        {
+            start_idx = Some(i);
+            break;
+        }
+    }
+
+    if let Some(si) = start_idx {
+        let mut ei = si + 1;
+        while ei < lines.len() {
+            if lines[ei].trim().is_empty() {
+                break;
+            }
+            if !lines[ei].starts_with(char::is_whitespace) {
+                break;
+            }
+            ei += 1;
+        }
+        let mut out: Vec<String> = lines[..si].iter().map(|s| s.to_string()).collect();
+        out.push(text);
+        out.extend(lines[ei..].iter().map(|s| s.to_string()));
+        (out.join("\n"), true)
+    } else {
+        let mut out = raw.to_string();
+        if !out.is_empty() && !out.ends_with('\n') {
+            out.push('\n');
+        }
+        out.push_str(&text);
+        (out, true)
     }
 }
 
