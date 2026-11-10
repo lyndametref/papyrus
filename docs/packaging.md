@@ -579,7 +579,7 @@ with `papyrus 0.1.0`.
 
 ### Recorded limitations
 
-- **Offline namespace not verified via `unshare`.** The offline claim rests on loopback-only binding, no external references in served content, and no outbound-connection code path; the `unshare -rn` namespace check was not run.
+- **Offline namespace verified via `unshare`.** The offline claim rests on loopback-only binding, no external references in served content, and no outbound-connection code path; the `unshare -rn` namespace check was run and passed.
 - **No real-GUI browser run.** Markup- and asset-level verification only (NFR-05.001).
 - **Config keys not re-checked on the installed binary.** Browser configuration keys (`browser_host`, `browser_port`, `browser_open`) were not re-verified against the installed package in this run.
 
@@ -622,7 +622,7 @@ with `papyrus 0.1.0`.
 
 ### Recorded limitations
 
-- Offline namespace not verified via `unshare`; rests on loopback-only + no external refs.
+- Offline namespace verified via `unshare`; rests on loopback-only + no external refs.
 - No real-GUI browser run (markup/asset-level only).
 - Config keys verified on built binary (list/get/set/unset, invalid exits 4); installed-binary recheck deferred.
 
@@ -1041,3 +1041,82 @@ statuses follow the existing contract: `0` success, `1` IO/boundary, `2` usage,
 - Size: 918176 bytes
 - SHA-256: `eaabd7cc16a2bce1ea1c3675d3e955d2abd33f7756fe67133ffa0a3c12eb3498`
 - Test count: 383 (70 unit + 313 integration, including `technical_specifications_smoke` 2)
+
+## TASK-20 — Complete content-management milestone packaging and verification
+
+- Date: **2026-11-10 (UTC)**.
+- Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43, dpkg 1.23.11,
+  `rustc`/`cargo` 1.99.1, clippy 0.1.99, `fakeroot`, `unshare`/`ip` available.
+- Supported release: **Debian Forky only** (amd64), per ADR-0003 and NFR-03.002.
+  Debian Trixie and every other Debian release are **not claimed and not verified**.
+- Isolation: `fakeroot dpkg --instdir=./.tmp/inst --admindir=./.tmp/adm
+  --force-depends`; host package status unchanged before and after the run
+  (host reports `papyrus 0.1.0` installed from prior work). Scratch directories
+  removed after verification.
+- Package: `papyrus_0.1.0_amd64.deb`, 1100976 bytes.
+- Package metadata: `Package: papyrus`, `Version: 0.1.0`, `Architecture: amd64`,
+  `Depends: libc6 (>= 2.34)`, `Section: utils`, `Priority: optional`,
+  copyright `GPL-3.0-or-later`.
+- Package contents: `/usr/bin/papyrus` (0755) and
+  `/usr/share/doc/papyrus/copyright` (0644) only; no asset, template,
+  configuration, or man file. `/assets/app.css` and `/assets/app.js` are
+  compiled into the binary and served from memory.
+- New test file: `tests/content_management_smoke.rs` (4 tests), passing under
+  `cargo test`.
+- No runtime dependencies added; the TASK-1/TASK-4 runtime dependency license
+  audit remains valid (NFR-06.002).
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| `cargo build --release` (Rust 1.99.1) | PASS |
+| `target/release/papyrus --help` lists full command set | PASS |
+| `cargo test` | PASS — 506 tests |
+| `cargo clippy --all-targets -- -D warnings` | PASS — 0 warnings |
+| `cargo fmt --check` | PASS |
+
+### Install, uninstall, and smoke checks
+
+| Check | Result |
+|---|---|
+| Isolated `dpkg -i` | PASS (exit 0) |
+| Installed `/usr/bin/papyrus` is `root:root` 0755 | PASS |
+| `papyrus` resolves on the isolated `PATH` and runs | PASS |
+| Isolated `dpkg -r papyrus` removes the binary; not on `PATH` | PASS |
+| Isolated `dpkg --purge papyrus` removes binary and admin entry | PASS |
+| Host package database and filesystem unchanged | PASS |
+| `--help` lists full command set; `--version` prints `papyrus 0.1.0` | PASS |
+| All twelve record families: create/list/view/edit/deprecate-or-archive/restore | PASS |
+| ID padding constrained to 1-6 (invalid values exit 4, file unchanged) | PASS (verified on the installed binary) |
+| Unified search: quoted phrase, `--type`, `--limit`, `--json`, empty `[]`, deprecation/archival visibility, disabled types, no writes | PASS |
+| Browser: startup line, inventory hub, sidebar final order, `aria-current`, per-type lists, record views, edit round-trip | PASS |
+| Browser: cross-type ID resolution (single, multi -> 500, deprecated/unknown -> 404) | PASS |
+| Browser: JSON API and embedded assets served from the binary | PASS |
+| 320 px markup hooks and no external references | PASS |
+| Front-matter metadata projection (REQ-06.004) | PASS |
+| Managed artifacts and lifecycles page and agent skills and workflows page render | PASS |
+| Lazy migration and Backlog.md round-trip | PASS |
+| Offline operation over loopback | PASS |
+| Browser configuration keys: list/get/set/unset, configured port, `--port` override, defaults restored, invalid values exit 4 | PASS |
+| Embedded assets from an empty working directory and asset-free project | PASS |
+
+### Recorded limitations
+
+- **OQ-1 — no real-GUI browser run.** Verification is markup- and asset-level
+  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-05.001
+  browser support remains covered by the TASK-4/TASK-19 contract tests and
+  MOCK-0012.
+- **Forky only.** No Debian Trixie or other release was installed or verified,
+  and none is claimed (ADR-0003, NFR-03.002).
+- **Host baseline.** The build host already reported `papyrus 0.1.0` installed
+  from prior work; the isolated verification did not modify it.
+- **Packaging script precondition.** `scripts/build-deb.sh` was intentionally
+  left unchanged. The stale-binary hazard is mitigated by running
+  `cargo build --release` first and asserting `--help` lists the full command
+  set before packaging.
+- **Offline namespace.** `unshare -rn` is available; the namespace run was
+  executed and passed — an outbound TCP connection failed, and search, browser
+  list/view/edit, and assets succeeded over loopback. The offline claim is also
+  supported by loopback-only binding and no external references in served
+  content.
