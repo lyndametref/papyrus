@@ -664,6 +664,15 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
                 }
             };
         }
+        let type_param = http::query_param(&request.target.query, "type")
+            .ok()
+            .flatten();
+        if type_param.is_none() {
+            return match method {
+                Method::Get | Method::Head => inventory_page(state),
+                _ => Err(HttpError::new(405)),
+            };
+        }
         return match method {
             Method::Get | Method::Head => list_page(&request, state),
             _ => Err(HttpError::new(405)),
@@ -690,6 +699,131 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
     }
 
     Err(HttpError::new(404))
+}
+
+fn inventory_page(state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let ctx = state.context();
+    let (project, bind_note) = chrome_for(&cfg, state);
+    let chrome = render::Chrome {
+        project: &project,
+        bind_note: &bind_note,
+    };
+
+    let count_for =
+        |kind: Category| -> usize { records::build_index(&ctx, &cfg, kind).records.len() };
+    let enabled = |key: &str| -> bool {
+        cfg.document_types
+            .get(key)
+            .map(|e| e.enabled)
+            .unwrap_or(false)
+    };
+
+    let mut cards: Vec<render::InventoryCard> = Vec::new();
+
+    // Business requirements (gated)
+    if enabled(Category::Req.key()) {
+        cards.push(render::InventoryCard {
+            title: "Business requirements".to_string(),
+            count: count_for(Category::Req).to_string(),
+            href: Some("/?type=req".to_string()),
+            note: "Business requirements in this project.".to_string(),
+        });
+    }
+    // Business rules (gated, config key "rule")
+    if enabled(Category::BusinessRule.config_key()) {
+        cards.push(render::InventoryCard {
+            title: "Business Rules".to_string(),
+            count: count_for(Category::BusinessRule).to_string(),
+            href: Some("/?type=business-rule".to_string()),
+            note: "Business rules in this project.".to_string(),
+        });
+    }
+    // Audit records (gated, config key "audit")
+    if enabled(Category::AuditRecord.config_key()) {
+        cards.push(render::InventoryCard {
+            title: "Audit Records".to_string(),
+            count: count_for(Category::AuditRecord).to_string(),
+            href: Some("/?type=audit-record".to_string()),
+            note: "Audit records in this project.".to_string(),
+        });
+    }
+    // Technical specifications (gated, config key "tech-spec")
+    if enabled(Category::TechSpec.config_key()) {
+        cards.push(render::InventoryCard {
+            title: "Technical Specifications".to_string(),
+            count: count_for(Category::TechSpec).to_string(),
+            href: Some("/?type=tech-spec".to_string()),
+            note: "Technical specifications in this project.".to_string(),
+        });
+    }
+    // Non-functional requirements (gated)
+    if enabled(Category::Nfr.key()) {
+        cards.push(render::InventoryCard {
+            title: "Non-functional requirements".to_string(),
+            count: count_for(Category::Nfr).to_string(),
+            href: Some("/?type=nfr".to_string()),
+            note: "Non-functional requirements in this project.".to_string(),
+        });
+    }
+    // Backlog (always present) - tasks list
+    cards.push(render::InventoryCard {
+        title: "Backlog".to_string(),
+        count: count_for(Category::Task).to_string(),
+        href: Some("/?type=task".to_string()),
+        note: "Backlog tasks in this project.".to_string(),
+    });
+    // Decisions (always present)
+    cards.push(render::InventoryCard {
+        title: "Decisions".to_string(),
+        count: count_for(Category::Decision).to_string(),
+        href: Some("/?type=decision".to_string()),
+        note: "Decisions in this project.".to_string(),
+    });
+    // Glossary (always present)
+    cards.push(render::InventoryCard {
+        title: "Glossary".to_string(),
+        count: count_for(Category::Glossary).to_string(),
+        href: Some("/?type=glossary".to_string()),
+        note: "Glossary terms in this project.".to_string(),
+    });
+    // UI specifications (gated)
+    if enabled(Category::UiSpec.config_key()) {
+        cards.push(render::InventoryCard {
+            title: "UI Specifications".to_string(),
+            count: count_for(Category::UiSpec).to_string(),
+            href: Some("/?type=ui-spec".to_string()),
+            note: "UI specifications in this project.".to_string(),
+        });
+    }
+    // UI mockups (gated)
+    if enabled(Category::UiMockup.config_key()) {
+        cards.push(render::InventoryCard {
+            title: "UI Mockups".to_string(),
+            count: count_for(Category::UiMockup).to_string(),
+            href: Some("/?type=ui-mockup".to_string()),
+            note: "UI mockups in this project.".to_string(),
+        });
+    }
+    // Managed artifacts & lifecycles (virtual, always present)
+    cards.push(render::InventoryCard {
+        title: "Managed artifacts & lifecycles".to_string(),
+        count: "12 types".to_string(),
+        href: Some("/lifecycle".to_string()),
+        note: "Managed artifacts and lifecycles.".to_string(),
+    });
+    // Agent skills & workflows (virtual, always present)
+    cards.push(render::InventoryCard {
+        title: "Agent skills & workflows".to_string(),
+        count: "8 groups".to_string(),
+        href: Some("/skills".to_string()),
+        note: "Agent skills and workflows.".to_string(),
+    });
+
+    Ok(Response::html(
+        200,
+        render::inventory_page(&cfg, chrome, &cards),
+    ))
 }
 
 fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpError> {

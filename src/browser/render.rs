@@ -274,16 +274,23 @@ fn build_sidebar(
         "<li><a href=\"/?type=glossary\"{}>Glossary</a></li>",
         current
     ));
-    // UI Specifications (always available)
-    let current = if selected == Some(Category::UiSpec) {
-        " aria-current=\"page\""
-    } else {
-        ""
-    };
-    items.push_str(&format!(
-        "<li><a href=\"/?type=ui-spec\"{}>UI Specifications</a></li>",
-        current
-    ));
+    // UI Specifications (omitted when the document type is disabled)
+    let ui_spec_enabled = cfg
+        .document_types
+        .get(Category::UiSpec.config_key())
+        .map(|e| e.enabled)
+        .unwrap_or(false);
+    if ui_spec_enabled {
+        let current = if selected == Some(Category::UiSpec) {
+            " aria-current=\"page\""
+        } else {
+            ""
+        };
+        items.push_str(&format!(
+            "<li><a href=\"/?type=ui-spec\"{}>UI Specifications</a></li>",
+            current
+        ));
+    }
     // UI Mockups (omitted when the document type is disabled)
     let mockup_enabled = cfg
         .document_types
@@ -3555,5 +3562,52 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
             ("sidebar", &sidebar_with_skills(None, cfg, true)),
             ("section", &sections),
         ],
+    )
+}
+
+/// An inventory hub card for one record type or virtual page.
+#[derive(Clone)]
+pub struct InventoryCard {
+    pub title: String,
+    pub count: String,
+    pub href: Option<String>,
+    pub note: String,
+}
+
+/// Render the inventory hub at `GET /`.
+pub fn inventory_page(cfg: &Config, chrome: Chrome<'_>, cards: &[InventoryCard]) -> String {
+    let mut section = String::from("<section class=\"inventory\">");
+    for card in cards {
+        section.push_str("<article class=\"card\">");
+        section.push_str(&format!(
+            "<span class=\"badge\">{} &middot; {}</span>",
+            escape(&card.title),
+            escape(&card.count)
+        ));
+        section.push_str(&format!("<h3>{}</h3>", escape(&card.title)));
+        if let Some(href) = &card.href {
+            section.push_str(&format!(
+                "<p><a class=\"btn\" href=\"{}\">Open</a></p>",
+                escape(href)
+            ));
+        }
+        if !card.note.is_empty() {
+            section.push_str(&format!("<p class=\"note\">{}</p>", escape(&card.note)));
+        }
+        section.push_str("</article>");
+    }
+    section.push_str("</section>");
+    let title = "Papyrus \u{2014} Browser inventory".to_string();
+    let subheading = "All Papyrus record types in one navigation (REQ-06.002, NFR-01.002).";
+    render_template(
+        LIST_TEMPLATE,
+        &[
+            ("title", &title),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+            ("heading", "Browser inventory"),
+            ("subheading", subheading),
+        ],
+        &[("sidebar", &sidebar(None, cfg)), ("section", &section)],
     )
 }

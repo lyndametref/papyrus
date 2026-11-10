@@ -650,7 +650,7 @@ fn t05_missing_opener_is_a_warning() {
     init_project(&dir);
     let server = Server::start(&dir, &[], &[("PATH", "")]);
     server.wait_for_stderr("could not open the default browser:");
-    let response = get(&server, "/");
+    let response = get(&server, "/?type=req");
     assert_eq!(response.status, 200);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
@@ -719,7 +719,7 @@ fn t09_list_renders_one_category() {
     let dir = fixture("list");
     let server = Server::start(&dir, &["--no-open"], &[]);
 
-    let business = get(&server, "/");
+    let business = get(&server, "/?type=req");
     assert_eq!(business.status, 200);
     let html = business.text();
     assert!(html.contains("Business requirements"));
@@ -767,7 +767,7 @@ fn t09_list_empty_project_and_empty_type() {
     let empty = test_root("empty-project");
     init_project(&empty);
     let server = Server::start(&empty, &["--no-open"], &[]);
-    for path in ["/", "/?type=nfr"] {
+    for path in ["/?type=req", "/?type=nfr"] {
         let html = get(&server, path).text();
         assert!(
             html.contains(
@@ -806,7 +806,7 @@ fn t09_group_without_members_and_other_requirements() {
     fs::remove_file(record_path(&dir, "req", &orphan_group)).unwrap();
 
     let server = Server::start(&dir, &["--no-open"], &[]);
-    let html = get(&server, "/").text();
+    let html = get(&server, "/?type=req").text();
     assert!(html.contains("No requirements in this group"));
     assert!(html.contains("No requirements"));
     assert!(html.contains("Other requirements"));
@@ -833,7 +833,7 @@ fn t11_deprecated_records_are_hidden() {
         "REQ-001.001",
     ]);
     let server = Server::start(&dir, &["--no-open"], &[]);
-    let list = get(&server, "/").text();
+    let list = get(&server, "/?type=req").text();
     assert!(!list.contains("REQ-001.001"));
     assert_eq!(get(&server, "/doc/REQ-001.001").status, 404);
     assert_eq!(get(&server, "/doc/REQ-001.001/edit").status, 404);
@@ -1283,7 +1283,7 @@ fn t19_symlink_escape_is_404() {
     let response = get(&server, "/doc/REQ-001.001");
     assert_eq!(response.status, 404);
     assert!(!response.text().contains("SECRET CONTENT"));
-    let list = get(&server, "/").text();
+    let list = get(&server, "/?type=req").text();
     assert!(!list.contains("REQ-001.001"));
     let version = "1.2.3";
     let body = form_body(&[("version", version), ("title", "Attack")]);
@@ -1315,7 +1315,7 @@ fn t20_html_escaping_prevents_script_injection() {
     )
     .unwrap();
     let server = Server::start(&dir, &["--no-open"], &[]);
-    for path in ["/", "/doc/REQ-001.001", "/doc/REQ-001.001/edit"] {
+    for path in ["/?type=req", "/doc/REQ-001.001", "/doc/REQ-001.001/edit"] {
         let html = get(&server, path).text();
         assert!(!html.contains("<script>alert(1)</script>"), "path={}", path);
         assert!(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
@@ -1763,7 +1763,7 @@ fn t24_assets_are_offline_and_embedded() {
     assert_eq!(css.text(), include_str!("../src/browser/app.css"));
     assert_eq!(js.text(), include_str!("../src/browser/app.js"));
 
-    for path in ["/", "/doc/REQ-001.001", "/doc/REQ-001.001/edit"] {
+    for path in ["/?type=req", "/doc/REQ-001.001", "/doc/REQ-001.001/edit"] {
         let html = get(&server, path).text();
         assert!(!html.contains("http://"));
         assert!(!html.contains("https://"));
@@ -1788,7 +1788,7 @@ fn t25_non_utf8_record_is_skipped_and_not_rewritten() {
     fs::write(&path, [0xff, 0xfe, 0x00, 0x01]).unwrap();
     let before = fs::read(&path).unwrap();
     let server = Server::start(&dir, &["--no-open"], &[]);
-    let list = get(&server, "/").text();
+    let list = get(&server, "/?type=req").text();
     assert!(!list.contains("REQ-009"));
     assert_eq!(get(&server, "/doc/REQ-009").status, 500);
     assert_eq!(fs::read(&path).unwrap(), before);
@@ -2155,7 +2155,7 @@ fn ui_matches_approved_mock_0001_layout() {
 
     let dir = fixture("mock-layout");
     let server = Server::start(&dir, &["--no-open"], &[]);
-    let html = get(&server, "/").text();
+    let html = get(&server, "/?type=req").text();
     assert!(html.contains("footer-long"));
     assert!(html.contains("footer-short"));
     assert!(html.contains("Papyrus local browser &mdash; served from this project only."));
@@ -2173,7 +2173,7 @@ fn ui_matches_approved_mock_0001_layout() {
 fn t28_accessibility_and_compatibility_basics() {
     let dir = fixture("a11y");
     let server = Server::start(&dir, &["--no-open"], &[]);
-    let list = get(&server, "/").text();
+    let list = get(&server, "/?type=req").text();
     assert_eq!(list.matches("<h1").count(), 1);
     for landmark in ["<header", "<nav", "<main", "<footer"] {
         assert!(list.contains(landmark), "missing {}", landmark);
@@ -2913,7 +2913,7 @@ fn t15b_category_parameter_decision() {
     let dir = decision_fixture("t15b");
     let server = Server::start(&dir, &["--no-open"], &[]);
 
-    assert_eq!(get(&server, "/").status, 200);
+    assert_eq!(get(&server, "/?type=req").status, 200);
     for ty in ["req", "nfr", "task", "milestone", "release", "decision"] {
         assert_eq!(
             get(&server, &format!("/?type={}", ty)).status,
@@ -3371,7 +3371,7 @@ fn t40a_list_ui_mockups_category() {
     assert!(html.contains("href=\"/doc/MOCK-001\""));
     assert!(html.contains("href=\"/doc/MOCK-002\""));
     // Default stays req; unknown values are 400.
-    assert_eq!(get(&server, "/").status, 200);
+    assert_eq!(get(&server, "/?type=req").status, 200);
     assert_eq!(get(&server, "/?type=req").status, 200);
     for ty in ["all", "x", "mockup", "ui-mockups"] {
         assert_eq!(
@@ -4129,7 +4129,7 @@ fn t25a_list_business_rules_category() {
     // preview first paragraph
     assert!(html.contains("First description paragraph."));
     // default stays req; unknown values are 400.
-    assert_eq!(get(&server, "/").status, 200);
+    assert_eq!(get(&server, "/?type=req").status, 200);
     assert_eq!(get(&server, "/?type=req").status, 200);
     for ty in ["all", "x", "business-rules", "rule"] {
         assert_eq!(
@@ -4748,7 +4748,7 @@ fn t26a_list_audit_records_category() {
     assert!(first < second);
     assert!(html.contains("href=\"/doc/AUD-001\""));
     assert!(html.contains("First content paragraph."));
-    assert_eq!(get(&server, "/").status, 200);
+    assert_eq!(get(&server, "/?type=req").status, 200);
     assert_eq!(get(&server, "/?type=req").status, 200);
     for ty in ["all", "x", "audit-records", "audit"] {
         assert_eq!(
@@ -5326,7 +5326,7 @@ fn t57a_list_category_and_sidebar() {
     assert!(html.find("TECH-001").unwrap() < html.find("TECH-002").unwrap());
     assert!(html.contains("href=\"/doc/TECH-001\""));
     assert!(html.contains("Defines the local browser."));
-    assert_eq!(get(&server, "/").status, 200);
+    assert_eq!(get(&server, "/?type=req").status, 200);
     assert_eq!(get(&server, "/?type=req").status, 200);
     for ty in ["all", "x", "tech-specs", "tech_spec"] {
         assert_eq!(
@@ -6169,4 +6169,248 @@ fn t77b_skills_page_custom_config() {
 
     drop(server);
     let _ = fs::remove_dir_all(&dir);
+}
+
+// ---- TASK-19 DoD #2: inventory hub integration test ----
+
+#[test]
+fn t19a_inventory_hub() {
+    // Empty project: inventory renders with h1, 12 cards in final order, zero counts.
+    let empty = test_root("t19a-empty");
+    init_project(&empty);
+    let server = Server::start(&empty, &["--no-open"], &[]);
+    let resp = get(&server, "/");
+    assert_eq!(resp.status, 200);
+    assert_eq!(
+        resp.header("Content-Type"),
+        Some("text/html; charset=utf-8")
+    );
+    let html = resp.text();
+    assert!(html.contains("Browser inventory"));
+    assert!(!html.contains("http://"));
+    assert!(!html.contains("https://"));
+
+    let labels = [
+        "Business requirements",
+        "Business Rules",
+        "Audit Records",
+        "Technical Specifications",
+        "Non-functional requirements",
+        "Backlog",
+        "Decisions",
+        "Glossary",
+        "UI Specifications",
+        "UI Mockups",
+        "Managed artifacts &amp; lifecycles",
+        "Agent skills &amp; workflows",
+    ];
+    let mut positions = Vec::new();
+    for label in &labels {
+        let marker = format!("<h3>{}</h3>", label);
+        let pos = html
+            .find(&marker)
+            .unwrap_or_else(|| panic!("missing card {}", label));
+        positions.push(pos);
+    }
+    for pair in positions.windows(2) {
+        assert!(pair[0] < pair[1], "card order wrong");
+    }
+    assert!(html.contains("Business requirements &middot; 0"));
+    assert!(html.contains("href=\"/?type=req\""));
+    assert!(html.contains("href=\"/lifecycle\""));
+    assert!(html.contains("href=\"/skills\""));
+    drop(server);
+
+    // Populated project: counts reflect active records.
+    let populated = test_root("t19a-pop");
+    init_project(&populated);
+    create_req_group(&populated, "Payments Group");
+    create_req(&populated, "Capture payment", "REQ-001");
+    create_req_group(&populated, "Search Group");
+    create_req(&populated, "Search records", "REQ-002");
+    create_nfr_group(&populated, "Persistence");
+    create_nfr(&populated, "Restrict access", "NFR-001");
+    let server = Server::start(&populated, &["--no-open"], &[]);
+    let html = get(&server, "/").text();
+
+    assert!(html.contains("Business requirements &middot; 4"));
+    assert!(html.contains("Non-functional requirements &middot; 2"));
+    drop(server);
+
+    // Disabled document type: no card, no error.
+    let disabled = test_root("t19a-disabled");
+    init_project(&disabled);
+    set_doc_type_enabled(&disabled, "tech-spec", false);
+    let server = Server::start(&disabled, &["--no-open"], &[]);
+    let html = get(&server, "/").text();
+    assert!(!html.contains("<h3>Technical Specifications</h3>"));
+    assert_eq!(get(&server, "/?type=tech-spec").status, 200);
+    drop(server);
+
+    let _ = fs::remove_dir_all(&empty);
+    let _ = fs::remove_dir_all(&populated);
+    let _ = fs::remove_dir_all(&disabled);
+}
+
+// ---- TASK-19 DoD #3: cross-type integration test ----
+
+#[test]
+fn t19b_cross_type_id_resolution() {
+    let dir = test_root("t19b-cross");
+    init_project(&dir);
+    // business requirements
+    create_req_group(&dir, "G");
+    create_req(&dir, "Req", "REQ-001");
+    // non-functional requirements
+    create_nfr_group(&dir, "G");
+    create_nfr(&dir, "Nfr", "NFR-001");
+    // backlog
+    create_release(&dir, "Rel");
+    create_milestone(&dir, "Ms", "REL-001");
+    create_task(&dir, "Task", "MS-001");
+    // decision
+    create_decision(&dir, "Dec");
+    // glossary
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "glossary",
+        "create",
+        "--term",
+        "Term",
+        "--definition",
+        "Def",
+    ]);
+    // ui spec
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "ui-spec",
+        "create",
+        "Spec",
+        "--view",
+        "V",
+        "--description",
+        "D",
+    ]);
+    // business rule
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "rule",
+        "create",
+        "Rule",
+        "--description",
+        "D",
+        "--rationale",
+        "R",
+        "--applicability",
+        "A",
+    ]);
+    // audit record
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "audit",
+        "create",
+        "--title",
+        "Audit",
+        "--content",
+        "C",
+    ]);
+    // tech spec
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "tech-spec",
+        "create",
+        "Tech",
+        "--description",
+        "D",
+    ]);
+    // ui mockup
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "ui-mockup",
+        "create",
+        "Mock",
+        "--task",
+        "TASK-001",
+        "--spec",
+        "UI-001",
+    ]);
+
+    let ids = [
+        "REQ-001.001",
+        "NFR-001.001",
+        "TASK-001",
+        "MS-001",
+        "REL-001",
+        "ADR-001",
+        "GLO-001",
+        "UI-001",
+        "MOCK-001",
+        "RUL-001",
+        "AUD-001",
+        "TECH-001",
+    ];
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    for id in &ids {
+        let r = get(&server, &format!("/doc/{}", id));
+        assert_eq!(r.status, 200, "id {} not reachable: {}", id, r.status);
+    }
+    // unknown -> 404
+    assert_eq!(get(&server, "/doc/NOPE-999").status, 404);
+    // deprecated -> 404
+    drop(server);
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "tech-spec",
+        "deprecate",
+        "TECH-001",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    assert_eq!(get(&server, "/doc/TECH-001").status, 404);
+    assert_eq!(get(&server, "/doc/TECH-001/edit").status, 404);
+    drop(server);
+
+    // duplicate IDs across req/nfr (shared prefix) -> 500
+    let dup = test_root("t19b-dup");
+    init_project(&dup);
+    // make nfr use the same prefix as req
+    let cfg_path = dup.join("papyrus.config.yml");
+    let text = fs::read_to_string(&cfg_path).unwrap();
+    let text = text.replace("    prefix: NFR\n", "    prefix: REQ\n");
+    fs::write(&cfg_path, text).unwrap();
+
+    create_req_group(&dup, "G");
+    create_req(&dup, "Req", "REQ-001");
+    // nfr group now uses REQ prefix
+    run_ok(&[
+        "--dir",
+        dup.to_str().unwrap(),
+        "nfreq",
+        "create-group",
+        "--title",
+        "G",
+    ]);
+    run_ok(&[
+        "--dir",
+        dup.to_str().unwrap(),
+        "nfreq",
+        "create",
+        "Nfr",
+        "--group",
+        "REQ-001",
+        "-d",
+        "D",
+    ]);
+    let server = Server::start(&dup, &["--no-open"], &[]);
+    assert_eq!(get(&server, "/doc/REQ-001.001").status, 500);
+    drop(server);
+
+    let _ = fs::remove_dir_all(&dir);
+    let _ = fs::remove_dir_all(&dup);
 }
