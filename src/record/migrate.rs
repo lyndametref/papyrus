@@ -1879,6 +1879,7 @@ mod tests {
     use super::*;
     use crate::context::Context;
     use std::fs;
+    use std::os::unix::fs::PermissionsExt;
     use std::path::PathBuf;
 
     fn tmpdir(name: &str) -> PathBuf {
@@ -2118,13 +2119,12 @@ mod tests {
         write(&path, legacy);
         // Make the target directory read-only so atomic write fails.
         let tasks_dir = dir.join("backlog/tasks");
+        let original_mode = fs::metadata(&tasks_dir).unwrap().permissions().mode();
         let mut perms = fs::metadata(&tasks_dir).unwrap().permissions();
         perms.set_readonly(true);
         fs::set_permissions(&tasks_dir, perms).unwrap();
         let result = ensure_front_matter(&c, &path);
-        let mut perms = fs::metadata(&tasks_dir).unwrap().permissions();
-        perms.set_readonly(false);
-        fs::set_permissions(&tasks_dir, perms).unwrap();
+        fs::set_permissions(&tasks_dir, fs::Permissions::from_mode(original_mode)).unwrap();
         assert!(result.is_err());
         assert_eq!(fs::read_to_string(&path).unwrap(), legacy);
         // No temp files left in the project.
@@ -2251,13 +2251,12 @@ mod tests {
         write(&path, legacy);
         // Remove write permission from the legacy archive dir so removal fails.
         let archived_dir = dir.join("backlog/tasks/archived");
+        let original_mode = fs::metadata(&archived_dir).unwrap().permissions().mode();
         let mut perms = fs::metadata(&archived_dir).unwrap().permissions();
         perms.set_readonly(true);
         fs::set_permissions(&archived_dir, perms).unwrap();
         let result = ensure_front_matter_canonical(&c, &path);
-        let mut perms = fs::metadata(&archived_dir).unwrap().permissions();
-        perms.set_readonly(false);
-        fs::set_permissions(&archived_dir, perms).unwrap();
+        fs::set_permissions(&archived_dir, fs::Permissions::from_mode(original_mode)).unwrap();
         assert!(result.is_err());
         assert!(path.exists(), "original should remain when removal fails");
     }

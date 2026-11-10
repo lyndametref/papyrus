@@ -627,18 +627,18 @@ pub fn edit(
             ));
         }
     }
-    if release_raw.is_some() {
-        if let Some(r) = &release_val {
-            ops.push(crate::record::patch::PatchOp::SetFrontMatter(
-                "release".into(),
+    if release_raw.is_some()
+        && let Some(r) = &release_val
+    {
+        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "release".into(),
+            r.clone(),
+        ));
+        if doc.sections.iter().any(|s| s.heading == "## Release") {
+            ops.push(crate::record::patch::PatchOp::SetSection(
+                "## Release".into(),
                 r.clone(),
             ));
-            if doc.sections.iter().any(|s| s.heading == "## Release") {
-                ops.push(crate::record::patch::PatchOp::SetSection(
-                    "## Release".into(),
-                    r.clone(),
-                ));
-            }
         }
     }
     if no_release.is_some() {

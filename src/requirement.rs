@@ -118,6 +118,7 @@ pub fn create_group(
     Ok(id)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create(
     ctx: &Context,
     kind: Kind,
@@ -487,20 +488,20 @@ pub fn view(ctx: &Context, kind: Kind, id_raw: &str) -> Result<crate::CommandOut
 
 fn frontmatter_list_req(content: &str, key: &str) -> Vec<String> {
     let mut out = Vec::new();
-    if let Ok(Some(fm)) = crate::record::frontmatter::parse(content) {
-        if let Some(yaml_serde::Value::Sequence(seq)) =
+    if let Ok(Some(fm)) = crate::record::frontmatter::parse(content)
+        && let Some(yaml_serde::Value::Sequence(seq)) =
             fm.data.get(yaml_serde::Value::String(key.to_string()))
-        {
-            for v in seq {
-                if let yaml_serde::Value::String(s) = v {
-                    out.push(s.clone());
-                }
+    {
+        for v in seq {
+            if let yaml_serde::Value::String(s) = v {
+                out.push(s.clone());
             }
         }
     }
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn edit(
     ctx: &Context,
     kind: Kind,
@@ -557,21 +558,22 @@ pub fn edit(
             parsed.title.clone(),
         ));
     }
-    if kind.supports_story() && story_raw.is_some() {
-        if let Some(s) = &parsed.story {
-            ops.push(crate::record::patch::PatchOp::SetSection(
-                "## User Story".into(),
-                s.clone(),
-            ));
-        }
+    if kind.supports_story()
+        && story_raw.is_some()
+        && let Some(s) = &parsed.story
+    {
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## User Story".into(),
+            s.clone(),
+        ));
     }
-    if desc_raw.is_some() {
-        if let Some(d) = &parsed.description {
-            ops.push(crate::record::patch::PatchOp::SetSection(
-                "## Description".into(),
-                d.clone(),
-            ));
-        }
+    if desc_raw.is_some()
+        && let Some(d) = &parsed.description
+    {
+        ops.push(crate::record::patch::PatchOp::SetSection(
+            "## Description".into(),
+            d.clone(),
+        ));
     }
     if !labels_raw.is_empty() {
         let mut fm_labels = frontmatter_list_req(&content, "labels");

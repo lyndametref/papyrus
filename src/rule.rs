@@ -344,6 +344,7 @@ fn dedup(mut values: Vec<String>) -> Vec<String> {
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create(
     ctx: &Context,
     title_raw: &str,
@@ -522,20 +523,20 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
 
 fn frontmatter_list_rule(content: &str, key: &str) -> Vec<String> {
     let mut out = Vec::new();
-    if let Ok(Some(fm)) = crate::record::frontmatter::parse(content) {
-        if let Some(yaml_serde::Value::Sequence(seq)) =
+    if let Ok(Some(fm)) = crate::record::frontmatter::parse(content)
+        && let Some(yaml_serde::Value::Sequence(seq)) =
             fm.data.get(yaml_serde::Value::String(key.to_string()))
-        {
-            for v in seq {
-                if let yaml_serde::Value::String(s) = v {
-                    out.push(s.clone());
-                }
+    {
+        for v in seq {
+            if let yaml_serde::Value::String(s) = v {
+                out.push(s.clone());
             }
         }
     }
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn edit(
     ctx: &Context,
     id_raw: &str,
@@ -583,7 +584,7 @@ pub fn edit(
     if let Some(no) = &no_requirement {
         match no {
             Some(rid) => {
-                let rid = sanitize_field(&rid)?;
+                let rid = sanitize_field(rid)?;
                 record.requirements.retain(|r| r != &rid);
             }
             None => record.requirements.clear(),
