@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' file: 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>MOCK-0012 &mdash; Browser final cross-type navigation and inventory review</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body data-mock-id="MOCK-0012">
+
+<header class="wf-chrome" role="navigation" aria-label="Review navigation (not part of the design)">
+  <span class="wf-chrome-label">Review</span>
+  <a class="wf-chrome-btn" href="#index">Overview</a>
+  <a class="wf-chrome-btn" href="#web">Web</a>
+  <span class="wf-chrome-note">Scaffolding for review only &mdash; not part of the mockup.</span>
+</header>
+
+<!-- 1. REVIEW LANDING -->
+<section class="wf-review wf-index is-active" data-review="index" data-screen="index">
+  <div class="wf-container">
+    <p class="wf-eyebrow">MOCK-0012 &middot; Wireframe review</p>
+    <h1 class="wf-title">Browser final cross-type navigation and inventory review</h1>
+    <p class="wf-subtitle">Layout and interaction reference for the complete browser with all record types in one navigation, verifying cross-type consistency. Grayscale wireframe only &mdash; no visual styling, library, or technology choices.</p>
+
+    <div class="wf-box wf-ticket">
+      <h2 class="wf-section-title">Ticket</h2>
+      <p><strong>TASK-60</strong> &mdash; Design review: final browser cross-type navigation and inventory</p>
+      <p class="wf-note">Sources: REQ-06.002, REQ-06.003, REQ-06.004, REQ-05.010, REQ-05.011, REQ-05.007; NFR-01.002, NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001; ADR-0007, ADR-0009; docs/specifications/browser-requirements.md; per-type browser specs; TASK-59, TASK-66 (MOCK-0010), TASK-76 (MOCK-0011)</p>
+    </div>
+
+    <h2 class="wf-section-title">Review contents</h2>
+    <div class="wf-cards">
+      <article class="wf-box wf-card">
+        <span class="wf-badge">Web &middot; 21 views</span>
+        <h3>Web prototype</h3>
+        <p>Click through the cross-type inventory, representative record views with front-matter metadata, lifecycle page, skills page, responsive views, and baseline error pages.</p>
+        <a class="wf-button" href="#web">Open web prototype</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- 2. PROTOTYPES -->
+<div class="wf-proto" data-platform="web">
+  <nav class="wf-proto-nav" aria-label="Web views (review navigation)">
+    <span class="wf-chrome-label">Web views</span>
+    <a class="wf-chrome-btn wf-view-link" href="#web/inventory">Inventory</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-tasks">Task list</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/view-task">Task view</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/edit-task">Task edit</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-milestones">Milestone list</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/view-milestone">Milestone view</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-releases">Release list</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/view-release">Release view</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/view-tech-spec">Tech spec view</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/lifecycle">Lifecycle</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/skills">Skills</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/responsive-list-320">320 list</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/responsive-edit-320">320 edit</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/responsive-lifecycle-320">320 lifecycle</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/responsive-skills-320">320 skills</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-404-unknown">404u</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-404-deprecated">404d</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-400">400</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-405">405</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-415">415</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-500">500</a>
+  </nav>
+
+  <div class="wf-frame wf-frame--desktop">
+
+    <!-- INVENTORY / CROSS-TYPE NAVIGATION HUB -->
+    <section class="wf-screen is-active" data-platform="web" data-screen="inventory">
+      <div class="wf-container">
+        <header class="wf-bar">
+          <strong>Papyrus</strong>
+          <span class="wf-note">Project: papyrus</span>
+          <span class="wf-note">Local browser / offline &middot; 127.0.0.1:6420</span>
+        </header>
+
+        <div class="wf-row" style="margin-top:12px;">
+          <nav class="wf-box" aria-label="Document types" style="flex:0 0 220px;max-width:220px;">
+            <p class="wf-label">Document types</p>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;">
+              <li><span>Business requirements</span></li>
+              <li><span>Business rules</span></li>
+              <li><span>Audit records</span></li>
+              <li><a href="#web/view-tech-spec">Technical specifications</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><a href="#web/list-tasks">Backlog</a></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI specifications</span></li>
+              <li><span>UI mockups</span></li>
+              <li><a href="#web/lifecycle">Managed artifacts &amp; lifecycles</a></li>
+              <li><a href="#web/skills">Agent skills &amp; workflows</a></li>
+            </ul>
+          </nav>
+
+          <main style="flex:1 1 0;min-width:0;">
+            <h1 class="wf-title">Browser inventory</h1>
+            <p class="wf-subtitle">All Papyrus record types in one navigation (REQ-06.002, NFR-01.002). Counts are illustrative. Select a type to open its list or page.</p>
+
+            <div class="wf-cards" style="margin-top:12px;">
+              <article class="wf-box wf-card"><span class="wf-badge">Business requirements &middot; 12</span><h3>Business requirements</h3><p class="wf-note">Covered by MOCK-0001.</p></article>
+              <article class="wf-box wf-card"><span class="wf-badge">Business rules &middot; 8</span><h3>Business rules</h3><p class="wf-note">Covered by MOCK-0007.</p></article>
+              <article class="wf-box wf-card"><span class="wf-badge">Audit records &middot; 5</span><h3>Audit records</h3><p class="wf-note">Covered by MOCK-0008.</p></article>
+              <article class="wf-box wf-card"><span class="wf-badge">Technical specifications &middot; 6</span><h3>Technical specifications</h3><p><a class="wf-link" href="#web/view-tech-spec" data-goto="view-tech-spec">Open representative view</a></p></article>
+              <article class="wf-box wf-card"><span class="wf-badge">Non-functional requirements &middot; 9</span><h3>Non-functional requirements</h3><p class="wf-note">Covered by MOCK-0001.</p></article>
+              <article class="wf-box wf-card"><span class="wf-badge">Backlog &middot; 14 tasks</span><h3>Backlog</h3><p><a class="wf-link" href="#web/list-tasks" data-goto="list-tasks">Open task list</a></p></article>
+              <article class="wf-box wf-card"><span class="wf-badge">Decisions &middot; 4</span><h3>Decisions</h3><p class="wf-note">Covered by MOCK-0003.</p></article>
+              <article class="wf-box wf-card"><span class="wf-badge">Glossary &middot; 23</span><h3>Glossary</h3><p class="wf-note">Covered by MOCK-0004.</p></article>
+              <article class="wf-box wf-card"><span class="wf-badge">UI specifications &middot; 7</span><h3>UI specifications</h3><p class="wf-note">Covered by MOCK-0005.</p></article>
+              <article class="wf-box wf-card"><span class="wf-badge">UI mockups &middot; 12</span><h3>UI mockups</h3><p class="wf-note">Covered by MOCK-0006.</p></article>
+              <article class="wf-box wf-card"><span class="wf-badge">Managed artifacts &middot; 12 types</span><h3>Managed artifacts &amp; lifecycles</h3><p><a class="wf-link" href="#web/lifecycle" data-goto="lifecycle">Open lifecycle page</a></p></article>
+              <article class="wf-box wf-card"><span class="wf-badge">Agent skills &middot; 8 groups</span><h3>Agent skills &amp; workflows</h3><p><a class="wf-link" href="#web/skills" data-goto="skills">Open skills page</a></p></article>
+            </div>
+
+            <footer class="wf-footer">Papyrus local browser &middot; offline &middot; no external resources</footer>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- TASK LIST -->
+    <section class="wf-screen" data-platform="web" data-screen="list-tasks">
+      <div class="wf-container">
+        <header class="wf-bar">
+          <strong>Papyrus</strong>
+          <span class="wf-note">Project: papyrus</span>
+          <span class="wf-note">Local browser / offline</span>
+        </header>
+        <div class="wf-row" style="margin-top:12px;">
+          <nav class="wf-box" aria-label="Document types" style="flex:0 0 220px;max-width:220px;">
+            <p class="wf-label">Document types</p>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;">
+              <li><span>Business requirements</span></li>
+              <li><span>Business rules</span></li>
+              <li><span>Audit records</span></li>
+              <li><a href="#web/view-tech-spec">Technical specifications</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><a href="#web/list-tasks" aria-current="page" style="font-weight:700;text-decoration:underline;">Backlog</a></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI specifications</span></li>
+              <li><span>UI mockups</span></li>
+              <li><a href="#web/lifecycle">Managed artifacts &amp; lifecycles</a></li>
+              <li><a href="#web/skills">Agent skills &amp; workflows</a></li>
+            </ul>
+          </nav>
+          <main style="flex:1 1 0;min-width:0;">
+            <h1 class="wf-title">Tasks</h1>
+            <p class="wf-subtitle">Backlog tasks with front-matter metadata (REQ-06.004).</p>
+            <table class="wf-table">
+              <thead><tr><th>ID</th><th>Title</th><th>Metadata</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><a href="#web/view-task" data-goto="view-task">TASK-060</a></td>
+                  <td>Final browser cross-type review</td>
+                  <td class="wf-note">created 2026-11-09 &middot; updated 2026-11-10 &middot; labels: ui, browser &middot; refs: REQ-06.002 &middot; status: Refined &middot; milestone: MS-012</td>
+                </tr>
+                <tr>
+                  <td><a href="#web/view-task" data-goto="view-task">TASK-066</a></td>
+                  <td>Front-matter metadata and lifecycle</td>
+                  <td class="wf-note">created 2026-11-08 &middot; updated 2026-11-09 &middot; labels: metadata &middot; refs: REQ-06.004 &middot; status: Done &middot; milestone: MS-012</td>
+                </tr>
+              </tbody>
+            </table>
+            <p style="margin-top:8px;"><a class="wf-button" href="#web/edit-task" data-goto="edit-task">Edit selected task</a></p>
+            <footer class="wf-footer">Papyrus local browser &middot; offline</footer>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- TASK VIEW -->
+    <section class="wf-screen" data-platform="web" data-screen="view-task">
+      <div class="wf-container">
+        <header class="wf-bar">
+          <strong>Papyrus</strong>
+          <span class="wf-note">Project: papyrus</span>
+          <span class="wf-note">Local browser / offline</span>
+        </header>
+        <div class="wf-row" style="margin-top:12px;">
+          <nav class="wf-box" aria-label="Document types" style="flex:0 0 220px;max-width:220px;">
+            <p class="wf-label">Document types</p>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;">
+              <li><span>Business requirements</span></li>
+              <li><span>Business rules</span></li>
+              <li><span>Audit records</span></li>
+              <li><a href="#web/view-tech-spec">Technical specifications</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><a href="#web/list-tasks" aria-current="page" style="font-weight:700;text-decoration:underline;">Backlog</a></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI specifications</span></li>
+              <li><span>UI mockups</span></li>
+              <li><a href="#web/lifecycle">Managed artifacts &amp; lifecycles</a></li>
+              <li><a href="#web/skills">Agent skills &amp; workflows</a></li>
+            </ul>
+          </nav>
+          <main style="flex:1 1 0;min-width:0;">
+            <h1 class="wf-title">TASK-060 &mdash; Final browser cross-type review</h1>
+            <section class="wf-box">
+              <h2 class="wf-section-title">Metadata</h2>
+              <dl style="margin:0;display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;">
+                <dt>Record ID</dt><dd>TASK-060</dd>
+                <dt>Title</dt><dd>Final browser cross-type review</dd>
+                <dt>Created date</dt><dd>2026-11-09 (read-only)</dd>
+                <dt>Updated date</dt><dd>2026-11-10 (read-only)</dd>
+                <dt>Labels</dt><dd>ui, browser</dd>
+                <dt>References</dt><dd>REQ-06.002, TASK-59</dd>
+                <dt>Status</dt><dd>Refined</dd>
+                <dt>Milestone</dt><dd>MS-012</dd>
+                <dt>Assignee</dt><dd>@ui-designer</dd>
+                <dt>Dependencies</dt><dd>TASK-59, TASK-66, TASK-76</dd>
+              </dl>
+            </section>
+            <section class="wf-box" style="margin-top:12px;">
+              <h2 class="wf-section-title">Description</h2>
+              <p class="wf-note">Final cross-type navigation/inventory review package.</p>
+            </section>
+            <p style="margin-top:8px;"><a class="wf-button" href="#web/edit-task" data-goto="edit-task">Edit</a> <a class="wf-link" href="#web/list-tasks" data-goto="list-tasks">Back to list</a></p>
+            <footer class="wf-footer">Papyrus local browser &middot; offline</footer>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- TASK EDIT -->
+    <section class="wf-screen" data-platform="web" data-screen="edit-task">
+      <div class="wf-container">
+        <header class="wf-bar">
+          <strong>Papyrus</strong>
+          <span class="wf-note">Project: papyrus</span>
+          <span class="wf-note">Local browser / offline</span>
+        </header>
+        <div class="wf-row" style="margin-top:12px;">
+          <nav class="wf-box" aria-label="Document types" style="flex:0 0 220px;max-width:220px;">
+            <p class="wf-label">Document types</p>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;">
+              <li><span>Business requirements</span></li>
+              <li><span>Business rules</span></li>
+              <li><span>Audit records</span></li>
+              <li><a href="#web/view-tech-spec">Technical specifications</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><a href="#web/list-tasks" aria-current="page" style="font-weight:700;text-decoration:underline;">Backlog</a></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI specifications</span></li>
+              <li><span>UI mockups</span></li>
+              <li><a href="#web/lifecycle">Managed artifacts &amp; lifecycles</a></li>
+              <li><a href="#web/skills">Agent skills &amp; workflows</a></li>
+            </ul>
+          </nav>
+          <main style="flex:1 1 0;min-width:0;">
+            <h1 class="wf-title">Edit TASK-060</h1>
+            <form class="wf-box" style="display:flex;flex-direction:column;gap:8px;">
+              <label class="wf-label">Title<input class="wf-input" type="text" value="Final browser cross-type review"></label>
+              <label class="wf-label">Description<textarea class="wf-input" rows="3">Final cross-type navigation/inventory review package.</textarea></label>
+              <label class="wf-label">Status<select class="wf-input"><option>Refined</option><option>Implemented</option></select></label>
+              <label class="wf-label">Milestone<input class="wf-input" type="text" value="MS-012"></label>
+              <label class="wf-label">Labels (tag add/remove)<span class="wf-badge">ui</span> <span class="wf-badge">browser</span> <button class="wf-button" type="button">+ add</button></label>
+              <label class="wf-label">References (tag add/remove)<span class="wf-badge">REQ-06.002</span> <button class="wf-button" type="button">+ add</button></label>
+              <label class="wf-label">Created date (read-only)<input class="wf-input" type="text" value="2026-11-09" disabled></label>
+              <label class="wf-label">Updated date (read-only)<input class="wf-input" type="text" value="2026-11-10" disabled></label>
+              <input type="hidden" value="v-001">
+              <div style="display:flex;gap:8px;">
+                <button class="wf-button wf-button-primary" type="button">Save changes</button>
+                <a class="wf-button" href="#web/view-task" data-goto="view-task">Cancel</a>
+              </div>
+            </form>
+            <footer class="wf-footer">Papyrus local browser &middot; offline</footer>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- MILESTONE LIST -->
+    <section class="wf-screen" data-platform="web" data-screen="list-milestones">
+      <div class="wf-container">
+        <header class="wf-bar">
+          <strong>Papyrus</strong>
+          <span class="wf-note">Project: papyrus</span>
+          <span class="wf-note">Local browser / offline</span>
+        </header>
+        <div class="wf-row" style="margin-top:12px;">
+          <nav class="wf-box" aria-label="Document types" style="flex:0 0 220px;max-width:220px;">
+            <p class="wf-label">Document types</p>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;">
+              <li><span>Business requirements</span></li>
+              <li><span>Business rules</span></li>
+              <li><span>Audit records</span></li>
+              <li><a href="#web/view-tech-spec">Technical specifications</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><a href="#web/list-tasks" aria-current="page" style="font-weight:700;text-decoration:underline;">Backlog</a></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI specifications</span></li>
+              <li><span>UI mockups</span></li>
+              <li><a href="#web/lifecycle">Managed artifacts &amp; lifecycles</a></li>
+              <li><a href="#web/skills">Agent skills &amp; workflows</a></li>
+            </ul>
+          </nav>
+          <main style="flex:1 1 0;min-width:0;">
+            <h1 class="wf-title">Milestones</h1>
+            <p class="wf-subtitle">Backlog milestones with front-matter metadata.</p>
+            <table class="wf-table">
+              <thead><tr><th>ID</th><th>Title</th><th>Metadata</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><a href="#web/view-milestone" data-goto="view-milestone">MS-012</a></td>
+                  <td>Browser access for all Papyrus content</td>
+                  <td class="wf-note">created 2026-10-01 &middot; updated 2026-11-10 &middot; labels: browser &middot; refs: REQ-06.002 &middot; release: REL-001</td>
+                </tr>
+              </tbody>
+            </table>
+            <footer class="wf-footer">Papyrus local browser &middot; offline</footer>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- MILESTONE VIEW -->
+    <section class="wf-screen" data-platform="web" data-screen="view-milestone">
+      <div class="wf-container">
+        <header class="wf-bar">
+          <strong>Papyrus</strong>
+          <span class="wf-note">Project: papyrus</span>
+          <span class="wf-note">Local browser / offline</span>
+        </header>
+        <div class="wf-row" style="margin-top:12px;">
+          <nav class="wf-box" aria-label="Document types" style="flex:0 0 220px;max-width:220px;">
+            <p class="wf-label">Document types</p>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;">
+              <li><span>Business requirements</span></li>
+              <li><span>Business rules</span></li>
+              <li><span>Audit records</span></li>
+              <li><a href="#web/view-tech-spec">Technical specifications</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><a href="#web/list-tasks" aria-current="page" style="font-weight:700;text-decoration:underline;">Backlog</a></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI specifications</span></li>
+              <li><span>UI mockups</span></li>
+              <li><a href="#web/lifecycle">Managed artifacts &amp; lifecycles</a></li>
+              <li><a href="#web/skills">Agent skills &amp; workflows</a></li>
+            </ul>
+          </nav>
+          <main style="flex:1 1 0;min-width:0;">
+            <h1 class="wf-title">MS-012 &mdash; Browser access for all Papyrus content</h1>
+            <section class="wf-box">
+              <h2 class="wf-section-title">Metadata</h2>
+              <dl style="margin:0;display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;">
+                <dt>Record ID</dt><dd>MS-012</dd>
+                <dt>Title</dt><dd>Browser access for all Papyrus content</dd>
+                <dt>Created date</dt><dd>2026-10-01 (read-only)</dd>
+                <dt>Updated date</dt><dd>2026-11-10 (read-only)</dd>
+                <dt>Labels</dt><dd>browser</dd>
+                <dt>References</dt><dd>REQ-06.002</dd>
+                <dt>Release</dt><dd>REL-001</dd>
+              </dl>
+            </section>
+            <p style="margin-top:8px;"><a class="wf-link" href="#web/list-milestones" data-goto="list-milestones">Back to list</a></p>
+            <footer class="wf-footer">Papyrus local browser &middot; offline</footer>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- RELEASE LIST -->
+    <section class="wf-screen" data-platform="web" data-screen="list-releases">
+      <div class="wf-container">
+        <header class="wf-bar">
+          <strong>Papyrus</strong>
+          <span class="wf-note">Project: papyrus</span>
+          <span class="wf-note">Local browser / offline</span>
+        </header>
+        <div class="wf-row" style="margin-top:12px;">
+          <nav class="wf-box" aria-label="Document types" style="flex:0 0 220px;max-width:220px;">
+            <p class="wf-label">Document types</p>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;">
+              <li><span>Business requirements</span></li>
+              <li><span>Business rules</span></li>
+              <li><span>Audit records</span></li>
+              <li><a href="#web/view-tech-spec">Technical specifications</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><a href="#web/list-tasks" aria-current="page" style="font-weight:700;text-decoration:underline;">Backlog</a></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI specifications</span></li>
+              <li><span>UI mockups</span></li>
+              <li><a href="#web/lifecycle">Managed artifacts &amp; lifecycles</a></li>
+              <li><a href="#web/skills">Agent skills &amp; workflows</a></li>
+            </ul>
+          </nav>
+          <main style="flex:1 1 0;min-width:0;">
+            <h1 class="wf-title">Releases</h1>
+            <p class="wf-subtitle">Backlog releases with front-matter metadata.</p>
+            <table class="wf-table">
+              <thead><tr><th>ID</th><th>Title</th><th>Metadata</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><a href="#web/view-release" data-goto="view-release">REL-001</a></td>
+                  <td>Browser access release</td>
+                  <td class="wf-note">created 2026-10-01 &middot; updated 2026-11-10 &middot; labels: release &middot; refs: REQ-06.002</td>
+                </tr>
+              </tbody>
+            </table>
+            <footer class="wf-footer">Papyrus local browser &middot; offline</footer>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- RELEASE VIEW -->
+    <section class="wf-screen" data-platform="web" data-screen="view-release">
+      <div class="wf-container">
+        <header class="wf-bar">
+          <strong>Papyrus</strong>
+          <span class="wf-note">Project: papyrus</span>
+          <span class="wf-note">Local browser / offline</span>
+        </header>
+        <div class="wf-row" style="margin-top:12px;">
+          <nav class="wf-box" aria-label="Document types" style="flex:0 0 220px;max-width:220px;">
+            <p class="wf-label">Document types</p>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;">
+              <li><span>Business requirements</span></li>
+              <li><span>Business rules</span></li>
+              <li><span>Audit records</span></li>
+              <li><a href="#web/view-tech-spec">Technical specifications</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><a href="#web/list-tasks" aria-current="page" style="font-weight:700;text-decoration:underline;">Backlog</a></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI specifications</span></li>
+              <li><span>UI mockups</span></li>
+              <li><a href="#web/lifecycle">Managed artifacts &amp; lifecycles</a></li>
+              <li><a href="#web/skills">Agent skills &amp; workflows</a></li>
+            </ul>
+          </nav>
+          <main style="flex:1 1 0;min-width:0;">
+            <h1 class="wf-title">REL-001 &mdash; Browser access release</h1>
+            <section class="wf-box">
+              <h2 class="wf-section-title">Metadata</h2>
+              <dl style="margin:0;display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;">
+                <dt>Record ID</dt><dd>REL-001</dd>
+                <dt>Title</dt><dd>Browser access release</dd>
+                <dt>Created date</dt><dd>2026-10-01 (read-only)</dd>
+                <dt>Updated date</dt><dd>2026-11-10 (read-only)</dd>
+                <dt>Labels</dt><dd>release</dd>
+                <dt>References</dt><dd>REQ-06.002</dd>
+              </dl>
+            </section>
+            <p style="margin-top:8px;"><a class="wf-link" href="#web/list-releases" data-goto="list-releases">Back to list</a></p>
+            <footer class="wf-footer">Papyrus local browser &middot; offline</footer>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- TECH SPEC VIEW -->
+    <section class="wf-screen" data-platform="web" data-screen="view-tech-spec">
+      <div class="wf-container">
+        <header class="wf-bar">
+          <strong>Papyrus</strong>
+          <span class="wf-note">Project: papyrus</span>
+          <span class="wf-note">Local browser / offline</span>
+        </header>
+        <div class="wf-row" style="margin-top:12px;">
+          <nav class="wf-box" aria-label="Document types" style="flex:0 0 220px;max-width:220px;">
+            <p class="wf-label">Document types</p>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;">
+              <li><span>Business requirements</span></li>
+              <li><span>Business rules</span></li>
+              <li><span>Audit records</span></li>
+              <li><a href="#web/view-tech-spec" aria-current="page" style="font-weight:700;text-decoration:underline;">Technical specifications</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><a href="#web/list-tasks">Backlog</a></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI specifications</span></li>
+              <li><span>UI mockups</span></li>
+              <li><a href="#web/lifecycle">Managed artifacts &amp; lifecycles</a></li>
+              <li><a href="#web/skills">Agent skills &amp; workflows</a></li>
+            </ul>
+          </nav>
+          <main style="flex:1 1 0;min-width:0;">
+            <h1 class="wf-title">TS-001 &mdash; Browser technical specification</h1>
+            <section class="wf-box">
+              <h2 class="wf-section-title">Metadata</h2>
+              <dl style="margin:0;display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;">
+                <dt>Record ID</dt><dd>TS-001</dd>
+                <dt>Title</dt><dd>Browser technical specification</dd>
+                <dt>Created date</dt><dd>2026-10-15 (read-only)</dd>
+                <dt>Updated date</dt><dd>2026-11-09 (read-only)</dd>
+                <dt>Labels</dt><dd>browser, spec</dd>
+                <dt>References</dt><dd>REQ-05.007, REQ-05.009</dd>
+                <dt>Type-specific</dt><dd>section: Browser rendering</dd>
+              </dl>
+            </section>
+            <p style="margin-top:8px;"><a class="wf-link" href="#web/inventory" data-goto="inventory">Back to inventory</a></p>
+            <footer class="wf-footer">Papyrus local browser &middot; offline</footer>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- LIFECYCLE PAGE -->
+    <section class="wf-screen" data-platform="web" data-screen="lifecycle">
+      <div class="wf-container">
+        <header class="wf-bar">
+          <strong>Papyrus</strong>
+          <span class="wf-note">Project: papyrus</span>
+          <span class="wf-note">Local browser / offline</span>
+        </header>
+        <div class="wf-row" style="margin-top:12px;">
+          <nav class="wf-box" aria-label="Document types" style="flex:0 0 220px;max-width:220px;">
+            <p class="wf-label">Document types</p>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;">
+              <li><span>Business requirements</span></li>
+              <li><span>Business rules</span></li>
+              <li><span>Audit records</span></li>
+              <li><a href="#web/view-tech-spec">Technical specifications</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><a href="#web/list-tasks">Backlog</a></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI specifications</span></li>
+              <li><span>UI mockups</span></li>
+              <li><a href="#web/lifecycle" aria-current="page" style="font-weight:700;text-decoration:underline;">Managed artifacts &amp; lifecycles</a></li>
+              <li><a href="#web/skills">Agent skills &amp; workflows</a></li>
+            </ul>
+          </nav>
+          <main style="flex:1 1 0;min-width:0;">
+            <h1 class="wf-title">Managed artifacts and lifecycles</h1>
+            <p class="wf-subtitle">One section per fixed record type. Backlog.md docs, drafts, and project configuration files are excluded.</p>
+
+            <section class="wf-box" style="margin-bottom:8px;">
+              <h2 class="wf-title" style="font-size:15px;">Tasks</h2>
+              <p class="wf-note">States derived from configured statuses (REQ-01.002); example set: To Do &rarr; In Progress &rarr; Done. Transitions follow configured status order.</p>
+            </section>
+            <section class="wf-box" style="margin-bottom:8px;">
+              <h2 class="wf-title" style="font-size:15px;">Milestones</h2>
+              <p class="wf-note">Open &rarr; Closed. A milestone closes when its tasks are complete; reopening restores Open.</p>
+            </section>
+            <section class="wf-box" style="margin-bottom:8px;">
+              <h2 class="wf-title" style="font-size:15px;">Releases</h2>
+              <p class="wf-note">Draft &rarr; Released. A release becomes released when its milestone set is complete (REQ-03.002).</p>
+            </section>
+            <section class="wf-box" style="margin-bottom:8px;">
+              <h2 class="wf-title" style="font-size:15px;">Decisions</h2>
+              <p class="wf-note">Proposed &rarr; Accepted &rarr; Superseded / Deprecated.</p>
+            </section>
+            <section class="wf-box" style="margin-bottom:8px;">
+              <h2 class="wf-title" style="font-size:15px;">Business requirements</h2>
+              <p class="wf-note">Draft &rarr; Approved &rarr; Deprecated / Restored (REQ-05.007).</p>
+            </section>
+            <section class="wf-box" style="margin-bottom:8px;">
+              <h2 class="wf-title" style="font-size:15px;">Non-functional requirements</h2>
+              <p class="wf-note">Draft &rarr; Approved &rarr; Deprecated / Restored.</p>
+            </section>
+            <section class="wf-box" style="margin-bottom:8px;">
+              <h2 class="wf-title" style="font-size:15px;">Glossary terms</h2>
+              <p class="wf-note">Draft &rarr; Approved &rarr; Deprecated / Restored.</p>
+            </section>
+            <section class="wf-box" style="margin-bottom:8px;">
+              <h2 class="wf-title" style="font-size:15px;">UI specifications</h2>
+              <p class="wf-note">Draft &rarr; Approved &rarr; Deprecated / Restored.</p>
+            </section>
+            <section class="wf-box" style="margin-bottom:8px;">
+              <h2 class="wf-title" style="font-size:15px;">Technical specifications</h2>
+              <p class="wf-note">Draft &rarr; Approved &rarr; Deprecated / Restored.</p>
+            </section>
+            <section class="wf-box" style="margin-bottom:8px;">
+              <h2 class="wf-title" style="font-size:15px;">UI mockups</h2>
+              <p class="wf-note">Draft &rarr; Approved &rarr; Deprecated / Restored. Approval explicit per mockup (REQ-05.008).</p>
+            </section>
+            <section class="wf-box" style="margin-bottom:8px;">
+              <h2 class="wf-title" style="font-size:15px;">Business rules</h2>
+              <p class="wf-note">Draft &rarr; Approved &rarr; Deprecated / Restored.</p>
+            </section>
+            <section class="wf-box" style="margin-bottom:8px;">
+              <h2 class="wf-title" style="font-size:15px;">Audit records</h2>
+              <p class="wf-note">Created only; immutable once written. No state transitions.</p>
+            </section>
+
+            <footer class="wf-footer">Papyrus local browser &middot; offline &middot; no external resources</footer>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- SKILLS PAGE -->
+    <section class="wf-screen" data-platform="web" data-screen="skills">
+      <div class="wf-container">
+        <header class="wf-bar">
+          <strong>Papyrus</strong>
+          <span class="wf-note">Project: papyrus</span>
+          <span class="wf-note">Local browser / offline</span>
+        </header>
+        <div class="wf-row" style="margin-top:12px;">
+          <nav class="wf-box" aria-label="Document types" style="flex:0 0 220px;max-width:220px;">
+            <p class="wf-label">Document types</p>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;">
+              <li><span>Business requirements</span></li>
+              <li><span>Business rules</span></li>
+              <li><span>Audit records</span></li>
+              <li><a href="#web/view-tech-spec">Technical specifications</a></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><a href="#web/list-tasks">Backlog</a></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI specifications</span></li>
+              <li><span>UI mockups</span></li>
+              <li><a href="#web/lifecycle">Managed artifacts &amp; lifecycles</a></li>
+              <li><a href="#web/skills" aria-current="page" style="font-weight:700;text-decoration:underline;">Agent skills &amp; workflows</a></li>
+            </ul>
+          </nav>
+          <main style="flex:1 1 0;min-width:0;">
+            <h1 class="wf-title">Agent skills and workflows</h1>
+            <p class="wf-subtitle">Agent-facing instructions parameterized by effective configuration. Read-only reference.</p>
+
+            <section class="wf-box" style="margin-bottom:12px;">
+              <h2 class="wf-title" style="font-size:15px;">Configuration in effect</h2>
+              <dl style="margin:0;display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;">
+                <dt>Task prefix</dt><dd>TASK</dd>
+                <dt>Milestone prefix</dt><dd>MS</dd>
+                <dt>Release prefix</dt><dd>REL</dd>
+                <dt>ID padding</dt><dd>3 (e.g. TASK-001)</dd>
+                <dt>Statuses</dt><dd>ToDo &rarr; Initiated &rarr; Refined &rarr; Implemented &rarr; Validated &rarr; Done</dd>
+                <dt>Enabled document types</dt><dd>req, nfr, glossary, rule, ui-spec, ui-mockup, audit, deploy, tech-spec</dd>
+                <dt>Enabled decision types</dt><dd>adr, bdr</dd>
+              </dl>
+            </section>
+
+            <section>
+              <h2 class="wf-title" style="font-size:16px;">1. Project setup and init</h2>
+              <article class="wf-box" style="margin-bottom:8px;">
+                <h3 style="margin:0 0 4px;font-size:14px;">Initialize a new project</h3>
+                <pre class="wf-box" style="margin:0 0 6px;font-family:monospace;white-space:pre-wrap;">papyrus init --dir ./my-project</pre>
+                <button class="wf-button" type="button">Copy</button>
+              </article>
+            </section>
+
+            <section>
+              <h2 class="wf-title" style="font-size:16px;">2. Backlog, tasks, milestones, releases</h2>
+              <article class="wf-box" style="margin-bottom:8px;">
+                <h3 style="margin:0 0 4px;font-size:14px;">Task IDs and statuses</h3>
+                <pre class="wf-box" style="margin:0 0 6px;font-family:monospace;white-space:pre-wrap;">papyrus task create "Title" --status ToDo</pre>
+                <button class="wf-button" type="button">Copy</button>
+              </article>
+            </section>
+
+            <footer class="wf-footer">Papyrus local browser &middot; offline &middot; no external resources</footer>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- RESPONSIVE LIST 320 -->
+    <section class="wf-screen" data-platform="web" data-screen="responsive-list-320">
+      <div class="wf-frame wf-frame--mobile">
+        <div class="wf-container">
+          <header class="wf-bar">
+            <button class="wf-button" type="button" aria-expanded="false" aria-controls="type-list-320">Document types</button>
+            <strong>Papyrus</strong>
+          </header>
+          <nav id="type-list-320" class="wf-box" style="display:none;margin-top:8px;" aria-label="Document types">
+            <p class="wf-note" style="margin:0;">Type links remain visible when JavaScript is disabled.</p>
+          </nav>
+          <main style="margin-top:8px;">
+            <h1 class="wf-title" style="font-size:16px;">Tasks</h1>
+            <article class="wf-box" style="margin-bottom:8px;">
+              <a href="#web/view-task" data-goto="view-task" style="font-weight:600;">TASK-060</a>
+              <p class="wf-note" style="margin:2px 0 0;">Final browser cross-type review</p>
+              <p class="wf-note" style="margin:2px 0 0;font-size:11px;">created 2026-11-09 &middot; updated 2026-11-10 &middot; Refined</p>
+            </article>
+            <article class="wf-box" style="margin-bottom:8px;">
+              <a href="#web/view-task" data-goto="view-task" style="font-weight:600;">TASK-066</a>
+              <p class="wf-note" style="margin:2px 0 0;">Front-matter metadata and lifecycle</p>
+              <p class="wf-note" style="margin:2px 0 0;font-size:11px;">created 2026-11-08 &middot; updated 2026-11-09 &middot; Done</p>
+            </article>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- RESPONSIVE EDIT 320 -->
+    <section class="wf-screen" data-platform="web" data-screen="responsive-edit-320">
+      <div class="wf-frame wf-frame--mobile">
+        <div class="wf-container">
+          <header class="wf-bar">
+            <button class="wf-button" type="button" aria-expanded="false" aria-controls="type-list-320b">Document types</button>
+            <strong>Papyrus</strong>
+          </header>
+          <main style="margin-top:8px;">
+            <h1 class="wf-title" style="font-size:16px;">Edit TASK-060</h1>
+            <form class="wf-box" style="display:flex;flex-direction:column;gap:8px;">
+              <label class="wf-label">Title<input class="wf-input" type="text" value="Final browser cross-type review"></label>
+              <label class="wf-label">Status<select class="wf-input"><option>Refined</option></select></label>
+              <label class="wf-label">Created (read-only)<input class="wf-input" type="text" value="2026-11-09" disabled></label>
+              <label class="wf-label">Updated (read-only)<input class="wf-input" type="text" value="2026-11-10" disabled></label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="wf-button wf-button-primary" type="button">Save</button>
+                <a class="wf-button" href="#web/view-task" data-goto="view-task">Cancel</a>
+              </div>
+            </form>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- RESPONSIVE LIFECYCLE 320 -->
+    <section class="wf-screen" data-platform="web" data-screen="responsive-lifecycle-320">
+      <div class="wf-frame wf-frame--mobile">
+        <div class="wf-container">
+          <header class="wf-bar">
+            <button class="wf-button" type="button" aria-expanded="false" aria-controls="type-list-320c">Document types</button>
+            <strong>Papyrus</strong>
+          </header>
+          <main style="margin-top:8px;">
+            <h1 class="wf-title" style="font-size:16px;">Managed artifacts and lifecycles</h1>
+            <article class="wf-box" style="margin-bottom:8px;">
+              <h2 style="margin:0 0 4px;font-size:14px;">Tasks</h2>
+              <p class="wf-note" style="margin:0;font-size:12px;">To Do &rarr; In Progress &rarr; Done</p>
+            </article>
+            <article class="wf-box" style="margin-bottom:8px;">
+              <h2 style="margin:0 0 4px;font-size:14px;">Releases</h2>
+              <p class="wf-note" style="margin:0;font-size:12px;">Planned &rarr; Active &rarr; Released</p>
+            </article>
+            <article class="wf-box" style="margin-bottom:8px;">
+              <h2 style="margin:0 0 4px;font-size:14px;">Other types</h2>
+              <p class="wf-note" style="margin:0;font-size:12px;">Active &rarr; Deprecated (restored via restore).</p>
+            </article>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- RESPONSIVE SKILLS 320 -->
+    <section class="wf-screen" data-platform="web" data-screen="responsive-skills-320">
+      <div class="wf-frame wf-frame--mobile">
+        <div class="wf-container">
+          <header class="wf-bar">
+            <button class="wf-button" type="button" aria-expanded="false" aria-controls="type-list-320d">Document types</button>
+            <strong>Papyrus</strong>
+          </header>
+          <main style="margin-top:8px;">
+            <h1 class="wf-title" style="font-size:16px;">Agent skills and workflows</h1>
+            <p class="wf-note" style="margin:0 0 8px;font-size:12px;">Configuration in effect: TASK, MS, REL; padding 3; statuses ToDo &rarr; Done.</p>
+            <article class="wf-box" style="margin-bottom:8px;">
+              <h3 style="margin:0 0 4px;font-size:14px;">Initialize a new project</h3>
+              <pre class="wf-box" style="margin:4px 0 0;font-family:monospace;white-space:pre-wrap;font-size:12px;">papyrus init --dir ./my-project</pre>
+            </article>
+            <article class="wf-box" style="margin-bottom:8px;">
+              <h3 style="margin:0 0 4px;font-size:14px;">Serve the local browser</h3>
+              <pre class="wf-box" style="margin:4px 0 0;font-family:monospace;white-space:pre-wrap;font-size:12px;">papyrus browser --port 6420</pre>
+            </article>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- ERROR PAGES -->
+    <section class="wf-screen" data-platform="web" data-screen="error-404-unknown">
+      <div class="wf-frame wf-frame--desktop">
+        <div class="wf-container">
+          <h1 class="wf-title">404 &mdash; Not found</h1>
+          <p class="wf-note">The requested page or record does not exist.</p>
+          <a class="wf-button" href="#web/inventory" data-goto="inventory">Back to inventory</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="wf-screen" data-platform="web" data-screen="error-404-deprecated">
+      <div class="wf-frame wf-frame--desktop">
+        <div class="wf-container">
+          <h1 class="wf-title">404 &mdash; Deprecated</h1>
+          <p class="wf-note">The requested record is deprecated and no longer reachable from navigation.</p>
+          <a class="wf-button" href="#web/inventory" data-goto="inventory">Back to inventory</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="wf-screen" data-platform="web" data-screen="error-400">
+      <div class="wf-frame wf-frame--desktop">
+        <div class="wf-container">
+          <h1 class="wf-title">400 &mdash; Bad request</h1>
+          <p class="wf-note">The request could not be understood.</p>
+          <a class="wf-button" href="#web/inventory" data-goto="inventory">Back to inventory</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="wf-screen" data-platform="web" data-screen="error-405">
+      <div class="wf-frame wf-frame--desktop">
+        <div class="wf-container">
+          <h1 class="wf-title">405 &mdash; Method not allowed</h1>
+          <p class="wf-note">The method is not allowed for this path. Allow: GET, HEAD.</p>
+          <a class="wf-button" href="#web/inventory" data-goto="inventory">Back to inventory</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="wf-screen" data-platform="web" data-screen="error-415">
+      <div class="wf-frame wf-frame--desktop">
+        <div class="wf-container">
+          <h1 class="wf-title">415 &mdash; Unsupported media type</h1>
+          <p class="wf-note">The request content type is not supported.</p>
+          <a class="wf-button" href="#web/inventory" data-goto="inventory">Back to inventory</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="wf-screen" data-platform="web" data-screen="error-500">
+      <div class="wf-frame wf-frame--desktop">
+        <div class="wf-container">
+          <h1 class="wf-title">500 &mdash; Internal server error</h1>
+          <p class="wf-note">An unexpected error occurred.</p>
+          <a class="wf-button" href="#web/inventory" data-goto="inventory">Back to inventory</a>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  function all(selector, scope) {
+    return Array.prototype.slice.call((scope || document).querySelectorAll(selector));
+  }
+  function byAttr(selector, attr, value) {
+    return all(selector).filter(function (el) { return el.getAttribute(attr) === value; })[0] || null;
+  }
+  function toggle(selector, active) {
+    all(selector).forEach(function (el) { el.classList.toggle('is-active', el === active); });
+  }
+  function go(hash) { location.hash = hash; }
+
+  function parse(rawHash) {
+    var raw = String(rawHash || '').replace(/^#\/?/, '');
+    var bits = raw.split('/');
+    if (!raw || bits[0] === 'index') return { mode: 'index' };
+    return { mode: 'proto', platform: bits[0], screen: bits[1] || '' };
+  }
+
+  function syncChrome(state) {
+    var key = state.mode === 'index' ? 'index' : state.platform;
+    all('.wf-chrome a').forEach(function (a) {
+      var target = String(a.getAttribute('href') || '').replace(/^#\/?/, '').split('/')[0];
+      var active = target === key;
+      a.classList.toggle('is-active', active);
+      if (active) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+    });
+  }
+
+  function render() {
+    var state = parse(location.hash);
+    var index = document.querySelector('[data-review="index"]');
+
+    syncChrome(state);
+
+    if (state.mode === 'proto') {
+      var proto = byAttr('.wf-proto', 'data-platform', state.platform);
+      if (!proto) { go('#index'); return; }
+      var screens = all('.wf-screen', proto);
+      var screen = state.screen ? byAttr('.wf-screen', 'data-screen', state.screen) : screens[0];
+      if (!screen || screens.indexOf(screen) === -1) screen = screens[0];
+      if (!screen) { go('#index'); return; }
+      var screenId = screen.getAttribute('data-screen');
+      if (state.screen !== screenId) { go('#' + state.platform + '/' + screenId); return; }
+
+      toggle('[data-review]', null);
+      toggle('.wf-proto', proto);
+      screens.forEach(function (s) { s.classList.toggle('is-active', s === screen); });
+      all('.wf-view-link', proto).forEach(function (link) {
+        var active = link.getAttribute('href') === '#' + state.platform + '/' + screenId;
+        link.classList.toggle('is-active', active);
+        if (active) link.setAttribute('aria-current', 'true'); else link.removeAttribute('aria-current');
+      });
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    toggle('.wf-proto', null);
+    toggle('[data-review]', index);
+  }
+
+  document.addEventListener('click', function (e) {
+    var target = e.target.closest('[data-goto]');
+    if (target) {
+      e.preventDefault();
+      var state = parse(location.hash);
+      if (state.mode === 'proto') go('#' + state.platform + '/' + target.getAttribute('data-goto'));
+    }
+  });
+
+  window.addEventListener('hashchange', render);
+  render();
+})();
+</script>
+</body>
+</html>
