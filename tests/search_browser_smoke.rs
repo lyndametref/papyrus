@@ -350,7 +350,7 @@ fn milestone_search_and_browser_flow() {
     let server = Server::start(&project, None);
 
     // Both categories render one at a time, selected entry marked current.
-    let business = server.get("/");
+    let business = server.get("/?type=req");
     assert_eq!(business.status, 200);
     let business_html = business.text();
     assert!(business_html.contains("REQ-001.001"), "{business_html}");
@@ -479,7 +479,7 @@ fn installed_layout_has_no_runtime_asset_dependency() {
 
     // The browser serves non-empty assets compiled into the binary.
     let server = Server::start(&project, Some(&cwd));
-    let page = server.get("/");
+    let page = server.get("/?type=req");
     assert_eq!(page.status, 200);
     assert!(page.text().contains("REQ-001.001"));
     let css = server.get("/assets/app.css");
