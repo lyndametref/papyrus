@@ -1,9 +1,10 @@
 ---
 id: TASK-78
 title: Manage use cases, test cases, and test reports from the CLI
-status: To Do
+status: Implemented
 assignee: []
 created_date: '2026-11-10T20:16:00Z'
+updated_date: '2026-11-10T20:49:00Z'
 labels:
   - cli
   - documentation
@@ -38,3 +39,9 @@ Deliver CLI management for three new managed document types — use cases (UC), 
 - [ ] #4 Records carry YAML front matter per REQ-05.010 and follow the active -> deprecated lifecycle (REQ-05.007).
 - [ ] #5 The managing command conflict (`req` vs dedicated per-type command) is resolved and documented before implementation.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implementation is on branch task/TASK-78 (WIP commit 167223f), NOT merged to main. Included: src/use_case.rs, src/test_case.rs, src/test_report.rs, CLI wiring in src/lib.rs/src/config.rs, browser render update, README manpage, tests/browser_cli.rs update, spec docs/specifications/use-cases-test-cases-and-test-reports-management.md. Next session: checkout task/TASK-78, run quality-gatekeeper first (no re-refinement, no re-implementation), then merge.
+<!-- SECTION:NOTES:END -->
