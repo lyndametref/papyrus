@@ -1,0 +1,34 @@
+# REQ-05.014 Manage Test Reports
+
+## User Story
+As a project contributor, I want to create, find, and maintain Test Report documents so that test execution results, pass/fail outcomes, and verification evidence can be documented and traced.
+
+## Group
+REQ-05 Project Documentation Management
+
+## Criticality
+Should have
+
+## Description
+Test reports are a document type that captures the results of test executions, including pass/fail status, test case coverage, and verification evidence. They are managed with the `req` command and follow the same lifecycle as other documentation types (active → deprecated). Test reports can be listed, viewed, edited, deprecated, and restored with their ID preserved.
+
+## Acceptance Criteria
+- A test report can be created with the required title, description, and optional applicability.
+- Test reports can be listed, viewed, and edited for title and description.
+- Test reports can be deprecated and restored with their ID preserved.
+- Test reports follow the same lifecycle as other documentation types (active → deprecated).
+- The `req` command supports creating, listing, viewing, editing, deprecating, and restoring test reports.
+
+## Traceability
+- Source: customer-feedback handoff — Internal team discussion, Item 10 (medium priority)
+- Raw quote: "add the following type of documents Use Cases, Test Cases and Test Report. Add the needed BR and edit the readme accordingly."
+- REQ-05.007 — Manage Documentation Record Lifecycle (lifecycle applies to test reports)
+- REQ-05.005 — Manage Business Rules (business rules can reference test reports)
+- REQ-05.010 — Record Metadata in YAML Front Matter (front matter required for test reports)
+
+## Open Questions
+- Document type fields (prefix MOCK, directory, enabled, deprecate/restore) need to be defined for test reports
+- Business rules should be able to reference test reports (already supported via requirement references)
+- README sections/structure for new types need to be added
+- Visibility in lists/search for test reports
+- Association to tickets/milestones for test reports

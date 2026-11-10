@@ -4,12 +4,13 @@ title: 'Release 1.0: verify, audit, and close the release'
 status: To Do
 assignee: []
 created_date: '2026-11-08T15:06:00Z'
-updated_date: '2026-11-09T18:51:00Z'
+updated_date: '2026-11-10T20:16:00Z'
 labels:
   - release
 milestone: m-14
 dependencies:
   - TASK-20
+  - TASK-82
 references:
   - docs/requirements/business/REQ-05.010.md
   - docs/requirements/business/REQ-05.011.md

@@ -28,7 +28,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        <b>papyrus</b> manages a project's backlog and long-term documentation from a single command-line interface. It combines:
 
        - **Backlog management** - tasks, milestones, releases, and decisions.
-        - **Documentation management** - business and non-functional requirements, glossary terms, UI and technical specifications, audit records, and business rules.
+        - **Documentation management** - business and non-functional requirements, glossary terms, UI and technical specifications, audit records, business rules, use cases, test cases, and test reports.
 
        All project data lives in the project directory selected with <b>--dir</b> (default: the current working directory). IDs are generated automatically and remain stable across archive/restore and deprecate/restore cycles.
 
@@ -737,6 +737,168 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
        Restore a deprecated audit record.
 
+<b style="color: light-dark(#0969da, #58a6ff);">use-case</b>
+
+        Manage use cases (UC-...).
+
+        <code style="font-weight: bold;">
+        papyrus use-case create <title> --description <text> [--applicability <text>]
+        papyrus use-case list
+        papyrus use-case view <id>
+        papyrus use-case edit <id> [--title <title>] [--description <text>] [--applicability <text>] [--editor]
+        papyrus use-case deprecate <id>
+        papyrus use-case restore <id>
+        </code>
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
+        Create a use case.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);"><title></b>
+           Use case title (required).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--description <text></b>
+           Description of the use case (required).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability <text></b>
+           Applicability of the use case (optional).
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
+        List use cases.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">view <id></b>
+        View a use case.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">edit <id></b>
+        Edit a use case.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--title <title></b>
+           Update the title.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--description <text></b>
+           Update the description.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability <text></b>
+           Update the applicability.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
+           Open the document body in $VISUAL or $EDITOR.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">deprecate <id></b>
+        Move a use case to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">restore <id></b>
+        Return a deprecated use case to its original folder. The ID is preserved.
+
+        Note: REQ-05.012 states use cases are managed with the `req` command; BR-018 recommends a dedicated `use-case` command (open decision). Recommended defaults (pending decision): prefix `UC`, directory `use-cases/`, `enabled: true`; lifecycle `active -> deprecated`; visibility active=visible/deprecated=hidden; no ticket or milestone association. Records carry YAML front matter with the general fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references` and a `# <ID> <title>` body heading (REQ-05.010). Whether `description` and `applicability` are front-matter fields or body content is undecided.
+
+<b style="color: light-dark(#0969da, #58a6ff);">test-case</b>
+
+        Manage test cases (TC-...).
+
+        <code style="font-weight: bold;">
+        papyrus test-case create <title> --description <text> [--applicability <text>]
+        papyrus test-case list
+        papyrus test-case view <id>
+        papyrus test-case edit <id> [--title <title>] [--description <text>] [--applicability <text>] [--editor]
+        papyrus test-case deprecate <id>
+        papyrus test-case restore <id>
+        </code>
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
+        Create a test case.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);"><title></b>
+           Test case title (required).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--description <text></b>
+           Description of the test case (required).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability <text></b>
+           Applicability of the test case (optional).
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
+        List test cases.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">view <id></b>
+        View a test case.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">edit <id></b>
+        Edit a test case.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--title <title></b>
+           Update the title.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--description <text></b>
+           Update the description.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability <text></b>
+           Update the applicability.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
+           Open the document body in $VISUAL or $EDITOR.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">deprecate <id></b>
+        Move a test case to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">restore <id></b>
+        Return a deprecated test case to its original folder. The ID is preserved.
+
+        Note: REQ-05.013 states test cases are managed with the `req` command; BR-019 recommends a dedicated `test-case` command (open decision). Recommended defaults (pending decision): prefix `TC`, directory `test-cases/`, `enabled: true`; lifecycle `active -> deprecated`; visibility active=visible/deprecated=hidden; no ticket or milestone association. Records carry YAML front matter with the general fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references` and a `# <ID> <title>` body heading (REQ-05.010). Whether `description` and `applicability` are front-matter fields or body content is undecided. Relationship to test reports is not stated (see BR-020).
+
+<b style="color: light-dark(#0969da, #58a6ff);">test-report</b>
+
+        Manage test reports (TR-...).
+
+        <code style="font-weight: bold;">
+        papyrus test-report create <title> --description <text> [--applicability <text>]
+        papyrus test-report list
+        papyrus test-report view <id>
+        papyrus test-report edit <id> [--title <title>] [--description <text>] [--applicability <text>] [--editor]
+        papyrus test-report deprecate <id>
+        papyrus test-report restore <id>
+        </code>
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
+        Create a test report.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);"><title></b>
+           Test report title (required).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--description <text></b>
+           Description of the test report (required).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability <text></b>
+           Applicability of the test report (optional).
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
+        List test reports.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">view <id></b>
+        View a test report.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">edit <id></b>
+        Edit a test report.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--title <title></b>
+           Update the title.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--description <text></b>
+           Update the description.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability <text></b>
+           Update the applicability.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
+           Open the document body in $VISUAL or $EDITOR.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">deprecate <id></b>
+        Move a test report to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">restore <id></b>
+        Return a deprecated test report to its original folder. The ID is preserved.
+
+        Note: REQ-05.014 states test reports are managed with the `req` command; BR-020 recommends a dedicated `test-report` command (open decision). Recommended defaults (pending decision): prefix `TR`, directory `test-reports/`, `enabled: true`; lifecycle `active -> deprecated`; visibility active=visible/deprecated=hidden; no ticket or milestone association. Records carry YAML front matter with the general fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references` and a `# <ID> <title>` body heading (REQ-05.010). Whether `description` and `applicability` are front-matter fields or body content is undecided. Test-case coverage should be recorded in the general `references` field rather than a type-specific field (proposal, not decided). Pass/fail outcome storage is undecided.
+
 <b style="color: light-dark(#0969da, #58a6ff);">search</b>
 
        Search tasks, milestones, releases, decisions, and documents in one pass.
@@ -798,7 +960,8 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 <b style="color: light-dark(#0969da, #58a6ff);">Documents</b>
 
         Business requirements, non-functional requirements, glossary terms,
-        UI specifications, and business rules share this lifecycle:
+        UI specifications, business rules, use cases, test cases, and test
+        reports share this lifecycle:
 
         <b>active</b> -&gt; <b>deprecated</b>
 
@@ -875,6 +1038,27 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
          <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.tech-spec.directory&gt;/deprecated/</b>
          Deprecated technical specifications, under the configured technical specifications folder.
+
+         <b style="color: light-dark(#8250df, #d2a8ff);">docs/use-cases/</b>
+         Use cases. Path is <b>doc_directory</b> plus
+         <b>document_types.use-case.directory</b>.
+
+         <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.use-case.directory&gt;/deprecated/</b>
+         Deprecated use cases, under the configured use cases folder.
+
+         <b style="color: light-dark(#8250df, #d2a8ff);">docs/test-cases/</b>
+         Test cases. Path is <b>doc_directory</b> plus
+         <b>document_types.test-case.directory</b>.
+
+         <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.test-case.directory&gt;/deprecated/</b>
+         Deprecated test cases, under the configured test cases folder.
+
+         <b style="color: light-dark(#8250df, #d2a8ff);">docs/test-reports/</b>
+         Test reports. Path is <b>doc_directory</b> plus
+         <b>document_types.test-report.directory</b>.
+
+         <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.test-report.directory&gt;/deprecated/</b>
+         Deprecated test reports, under the configured test reports folder.
 
 <b style="color: light-dark(#0969da, #58a6ff);">ENVIRONMENT</b>
 
@@ -1056,10 +1240,16 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
          tech-spec: { prefix: TECH, directory: technical/, enabled: true }
          audit:    { prefix: AUD, directory: audit-records/,                enabled: true }
          deploy:   { prefix: DEP, directory: architecture/deployment/,     enabled: true }
+         use-case: { prefix: UC,  directory: use-cases/,                  enabled: true }
+         test-case: { prefix: TC, directory: test-cases/,                enabled: true }
+         test-report: { prefix: TR, directory: test-reports/,            enabled: true }
        </code>
 
        The <b>nfreq</b> command uses the <b>nfr</b> type key. Additional types may
        be added. Disabled types cannot be created and are hidden from lists and search.
+       Use cases, test cases, and test reports use the <b>use-case</b>, <b>test-case</b>,
+       and <b>test-report</b> commands respectively (open decision vs. <b>req</b>;
+       see BR-018, BR-019, and BR-020).
 
 <b style="color: light-dark(#0969da, #58a6ff);">Web UI</b>
 
@@ -1101,6 +1291,9 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
          tech-spec: { prefix: TECH, directory: technical/, enabled: true }
          audit:    { prefix: AUD, directory: audit-records/,                enabled: true }
          deploy:   { prefix: DEP, directory: architecture/deployment/,     enabled: true }
+         use-case: { prefix: UC,  directory: use-cases/,                  enabled: true }
+         test-case: { prefix: TC, directory: test-cases/,                enabled: true }
+         test-report: { prefix: TR, directory: test-reports/,            enabled: true }
        # Deprecated documents live under each type directory's deprecated/ subfolder.
 
        browser_host: 127.0.0.1
