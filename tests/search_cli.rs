@@ -1239,3 +1239,240 @@ fn tech_spec_search_symlink_file_escape_exits_one() {
     assert_eq!(stdout(&out), "");
     assert!(!stderr(&out).contains("SECRETWORD"));
 }
+
+// ---------------------------------------------------------------------------
+// Cross-type unified search (TASK-18)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cross_type_unified_search() {
+    let d = tmpdir("cross-type");
+    init(&d);
+
+    // Release, milestone, and task (task depends on nothing for search).
+    let out = run(
+        &d,
+        &[
+            "release",
+            "create",
+            "Release title",
+            "-d",
+            "quick brown fox",
+        ],
+    );
+    assert_eq!(stdout(&out).trim(), "REL-001", "stderr={}", stderr(&out));
+    let out = run(
+        &d,
+        &[
+            "milestone",
+            "create",
+            "Milestone title",
+            "-d",
+            "quick brown fox",
+        ],
+    );
+    assert_eq!(stdout(&out).trim(), "MS-001", "stderr={}", stderr(&out));
+    let out = run(
+        &d,
+        &["task", "create", "Task title", "-d", "quick brown fox"],
+    );
+    assert_eq!(stdout(&out).trim(), "TASK-001", "stderr={}", stderr(&out));
+    let out = run(
+        &d,
+        &[
+            "decision",
+            "create",
+            "Decision title",
+            "-d",
+            "quick brown fox",
+        ],
+    );
+    assert_eq!(stdout(&out).trim(), "ADR-001", "stderr={}", stderr(&out));
+
+    // Business requirements: group + member.
+    let out = run(
+        &d,
+        &[
+            "req",
+            "create-group",
+            "--title",
+            "Req Group",
+            "-d",
+            "quick brown fox",
+        ],
+    );
+    assert_eq!(stdout(&out).trim(), "REQ-001", "stderr={}", stderr(&out));
+    let req = create_req(
+        &d,
+        "req",
+        "Req Title",
+        "REQ-001",
+        &["-d", "quick brown fox"],
+    );
+    assert_eq!(req, "REQ-001.001");
+
+    // Non-functional requirements: group + member.
+    let out = run(
+        &d,
+        &[
+            "nfreq",
+            "create-group",
+            "--title",
+            "Nfr Group",
+            "-d",
+            "quick brown fox",
+        ],
+    );
+    assert_eq!(stdout(&out).trim(), "NFR-001", "stderr={}", stderr(&out));
+    let nfr = create_req(
+        &d,
+        "nfreq",
+        "Nfr Title",
+        "NFR-001",
+        &["-d", "quick brown fox"],
+    );
+    assert_eq!(nfr, "NFR-001.001");
+
+    // Glossary, UI spec, UI mockup, rule, audit, tech spec.
+    let out = run(
+        &d,
+        &[
+            "glossary",
+            "create",
+            "--term",
+            "Glossary term",
+            "--definition",
+            "quick brown fox",
+        ],
+    );
+    assert!(out.status.success(), "stderr={}", stderr(&out));
+    let out = run(
+        &d,
+        &[
+            "ui-spec",
+            "create",
+            "UI Title",
+            "--view",
+            "v",
+            "--description",
+            "quick brown fox",
+        ],
+    );
+    assert!(out.status.success(), "stderr={}", stderr(&out));
+    let out = run(
+        &d,
+        &[
+            "ui-mockup",
+            "create",
+            "Mock quick brown fox",
+            "--task",
+            "TASK-001",
+            "--spec",
+            "UI-001",
+        ],
+    );
+    assert!(out.status.success(), "stderr={}", stderr(&out));
+    let out = run(
+        &d,
+        &[
+            "rule",
+            "create",
+            "Rule Title",
+            "--description",
+            "quick brown fox",
+            "--rationale",
+            "r",
+            "--applicability",
+            "a",
+        ],
+    );
+    assert!(out.status.success(), "stderr={}", stderr(&out));
+    let out = run(
+        &d,
+        &[
+            "audit",
+            "create",
+            "--title",
+            "Audit Title",
+            "--content",
+            "quick brown fox",
+        ],
+    );
+    assert!(out.status.success(), "stderr={}", stderr(&out));
+    let out = run(
+        &d,
+        &[
+            "tech-spec",
+            "create",
+            "Tech Title",
+            "--description",
+            "quick brown fox",
+        ],
+    );
+    assert!(out.status.success(), "stderr={}", stderr(&out));
+
+    // Default search returns every supported record type.
+    let out = search(&d, &["quick brown fox"]);
+    assert_eq!(out.status.code(), Some(0), "stderr={}", stderr(&out));
+    let out_stdout = stdout(&out);
+    let lines: Vec<&str> = out_stdout.lines().collect();
+    assert_eq!(lines.len(), 14, "stdout={}", stdout(&out));
+    let ids: Vec<&str> = lines
+        .iter()
+        .map(|l| l.split_whitespace().next().unwrap())
+        .collect();
+    let mut sorted = ids.clone();
+    sorted.sort();
+    assert_eq!(ids, sorted, "not ordered by id asc");
+
+    // --type doc restricts to document types.
+    let out = search(&d, &["quick brown fox", "--type", "doc"]);
+    assert_eq!(out.status.code(), Some(0), "stderr={}", stderr(&out));
+    let out_stdout = stdout(&out);
+    let lines: Vec<&str> = out_stdout.lines().collect();
+    assert_eq!(lines.len(), 10, "stdout={}", stdout(&out));
+    for line in &lines {
+        assert!(
+            !line.contains(" task ")
+                && !line.contains(" milestone ")
+                && !line.contains(" release ")
+                && !line.contains(" decision "),
+            "non-doc in --type doc: {}",
+            line
+        );
+    }
+
+    // --limit operates across the combined set.
+    let out = search(&d, &["quick brown fox", "--limit", "3"]);
+    assert_eq!(out.status.code(), Some(0), "stderr={}", stderr(&out));
+    let out_stdout = stdout(&out);
+    let lines: Vec<&str> = out_stdout.lines().collect();
+    assert_eq!(lines.len(), 3, "stdout={}", stdout(&out));
+
+    // Quoted phrase: contiguous match required.
+    let out = search(&d, &["quick fox"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+
+    // Deprecation hiding for a document record.
+    let out = run(&d, &["audit", "deprecate", "AUD-001"]);
+    assert!(out.status.success(), "stderr={}", stderr(&out));
+    // Archival hiding for task and milestone records.
+    let out = run(&d, &["task", "archive", "TASK-001"]);
+    assert!(out.status.success(), "stderr={}", stderr(&out));
+    let out = run(&d, &["milestone", "archive", "MS-001"]);
+    assert!(out.status.success(), "stderr={}", stderr(&out));
+
+    let out = search(&d, &["quick brown fox"]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout(&out);
+    assert!(!s.contains("AUD-001"), "deprecated doc still present");
+    assert!(!s.contains("TASK-001"), "archived task still present");
+    assert!(!s.contains("MS-001"), "archived milestone still present");
+
+    // Restored document record reappears.
+    let out = run(&d, &["audit", "restore", "AUD-001"]);
+    assert!(out.status.success(), "stderr={}", stderr(&out));
+    let out = search(&d, &["quick brown fox"]);
+    assert!(stdout(&out).contains("AUD-001"), "restored doc missing");
+}

@@ -162,19 +162,7 @@ fn collect_type(
             continue;
         }
         let title = if key == "ui-mockup" {
-            // Mockup records are HTML documents; parse the <h1> heading.
-            content
-                .split_once("<h1>")
-                .map(|(_, rest)| rest)
-                .and_then(|rest| rest.split("</h1>").next())
-                .map(|inner| {
-                    let inner = inner.trim();
-                    let mut parts = inner.splitn(2, char::is_whitespace);
-                    let _ = parts.next();
-                    parts.next().unwrap_or("").trim().to_string()
-                })
-                .filter(|t| !t.is_empty())
-                .unwrap_or_else(|| id.to_string())
+            crate::ui_mockup::extract_title(&content, id)
         } else {
             let heading = crate::record::document::parse(&content)
                 .ok()
@@ -223,6 +211,9 @@ fn collect_backlog_store(
         let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
+        if !accepted_backlog_stem(folder, cfg, id) {
+            continue;
+        }
         let safe = Context::ensure_within(&ctx.project_dir, &path)?;
         let Ok(content) = fs::read_to_string(&safe) else {
             continue;
@@ -230,15 +221,11 @@ fn collect_backlog_store(
         if !content.to_lowercase().contains(needle) {
             continue;
         }
-        let heading = crate::record::document::parse(&content)
+        let title = crate::record::document::parse(&content)
             .ok()
-            .and_then(|d| d.heading)
+            .map(|d| crate::record::document::heading_id_title_with_frontmatter(&d).1)
             .unwrap_or_default();
-        let rest = heading.trim_start_matches('#').trim();
-        let mut parts = rest.splitn(2, char::is_whitespace);
-        let _ = parts.next();
-        let title = parts.next().unwrap_or("").trim().to_string();
-        let title = if title.is_empty() {
+        let title = if title.trim().is_empty() {
             id.to_string()
         } else {
             title
@@ -287,21 +274,30 @@ fn collect_decision_store(
         let Some(_type_key) = crate::decision::type_key_for_id(cfg, id) else {
             continue;
         };
+        // Require a numeric ID form (e.g. ADR-001), so non-record files
+        // such as notes.md are ignored.
+        let decision_is_record = cfg.decision_types.iter().any(|(_, entry)| {
+            if !entry.enabled || entry.prefix.is_empty() {
+                return false;
+            }
+            id.strip_prefix(&format!("{}-", entry.prefix))
+                .map(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit()))
+                .unwrap_or(false)
+        });
+        if !decision_is_record {
+            continue;
+        }
         let Ok(content) = fs::read_to_string(&safe) else {
             continue;
         };
         if !content.to_lowercase().contains(needle) {
             continue;
         }
-        let heading = crate::record::document::parse(&content)
+        let title = crate::record::document::parse(&content)
             .ok()
-            .and_then(|d| d.heading)
+            .map(|d| crate::record::document::heading_id_title_with_frontmatter(&d).1)
             .unwrap_or_default();
-        let rest = heading.trim_start_matches('#').trim();
-        let mut parts = rest.splitn(2, char::is_whitespace);
-        let _ = parts.next();
-        let title = parts.next().unwrap_or("").trim().to_string();
-        let title = if title.is_empty() {
+        let title = if title.trim().is_empty() {
             id.to_string()
         } else {
             title
@@ -314,6 +310,26 @@ fn collect_decision_store(
         });
     }
     Ok(())
+}
+
+fn has_prefix_digits(base: &str, prefix: &str) -> bool {
+    let base_l = base.to_ascii_lowercase();
+    let prefix_l = prefix.to_ascii_lowercase();
+    let Some(rest) = base_l.strip_prefix(&format!("{}-", prefix_l)) else {
+        return false;
+    };
+    !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit())
+}
+
+fn accepted_backlog_stem(folder: &str, cfg: &Config, stem: &str) -> bool {
+    let base = stem.split(" - ").next().unwrap_or(stem).trim();
+    let prefixes: &[&str] = match folder {
+        "tasks" => &[cfg.task_prefix.as_str(), "task", "TASK"],
+        "milestones" => &[cfg.milestone_prefix.as_str(), "MS", "ms", "M", "m"],
+        "releases" => &[cfg.release_prefix.as_str(), "REL", "rel"],
+        _ => &[],
+    };
+    prefixes.iter().any(|p| has_prefix_digits(base, p))
 }
 
 fn active_dir(

@@ -969,12 +969,11 @@ fn ac_items_from_document(doc: &crate::record::document::Document) -> Vec<String
                     break;
                 }
             }
-            if let Some(rest) = item.strip_prefix('#') {
-                if let Some(sp) = rest.find(' ') {
-                    if rest[..sp].chars().all(|c| c.is_ascii_digit()) {
-                        item = rest[sp + 1..].trim().to_string();
-                    }
-                }
+            if let Some(rest) = item.strip_prefix('#')
+                && let Some(sp) = rest.find(' ')
+                && rest[..sp].chars().all(|c| c.is_ascii_digit())
+            {
+                item = rest[sp + 1..].trim().to_string();
             }
             if !item.is_empty() {
                 out.push(item);
@@ -1384,13 +1383,13 @@ pub fn edit(
             "assignee".into(),
             cleaned.join("\n"),
         ));
-        if has_doc_section(&doc, "## Assignee") {
-            if let Some(a) = &td.assignee {
-                ops.push(crate::record::patch::PatchOp::SetSection(
-                    "## Assignee".into(),
-                    a.clone(),
-                ));
-            }
+        if has_doc_section(&doc, "## Assignee")
+            && let Some(a) = &td.assignee
+        {
+            ops.push(crate::record::patch::PatchOp::SetSection(
+                "## Assignee".into(),
+                a.clone(),
+            ));
         }
     }
     if !comments_raw.is_empty() {
