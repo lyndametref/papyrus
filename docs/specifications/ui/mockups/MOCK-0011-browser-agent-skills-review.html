@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' file: 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>MOCK-0011 &mdash; Browser agent skills and workflows review</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body data-mock-id="MOCK-0011">
+
+<header class="wf-chrome" role="navigation" aria-label="Review navigation (not part of the design)">
+  <span class="wf-chrome-label">Review</span>
+  <a class="wf-chrome-btn" href="#index">Overview</a>
+  <a class="wf-chrome-btn" href="#web">Web</a>
+  <span class="wf-chrome-note">Scaffolding for review only &mdash; not part of the mockup.</span>
+</header>
+
+<!-- 1. REVIEW LANDING -->
+<section class="wf-review wf-index is-active" data-review="index" data-screen="index">
+  <div class="wf-container">
+    <p class="wf-eyebrow">MOCK-0011 &middot; Wireframe review</p>
+    <h1 class="wf-title">Browser agent skills and workflows review</h1>
+    <p class="wf-subtitle">Layout and interaction reference for the agent-facing skills page. Grayscale wireframe only &mdash; no visual styling, library, or technology choices.</p>
+
+    <div class="wf-box wf-ticket">
+      <h2 class="wf-section-title">Ticket</h2>
+      <p><strong>TASK-76</strong> &mdash; Design review: browser skills page for agent workflow configuration</p>
+      <p class="wf-note">Sources: REQ-06.005, REQ-06.003, NFR-01.002, BR-016; docs/specifications/browser-requirements.md; docs/specifications/browser-managed-artifacts-and-lifecycles.md; TASK-77 (implementation)</p>
+    </div>
+
+    <h2 class="wf-section-title">Review contents</h2>
+    <div class="wf-cards">
+      <article class="wf-box wf-card">
+        <span class="wf-badge">Web &middot; 8 views</span>
+        <h3>Web prototype</h3>
+        <p>Click through the skills page, responsive 320 px view, and baseline error pages.</p>
+        <a class="wf-button" href="#web">Open web prototype</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- 2. PROTOTYPES -->
+<div class="wf-proto" data-platform="web">
+  <nav class="wf-proto-nav" aria-label="Web views (review navigation)">
+    <span class="wf-chrome-label">Web views</span>
+    <a class="wf-chrome-btn wf-view-link" href="#web/skills">Skills</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/responsive-skills-320">320&nbsp;px</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-404">404</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-400">400</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-405">405</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-415">415</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-500">500</a>
+  </nav>
+
+  <div class="wf-frame wf-frame--desktop">
+
+    <!-- SKILLS PAGE -->
+    <section class="wf-screen is-active" data-platform="web" data-screen="skills">
+      <div class="wf-container">
+        <header class="wf-bar">
+          <strong>Papyrus</strong>
+          <span class="wf-note">Project: papyrus</span>
+          <span class="wf-note">Local browser / offline &middot; 127.0.0.1:6420</span>
+        </header>
+
+        <div class="wf-row" style="margin-top:12px;">
+          <nav class="wf-box" aria-label="Document types" style="flex:0 0 220px;max-width:220px;">
+            <p class="wf-label">Document types</p>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;">
+              <li><span>Business requirements</span></li>
+              <li><span>Business rules</span></li>
+              <li><span>Audit records</span></li>
+              <li><span>Technical specifications</span></li>
+              <li><span>Non-functional requirements</span></li>
+              <li><span>Backlog</span></li>
+              <li><span>Decisions</span></li>
+              <li><span>Glossary</span></li>
+              <li><span>UI specifications</span></li>
+              <li><span>UI mockups</span></li>
+              <li><span>Managed artifacts &amp; lifecycles</span></li>
+              <li><a href="#web/skills" aria-current="page" style="font-weight:700;text-decoration:underline;">Agent skills &amp; workflows</a></li>
+            </ul>
+          </nav>
+
+          <main style="flex:1 1 0;min-width:0;">
+            <h1 class="wf-title">Agent skills and workflows</h1>
+            <p class="wf-subtitle">Agent-facing instructions for configuring and operating Papyrus. Values reflect the effective project configuration. Read-only reference.</p>
+
+            <section class="wf-box" style="margin-bottom:12px;">
+              <h2 class="wf-title" style="font-size:15px;">Configuration in effect</h2>
+              <dl style="margin:0;display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;">
+                <dt>Task prefix</dt><dd>TASK</dd>
+                <dt>Milestone prefix</dt><dd>MS</dd>
+                <dt>Release prefix</dt><dd>REL</dd>
+                <dt>ID padding</dt><dd>3 (e.g. TASK-001)</dd>
+                <dt>Date format</dt><dd>yyyy-mm-dd</dd>
+                <dt>Statuses</dt><dd>ToDo &rarr; Initiated &rarr; Refined &rarr; Implemented &rarr; Validated &rarr; Done</dd>
+                <dt>Enabled document types</dt><dd>req, nfr, glossary, rule, ui-spec, ui-mockup, audit, deploy, tech-spec</dd>
+                <dt>Enabled decision types</dt><dd>adr, bdr</dd>
+                <dt>Backlog directory</dt><dd>backlog/</dd>
+                <dt>Decision directory</dt><dd>decisions/</dd>
+                <dt>Doc directory</dt><dd>docs/</dd>
+              </dl>
+            </section>
+
+            <section>
+              <h2 class="wf-title" style="font-size:16px;">1. Project setup and init</h2>
+              <article class="wf-box" style="margin-bottom:8px;">
+                <h3 style="margin:0 0 4px;font-size:14px;">Initialize a new project</h3>
+                <p class="wf-note" style="margin:0 0 6px;">Create the project skeleton and write the initial configuration.</p>
+                <pre class="wf-box" style="margin:0 0 6px;font-family:monospace;white-space:pre-wrap;">papyrus init --dir ./my-project</pre>
+                <button class="wf-button" type="button">Copy</button>
+              </article>
+              <article class="wf-box" style="margin-bottom:8px;">
+                <h3 style="margin:0 0 4px;font-size:14px;">Inspect effective configuration</h3>
+                <p class="wf-note" style="margin:0 0 6px;">Prefixes, padding, statuses, enabled types, and directories are read from papyrus.config.yml with built-in defaults.</p>
+                <pre class="wf-box" style="margin:0 0 6px;font-family:monospace;white-space:pre-wrap;">papyrus config list</pre>
+                <button class="wf-button" type="button">Copy</button>
+              </article>
+            </section>
+
+            <section>
+              <h2 class="wf-title" style="font-size:16px;">2. Backlog, tasks, milestones, releases</h2>
+              <article class="wf-box" style="margin-bottom:8px;">
+                <h3 style="margin:0 0 4px;font-size:14px;">Task IDs and statuses</h3>
+                <p class="wf-note" style="margin:0 0 6px;">New tasks use prefix TASK with padding 3: TASK-001. Statuses flow ToDo &rarr; Initiated &rarr; Refined &rarr; Implemented &rarr; Validated &rarr; Done.</p>
+                <pre class="wf-box" style="margin:0 0 6px;font-family:monospace;white-space:pre-wrap;">papyrus task create "Title" --status ToDo</pre>
+                <button class="wf-button" type="button">Copy</button>
+              </article>
+              <article class="wf-box" style="margin-bottom:8px;">
+                <h3 style="margin:0 0 4px;font-size:14px;">Milestones and releases</h3>
+                <p class="wf-note" style="margin:0 0 6px;">Milestone IDs use prefix MS (MS-001); release IDs use prefix REL (REL-001). Release lifecycle is separate from task workflow status.</p>
+                <pre class="wf-box" style="margin:0 0 6px;font-family:monospace;white-space:pre-wrap;">papyrus milestone create "Title"
+papyrus release create "Title"</pre>
+                <button class="wf-button" type="button">Copy</button>
+              </article>
+            </section>
+
+            <section>
+              <h2 class="wf-title" style="font-size:16px;">3. Requirements and documentation management</h2>
+              <article class="wf-box" style="margin-bottom:8px;">
+                <h3 style="margin:0 0 4px;font-size:14px;">Document types and directories</h3>
+                <p class="wf-note" style="margin:0 0 6px;">Enabled types (req, nfr, glossary, rule, ui-spec, ui-mockup, audit, deploy, tech-spec) are stored under docs/ in their configured directories. Disabled types are hidden.</p>
+                <pre class="wf-box" style="margin:0 0 6px;font-family:monospace;white-space:pre-wrap;">papyrus req create "Title"
+papyrus nfreq create "Title"</pre>
+                <button class="wf-button" type="button">Copy</button>
+              </article>
+              <article class="wf-box" style="margin-bottom:8px;">
+                <h3 style="margin:0 0 4px;font-size:14px;">Business rules, glossary, specifications</h3>
+                <p class="wf-note" style="margin:0 0 6px;">Rules, glossary terms, UI specs, technical specs, and mockups follow the same record lifecycle: active &rarr; deprecated (restored via restore).</p>
+                <pre class="wf-box" style="margin:0 0 6px;font-family:monospace;white-space:pre-wrap;">papyrus rule create "Title"
+papyrus glossary create "Term"</pre>
+                <button class="wf-button" type="button">Copy</button>
+              </article>
+            </section>
+
+            <section>
+              <h2 class="wf-title" style="font-size:16px;">4. Search</h2>
+              <article class="wf-box" style="margin-bottom:8px;">
+                <h3 style="margin:0 0 4px;font-size:14px;">Search across records</h3>
+                <p class="wf-note" style="margin:0 0 6px;">Search spans enabled document and decision types; disabled types are excluded.</p>
+                <pre class="wf-box" style="margin:0 0 6px;font-family:monospace;white-space:pre-wrap;">papyrus search "query"</pre>
+                <button class="wf-button" type="button">Copy</button>
+              </article>
+            </section>
+
+            <section>
+              <h2 class="wf-title" style="font-size:16px;">5. Browser usage</h2>
+              <article class="wf-box" style="margin-bottom:8px;">
+                <h3 style="margin:0 0 4px;font-size:14px;">Serve the local browser</h3>
+                <p class="wf-note" style="margin:0 0 6px;">Offline, loopback by default. No internet connection required.</p>
+                <pre class="wf-box" style="margin:0 0 6px;font-family:monospace;white-space:pre-wrap;">papyrus browser --port 6420</pre>
+                <button class="wf-button" type="button">Copy</button>
+              </article>
+            </section>
+
+            <section>
+              <h2 class="wf-title" style="font-size:16px;">6. Release and audit workflows</h2>
+              <article class="wf-box" style="margin-bottom:8px;">
+                <h3 style="margin:0 0 4px;font-size:14px;">Releases and audits</h3>
+                <p class="wf-note" style="margin:0 0 6px;">Releases move active &rarr; released; audit records are created for release audits. Decision types enabled: adr, bdr.</p>
+                <pre class="wf-box" style="margin:0 0 6px;font-family:monospace;white-space:pre-wrap;">papyrus release status REL-001 released</pre>
+                <button class="wf-button" type="button">Copy</button>
+              </article>
+            </section>
+
+            <section>
+              <h2 class="wf-title" style="font-size:16px;">7. Configuration management</h2>
+              <article class="wf-box" style="margin-bottom:8px;">
+                <h3 style="margin:0 0 4px;font-size:14px;">Set and unset keys</h3>
+                <p class="wf-note" style="margin:0 0 6px;">Prefixes, padding, statuses, enabled types, and directories are configuration keys (BR-016).</p>
+                <pre class="wf-box" style="margin:0 0 6px;font-family:monospace;white-space:pre-wrap;">papyrus config set task_prefix TASK
+papyrus config unset statuses</pre>
+                <button class="wf-button" type="button">Copy</button>
+              </article>
+            </section>
+
+            <section>
+              <h2 class="wf-title" style="font-size:16px;">8. Decisions</h2>
+              <article class="wf-box" style="margin-bottom:8px;">
+                <h3 style="margin:0 0 4px;font-size:14px;">Decision records</h3>
+                <p class="wf-note" style="margin:0 0 6px;">Enabled decision types: adr, bdr. Lifecycle: proposed &rarr; accepted | rejected; accepted &rarr; deprecated | superseded.</p>
+                <pre class="wf-box" style="margin:0 0 6px;font-family:monospace;white-space:pre-wrap;">papyrus decision create --type adr "Title"</pre>
+                <button class="wf-button" type="button">Copy</button>
+              </article>
+            </section>
+
+            <footer class="wf-footer">Papyrus local browser &middot; offline &middot; no external resources</footer>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- RESPONSIVE 320 -->
+    <section class="wf-screen" data-platform="web" data-screen="responsive-skills-320">
+      <div class="wf-frame wf-frame--mobile">
+        <div class="wf-container">
+          <header class="wf-bar">
+            <button class="wf-button" type="button" aria-expanded="false" aria-controls="type-list-320">Document types</button>
+            <strong>Papyrus</strong>
+          </header>
+          <nav id="type-list-320" class="wf-box" style="display:none;margin-top:8px;" aria-label="Document types">
+            <p class="wf-note" style="margin:0;">Type links remain visible when JavaScript is disabled.</p>
+          </nav>
+          <main style="margin-top:8px;">
+            <h1 class="wf-title" style="font-size:16px;">Agent skills and workflows</h1>
+            <p class="wf-subtitle">Configuration in effect: TASK, MS, REL; padding 3; statuses ToDo &rarr; Done.</p>
+            <article class="wf-box" style="margin-bottom:8px;">
+              <h3 style="margin:0 0 4px;font-size:14px;">Initialize a new project</h3>
+              <pre class="wf-box" style="margin:4px 0 0;font-family:monospace;white-space:pre-wrap;font-size:12px;">papyrus init --dir ./my-project</pre>
+            </article>
+            <article class="wf-box" style="margin-bottom:8px;">
+              <h3 style="margin:0 0 4px;font-size:14px;">Serve the local browser</h3>
+              <pre class="wf-box" style="margin:4px 0 0;font-family:monospace;white-space:pre-wrap;font-size:12px;">papyrus browser --port 6420</pre>
+            </article>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- ERROR PAGES -->
+    <section class="wf-screen" data-platform="web" data-screen="error-404">
+      <div class="wf-frame wf-frame--desktop">
+        <div class="wf-container">
+          <h1 class="wf-title">404 &mdash; Not found</h1>
+          <p class="wf-note">The requested page or record does not exist.</p>
+          <a class="wf-button" href="#web/skills">Back to skills</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="wf-screen" data-platform="web" data-screen="error-400">
+      <div class="wf-frame wf-frame--desktop">
+        <div class="wf-container">
+          <h1 class="wf-title">400 &mdash; Bad request</h1>
+          <p class="wf-note">The request could not be understood.</p>
+          <a class="wf-button" href="#web/skills">Back to skills</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="wf-screen" data-platform="web" data-screen="error-405">
+      <div class="wf-frame wf-frame--desktop">
+        <div class="wf-container">
+          <h1 class="wf-title">405 &mdash; Method not allowed</h1>
+          <p class="wf-note">The method is not allowed for this path. Allow: GET, HEAD.</p>
+          <a class="wf-button" href="#web/skills">Back to skills</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="wf-screen" data-platform="web" data-screen="error-415">
+      <div class="wf-frame wf-frame--desktop">
+        <div class="wf-container">
+          <h1 class="wf-title">415 &mdash; Unsupported media type</h1>
+          <p class="wf-note">The request content type is not supported.</p>
+          <a class="wf-button" href="#web/skills">Back to skills</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="wf-screen" data-platform="web" data-screen="error-500">
+      <div class="wf-frame wf-frame--desktop">
+        <div class="wf-container">
+          <h1 class="wf-title">500 &mdash; Internal server error</h1>
+          <p class="wf-note">An unexpected error occurred.</p>
+          <a class="wf-button" href="#web/skills">Back to skills</a>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  function all(selector, scope) {
+    return Array.prototype.slice.call((scope || document).querySelectorAll(selector));
+  }
+  function byAttr(selector, attr, value) {
+    return all(selector).filter(function (el) { return el.getAttribute(attr) === value; })[0] || null;
+  }
+  function toggle(selector, active) {
+    all(selector).forEach(function (el) { el.classList.toggle('is-active', el === active); });
+  }
+  function go(hash) { location.hash = hash; }
+
+  function parse(rawHash) {
+    var raw = String(rawHash || '').replace(/^#\/?/, '');
+    var bits = raw.split('/');
+    if (!raw || bits[0] === 'index') return { mode: 'index' };
+    return { mode: 'proto', platform: bits[0], screen: bits[1] || '' };
+  }
+
+  function syncChrome(state) {
+    var key = state.mode === 'index' ? 'index' : state.platform;
+    all('.wf-chrome a').forEach(function (a) {
+      var target = String(a.getAttribute('href') || '').replace(/^#\/?/, '').split('/')[0];
+      var active = target === key;
+      a.classList.toggle('is-active', active);
+      if (active) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+    });
+  }
+
+  function render() {
+    var state = parse(location.hash);
+    var index = document.querySelector('[data-review="index"]');
+
+    syncChrome(state);
+
+    if (state.mode === 'proto') {
+      var proto = byAttr('.wf-proto', 'data-platform', state.platform);
+      if (!proto) { go('#index'); return; }
+      var screens = all('.wf-screen', proto);
+      var screen = state.screen ? byAttr('.wf-screen', 'data-screen', state.screen) : screens[0];
+      if (!screen || screens.indexOf(screen) === -1) screen = screens[0];
+      if (!screen) { go('#index'); return; }
+      var screenId = screen.getAttribute('data-screen');
+      if (state.screen !== screenId) { go('#' + state.platform + '/' + screenId); return; }
+
+      toggle('[data-review]', null);
+      toggle('.wf-proto', proto);
+      screens.forEach(function (s) { s.classList.toggle('is-active', s === screen); });
+      all('.wf-view-link', proto).forEach(function (link) {
+        var active = link.getAttribute('href') === '#' + state.platform + '/' + screenId;
+        link.classList.toggle('is-active', active);
+        if (active) link.setAttribute('aria-current', 'true'); else link.removeAttribute('aria-current');
+      });
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    toggle('.wf-proto', null);
+    toggle('[data-review]', index);
+  }
+
+  document.addEventListener('click', function (e) {
+    var target = e.target.closest('[data-goto]');
+    if (target) {
+      e.preventDefault();
+      var state = parse(location.hash);
+      if (state.mode === 'proto') go('#' + state.platform + '/' + target.getAttribute('data-goto'));
+    }
+  });
+
+  window.addEventListener('hashchange', render);
+  render();
+})();
+</script>
+</body>
+</html>
