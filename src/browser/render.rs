@@ -122,7 +122,7 @@ fn plural(count: usize, singular: &str, plural: &str) -> String {
 
 /// Sidebar fragment. Only enabled document types are listed.
 pub fn sidebar(selected: Option<Category>, cfg: &Config) -> String {
-    sidebar_with_lifecycle(selected, cfg, false)
+    build_sidebar(selected, cfg, false, false)
 }
 
 /// Sidebar fragment with optional lifecycle-page active state.
@@ -130,6 +130,24 @@ pub fn sidebar_with_lifecycle(
     selected: Option<Category>,
     cfg: &Config,
     lifecycle_active: bool,
+) -> String {
+    build_sidebar(selected, cfg, lifecycle_active, false)
+}
+
+/// Sidebar fragment with optional skills-page active state.
+pub fn sidebar_with_skills(
+    selected: Option<Category>,
+    cfg: &Config,
+    skills_active: bool,
+) -> String {
+    build_sidebar(selected, cfg, false, skills_active)
+}
+
+fn build_sidebar(
+    selected: Option<Category>,
+    cfg: &Config,
+    lifecycle_active: bool,
+    skills_active: bool,
 ) -> String {
     let mut items = String::new();
     // Three sidebar entries: Business requirements, Non-functional requirements, Backlog.
@@ -292,6 +310,16 @@ pub fn sidebar_with_lifecycle(
     items.push_str(&format!(
         "<li><a href=\"/lifecycle\"{}>Managed artifacts &amp; lifecycles</a></li>",
         lifecycle_current
+    ));
+    // Agent skills & workflows (always present, not gated by document_types)
+    let skills_current = if skills_active {
+        " aria-current=\"page\""
+    } else {
+        ""
+    };
+    items.push_str(&format!(
+        "<li><a href=\"/skills\"{}>Agent skills &amp; workflows</a></li>",
+        skills_current
     ));
     format!(
         "<aside class=\"sidebar\">\
@@ -3261,6 +3289,269 @@ pub fn lifecycle_page(cfg: &Config, chrome: Chrome<'_>) -> String {
         ],
         &[
             ("sidebar", &sidebar_with_lifecycle(None, cfg, true)),
+            ("section", &sections),
+        ],
+    )
+}
+
+/// Render the agent skills and workflows page.
+#[allow(clippy::type_complexity)]
+pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
+    // Status fallback mirrors the lifecycle page.
+    let statuses = if cfg.statuses.is_empty() || !cfg.statuses.contains(&cfg.default_status) {
+        Config::default().statuses
+    } else {
+        cfg.statuses.clone()
+    };
+    let status_chain_raw = statuses.join(" \u{2192} ");
+
+    // id_padding fallback.
+    let padding = if (1..=6).contains(&cfg.id_padding) {
+        cfg.id_padding
+    } else {
+        3
+    };
+    let example = format!("{:0width$}", 1, width = padding as usize);
+    let id_padding_str = padding.to_string();
+
+    let task_prefix = cfg.task_prefix.clone();
+    let milestone_prefix = cfg.milestone_prefix.clone();
+    let release_prefix = cfg.release_prefix.clone();
+    let default_status = cfg.default_status.clone();
+    let date_format = cfg.date_format.clone();
+    let backlog_directory = cfg.backlog_directory.clone();
+    let decision_directory = cfg.decision_directory.clone();
+    let doc_directory = cfg.doc_directory.clone();
+
+    // Enabled document types in configured (canonical default) order.
+    let known_doc_order = [
+        "req",
+        "nfr",
+        "glossary",
+        "rule",
+        "ui-spec",
+        "ui-mockup",
+        "audit",
+        "deploy",
+        "tech-spec",
+    ];
+    let mut enabled_doc = Vec::new();
+    for key in known_doc_order {
+        if let Some(e) = cfg.document_types.get(key)
+            && e.enabled
+        {
+            enabled_doc.push(key.to_string());
+        }
+    }
+    // Append any unknown enabled keys (sorted).
+    let mut unknown: Vec<String> = cfg
+        .document_types
+        .iter()
+        .filter(|(k, e)| e.enabled && !known_doc_order.contains(&k.as_str()))
+        .map(|(k, _)| k.clone())
+        .collect();
+    unknown.sort();
+    enabled_doc.extend(unknown);
+    let enabled_doc_types = enabled_doc.join(", ");
+    let enabled_doc_types_display = if enabled_doc_types.is_empty() {
+        "(none)".to_string()
+    } else {
+        enabled_doc_types.clone()
+    };
+
+    // Enabled decision types (BTreeMap order = sorted).
+    let enabled_decision: Vec<String> = cfg
+        .decision_types
+        .iter()
+        .filter(|(_, e)| e.enabled)
+        .map(|(k, _)| k.clone())
+        .collect();
+    let enabled_decision_types = enabled_decision.join(", ");
+    let enabled_decision_types_display = if enabled_decision_types.is_empty() {
+        "(none)".to_string()
+    } else {
+        enabled_decision_types.clone()
+    };
+
+    // Variables for substitution.
+    let vars: Vec<(&str, String)> = vec![
+        ("task_prefix", task_prefix.clone()),
+        ("milestone_prefix", milestone_prefix.clone()),
+        ("release_prefix", release_prefix.clone()),
+        ("id_padding", id_padding_str.clone()),
+        ("example", example.clone()),
+        ("status_chain", status_chain_raw.clone()),
+        ("default_status", default_status.clone()),
+        ("enabled_doc_types", enabled_doc_types_display.clone()),
+        (
+            "enabled_decision_types",
+            enabled_decision_types_display.clone(),
+        ),
+        ("doc_directory", doc_directory.clone()),
+        ("decision_directory", decision_directory.clone()),
+        ("backlog_directory", backlog_directory.clone()),
+        ("date_format", date_format.clone()),
+    ];
+
+    fn substitute(text: &str, vars: &[(&str, String)]) -> String {
+        let mut out = text.to_string();
+        for (key, val) in vars {
+            out = out.replace(&format!("{{{}}}", key), val);
+        }
+        out
+    }
+
+    // Config block (dl).
+    let mut config_block = String::new();
+    config_block.push_str("<section><h2>Configuration in effect</h2><dl>");
+    let pairs: Vec<(&str, String)> = vec![
+        ("Task prefix", task_prefix.clone()),
+        ("Milestone prefix", milestone_prefix.clone()),
+        ("Release prefix", release_prefix.clone()),
+        (
+            "ID padding",
+            format!("{} (e.g. {}-{})", padding, task_prefix, example),
+        ),
+        ("Date format", date_format.clone()),
+        ("Statuses", status_chain_raw.clone()),
+        ("Enabled document types", enabled_doc_types_display.clone()),
+        (
+            "Enabled decision types",
+            enabled_decision_types_display.clone(),
+        ),
+        ("Backlog directory", backlog_directory.clone()),
+        ("Decision directory", decision_directory.clone()),
+        ("Doc directory", doc_directory.clone()),
+    ];
+    for (label, value) in pairs {
+        config_block.push_str(&format!(
+            "<div><dt>{}</dt><dd>{}</dd></div>",
+            escape(label),
+            escape(&value)
+        ));
+    }
+    config_block.push_str("</dl></section>");
+
+    // Skill groups.
+    // (group title, Vec of (title, desc_template, snippet_template))
+    let groups: Vec<(&str, Vec<(&str, &str, &str)>)> = vec![
+        (
+            "Project setup and init",
+            vec![
+                (
+                    "Initialize a new project",
+                    "Create the project skeleton and write the initial configuration.",
+                    "papyrus init --dir ./my-project",
+                ),
+                (
+                    "Inspect effective configuration",
+                    "Prefixes, padding, statuses, enabled types, and directories are read from papyrus.config.yml with built-in defaults.",
+                    "papyrus config list",
+                ),
+            ],
+        ),
+        (
+            "Backlog, tasks, milestones, releases",
+            vec![
+                (
+                    "Task IDs and statuses",
+                    "New tasks use prefix {task_prefix} with padding {id_padding}: {task_prefix}-{example}. Statuses flow {status_chain}.",
+                    "papyrus task create \"Title\" --status {default_status}",
+                ),
+                (
+                    "Milestones and releases",
+                    "Milestone IDs use prefix {milestone_prefix} ({milestone_prefix}-{example}); release IDs use prefix {release_prefix} ({release_prefix}-{example}). Release lifecycle is separate from task workflow status.",
+                    "papyrus milestone create \"Title\"\npapyrus release create \"Title\"",
+                ),
+            ],
+        ),
+        (
+            "Requirements and documentation management",
+            vec![
+                (
+                    "Document types and directories",
+                    "Enabled types ({enabled_doc_types}) are stored under {doc_directory} in their configured directories. Disabled types are hidden.",
+                    "papyrus req create \"Title\"\npapyrus nfreq create \"Title\"",
+                ),
+                (
+                    "Business rules, glossary, specifications",
+                    "Rules, glossary terms, UI specs, technical specs, and mockups follow the same record lifecycle: active \u{2192} deprecated (restored via restore).",
+                    "papyrus rule create \"Title\"\npapyrus glossary create \"Term\"",
+                ),
+            ],
+        ),
+        (
+            "Search",
+            vec![(
+                "Search across records",
+                "Search spans enabled document and decision types; disabled types are excluded.",
+                "papyrus search \"query\"",
+            )],
+        ),
+        (
+            "Browser usage",
+            vec![(
+                "Serve the local browser",
+                "Offline, loopback by default. No internet connection required.",
+                "papyrus browser --port 6420",
+            )],
+        ),
+        (
+            "Release and audit workflows",
+            vec![(
+                "Releases and audits",
+                "Releases move active \u{2192} released; audit records are created for release audits. Decision types enabled: {enabled_decision_types}.",
+                "papyrus release status {release_prefix}-{example} released",
+            )],
+        ),
+        (
+            "Configuration management",
+            vec![(
+                "Set and unset keys",
+                "Prefixes, padding, statuses, enabled types, and directories are configuration keys (BR-016).",
+                "papyrus config set task_prefix {task_prefix}\npapyrus config unset statuses",
+            )],
+        ),
+        (
+            "Decisions",
+            vec![(
+                "Decision records",
+                "Enabled decision types: {enabled_decision_types}. Lifecycle: proposed \u{2192} accepted | rejected; accepted \u{2192} deprecated | superseded.",
+                "papyrus decision create --type adr \"Title\"",
+            )],
+        ),
+    ];
+
+    let mut sections = String::new();
+    sections.push_str(&config_block);
+    for (group, articles) in &groups {
+        sections.push_str(&format!("<section><h2>{}</h2>", escape(group)));
+        for (title, desc_tpl, snippet_tpl) in articles {
+            let desc = substitute(desc_tpl, &vars);
+            let snippet = substitute(snippet_tpl, &vars);
+            sections.push_str(&format!(
+                "<article><h3>{}</h3><p>{}</p><pre>{}</pre><button type=\"button\">Copy</button></article>",
+                escape(title),
+                escape(&desc),
+                escape(&snippet)
+            ));
+        }
+        sections.push_str("</section>");
+    }
+
+    let title = "Papyrus \u{2014} Agent skills and workflows".to_string();
+    let subheading = "Agent-facing instructions for configuring and operating Papyrus. Values reflect the effective project configuration. Read-only reference.";
+    render_template(
+        LIST_TEMPLATE,
+        &[
+            ("title", &title),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+            ("heading", "Agent skills and workflows"),
+            ("subheading", subheading),
+        ],
+        &[
+            ("sidebar", &sidebar_with_skills(None, cfg, true)),
             ("section", &sections),
         ],
     )
