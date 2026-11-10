@@ -18,8 +18,11 @@ pub mod sanitize;
 pub mod search;
 pub mod task;
 pub mod tech_spec;
+pub mod test_case;
+pub mod test_report;
 pub mod ui_mockup;
 pub mod ui_spec;
+pub mod use_case;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -142,6 +145,21 @@ pub enum Commands {
     Audit {
         #[command(subcommand)]
         action: audit::AuditCmd,
+    },
+    /// Manage use cases.
+    UseCase {
+        #[command(subcommand)]
+        action: use_case::UseCaseCmd,
+    },
+    /// Manage test cases.
+    TestCase {
+        #[command(subcommand)]
+        action: test_case::TestCaseCmd,
+    },
+    /// Manage test reports.
+    TestReport {
+        #[command(subcommand)]
+        action: test_report::TestReportCmd,
     },
     /// Serve the local web interface.
     #[command(override_usage = "papyrus browser [--host <host>] [--port <port>] [--no-open]")]
@@ -349,6 +367,18 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
         Commands::Audit { action } => {
             let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
             audit::run(&ctx, action)
+        }
+        Commands::UseCase { action } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            use_case::run(&ctx, action)
+        }
+        Commands::TestCase { action } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            test_case::run(&ctx, action)
+        }
+        Commands::TestReport { action } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            test_report::run(&ctx, action)
         }
         Commands::Browser {
             host,

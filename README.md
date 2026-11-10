@@ -629,6 +629,162 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
         <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
          Return a deprecated technical specification to its original folder. The ID is preserved.
 
+<b style="color: light-dark(#0969da, #58a6ff);">use-case</b>
+
+        Manage use cases (UC-...).
+
+        <code style="font-weight: bold;">
+        papyrus use-case create &lt;title&gt; --description &lt;text&gt; [--applicability &lt;text&gt;] [--label &lt;label&gt;...] [--reference &lt;value&gt;...]
+        papyrus use-case list
+        papyrus use-case view &lt;id&gt;
+        papyrus use-case edit &lt;id&gt; [--title &lt;title&gt;] [--description &lt;text&gt;] [--applicability &lt;text&gt;] [--label &lt;label&gt;...] [--reference &lt;value&gt;...] [--editor]
+        papyrus use-case deprecate &lt;id&gt;
+        papyrus use-case restore &lt;id&gt;
+        </code>
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
+        Create a use case.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">&lt;title&gt;</b>
+           Use case title (required).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
+           Description of the use case (required).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability &lt;text&gt;</b>
+           Optional applicability.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
+        List use cases.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
+        View a use case.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
+        Edit a use case.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
+           Update the title.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
+           Update the description.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability &lt;text&gt;</b>
+           Update the applicability (empty clears it).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
+           Open the document body in $VISUAL or $EDITOR.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
+         Move a use case to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
+         Return a deprecated use case to its original folder. The ID is preserved.
+
+<b style="color: light-dark(#0969da, #58a6ff);">test-case</b>
+
+        Manage test cases (TC-...).
+
+        <code style="font-weight: bold;">
+        papyrus test-case create &lt;title&gt; --description &lt;text&gt; [--applicability &lt;text&gt;] [--label &lt;label&gt;...] [--reference &lt;value&gt;...]
+        papyrus test-case list
+        papyrus test-case view &lt;id&gt;
+        papyrus test-case edit &lt;id&gt; [--title &lt;title&gt;] [--description &lt;text&gt;] [--applicability &lt;text&gt;] [--label &lt;label&gt;...] [--reference &lt;value&gt;...] [--editor]
+        papyrus test-case deprecate &lt;id&gt;
+        papyrus test-case restore &lt;id&gt;
+        </code>
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
+        Create a test case.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">&lt;title&gt;</b>
+           Test case title (required).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
+           Description of the test case (required).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability &lt;text&gt;</b>
+           Optional applicability.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
+        List test cases.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
+        View a test case.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
+        Edit a test case.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
+           Update the title.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
+           Update the description.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability &lt;text&gt;</b>
+           Update the applicability (empty clears it).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
+           Open the document body in $VISUAL or $EDITOR.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
+         Move a test case to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
+         Return a deprecated test case to its original folder. The ID is preserved.
+
+<b style="color: light-dark(#0969da, #58a6ff);">test-report</b>
+
+        Manage test reports (TR-...).
+
+        <code style="font-weight: bold;">
+        papyrus test-report create &lt;title&gt; --description &lt;text&gt; [--applicability &lt;text&gt;] [--label &lt;label&gt;...] [--reference &lt;value&gt;...]
+        papyrus test-report list
+        papyrus test-report view &lt;id&gt;
+        papyrus test-report edit &lt;id&gt; [--title &lt;title&gt;] [--description &lt;text&gt;] [--applicability &lt;text&gt;] [--label &lt;label&gt;...] [--reference &lt;value&gt;...] [--editor]
+        papyrus test-report deprecate &lt;id&gt;
+        papyrus test-report restore &lt;id&gt;
+        </code>
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
+        Create a test report.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">&lt;title&gt;</b>
+           Test report title (required).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
+           Description of the test report (required).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability &lt;text&gt;</b>
+           Optional applicability.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
+        List test reports.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
+        View a test report.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
+        Edit a test report.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
+           Update the title.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
+           Update the description.
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability &lt;text&gt;</b>
+           Update the applicability (empty clears it).
+
+           <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
+           Open the document body in $VISUAL or $EDITOR.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
+         Move a test report to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
+
+        <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
+         Return a deprecated test report to its original folder. The ID is preserved.
+
 <b style="color: light-dark(#0969da, #58a6ff);">rule</b>
 
        Manage business rules (RUL-...).

@@ -3342,6 +3342,9 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
         "audit",
         "deploy",
         "tech-spec",
+        "use-case",
+        "test-case",
+        "test-report",
     ];
     let mut enabled_doc = Vec::new();
     for key in known_doc_order {
