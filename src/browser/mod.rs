@@ -584,6 +584,23 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
         };
     }
 
+    if path == "/skills" {
+        return match method {
+            Method::Get | Method::Head => skills_page(state),
+            _ => {
+                let cfg = state.config().unwrap_or_default();
+                let (project, bind_note) = chrome_for(&cfg, state);
+                let chrome = render::Chrome {
+                    project: &project,
+                    bind_note: &bind_note,
+                };
+                let mut response = Response::html(405, render::error_page(405, &cfg, chrome, None));
+                response = response.with_header("Allow", "GET, HEAD");
+                Ok(response)
+            }
+        };
+    }
+
     if path == "/lifecycle" {
         return match method {
             Method::Get | Method::Head => lifecycle_page(state),
@@ -601,6 +618,29 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
         };
     }
     if path == "/" {
+        // Alias: /?type=skills serves the agent skills page.
+        if http::query_param(&request.target.query, "type")
+            .ok()
+            .flatten()
+            .as_deref()
+            == Some("skills")
+        {
+            return match method {
+                Method::Get | Method::Head => skills_page(state),
+                _ => {
+                    let cfg = state.config().unwrap_or_default();
+                    let (project, bind_note) = chrome_for(&cfg, state);
+                    let chrome = render::Chrome {
+                        project: &project,
+                        bind_note: &bind_note,
+                    };
+                    let mut response =
+                        Response::html(405, render::error_page(405, &cfg, chrome, None));
+                    response = response.with_header("Allow", "GET, HEAD");
+                    Ok(response)
+                }
+            };
+        }
         // Alias: /?type=lifecycle serves the managed artifacts and lifecycles page.
         if http::query_param(&request.target.query, "type")
             .ok()
@@ -704,6 +744,16 @@ fn lifecycle_page(state: &ServerState) -> Result<Response, HttpError> {
         bind_note: &bind_note,
     };
     Ok(Response::html(200, render::lifecycle_page(&cfg, chrome)))
+}
+
+fn skills_page(state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let (project, bind_note) = chrome_for(&cfg, state);
+    let chrome = render::Chrome {
+        project: &project,
+        bind_note: &bind_note,
+    };
+    Ok(Response::html(200, render::skills_page(&cfg, chrome)))
 }
 
 fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {

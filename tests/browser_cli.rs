@@ -5990,3 +5990,183 @@ fn t72b_lifecycle_custom_status_list() {
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
+
+// TASK-77 / spec §8: eight skill groups in order.
+fn assert_eight_skill_groups_in_order(body: &str) {
+    const GROUPS: [&str; 8] = [
+        "Project setup and init",
+        "Backlog, tasks, milestones, releases",
+        "Requirements and documentation management",
+        "Search",
+        "Browser usage",
+        "Release and audit workflows",
+        "Configuration management",
+        "Decisions",
+    ];
+    assert_eq!(
+        body.matches("<section>").count(),
+        9,
+        "section count (config + 8 groups)"
+    );
+    let mut previous = 0usize;
+    for (index, group) in GROUPS.iter().enumerate() {
+        let marker = format!("<h2>{}</h2>", group);
+        let position = body
+            .find(&marker)
+            .unwrap_or_else(|| panic!("missing group heading {}", group));
+        if index > 0 {
+            assert!(
+                position > previous,
+                "group heading {} is out of order",
+                group
+            );
+        }
+        previous = position;
+    }
+}
+
+/// Replace one document type's `enabled` flag in the project configuration.
+fn set_doc_type_enabled(dir: &Path, key: &str, enabled: bool) {
+    let path = dir.join("papyrus.config.yml");
+    let text = fs::read_to_string(&path).unwrap();
+    let mut out = String::new();
+    let mut in_document_types = false;
+    let mut current_key: Option<String> = None;
+    for line in text.lines() {
+        if line == "document_types:" {
+            in_document_types = true;
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        }
+        if in_document_types {
+            if !line.starts_with("  ") || line.trim().is_empty() {
+                in_document_types = false;
+                current_key = None;
+                out.push_str(line);
+                out.push('\n');
+                continue;
+            }
+            let trimmed = line.trim();
+            if !line.starts_with("    ") && trimmed.ends_with(':') {
+                current_key = Some(trimmed.trim_end_matches(':').to_string());
+                out.push_str(line);
+                out.push('\n');
+                continue;
+            }
+            if current_key.as_deref() == Some(key)
+                && (trimmed == "enabled: true" || trimmed == "enabled: false")
+            {
+                out.push_str(&format!("    enabled: {}\n", enabled));
+                continue;
+            }
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    fs::write(&path, out).unwrap();
+}
+
+// TASK-77 / spec §8.1-8.3: GET /skills, alias route, method and unknown path.
+#[test]
+fn t77a_skills_page_route_alias_and_method() {
+    let dir = test_root("skills");
+    init_project(&dir);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    let response = get(&server, "/skills");
+    assert_eq!(response.status, 200);
+    assert_eq!(
+        response.header("Content-Type"),
+        Some("text/html; charset=utf-8")
+    );
+    let body = response.text();
+    assert_eq!(body.matches("<h1 class=\"h1\">").count(), 1);
+    assert!(body.contains("<h1 class=\"h1\">Agent skills and workflows</h1>"));
+    assert_eight_skill_groups_in_order(&body);
+    assert!(body.contains("ToDo → Initiated → Refined → Implemented → Validated → Done"));
+    assert!(body.contains("<dt>Task prefix</dt><dd>TASK</dd>"));
+    assert!(body.contains("<dt>Milestone prefix</dt><dd>MS</dd>"));
+    assert!(body.contains("<dt>Release prefix</dt><dd>REL</dd>"));
+    assert!(body.contains("<dt>ID padding</dt><dd>3 (e.g. TASK-001)</dd>"));
+    assert!(body.contains("<dt>Date format</dt><dd>yyyy-mm-dd</dd>"));
+    assert!(body.contains(
+        "<dt>Statuses</dt><dd>ToDo → Initiated → Refined → Implemented → Validated → Done</dd>"
+    ));
+    assert!(body.contains(
+        "<dt>Enabled document types</dt><dd>req, nfr, glossary, rule, ui-spec, ui-mockup, audit, deploy, tech-spec</dd>"
+    ));
+    assert!(body.contains("<dt>Enabled decision types</dt><dd>adr, bdr</dd>"));
+    assert!(body.contains("<dt>Backlog directory</dt><dd>backlog/</dd>"));
+    assert!(body.contains("<dt>Decision directory</dt><dd>decisions/</dd>"));
+    assert!(body.contains("<dt>Doc directory</dt><dd>docs/</dd>"));
+    assert!(body.contains("Agent skills &amp; workflows"));
+    assert!(
+        body.contains("<a href=\"/skills\" aria-current=\"page\">Agent skills &amp; workflows</a>")
+    );
+    assert!(!body.contains("http://"), "external reference");
+    assert!(!body.contains("https://"), "external reference");
+
+    // Alias route serves the same page.
+    let alias = get(&server, "/?type=skills");
+    assert_eq!(alias.status, 200);
+    assert_eq!(
+        alias.header("Content-Type"),
+        Some("text/html; charset=utf-8")
+    );
+    assert_eq!(alias.text(), body);
+
+    // Non-GET methods are rejected with an Allow header.
+    let post = request(server.port, "POST", "/skills", &[], Some(b""));
+    assert_eq!(post.status, 405);
+    assert_eq!(post.header("Allow"), Some("GET, HEAD"));
+
+    // Unknown path returns 404.
+    let unknown = get(&server, "/definitely-unknown-path");
+    assert_eq!(unknown.status, 404);
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-77 / spec §8.4: custom configuration reflected.
+#[test]
+fn t77b_skills_page_custom_config() {
+    let dir = test_root("skills-custom");
+    init_project(&dir);
+    set_config_value(&dir, "task_prefix", "FOO");
+    set_config_value(&dir, "milestone_prefix", "MIL");
+    set_config_value(&dir, "release_prefix", "RLS");
+    set_config_value(&dir, "id_padding", "4");
+    set_config_value(&dir, "date_format", "dd/mm/yyyy");
+    set_statuses(&dir, &["Backlog", "Doing", "Done"], "Backlog");
+    set_doc_type_enabled(&dir, "req", false);
+
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let body = get(&server, "/skills").text();
+    assert_eight_skill_groups_in_order(&body);
+    assert!(body.contains("<dt>Task prefix</dt><dd>FOO</dd>"));
+    assert!(body.contains("<dt>Milestone prefix</dt><dd>MIL</dd>"));
+    assert!(body.contains("<dt>Release prefix</dt><dd>RLS</dd>"));
+    assert!(body.contains("<dt>ID padding</dt><dd>4 (e.g. FOO-0001)</dd>"));
+    assert!(body.contains("<dt>Date format</dt><dd>dd/mm/yyyy</dd>"));
+    assert!(body.contains("<dt>Statuses</dt><dd>Backlog → Doing → Done</dd>"));
+    assert!(body.contains(
+        "<dt>Enabled document types</dt><dd>nfr, glossary, rule, ui-spec, ui-mockup, audit, deploy, tech-spec</dd>"
+    ));
+    assert!(body.contains("<dt>Enabled decision types</dt><dd>adr, bdr</dd>"));
+    assert!(body.contains(
+        "New tasks use prefix FOO with padding 4: FOO-0001. Statuses flow Backlog → Doing → Done."
+    ));
+    assert!(body.contains("papyrus config set task_prefix FOO"));
+    assert!(
+        !body.contains("ToDo → Initiated"),
+        "default chain must not render"
+    );
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
