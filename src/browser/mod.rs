@@ -433,6 +433,9 @@ fn category_from_query(request: &Request) -> Result<Category, HttpError> {
         Some(value) if value == "business-rule" => Ok(Category::BusinessRule),
         Some(value) if value == "audit-record" => Ok(Category::AuditRecord),
         Some(value) if value == "tech-spec" => Ok(Category::TechSpec),
+        Some(value) if value == "use-case" => Ok(Category::UseCase),
+        Some(value) if value == "test-case" => Ok(Category::TestCase),
+        Some(value) if value == "test-report" => Ok(Category::TestReport),
         Some(_) => Err(HttpError::new(400)),
     }
 }
@@ -468,14 +471,24 @@ fn handle_request(request: Request, state: &ServerState) -> Response {
                 && !api
                 && let Some(id) = html_doc_id(&path)
                 && let Ok(cfg) = state.config()
-                && records::matches_tech_spec_id(&cfg, id)
             {
                 let (project, bind_note) = chrome_for(&cfg, state);
                 let chrome = render::Chrome {
                     project: &project,
                     bind_note: &bind_note,
                 };
-                return Response::html(404, render::tech_spec_not_found_page(&cfg, chrome));
+                if records::matches_tech_spec_id(&cfg, id) {
+                    return Response::html(404, render::tech_spec_not_found_page(&cfg, chrome));
+                }
+                if records::matches_use_case_id(&cfg, id) {
+                    return Response::html(404, render::use_case_not_found_page(&cfg, chrome));
+                }
+                if records::matches_test_case_id(&cfg, id) {
+                    return Response::html(404, render::test_case_not_found_page(&cfg, chrome));
+                }
+                if records::matches_test_report_id(&cfg, id) {
+                    return Response::html(404, render::test_report_not_found_page(&cfg, chrome));
+                }
             }
             error_response(error.status, api, state)
         }
@@ -570,6 +583,24 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
     if path == "/api/tech-specs" || path == "/api/tech-spec" {
         return match method {
             Method::Get | Method::Head => api_tech_specs(state),
+            _ => Err(HttpError::new(405)),
+        };
+    }
+    if path == "/api/use-cases" || path == "/api/use-case" {
+        return match method {
+            Method::Get | Method::Head => api_use_cases(state),
+            _ => Err(HttpError::new(405)),
+        };
+    }
+    if path == "/api/test-cases" || path == "/api/test-case" {
+        return match method {
+            Method::Get | Method::Head => api_test_cases(state),
+            _ => Err(HttpError::new(405)),
+        };
+    }
+    if path == "/api/test-reports" || path == "/api/test-report" {
+        return match method {
+            Method::Get | Method::Head => api_test_reports(state),
             _ => Err(HttpError::new(405)),
         };
     }
@@ -1149,6 +1180,23 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
+        Category::UseCase | Category::TestCase | Category::TestReport => {
+            let values = render::UseCaseEditValues {
+                title: record.title.clone(),
+                description: record.description.clone().unwrap_or_default(),
+                applicability: record.applicability.clone().unwrap_or_default(),
+                labels: record.labels.clone(),
+                references: record.refs.clone(),
+            };
+            render::edit_page_use_case(
+                &record,
+                &values,
+                &render::UseCaseFieldErrors::default(),
+                &record.version,
+                &cfg,
+                chrome,
+            )
+        }
         Category::AuditRecord => {
             let values = render::AuditEditValues {
                 title: record.title.clone(),
@@ -1291,6 +1339,31 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             return Ok(Response::html(
                 409,
                 render::conflict_page_tech_spec(&record, &title, &description, &cfg, chrome),
+            ));
+        }
+        if matches!(
+            record.kind,
+            Category::UseCase | Category::TestCase | Category::TestReport
+        ) {
+            let title = form_field(&fields, "title").unwrap_or("").to_string();
+            let description = form_field(&fields, "description").unwrap_or("").to_string();
+            let applicability = form_field(&fields, "applicability")
+                .unwrap_or("")
+                .to_string();
+            let labels = records::submitted_tag_values(&form_fields(&fields, "labels"));
+            let references = records::submitted_tag_values(&form_fields(&fields, "references"));
+            return Ok(Response::html(
+                409,
+                render::conflict_page_use_case(
+                    &record,
+                    &title,
+                    &description,
+                    &applicability,
+                    &labels,
+                    &references,
+                    &cfg,
+                    chrome,
+                ),
             ));
         }
         // Conflict page with submitted values (best-effort).
@@ -2185,6 +2258,94 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             }
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
+        Category::UseCase | Category::TestCase | Category::TestReport => {
+            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
+            let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
+            let raw_applicability = form_field(&fields, "applicability")
+                .unwrap_or("")
+                .to_string();
+            let raw_labels = form_fields(&fields, "labels");
+            let raw_references = form_fields(&fields, "references");
+
+            let mut errors = render::UseCaseFieldErrors::default();
+            let title = match records::validate_title(&raw_title) {
+                Ok(t) => Some(t),
+                Err(m) => {
+                    errors.title = Some(m);
+                    None
+                }
+            };
+            let mut description_change = FieldChange::Keep;
+            match records::validate_multiline("Description", &raw_description) {
+                Ok(Some(value)) => description_change = FieldChange::Set(value),
+                Ok(None) => {
+                    errors.description = Some("Description is required.".to_string());
+                }
+                Err(m) => errors.description = Some(m),
+            }
+            let mut applicability_change = FieldChange::Keep;
+            match records::validate_multiline("Applicability", &raw_applicability) {
+                Ok(Some(value)) => applicability_change = FieldChange::Set(value),
+                Ok(None) => applicability_change = FieldChange::Clear,
+                Err(m) => errors.applicability = Some(m),
+            }
+            let labels = match records::validate_labels(&raw_labels) {
+                Ok(v) => Some(v),
+                Err(m) => {
+                    errors.labels = Some(m);
+                    None
+                }
+            };
+            let references = match records::validate_refs(&raw_references) {
+                Ok(v) => Some(v),
+                Err(m) => {
+                    errors.references = Some(m);
+                    None
+                }
+            };
+            if errors.any() {
+                let values = render::UseCaseEditValues {
+                    title: raw_title.clone(),
+                    description: raw_description.clone(),
+                    applicability: raw_applicability.clone(),
+                    labels: records::submitted_tag_values(&raw_labels),
+                    references: records::submitted_tag_values(&raw_references),
+                };
+                return Ok(Response::html(
+                    422,
+                    render::edit_page_use_case(
+                        &record,
+                        &values,
+                        &errors,
+                        &record.version,
+                        &cfg,
+                        chrome,
+                    ),
+                ));
+            }
+            let title = title.unwrap_or_default();
+            let labels = labels.unwrap_or_default();
+            let references = references.unwrap_or_default();
+            let content = records::apply_use_case_edit(
+                &record.doc,
+                &record.id,
+                &title,
+                description_change,
+                applicability_change,
+                labels,
+                references,
+            );
+            if content != record.doc.source {
+                if crate::record::frontmatter::has_front_matter(&content) {
+                    crate::record::store::write_atomic(&ctx, &record.path, &content)
+                        .map_err(|_| HttpError::new(500))?;
+                } else {
+                    records::write_atomic(&ctx, &record.path, &content)
+                        .map_err(|_| HttpError::new(500))?;
+                }
+            }
+            Ok(Response::redirect(&format!("/doc/{}", record.id)))
+        }
         Category::AuditRecord => {
             let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
             let raw_audit_type = form_field(&fields, "audit_type").unwrap_or("").to_string();
@@ -2289,7 +2450,7 @@ fn record_json(
             serde_json::json!({
                 "id": record.id,
                 "kind": record.kind.key(),
-                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision", Form::Glossary => "glossary", Form::UiSpec => "ui-spec", Form::UiMockup => "ui-mockup", Form::BusinessRule => "business-rule", Form::AuditRecord => "audit-record", Form::TechSpec => "tech-spec" },
+                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision", Form::Glossary => "glossary", Form::UiSpec => "ui-spec", Form::UiMockup => "ui-mockup", Form::BusinessRule => "business-rule", Form::AuditRecord => "audit-record", Form::TechSpec => "tech-spec", Form::UseCase => "use-case", Form::TestCase => "test-case", Form::TestReport => "test-report" },
                 "title": record.title,
                 "group": group_value,
                 "story": story,
@@ -2443,6 +2604,23 @@ fn record_json(
                 "form": "tech-spec",
                 "title": record.title,
                 "description": record.description,
+                "version": record.version,
+                "path": record.rel_path,
+                "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
+            })
+        }
+        Category::UseCase | Category::TestCase | Category::TestReport => {
+            let kind = record.kind.key();
+            let form = record.kind.key();
+            serde_json::json!({
+                "id": record.id,
+                "kind": kind,
+                "form": form,
+                "title": record.title,
+                "description": record.description,
+                "applicability": record.applicability,
+                "labels": record.labels,
+                "references": record.refs,
                 "version": record.version,
                 "path": record.rel_path,
                 "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
@@ -2654,6 +2832,56 @@ fn api_business_rules(state: &ServerState) -> Result<Response, HttpError> {
 fn api_tech_specs(state: &ServerState) -> Result<Response, HttpError> {
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let index = records::build_index(&state.context(), &cfg, Category::TechSpec);
+    let items: Vec<serde_json::Value> = index
+        .records
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "id": r.id,
+                "title": r.title,
+                "metadata": record_metadata_json(r),
+            })
+        })
+        .collect();
+    Ok(Response::json(200, serde_json::json!(items)))
+}
+fn api_use_cases(state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let index = records::build_index(&state.context(), &cfg, Category::UseCase);
+    let items: Vec<serde_json::Value> = index
+        .records
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "id": r.id,
+                "title": r.title,
+                "metadata": record_metadata_json(r),
+            })
+        })
+        .collect();
+    Ok(Response::json(200, serde_json::json!(items)))
+}
+
+fn api_test_cases(state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let index = records::build_index(&state.context(), &cfg, Category::TestCase);
+    let items: Vec<serde_json::Value> = index
+        .records
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "id": r.id,
+                "title": r.title,
+                "metadata": record_metadata_json(r),
+            })
+        })
+        .collect();
+    Ok(Response::json(200, serde_json::json!(items)))
+}
+
+fn api_test_reports(state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let index = records::build_index(&state.context(), &cfg, Category::TestReport);
     let items: Vec<serde_json::Value> = index
         .records
         .iter()
@@ -3641,6 +3869,99 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             // without front matter keep the browser's non-migrating
             // writer so a browser save never triggers lazy migration
             // (migration is owned by TASK-68/TASK-69).
+            if content != record.doc.source {
+                if crate::record::frontmatter::has_front_matter(&content) {
+                    crate::record::store::write_atomic(&ctx, &record.path, &content)
+                        .map_err(|_| HttpError::new(500))?;
+                } else {
+                    records::write_atomic(&ctx, &record.path, &content)
+                        .map_err(|_| HttpError::new(500))?;
+                }
+            }
+            let (updated, _updated_cfg) = resolve_record(id, state)?;
+            Ok(Response::json(200, record_json(&updated, None, None)))
+        }
+        Category::UseCase | Category::TestCase | Category::TestReport => {
+            let title = match object.get("title") {
+                None => record.title.clone(),
+                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
+                    Ok(t) => t,
+                    Err(m) => return Ok(json_error(422, &m)),
+                },
+                Some(_) => return Err(HttpError::new(400)),
+            };
+            let mut description_change = FieldChange::Keep;
+            match object.get("description") {
+                None => {}
+                Some(serde_json::Value::Null) => {
+                    return Ok(json_error(422, "Description is required."));
+                }
+                Some(serde_json::Value::String(raw)) => {
+                    match records::validate_multiline("Description", raw) {
+                        Ok(Some(value)) => description_change = FieldChange::Set(value),
+                        Ok(None) => return Ok(json_error(422, "Description is required.")),
+                        Err(m) => return Ok(json_error(422, &m)),
+                    }
+                }
+                Some(_) => return Err(HttpError::new(400)),
+            }
+            let mut applicability_change = FieldChange::Keep;
+            match object.get("applicability") {
+                None => {}
+                Some(serde_json::Value::Null) => applicability_change = FieldChange::Clear,
+                Some(serde_json::Value::String(raw)) => {
+                    match records::validate_multiline("Applicability", raw) {
+                        Ok(v) => applicability_change = render::change(v),
+                        Err(m) => return Ok(json_error(422, &m)),
+                    }
+                }
+                Some(_) => return Err(HttpError::new(400)),
+            }
+            let labels = match object.get("labels") {
+                None => record.labels.clone(),
+                Some(serde_json::Value::Null) => Vec::new(),
+                Some(serde_json::Value::Array(items)) => {
+                    let mut raw: Vec<String> = Vec::new();
+                    for item in items {
+                        match item.as_str() {
+                            Some(text) => raw.push(text.to_string()),
+                            None => return Err(HttpError::new(400)),
+                        }
+                    }
+                    match records::validate_labels(&raw) {
+                        Ok(v) => v,
+                        Err(m) => return Ok(json_error(422, &m)),
+                    }
+                }
+                Some(_) => return Err(HttpError::new(400)),
+            };
+            let references = match object.get("references") {
+                None => record.refs.clone(),
+                Some(serde_json::Value::Null) => Vec::new(),
+                Some(serde_json::Value::Array(items)) => {
+                    let mut raw: Vec<String> = Vec::new();
+                    for item in items {
+                        match item.as_str() {
+                            Some(text) => raw.push(text.to_string()),
+                            None => return Err(HttpError::new(400)),
+                        }
+                    }
+                    match records::validate_refs(&raw) {
+                        Ok(v) => v,
+                        Err(m) => return Ok(json_error(422, &m)),
+                    }
+                }
+                Some(_) => return Err(HttpError::new(400)),
+            };
+            let content = records::apply_use_case_edit(
+                &record.doc,
+                &record.id,
+                &title,
+                description_change,
+                applicability_change,
+                labels,
+                references,
+            );
             if content != record.doc.source {
                 if crate::record::frontmatter::has_front_matter(&content) {
                     crate::record::store::write_atomic(&ctx, &record.path, &content)
