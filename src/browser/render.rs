@@ -78,6 +78,9 @@ fn category_name(kind: Category) -> &'static str {
         Category::BusinessRule => "Business Rules",
         Category::AuditRecord => "Audit Records",
         Category::TechSpec => "Technical Specifications",
+        Category::UseCase => "Use Cases",
+        Category::TestCase => "Test Cases",
+        Category::TestReport => "Test Reports",
     }
 }
 
@@ -95,6 +98,9 @@ fn category_short(kind: Category) -> &'static str {
         Category::BusinessRule => "business rules",
         Category::AuditRecord => "audit records",
         Category::TechSpec => "technical specifications",
+        Category::UseCase => "use cases",
+        Category::TestCase => "test cases",
+        Category::TestReport => "test reports",
     }
 }
 
@@ -225,6 +231,29 @@ fn build_sidebar(
             "<li><a href=\"/?type=tech-spec\"{}>Technical Specifications</a></li>",
             current
         ));
+    }
+    // Use Cases, Test Cases, Test Reports (omitted when the document type is disabled)
+    for (key, label, cat) in [
+        ("use-case", "Use Cases", Category::UseCase),
+        ("test-case", "Test Cases", Category::TestCase),
+        ("test-report", "Test Reports", Category::TestReport),
+    ] {
+        let enabled = cfg
+            .document_types
+            .get(key)
+            .map(|e| e.enabled)
+            .unwrap_or(false);
+        if enabled {
+            let current = if selected == Some(cat) {
+                " aria-current=\"page\""
+            } else {
+                ""
+            };
+            items.push_str(&format!(
+                "<li><a href=\"/?type={}\"{}>{}</a></li>",
+                key, current, label
+            ));
+        }
     }
     // Non-functional requirements
     let nfr_enabled = cfg
@@ -359,6 +388,9 @@ fn breadcrumb(
         Category::BusinessRule => ("Business Rules", "business-rule"),
         Category::AuditRecord => ("Audit Records", "audit-record"),
         Category::TechSpec => ("Technical Specifications", "tech-spec"),
+        Category::UseCase => ("Use Cases", "use-case"),
+        Category::TestCase => ("Test Cases", "test-case"),
+        Category::TestReport => ("Test Reports", "test-report"),
     };
     let mut items = String::new();
     items.push_str(&format!(
@@ -388,6 +420,9 @@ fn edit_breadcrumb(record: &Record, _resolved_group: Option<&Record>) -> String 
         Category::BusinessRule => ("Business Rules", "business-rule"),
         Category::AuditRecord => ("Audit Records", "audit-record"),
         Category::TechSpec => ("Technical Specifications", "tech-spec"),
+        Category::UseCase => ("Use Cases", "use-case"),
+        Category::TestCase => ("Test Cases", "test-case"),
+        Category::TestReport => ("Test Reports", "test-report"),
     };
     let mut items = String::new();
     items.push_str(&format!(
@@ -437,7 +472,10 @@ fn owning_group_dd(record: &Record, resolved_group: Option<&Record>) -> String {
         | Form::UiMockup
         | Form::BusinessRule
         | Form::AuditRecord
-        | Form::TechSpec => "<dd class=\"link-muted\">(none)</dd>".to_string(),
+        | Form::TechSpec
+        | Form::UseCase
+        | Form::TestCase
+        | Form::TestReport => "<dd class=\"link-muted\">(none)</dd>".to_string(),
     }
 }
 
@@ -570,7 +608,10 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
             | Form::UiMockup
             | Form::BusinessRule
             | Form::AuditRecord
-            | Form::TechSpec => "<dd class=\"link-muted\">(none)</dd>".to_string(),
+            | Form::TechSpec
+            | Form::UseCase
+            | Form::TestCase
+            | Form::TestReport => "<dd class=\"link-muted\">(none)</dd>".to_string(),
         }
     } else {
         owning_group_dd(record, resolved_group)
@@ -736,7 +777,11 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
     let total = index.records.len();
     // MOCK-0009's empty list still shows a count ("0 technical specifications"),
     // unlike the other categories' "No records" summary.
-    let count = if total == 0 && kind != Category::TechSpec {
+    let count = if total == 0
+        && !matches!(
+            kind,
+            Category::TechSpec | Category::UseCase | Category::TestCase | Category::TestReport
+        ) {
         "No records".to_string()
     } else {
         let singular = match kind {
@@ -750,6 +795,9 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
             Category::BusinessRule => "business rule",
             Category::AuditRecord => "audit record",
             Category::TechSpec => "technical specification",
+            Category::UseCase => "use case",
+            Category::TestCase => "test case",
+            Category::TestReport => "test report",
             _ => "record",
         };
         let plural_word = format!("{}s", singular);
@@ -763,10 +811,16 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
         escape(&count)
     ));
     if total == 0 {
-        if kind == Category::TechSpec {
-            body.push_str(
-                "<div class=\"empty\"><p>No technical specifications were found in the configured directory.</p><p class=\"help\">Technical specifications are created from the command line; this browser does not create records. Deprecated technical specifications are hidden.</p></div></section>",
-            );
+        if matches!(
+            kind,
+            Category::TechSpec | Category::UseCase | Category::TestCase | Category::TestReport
+        ) {
+            body.push_str(&format!(
+                "<div class=\"empty\"><p>No {} were found in the configured directory.</p><p class=\"help\">{} are created from the command line; this browser does not create records. Deprecated {} are hidden.</p></div></section>",
+                category_short(kind),
+                category_name(kind),
+                category_short(kind)
+            ));
             return body;
         }
         let message = format!("No {} in this project.", category_short(kind));
@@ -817,11 +871,17 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
             || kind == Category::BusinessRule
             || kind == Category::AuditRecord
             || kind == Category::TechSpec
+            || kind == Category::UseCase
+            || kind == Category::TestCase
+            || kind == Category::TestReport
         {
             let preview = if kind == Category::UiSpec
                 || kind == Category::BusinessRule
                 || kind == Category::AuditRecord
                 || kind == Category::TechSpec
+                || kind == Category::UseCase
+                || kind == Category::TestCase
+                || kind == Category::TestReport
             {
                 record
                     .description
@@ -913,6 +973,9 @@ pub fn list_page(
         Category::BusinessRule => "Business Rules",
         Category::AuditRecord => "Audit Records",
         Category::TechSpec => "Technical Specifications",
+        Category::UseCase => "Use Cases",
+        Category::TestCase => "Test Cases",
+        Category::TestReport => "Test Reports",
     };
     let subheading = match kind {
         Category::Req => "Business requirement records in this project.",
@@ -927,6 +990,9 @@ pub fn list_page(
         Category::BusinessRule => "Business rules in this project.",
         Category::AuditRecord => "Audit records in this project.",
         Category::TechSpec => "Technical specifications in this project.",
+        Category::UseCase => "Use cases in this project.",
+        Category::TestCase => "Test cases in this project.",
+        Category::TestReport => "Test reports in this project.",
     };
     let title = format!("Papyrus \u{2014} {}", category_name(kind));
     render_template(
@@ -1290,6 +1356,25 @@ pub fn view_page(
                 content.push_str(&format!("<p class=\"text\">{}</p>", escape(content_text)));
             }
         }
+        Category::UseCase | Category::TestCase | Category::TestReport => {
+            let content_text = record.description.as_deref().unwrap_or("");
+            if content_text.trim().is_empty() {
+                content.push_str("<p class=\"text empty-text\">(none)</p>");
+            } else {
+                content.push_str(&format!(
+                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
+                    escape(content_text)
+                ));
+            }
+            if let Some(app) = &record.applicability
+                && !app.trim().is_empty()
+            {
+                content.push_str(&format!(
+                    "<section class=\"record-section\"><h2>Applicability</h2><p class=\"text\" style=\"white-space: pre-wrap\">{}</p></section>",
+                    escape(app)
+                ));
+            }
+        }
     }
 
     let page_head = if record.kind == Category::AuditRecord {
@@ -1452,6 +1537,30 @@ fn metadata_block_backlog_inner(
                 escape(&record.id),
                 escape(record.form.label()),
                 escape("Technical Specifications"),
+            )
+        }
+        Category::UseCase => {
+            format!(
+                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div></dl></div>",
+                escape(&record.id),
+                escape(record.form.label()),
+                escape("Use Cases"),
+            )
+        }
+        Category::TestCase => {
+            format!(
+                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div></dl></div>",
+                escape(&record.id),
+                escape(record.form.label()),
+                escape("Test Cases"),
+            )
+        }
+        Category::TestReport => {
+            format!(
+                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div></dl></div>",
+                escape(&record.id),
+                escape(record.form.label()),
+                escape("Test Reports"),
             )
         }
         Category::Decision => {
@@ -2737,6 +2846,38 @@ pub struct TechSpecEditValues {
     pub description: String,
 }
 
+pub struct UseCaseEditValues {
+    pub title: String,
+    pub description: String,
+    pub applicability: String,
+    pub labels: Vec<String>,
+    pub references: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct UseCaseFieldErrors {
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub applicability: Option<String>,
+    pub labels: Option<String>,
+    pub references: Option<String>,
+}
+
+impl UseCaseFieldErrors {
+    pub fn any(&self) -> bool {
+        self.title.is_some()
+            || self.description.is_some()
+            || self.applicability.is_some()
+            || self.labels.is_some()
+            || self.references.is_some()
+    }
+}
+
+pub type TestCaseEditValues = UseCaseEditValues;
+pub type TestReportEditValues = UseCaseEditValues;
+pub type TestCaseFieldErrors = UseCaseFieldErrors;
+pub type TestReportFieldErrors = UseCaseFieldErrors;
+
 #[derive(Clone, Debug, Default)]
 pub struct TechSpecFieldErrors {
     pub title: Option<String>,
@@ -2820,6 +2961,235 @@ pub fn edit_page_tech_spec(
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", &form),
         ],
+    )
+}
+
+pub fn edit_page_use_case(
+    record: &Record,
+    values: &UseCaseEditValues,
+    errors: &UseCaseFieldErrors,
+    version: &str,
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    let mut form = String::new();
+    form.push_str(&format!(
+        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard><input type=\"hidden\" name=\"version\" value=\"{}\">",
+        escape(&record.id),
+        escape(version)
+    ));
+    if errors.any() {
+        form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
+        for (field, msg) in [
+            ("title", errors.title.as_deref()),
+            ("description", errors.description.as_deref()),
+            ("applicability", errors.applicability.as_deref()),
+            ("labels", errors.labels.as_deref()),
+            ("references", errors.references.as_deref()),
+        ] {
+            if let Some(m) = msg {
+                form.push_str(&format!(
+                    "<li><a href=\"#{}\">{}</a></li>",
+                    field,
+                    escape(m)
+                ));
+            }
+        }
+        form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
+    }
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"title\">Title <span class=\"req\">(required)</span></label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}><p class=\"help\">Required.</p>{}</div>",
+        escape(&values.title),
+        invalid_attrs("title", errors.title.as_deref()),
+        field_error("title", errors.title.as_deref())
+    ));
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"description\">Description <span class=\"req\">(required)</span></label><textarea class=\"textarea\" id=\"description\" name=\"description\" rows=\"12\" required{}>{}</textarea><p class=\"help\">Required \u{b7} multi-line.</p>{}</div>",
+        invalid_attrs("description", errors.description.as_deref()),
+        escape(&values.description),
+        field_error("description", errors.description.as_deref())
+    ));
+    form.push_str(&format!(
+        "<div class=\"field\"><label for=\"applicability\">Applicability</label><textarea class=\"textarea\" id=\"applicability\" name=\"applicability\" rows=\"6\"{}>{}</textarea><p class=\"help\">Optional.</p>{}</div>",
+        invalid_attrs("applicability", errors.applicability.as_deref()),
+        escape(&values.applicability),
+        field_error("applicability", errors.applicability.as_deref())
+    ));
+    form.push_str(&tag_field(
+        "labels",
+        "labels-add",
+        "Labels",
+        &values.labels,
+        "Add a label",
+        "Optional.",
+        errors.labels.as_deref(),
+        "Label",
+    ));
+    form.push_str(&tag_field(
+        "references",
+        "references-add",
+        "References",
+        &values.references,
+        "Add a reference",
+        "Optional.",
+        errors.references.as_deref(),
+        "Reference",
+    ));
+    form.push_str(&read_only_timestamps(record));
+    form.push_str(
+        "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
+    );
+    form.push_str(&format!(
+        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
+        escape(&record.id)
+    ));
+
+    let page_head = format!(
+        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div><p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
+        escape(&record.id),
+        escape(&record.title)
+    );
+    let title = format!("Papyrus \u{2014} Edit {}", record.id);
+    render_template(
+        EDIT_TEMPLATE,
+        &[
+            ("title", &title),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("breadcrumb", &edit_breadcrumb(record, None)),
+            ("page_head", &page_head),
+            ("meta", &metadata_block_backlog(record, None, None)),
+            ("form", &form),
+        ],
+    )
+}
+
+pub fn edit_page_test_case(
+    record: &Record,
+    values: &TestCaseEditValues,
+    errors: &TestCaseFieldErrors,
+    version: &str,
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    edit_page_use_case(record, values, errors, version, cfg, chrome)
+}
+
+pub fn edit_page_test_report(
+    record: &Record,
+    values: &TestReportEditValues,
+    errors: &TestReportFieldErrors,
+    version: &str,
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    edit_page_use_case(record, values, errors, version, cfg, chrome)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn conflict_page_use_case(
+    record: &Record,
+    title: &str,
+    description: &str,
+    applicability: &str,
+    labels: &[String],
+    references: &[String],
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    let mut body = String::new();
+    body.push_str(
+        "<h1 class=\"h1\">This record changed on disk</h1><p class=\"sub\">Nothing was saved. The file was modified after this form was opened.</p><div class=\"conflict-box\"><p><strong>409 Conflict \u{2014} record changed on disk; reload the form.</strong></p></div>",
+    );
+    body.push_str(&format!(
+        "<div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Reload the form</a><a class=\"link\" href=\"/doc/{}\">View current record</a></div>",
+        escape(&record.id),
+        escape(&record.id)
+    ));
+    body.push_str("<div class=\"readonly-block\"><dl>");
+    body.push_str(&format!("<dt>Title</dt><dd>{}</dd>", escape(title)));
+    body.push_str(&format!(
+        "<dt>Description</dt><dd class=\"text\">{}</dd>",
+        escape(description)
+    ));
+    body.push_str(&format!(
+        "<dt>Applicability</dt><dd class=\"text\">{}</dd>",
+        escape(applicability)
+    ));
+    body.push_str(&format!(
+        "<dt>Labels</dt><dd class=\"text\">{}</dd>",
+        escape(&labels.join(" "))
+    ));
+    body.push_str(&format!(
+        "<dt>References</dt><dd class=\"text\">{}</dd>",
+        escape(&references.join(" "))
+    ));
+    body.push_str("</dl></div>");
+
+    let title_page = format!("Papyrus \u{2014} Edit {}", record.id);
+    render_template(
+        EDIT_TEMPLATE,
+        &[
+            ("title", &title_page),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("breadcrumb", &edit_breadcrumb(record, None)),
+            ("page_head", &body),
+            ("meta", &metadata_block_backlog(record, None, None)),
+            ("form", ""),
+        ],
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn conflict_page_test_case(
+    record: &Record,
+    title: &str,
+    description: &str,
+    applicability: &str,
+    labels: &[String],
+    references: &[String],
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    conflict_page_use_case(
+        record,
+        title,
+        description,
+        applicability,
+        labels,
+        references,
+        cfg,
+        chrome,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn conflict_page_test_report(
+    record: &Record,
+    title: &str,
+    description: &str,
+    applicability: &str,
+    labels: &[String],
+    references: &[String],
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    conflict_page_use_case(
+        record,
+        title,
+        description,
+        applicability,
+        labels,
+        references,
+        cfg,
+        chrome,
     )
 }
 
@@ -2993,6 +3363,78 @@ The same page is used for an unknown address.",
         ],
         &[
             ("sidebar", &sidebar(Some(Category::TechSpec), cfg)),
+            ("actions", actions),
+        ],
+    )
+}
+
+/// Render the use-cases `404` page.
+pub fn use_case_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
+    let actions = "<a class=\"link\" href=\"/?type=use-case\">Back to Use Cases</a>";
+    render_template(
+        ERROR_TEMPLATE,
+        &[
+            ("title", "Papyrus \u{2014} Record not found"),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+            ("status_code", "404"),
+            ("heading", "Record not found"),
+            ("message", "That record does not exist or is not available."),
+            (
+                "hint",
+                "Deprecated use cases are not listed and cannot be opened. The same page is used for an unknown address.",
+            ),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(Category::UseCase), cfg)),
+            ("actions", actions),
+        ],
+    )
+}
+
+/// Render the test-cases `404` page.
+pub fn test_case_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
+    let actions = "<a class=\"link\" href=\"/?type=test-case\">Back to Test Cases</a>";
+    render_template(
+        ERROR_TEMPLATE,
+        &[
+            ("title", "Papyrus \u{2014} Record not found"),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+            ("status_code", "404"),
+            ("heading", "Record not found"),
+            ("message", "That record does not exist or is not available."),
+            (
+                "hint",
+                "Deprecated test cases are not listed and cannot be opened. The same page is used for an unknown address.",
+            ),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(Category::TestCase), cfg)),
+            ("actions", actions),
+        ],
+    )
+}
+
+/// Render the test-reports `404` page.
+pub fn test_report_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
+    let actions = "<a class=\"link\" href=\"/?type=test-report\">Back to Test Reports</a>";
+    render_template(
+        ERROR_TEMPLATE,
+        &[
+            ("title", "Papyrus \u{2014} Record not found"),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+            ("status_code", "404"),
+            ("heading", "Record not found"),
+            ("message", "That record does not exist or is not available."),
+            (
+                "hint",
+                "Deprecated test reports are not listed and cannot be opened. The same page is used for an unknown address.",
+            ),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(Category::TestReport), cfg)),
             ("actions", actions),
         ],
     )

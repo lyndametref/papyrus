@@ -36,6 +36,9 @@ pub enum Category {
     BusinessRule,
     AuditRecord,
     TechSpec,
+    UseCase,
+    TestCase,
+    TestReport,
 }
 
 impl Category {
@@ -53,6 +56,9 @@ impl Category {
             Category::BusinessRule => "business-rule",
             Category::AuditRecord => "audit-record",
             Category::TechSpec => "tech-spec",
+            Category::UseCase => "use-case",
+            Category::TestCase => "test-case",
+            Category::TestReport => "test-report",
         }
     }
 
@@ -89,6 +95,9 @@ pub enum Form {
     BusinessRule,
     AuditRecord,
     TechSpec,
+    UseCase,
+    TestCase,
+    TestReport,
 }
 
 impl Form {
@@ -106,6 +115,9 @@ impl Form {
             Form::BusinessRule => "Business rule",
             Form::AuditRecord => "Audit record",
             Form::TechSpec => "Technical specification",
+            Form::UseCase => "Use case",
+            Form::TestCase => "Test case",
+            Form::TestReport => "Test report",
         }
     }
 }
@@ -196,6 +208,9 @@ impl Record {
             Category::BusinessRule => "Business Rules",
             Category::AuditRecord => "Audit Records",
             Category::TechSpec => "Technical Specifications",
+            Category::UseCase => "Use Cases",
+            Category::TestCase => "Test Cases",
+            Category::TestReport => "Test Reports",
         };
         match self.form {
             Form::Group => format!("{} group", base),
@@ -209,7 +224,10 @@ impl Record {
             | Form::UiMockup
             | Form::BusinessRule
             | Form::AuditRecord
-            | Form::TechSpec => base.to_string(),
+            | Form::TechSpec
+            | Form::UseCase
+            | Form::TestCase
+            | Form::TestReport => base.to_string(),
         }
     }
 }
@@ -343,6 +361,33 @@ pub fn matches_tech_spec_id(cfg: &Config, id: &str) -> bool {
         .unwrap_or(false)
 }
 
+pub fn matches_use_case_id(cfg: &Config, id: &str) -> bool {
+    let Some(entry) = cfg.document_types.get(Category::UseCase.config_key()) else {
+        return false;
+    };
+    id.strip_prefix(&format!("{}-", entry.prefix))
+        .map(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit()))
+        .unwrap_or(false)
+}
+
+pub fn matches_test_case_id(cfg: &Config, id: &str) -> bool {
+    let Some(entry) = cfg.document_types.get(Category::TestCase.config_key()) else {
+        return false;
+    };
+    id.strip_prefix(&format!("{}-", entry.prefix))
+        .map(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit()))
+        .unwrap_or(false)
+}
+
+pub fn matches_test_report_id(cfg: &Config, id: &str) -> bool {
+    let Some(entry) = cfg.document_types.get(Category::TestReport.config_key()) else {
+        return false;
+    };
+    id.strip_prefix(&format!("{}-", entry.prefix))
+        .map(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit()))
+        .unwrap_or(false)
+}
+
 fn form_for_stem(prefix: &str, stem: &str) -> Option<Form> {
     let rest = stem.strip_prefix(prefix)?.strip_prefix('-')?;
     if rest.is_empty() {
@@ -419,6 +464,21 @@ fn active_entry(cfg: &Config, kind: Category) -> Option<crate::config::DocTypeEn
             .get("tech-spec")
             .cloned()
             .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
+        Category::UseCase => cfg
+            .document_types
+            .get("use-case")
+            .cloned()
+            .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
+        Category::TestCase => cfg
+            .document_types
+            .get("test-case")
+            .cloned()
+            .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
+        Category::TestReport => cfg
+            .document_types
+            .get("test-report")
+            .cloned()
+            .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
     }
 }
 
@@ -432,7 +492,10 @@ fn active_dir(ctx: &Context, cfg: &Config, kind: Category) -> Option<PathBuf> {
         | Category::UiMockup
         | Category::BusinessRule
         | Category::AuditRecord
-        | Category::TechSpec => ctx.project_dir.join(&cfg.doc_directory),
+        | Category::TechSpec
+        | Category::UseCase
+        | Category::TestCase
+        | Category::TestReport => ctx.project_dir.join(&cfg.doc_directory),
         Category::Task | Category::Milestone | Category::Release => {
             ctx.project_dir.join(&cfg.backlog_directory)
         }
@@ -1380,6 +1443,108 @@ fn load_tech_spec_record(ctx: &Context, path: &Path) -> Result<Option<Record>, A
     }))
 }
 
+fn load_simple_doc_record(
+    ctx: &Context,
+    path: &Path,
+    kind: Category,
+) -> Result<Option<Record>, AppError> {
+    let safe = match Context::ensure_within(&ctx.project_dir, path) {
+        Ok(safe) => safe,
+        Err(_) => return Ok(None),
+    };
+    let content = match fs::read_to_string(&safe) {
+        Ok(content) => content,
+        Err(_) => return Ok(None),
+    };
+    let meta = match fs::metadata(&safe) {
+        Ok(meta) => meta,
+        Err(_) => return Ok(None),
+    };
+    let Some(stem) = safe.file_stem().and_then(|s| s.to_str()) else {
+        return Ok(None);
+    };
+    if !valid_id(stem) {
+        return Ok(None);
+    }
+    let cfg = match crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir) {
+        Ok(c) => c,
+        Err(_) => return Ok(None),
+    };
+    let entry = match active_entry(&cfg, kind) {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+    let rest = match stem.strip_prefix(&format!("{}-", entry.prefix)) {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+    if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+        return Ok(None);
+    }
+    let form = match kind {
+        Category::UseCase => Form::UseCase,
+        Category::TestCase => Form::TestCase,
+        Category::TestReport => Form::TestReport,
+        _ => return Ok(None),
+    };
+    let doc = parse_doc(&content);
+    let title = if doc.title.is_empty() {
+        stem.to_string()
+    } else {
+        doc.title.clone()
+    };
+    let description = section_value(&doc, "## Description");
+    let applicability = section_value(&doc, "## Applicability");
+    let view = crate::record::view::RecordView::from_content(&content, stem, "").ok();
+    let labels = view
+        .as_ref()
+        .map(|v| v.list_value("labels"))
+        .unwrap_or_default();
+    let refs = view
+        .as_ref()
+        .map(|v| v.list_value("references"))
+        .unwrap_or_default();
+    Ok(Some(Record {
+        id: stem.to_string(),
+        kind,
+        form,
+        title,
+        story: None,
+        group_id: None,
+        group_title: None,
+        description,
+        rationale: None,
+        applicability,
+        requirements: Vec::new(),
+        definition: None,
+        view: None,
+        status: None,
+        milestone_id: None,
+        milestone_title: None,
+        assignee: None,
+        labels,
+        dependencies: Vec::new(),
+        acceptance_criteria: Vec::new(),
+        comments: Vec::new(),
+        release_id: None,
+        release_title: None,
+        decision: None,
+        context: None,
+        consequences: None,
+        decision_type: None,
+        superseded_by: None,
+        superseded_title: None,
+        specs: Vec::new(),
+        refs,
+        mockup_task: String::new(),
+        audit_type: None,
+        doc,
+        path: safe.clone(),
+        rel_path: relative_path(&ctx.project_dir, &safe),
+        version: version_token(&meta),
+    }))
+}
+
 fn load_record_from_path(
     ctx: &Context,
     kind: Category,
@@ -1405,6 +1570,12 @@ fn load_record_from_path(
     }
     if kind == Category::TechSpec {
         return load_tech_spec_record(ctx, path);
+    }
+    if matches!(
+        kind,
+        Category::UseCase | Category::TestCase | Category::TestReport
+    ) {
+        return load_simple_doc_record(ctx, path, kind);
     }
     if matches!(
         kind,
@@ -1542,6 +1713,9 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
             | Category::BusinessRule
             | Category::AuditRecord
             | Category::TechSpec
+            | Category::UseCase
+            | Category::TestCase
+            | Category::TestReport
     ) {
         let Some(entry) = active_entry(cfg, kind) else {
             return index;
@@ -1670,6 +1844,9 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
         Category::BusinessRule,
         Category::AuditRecord,
         Category::TechSpec,
+        Category::UseCase,
+        Category::TestCase,
+        Category::TestReport,
     ] {
         let Some(entry) = active_entry(cfg, kind) else {
             continue;
@@ -1700,6 +1877,9 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
                 || kind == Category::BusinessRule
                 || kind == Category::AuditRecord
                 || kind == Category::TechSpec
+                || kind == Category::UseCase
+                || kind == Category::TestCase
+                || kind == Category::TestReport
             {
                 id.strip_prefix(&format!("{}-", entry.prefix))
                     .map(|r| !r.is_empty() && r.bytes().all(|b| b.is_ascii_digit()))
@@ -2145,6 +2325,186 @@ fn render_list_items(items: &[String], prefix: &str) -> String {
         .map(|v| format!("{} {}", prefix, v))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+#[allow(clippy::too_many_arguments)]
+/// Serialize a use-case/test-case/test-report document with title, description,
+/// applicability, labels, and references changes. Only the heading, the
+/// `## Description` and `## Applicability` sections, and the front-matter
+/// `title`/`labels`/`references` keys are rewritten; the preamble and every
+/// other section are preserved content-identically.
+pub fn apply_use_case_edit(
+    doc: &Doc,
+    _id: &str,
+    title: &str,
+    description: FieldChange,
+    applicability: FieldChange,
+    labels: Vec<String>,
+    references: Vec<String>,
+) -> String {
+    let has_fm = doc.front_matter.is_some();
+    let mut fm_ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    if title != doc.title {
+        if has_fm {
+            fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+                "title".into(),
+                title.to_string(),
+            ));
+        }
+        fm_ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
+            title.to_string(),
+        ));
+    }
+    // labels
+    if has_fm {
+        fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "labels".into(),
+            labels.join("\n"),
+        ));
+        fm_ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+            "references".into(),
+            references.join("\n"),
+        ));
+    }
+    let mut sections = doc.sections.clone();
+    match description {
+        FieldChange::Keep => {}
+        FieldChange::Clear => {
+            // description is required; clearing removes section
+            if let Some(index) = sections.iter().position(|s| s.heading == "## Description") {
+                sections.remove(index);
+            }
+        }
+        FieldChange::Set(value) => {
+            if let Some(index) = sections.iter().position(|s| s.heading == "## Description") {
+                let trailing = trailing_empty_lines(&sections[index].body);
+                let mut body: Vec<String> =
+                    value.split('\n').map(|line| line.to_string()).collect();
+                for _ in 0..trailing {
+                    body.push(String::new());
+                }
+                sections[index].body = body;
+            } else {
+                // Insert immediately after the preamble, before the first section.
+                let mut body: Vec<String> =
+                    value.split('\n').map(|line| line.to_string()).collect();
+                if !sections.is_empty() {
+                    body.push(String::new());
+                }
+                sections.insert(
+                    0,
+                    Section {
+                        heading: "## Description".to_string(),
+                        body,
+                    },
+                );
+            }
+        }
+    }
+    match applicability {
+        FieldChange::Keep => {}
+        FieldChange::Clear => {
+            if let Some(index) = sections
+                .iter()
+                .position(|s| s.heading == "## Applicability")
+            {
+                sections.remove(index);
+            }
+        }
+        FieldChange::Set(value) => {
+            if let Some(index) = sections
+                .iter()
+                .position(|s| s.heading == "## Applicability")
+            {
+                let trailing = trailing_empty_lines(&sections[index].body);
+                let mut body: Vec<String> =
+                    value.split('\n').map(|line| line.to_string()).collect();
+                for _ in 0..trailing {
+                    body.push(String::new());
+                }
+                sections[index].body = body;
+            } else {
+                // Insert after last preceding known section (Description), else
+                // before first following known, else append.
+                let known = ["## Description", "## Applicability"];
+                let order = 1usize;
+                let mut position = None;
+                for (index, section) in sections.iter().enumerate() {
+                    if let Some(section_order) = known.iter().position(|h| *h == section.heading)
+                        && section_order < order
+                    {
+                        position = Some(index + 1);
+                    }
+                }
+                if position.is_none() {
+                    for (index, section) in sections.iter().enumerate() {
+                        if let Some(section_order) =
+                            known.iter().position(|h| *h == section.heading)
+                            && section_order > order
+                        {
+                            position = Some(index);
+                            break;
+                        }
+                    }
+                }
+                let position = position.unwrap_or(sections.len());
+                let mut body: Vec<String> =
+                    value.split('\n').map(|line| line.to_string()).collect();
+                if position < sections.len() {
+                    body.push(String::new());
+                }
+                sections.insert(
+                    position,
+                    Section {
+                        heading: "## Applicability".to_string(),
+                        body,
+                    },
+                );
+            }
+        }
+    }
+
+    finish_patch(doc, &mut fm_ops, &sections)
+}
+
+pub fn apply_test_case_edit(
+    doc: &Doc,
+    id: &str,
+    title: &str,
+    description: FieldChange,
+    applicability: FieldChange,
+    labels: Vec<String>,
+    references: Vec<String>,
+) -> String {
+    apply_use_case_edit(
+        doc,
+        id,
+        title,
+        description,
+        applicability,
+        labels,
+        references,
+    )
+}
+
+pub fn apply_test_report_edit(
+    doc: &Doc,
+    id: &str,
+    title: &str,
+    description: FieldChange,
+    applicability: FieldChange,
+    labels: Vec<String>,
+    references: Vec<String>,
+) -> String {
+    apply_use_case_edit(
+        doc,
+        id,
+        title,
+        description,
+        applicability,
+        labels,
+        references,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2816,6 +3176,24 @@ pub fn validate_refs(values: &[String]) -> Result<Vec<String>, String> {
 }
 
 /// Validate requirement references for business rules.
+/// Validate labels (front-matter list): collapse duplicates, 1-200 chars, no control.
+pub fn validate_labels(values: &[String]) -> Result<Vec<String>, String> {
+    let trimmed = submitted_tag_values(values);
+    let mut out: Vec<String> = Vec::new();
+    for value in trimmed {
+        if value.chars().count() > MAX_TITLE_CHARS {
+            return Err("Labels must be at most 200 characters.".to_string());
+        }
+        if value.chars().any(|c| c.is_control()) {
+            return Err("Labels cannot contain control characters.".to_string());
+        }
+        if !out.contains(&value) {
+            out.push(value);
+        }
+    }
+    Ok(out)
+}
+
 pub fn validate_requirement_refs(values: &[String]) -> Result<Vec<String>, String> {
     let trimmed = submitted_tag_values(values);
     for value in &trimmed {
