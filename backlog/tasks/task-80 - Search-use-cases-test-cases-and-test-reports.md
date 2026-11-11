@@ -1,10 +1,10 @@
 ---
 id: TASK-80
 title: Search use cases, test cases, and test reports
-status: Implemented
+status: Done
 assignee: []
 created_date: '2026-11-10T20:16:00Z'
-updated_date: '2026-11-11T07:15:00Z'
+updated_date: '2026-11-11T07:17:00Z'
 labels:
   - search
   - documentation
