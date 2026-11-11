@@ -59,6 +59,9 @@ const RULE_SECTIONS: &[&str] = &[
     "## Requirements",
 ];
 const AUDIT_SECTIONS: &[&str] = &["## Audit Type", "## Content"];
+const USE_CASE_SECTIONS: &[&str] = &["## Description", "## Applicability"];
+const TEST_CASE_SECTIONS: &[&str] = &["## Description", "## Applicability"];
+const TEST_REPORT_SECTIONS: &[&str] = &["## Description", "## Applicability"];
 
 pub const DESCRIPTORS: &[RecordDescriptor] = &[
     RecordDescriptor {
@@ -179,6 +182,36 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         frontmatter_keys: &["type"],
         sections: AUDIT_SECTIONS,
     },
+    RecordDescriptor {
+        name: "use case",
+        record_type: "use-case",
+        type_name: "use_case",
+        label: "Use case",
+        display_id_pattern: "UC-###",
+        directory: "docs/use-cases",
+        frontmatter_keys: &[],
+        sections: USE_CASE_SECTIONS,
+    },
+    RecordDescriptor {
+        name: "test case",
+        record_type: "test-case",
+        type_name: "test_case",
+        label: "Test case",
+        display_id_pattern: "TC-###",
+        directory: "docs/test-cases",
+        frontmatter_keys: &[],
+        sections: TEST_CASE_SECTIONS,
+    },
+    RecordDescriptor {
+        name: "test report",
+        record_type: "test-report",
+        type_name: "test_report",
+        label: "Test report",
+        display_id_pattern: "TR-###",
+        directory: "docs/test-reports",
+        frontmatter_keys: &[],
+        sections: TEST_REPORT_SECTIONS,
+    },
 ];
 
 pub fn descriptors() -> &'static [RecordDescriptor] {
@@ -213,7 +246,7 @@ mod tests {
 
     #[test]
     fn descriptor_count_excludes_ui_mockup() {
-        assert_eq!(DESCRIPTORS.len(), 11);
+        assert_eq!(DESCRIPTORS.len(), 14);
         assert!(descriptor_for("ui mockup").is_none());
     }
 }

@@ -6097,7 +6097,7 @@ fn t77a_skills_page_route_alias_and_method() {
         "<dt>Statuses</dt><dd>ToDo → Initiated → Refined → Implemented → Validated → Done</dd>"
     ));
     assert!(body.contains(
-        "<dt>Enabled document types</dt><dd>req, nfr, glossary, rule, ui-spec, ui-mockup, audit, deploy, tech-spec</dd>"
+        "<dt>Enabled document types</dt><dd>req, nfr, glossary, rule, ui-spec, ui-mockup, audit, deploy, tech-spec, use-case, test-case, test-report</dd>"
     ));
     assert!(body.contains("<dt>Enabled decision types</dt><dd>adr, bdr</dd>"));
     assert!(body.contains("<dt>Backlog directory</dt><dd>backlog/</dd>"));
@@ -6155,7 +6155,7 @@ fn t77b_skills_page_custom_config() {
     assert!(body.contains("<dt>Date format</dt><dd>dd/mm/yyyy</dd>"));
     assert!(body.contains("<dt>Statuses</dt><dd>Backlog → Doing → Done</dd>"));
     assert!(body.contains(
-        "<dt>Enabled document types</dt><dd>nfr, glossary, rule, ui-spec, ui-mockup, audit, deploy, tech-spec</dd>"
+        "<dt>Enabled document types</dt><dd>nfr, glossary, rule, ui-spec, ui-mockup, audit, deploy, tech-spec, use-case, test-case, test-report</dd>"
     ));
     assert!(body.contains("<dt>Enabled decision types</dt><dd>adr, bdr</dd>"));
     assert!(body.contains(

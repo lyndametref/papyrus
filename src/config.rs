@@ -89,6 +89,9 @@ impl Default for Config {
             ("audit", "AUD", "audit-records/"),
             ("deploy", "DEP", "architecture/deployment/"),
             ("tech-spec", "TECH", "technical/"),
+            ("use-case", "UC", "use-cases/"),
+            ("test-case", "TC", "test-cases/"),
+            ("test-report", "TR", "test-reports/"),
         ];
         for (k, p, d) in docs {
             document_types.insert(
