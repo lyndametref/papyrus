@@ -1,10 +1,10 @@
 ---
 id: TASK-82
 title: Package and verify the use cases and test documentation milestone
-status: Refined
+status: Done
 assignee: []
 created_date: '2026-11-10T20:16:00Z'
-updated_date: '2026-11-11T08:45:00Z'
+updated_date: '2026-11-11T08:48:00Z'
 labels:
   - packaging
 milestone: m-15
