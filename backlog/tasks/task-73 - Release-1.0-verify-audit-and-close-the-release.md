@@ -4,29 +4,50 @@ title: 'Release 1.0: verify, audit, and close the release'
 status: To Do
 assignee: []
 created_date: '2026-11-08T15:06:00Z'
-updated_date: '2026-11-11T08:57:00Z'
+updated_date: '2026-11-11T20:45:00Z'
 labels:
   - release
 milestone: m-14
 dependencies:
   - TASK-20
   - TASK-82
+  - TASK-83
+  - TASK-84
+  - TASK-85
+  - TASK-86
+  - TASK-87
+  - TASK-88
+  - TASK-89
+  - TASK-90
+  - TASK-91
+  - TASK-92
+  - TASK-93
+  - TASK-94
+  - TASK-95
+  - TASK-96
+  - TASK-97
+  - TASK-98
+  - TASK-99
+  - TASK-100
 references:
+  - docs/requirements/business/REQ-01.005.md
   - docs/requirements/business/REQ-05.010.md
   - docs/requirements/business/REQ-05.011.md
   - docs/requirements/business/REQ-06.003.md
-  - docs/requirements/business/REQ-06.004.md
-  - docs/requirements/non-functional/NFR-04.003.md
+  - docs/requirements/business/REQ-06.006.md
+  - docs/requirements/business/REQ-06.007.md
+  - docs/requirements/business/REQ-06.008.md
+  - docs/requirements/business/REQ-06.009.md
+  - docs/requirements/business/REQ-06.010.md
+  - docs/requirements/business/REQ-06.011.md
+  - docs/requirements/business/REQ-06.012.md
+  - docs/requirements/non-functional/NFR-04.004.md
+  - docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md
+  - docs/architecture/adr/ADR-0011-one-way-backlog-md-import.md
+  - docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md
   - >-
-    docs/architecture/adr/ADR-0007-yaml-front-matter-as-single-record-metadata-source.md
-  - >-
-    docs/architecture/adr/ADR-0008-adopt-backlog-md-on-disk-layout-for-tasks-and-milestones.md
-  - >-
-    docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md
+    docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
   - docs/specifications/release-lifecycle.md
-  - docs/requirements/business/REQ-01.006.md
-  - docs/requirements/business/REQ-01.007.md
-  - docs/requirements/business/REQ-06.005.md
 priority: high
 type: task
 ordinal: 40000
@@ -35,22 +56,24 @@ ordinal: 40000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Close the first complete Papyrus release after the final cross-type integration milestone is Done. Run release-level build and test checks, delegate the mandatory end-of-release audit to security-officer, compile the release report, and record the audit summary and explicit user approval here.
+Close Release 1.0 after the release scope was extended on 2026-11-11 with the Papyrus-native record layout, the single ID space, and the one-way Backlog.md import (ADR-0010 to ADR-0013), the configuration and browser requirements adopted the same day, and the migration of this repository own store. The release gate verifies the extended scope, re-runs the mandatory security audit over it, confirms that the upgrade notes and the one-time import are in place, compiles the release report, and records explicit user approval.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every m-12 task, including TASK-20, is Done.
-- [ ] #2 The Debian package builds and installs on the supported targets and the full test suite passes.
-- [ ] #3 The security-officer release audit is complete; no Critical or High finding is unresolved and remaining findings have documented owners.
-- [ ] #4 This ticket records the audit summary, the release version, and explicit user approval.
-- [ ] #5 The release report is compiled.
+- [ ] #1 Every other task in milestone m-14, including TASK-20 (m-12) and TASK-82 (m-15), is Done.
+- [ ] #2 The Debian package builds and installs on the supported targets, and the full test suite, clippy, and formatting checks pass.
+- [ ] #3 The security-officer release audit is re-run over the extended scope (native layout, import, relocation, browser configuration view); no Critical or High finding is unresolved and remaining findings have documented owners.
+- [ ] #4 The upgrade notes document the one-time import and the renumbering, and this repository own store has been imported once with its plan and report recorded.
+- [ ] #5 This ticket records the audit summary, the release version, and explicit user approval, and the release report is compiled.
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Security audit (security-officer, 2026-11-11): Pass with findings. No Critical/High. Medium (1): symlink traversal in task/milestone resolution (owner rust-dev, NFR-04.002). Low (3): unauthenticated non-loopback browser bind (rust-dev); path disclosure in diagnostics (rust-dev); trimming normalization vs rejection (rust-dev + requirements-engineer). Info (3): CLI non-atomic writes (accepted risk); plaintext HTTP (loopback default); cargo audit unavailable (CI follow-up). Secrets: none. Dependencies: 4 direct (clap, serde, serde_json, yaml_serde), crates.io, checksums verified, GPL-compatible. NFR coverage: NFR-02.001/002, NFR-04.001/002/003, NFR-01.003, NFR-06.002 addressed. Release version: 0.1.0 (Cargo.toml). Package: papyrus_0.1.0_amd64.deb (1136804 bytes). Tests: 565 passed. Clippy: 0 warnings. Build: release ok.
+
+Release scope extension (planner, 2026-11-11): milestone m-14 gained TASK-83 to TASK-100 for the accepted architecture decisions ADR-0010 to ADR-0013 (native record layout and single ID space, one-way Backlog.md import), the requirement changes of 2026-11-11, the configuration work, the browser work, and the import of this repository own store. TASK-73 now depends on every one of them; the dependency list also still carries TASK-20 (m-12) and TASK-82 (m-15). The security audit text and the release report recorded above were produced before the extension and are superseded: the audit must be re-run over the extended scope and the report recompiled. The release must ship the native layout and papyrus import backlog together and must publish the one-time import in its upgrade notes (ADR-0010 decision 11, ADR-0011 decision 9).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
