@@ -1,0 +1,1693 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' file: 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>MOCK-0013 &mdash; Browser use cases, test cases, and test reports review package</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body class="wf-package wf-annotate" data-mock-id="MOCK-0013">
+
+<header class="wf-chrome" role="navigation" aria-label="Review navigation (not part of the design)">
+  <span class="wf-chrome-label">Review</span>
+  <a class="wf-chrome-btn" href="#index">Overview</a>
+  <a class="wf-chrome-btn" href="#web">Web</a>
+  <span class="wf-chrome-note">Scaffolding for review only &mdash; not part of the mockup.</span>
+</header>
+
+<section class="wf-review wf-index is-active" data-review="index" data-screen="index">
+  <div class="wf-container">
+    <p class="wf-eyebrow">MOCK-0013 &middot; Wireframe review</p>
+    <h1 class="wf-title">Browser use cases, test cases, and test reports review package</h1>
+    <p class="wf-subtitle">Layout and interaction reference. Grayscale wireframe only &mdash; no visual styling, library, or technology choices.</p>
+
+    <div class="wf-box wf-ticket">
+      <h2 class="wf-section-title">Ticket</h2>
+      <p><strong>TASK-79</strong> &mdash; Design review: use cases, test cases, and test reports browser UI mockup</p>
+      <p class="wf-note">Sources: REQ-05.007, REQ-05.010, REQ-05.012, REQ-05.013, REQ-05.014, REQ-06.002, REQ-06.003, REQ-06.004; NFR-01.002, NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001; BR-004, BR-016, BR-018, BR-019, BR-020; use-cases-test-cases-and-test-reports-management.md; browser-requirements.md (baseline shell); TASK-78, TASK-81.</p>
+    </div>
+
+    <h2 class="wf-section-title">Review contents</h2>
+    <div class="wf-cards">
+      <article class="wf-box wf-card">
+        <span class="wf-badge">Web &middot; 39 views</span>
+        <h3>Web prototype</h3>
+        <p>Click through the web views and interactions to test the usability of the current feature.</p>
+        <a class="wf-button" href="#web/list-use-cases">Open web prototype</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<div class="wf-proto" data-platform="web">
+  <nav class="wf-proto-nav" aria-label="Web views (review navigation)">
+    <span class="wf-chrome-label">Web views</span>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-use-cases">list-use-cases</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-use-cases-empty">list-use-cases-empty</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-use-cases-long">list-use-cases-long</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/view-use-case">view-use-case</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/view-use-case-after-save">view-use-case-after-save</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/edit-use-case">edit-use-case</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/edit-use-case-dirty">edit-use-case-dirty</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/edit-use-case-errors">edit-use-case-errors</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/edit-use-case-conflict">edit-use-case-conflict</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/responsive-list-use-cases-320">responsive-list-use-cases-320</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/responsive-edit-use-cases-320">responsive-edit-use-cases-320</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-test-cases">list-test-cases</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-test-cases-empty">list-test-cases-empty</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-test-cases-long">list-test-cases-long</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/view-test-case">view-test-case</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/view-test-case-after-save">view-test-case-after-save</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/edit-test-case">edit-test-case</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/edit-test-case-dirty">edit-test-case-dirty</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/edit-test-case-errors">edit-test-case-errors</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/edit-test-case-conflict">edit-test-case-conflict</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/responsive-list-test-cases-320">responsive-list-test-cases-320</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/responsive-edit-test-cases-320">responsive-edit-test-cases-320</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-test-reports">list-test-reports</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-test-reports-empty">list-test-reports-empty</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-test-reports-long">list-test-reports-long</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/view-test-report">view-test-report</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/view-test-report-after-save">view-test-report-after-save</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/edit-test-report">edit-test-report</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/edit-test-report-dirty">edit-test-report-dirty</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/edit-test-report-errors">edit-test-report-errors</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/edit-test-report-conflict">edit-test-report-conflict</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/responsive-list-test-reports-320">responsive-list-test-reports-320</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/responsive-edit-test-reports-320">responsive-edit-test-reports-320</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-404-unknown">error-404-unknown</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-404-deprecated">error-404-deprecated</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-400">error-400</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-405">error-405</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-415">error-415</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/error-500">error-500</a>
+    
+  </nav>
+  <div class="wf-frame wf-frame--desktop">
+    <section class="wf-screen" data-platform="web" data-screen="list-use-cases" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases" aria-current="page">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <h1 class="wf-h1">Use Cases</h1>
+        <p class="wf-sub">Use Cases in this project.</p>
+        <section class="wf-section" aria-label="Use Cases">
+          <div class="wf-section-head"><h2 class="wf-h2">Use Cases</h2><p class="wf-count">2 use cases</p></div>
+                    <article class="wf-row">
+            <div class="wf-row-head"><h3 class="wf-row-title"><a href="#web/view-use-case" data-goto="view-use-case"><span class="wf-row-id">UC-001</span> User logs in</a></h3></div>
+            <p class="wf-group-preview">Describes how a user authenticates with valid credentials.</p>
+            <p class="wf-row-meta">Created '2026-11-10T09:00:00Z' &middot; Updated '2026-11-11T07:19:00Z' &middot; Labels: authentication, login &middot; References: REQ-05.012</p>
+          </article>          <article class="wf-row">
+            <div class="wf-row-head"><h3 class="wf-row-title"><a href="#web/view-use-case" data-goto="view-use-case"><span class="wf-row-id">UC-002</span> User resets password</a></h3></div>
+            <p class="wf-group-preview">Describes the password reset flow triggered from the login screen.</p>
+            <p class="wf-row-meta">Created '2026-11-10T09:00:00Z' &middot; Updated '2026-11-11T07:19:00Z' &middot; Labels: authentication &middot; References: REQ-05.012</p>
+          </article>
+        </section>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="list-use-cases-empty" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases" aria-current="page">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <h1 class="wf-h1">Use Cases</h1>
+        <p class="wf-sub">Use Cases in this project.</p>
+        <section class="wf-section" aria-label="Use Cases">
+          <div class="wf-section-head"><h2 class="wf-h2">Use Cases</h2><p class="wf-count">0 use cases</p></div>
+          <div class="wf-empty"><p>No use cases were found in the configured directory. Use cases are created from the command line; this browser does not create records. Deprecated use cases are hidden.</p></div>
+        </section>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="list-use-cases-long" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases" aria-current="page">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <h1 class="wf-h1">Use Cases</h1>
+        <p class="wf-sub">Use Cases in this project.</p>
+        <section class="wf-section" aria-label="Use Cases">
+          <div class="wf-section-head"><h2 class="wf-h2">Use Cases</h2><p class="wf-count">1 use cases</p></div>
+                    <article class="wf-row">
+            <div class="wf-row-head"><h3 class="wf-row-title"><a href="#web/view-use-case" data-goto="view-use-case"><span class="wf-row-id">UC-009</span> A very long use case title that must wrap gracefully inside the list row without horizontal scrolling</a></h3></div>
+            <p class="wf-group-preview">Preview text for the long-title wrapping case.</p>
+            <p class="wf-row-meta">Created '2026-11-10T09:00:00Z' &middot; Updated '2026-11-11T07:19:00Z' &middot; Labels: layout &middot; References: (none)</p>
+          </article>
+          <p class="wf-annotation">Long title wraps inside the row without horizontal scrolling.</p>
+        </section>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="view-use-case" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases" aria-current="page">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li>
+          <li aria-current="page">UC-001</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">UC-001</p>
+            <h1 class="wf-h1">User logs in</h1>
+          </div>
+          <div class="wf-actions"><a class="wf-btn wf-btn-primary" href="#web/edit-use-case" data-goto="edit-use-case">Edit</a></div>
+        </div>
+                <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">UC-001</dd></div>
+            <div><dt>Title</dt><dd>User logs in</dd></div>
+            <div><dt>Created date</dt><dd>'2026-11-10T09:00:00Z' (read-only)</dd></div>
+            <div><dt>Updated date</dt><dd>'2026-11-11T07:19:00Z' (read-only)</dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">authentication</span> <span class="wf-tag">login</span></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.012</span></dd></div>
+          </dl>
+        </div>
+        <section class="wf-record-section">
+          <h2>Description</h2>
+          <p class="wf-text">Describes how a user authenticates with valid credentials.</p>
+        </section>
+                <section class="wf-record-section">
+          <h2>Applicability</h2>
+          <p class="wf-text">Applies to the login flow and its error paths.</p>
+        </section>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="view-use-case-after-save" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases" aria-current="page">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li>
+          <li aria-current="page">UC-001</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">UC-001</p>
+            <h1 class="wf-h1">User logs in</h1>
+          </div>
+          <div class="wf-actions"><a class="wf-btn wf-btn-primary" href="#web/edit-use-case" data-goto="edit-use-case">Edit</a></div>
+        </div>
+                <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">UC-001</dd></div>
+            <div><dt>Title</dt><dd>User logs in</dd></div>
+            <div><dt>Created date</dt><dd>'2026-11-10T09:00:00Z' (read-only)</dd></div>
+            <div><dt>Updated date</dt><dd>'2026-11-11T07:19:00Z' (read-only)</dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">authentication</span> <span class="wf-tag">login</span></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.012</span></dd></div>
+          </dl>
+        </div>
+        <section class="wf-record-section">
+          <h2>Description</h2>
+          <p class="wf-text">Describes how a user authenticates with valid credentials.</p>
+        </section>
+                <section class="wf-record-section">
+          <h2>Applicability</h2>
+          <p class="wf-text">Applies to the login flow and its error paths.</p>
+        </section>
+        <p class="wf-annotation">Saved. The record view reflects the updated values.</p>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="edit-use-case" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases" aria-current="page">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li>
+          <li><a href="#web/view-use-case" data-goto="view-use-case">UC-001</a></li>
+          <li aria-current="page">Edit</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">UC-001</p>
+            <h1 class="wf-h1">Edit UC-001</h1>
+            <p class="wf-sub">User logs in</p>
+          </div>
+          <div class="wf-actions"></div>
+        </div>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">UC-001 (read-only)</dd></div>
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled aria-label="Created date (read-only)"></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled aria-label="Updated date (read-only)"></dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">authentication</span> <span class="wf-tag">login</span> <input type="text" placeholder="Add label"></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.012</span> <input type="text" placeholder="Add reference"></dd></div>
+          </dl>
+          <p class="wf-annotation">Timestamps are read-only; updated_date is refreshed automatically on save. Metadata edits target front matter, not body sections.</p>
+        </div>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field">
+            <label for="edit-use-case-title">Title (required)</label>
+            <input id="edit-use-case-title" name="title" type="text" required value="User logs in">
+            <p class="wf-help">Required &middot; whitespace is trimmed.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-use-case-description">Description (required)</label>
+            <textarea id="edit-use-case-description" name="description" rows="4" required>Describes how a user authenticates with valid credentials.</textarea>
+            <p class="wf-help">Required &middot; multi-line &middot; LF preserved.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-use-case-applicability">Applicability (optional)</label>
+            <textarea id="edit-use-case-applicability" name="applicability" rows="3">Applies to the login flow and its error paths.</textarea>
+            <p class="wf-help">Optional &middot; multi-line.</p>
+          </div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-use-case" data-goto="view-use-case">Cancel</a>
+          </div>
+        </form>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="edit-use-case-dirty" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases" aria-current="page">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li>
+          <li><a href="#web/view-use-case" data-goto="view-use-case">UC-001</a></li>
+          <li aria-current="page">Edit</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">UC-001</p>
+            <h1 class="wf-h1">Edit UC-001</h1>
+            <p class="wf-sub">User logs in</p>
+          </div>
+          <div class="wf-actions"></div>
+        </div>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">UC-001 (read-only)</dd></div>
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled aria-label="Created date (read-only)"></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled aria-label="Updated date (read-only)"></dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">authentication</span> <span class="wf-tag">login</span> <input type="text" placeholder="Add label"></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.012</span> <input type="text" placeholder="Add reference"></dd></div>
+          </dl>
+          <p class="wf-annotation">Timestamps are read-only; updated_date is refreshed automatically on save. Metadata edits target front matter, not body sections.</p>
+        </div>
+        <p class="wf-annotation"><strong>Unsaved changes</strong></p>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field">
+            <label for="edit-use-case-title">Title (required)</label>
+            <input id="edit-use-case-title" name="title" type="text" required value="User logs in">
+            <p class="wf-help">Required &middot; whitespace is trimmed.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-use-case-description">Description (required)</label>
+            <textarea id="edit-use-case-description" name="description" rows="4" required>Describes how a user authenticates with valid credentials.</textarea>
+            <p class="wf-help">Required &middot; multi-line &middot; LF preserved.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-use-case-applicability">Applicability (optional)</label>
+            <textarea id="edit-use-case-applicability" name="applicability" rows="3">Applies to the login flow and its error paths.</textarea>
+            <p class="wf-help">Optional &middot; multi-line.</p>
+          </div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-use-case" data-goto="view-use-case">Cancel</a>
+          </div>
+        </form>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="edit-use-case-errors" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases" aria-current="page">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li>
+          <li><a href="#web/view-use-case" data-goto="view-use-case">UC-001</a></li>
+          <li aria-current="page">Edit</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">UC-001</p>
+            <h1 class="wf-h1">Edit UC-001</h1>
+            <p class="wf-sub">User logs in</p>
+          </div>
+          <div class="wf-actions"></div>
+        </div>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">UC-001 (read-only)</dd></div>
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled aria-label="Created date (read-only)"></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled aria-label="Updated date (read-only)"></dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">authentication</span> <span class="wf-tag">login</span> <input type="text" placeholder="Add label"></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.012</span> <input type="text" placeholder="Add reference"></dd></div>
+          </dl>
+          <p class="wf-annotation">Timestamps are read-only; updated_date is refreshed automatically on save. Metadata edits target front matter, not body sections.</p>
+        </div>
+        <div class="wf-alert" role="alert">
+          <p class="wf-error">Title is required.</p>
+          <p class="wf-error">Description is required.</p>
+        </div>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field">
+            <label for="edit-use-case-title">Title (required)</label>
+            <input id="edit-use-case-title" name="title" type="text" required aria-invalid="true" value="">
+            <p class="wf-help">Required &middot; whitespace is trimmed.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-use-case-description">Description (required)</label>
+            <textarea id="edit-use-case-description" name="description" rows="4" required aria-invalid="true">Describes how a user authenticates with valid credentials.</textarea>
+            <p class="wf-help">Required &middot; multi-line &middot; LF preserved.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-use-case-applicability">Applicability (optional)</label>
+            <textarea id="edit-use-case-applicability" name="applicability" rows="3">Applies to the login flow and its error paths.</textarea>
+            <p class="wf-help">Optional &middot; multi-line.</p>
+          </div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-use-case" data-goto="view-use-case">Cancel</a>
+          </div>
+        </form>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="edit-use-case-conflict" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases" aria-current="page">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li>
+          <li><a href="#web/view-use-case" data-goto="view-use-case">UC-001</a></li>
+          <li aria-current="page">Edit</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">UC-001</p>
+            <h1 class="wf-h1">Edit UC-001</h1>
+            <p class="wf-sub">User logs in</p>
+          </div>
+          <div class="wf-actions"></div>
+        </div>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">UC-001 (read-only)</dd></div>
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled aria-label="Created date (read-only)"></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled aria-label="Updated date (read-only)"></dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">authentication</span> <span class="wf-tag">login</span> <input type="text" placeholder="Add label"></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.012</span> <input type="text" placeholder="Add reference"></dd></div>
+          </dl>
+          <p class="wf-annotation">Timestamps are read-only; updated_date is refreshed automatically on save. Metadata edits target front matter, not body sections.</p>
+        </div>
+        <div class="wf-alert" role="alert">
+          <p class="wf-error">Conflict (409): the record changed since you opened the form.</p>
+          <p><a class="wf-link" href="#web/view-use-case" data-goto="view-use-case">Reload the form</a> &middot; <a class="wf-link" href="#web/view-use-case" data-goto="view-use-case">View current record</a></p>
+        </div>
+        <div class="wf-meta"><p class="wf-annotation">Unsaved values: Title="changed", Description="changed".</p></div>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field">
+            <label for="edit-use-case-title">Title (required)</label>
+            <input id="edit-use-case-title" name="title" type="text" required value="User logs in">
+            <p class="wf-help">Required &middot; whitespace is trimmed.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-use-case-description">Description (required)</label>
+            <textarea id="edit-use-case-description" name="description" rows="4" required>Describes how a user authenticates with valid credentials.</textarea>
+            <p class="wf-help">Required &middot; multi-line &middot; LF preserved.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-use-case-applicability">Applicability (optional)</label>
+            <textarea id="edit-use-case-applicability" name="applicability" rows="3">Applies to the login flow and its error paths.</textarea>
+            <p class="wf-help">Optional &middot; multi-line.</p>
+          </div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-use-case" data-goto="view-use-case">Cancel</a>
+          </div>
+        </form>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="responsive-list-use-cases-320" hidden>
+  <div class="wf-app">
+    <header class="wf-header"><div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span></span></div></header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types">
+        <button class="wf-btn" data-type-toggle aria-expanded="false" aria-controls="type-list-r1">Document types</button>
+        <ul id="type-list-r1" hidden>
+          <li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li>
+        </ul>
+      </aside>
+      <main class="wf-main">
+        
+        <h1 class="wf-h1">Use Cases</h1>
+        <article class="wf-row"><h3 class="wf-row-title"><span class="wf-row-id">UC-001</span> User logs in</h3><p class="wf-row-meta">Created '2026-11-10T09:00:00Z' &middot; Updated '2026-11-11T07:19:00Z'</p></article>
+        <p class="wf-annotation">320 px list: sidebar collapses behind toggle; rows full width; metadata wraps.</p>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="responsive-edit-use-cases-320" hidden>
+  <div class="wf-app">
+    <header class="wf-header"><div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span></span></div></header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types">
+        <button class="wf-btn" data-type-toggle aria-expanded="false" aria-controls="type-list-r2">Document types</button>
+        <ul id="type-list-r2" hidden>
+          <li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li>
+        </ul>
+      </aside>
+      <main class="wf-main">
+        <h1 class="wf-h1">Edit UC-001</h1>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled></dd></div>
+          </dl>
+        </div>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field"><label for="r-title">Title (required)</label><input id="r-title" type="text" value="User logs in"></div>
+          <div class="wf-field"><label for="r-desc">Description (required)</label><textarea id="r-desc" rows="4">Describes how a user authenticates with valid credentials.</textarea></div>
+          <div class="wf-field"><label for="r-appl">Applicability (optional)</label><textarea id="r-appl" rows="3">Applies to the login flow and its error paths.</textarea></div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-use-case" data-goto="view-use-case">Cancel</a>
+          </div>
+        </form>
+        <p class="wf-annotation">320 px edit: timestamps read-only; fields full width; actions stacked; annotation legend.</p>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="list-test-cases" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases" aria-current="page">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <h1 class="wf-h1">Test Cases</h1>
+        <p class="wf-sub">Test Cases in this project.</p>
+        <section class="wf-section" aria-label="Test Cases">
+          <div class="wf-section-head"><h2 class="wf-h2">Test Cases</h2><p class="wf-count">2 test cases</p></div>
+                    <article class="wf-row">
+            <div class="wf-row-head"><h3 class="wf-row-title"><a href="#web/view-test-case" data-goto="view-test-case"><span class="wf-row-id">TC-001</span> Login succeeds with valid credentials</a></h3></div>
+            <p class="wf-group-preview">Verifies that a user with valid credentials reaches the dashboard.</p>
+            <p class="wf-row-meta">Created '2026-11-10T09:00:00Z' &middot; Updated '2026-11-11T07:19:00Z' &middot; Labels: authentication, happy-path &middot; References: REQ-05.013</p>
+          </article>          <article class="wf-row">
+            <div class="wf-row-head"><h3 class="wf-row-title"><a href="#web/view-test-case" data-goto="view-test-case"><span class="wf-row-id">TC-002</span> Login fails with wrong password</a></h3></div>
+            <p class="wf-group-preview">Verifies the error message shown for an invalid password.</p>
+            <p class="wf-row-meta">Created '2026-11-10T09:00:00Z' &middot; Updated '2026-11-11T07:19:00Z' &middot; Labels: authentication, error-path &middot; References: REQ-05.013</p>
+          </article>
+        </section>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="list-test-cases-empty" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases" aria-current="page">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <h1 class="wf-h1">Test Cases</h1>
+        <p class="wf-sub">Test Cases in this project.</p>
+        <section class="wf-section" aria-label="Test Cases">
+          <div class="wf-section-head"><h2 class="wf-h2">Test Cases</h2><p class="wf-count">0 test cases</p></div>
+          <div class="wf-empty"><p>No test cases were found in the configured directory. Test cases are created from the command line; this browser does not create records. Deprecated test cases are hidden.</p></div>
+        </section>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="list-test-cases-long" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases" aria-current="page">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <h1 class="wf-h1">Test Cases</h1>
+        <p class="wf-sub">Test Cases in this project.</p>
+        <section class="wf-section" aria-label="Test Cases">
+          <div class="wf-section-head"><h2 class="wf-h2">Test Cases</h2><p class="wf-count">1 test cases</p></div>
+                    <article class="wf-row">
+            <div class="wf-row-head"><h3 class="wf-row-title"><a href="#web/view-test-case" data-goto="view-test-case"><span class="wf-row-id">TC-009</span> A very long test case title that must wrap gracefully inside the list row without horizontal scrolling</a></h3></div>
+            <p class="wf-group-preview">Preview text for the long-title wrapping case.</p>
+            <p class="wf-row-meta">Created '2026-11-10T09:00:00Z' &middot; Updated '2026-11-11T07:19:00Z' &middot; Labels: layout &middot; References: (none)</p>
+          </article>
+          <p class="wf-annotation">Long title wraps inside the row without horizontal scrolling.</p>
+        </section>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="view-test-case" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases" aria-current="page">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li>
+          <li aria-current="page">TC-001</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">TC-001</p>
+            <h1 class="wf-h1">Login succeeds with valid credentials</h1>
+          </div>
+          <div class="wf-actions"><a class="wf-btn wf-btn-primary" href="#web/edit-test-case" data-goto="edit-test-case">Edit</a></div>
+        </div>
+                <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">TC-001</dd></div>
+            <div><dt>Title</dt><dd>Login succeeds with valid credentials</dd></div>
+            <div><dt>Created date</dt><dd>'2026-11-10T09:00:00Z' (read-only)</dd></div>
+            <div><dt>Updated date</dt><dd>'2026-11-11T07:19:00Z' (read-only)</dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">authentication</span> <span class="wf-tag">happy-path</span></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.013</span></dd></div>
+          </dl>
+        </div>
+        <section class="wf-record-section">
+          <h2>Description</h2>
+          <p class="wf-text">Verifies that a user with valid credentials reaches the dashboard.</p>
+        </section>
+                <section class="wf-record-section">
+          <h2>Applicability</h2>
+          <p class="wf-text">Applies to the happy path.</p>
+        </section>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="view-test-case-after-save" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases" aria-current="page">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li>
+          <li aria-current="page">TC-001</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">TC-001</p>
+            <h1 class="wf-h1">Login succeeds with valid credentials</h1>
+          </div>
+          <div class="wf-actions"><a class="wf-btn wf-btn-primary" href="#web/edit-test-case" data-goto="edit-test-case">Edit</a></div>
+        </div>
+                <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">TC-001</dd></div>
+            <div><dt>Title</dt><dd>Login succeeds with valid credentials</dd></div>
+            <div><dt>Created date</dt><dd>'2026-11-10T09:00:00Z' (read-only)</dd></div>
+            <div><dt>Updated date</dt><dd>'2026-11-11T07:19:00Z' (read-only)</dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">authentication</span> <span class="wf-tag">happy-path</span></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.013</span></dd></div>
+          </dl>
+        </div>
+        <section class="wf-record-section">
+          <h2>Description</h2>
+          <p class="wf-text">Verifies that a user with valid credentials reaches the dashboard.</p>
+        </section>
+                <section class="wf-record-section">
+          <h2>Applicability</h2>
+          <p class="wf-text">Applies to the happy path.</p>
+        </section>
+        <p class="wf-annotation">Saved. The record view reflects the updated values.</p>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="edit-test-case" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases" aria-current="page">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li>
+          <li><a href="#web/view-test-case" data-goto="view-test-case">TC-001</a></li>
+          <li aria-current="page">Edit</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">TC-001</p>
+            <h1 class="wf-h1">Edit TC-001</h1>
+            <p class="wf-sub">Login succeeds with valid credentials</p>
+          </div>
+          <div class="wf-actions"></div>
+        </div>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">TC-001 (read-only)</dd></div>
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled aria-label="Created date (read-only)"></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled aria-label="Updated date (read-only)"></dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">authentication</span> <span class="wf-tag">happy-path</span> <input type="text" placeholder="Add label"></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.013</span> <input type="text" placeholder="Add reference"></dd></div>
+          </dl>
+          <p class="wf-annotation">Timestamps are read-only; updated_date is refreshed automatically on save. Metadata edits target front matter, not body sections.</p>
+        </div>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field">
+            <label for="edit-test-case-title">Title (required)</label>
+            <input id="edit-test-case-title" name="title" type="text" required value="Login succeeds with valid credentials">
+            <p class="wf-help">Required &middot; whitespace is trimmed.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-case-description">Description (required)</label>
+            <textarea id="edit-test-case-description" name="description" rows="4" required>Verifies that a user with valid credentials reaches the dashboard.</textarea>
+            <p class="wf-help">Required &middot; multi-line &middot; LF preserved.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-case-applicability">Applicability (optional)</label>
+            <textarea id="edit-test-case-applicability" name="applicability" rows="3">Applies to the happy path.</textarea>
+            <p class="wf-help">Optional &middot; multi-line.</p>
+          </div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-test-case" data-goto="view-test-case">Cancel</a>
+          </div>
+        </form>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="edit-test-case-dirty" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases" aria-current="page">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li>
+          <li><a href="#web/view-test-case" data-goto="view-test-case">TC-001</a></li>
+          <li aria-current="page">Edit</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">TC-001</p>
+            <h1 class="wf-h1">Edit TC-001</h1>
+            <p class="wf-sub">Login succeeds with valid credentials</p>
+          </div>
+          <div class="wf-actions"></div>
+        </div>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">TC-001 (read-only)</dd></div>
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled aria-label="Created date (read-only)"></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled aria-label="Updated date (read-only)"></dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">authentication</span> <span class="wf-tag">happy-path</span> <input type="text" placeholder="Add label"></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.013</span> <input type="text" placeholder="Add reference"></dd></div>
+          </dl>
+          <p class="wf-annotation">Timestamps are read-only; updated_date is refreshed automatically on save. Metadata edits target front matter, not body sections.</p>
+        </div>
+        <p class="wf-annotation"><strong>Unsaved changes</strong></p>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field">
+            <label for="edit-test-case-title">Title (required)</label>
+            <input id="edit-test-case-title" name="title" type="text" required value="Login succeeds with valid credentials">
+            <p class="wf-help">Required &middot; whitespace is trimmed.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-case-description">Description (required)</label>
+            <textarea id="edit-test-case-description" name="description" rows="4" required>Verifies that a user with valid credentials reaches the dashboard.</textarea>
+            <p class="wf-help">Required &middot; multi-line &middot; LF preserved.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-case-applicability">Applicability (optional)</label>
+            <textarea id="edit-test-case-applicability" name="applicability" rows="3">Applies to the happy path.</textarea>
+            <p class="wf-help">Optional &middot; multi-line.</p>
+          </div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-test-case" data-goto="view-test-case">Cancel</a>
+          </div>
+        </form>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="edit-test-case-errors" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases" aria-current="page">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li>
+          <li><a href="#web/view-test-case" data-goto="view-test-case">TC-001</a></li>
+          <li aria-current="page">Edit</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">TC-001</p>
+            <h1 class="wf-h1">Edit TC-001</h1>
+            <p class="wf-sub">Login succeeds with valid credentials</p>
+          </div>
+          <div class="wf-actions"></div>
+        </div>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">TC-001 (read-only)</dd></div>
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled aria-label="Created date (read-only)"></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled aria-label="Updated date (read-only)"></dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">authentication</span> <span class="wf-tag">happy-path</span> <input type="text" placeholder="Add label"></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.013</span> <input type="text" placeholder="Add reference"></dd></div>
+          </dl>
+          <p class="wf-annotation">Timestamps are read-only; updated_date is refreshed automatically on save. Metadata edits target front matter, not body sections.</p>
+        </div>
+        <div class="wf-alert" role="alert">
+          <p class="wf-error">Title is required.</p>
+          <p class="wf-error">Description is required.</p>
+        </div>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field">
+            <label for="edit-test-case-title">Title (required)</label>
+            <input id="edit-test-case-title" name="title" type="text" required aria-invalid="true" value="">
+            <p class="wf-help">Required &middot; whitespace is trimmed.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-case-description">Description (required)</label>
+            <textarea id="edit-test-case-description" name="description" rows="4" required aria-invalid="true">Verifies that a user with valid credentials reaches the dashboard.</textarea>
+            <p class="wf-help">Required &middot; multi-line &middot; LF preserved.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-case-applicability">Applicability (optional)</label>
+            <textarea id="edit-test-case-applicability" name="applicability" rows="3">Applies to the happy path.</textarea>
+            <p class="wf-help">Optional &middot; multi-line.</p>
+          </div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-test-case" data-goto="view-test-case">Cancel</a>
+          </div>
+        </form>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="edit-test-case-conflict" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases" aria-current="page">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li>
+          <li><a href="#web/view-test-case" data-goto="view-test-case">TC-001</a></li>
+          <li aria-current="page">Edit</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">TC-001</p>
+            <h1 class="wf-h1">Edit TC-001</h1>
+            <p class="wf-sub">Login succeeds with valid credentials</p>
+          </div>
+          <div class="wf-actions"></div>
+        </div>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">TC-001 (read-only)</dd></div>
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled aria-label="Created date (read-only)"></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled aria-label="Updated date (read-only)"></dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">authentication</span> <span class="wf-tag">happy-path</span> <input type="text" placeholder="Add label"></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.013</span> <input type="text" placeholder="Add reference"></dd></div>
+          </dl>
+          <p class="wf-annotation">Timestamps are read-only; updated_date is refreshed automatically on save. Metadata edits target front matter, not body sections.</p>
+        </div>
+        <div class="wf-alert" role="alert">
+          <p class="wf-error">Conflict (409): the record changed since you opened the form.</p>
+          <p><a class="wf-link" href="#web/view-test-case" data-goto="view-test-case">Reload the form</a> &middot; <a class="wf-link" href="#web/view-test-case" data-goto="view-test-case">View current record</a></p>
+        </div>
+        <div class="wf-meta"><p class="wf-annotation">Unsaved values: Title="changed", Description="changed".</p></div>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field">
+            <label for="edit-test-case-title">Title (required)</label>
+            <input id="edit-test-case-title" name="title" type="text" required value="Login succeeds with valid credentials">
+            <p class="wf-help">Required &middot; whitespace is trimmed.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-case-description">Description (required)</label>
+            <textarea id="edit-test-case-description" name="description" rows="4" required>Verifies that a user with valid credentials reaches the dashboard.</textarea>
+            <p class="wf-help">Required &middot; multi-line &middot; LF preserved.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-case-applicability">Applicability (optional)</label>
+            <textarea id="edit-test-case-applicability" name="applicability" rows="3">Applies to the happy path.</textarea>
+            <p class="wf-help">Optional &middot; multi-line.</p>
+          </div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-test-case" data-goto="view-test-case">Cancel</a>
+          </div>
+        </form>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="responsive-list-test-cases-320" hidden>
+  <div class="wf-app">
+    <header class="wf-header"><div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span></span></div></header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types">
+        <button class="wf-btn" data-type-toggle aria-expanded="false" aria-controls="type-list-r1">Document types</button>
+        <ul id="type-list-r1" hidden>
+          <li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li>
+        </ul>
+      </aside>
+      <main class="wf-main">
+        
+        <h1 class="wf-h1">Test Cases</h1>
+        <article class="wf-row"><h3 class="wf-row-title"><span class="wf-row-id">TC-001</span> Login succeeds with valid credentials</h3><p class="wf-row-meta">Created '2026-11-10T09:00:00Z' &middot; Updated '2026-11-11T07:19:00Z'</p></article>
+        <p class="wf-annotation">320 px list: sidebar collapses behind toggle; rows full width; metadata wraps.</p>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="responsive-edit-test-cases-320" hidden>
+  <div class="wf-app">
+    <header class="wf-header"><div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span></span></div></header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types">
+        <button class="wf-btn" data-type-toggle aria-expanded="false" aria-controls="type-list-r2">Document types</button>
+        <ul id="type-list-r2" hidden>
+          <li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li>
+        </ul>
+      </aside>
+      <main class="wf-main">
+        <h1 class="wf-h1">Edit TC-001</h1>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled></dd></div>
+          </dl>
+        </div>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field"><label for="r-title">Title (required)</label><input id="r-title" type="text" value="Login succeeds with valid credentials"></div>
+          <div class="wf-field"><label for="r-desc">Description (required)</label><textarea id="r-desc" rows="4">Verifies that a user with valid credentials reaches the dashboard.</textarea></div>
+          <div class="wf-field"><label for="r-appl">Applicability (optional)</label><textarea id="r-appl" rows="3">Applies to the happy path.</textarea></div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-test-case" data-goto="view-test-case">Cancel</a>
+          </div>
+        </form>
+        <p class="wf-annotation">320 px edit: timestamps read-only; fields full width; actions stacked; annotation legend.</p>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="list-test-reports" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports" aria-current="page">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <h1 class="wf-h1">Test Reports</h1>
+        <p class="wf-sub">Test Reports in this project.</p>
+        <section class="wf-section" aria-label="Test Reports">
+          <div class="wf-section-head"><h2 class="wf-h2">Test Reports</h2><p class="wf-count">2 test reports</p></div>
+                    <article class="wf-row">
+            <div class="wf-row-head"><h3 class="wf-row-title"><a href="#web/view-test-report" data-goto="view-test-report"><span class="wf-row-id">TR-001</span> Login test run 2026-11</a></h3></div>
+            <p class="wf-group-preview">Summarises the results of the November login test campaign.</p>
+            <p class="wf-row-meta">Created '2026-11-10T09:00:00Z' &middot; Updated '2026-11-11T07:19:00Z' &middot; Labels: release-1.0, login &middot; References: REQ-05.014</p>
+          </article>          <article class="wf-row">
+            <div class="wf-row-head"><h3 class="wf-row-title"><a href="#web/view-test-report" data-goto="view-test-report"><span class="wf-row-id">TR-002</span> Password reset test run</a></h3></div>
+            <p class="wf-group-preview">Summarises password reset test results.</p>
+            <p class="wf-row-meta">Created '2026-11-10T09:00:00Z' &middot; Updated '2026-11-11T07:19:00Z' &middot; Labels: authentication &middot; References: REQ-05.014</p>
+          </article>
+        </section>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="list-test-reports-empty" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports" aria-current="page">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <h1 class="wf-h1">Test Reports</h1>
+        <p class="wf-sub">Test Reports in this project.</p>
+        <section class="wf-section" aria-label="Test Reports">
+          <div class="wf-section-head"><h2 class="wf-h2">Test Reports</h2><p class="wf-count">0 test reports</p></div>
+          <div class="wf-empty"><p>No test reports were found in the configured directory. Test reports are created from the command line; this browser does not create records. Deprecated test reports are hidden.</p></div>
+        </section>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="list-test-reports-long" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports" aria-current="page">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <h1 class="wf-h1">Test Reports</h1>
+        <p class="wf-sub">Test Reports in this project.</p>
+        <section class="wf-section" aria-label="Test Reports">
+          <div class="wf-section-head"><h2 class="wf-h2">Test Reports</h2><p class="wf-count">1 test reports</p></div>
+                    <article class="wf-row">
+            <div class="wf-row-head"><h3 class="wf-row-title"><a href="#web/view-test-report" data-goto="view-test-report"><span class="wf-row-id">TR-009</span> A very long test report title that must wrap gracefully inside the list row without horizontal scrolling</a></h3></div>
+            <p class="wf-group-preview">Preview text for the long-title wrapping case.</p>
+            <p class="wf-row-meta">Created '2026-11-10T09:00:00Z' &middot; Updated '2026-11-11T07:19:00Z' &middot; Labels: layout &middot; References: (none)</p>
+          </article>
+          <p class="wf-annotation">Long title wraps inside the row without horizontal scrolling.</p>
+        </section>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="view-test-report" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports" aria-current="page">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li>
+          <li aria-current="page">TR-001</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">TR-001</p>
+            <h1 class="wf-h1">Login test run 2026-11</h1>
+          </div>
+          <div class="wf-actions"><a class="wf-btn wf-btn-primary" href="#web/edit-test-report" data-goto="edit-test-report">Edit</a></div>
+        </div>
+                <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">TR-001</dd></div>
+            <div><dt>Title</dt><dd>Login test run 2026-11</dd></div>
+            <div><dt>Created date</dt><dd>'2026-11-10T09:00:00Z' (read-only)</dd></div>
+            <div><dt>Updated date</dt><dd>'2026-11-11T07:19:00Z' (read-only)</dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">release-1.0</span> <span class="wf-tag">login</span></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.014</span></dd></div>
+          </dl>
+        </div>
+        <section class="wf-record-section">
+          <h2>Description</h2>
+          <p class="wf-text">Summarises the results of the November login test campaign.</p>
+        </section>
+                <section class="wf-record-section">
+          <h2>Applicability</h2>
+          <p class="wf-text">Applies to release 1.0.</p>
+        </section>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="view-test-report-after-save" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports" aria-current="page">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li>
+          <li aria-current="page">TR-001</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">TR-001</p>
+            <h1 class="wf-h1">Login test run 2026-11</h1>
+          </div>
+          <div class="wf-actions"><a class="wf-btn wf-btn-primary" href="#web/edit-test-report" data-goto="edit-test-report">Edit</a></div>
+        </div>
+                <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">TR-001</dd></div>
+            <div><dt>Title</dt><dd>Login test run 2026-11</dd></div>
+            <div><dt>Created date</dt><dd>'2026-11-10T09:00:00Z' (read-only)</dd></div>
+            <div><dt>Updated date</dt><dd>'2026-11-11T07:19:00Z' (read-only)</dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">release-1.0</span> <span class="wf-tag">login</span></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.014</span></dd></div>
+          </dl>
+        </div>
+        <section class="wf-record-section">
+          <h2>Description</h2>
+          <p class="wf-text">Summarises the results of the November login test campaign.</p>
+        </section>
+                <section class="wf-record-section">
+          <h2>Applicability</h2>
+          <p class="wf-text">Applies to release 1.0.</p>
+        </section>
+        <p class="wf-annotation">Saved. The record view reflects the updated values.</p>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="edit-test-report" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports" aria-current="page">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li>
+          <li><a href="#web/view-test-report" data-goto="view-test-report">TR-001</a></li>
+          <li aria-current="page">Edit</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">TR-001</p>
+            <h1 class="wf-h1">Edit TR-001</h1>
+            <p class="wf-sub">Login test run 2026-11</p>
+          </div>
+          <div class="wf-actions"></div>
+        </div>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">TR-001 (read-only)</dd></div>
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled aria-label="Created date (read-only)"></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled aria-label="Updated date (read-only)"></dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">release-1.0</span> <span class="wf-tag">login</span> <input type="text" placeholder="Add label"></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.014</span> <input type="text" placeholder="Add reference"></dd></div>
+          </dl>
+          <p class="wf-annotation">Timestamps are read-only; updated_date is refreshed automatically on save. Metadata edits target front matter, not body sections.</p>
+        </div>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field">
+            <label for="edit-test-report-title">Title (required)</label>
+            <input id="edit-test-report-title" name="title" type="text" required value="Login test run 2026-11">
+            <p class="wf-help">Required &middot; whitespace is trimmed.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-report-description">Description (required)</label>
+            <textarea id="edit-test-report-description" name="description" rows="4" required>Summarises the results of the November login test campaign.</textarea>
+            <p class="wf-help">Required &middot; multi-line &middot; LF preserved.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-report-applicability">Applicability (optional)</label>
+            <textarea id="edit-test-report-applicability" name="applicability" rows="3">Applies to release 1.0.</textarea>
+            <p class="wf-help">Optional &middot; multi-line.</p>
+          </div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-test-report" data-goto="view-test-report">Cancel</a>
+          </div>
+        </form>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="edit-test-report-dirty" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports" aria-current="page">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li>
+          <li><a href="#web/view-test-report" data-goto="view-test-report">TR-001</a></li>
+          <li aria-current="page">Edit</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">TR-001</p>
+            <h1 class="wf-h1">Edit TR-001</h1>
+            <p class="wf-sub">Login test run 2026-11</p>
+          </div>
+          <div class="wf-actions"></div>
+        </div>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">TR-001 (read-only)</dd></div>
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled aria-label="Created date (read-only)"></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled aria-label="Updated date (read-only)"></dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">release-1.0</span> <span class="wf-tag">login</span> <input type="text" placeholder="Add label"></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.014</span> <input type="text" placeholder="Add reference"></dd></div>
+          </dl>
+          <p class="wf-annotation">Timestamps are read-only; updated_date is refreshed automatically on save. Metadata edits target front matter, not body sections.</p>
+        </div>
+        <p class="wf-annotation"><strong>Unsaved changes</strong></p>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field">
+            <label for="edit-test-report-title">Title (required)</label>
+            <input id="edit-test-report-title" name="title" type="text" required value="Login test run 2026-11">
+            <p class="wf-help">Required &middot; whitespace is trimmed.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-report-description">Description (required)</label>
+            <textarea id="edit-test-report-description" name="description" rows="4" required>Summarises the results of the November login test campaign.</textarea>
+            <p class="wf-help">Required &middot; multi-line &middot; LF preserved.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-report-applicability">Applicability (optional)</label>
+            <textarea id="edit-test-report-applicability" name="applicability" rows="3">Applies to release 1.0.</textarea>
+            <p class="wf-help">Optional &middot; multi-line.</p>
+          </div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-test-report" data-goto="view-test-report">Cancel</a>
+          </div>
+        </form>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="edit-test-report-errors" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports" aria-current="page">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li>
+          <li><a href="#web/view-test-report" data-goto="view-test-report">TR-001</a></li>
+          <li aria-current="page">Edit</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">TR-001</p>
+            <h1 class="wf-h1">Edit TR-001</h1>
+            <p class="wf-sub">Login test run 2026-11</p>
+          </div>
+          <div class="wf-actions"></div>
+        </div>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">TR-001 (read-only)</dd></div>
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled aria-label="Created date (read-only)"></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled aria-label="Updated date (read-only)"></dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">release-1.0</span> <span class="wf-tag">login</span> <input type="text" placeholder="Add label"></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.014</span> <input type="text" placeholder="Add reference"></dd></div>
+          </dl>
+          <p class="wf-annotation">Timestamps are read-only; updated_date is refreshed automatically on save. Metadata edits target front matter, not body sections.</p>
+        </div>
+        <div class="wf-alert" role="alert">
+          <p class="wf-error">Title is required.</p>
+          <p class="wf-error">Description is required.</p>
+        </div>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field">
+            <label for="edit-test-report-title">Title (required)</label>
+            <input id="edit-test-report-title" name="title" type="text" required aria-invalid="true" value="">
+            <p class="wf-help">Required &middot; whitespace is trimmed.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-report-description">Description (required)</label>
+            <textarea id="edit-test-report-description" name="description" rows="4" required aria-invalid="true">Summarises the results of the November login test campaign.</textarea>
+            <p class="wf-help">Required &middot; multi-line &middot; LF preserved.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-report-applicability">Applicability (optional)</label>
+            <textarea id="edit-test-report-applicability" name="applicability" rows="3">Applies to release 1.0.</textarea>
+            <p class="wf-help">Optional &middot; multi-line.</p>
+          </div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-test-report" data-goto="view-test-report">Cancel</a>
+          </div>
+        </form>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="edit-test-report-conflict" hidden>
+  <div class="wf-app">
+    <header class="wf-header">
+      <div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span></div>
+      <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+    </header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types"><p class="wf-sidebar-label">Document types</p><ul><li><span>Business requirements</span></li><li><span>Business Rules</span></li><li><span>Audit Records</span></li><li><span>Technical Specifications</span></li><li><a href="#web/list-use-cases" data-goto="list-use-cases">Use Cases</a></li><li><a href="#web/list-test-cases" data-goto="list-test-cases">Test Cases</a></li><li><a href="#web/list-test-reports" data-goto="list-test-reports" aria-current="page">Test Reports</a></li><li><span>Non-functional requirements</span></li><li><span>Backlog</span></li><li><span>Decisions</span></li><li><span>Glossary</span></li><li><span>UI Specifications</span></li><li><span>UI Mockups</span></li><li><span>Managed artifacts &amp; lifecycles</span></li><li><span>Agent skills &amp; workflows</span></li></ul></aside>
+      <main class="wf-main">
+        
+        <nav class="wf-breadcrumb" aria-label="Breadcrumb"><ol>
+          <li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li>
+          <li><a href="#web/view-test-report" data-goto="view-test-report">TR-001</a></li>
+          <li aria-current="page">Edit</li>
+        </ol></nav>
+        <div class="wf-page-head">
+          <div>
+            <p class="wf-id">TR-001</p>
+            <h1 class="wf-h1">Edit TR-001</h1>
+            <p class="wf-sub">Login test run 2026-11</p>
+          </div>
+          <div class="wf-actions"></div>
+        </div>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Record ID</dt><dd class="wf-mono">TR-001 (read-only)</dd></div>
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled aria-label="Created date (read-only)"></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled aria-label="Updated date (read-only)"></dd></div>
+            <div><dt>Labels</dt><dd><span class="wf-tag">release-1.0</span> <span class="wf-tag">login</span> <input type="text" placeholder="Add label"></dd></div>
+            <div><dt>References</dt><dd><span class="wf-tag">REQ-05.014</span> <input type="text" placeholder="Add reference"></dd></div>
+          </dl>
+          <p class="wf-annotation">Timestamps are read-only; updated_date is refreshed automatically on save. Metadata edits target front matter, not body sections.</p>
+        </div>
+        <div class="wf-alert" role="alert">
+          <p class="wf-error">Conflict (409): the record changed since you opened the form.</p>
+          <p><a class="wf-link" href="#web/view-test-report" data-goto="view-test-report">Reload the form</a> &middot; <a class="wf-link" href="#web/view-test-report" data-goto="view-test-report">View current record</a></p>
+        </div>
+        <div class="wf-meta"><p class="wf-annotation">Unsaved values: Title="changed", Description="changed".</p></div>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field">
+            <label for="edit-test-report-title">Title (required)</label>
+            <input id="edit-test-report-title" name="title" type="text" required value="Login test run 2026-11">
+            <p class="wf-help">Required &middot; whitespace is trimmed.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-report-description">Description (required)</label>
+            <textarea id="edit-test-report-description" name="description" rows="4" required>Summarises the results of the November login test campaign.</textarea>
+            <p class="wf-help">Required &middot; multi-line &middot; LF preserved.</p>
+          </div>
+          <div class="wf-field">
+            <label for="edit-test-report-applicability">Applicability (optional)</label>
+            <textarea id="edit-test-report-applicability" name="applicability" rows="3">Applies to release 1.0.</textarea>
+            <p class="wf-help">Optional &middot; multi-line.</p>
+          </div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-test-report" data-goto="view-test-report">Cancel</a>
+          </div>
+        </form>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="responsive-list-test-reports-320" hidden>
+  <div class="wf-app">
+    <header class="wf-header"><div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span></span></div></header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types">
+        <button class="wf-btn" data-type-toggle aria-expanded="false" aria-controls="type-list-r1">Document types</button>
+        <ul id="type-list-r1" hidden>
+          <li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li>
+        </ul>
+      </aside>
+      <main class="wf-main">
+        
+        <h1 class="wf-h1">Test Reports</h1>
+        <article class="wf-row"><h3 class="wf-row-title"><span class="wf-row-id">TR-001</span> Login test run 2026-11</h3><p class="wf-row-meta">Created '2026-11-10T09:00:00Z' &middot; Updated '2026-11-11T07:19:00Z'</p></article>
+        <p class="wf-annotation">320 px list: sidebar collapses behind toggle; rows full width; metadata wraps.</p>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="responsive-edit-test-reports-320" hidden>
+  <div class="wf-app">
+    <header class="wf-header"><div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span></span></div></header>
+    <div class="wf-layout">
+      <aside class="wf-sidebar" aria-label="Document types">
+        <button class="wf-btn" data-type-toggle aria-expanded="false" aria-controls="type-list-r2">Document types</button>
+        <ul id="type-list-r2" hidden>
+          <li><a href="#web/list-test-reports" data-goto="list-test-reports">Test Reports</a></li>
+        </ul>
+      </aside>
+      <main class="wf-main">
+        <h1 class="wf-h1">Edit TR-001</h1>
+        <div class="wf-meta">
+          <dl class="wf-dl">
+            <div><dt>Created date</dt><dd><input type="text" value='2026-11-10T09:00:00Z' disabled></dd></div>
+            <div><dt>Updated date</dt><dd><input type="text" value='2026-11-11T07:19:00Z' disabled></dd></div>
+          </dl>
+        </div>
+        <form class="wf-form" action="#" method="post">
+          <div class="wf-field"><label for="r-title">Title (required)</label><input id="r-title" type="text" value="Login test run 2026-11"></div>
+          <div class="wf-field"><label for="r-desc">Description (required)</label><textarea id="r-desc" rows="4">Summarises the results of the November login test campaign.</textarea></div>
+          <div class="wf-field"><label for="r-appl">Applicability (optional)</label><textarea id="r-appl" rows="3">Applies to release 1.0.</textarea></div>
+          <p class="wf-annotation">Hidden field: version (optimistic-concurrency token)</p>
+          <input type="hidden" name="version" value="1700000000.0.100">
+          <div class="wf-form-actions">
+            <button class="wf-btn wf-btn-primary" type="submit">Save changes</button>
+            <a class="wf-link" href="#web/view-test-report" data-goto="view-test-report">Cancel</a>
+          </div>
+        </form>
+        <p class="wf-annotation">320 px edit: timestamps read-only; fields full width; actions stacked; annotation legend.</p>
+      </main>
+    </div>
+    <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="error-404-unknown" hidden>
+  <div class="wf-app">
+    <header class="wf-header"><div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span></span></div></header>
+    <main class="wf-main">
+      <h1 class="wf-h1">404 &mdash; Not found</h1>
+      <p class="wf-text">The requested record was not found.</p>
+      <p><a class="wf-link" href="#web/list-use-cases" data-goto="list-use-cases">Back to use cases</a></p>
+    </main>
+    <footer class="wf-footer">Papyrus local browser &mdash; offline.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="error-404-deprecated" hidden>
+  <div class="wf-app">
+    <header class="wf-header"><div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span></span></div></header>
+    <main class="wf-main">
+      <h1 class="wf-h1">404 &mdash; Not found</h1>
+      <p class="wf-text">Deprecated records are not listed and cannot be opened.</p>
+      <p><a class="wf-link" href="#web/list-use-cases" data-goto="list-use-cases">Back to use cases</a></p>
+    </main>
+    <footer class="wf-footer">Papyrus local browser &mdash; offline.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="error-400" hidden>
+  <div class="wf-app">
+    <header class="wf-header"><div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span></span></div></header>
+    <main class="wf-main">
+      <h1 class="wf-h1">400 &mdash; Bad request</h1>
+      <p class="wf-text">The request could not be understood.</p>
+      <p><a class="wf-link" href="#web/list-use-cases" data-goto="list-use-cases">Back to use cases</a></p>
+    </main>
+    <footer class="wf-footer">Papyrus local browser &mdash; offline.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="error-405" hidden>
+  <div class="wf-app">
+    <header class="wf-header"><div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span></span></div></header>
+    <main class="wf-main">
+      <h1 class="wf-h1">405 &mdash; Method not allowed</h1>
+      <p class="wf-text">The requested method is not allowed.</p>
+      <p><a class="wf-link" href="#web/list-use-cases" data-goto="list-use-cases">Back to use cases</a></p>
+    </main>
+    <footer class="wf-footer">Papyrus local browser &mdash; offline.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="error-415" hidden>
+  <div class="wf-app">
+    <header class="wf-header"><div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span></span></div></header>
+    <main class="wf-main">
+      <h1 class="wf-h1">415 &mdash; Unsupported media type</h1>
+      <p class="wf-text">The request content type is not supported.</p>
+      <p><a class="wf-link" href="#web/list-use-cases" data-goto="list-use-cases">Back to use cases</a></p>
+    </main>
+    <footer class="wf-footer">Papyrus local browser &mdash; offline.</footer>
+  </div>
+</section>
+
+<section class="wf-screen" data-platform="web" data-screen="error-500" hidden>
+  <div class="wf-app">
+    <header class="wf-header"><div class="wf-brand"><span class="wf-mark" aria-hidden="true">P</span><span><span class="wf-brand-name">Papyrus</span></span></div></header>
+    <main class="wf-main">
+      <h1 class="wf-h1">500 &mdash; Server error</h1>
+      <p class="wf-text">An unexpected error occurred.</p>
+      <p><a class="wf-link" href="#web/list-use-cases" data-goto="list-use-cases">Back to use cases</a></p>
+    </main>
+    <footer class="wf-footer">Papyrus local browser &mdash; offline.</footer>
+  </div>
+</section>
+  </div>
+</div>
+
+<script>
+(function () {
+  function all(selector, scope) {
+    return Array.prototype.slice.call((scope || document).querySelectorAll(selector));
+  }
+  function byAttr(selector, attr, value) {
+    return all(selector).filter(function (el) { return el.getAttribute(attr) === value; })[0] || null;
+  }
+  function toggle(selector, active) {
+    all(selector).forEach(function (el) { el.classList.toggle('is-active', el === active); });
+  }
+  function go(hash) { location.hash = hash; }
+
+  function parse(rawHash) {
+    var raw = String(rawHash || '').replace(/^#\/?/, '');
+    var bits = raw.split('/');
+    if (!raw || bits[0] === 'index') return { mode: 'index' };
+    return { mode: 'proto', platform: bits[0], screen: bits[1] || '' };
+  }
+
+  function syncChrome(state) {
+    var key = state.mode === 'index' ? 'index' : state.platform;
+    all('.wf-chrome a').forEach(function (a) {
+      var target = String(a.getAttribute('href') || '').replace(/^#\/?/, '').split('/')[0];
+      var active = target === key;
+      a.classList.toggle('is-active', active);
+      if (active) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+    });
+  }
+
+  function render() {
+    var state = parse(location.hash);
+    var index = document.querySelector('[data-review="index"]');
+
+    syncChrome(state);
+
+    if (state.mode === 'proto') {
+      var proto = byAttr('.wf-proto', 'data-platform', state.platform);
+      if (!proto) { go('#index'); return; }
+      var screens = all('.wf-screen', proto);
+      var screen = state.screen ? byAttr('.wf-screen', 'data-screen', state.screen) : screens[0];
+      if (!screen || screens.indexOf(screen) === -1) screen = screens[0];
+      if (!screen) { go('#index'); return; }
+      var screenId = screen.getAttribute('data-screen');
+      if (state.screen !== screenId) { go('#' + state.platform + '/' + screenId); return; }
+
+      toggle('[data-review]', null);
+      toggle('.wf-proto', proto);
+      screens.forEach(function (s) { s.classList.toggle('is-active', s === screen); });
+      all('.wf-view-link', proto).forEach(function (link) {
+        var active = link.getAttribute('href') === '#' + state.platform + '/' + screenId;
+        link.classList.toggle('is-active', active);
+        if (active) link.setAttribute('aria-current', 'true'); else link.removeAttribute('aria-current');
+      });
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    toggle('.wf-proto', null);
+    toggle('[data-review]', index);
+  }
+
+  document.addEventListener('click', function (e) {
+    var target = e.target.closest('[data-goto]');
+    if (target) {
+      e.preventDefault();
+      var state = parse(location.hash);
+      if (state.mode === 'proto') go('#' + state.platform + '/' + target.getAttribute('data-goto'));
+    }
+  });
+
+  window.addEventListener('hashchange', render);
+  render();
+})();
+</script>
+</body>
+</html>
