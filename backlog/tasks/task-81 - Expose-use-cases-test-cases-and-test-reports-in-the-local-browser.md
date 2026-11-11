@@ -1,9 +1,10 @@
 ---
 id: TASK-81
 title: Expose use cases, test cases, and test reports in the local browser
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-10T20:16:00Z'
+updated_date: '2026-11-11T08:37:00Z'
 labels:
   - browser
   - documentation
@@ -33,8 +34,8 @@ Extend the local offline browser to expose use cases, test cases, and test repor
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Browser lists, views, edits, deprecates, and restores use cases, test cases, and test reports with IDs preserved.
-- [ ] #2 Front-matter metadata projection matches CLI views for all three types.
-- [ ] #3 Deprecated records hidden; restored records reappear.
-- [ ] #4 Assets embedded; no external references; 320px markup supported.
+- [x] #1 Browser lists, views, edits, deprecates, and restores use cases, test cases, and test reports with IDs preserved.
+- [x] #2 Front-matter metadata projection matches CLI views for all three types.
+- [x] #3 Deprecated records hidden; restored records reappear.
+- [x] #4 Assets embedded; no external references; 320px markup supported.
 <!-- AC:END -->
