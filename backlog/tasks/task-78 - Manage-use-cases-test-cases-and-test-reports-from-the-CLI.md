@@ -1,10 +1,10 @@
 ---
 id: TASK-78
 title: Manage use cases, test cases, and test reports from the CLI
-status: Refined
+status: Done
 assignee: []
 created_date: '2026-11-10T20:16:00Z'
-updated_date: '2026-11-11T06:59:00Z'
+updated_date: '2026-11-11T07:11:00Z'
 labels:
   - cli
   - documentation
