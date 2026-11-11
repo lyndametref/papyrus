@@ -10,7 +10,7 @@ use std::fs;
 use std::path::PathBuf;
 
 const DOC_TYPE: &str = "doc";
-const DOC_KEYS: [&str; 8] = [
+const DOC_KEYS: [&str; 11] = [
     "req",
     "nfr",
     "glossary",
@@ -19,6 +19,9 @@ const DOC_KEYS: [&str; 8] = [
     "rule",
     "audit",
     "tech-spec",
+    "use-case",
+    "test-case",
+    "test-report",
 ];
 
 pub fn sanitize_query(raw: &str) -> Result<String, AppError> {
@@ -145,6 +148,9 @@ fn collect_type(
             || key == "rule"
             || key == "audit"
             || key == "tech-spec"
+            || key == "use-case"
+            || key == "test-case"
+            || key == "test-report"
         {
             let prefix = format!("{}-", entry.prefix);
             let Some(rest) = id.strip_prefix(&prefix) else {
