@@ -945,7 +945,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
         <b style="color: light-dark(#8250df, #d2a8ff);">restore <id></b>
         Return a deprecated use case to its original folder. The ID is preserved.
 
-        Note: REQ-05.012 states use cases are managed with the `req` command; BR-018 recommends a dedicated `use-case` command (open decision). Recommended defaults (pending decision): prefix `UC`, directory `use-cases/`, `enabled: true`; lifecycle `active -> deprecated`; visibility active=visible/deprecated=hidden; no ticket or milestone association. Records carry YAML front matter with the general fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references` and a `# <ID> <title>` body heading (REQ-05.010). Whether `description` and `applicability` are front-matter fields or body content is undecided.
+        Note: REQ-05.012 states use cases are managed with the `req` command; this is superseded by the decided dedicated `use-case` command (BR-018). Decided defaults: prefix `UC`, directory `use-cases/`, `enabled: true`; lifecycle `active -> deprecated`; visibility active=visible/deprecated=hidden; no ticket or milestone association. Records carry YAML front matter with the general fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references` (REQ-05.010); `description` and `applicability` are body fields, not front-matter keys.
 
 <b style="color: light-dark(#0969da, #58a6ff);">test-case</b>
 
@@ -999,7 +999,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
         <b style="color: light-dark(#8250df, #d2a8ff);">restore <id></b>
         Return a deprecated test case to its original folder. The ID is preserved.
 
-        Note: REQ-05.013 states test cases are managed with the `req` command; BR-019 recommends a dedicated `test-case` command (open decision). Recommended defaults (pending decision): prefix `TC`, directory `test-cases/`, `enabled: true`; lifecycle `active -> deprecated`; visibility active=visible/deprecated=hidden; no ticket or milestone association. Records carry YAML front matter with the general fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references` and a `# <ID> <title>` body heading (REQ-05.010). Whether `description` and `applicability` are front-matter fields or body content is undecided. Relationship to test reports is not stated (see BR-020).
+        Note: REQ-05.013 states test cases are managed with the `req` command; this is superseded by the decided dedicated `test-case` command (BR-019). Decided defaults: prefix `TC`, directory `test-cases/`, `enabled: true`; lifecycle `active -> deprecated`; visibility active=visible/deprecated=hidden; no ticket or milestone association. Records carry YAML front matter with the general fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references` (REQ-05.010); `description` and `applicability` are body fields, not front-matter keys. Relationship to test reports is not stated (see BR-020).
 
 <b style="color: light-dark(#0969da, #58a6ff);">test-report</b>
 
@@ -1053,7 +1053,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
         <b style="color: light-dark(#8250df, #d2a8ff);">restore <id></b>
         Return a deprecated test report to its original folder. The ID is preserved.
 
-        Note: REQ-05.014 states test reports are managed with the `req` command; BR-020 recommends a dedicated `test-report` command (open decision). Recommended defaults (pending decision): prefix `TR`, directory `test-reports/`, `enabled: true`; lifecycle `active -> deprecated`; visibility active=visible/deprecated=hidden; no ticket or milestone association. Records carry YAML front matter with the general fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references` and a `# <ID> <title>` body heading (REQ-05.010). Whether `description` and `applicability` are front-matter fields or body content is undecided. Test-case coverage should be recorded in the general `references` field rather than a type-specific field (proposal, not decided). Pass/fail outcome storage is undecided.
+        Note: REQ-05.014 states test reports are managed with the `req` command; this is superseded by the decided dedicated `test-report` command (BR-020). Decided defaults: prefix `TR`, directory `test-reports/`, `enabled: true`; lifecycle `active -> deprecated`; visibility active=visible/deprecated=hidden; no ticket or milestone association. Records carry YAML front matter with the general fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references` (REQ-05.010); `description` and `applicability` are body fields, not front-matter keys. Test-case coverage should be recorded in the general `references` field rather than a type-specific field. Pass/fail outcome storage is undecided.
 
 <b style="color: light-dark(#0969da, #58a6ff);">search</b>
 
@@ -1404,8 +1404,8 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
        The <b>nfreq</b> command uses the <b>nfr</b> type key. Additional types may
        be added. Disabled types cannot be created and are hidden from lists and search.
        Use cases, test cases, and test reports use the <b>use-case</b>, <b>test-case</b>,
-       and <b>test-report</b> commands respectively (open decision vs. <b>req</b>;
-       see BR-018, BR-019, and BR-020).
+       and <b>test-report</b> commands respectively (decided; <b>req</b> remains
+       business-requirements only; see BR-018, BR-019, and BR-020).
 
 <b style="color: light-dark(#0969da, #58a6ff);">Web UI</b>
 

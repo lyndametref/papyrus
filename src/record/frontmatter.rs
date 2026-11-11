@@ -420,9 +420,6 @@ pub fn wrap(front_matter_raw: &str, body: &str) -> String {
     }
     out.push_str("---\n");
     if !body.is_empty() {
-        if !body.starts_with('\n') {
-            out.push('\n');
-        }
         out.push_str(body);
         if !body.ends_with('\n') {
             out.push('\n');

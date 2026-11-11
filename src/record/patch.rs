@@ -372,10 +372,10 @@ mod tests {
 
     #[test]
     fn set_heading_title_no_heading_in_frontmatter_record_is_noop() {
-        let body = "\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
+        let body = "## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
         let input = format!(
             "---\nid: TASK-1\ntitle: Old\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\n---\n{}",
-            body.trim_start_matches('\n')
+            body
         );
         let doc = document::parse(&input).unwrap();
         let ops = vec![PatchOp::SetHeadingTitle("New".into())];
