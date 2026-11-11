@@ -1476,3 +1476,315 @@ fn cross_type_unified_search() {
     let out = search(&d, &["quick brown fox"]);
     assert!(stdout(&out).contains("AUD-001"), "restored doc missing");
 }
+
+// ---------------------------------------------------------------------------
+// Use case / test case / test report search (TASK-80)
+// ---------------------------------------------------------------------------
+
+fn create_use_case(project: &Path, title: &str, description: &str) -> String {
+    let out = assert_ok(run(
+        project,
+        &["use-case", "create", title, "--description", description],
+    ));
+    stdout(&out).trim().to_string()
+}
+
+fn create_test_case(project: &Path, title: &str, description: &str) -> String {
+    let out = assert_ok(run(
+        project,
+        &["test-case", "create", title, "--description", description],
+    ));
+    stdout(&out).trim().to_string()
+}
+
+fn create_test_report(project: &Path, title: &str, description: &str) -> String {
+    let out = assert_ok(run(
+        project,
+        &["test-report", "create", title, "--description", description],
+    ));
+    stdout(&out).trim().to_string()
+}
+
+#[test]
+fn use_case_search_default_and_doc_include_uc() {
+    let d = tmpdir("uc-default");
+    init(&d);
+    let id = create_use_case(&d, "UC Title", "quick brown fox");
+    assert_eq!(id, "UC-001");
+
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("UC-001 doc UC Title"));
+
+    let out = search(&d, &["quick brown", "--type", "doc"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("UC-001 doc UC Title"));
+
+    for ty in ["task", "milestone", "release", "decision"] {
+        let out = search(&d, &["quick brown", "--type", ty]);
+        assert_eq!(out.status.code(), Some(0), "type={ty}");
+        assert_eq!(stdout(&out), "", "type={ty}");
+    }
+}
+
+#[test]
+fn test_case_search_default_and_doc_include_tc() {
+    let d = tmpdir("tc-default");
+    init(&d);
+    let id = create_test_case(&d, "TC Title", "quick brown fox");
+    assert_eq!(id, "TC-001");
+
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("TC-001 doc TC Title"));
+
+    let out = search(&d, &["quick brown", "--type", "doc"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("TC-001 doc TC Title"));
+}
+
+#[test]
+fn test_report_search_default_and_doc_include_tr() {
+    let d = tmpdir("tr-default");
+    init(&d);
+    let id = create_test_report(&d, "TR Title", "quick brown fox");
+    assert_eq!(id, "TR-001");
+
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("TR-001 doc TR Title"));
+
+    let out = search(&d, &["quick brown", "--type", "doc"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains("TR-001 doc TR Title"));
+}
+
+#[test]
+fn uc_tc_tr_search_non_record_files_are_ignored() {
+    let d = tmpdir("uctctr-ignore");
+    init(&d);
+    write_file(
+        &d.join("docs/use-cases/notes.md"),
+        "# notes with searchable phrase\n",
+    );
+    write_file(
+        &d.join("docs/use-cases/UC-foo.md"),
+        "# UC-foo bad with searchable phrase\n",
+    );
+    write_file(
+        &d.join("docs/test-cases/TCfoo-001.md"),
+        "# TCfoo-001 bad with searchable phrase\n",
+    );
+    write_file(
+        &d.join("docs/test-reports/TRX-001.md"),
+        "# TRX-001 bad with searchable phrase\n",
+    );
+    create_use_case(&d, "UC Title", "searchable phrase");
+    create_test_case(&d, "TC Title", "searchable phrase");
+    create_test_report(&d, "TR Title", "searchable phrase");
+
+    let out = search(&d, &["searchable phrase"]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout(&out);
+    assert!(s.contains("UC-001"), "output={s}");
+    assert!(s.contains("TC-001"), "output={s}");
+    assert!(s.contains("TR-001"), "output={s}");
+    assert!(!s.contains("notes"), "output={s}");
+    assert!(!s.contains("UC-foo"), "output={s}");
+    assert!(!s.contains("TCfoo-001"), "output={s}");
+    assert!(!s.contains("TRX-001"), "output={s}");
+}
+
+#[test]
+fn uc_tc_tr_search_deprecated_excluded_restored_visible() {
+    let d = tmpdir("uctctr-depr");
+    init(&d);
+    create_use_case(&d, "UC Title", "quick brown fox");
+    create_test_case(&d, "TC Title", "quick brown fox");
+    create_test_report(&d, "TR Title", "quick brown fox");
+
+    assert_ok(run(&d, &["use-case", "deprecate", "UC-001"]));
+    assert_ok(run(&d, &["test-case", "deprecate", "TC-001"]));
+    assert_ok(run(&d, &["test-report", "deprecate", "TR-001"]));
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+
+    assert_ok(run(&d, &["use-case", "restore", "UC-001"]));
+    assert_ok(run(&d, &["test-case", "restore", "TC-001"]));
+    assert_ok(run(&d, &["test-report", "restore", "TR-001"]));
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout(&out);
+    assert!(s.contains("UC-001 doc UC Title"), "output={s}");
+    assert!(s.contains("TC-001 doc TC Title"), "output={s}");
+    assert!(s.contains("TR-001 doc TR Title"), "output={s}");
+}
+
+#[test]
+fn uc_tc_tr_search_disabled_type_contributes_nothing() {
+    let d = tmpdir("uctctr-disabled");
+    init(&d);
+    create_use_case(&d, "UC Title", "quick brown fox");
+    create_test_case(&d, "TC Title", "quick brown fox");
+    create_test_report(&d, "TR Title", "quick brown fox");
+
+    for key in ["use-case", "test-case", "test-report"] {
+        assert_ok(run(
+            &d,
+            &[
+                "config",
+                "set",
+                &format!("document_types.{}.enabled", key),
+                "false",
+            ],
+        ));
+    }
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+
+    for key in ["use-case", "test-case", "test-report"] {
+        assert_ok(run(
+            &d,
+            &[
+                "config",
+                "set",
+                &format!("document_types.{}.enabled", key),
+                "true",
+            ],
+        ));
+    }
+    let out = search(&d, &["quick brown"]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout(&out);
+    assert!(s.contains("UC-001"));
+    assert!(s.contains("TC-001"));
+    assert!(s.contains("TR-001"));
+}
+
+#[test]
+fn uc_tc_tr_search_missing_dir_empty_success() {
+    let d = tmpdir("uctctr-missing");
+    init(&d);
+    fs::remove_dir_all(d.join("docs/use-cases")).unwrap();
+    fs::remove_dir_all(d.join("docs/test-cases")).unwrap();
+    fs::remove_dir_all(d.join("docs/test-reports")).unwrap();
+    let out = search(&d, &["anything"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+}
+
+#[test]
+fn uc_tc_tr_search_creates_no_files_or_directories() {
+    let d = tmpdir("uctctr-nowrite");
+    init(&d);
+    fs::remove_dir_all(d.join("docs/use-cases")).unwrap();
+    fs::remove_dir_all(d.join("docs/test-cases")).unwrap();
+    fs::remove_dir_all(d.join("docs/test-reports")).unwrap();
+    let before = snapshot(&d);
+    let out = search(&d, &["anything"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+    assert_eq!(before, snapshot(&d));
+}
+
+#[cfg(unix)]
+#[test]
+fn uc_tc_tr_search_symlink_dir_escape_exits_one() {
+    use std::os::unix::fs::symlink;
+    let root = tmpdir("uctctr-symdir");
+    let proj = root.join("proj");
+    fs::create_dir_all(&proj).unwrap();
+    init(&proj);
+    let outside = root.join("outside");
+    fs::create_dir_all(&outside).unwrap();
+    write_file(&outside.join("secret.md"), "# SECRET SECRETWORD\n");
+
+    for dir in ["docs/use-cases", "docs/test-cases", "docs/test-reports"] {
+        let active = proj.join(dir);
+        let _ = fs::remove_dir_all(&active);
+        symlink(&outside, &active).unwrap();
+        let out = search(&proj, &["secretword"]);
+        assert_eq!(
+            out.status.code(),
+            Some(1),
+            "dir={dir} stderr={}",
+            stderr(&out)
+        );
+        assert_eq!(stdout(&out), "");
+        assert!(!stderr(&out).contains("SECRETWORD"));
+        let _ = fs::remove_file(&active);
+        fs::create_dir_all(&active).unwrap();
+    }
+}
+
+#[test]
+fn uc_tc_tr_search_cross_type_combined() {
+    let d = tmpdir("uctctr-cross");
+    init(&d);
+    create_use_case(&d, "UC Title", "quick brown fox");
+    create_test_case(&d, "TC Title", "quick brown fox");
+    create_test_report(&d, "TR Title", "quick brown fox");
+
+    // Default search returns all three.
+    let out = search(&d, &["quick brown fox"]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout(&out);
+    assert!(s.contains("UC-001 doc UC Title"));
+    assert!(s.contains("TC-001 doc TC Title"));
+    assert!(s.contains("TR-001 doc TR Title"));
+
+    // --type doc includes all three.
+    let out = search(&d, &["quick brown fox", "--type", "doc"]);
+    assert_eq!(out.status.code(), Some(0));
+    let s = stdout(&out);
+    assert!(s.contains("UC-001 doc UC Title"));
+    assert!(s.contains("TC-001 doc TC Title"));
+    assert!(s.contains("TR-001 doc TR Title"));
+
+    // Ordering by id ascending.
+    let out = search(&d, &["quick brown fox"]);
+    let binding = stdout(&out);
+    let ids: Vec<&str> = binding
+        .lines()
+        .map(|l| l.split_whitespace().next().unwrap())
+        .collect();
+    let mut sorted = ids.clone();
+    sorted.sort();
+    assert_eq!(ids, sorted);
+
+    // --limit caps combined set.
+    let out = search(&d, &["quick brown fox", "--limit", "2"]);
+    assert_eq!(stdout(&out).lines().count(), 2);
+
+    // Quoted phrase contiguous.
+    let out = search(&d, &["quick fox"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(stdout(&out), "");
+
+    // Deprecation hiding + restore for all three.
+    assert_ok(run(&d, &["use-case", "deprecate", "UC-001"]));
+    assert_ok(run(&d, &["test-case", "deprecate", "TC-001"]));
+    assert_ok(run(&d, &["test-report", "deprecate", "TR-001"]));
+    let out = search(&d, &["quick brown fox"]);
+    let s = stdout(&out);
+    assert!(!s.contains("UC-001"));
+    assert!(!s.contains("TC-001"));
+    assert!(!s.contains("TR-001"));
+    assert_ok(run(&d, &["use-case", "restore", "UC-001"]));
+    assert_ok(run(&d, &["test-case", "restore", "TC-001"]));
+    assert_ok(run(&d, &["test-report", "restore", "TR-001"]));
+    let out = search(&d, &["quick brown fox"]);
+    let s = stdout(&out);
+    assert!(s.contains("UC-001"));
+    assert!(s.contains("TC-001"));
+    assert!(s.contains("TR-001"));
+
+    // type filters never return them.
+    for ty in ["task", "milestone", "release", "decision"] {
+        let out = search(&d, &["quick brown fox", "--type", ty]);
+        assert_eq!(out.status.code(), Some(0), "type={ty}");
+        assert_eq!(stdout(&out), "", "type={ty}");
+    }
+}
