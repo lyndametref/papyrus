@@ -2,11 +2,11 @@
 
 ## Status
 
-Accepted — approved by explicit user confirmation on 2026-11-08
+Superseded by ADR-0010 on 2026-11-11 — NFR-04.004 (adopted 2026-11-11) renounces Backlog.md compatibility and REQ-01.005 now defines a single Papyrus ID space, so the Backlog.md on-disk layout, the storage IDs, and the display/storage translation this ADR decided no longer apply. Body frozen; see ADR-0010 for the native layout, ADR-0011 for the one-way import, and ADR-0012/ADR-0013 for the metadata and write-path restatement.
 
 ## Date
 
-2026-11-08 (status: Accepted, 2026-11-08)
+2026-11-08 (status: Superseded, 2026-11-11)
 
 ## Context
 

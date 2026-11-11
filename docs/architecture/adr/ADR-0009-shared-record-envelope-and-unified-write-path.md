@@ -2,11 +2,11 @@
 
 ## Status
 
-Accepted — approved by explicit user confirmation on 2026-11-08
+Superseded by ADR-0013 on 2026-11-11 — the shared-envelope, single-writer, projection, and staged-delivery decisions carry over, but this ADR's storage-identity translation, storage ID pattern, Stage 2 (storage identity), and Stage 4 (migration to the Backlog.md layout) contradict NFR-04.004 (adopted 2026-11-11) and REQ-01.005. Body frozen; ADR-0013 restates the structure without the storage layer and fixes the revised stage plan.
 
 ## Date
 
-2026-11-08 (status: Accepted, 2026-11-08)
+2026-11-08 (status: Superseded, 2026-11-11)
 
 ## Context
 

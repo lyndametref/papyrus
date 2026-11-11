@@ -2,11 +2,11 @@
 
 ## Status
 
-Accepted — approved by explicit user confirmation on 2026-11-08
+Superseded by ADR-0012 on 2026-11-11 — the front-matter-as-single-source and patch decisions carry over unchanged, but this ADR's Backlog.md key-set, Backlog-compatible serialization, storage-ID values, and lazy conversion to the Backlog.md layout contradict NFR-04.004 (adopted 2026-11-11) and REQ-01.005 (single Papyrus ID space). Body frozen; ADR-0012 restates the metadata contract without them, ADR-0010 owns the layout, and ADR-0013 owns the write path.
 
 ## Date
 
-2026-11-08 (status: Accepted, 2026-11-08)
+2026-11-08 (status: Superseded, 2026-11-11)
 
 ## Context
 

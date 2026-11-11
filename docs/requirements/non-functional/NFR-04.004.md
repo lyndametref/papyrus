@@ -12,8 +12,8 @@ This records the strategic decision to renounce Backlog.md compatibility in favo
 Review the storage, identity, and write paths to confirm that no Backlog.md compatibility layer remains: no Backlog.md key-set or body contract, no display-to-storage ID translation, no lazy conversion to the Backlog.md layout, and no read or write path that rewrites a record into a Backlog.md shape. Run the import script against a sample Backlog.md backlog and confirm that each task and milestone becomes a Papyrus record with a Papyrus ID, its metadata, and its body content preserved. Then run Papyrus commands against the imported project and confirm that Backlog.md `docs`, `drafts`, and `decisions` are neither read nor rewritten.
 
 ## Open Questions
-- Native on-disk file layout and path convention for task and milestone records (Papyrus-owned; an architecture decision, not fixed by this requirement).
-- Collision handling when the import meets an existing Papyrus record with the same number or title.
+- Native on-disk file layout and path convention for task and milestone records (Papyrus-owned; an architecture decision, not fixed by this requirement). **Resolved 2026-11-11 by ADR-0010** — Papyrus-native `<ID>.md` records under configuration-driven roots, one record per file, one Papyrus ID, no storage ID.
+- Collision handling when the import meets an existing Papyrus record with the same number or title. **Resolved 2026-11-11 by ADR-0011** — allocation makes number collisions impossible, a same-title existing record is imported as a new record with a "possible duplicate" warning, no merge or overwrite.
 
 ## Traceability
 - Source: customer-feedback handoff — maintainer, Item 12.
@@ -22,5 +22,9 @@ Review the storage, identity, and write paths to confirm that no Backlog.md comp
 - REQ-01.005 — Assign Stable Record IDs (single ID space)
 - REQ-05.010 — Record Metadata in YAML Front Matter
 - REQ-05.011 — Maintain Record Metadata Through All Commands
-- ADR-0007 — YAML Front Matter as the Single Record Metadata Source
-- ADR-0008 — Adopt the Backlog.md On-Disk Layout for Task and Milestone Records (storage-layout decisions superseded by this requirement)
+- ADR-0007 — YAML Front Matter as the Single Record Metadata Source (superseded by ADR-0012)
+- ADR-0008 — Adopt the Backlog.md On-Disk Layout for Task and Milestone Records (superseded by ADR-0010)
+- ADR-0010 — Papyrus-Native On-Disk Record Layout and Path Convention (native layout, single ID space)
+- ADR-0011 — One-Way Backlog.md Import as the Only Bridge (import scope, ID assignment, collisions)
+- ADR-0012 — Papyrus-Owned Front Matter as the Single Record Metadata Source
+- ADR-0013 — Shared Record Envelope and Single Write Path Without a Storage Layer
