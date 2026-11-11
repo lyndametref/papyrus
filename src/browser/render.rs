@@ -871,11 +871,17 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
             || kind == Category::BusinessRule
             || kind == Category::AuditRecord
             || kind == Category::TechSpec
+            || kind == Category::UseCase
+            || kind == Category::TestCase
+            || kind == Category::TestReport
         {
             let preview = if kind == Category::UiSpec
                 || kind == Category::BusinessRule
                 || kind == Category::AuditRecord
                 || kind == Category::TechSpec
+                || kind == Category::UseCase
+                || kind == Category::TestCase
+                || kind == Category::TestReport
             {
                 record
                     .description
