@@ -1,0 +1,65 @@
+project_name: papyrus
+task_prefix: TASK
+milestone_prefix: MS
+release_prefix: REL
+id_padding: 3
+date_format: yyyy-mm-dd
+editor: null
+backlog_directory: backlog/
+decision_directory: docs/architecture/adr
+doc_directory: docs/
+statuses:
+- ToDo
+- Initiated
+- Refined
+- Implemented
+- Validated
+- Done
+default_status: ToDo
+decision_types:
+  adr:
+    prefix: ADR
+    enabled: true
+  bdr:
+    prefix: BDR
+    enabled: false
+document_types:
+  audit:
+    prefix: AUD
+    directory: audit-records/
+    enabled: true
+  deploy:
+    prefix: DEP
+    directory: architecture/deployment/
+    enabled: false
+  glossary:
+    prefix: GLO
+    directory: domain-model/business-glossary
+    enabled: true
+  nfr:
+    prefix: NFR
+    directory: requirements/non-functional/
+    enabled: true
+  req:
+    prefix: REQ
+    directory: requirements/business/
+    enabled: true
+  rule:
+    prefix: RUL
+    directory: business-rules/
+    enabled: true
+  tech-spec:
+    prefix: TECH
+    directory: specifications/technical
+    enabled: true
+  ui-mockup:
+    prefix: MOCK
+    directory: specifications/ui/mockups/
+    enabled: true
+  ui-spec:
+    prefix: UI
+    directory: specifications/ui/
+    enabled: true
+browser_host: 127.0.0.1
+browser_port: 6420
+browser_open: true
