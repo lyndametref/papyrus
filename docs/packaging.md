@@ -1120,3 +1120,101 @@ statuses follow the existing contract: `0` success, `1` IO/boundary, `2` usage,
   list/view/edit, and assets succeeded over loopback. The offline claim is also
   supported by loopback-only binding and no external references in served
   content.
+
+## TASK-82 — Use cases and test documentation milestone packaging and verification
+
+- Date: **2026-11-11 08:45:12 UTC** (verification started; local CET 09:45:12).
+- Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43, dpkg 1.23.11,
+  `rustc`/`cargo` 1.99.1, clippy 0.1.99, `rustfmt` (rustfmt 1.99.1), `fakeroot`
+  2.1.4, `unshare`/`ip` available.
+- Supported release: **Debian Forky only** (amd64), per ADR-0003 and NFR-03.002.
+  Debian Trixie and every other Debian release are **not claimed and not verified**.
+- Isolation: `fakeroot dpkg --instdir=./.tmp/inst --admindir=./.tmp/adm
+  --force-depends`; the host reported `papyrus 0.1.0` installed before and after
+  the run and was not modified. Scratch directories were removed after verification.
+- Package: `papyrus_0.1.0_amd64.deb`, 1136804 bytes,
+  SHA-256 `b5f01d4e33fe100232b39bbf2adfc1c4f2d5767cd64adeec4c11771fa2051592`.
+- Package metadata: `Package: papyrus`, `Version: 0.1.0` (from `Cargo.toml`),
+  `Architecture: amd64`, `Depends: libc6 (>= 2.34)`, `Section: utils`,
+  `Priority: optional`, copyright `GPL-3.0-or-later`.
+- Package contents: `/usr/bin/papyrus` (0755, 3817808 bytes) and
+  `/usr/share/doc/papyrus/copyright` (0644, 865 bytes) only; no asset, template,
+  configuration, or man file. `/assets/app.css` and `/assets/app.js` are compiled
+  into the binary and served from memory.
+- New test file: `tests/use_cases_test_cases_test_reports_smoke.rs` (2 tests),
+  passing under `cargo test`.
+- No runtime dependencies were added; the TASK-1/TASK-4 runtime dependency
+  license audit remains valid (NFR-06.002). Use cases, test cases, and test
+  reports have no supersede or delete command (BR-018/BR-019/BR-020); the
+  lifecycle smoke covers create/list/view/edit/deprecate/restore only. There is no
+  dedicated `--type use-case`/`--type test-case`/`--type test-report` search
+  filter; all three are found through `--type doc` and default search.
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| `cargo build --release` (Rust 1.99.1) | PASS |
+| `target/release/papyrus --help` lists `use-case`, `test-case`, `test-report`, `search`, `browser` | PASS |
+| `cargo test` | PASS — 565 tests (including `use_cases_test_cases_test_reports_smoke` 2) |
+| `cargo clippy --all-targets -- -D warnings` | PASS — 0 warnings |
+| `cargo fmt --check` | PASS |
+
+### Install, uninstall, and smoke checks
+
+| Check | Result |
+|---|---|
+| Isolated `dpkg -i` | PASS (exit 0) |
+| Installed `/usr/bin/papyrus` is `root:root` 0755 | PASS |
+| `papyrus` resolves on the isolated `PATH` and runs | PASS |
+| Isolated `dpkg -r papyrus` removes the binary; not on `PATH` | PASS |
+| Isolated `dpkg --purge papyrus` removes the admin entry | PASS |
+| Host package database and filesystem unchanged | PASS |
+| `--help` lists `use-case`, `test-case`, `test-report`, `search`, `browser`; `--version` prints `papyrus 0.1.0` | PASS |
+| Use-case/test-case/test-report lifecycle: create/list/view/edit/deprecate/restore; IDs preserved | PASS |
+| Lifecycle exit codes: unknown id 3, already-deprecated/already-active 4, missing args 2, sanitization 4 | PASS |
+| Search: quoted phrase, split words no match, `--type doc` includes all three, other `--type` filters exclude them, `--limit`, `--json`, empty `[]`, deprecated hidden until restored | PASS |
+| Search: `--type use-case`/`--type test-case`/`--type test-report` exit 2 (undocumented) | PASS |
+| Browser: startup line `Serving http://127.0.0.1:<port>/` with `--no-open` | PASS |
+| Browser: `?type=use-case`, `?type=test-case`, `?type=test-report` with sidebar order after Technical Specifications and `aria-current="page"` | PASS |
+| Browser: list count/rows/preview/metadata; record view form, category, title, description body without a Description heading, applicability section, single Edit | PASS |
+| Browser edit round-trip: `303`, `Location`, persisted through UI and CLI | PASS |
+| Browser field-preserving write: preamble and unknown sections byte-identical | PASS |
+| Browser JSON API: `/api/use-cases`, `/api/use-case`, `/api/test-cases`, `/api/test-case`, `/api/test-reports`, `/api/test-report`, `/api/doc/<id>` | PASS |
+| Embedded assets: `/assets/app.css`, `/assets/app.js`, non-empty, correct content type, `Cache-Control: no-store` | PASS |
+| 320 px markup hooks and narrow-viewport CSS | PASS |
+| No external references in served HTML/CSS/JS; CSP present on HTML | PASS |
+| Deprecated records not listed or counted; `404` on view, edit, POST, and API with identical 404 page and single recovery link | PASS |
+| Offline (`unshare -rn`, outbound TCP fails): search, list, view, edit, assets over loopback | PASS |
+| Config keys: list/get/set/unset for `browser_host`, `browser_port`, `browser_open`; configured port honored; `--port` overrides; defaults restored; invalid values exit 4 with unchanged file | PASS |
+| Embedded assets from an empty working directory and asset-free project | PASS |
+
+### Recorded limitations
+
+- **OQ-1 — no real-GUI browser run.** Verification is markup- and asset-level
+  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-05.001
+  browser support remains covered by the TASK-81 contract tests and MOCK-0013.
+- **Forky only.** No Debian Trixie or other release was installed or verified,
+  and none is claimed (ADR-0003, NFR-03.002).
+- **Host baseline.** The build host already reported `papyrus 0.1.0` installed
+  from prior work; the isolated verification did not modify it.
+- **Packaging script precondition.** `scripts/build-deb.sh` was intentionally left
+  unchanged. The stale-binary hazard is mitigated by running
+  `cargo build --release` first and asserting `--help` lists `use-case`,
+  `test-case`, and `test-report` before packaging.
+- **No supersede or delete.** Use cases, test cases, and test reports have no
+  supersede or delete command (BR-018/BR-019/BR-020); the lifecycle smoke covers
+  create/list/view/edit/deprecate/restore only.
+- **`--editor` not exercised.** The multi-line editor route is environment
+  dependent and remains covered by `tests/use_cases_cli.rs`,
+  `tests/test_cases_cli.rs`, and `tests/test_reports_cli.rs`.
+- **Offline namespace.** `unshare -rn` is available; the namespace run was
+  executed and passed — an outbound TCP connection failed, and search, browser
+  list/view/edit, and assets succeeded over loopback.
+
+### TASK-82 package artifact
+
+- File: `papyrus_0.1.0_amd64.deb`
+- Size: 1136804 bytes
+- SHA-256: `b5f01d4e33fe100232b39bbf2adfc1c4f2d5767cd64adeec4c11771fa2051592`
+- Test count: 565 (including `use_cases_test_cases_test_reports_smoke` 2)
