@@ -1,0 +1,29 @@
+# REQ-06.010 Present Dependencies as Links in the Browser
+
+## User Story
+As a project contributor, I want dependencies in the browser to be clickable links so that I can open them and return with the browser back button.
+
+## Group
+REQ-06 Search and Local Web Interface
+
+## Criticality
+Should have
+
+## Description
+Every dependency shall be presented as a link in the browser so that the user can open it and return via the browser back button. The rule covers every record reference the browser renders that resolves to a Papyrus record: task dependencies, a task's milestone, `references` values, and a sub-requirement's owning group. A reference that does not resolve to an existing record is rendered as plain text rather than as a link, and no error is shown. Links are generated in the page and work offline.
+
+## Acceptance Criteria
+- Dependency references rendered in the browser are hyperlinks.
+- Milestone, `references`, and owning-group values rendered in the browser are hyperlinks under the same rule.
+- Activating a link navigates to the referenced record's view; the browser back button returns to the originating page.
+- A reference that does not resolve to an existing record is rendered as plain text and does not raise an error.
+- Links are generated locally and require no network access (NFR-01.003).
+
+## Traceability
+- Source: customer-feedback handoff — maintainer, Item 10.
+- Maintainer decision 2026-11-11: the rule covers all rendered record references (dependencies, milestone, references, owning group); unresolved references render as plain text.
+- REQ-01.005 — Assign Stable Record IDs (link targets)
+- REQ-06.002 — Serve the Local Web Interface
+- REQ-06.004 — Use Front-Matter Metadata in CLI and Browser Views (reference values come from front matter)
+- NFR-01.002 — Display, View, and Edit All Papyrus Content in a Local Browser
+- NFR-01.003 — Use the Browser Command and Interface Without Internet
