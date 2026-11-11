@@ -4,7 +4,7 @@ title: Search use cases, test cases, and test reports
 status: Done
 assignee: []
 created_date: '2026-11-10T20:16:00Z'
-updated_date: '2026-11-11T07:17:00Z'
+updated_date: '2026-11-11T08:48:00Z'
 labels:
   - search
   - documentation
@@ -65,20 +65,20 @@ Dependencies: TASK-78 (completed).
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Unified search returns active use-case, test-case, and test-report records (default and --type doc).
-- [ ] #2 --type doc includes all three types together with other document records; --type task/milestone/release/decision never returns them.
-- [ ] #3 Deprecated records of all three types never appear; restored records appear again.
-- [ ] #4 Disabled or absent use-case, test-case, or test-report type contributes no results and no error.
-- [ ] #5 Matching is case-insensitive substring matching over the whole persisted record text, including front matter.
-- [ ] #6 A quoted phrase is matched as one contiguous substring across all three types.
-- [ ] #7 Results are ordered by record ID ascending across stores; ties broken by type then path.
-- [ ] #8 Each hit reports type value doc and title equal to the record title.
-- [ ] #9 --limit caps the combined result set after ordering.
-- [ ] #10 Only files directly in the configured active directory matching <prefix>-<digits>.md are candidates; deprecated/ and non-record files are never scanned.
-- [ ] #11 Missing type directory yields empty success without creation.
-- [ ] #12 Symlink escape exits 1 and does not expose outside content.
-- [ ] #13 search performs no writes.
-- [ ] #14 Build, tests, clippy, and formatting pass with existing dependencies only.
+- [x] #1 Unified search returns active use-case, test-case, and test-report records (default and --type doc).
+- [x] #2 --type doc includes all three types together with other document records; --type task/milestone/release/decision never returns them.
+- [x] #3 Deprecated records of all three types never appear; restored records appear again.
+- [x] #4 Disabled or absent use-case, test-case, or test-report type contributes no results and no error.
+- [x] #5 Matching is case-insensitive substring matching over the whole persisted record text, including front matter.
+- [x] #6 A quoted phrase is matched as one contiguous substring across all three types.
+- [x] #7 Results are ordered by record ID ascending across stores; ties broken by type then path.
+- [x] #8 Each hit reports type value doc and title equal to the record title.
+- [x] #9 --limit caps the combined result set after ordering.
+- [x] #10 Only files directly in the configured active directory matching <prefix>-<digits>.md are candidates; deprecated/ and non-record files are never scanned.
+- [x] #11 Missing type directory yields empty success without creation.
+- [x] #12 Symlink escape exits 1 and does not expose outside content.
+- [x] #13 search performs no writes.
+- [x] #14 Build, tests, clippy, and formatting pass with existing dependencies only.
 <!-- AC:END -->
 
 ## Definition of Done

@@ -4,7 +4,7 @@ title: Manage use cases, test cases, and test reports from the CLI
 status: Done
 assignee: []
 created_date: '2026-11-10T20:16:00Z'
-updated_date: '2026-11-11T07:11:00Z'
+updated_date: '2026-11-11T08:48:00Z'
 labels:
   - cli
   - documentation
@@ -42,16 +42,16 @@ Out of scope: search (TASK-80), browser (TASK-81), mockups (TASK-79), packaging 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Dedicated commands `use-case`, `test-case`, and `test-report` each support create, list, view, edit, deprecate, and restore subcommands.
-- [ ] #2 Each type can be created with required title and description and optional applicability; missing required arguments exit 2.
-- [ ] #3 Each type can be listed (active only, ID and title, ID ascending), viewed (full persisted text; deprecated viewable), and edited for title, description, and applicability.
-- [ ] #4 Each type can be deprecated and restored with its ID preserved; deprecated records are hidden from lists, search, and the web UI; already-deprecated/already-active operations exit 4; unknown ID exits 3.
-- [ ] #5 Records carry YAML front matter with id, title, created_date, updated_date, labels, references; description and applicability are body fields (REQ-05.010).
-- [ ] #6 Record files use the template `# <ID> <title>`, then `## Description`, then optional `## Applicability`, ending with a single trailing newline.
-- [ ] #7 IDs are generated as <prefix>-<number> padded to id_padding using UC/TC/TR and directories use-cases/test-cases/test-reports; IDs are never reused.
-- [ ] #8 Create and edit expose --label and --reference for front-matter lists; created_date/updated_date are automatic; updated_date refreshes only on a content-changing write.
-- [ ] #9 All user input is sanitized (NFR-02.002); a disabled type reports a validation error (exit 4); common CLI controls and exit codes 0/1/2/3/4 behave as TASK-2.
-- [ ] #10 The req-vs-dedicated-command conflict is resolved and documented: dedicated commands are used and req remains business-requirements only.
+- [x] #1 Dedicated commands `use-case`, `test-case`, and `test-report` each support create, list, view, edit, deprecate, and restore subcommands.
+- [x] #2 Each type can be created with required title and description and optional applicability; missing required arguments exit 2.
+- [x] #3 Each type can be listed (active only, ID and title, ID ascending), viewed (full persisted text; deprecated viewable), and edited for title, description, and applicability.
+- [x] #4 Each type can be deprecated and restored with its ID preserved; deprecated records are hidden from lists, search, and the web UI; already-deprecated/already-active operations exit 4; unknown ID exits 3.
+- [x] #5 Records carry YAML front matter with id, title, created_date, updated_date, labels, references; description and applicability are body fields (REQ-05.010).
+- [x] #6 Record files use the template `# <ID> <title>`, then `## Description`, then optional `## Applicability`, ending with a single trailing newline.
+- [x] #7 IDs are generated as <prefix>-<number> padded to id_padding using UC/TC/TR and directories use-cases/test-cases/test-reports; IDs are never reused.
+- [x] #8 Create and edit expose --label and --reference for front-matter lists; created_date/updated_date are automatic; updated_date refreshes only on a content-changing write.
+- [x] #9 All user input is sanitized (NFR-02.002); a disabled type reports a validation error (exit 4); common CLI controls and exit codes 0/1/2/3/4 behave as TASK-2.
+- [x] #10 The req-vs-dedicated-command conflict is resolved and documented: dedicated commands are used and req remains business-requirements only.
 <!-- AC:END -->
 
 ## Definition of Done
