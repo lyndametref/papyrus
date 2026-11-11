@@ -6,12 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-11T20:41:00Z'
+updated_date: '2026-11-11T20:57:00Z'
 labels:
   - specification
   - front-matter
   - native-layout
   - release-1.0
-milestone: m-14
+milestone: m-16
 dependencies: []
 references:
   - docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md

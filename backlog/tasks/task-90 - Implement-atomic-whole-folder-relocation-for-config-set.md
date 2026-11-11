@@ -4,11 +4,12 @@ title: Implement atomic whole-folder relocation for config set
 status: To Do
 assignee: []
 created_date: '2026-11-11T20:42:00Z'
+updated_date: '2026-11-11T20:57:00Z'
 labels:
   - configuration
   - relocation
   - release-1.0
-milestone: m-14
+milestone: m-16
 dependencies:
   - TASK-85
   - TASK-88

@@ -6,12 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-11T20:41:00Z'
+updated_date: '2026-11-11T20:57:00Z'
 labels:
   - specification
   - native-layout
   - import
   - release-1.0
-milestone: m-14
+milestone: m-16
 dependencies: []
 references:
   - docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md

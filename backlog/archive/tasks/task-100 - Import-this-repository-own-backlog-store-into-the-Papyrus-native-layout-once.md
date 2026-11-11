@@ -4,11 +4,11 @@ title: Import this repository own backlog store into the Papyrus-native layout o
 status: To Do
 assignee: []
 created_date: '2026-11-11T20:45:00Z'
+updated_date: '2026-11-11T20:53:00Z'
 labels:
   - import
   - release-1.0
   - migration
-milestone: m-14
 dependencies:
   - TASK-98
   - TASK-99
@@ -36,3 +36,9 @@ This repository still stores its own work as backlog/tasks/task-N and backlog/mi
 - [ ] #5 Post-import verification is recorded: record counts, unresolved references with their warnings, and the renumbered milestone list.
 - [ ] #6 The source store stays in place until the release ticket approval is recorded, and its retirement is documented as the final upgrade step.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Deferred by user decision (2026-11-11): this repository own store is NOT imported in Release 1.0. The import of this repository own backlog is postponed until after the release; the release still ships papyrus import backlog and documents the one-time import in its upgrade notes (TASK-92, TASK-99). This task is archived and leaves milestone m-14, so it no longer blocks TASK-73. Restore it when the migration is scheduled, before this repository starts relying on the native layout for its own records.
+<!-- SECTION:NOTES:END -->

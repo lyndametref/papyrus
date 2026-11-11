@@ -4,10 +4,11 @@ title: Make the browser console quiet by default and add debug request logging
 status: To Do
 assignee: []
 created_date: '2026-11-11T20:44:00Z'
+updated_date: '2026-11-11T20:57:00Z'
 labels:
   - browser
   - release-1.0
-milestone: m-14
+milestone: m-16
 dependencies:
   - TASK-86
 references:

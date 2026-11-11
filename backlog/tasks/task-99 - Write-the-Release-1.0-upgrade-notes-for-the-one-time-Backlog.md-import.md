@@ -4,6 +4,7 @@ title: Write the Release 1.0 upgrade notes for the one-time Backlog.md import
 status: To Do
 assignee: []
 created_date: '2026-11-11T20:44:00Z'
+updated_date: '2026-11-11T21:00:00Z'
 labels:
   - documentation
   - import
@@ -16,7 +17,7 @@ references:
   - docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md
   - docs/architecture/adr/ADR-0011-one-way-backlog-md-import.md
   - docs/requirements/non-functional/NFR-04.004.md
-priority: high
+priority: low
 type: docs
 ordinal: 39160
 ---
@@ -35,4 +36,11 @@ ADR-0010 decision 11 and ADR-0011 decision 9 make the upgrade notes a release ga
 - [ ] #4 They state that Backlog.md compatibility is renounced, that papyrus import backlog is the only bridge, and that re-running it duplicates records.
 - [ ] #5 They list the other user-visible changes of the release: the record view layout, the browser configuration view, non-functional requirement grouping, the browser-only --debug flag, and the removed storage-ID JSON fields.
 - [ ] #6 The documented command, options, and caveats match the shipped command help.
+- [ ] #7 They state that the upgrade performs no automatic import and that a project keeps its Backlog.md-layout records, which the new version does not recognise, until the command is run.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Scope note (planner, 2026-11-11): the user deferred the import of this repository own store out of Release 1.0, so this task documents the one-time import for users only; it does not record a migration of this repository.
+<!-- SECTION:NOTES:END -->

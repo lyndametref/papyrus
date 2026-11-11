@@ -3,7 +3,7 @@ id: doc-1
 title: Papyrus Feature Roadmap
 type: specification
 created_date: '2026-11-04T19:22:00Z'
-updated_date: '2026-11-11T20:46:00Z'
+updated_date: '2026-11-11T21:01:00Z'
 ---
 # Papyrus Feature Roadmap
 
@@ -24,7 +24,8 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 - m-11: Technical Specifications — domain model (TASK-21), search (TASK-56), browser (TASK-57), design review (TASK-58), packaging (TASK-59).
 - m-12: Final Cross-Type Integration and Record Metadata — shared record envelope (TASK-63), identity translation (TASK-64), CLI front-matter options (TASK-65), design review (TASK-66), metadata projection (TASK-67), document-record migration (TASK-68), task/milestone migration (TASK-69), legacy removal (TASK-70), Backlog.md round-trip gate (TASK-71), lifecycle page (TASK-72), final cross-type design review (TASK-60), unified search (TASK-18), cross-type browser (TASK-19), packaging (TASK-20), id_padding constraint (TASK-74), interactive init walkthrough (TASK-75), browser skills design review (TASK-76), browser skills page (TASK-77).
 - m-15: Use Cases and Test Documentation — manage use cases, test cases, and test reports from the CLI (TASK-78), search (TASK-80), browser exposure (TASK-81), design review mockup (TASK-79), packaging and verification (TASK-82). Should-have document types (REQ-05.012/013/014); lifecycle active → deprecated; front-matter required. Placed before Release 1.0.
-- m-14: Release 1.0 — release ticket (TASK-73); closes only after TASK-20 (m-12) and TASK-82 (m-15) are Done, build/tests pass, and the security audit is complete.
+- m-14: Release 1.0 — two tasks, both Low priority: the release-level upgrade notes TASK-99 (ordinal 39160) and the release gate TASK-73 (labelled release, ordinal 40000, last). m-14 holds no implementation or specification work and stays open and isolated so more requirements can be added before 1.0 without redefining the gate. Closing it requires the feature milestone m-16 to be fully Done plus TASK-20 (m-12) and TASK-82 (m-15), with build/tests passing and the security audit complete.
+- m-16: Release 1.0 - Native Layout, Import, and Browser Refinements — the extension feature milestone, 16 tasks, all High priority: specifications TASK-83 to TASK-86, design review TASK-87, native layout TASK-88, task and milestone adoption TASK-89, relocation TASK-90, init/config TASK-91, import TASK-92, browser surfaces TASK-93 to TASK-96, serializer removal TASK-97, verification and packaging TASK-98. Placed before the release milestone; TASK-73 depends on its final tasks.
 
 ## Removed
 
@@ -51,7 +52,8 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 - m-11 search/design/browser/packaging -> TASK-55 (CLI); TASK-21 -> TASK-1 (foundation, completed).
 - m-12 TASK-66 -> TASK-59 (m-11); TASK-60 -> TASK-66 and TASK-76; TASK-18 -> search tasks (TASK-31, TASK-35, TASK-39, TASK-44, TASK-48, TASK-56) plus TASK-14 (m-3) and TASK-68; TASK-19 -> TASK-60 plus browser tasks (TASK-23, TASK-24, TASK-25, TASK-26), TASK-67, TASK-72, and TASK-77; TASK-74 -> (none); TASK-75 -> TASK-74; TASK-76 -> TASK-66; TASK-77 -> TASK-76, TASK-72, TASK-67; TASK-20 -> TASK-18, TASK-19, TASK-60, TASK-59, TASK-69, TASK-70, TASK-71, TASK-72, TASK-74, TASK-75, TASK-77.
 - m-15 TASK-78 -> TASK-20 (m-12); TASK-80 -> TASK-78; TASK-79 -> TASK-78; TASK-81 -> TASK-78 and TASK-79; TASK-82 -> TASK-78, TASK-80, TASK-81.
-- m-14 TASK-73 -> TASK-20 (m-12) and TASK-82 (m-15). No task depends on a later milestone.
+- m-16 all 16 tasks depend only on tasks inside m-16; the entry tasks TASK-83 to TASK-86 have no dependencies. No m-16 task depends on m-12, m-15, or m-14 work, and none depends on a later milestone.
+- m-14 TASK-99 -> TASK-83 (m-16) and TASK-92 (m-16); TASK-73 -> TASK-99 (m-14), TASK-98 (m-16), TASK-91 (m-16), TASK-20 (m-12), TASK-82 (m-15). The release milestone depends on the feature milestone; no m-16 task depends on m-14 or on a later milestone.
 - New m-12 internal order: TASK-63 -> TASK-64 -> TASK-65 -> TASK-67; TASK-63/TASK-65 -> TASK-68 -> TASK-69; TASK-67/TASK-69 -> TASK-70 -> TASK-71; TASK-66 -> TASK-67, TASK-72, TASK-60, TASK-76; TASK-74 -> TASK-75; TASK-76 -> TASK-77; TASK-60/TASK-67/TASK-72/TASK-77 -> TASK-19; TASK-20 last.
 
 ## Requirement coverage
@@ -113,18 +115,19 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 - Placement decision: unlike the 2026-11-08/09 front-matter and skills work, these are new document types not yet implemented anywhere, so they cannot be merged into the completed m-12. A new milestone m-15 "Use Cases and Test Documentation" is created and placed before Release 1.0. m-14 (TASK-73) now also depends on TASK-82 (m-15 packaging) in addition to TASK-20.
 - The three types share one combined milestone and one task per pattern category (CLI management, search, browser exposure, design review mockup, packaging/verification) because they share the lifecycle and front-matter contract; per-type CLI command naming remains an open question (see above).
 - No in-progress task is reordered; TASK-73 gains a dependency only.
-
 ## Requirement change update (2026-11-11) — Release 1.0 extension
 
 - Settled inputs: requirements commit 5fd5046 and architecture commit 1d4914c. NFR-04.004 adopted and NFR-04.003 superseded; REQ-01.005 single Papyrus ID space; REQ-05.010 and REQ-05.011 Backlog.md clauses removed; REQ-01.001, REQ-01.002, and REQ-01.003 changed; REQ-01.006 now a single space-toggle TTY walkthrough; REQ-06.003 extended; REQ-06.006 to REQ-06.012 added. ADR-0010 to ADR-0013 accepted; ADR-0007, ADR-0008, and ADR-0009 superseded.
-- Roadmap correction: the earlier roadmap closed Release 1.0 without the native record layout, the one-way import, and the new browser surfaces, so it no longer covered the requirement set. The gap is closed inside m-14, as instructed by the user, not in a new milestone: ADR-0010 decision 11 and ADR-0011 decision 9 require the layout and the import in the same release, TASK-73 was still To Do, and no completed packaging or audit is invalidated by extending the milestone.
-- m-14 now holds TASK-83 to TASK-100 plus TASK-73 as the final gate. Order: specifications TASK-83 to TASK-86, design review TASK-87, native layout TASK-88, task and milestone adoption TASK-89, relocation TASK-90 and init/config TASK-91, import TASK-92, browser surfaces TASK-93 to TASK-96, serializer removal TASK-97, verification and packaging TASK-98, upgrade notes TASK-99, one-time import of this repository own store TASK-100, release gate TASK-73.
-- Hard constraints encoded: the native layout and the import ship in the same release (TASK-88 and TASK-92 both feed TASK-73, and TASK-98 verifies both together); the repository own store is imported before the gate closes (TASK-100 precedes TASK-73); specifications and ADR alignment precede implementation; the release gate depends on every new task and re-runs the security audit.
-- Priorities: every new task is High because the user placed all of it in Release 1.0 scope; relative order is expressed by ordinal, not by priority. No in-progress task exists, nothing was moved across milestones, and TASK-73 keeps ordinal 40000.
+- Roadmap correction: the earlier roadmap closed Release 1.0 without the native record layout, the one-way import, and the new browser surfaces, so it no longer covered the requirement set. The work is added to the Release 1.0 delivery, not to a separate later release: ADR-0010 decision 11 and ADR-0011 decision 9 require the layout and the import in the same release, and no completed packaging or audit is invalidated.
+- Milestone restructure (user decisions 2026-11-11): the release milestone and the feature work are separated. m-14 Release 1.0 holds only release-level work — the release-level upgrade notes TASK-99 and the release gate TASK-73, both Low priority — and stays open and isolated, because more requirements may still arrive before 1.0. The implementation and specification work lives in the new m-16 Release 1.0 - Native Layout, Import, and Browser Refinements (TASK-83 to TASK-98, all High). The release milestone depends on the feature milestone, never the reverse.
+- Order inside m-16: specifications TASK-83 to TASK-86, design review TASK-87, native layout TASK-88, task and milestone adoption TASK-89, relocation TASK-90 and init/config TASK-91, import TASK-92, browser surfaces TASK-93 to TASK-96, serializer removal TASK-97, verification and packaging TASK-98. TASK-99 follows the feature work at ordinal 39160 and TASK-73 closes the release at ordinal 40000. TASK-73 depends on TASK-99, TASK-98, TASK-91, TASK-20, and TASK-82; TASK-91 is listed explicitly because nothing else depends on it.
+- Hard constraints encoded: the native layout and the import ship in the same release (TASK-88 and TASK-92 are both in m-16, feed TASK-98, and are verified together); specifications and ADR alignment precede implementation; no task depends on a later milestone or on the release gate.
+- Priorities: release-milestone tasks (TASK-73, TASK-99) are Low per the user decision; every m-16 task is High. Relative order is expressed by ordinal, not by priority.
+- User decision (2026-11-11, revision): this repository own backlog store is NOT imported in Release 1.0. The migration is deferred to after the release. TASK-100 was removed from the feature scope, left unassigned, and archived as deferred; it is not a dependency of TASK-73. The release still meets the ADR-0010 decision 11 and ADR-0011 decision 9 shipment coupling: the native layout and papyrus import backlog ship in the same release, TASK-98 verifies the import against an isolated sample Backlog.md project, and TASK-99 publishes the one-time import in the upgrade notes for users. Accepted consequence: after the release, this repository own backlog keeps the Backlog.md layout and is therefore not visible to the new Papyrus binary until the deferred import is run.
 
 ### Coverage of the changed and new requirements
 
-- NFR-04.004 — TASK-83 (specification), TASK-88 (no translation, no backlog/config.yml), TASK-89 (no Backlog body conversion), TASK-92 (one-way import), TASK-97 (removal and enforcement), TASK-98 (verification), TASK-99 (upgrade notes), TASK-100 (own store), TASK-73 (gate and re-audit).
+- NFR-04.004 — TASK-83 (specification), TASK-88 (no translation, no backlog/config.yml), TASK-89 (no Backlog body conversion), TASK-92 (one-way import), TASK-97 (removal and enforcement), TASK-98 (verification on a sample project), TASK-99 (upgrade notes), TASK-73 (gate and re-audit). Own-store migration deferred: TASK-100, archived.
 - NFR-04.003 — superseded, no work planned; the historical round-trip suites and fixtures are deleted by TASK-89 and TASK-97.
 - REQ-01.005 — TASK-83, TASK-84, TASK-88 (single ID, allocation, resolution), TASK-92 (imported IDs), TASK-93 (browser ID surfaces), TASK-97 (storage-ID JSON removal), TASK-98 (verification).
 - REQ-05.010 — TASK-84, TASK-88 (front-matter id), TASK-89 (task and milestone adoption, key set), TASK-92 (imported record format).
@@ -149,3 +152,7 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 - Revised by TASK-84: shared-record-envelope-and-front-matter-patcher, migrate-document-record-types-to-front-matter-lazily-on-first-read-and-first-write, expose-front-matter-metadata-options-on-all-record-commands, render-one-metadata-projection-in-cli-and-browser-views, remove-legacy-record-serializers-and-enforce-the-no-drift-rule, task-management, milestone-and-release-management, and the search specifications.
 - Revised by TASK-85: project-initialization-and-configuration, interactive-init-walkthrough-for-artifact-activation.
 - Revised by TASK-86: browser-requirements, browser-managed-artifacts-and-lifecycles, browser-glossary-terms, browser-tasks-milestones-and-releases, browser-complete-access (shared header), plus a configuration view specification; TASK-87 produces the mockup package for the configuration view and the record view layout before browser implementation starts.
+
+### Deferred work
+
+- TASK-100 (import this repository own backlog store into the native layout once) — deferred by user decision on 2026-11-11 until after Release 1.0; archived, outside m-14 and m-16, and not a release dependency. Restore it when the migration is scheduled, before this repository starts relying on Papyrus for its own records.

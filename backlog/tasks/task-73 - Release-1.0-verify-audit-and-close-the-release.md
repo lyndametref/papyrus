@@ -4,31 +4,16 @@ title: 'Release 1.0: verify, audit, and close the release'
 status: To Do
 assignee: []
 created_date: '2026-11-08T15:06:00Z'
-updated_date: '2026-11-11T20:45:00Z'
+updated_date: '2026-11-11T21:00:00Z'
 labels:
   - release
 milestone: m-14
 dependencies:
   - TASK-20
   - TASK-82
-  - TASK-83
-  - TASK-84
-  - TASK-85
-  - TASK-86
-  - TASK-87
-  - TASK-88
-  - TASK-89
-  - TASK-90
   - TASK-91
-  - TASK-92
-  - TASK-93
-  - TASK-94
-  - TASK-95
-  - TASK-96
-  - TASK-97
   - TASK-98
   - TASK-99
-  - TASK-100
 references:
   - docs/requirements/business/REQ-01.005.md
   - docs/requirements/business/REQ-05.010.md
@@ -48,7 +33,7 @@ references:
   - >-
     docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
   - docs/specifications/release-lifecycle.md
-priority: high
+priority: low
 type: task
 ordinal: 40000
 ---
@@ -61,10 +46,10 @@ Close Release 1.0 after the release scope was extended on 2026-11-11 with the Pa
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every other task in milestone m-14, including TASK-20 (m-12) and TASK-82 (m-15), is Done.
+- [ ] #1 Every task in milestone m-14 is Done, and the feature milestone m-16 (Release 1.0 - Native Layout, Import, and Browser Refinements) is fully Done, including TASK-20 (m-12) and TASK-82 (m-15).
 - [ ] #2 The Debian package builds and installs on the supported targets, and the full test suite, clippy, and formatting checks pass.
 - [ ] #3 The security-officer release audit is re-run over the extended scope (native layout, import, relocation, browser configuration view); no Critical or High finding is unresolved and remaining findings have documented owners.
-- [ ] #4 The upgrade notes document the one-time import and the renumbering, and this repository own store has been imported once with its plan and report recorded.
+- [ ] #4 The upgrade notes document the one-time import for users, naming the affected directories, the command, and the renumbering, and the import is verified against an isolated sample Backlog.md project; this repository own store is explicitly out of release scope and was not imported.
 - [ ] #5 This ticket records the audit summary, the release version, and explicit user approval, and the release report is compiled.
 <!-- AC:END -->
 
@@ -74,6 +59,12 @@ Close Release 1.0 after the release scope was extended on 2026-11-11 with the Pa
 Security audit (security-officer, 2026-11-11): Pass with findings. No Critical/High. Medium (1): symlink traversal in task/milestone resolution (owner rust-dev, NFR-04.002). Low (3): unauthenticated non-loopback browser bind (rust-dev); path disclosure in diagnostics (rust-dev); trimming normalization vs rejection (rust-dev + requirements-engineer). Info (3): CLI non-atomic writes (accepted risk); plaintext HTTP (loopback default); cargo audit unavailable (CI follow-up). Secrets: none. Dependencies: 4 direct (clap, serde, serde_json, yaml_serde), crates.io, checksums verified, GPL-compatible. NFR coverage: NFR-02.001/002, NFR-04.001/002/003, NFR-01.003, NFR-06.002 addressed. Release version: 0.1.0 (Cargo.toml). Package: papyrus_0.1.0_amd64.deb (1136804 bytes). Tests: 565 passed. Clippy: 0 warnings. Build: release ok.
 
 Release scope extension (planner, 2026-11-11): milestone m-14 gained TASK-83 to TASK-100 for the accepted architecture decisions ADR-0010 to ADR-0013 (native record layout and single ID space, one-way Backlog.md import), the requirement changes of 2026-11-11, the configuration work, the browser work, and the import of this repository own store. TASK-73 now depends on every one of them; the dependency list also still carries TASK-20 (m-12) and TASK-82 (m-15). The security audit text and the release report recorded above were produced before the extension and are superseded: the audit must be re-run over the extended scope and the report recompiled. The release must ship the native layout and papyrus import backlog together and must publish the one-time import in its upgrade notes (ADR-0010 decision 11, ADR-0011 decision 9).
+
+Revision (planner, 2026-11-11, user decision): the import of this repository own backlog store is deferred and out of Release 1.0 scope. TASK-100 left milestone m-14, was archived as deferred, and is no longer a dependency of this gate; the gate now depends on TASK-83 to TASK-99 plus TASK-20 and TASK-82. The release still satisfies ADR-0010 decision 11 and ADR-0011 decision 9: the native layout and papyrus import backlog ship together (TASK-88, TASK-92), the import is verified against an isolated sample Backlog.md project (TASK-98), and the upgrade notes document the one-time import for users (TASK-99). This repository own store keeps its Backlog.md layout after the release.
+
+Restructure (planner, 2026-11-11, user decision): feature and specification work moved out of the release milestone into the dedicated feature milestone m-16, so m-14 holds only this release gate. The gate now depends on TASK-91, TASK-98, and TASK-99 in m-16 (the last tasks of the feature milestone) plus TASK-20 and TASK-82. Rationale: more requirements may still arrive before 1.0, and the release milestone stays open and isolated so the feature scope can grow without redefining the gate. TASK-91 is listed explicitly because nothing else in m-16 depends on it.
+
+Revision (planner, 2026-11-11, user decision): TASK-99 (upgrade notes) moved into the release milestone m-14 at ordinal 39160, between the feature milestone and this gate. m-14 now holds TASK-99 and this ticket only, and both are Low priority per the user; m-16 keeps its 16 tasks at High. Dependencies are unchanged in substance: this gate still depends on TASK-99, TASK-98, TASK-91, TASK-20, and TASK-82, and TASK-99 still depends on TASK-83 and TASK-92 in m-16, so m-14 depends on m-16 and never the reverse.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

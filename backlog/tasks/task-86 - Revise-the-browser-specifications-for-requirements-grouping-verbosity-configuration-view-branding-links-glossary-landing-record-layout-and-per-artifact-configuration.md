@@ -7,11 +7,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-11T20:41:00Z'
+updated_date: '2026-11-11T20:57:00Z'
 labels:
   - specification
   - browser
   - release-1.0
-milestone: m-14
+milestone: m-16
 dependencies: []
 references:
   - docs/requirements/business/REQ-06.003.md
