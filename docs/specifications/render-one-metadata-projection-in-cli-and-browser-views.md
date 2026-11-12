@@ -7,7 +7,7 @@
 
 ## Purpose
 
-Deliver ADR-0009 decision 5: a single `RecordView` projection that is the only source for record metadata in every read surface, so that CLI list/view text and `--json`, browser list/detail JSON, and browser HTML present identical metadata values for the same record. This ticket implements REQ-06.004 (CLI and browser read front matter), REQ-05.010 (front-matter field map), REQ-05.011 (metadata maintained through all commands), and REQ-01.005 (single Papyrus ID space), on top of the shared envelope and Papyrus identity delivered by TASK-63 and TASK-64 and the option exposure delivered by TASK-65. It does not migrate the corpus (TASK-68, TASK-69), remove legacy serializers (TASK-70), or add the lifecycle page (TASK-72).
+Deliver ADR-0013 decision 5 (superseding ADR-0009): a single `RecordView` projection that is the only source for record metadata in every read surface, so that CLI list/view text and `--json`, browser list/detail JSON, and browser HTML present identical metadata values for the same record. This ticket implements REQ-06.004 (CLI and browser read front matter), REQ-05.010 (front-matter field map), REQ-05.011 (metadata maintained through all commands), and REQ-01.005 (single Papyrus ID space), on top of the shared envelope and Papyrus identity delivered by TASK-63 and TASK-64 and the option exposure delivered by TASK-65. It does not migrate the corpus (TASK-68, TASK-69), remove legacy serializers (TASK-70), or add the lifecycle page (TASK-72).
 
 ## Scope
 
@@ -21,7 +21,7 @@ Deliver ADR-0009 decision 5: a single `RecordView` projection that is the only s
 - Adding the `metadata` object to CLI `--json` output and to browser list/detail JSON output, in canonical front-matter key order.
 - Keeping the top-level identity field as the Papyrus ID on every surface; `metadata.id` carries the same Papyrus ID, and no second identity is printed.- Keeping the browser editable field set unchanged; `created_date` and `updated_date` are rendered read-only (disabled inputs) in the browser edit form.
 - Routing every browser save through the shared patcher/writer so that a metadata-backed edit writes the new value into front matter, preserves the other front-matter keys and the rest of the file, refreshes `updated_date`, and never copies metadata into the body.
-- Parity, round-trip, read-only-timestamp, and identity-position tests.
+- Parity, read-write, read-only-timestamp, and identity-position tests.
 - Correction of the three browser specification pages that currently describe front matter as content preserved content-identically (see section 7).
 
 ### Out of scope
@@ -52,7 +52,7 @@ Deliver ADR-0009 decision 5: a single `RecordView` projection that is the only s
 2. CLI list output continues to print at least the ID and title of each record; where the command already prints additional metadata (status, milestone, assignee, etc.) it prints the same values as before, now sourced from `RecordView`.
 3. `papyrus <type> view` prints the full record. In addition to the existing body rendering, the metadata block (id, title, created_date, updated_date, labels, references, plus type-specific keys) is available to the renderer from `RecordView`. The exact plain-text layout of the metadata block follows the existing per-type view layout; this ticket does not redesign CLI text formatting.
 4. `--json` output for every managed record type gains a `metadata` object whose keys are the front-matter keys in canonical order and whose values are the stored values (strings, lists, or null as stored). The top-level `id` field is the Papyrus ID; `metadata.id` carries the same value and is not a second identity.
-5. The Papyrus ID appears in `--json` as the top-level `id` and as `metadata.id`, and in labelled diagnostics; no other top-level identity-like field is added.6. `--json` remains a stable public contract: existing keys keep their meaning and type; `metadata` is additive only. Changes to `metadata` are additive only (ADR-0009 decision 5).
+5. The Papyrus ID appears in `--json` as the top-level `id` and as `metadata.id`, and in labelled diagnostics; no other top-level identity-like field is added.6. `--json` remains a stable public contract: existing keys keep their meaning and type; `metadata` is additive only. Changes to `metadata` are additive only (ADR-0013 decision 5). Any field that previously exposed a non-Papyrus identity is removed as a documented breaking change, and `metadata.id` carries the Papyrus ID.
 7. A no-op read (a record already carrying front matter) produces byte-identical file content and an identical `RecordView` on repeated reads.
 
 ### 3. Browser rendering
@@ -67,10 +67,10 @@ Deliver ADR-0009 decision 5: a single `RecordView` projection that is the only s
 ### 4. Browser save through the shared writer
 
 1. Every browser `POST` (HTML form and JSON API) for a metadata-backed record is handled by reading the record into a `RecordView`, building a patch through `record::patch` (front-matter `SetFrontMatter`/`ClearFrontMatter` for changed metadata fields; section patches for changed body fields), and writing through `record::store::write_atomic`.
-2. A save that changes a metadata-backed field writes the new value into the front matter only. It does not rewrite the `# <ID> <title>` heading from metadata unless the title field itself changed, in which case both the front matter and, where the record type keeps one, the heading line are patched in the same write (ADR-0009 decision 3).
+2. A save that changes a metadata-backed field writes the new value into the front matter only. It does not rewrite the `# <ID> <title>` heading from metadata unless the title field itself changed, in which case both the front matter and, where the record type keeps one, the heading line are patched in the same write (ADR-0013 decision 3).
 3. A save preserves every front-matter key the operation does not change, including unknown foreign keys, in their stored order and quoting.
 4. A save preserves the body, marker comments, unknown sections, preamble, and line endings byte-for-byte apart from the patched sections.
-5. A save refreshes `updated_date` to a single UTC timestamp obtained for that write (ADR-0009 decision 9). `created_date` is never changed by a save.
+5. A save refreshes `updated_date` to a single UTC timestamp obtained for that write (ADR-0013 decision 9). `created_date` is never changed by a save.
 6. A no-op save (no field changed) performs no write and does not refresh `updated_date`.
 7. A save never copies metadata back into the document core (no retired metadata section is created or updated).
 8. Optimistic concurrency (ADR-0006) is unchanged: missing/malformed `version` → 400, stale token → 409 with "record changed on disk; reload the form", matching token proceeds. After a successful write the server keeps no cached copy and the redirect target re-reads the file (save-then-reread).
@@ -127,7 +127,7 @@ Correction is owned by `business-analyst`/`tech-writer` and is a prerequisite fo
 - Assumption: option exposure from TASK-65 is complete, so every metadata-backed field that can change already has a CLI option and a browser form field where applicable.
 - Assumption: MOCK-0010 is the approved UI source for metadata display and is reused unchanged; no new mockup is required.
 - Assumption: the three browser spec pages listed in section 7 are corrected by `business-analyst`/`tech-writer` before implementation; this ticket's tests reference the corrected wording.
-- Assumption: `--json` `metadata` is a stable public contract; changes are additive only (ADR-0009 decision 5, resolved 2026-11-08).
+- Assumption: `--json` `metadata` is a stable public contract; changes are additive only (ADR-0013 decision 5, resolved 2026-11-08).
 - Assumption: no corpus migration occurs in this ticket; unmigrated records are projected through the legacy fallback and migration is delivered by TASK-68/TASK-69.
 
 ## Open questions
@@ -143,7 +143,7 @@ Correction is owned by `business-analyst`/`tech-writer` and is a prerequisite fo
 |---|---|
 | Ticket | TASK-67 |
 | Requirements | REQ-06.004, REQ-05.010, REQ-05.011, REQ-01.005, REQ-06.002, REQ-06.003 |
-| ADRs | ADR-0006, ADR-0007, ADR-0008, ADR-0009 (decision 5) |
+| ADRs | ADR-0006, ADR-0012, ADR-0013 (decision 5) |
 | Related tickets | TASK-63, TASK-64, TASK-65, TASK-66, TASK-68, TASK-69, TASK-70, TASK-72, TASK-19 |
 | Source | `src/record/` (`frontmatter`, `document`, `patch`, `store`, `identity`), `src/browser/records.rs`, per-type CLI modules, `src/browser/mod.rs` |
 | UI | `docs/specifications/ui/browser-front-matter-and-lifecycle-ui.md`, `docs/specifications/ui/mockups/MOCK-0010-browser-front-matter-and-lifecycle-review.html` |
