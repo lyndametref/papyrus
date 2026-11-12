@@ -29,5 +29,5 @@ init
        Do not initialize a Git repository.
 
        --force
-       Allow initialization in a non-empty directory. Existing files are never overwritten.
+       Overwrite an existing papyrus.config.yml in full with the generated configuration (replacement, not a merge). Initialization is allowed in a non-empty directory without --force; only an existing papyrus.config.yml conflicts without it. Other pre-existing files are never overwritten.
 ```

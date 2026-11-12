@@ -4,10 +4,10 @@ title: >-
   Revise the initialization and configuration specifications for
   force-overwrite, folder relocation, missing-config failure, and the TTY
   walkthrough
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-11T20:41:00Z'
-updated_date: '2026-11-11T20:57:00Z'
+updated_date: '2026-11-12T07:02:00Z'
 labels:
   - specification
   - configuration
@@ -22,6 +22,9 @@ references:
   - docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md
   - docs/specifications/project-initialization-and-configuration.md
   - docs/specifications/interactive-init-walkthrough-for-artifact-activation.md
+  - >-
+    docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
+  - docs/requirements/business/REQ-01.007.md
 priority: high
 type: docs
 ordinal: 39020
@@ -44,3 +47,11 @@ REQ-01.001, REQ-01.002, REQ-01.003, and REQ-01.006 changed on 2026-11-11, but th
 - [ ] #7 The specifications name the browser configuration view as a consumer of the same config set path, not as a folder mover.
 - [ ] #8 Traceability links REQ-01.001, REQ-01.002, REQ-01.003, REQ-01.006, REQ-01.007, BR-016, ADR-0010 decision 8, and ADR-0013 stage 5.
 <!-- AC:END -->
+
+## Definition of Done
+<!-- DOD:BEGIN -->
+- [ ] #1 Both target specifications are updated and internally consistent with REQ-01.001, REQ-01.002, REQ-01.003, REQ-01.006, REQ-01.007, BR-016, ADR-0010 decision 8, and ADR-0013 stage 5
+- [ ] #2 No specification states that a non-empty directory requires --force or that a missing configuration file falls back to built-in defaults
+- [ ] #3 Traceability tables in both specifications list REQ-01.001, REQ-01.002, REQ-01.003, REQ-01.006, REQ-01.007, BR-016, ADR-0010 decision 8, and ADR-0013 stage 5
+- [ ] #4 Browser configuration view is named as a consumer of the same config set path, not as a folder mover
+<!-- DOD:END -->
