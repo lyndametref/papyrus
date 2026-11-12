@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-11T20:44:00Z'
-updated_date: '2026-11-11T20:57:00Z'
+updated_date: '2026-11-11T21:16:00Z'
 labels:
   - verification
   - packaging
@@ -14,11 +14,9 @@ labels:
 milestone: m-16
 dependencies:
   - TASK-97
+  - TASK-103
 references:
-  - >-
-    docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
-  - docs/requirements/non-functional/NFR-04.004.md
-  - docs/requirements/non-functional/NFR-03.001.md
+  - docs/requirements/business/REQ-06.013.md
 priority: high
 type: task
 ordinal: 39150
@@ -46,4 +44,6 @@ ADR-0013 stage 8 is the gate on any release that claims NFR-04.004, and the rele
 
 <!-- SECTION:NOTES:BEGIN -->
 Scope note (planner, 2026-11-11): the user deferred the import of this repository own store out of Release 1.0. Verify the import against an isolated sample Backlog.md project fixture only; this repository store is not part of the verification evidence.
+
+Scope note (planner, 2026-11-11): TASK-103 adds the per-milestone kanban board with card status change (REQ-06.013) in m-16 at ordinal 39145, after TASK-97 and before this task. This task now depends on it, so the verification and the packaged release build include the board; board behaviour is covered by TASK-103's own tests, and this task's acceptance criteria are unchanged.
 <!-- SECTION:NOTES:END -->

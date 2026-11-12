@@ -3,7 +3,7 @@ id: doc-1
 title: Papyrus Feature Roadmap
 type: specification
 created_date: '2026-11-04T19:22:00Z'
-updated_date: '2026-11-11T21:01:00Z'
+updated_date: '2026-11-11T21:16:00Z'
 ---
 # Papyrus Feature Roadmap
 
@@ -25,7 +25,7 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 - m-12: Final Cross-Type Integration and Record Metadata — shared record envelope (TASK-63), identity translation (TASK-64), CLI front-matter options (TASK-65), design review (TASK-66), metadata projection (TASK-67), document-record migration (TASK-68), task/milestone migration (TASK-69), legacy removal (TASK-70), Backlog.md round-trip gate (TASK-71), lifecycle page (TASK-72), final cross-type design review (TASK-60), unified search (TASK-18), cross-type browser (TASK-19), packaging (TASK-20), id_padding constraint (TASK-74), interactive init walkthrough (TASK-75), browser skills design review (TASK-76), browser skills page (TASK-77).
 - m-15: Use Cases and Test Documentation — manage use cases, test cases, and test reports from the CLI (TASK-78), search (TASK-80), browser exposure (TASK-81), design review mockup (TASK-79), packaging and verification (TASK-82). Should-have document types (REQ-05.012/013/014); lifecycle active → deprecated; front-matter required. Placed before Release 1.0.
 - m-14: Release 1.0 — two tasks, both Low priority: the release-level upgrade notes TASK-99 (ordinal 39160) and the release gate TASK-73 (labelled release, ordinal 40000, last). m-14 holds no implementation or specification work and stays open and isolated so more requirements can be added before 1.0 without redefining the gate. Closing it requires the feature milestone m-16 to be fully Done plus TASK-20 (m-12) and TASK-82 (m-15), with build/tests passing and the security audit complete.
-- m-16: Release 1.0 - Native Layout, Import, and Browser Refinements — the extension feature milestone, 16 tasks, all High priority: specifications TASK-83 to TASK-86, design review TASK-87, native layout TASK-88, task and milestone adoption TASK-89, relocation TASK-90, init/config TASK-91, import TASK-92, browser surfaces TASK-93 to TASK-96, serializer removal TASK-97, verification and packaging TASK-98. Placed before the release milestone; TASK-73 depends on its final tasks.
+- m-16: Release 1.0 - Native Layout, Import, and Browser Refinements — the extension feature milestone, 19 tasks, all High priority: specifications TASK-83 to TASK-86, design review TASK-87, native layout TASK-88, task and milestone adoption TASK-89, relocation TASK-90, init/config TASK-91, import TASK-92, browser surfaces TASK-93 to TASK-96, serializer removal TASK-97, backlog kanban board specification TASK-101, mockup revision TASK-102 and implementation TASK-103, verification and packaging TASK-98. Placed before the release milestone; TASK-73 depends on its final tasks.
 
 ## Removed
 
@@ -52,7 +52,7 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 - m-11 search/design/browser/packaging -> TASK-55 (CLI); TASK-21 -> TASK-1 (foundation, completed).
 - m-12 TASK-66 -> TASK-59 (m-11); TASK-60 -> TASK-66 and TASK-76; TASK-18 -> search tasks (TASK-31, TASK-35, TASK-39, TASK-44, TASK-48, TASK-56) plus TASK-14 (m-3) and TASK-68; TASK-19 -> TASK-60 plus browser tasks (TASK-23, TASK-24, TASK-25, TASK-26), TASK-67, TASK-72, and TASK-77; TASK-74 -> (none); TASK-75 -> TASK-74; TASK-76 -> TASK-66; TASK-77 -> TASK-76, TASK-72, TASK-67; TASK-20 -> TASK-18, TASK-19, TASK-60, TASK-59, TASK-69, TASK-70, TASK-71, TASK-72, TASK-74, TASK-75, TASK-77.
 - m-15 TASK-78 -> TASK-20 (m-12); TASK-80 -> TASK-78; TASK-79 -> TASK-78; TASK-81 -> TASK-78 and TASK-79; TASK-82 -> TASK-78, TASK-80, TASK-81.
-- m-16 all 16 tasks depend only on tasks inside m-16; the entry tasks TASK-83 to TASK-86 have no dependencies. No m-16 task depends on m-12, m-15, or m-14 work, and none depends on a later milestone.
+- m-16 all 19 tasks depend only on tasks inside m-16; the entry tasks TASK-83 to TASK-86 and TASK-101 follow. TASK-101 -> TASK-86; TASK-102 -> TASK-101; TASK-103 -> TASK-97, TASK-101, TASK-102; TASK-98 -> TASK-97, TASK-103. No m-16 task depends on m-12, m-15, or m-14 work, and none depends on a later milestone.
 - m-14 TASK-99 -> TASK-83 (m-16) and TASK-92 (m-16); TASK-73 -> TASK-99 (m-14), TASK-98 (m-16), TASK-91 (m-16), TASK-20 (m-12), TASK-82 (m-15). The release milestone depends on the feature milestone; no m-16 task depends on m-14 or on a later milestone.
 - New m-12 internal order: TASK-63 -> TASK-64 -> TASK-65 -> TASK-67; TASK-63/TASK-65 -> TASK-68 -> TASK-69; TASK-67/TASK-69 -> TASK-70 -> TASK-71; TASK-66 -> TASK-67, TASK-72, TASK-60, TASK-76; TASK-74 -> TASK-75; TASK-76 -> TASK-77; TASK-60/TASK-67/TASK-72/TASK-77 -> TASK-19; TASK-20 last.
 
@@ -144,6 +144,7 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 - REQ-06.010 — TASK-86, TASK-93.
 - REQ-06.011 — TASK-86, TASK-93.
 - REQ-06.012 — TASK-86, TASK-87, TASK-93.
+- REQ-06.013 — TASK-101 (specification for the per-milestone kanban board and the card status control), TASK-102 (MOCK-0002 revision and explicit approval), TASK-103 (rendering, release grouping, card order and links, drag-and-drop and non-drag status change, persistence and failure path).
 - Unchanged requirements that run through rewritten code paths stay covered by the existing Done tasks and are re-verified by TASK-98: REQ-02, REQ-03, REQ-04, REQ-05.001 to REQ-05.009, REQ-05.012 to REQ-05.014, REQ-06.001, REQ-06.002, REQ-06.004, REQ-06.005.
 
 ### Specification revisions
@@ -152,7 +153,18 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 - Revised by TASK-84: shared-record-envelope-and-front-matter-patcher, migrate-document-record-types-to-front-matter-lazily-on-first-read-and-first-write, expose-front-matter-metadata-options-on-all-record-commands, render-one-metadata-projection-in-cli-and-browser-views, remove-legacy-record-serializers-and-enforce-the-no-drift-rule, task-management, milestone-and-release-management, and the search specifications.
 - Revised by TASK-85: project-initialization-and-configuration, interactive-init-walkthrough-for-artifact-activation.
 - Revised by TASK-86: browser-requirements, browser-managed-artifacts-and-lifecycles, browser-glossary-terms, browser-tasks-milestones-and-releases, browser-complete-access (shared header), plus a configuration view specification; TASK-87 produces the mockup package for the configuration view and the record view layout before browser implementation starts.
+- Revised by TASK-101, after TASK-86 has revised the shared backlog specification: browser-backlog-records-ui.md section 4 and the backlog list section of browser-tasks-milestones-and-releases.md, plus the mockup register and approval status; TASK-102 revises MOCK-0002 and obtains explicit user approval before TASK-103 implements the board. TASK-101 depends on TASK-86 so the two specification revisions do not edit the browser specification set at the same time.
 
 ### Deferred work
 
 - TASK-100 (import this repository own backlog store into the native layout once) — deferred by user decision on 2026-11-11 until after Release 1.0; archived, outside m-14 and m-16, and not a release dependency. Restore it when the migration is scheduled, before this repository starts relying on Papyrus for its own records.
+
+## Requirement change update (2026-11-11) — Backlog kanban board (REQ-06.013)
+
+- Changed requirement: REQ-06.013 Present the Backlog as a Per-Milestone Kanban Board (Should have, validated, 12 acceptance criteria), from project-owner feedback; the REQ-06 group description now includes the backlog kanban presentation. Source requirement IDs: REQ-06.013, with REQ-01.002 (configured task statuses), REQ-02.001 and REQ-02.002 (task records and lifecycle), REQ-06.002, NFR-01.002, and NFR-05.001.
+- Placement (user directive): milestone m-16, priority High, no work in m-14. m-16 is the release feature milestone and is still fully To Do, so the change extends the Release 1.0 delivery without reopening completed work and without redefining the release gate.
+- Ordering rule applied: the board is a browser list surface with a write path, so the specification and the approved mockup precede the implementation (no unapproved mockup is implemented), and the implementation follows TASK-97, which deletes the legacy browser write helpers and leaves one shared write path. Building the board earlier would mean writing against the path TASK-97 removes.
+- Tasks: TASK-101 (specification revision, ordinal 39035, depends on TASK-86) -> TASK-102 (MOCK-0002 revision and explicit user approval, ordinal 39045) -> TASK-103 (implementation, ordinal 39145, depends on TASK-97, TASK-101, TASK-102).
+- Release gate: no change to TASK-73's dependency list. TASK-98 gains TASK-103, so the packaged build and the verification cover the board, and TASK-73's existing dependency on TASK-98 covers the new work transitively. TASK-99 is unaffected.
+- Hard constraints encoded: the status change uses the existing browser write contract (ADR-0006 version token, ADR-0013 single writer) and introduces no new module, stack, or non-functional requirement; the specification drift in browser-backlog-records-ui.md section 4 and browser-tasks-milestones-and-releases.md section 3 is fixed before implementation; a materially revised mockup requires explicit user approval before implementation starts.
+- Requirement coverage: REQ-06.013 -> TASK-101, TASK-102, TASK-103; REQ-01.002 (configured statuses drive the columns) -> TASK-101, TASK-103; REQ-02.002 (status change and field preservation) -> TASK-103; REQ-06.002 and NFR-01.002 (served in the local browser) -> TASK-103; NFR-05.001 (named browsers) -> TASK-103 tests.

@@ -21,7 +21,7 @@ references:
   - docs/requirements/business/REQ-06.003.md
 priority: high
 type: task
-ordinal: 39040
+ordinal: 39142.5
 ---
 
 ## Description

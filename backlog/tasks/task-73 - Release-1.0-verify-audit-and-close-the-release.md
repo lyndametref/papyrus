@@ -4,7 +4,7 @@ title: 'Release 1.0: verify, audit, and close the release'
 status: To Do
 assignee: []
 created_date: '2026-11-08T15:06:00Z'
-updated_date: '2026-11-11T21:00:00Z'
+updated_date: '2026-11-11T21:16:00Z'
 labels:
   - release
 milestone: m-14
@@ -15,24 +15,7 @@ dependencies:
   - TASK-98
   - TASK-99
 references:
-  - docs/requirements/business/REQ-01.005.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/business/REQ-05.011.md
-  - docs/requirements/business/REQ-06.003.md
-  - docs/requirements/business/REQ-06.006.md
-  - docs/requirements/business/REQ-06.007.md
-  - docs/requirements/business/REQ-06.008.md
-  - docs/requirements/business/REQ-06.009.md
-  - docs/requirements/business/REQ-06.010.md
-  - docs/requirements/business/REQ-06.011.md
-  - docs/requirements/business/REQ-06.012.md
-  - docs/requirements/non-functional/NFR-04.004.md
-  - docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md
-  - docs/architecture/adr/ADR-0011-one-way-backlog-md-import.md
-  - docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md
-  - >-
-    docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
-  - docs/specifications/release-lifecycle.md
+  - docs/requirements/business/REQ-06.013.md
 priority: low
 type: task
 ordinal: 40000
@@ -65,6 +48,8 @@ Revision (planner, 2026-11-11, user decision): the import of this repository own
 Restructure (planner, 2026-11-11, user decision): feature and specification work moved out of the release milestone into the dedicated feature milestone m-16, so m-14 holds only this release gate. The gate now depends on TASK-91, TASK-98, and TASK-99 in m-16 (the last tasks of the feature milestone) plus TASK-20 and TASK-82. Rationale: more requirements may still arrive before 1.0, and the release milestone stays open and isolated so the feature scope can grow without redefining the gate. TASK-91 is listed explicitly because nothing else in m-16 depends on it.
 
 Revision (planner, 2026-11-11, user decision): TASK-99 (upgrade notes) moved into the release milestone m-14 at ordinal 39160, between the feature milestone and this gate. m-14 now holds TASK-99 and this ticket only, and both are Low priority per the user; m-16 keeps its 16 tasks at High. Dependencies are unchanged in substance: this gate still depends on TASK-99, TASK-98, TASK-91, TASK-20, and TASK-82, and TASK-99 still depends on TASK-83 and TASK-92 in m-16, so m-14 depends on m-16 and never the reverse.
+
+Requirement change (planner, 2026-11-11): REQ-06.013 (per-milestone kanban board in the Backlog view) is planned into m-16 as TASK-101 (specification, 39035), TASK-102 (mockup revision and approval, 39045), and TASK-103 (implementation, 39145). No change to this gate's dependency list: TASK-103 depends on TASK-97 and TASK-98 now depends on TASK-103, so the gate's existing dependency on TASK-98 covers the new work transitively, and the gate's acceptance criteria (m-16 fully Done plus build, tests, re-audit, upgrade notes) already require it.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
