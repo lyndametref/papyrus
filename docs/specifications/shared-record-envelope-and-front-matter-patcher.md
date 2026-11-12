@@ -7,7 +7,7 @@
 
 ## Purpose
 
-Deliver ADR-0009 Stage 1: a single shared record implementation inside the existing Rust crate so every managed record type has one front-matter parser, one lossless document envelope, one patch API, and one atomic store. This ticket implements the infrastructure required by REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.001, NFR-04.002, and NFR-04.003. It does not migrate the corpus (TASK-68, TASK-69), does not implement identity translation (TASK-64), and does not change any record command surface (TASK-65).
+Deliver ADR-0009 Stage 1: a single shared record implementation inside the existing Rust crate so every managed record type has one front-matter parser, one lossless document envelope, one patch API, and one atomic store. This ticket implements the infrastructure required by REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.001, NFR-04.002, and NFR-04.003. It does not migrate the corpus (TASK-68, TASK-69), does not implement Papyrus identity (TASK-64), and does not change any record command surface (TASK-65).
 
 ## Scope
 
@@ -25,12 +25,12 @@ Deliver ADR-0009 Stage 1: a single shared record implementation inside the exist
 
 ### Out of scope
 
-- Identity translation between Papyrus display IDs and Backlog.md storage IDs — TASK-64.
+- Papyrus IDs only — TASK-64 (storage-ID translation removed by ADR-0010/ADR-0013).
 - CLI option exposure for front-matter fields — TASK-65.
 - Lazy migration of document record types — TASK-68.
-- Lazy migration of tasks and milestones to the Backlog.md layout — TASK-69.
+- Lazy migration of tasks and milestones to the native layout and one-way import — TASK-83 (see `papyrus-native-record-layout-and-single-id-space.md`, `import-backlog-md-records.md`).
 - Removal of legacy per-module parsers/writers and no-drift enforcement beyond this stage — TASK-70.
-- Backlog.md round-trip verification — TASK-71.
+- Native layout and one-way import verification — TASK-98.
 - Browser UI changes and metadata projection — TASK-66, TASK-67, TASK-72.
 - UI mockups and other HTML files — excluded by REQ-05.010 and ADR-0007 decision 11.
 - Backlog.md `docs` and `drafts` records — out of scope (REQ-05.010).
@@ -42,7 +42,7 @@ Deliver ADR-0009 Stage 1: a single shared record implementation inside the exist
 
 1. All record parsing, metadata formatting, and record writing live under `src/record/`. No other module may hand-format a `---` block, re-serialize an untouched block, or parse front matter with ad-hoc string splitting.
 2. `record::frontmatter`, `record::document`, `record::patch`, and `record::store` are the only entry points used by later tasks.
-3. `record::identity` is not part of this ticket; it is delivered by TASK-64. Descriptors may reserve storage-ID fields but must not implement translation here.
+3. `record::identity` is not part of this ticket; it is delivered by TASK-64. Descriptors carry Papyrus IDs only; no storage-ID fields are reserved or translated here.
 4. Every record module becomes a descriptor consumer in later tasks; this ticket only defines the descriptor shape and the shared implementation.
 
 ### 2. `record::frontmatter`
@@ -50,11 +50,10 @@ Deliver ADR-0009 Stage 1: a single shared record implementation inside the exist
 1. Detection: a leading YAML block is recognized only when the file's first byte is the start of a line containing exactly `---`, followed by a closing line containing exactly `---`. Nothing may precede the opening delimiter.
 2. Parsing uses `yaml_serde`. The parse result preserves key order, raw scalar text, and unknown keys.
 3. Typed accessors cover the general keys (`id`, `title`, `created_date`, `updated_date`, `labels`, `references`) and the per-type extras declared in the key registry from ADR-0007.
-4. Serialization emits the canonical key order and Backlog-compatible quoting. General keys precede type-specific keys.
+4. Serialization emits the canonical key order and Papyrus-native quoting. General keys precede type-specific keys.
 5. Patching rewrites only changed keys and preserves unknown keys, key order, and comments. A full document re-serialization that reorders or requotes foreign keys is prohibited.
 6. Timestamps are quoted ISO-8601 UTC strings of the form `'YYYY-MM-DDTHH:MM:SSZ'`.
-7. For tasks and milestones, YAML key order and quoting follow the Backlog.md-compatible serialization. `assignee` is a YAML list.
-
+7. For tasks and milestones, YAML key order and quoting follow the Papyrus-native serialization. `assignee` is a YAML list.
 ### 3. `record::document`
 
 1. The envelope splits a file into:
@@ -96,7 +95,7 @@ Deliver ADR-0009 Stage 1: a single shared record implementation inside the exist
 1. A descriptor exists for each managed record type listed in scope.
 2. Each descriptor declares:
    - record type name;
-   - display ID pattern and directory;
+   - Papyrus ID pattern and directory;
    - type-specific front-matter keys and their order after the general keys;
    - known body sections and their order;
    - field validation rules.

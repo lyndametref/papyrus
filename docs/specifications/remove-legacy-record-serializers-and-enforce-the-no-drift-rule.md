@@ -7,7 +7,7 @@
 
 ## Purpose
 
-Deliver ADR-0009 Stage 5: remove every legacy per-module record parser, renderer, and serializer and enforce the no-drift rule so that parsing, identity, and writing each have exactly one implementation under `src/record/`. This ticket implements REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.001, NFR-04.002, and NFR-04.003. It is a refactor with no intended change to command behavior, output, or exit codes; existing unit and integration tests keep their expected results. Backlog.md round-trip verification remains TASK-71.
+Deliver ADR-0009 Stage 5: remove every legacy per-module record parser, renderer, and serializer and enforce the no-drift rule so that parsing, identity, and writing each have exactly one implementation under `src/record/`. This ticket implements REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.001, NFR-04.002, and NFR-04.003. It is a refactor with no intended change to command behavior, output, or exit codes; existing unit and integration tests keep their expected results. Native layout and one-way import verification — TASK-98.
 
 ## Scope
 
@@ -16,8 +16,7 @@ Deliver ADR-0009 Stage 5: remove every legacy per-module record parser, renderer
 - Remove module-local record parsers and renderers from every managed Markdown record module: `audit`, `decision`, `glossary`, `milestone`, `release`, `requirement`, `rule`, `task`, `tech_spec`, `ui_spec`, and any other module that still splits, parses, or renders a managed record body.
 - Remove manual front-matter string formatting from all record creation and edit paths; record creation and edits build their output through `record::frontmatter`, `record::document`, and `record::patch`.
 - Remove browser-local `records::parse_doc` parsing logic and all `records::apply_*_edit` functions; browser edit handlers build `PatchOp` lists and persist through `record::patch` and `record::store`.
-- Move all remaining ID parsing, formatting, allocation, and translation into `record::identity`; no other module formats an ID, strips or pads a number, applies an offset, or allocates a storage number.
-- Move all remaining record-file writes to `record::store::write_atomic`, including UI mockup HTML record files. `fs::write` remains permitted only for non-record files such as configuration, init output, and test fixtures.
+- Move all remaining ID parsing, formatting, and allocation into `record::identity`; no other module formats an ID, strips or pads a number, or allocates a number.- Move all remaining record-file writes to `record::store::write_atomic`, including UI mockup HTML record files. `fs::write` remains permitted only for non-record files such as configuration, init output, and test fixtures.
 - Remove the duplicate `src/record/descriptors.rs` module; `src/record/descriptor.rs` is the sole descriptor source.
 - Update search code to obtain record text and titles through the shared reader/envelope instead of module-local parsers.
 - Update the per-type search specifications under `docs/specifications/search-*.md` to state that matching runs over the whole persisted record text, including front matter, so metadata values are searchable.
@@ -28,7 +27,7 @@ Deliver ADR-0009 Stage 5: remove every legacy per-module record parser, renderer
 
 - New record types, fields, commands, or user-visible features.
 - UI mockup metadata format changes; mockups remain HTML-comment based (REQ-05.008) and carry no front matter.
-- Backlog.md round-trip verification — TASK-71.
+- Native layout and one-way import verification — TASK-98.
 - Browser UI redesign or metadata projection changes — TASK-66, TASK-67, TASK-72.
 - Corpus migration or any write to an existing record file; convergence stays lazy.
 - Configuration and init file writes.
@@ -54,12 +53,10 @@ Deliver ADR-0009 Stage 5: remove every legacy per-module record parser, renderer
 
 ### 3. Single owner of identity
 
-1. `src/record/identity` is the only location of ID parsing, normalization, formatting, allocation, and display/storage translation.
-2. Record modules no longer format IDs with `format!`, strip prefixes, pad numbers, apply offsets, or scan for the next number locally. They call `record::identity` allocators and formatters.
-3. Path construction that appends a storage filename (for example `format!("{}.md", id)`) is permitted only after the ID has been produced by `record::identity`; it is path construction, not ID formatting.
-4. No CLI, browser, JSON, or URL surface presents a storage ID as the record identity.
-
-### 4. Single write path
+1. `src/record/identity` is the only location of ID parsing, normalization, formatting, and allocation.
+2. Record modules no longer format IDs with `format!`, strip prefixes, pad numbers, or scan for the next number locally. They call `record::identity` allocators and formatters.
+3. Path construction that appends a record filename (for example `format!("{}.md", id)`) is permitted only after the ID has been produced by `record::identity`; it is path construction, not ID formatting.
+4. No CLI, browser, JSON, or URL surface presents anything other than the Papyrus ID as the record identity.### 4. Single write path
 
 1. Every create, edit, archive, restore, deprecate, supersede, and delete operation on a managed Markdown record uses `record::store::write_atomic`.
 2. UI mockup HTML record writes use `record::store::write_atomic` as well.
@@ -71,8 +68,7 @@ Deliver ADR-0009 Stage 5: remove every legacy per-module record parser, renderer
 1. `browser::records::parse_doc` is removed or reduced to a thin adapter over `record::document::parse` with no duplicated parsing logic.
 2. The ten `apply_*_edit` functions are removed from `browser::records`.
 3. Browser edit handlers continue to use the `RecordView` projection from TASK-67 for display and `record::patch` for mutation.
-4. Browser routes, form values, and links continue to carry display IDs; `record::store` translates before filesystem access.
-
+4. Browser routes, form values, and links carry Papyrus IDs; `record::store` resolves the record path from the Papyrus ID.
 ### 6. Search
 
 1. Search obtains record content through the shared reader and does not parse records with module-local parsers.
@@ -86,8 +82,7 @@ The test suite includes automated checks that fail the build if any of the follo
 
 1. `fs::write` on a record path outside the allowlist (`src/config.rs`, `src/init.rs`, and `#[cfg(test)]` modules). UI mockup writes must already have moved to `record::store::write_atomic`.
 2. `format!("---` or an equivalent front-matter delimiter construction outside `src/record/`.
-3. ID formatting outside `src/record/identity`, defined as any `format!` that combines an ID prefix literal with zero-padding, width, or offset logic. Path construction of the form `format!("{}.md", id)` is excluded.
-
+3. ID formatting outside `src/record/identity`, defined as any `format!` that combines an ID prefix literal with zero-padding or width logic. Path construction of the form `format!("{}.md", id)` is excluded.
 The checks may be implemented as a test that shells out to `grep`/`rg` with documented patterns and allowlists. Their patterns and allowlists are documented in the test itself.
 
 ### 8. Behavior preservation

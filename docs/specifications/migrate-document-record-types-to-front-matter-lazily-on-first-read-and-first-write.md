@@ -26,9 +26,9 @@ Deliver ADR-0009 Stage 3: lazy, per-record migration of the document record type
 
 ### Out of scope
 
-- Task and milestone migration to the Backlog.md layout — TASK-69.
+- Task and milestone native layout and one-way import — TASK-83 (see `papyrus-native-record-layout-and-single-id-space.md`, `import-backlog-md-records.md`).
 - Removal of legacy per-module parsers/writers and no-drift enforcement — TASK-70.
-- Backlog.md round-trip verification — TASK-71.
+- Native layout and one-way import verification — TASK-98.
 - Browser UI changes and metadata projection — TASK-66, TASK-67, TASK-72.
 - UI mockups and other HTML files — excluded by REQ-05.008 and ADR-0007 decision 11.
 - Backlog.md `docs` and `drafts` records — out of scope (REQ-05.010).

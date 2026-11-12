@@ -7,7 +7,7 @@
 
 ## Purpose
 
-Deliver ADR-0009 Stage 3: every managed record command (create and edit) exposes an option for every front-matter field except `id`, `created_date`, and `updated_date`, and every write goes through the shared patch-preserving path delivered by TASK-63 and TASK-64. This ticket implements the option rule in REQ-05.011, the field map in REQ-05.010, the view parity contract in REQ-06.004, and the Backlog.md interoperability requirement NFR-04.003. It does not migrate the corpus (TASK-68, TASK-69), remove legacy serializers (TASK-70), or change browser UI (TASK-66, TASK-67, TASK-72).
+Deliver ADR-0009 Stage 3: every managed record command (create and edit) exposes an option for every front-matter field except `id`, `created_date`, and `updated_date`, and every write goes through the shared patch-preserving path delivered by TASK-63 and TASK-64. This ticket implements the option rule in REQ-05.011, the field map in REQ-05.010, and the view parity contract in REQ-06.004. Backlog.md file-level interoperability is not a goal of this ticket (NFR-04.004). It does not migrate the corpus (TASK-68, TASK-69), remove legacy serializers (TASK-70), or change browser UI (TASK-66, TASK-67, TASK-72).
 
 ## Scope
 
@@ -170,8 +170,8 @@ Create and edit gain `--label` and `--reference` in addition to `--title`, `--co
 
 ### 9. Identity and reference handling
 
-1. Commands continue to accept and display Papyrus display IDs only. Storage IDs are translated at the boundary by `record::identity` (TASK-64).
-2. `milestone`, `dependencies`, `release`, and `superseded_by` values are translated to storage form on write and to display form on read, as defined by TASK-64.
+1. Commands accept and display Papyrus IDs only. There is no storage ID and no translation at any boundary (ADR-0010, ADR-0013, NFR-04.004).
+2. `milestone`, `dependencies`, `release`, and `superseded_by` values are Papyrus IDs and are stored as-is; no translation is performed (ADR-0012).
 3. The general `references` list is stored verbatim after sanitization and is not translated by this ticket.
 
 ### 10. Validation and error behavior
@@ -181,7 +181,7 @@ Create and edit gain `--label` and `--reference` in addition to `--title`, `--co
 3. Invalid `ordinal` (negative or non-integer) → exit code 4.
 4. Invalid or empty sanitized field value → exit code 4.
 5. Mutually exclusive flags supplied together → exit code 4.
-6. Storage ID supplied as input → exit code 4 with a hint naming the equivalent display ID (TASK-64).
+6. No Backlog.md storage ID is accepted as input; all IDs must be Papyrus IDs (REQ-01.005, NFR-04.004).
 7. A no-op write leaves the original file byte-identical, removes no temporary file beyond the store's own cleanup, and exits successfully.
 8. Atomic write failure leaves the original file byte-identical and removes temporary files (inherited from TASK-63).
 
@@ -192,7 +192,7 @@ Create and edit gain `--label` and `--reference` in addition to `--title`, `--co
 3. Ordinal: tests verify a supplied ordinal is stored, and an omitted ordinal on create is derived from the current maximum plus one (or `0` when no records exist).
 4. Field preservation: tests verify that writing with a subset of options preserves all other front-matter keys (including unknown keys) and body content byte-for-byte, and that a no-op write is byte-identical.
 5. Browser: tests verify a metadata-backed save writes the new value, preserves the remaining fields and body, and does not refresh `updated_date` on a no-op save.
-6. Interoperability: task and milestone files created or edited with the new options remain readable, listable, and updatable by Backlog.md, including additive keys (NFR-04.003).
+6. No Backlog.md file-compatibility gate is asserted: records are Papyrus-native and Backlog.md file-level interoperability is renounced (NFR-04.004, ADR-0010, ADR-0013).
 
 ## Inputs and outputs
 
@@ -229,7 +229,7 @@ Create and edit gain `--label` and `--reference` in addition to `--title`, `--co
 | Artifact | Reference |
 |---|---|
 | Ticket | TASK-65 |
-| Requirements | REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.003 |
+| Requirements | REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.004, REQ-01.005 |
 | ADRs | ADR-0007, ADR-0008, ADR-0009 |
 | Related tickets | TASK-63 (Done), TASK-64 (Done), TASK-66, TASK-67, TASK-68, TASK-69, TASK-70, TASK-72 |
 | Source | src/task.rs, src/milestone.rs, src/release.rs, src/decision.rs, src/requirement.rs, src/glossary.rs, src/ui_spec.rs, src/tech_spec.rs, src/rule.rs, src/audit.rs, src/record/* |
