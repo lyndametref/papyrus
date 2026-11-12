@@ -2132,6 +2132,91 @@ mod tests {
     }
 
     #[test]
+    fn no_op_edit_does_not_write_or_refresh_updated_date() {
+        let dir = tmpdir("no-op-edit");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
+        let content = task_record("TASK-001", "One");
+        let path = dir.join("backlog/tasks/TASK-001.md");
+        fs::write(&path, &content).unwrap();
+
+        edit(
+            &c,
+            "TASK-001",
+            None,
+            None,
+            &[],
+            &[],
+            None,
+            None,
+            &[],
+            None,
+            None,
+            &[],
+            &[],
+            &[],
+            None,
+            None,
+            &[],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            content,
+            "an edit that changes nothing must not write or refresh updated_date"
+        );
+    }
+
+    #[test]
+    fn partial_front_matter_is_not_completed_on_write() {
+        let dir = tmpdir("partial-write");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
+        let content = "---\nid: TASK-006\ntitle: Interop\n---\n\n## Description\n\nBody\n";
+        let path = dir.join("backlog/tasks/TASK-006.md");
+        fs::write(&path, content).unwrap();
+
+        edit(
+            &c,
+            "TASK-006",
+            Some("Renamed"),
+            None,
+            &[],
+            &[],
+            None,
+            None,
+            &[],
+            None,
+            None,
+            &[],
+            &[],
+            &[],
+            None,
+            None,
+            &[],
+            false,
+        )
+        .unwrap();
+
+        let after = fs::read_to_string(&path).unwrap();
+        assert!(after.contains("title: Renamed"), "got: {after}");
+        for missing in [
+            "status:",
+            "assignee:",
+            "milestone:",
+            "labels:",
+            "dependencies:",
+        ] {
+            assert!(
+                !after.contains(missing),
+                "a write must not complete a partial front matter key {missing}: {after}"
+            );
+        }
+    }
+
+    #[test]
     fn archive_moves_to_canonical_archive_and_restore_round_trips() {
         let dir = tmpdir("archive-round-trip");
         let c = ctx(&dir);

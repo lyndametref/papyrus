@@ -575,8 +575,7 @@ pub fn edit(
         parsed_title
     };
     let mut desc_val = parsed_desc;
-    let mut release_val = parsed_release
-        .or_else(|| crate::record::frontmatter::current_value_string(&content, "release"));
+    let mut release_val = parsed_release;
 
     if let Some(t) = title_raw {
         title_val = sanitize_text(t)?;
@@ -980,6 +979,24 @@ mod tests {
         format!(
             "---\nid: {id}\ntitle: {title}\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nBody\n"
         )
+    }
+
+    #[test]
+    fn no_op_edit_does_not_write_or_refresh_updated_date() {
+        let dir = tmpdir("no-op-edit");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
+        let content = milestone_record("MS-001", "One");
+        let path = dir.join("backlog/milestones/MS-001.md");
+        fs::write(&path, &content).unwrap();
+
+        edit(&c, "MS-001", None, None, None, None, &[], &[]).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            content,
+            "an edit that changes nothing must not write or refresh updated_date"
+        );
     }
 
     #[test]
