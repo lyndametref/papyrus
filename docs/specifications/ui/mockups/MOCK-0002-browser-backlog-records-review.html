@@ -297,6 +297,8 @@ summary:focus-visible {
 .wf-narrow .wf-group-count { margin-left: 0; width: 100%; }
 .wf-narrow .wf-req-list { padding-left: 10px; }
 .wf-narrow .wf-req-list a { display: inline-block; }
+.wf-narrow .wf-kanban { grid-template-columns: 1fr; }
+.wf-narrow .wf-status-control { max-width: none; }
 .wf-narrow .wf-dl { grid-template-columns: 1fr 1fr; gap: 10px; }
 .wf-narrow .wf-form-actions { flex-direction: column; align-items: stretch; }
 .wf-narrow .wf-form-actions .wf-btn { width: 100%; text-align: center; }
@@ -692,6 +694,8 @@ body.wf-package .wf-btn[disabled] {
 .wf-drag { cursor: grab; color: var(--muted); margin-right: 6px; user-select: none; }
 .wf-column { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: var(--box); }
 .wf-release-sep { font-weight: 700; padding: 8px 0; border-bottom: 2px solid var(--line); margin: 8px 0; }
+.wf-status-control { width: 100%; padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--white); font: inherit; font-size: 12px; margin-top: 6px; }
+.wf-card .wf-status-control { max-width: 160px; }
 
 .wf-list { margin: 4px 0 4px 18px; padding: 0; }
 .wf-list li { margin: 2px 0; }
@@ -710,39 +714,37 @@ body.wf-package .wf-btn[disabled] {
 <body class="wf-package wf-annotate" data-mock-id="MOCK-0002">
 
 <header class="wf-chrome">
-  <span class="wf-chrome-title">MOCK-0002 &middot; TASK-11</span>
+  <span class="wf-chrome-title">MOCK-0002 &middot; TASK-102 (revision of TASK-11)</span>
   <span class="wf-chrome-label">Review scaffolding &mdash; not part of the design</span>
   <nav aria-label="Review contents">
     <a href="#index" data-route="index">Overview</a>
-    <a href="#deck" data-route="deck">Design deck</a>
     <a href="#web" data-route="web">Web prototype</a>
   </nav>
-  <span class="wf-chrome-meta">Status: pending &middot; web &middot; 26 views</span>
+  <span class="wf-chrome-meta">Status: approved &middot; web &middot; 27 views</span>
 </header>
 
 <!-- LANDING -->
 
 <section class="wf-review wf-index is-active" data-review="index" data-screen="index">
   <div class="wf-index-head">
-    <p class="wf-index-kicker">MOCK-0002 &middot; Review package &middot; Status pending</p>
-    <h1>TASK-11 &mdash; Extend browser access to tasks, milestones, and releases</h1>
-    <p class="wf-lede">Layout review for the backlog-records browser increment: listing, viewing and editing tasks, milestones, and releases, plus recovery states, error pages, and 320 px / accessibility behaviour. Reuses the approved MOCK-0001 shell.</p>
+    <p class="wf-index-kicker">MOCK-0002 &middot; Review package &middot; Status approved</p>
+    <h1>TASK-102 &mdash; Revise the backlog kanban board mockup (MOCK-0002)</h1>
+    <p class="wf-lede">Revised per-milestone kanban board mockup (REQ-06.013): expandable milestones with a kanban board per milestone, release grouping with a bold named separator, a tasks-without-milestone section, ID-plus-title cards linking to the record view, drag-and-drop and a non-drag status control, and the failed-persistence state. Reuses the approved MOCK-0001 shell.</p>
   </div>
   <table class="wf-meta-table">
     <caption class="wf-visually-hidden">Review package metadata</caption>
     <tbody>
-      <tr><th scope="row">Ticket</th><td>TASK-11 &mdash; Extend browser access to tasks, milestones, and releases</td></tr>
+      <tr><th scope="row">Ticket</th><td>TASK-102 &mdash; Design review: revise the backlog kanban board mockup (revises TASK-11)</td></tr>
       <tr><th scope="row">Milestone</th><td>m-2</td></tr>
       <tr><th scope="row">Specification</th><td><code>docs/specifications/browser-tasks-milestones-and-releases.md</code> &sect;3&ndash;&sect;9 and UI design handoff</td></tr>
       <tr><th scope="row">UI description</th><td><code>docs/specifications/ui/browser-backlog-records-ui.md</code></td></tr>
       <tr><th scope="row">Platform</th><td>web &mdash; desktop canvas 1440 &times; 900 CSS px, narrow review at 320 CSS px</td></tr>
-      <tr><th scope="row">Approval status</th><td><span class="wf-pill">pending</span> &mdash; awaiting explicit user approval.</td></tr>
+      <tr><th scope="row">Approval status</th><td><span class="wf-pill">approved</span> &mdash; explicitly approved by the user on 2026-11-12 (UTC) (TASK-102).</td></tr>
       <tr><th scope="row">Convention</th><td>Grayscale wireframe, layout and interaction only.</td></tr>
     </tbody>
   </table>
   <div class="wf-cards">
-    <a class="wf-card" href="#deck"><span class="wf-card-kind">Review content 1</span><h2>Design deck</h2><p>12 slides: cover, view slides with rationale, decisions, open questions.</p></a>
-    <a class="wf-card" href="#web"><span class="wf-card-kind">Review content 2</span><h2>Web prototype</h2><p>26 clickable views.</p></a>
+    <a class="wf-card" href="#web"><span class="wf-card-kind">Review content 1</span><h2>Web prototype</h2><p>27 clickable views.</p></a>
   </div>
   <div class="wf-coverage">
     <h2>Views in the web prototype</h2>
@@ -759,166 +761,17 @@ body.wf-package .wf-btn[disabled] {
   </div>
 </section>
 
-<!-- DECK -->
-<section class="wf-review wf-deck" data-review="deck" data-screen="deck" aria-label="Design deck">
-  <div class="wf-deck-stage">
-    <article class="wf-slide is-active" id="deck-1" data-slide="1" data-screen="1">
-      <div class="wf-slide-head">
-        <p class="wf-index-kicker">Cover</p>
-        <h2>MOCK-0002 &mdash; Browser backlog records review</h2>
-      </div>
-      <div class="wf-slide-body">
-
-        <p>Review package for TASK-11: extends the MOCK-0001 shell to tasks, milestones, and releases.</p>
-        <ul class="wf-deck-list"><li><strong>Web prototype</strong> &mdash; 26 clickable views.</li><li><strong>Deck</strong> &mdash; 12 slides.</li></ul>
-        <p class="wf-slide-links"><span>Start:</span><a href="#web/backlog">Open task list</a><a href="#deck/2">Next: shell</a></p>
-
-      </div>
-    </article>
-    <article class="wf-slide" id="deck-2" data-slide="2" data-screen="2">
-      <div class="wf-slide-head">
-        <p class="wf-index-kicker">Shell</p>
-        <h2>Shared shell (reused)</h2>
-      </div>
-      <div class="wf-slide-body">
-
-        <p>Header (product, project, offline note), persistent left sidebar with three entries, main, footer, one h1.</p>
-
-      </div>
-    </article>
-    <article class="wf-slide" id="deck-3" data-slide="3" data-screen="3">
-      <div class="wf-slide-head">
-        <p class="wf-index-kicker">List</p>
-        <h2>Task list</h2>
-      </div>
-      <div class="wf-slide-body">
-
-        <p>Unified backlog: releases as separators, milestones expandable/collapsible, tasks as a kanban board with one column per status; drag a card to change status. Empty states and long titles.</p>
-        <p class="wf-slide-links"><span>Open:</span><a href="#web/backlog">Task list</a><a href="#web/list-empty-project">Empty</a></p>
-
-      </div>
-    </article>
-    <article class="wf-slide" id="deck-4" data-slide="4" data-screen="4">
-      <div class="wf-slide-head">
-        <p class="wf-index-kicker">List</p>
-        <h2>Milestone and release lists</h2>
-      </div>
-      <div class="wf-slide-body">
-
-        <p>Milestone and release records are reached from the unified backlog and their own view/edit screens; sidebar offers a single Backlog entry.</p>
-        <p class="wf-slide-links"><span>Open:</span><a href="#web/backlog">Milestones</a><a href="#web/backlog">Releases</a></p>
-
-      </div>
-    </article>
-    <article class="wf-slide" id="deck-5" data-slide="5" data-screen="5">
-      <div class="wf-slide-head">
-        <p class="wf-index-kicker">View</p>
-        <h2>Task view</h2>
-      </div>
-      <div class="wf-slide-body">
-
-        <p>Metadata block, description, breadcrumb Tasks &rsaquo; ID, single Edit action.</p>
-        <p class="wf-slide-links"><span>Open:</span><a href="#web/view-task">Task view</a></p>
-
-      </div>
-    </article>
-    <article class="wf-slide" id="deck-6" data-slide="6" data-screen="6">
-      <div class="wf-slide-head">
-        <p class="wf-index-kicker">View</p>
-        <h2>Milestone and release views</h2>
-      </div>
-      <div class="wf-slide-body">
-
-        <p>Milestone: metadata, release link, description, breadcrumb. Release: metadata, description, breadcrumb.</p>
-
-      </div>
-    </article>
-    <article class="wf-slide" id="deck-7" data-slide="7" data-screen="7">
-      <div class="wf-slide-head">
-        <p class="wf-index-kicker">Edit</p>
-        <h2>Edit forms</h2>
-      </div>
-      <div class="wf-slide-body">
-
-        <p>Task, milestone, release edit forms; pristine, dirty, validation-error, conflict, 320 px states.</p>
-
-      </div>
-    </article>
-    <article class="wf-slide" id="deck-8" data-slide="8" data-screen="8">
-      <div class="wf-slide-head">
-        <p class="wf-index-kicker">Edit</p>
-        <h2>Task edit fields</h2>
-      </div>
-      <div class="wf-slide-body">
-
-        <p>Title, description, status, milestone, assignee, labels, dependencies, acceptance criteria, hidden version annotation.</p>
-
-      </div>
-    </article>
-    <article class="wf-slide" id="deck-9" data-slide="9" data-screen="9">
-      <div class="wf-slide-head">
-        <p class="wf-index-kicker">Errors</p>
-        <h2>Error pages reused</h2>
-      </div>
-      <div class="wf-slide-body">
-
-        <p>404 unknown/archived, 400, 405, 415, 500 &mdash; one layout.</p>
-
-      </div>
-    </article>
-    <article class="wf-slide" id="deck-10" data-slide="10" data-screen="10">
-      <div class="wf-slide-head">
-        <p class="wf-index-kicker">Responsive</p>
-        <h2>320 px and accessibility</h2>
-      </div>
-      <div class="wf-slide-body">
-
-        <p>Narrow list and edit form with sidebar toggle and annotation legend.</p>
-
-      </div>
-    </article>
-    <article class="wf-slide" id="deck-11" data-slide="11" data-screen="11">
-      <div class="wf-slide-head">
-        <p class="wf-index-kicker">Decisions</p>
-        <h2>Cross-cutting</h2>
-      </div>
-      <div class="wf-slide-body">
-
-        <ul class="wf-deck-list"><li>Grayscale wireframe, layout only.</li><li>One h1 per page; sidebar current bold+underline+aria-current.</li><li>No create/archive/delete from browser.</li></ul>
-
-      </div>
-    </article>
-    <article class="wf-slide" id="deck-12" data-slide="12" data-screen="12">
-      <div class="wf-slide-head">
-        <p class="wf-index-kicker">Approval</p>
-        <h2>Open questions and status</h2>
-      </div>
-      <div class="wf-slide-body">
-
-        <p>Status pending &mdash; awaiting explicit user approval.</p>
-        <p class="wf-slide-links"><span>Back:</span><a href="#index">Overview</a><a href="#web">All views</a></p>
-
-      </div>
-    </article>
-  </div>
-  <div class="wf-deck-bar">
-    <button class="wf-btn" type="button" id="deck-prev">&larr; Previous</button>
-    <button class="wf-btn" type="button" id="deck-next">Next &rarr;</button>
-    <span class="wf-counter" id="deck-counter" aria-live="polite" data-slide-total="12" data-slide-current="1">1 / 12</span>
-  </div>
-  <p class="wf-deck-hint">Keyboard: &larr; &rarr;, PageUp / PageDown, Home / End.</p>
-</section>
-
 <!-- PROTOTYPE -->
 <section class="wf-review wf-proto" data-review="web" data-screen="web" data-platform="web" aria-label="Web prototype">
 
   <nav class="wf-proto-nav" aria-label="Web prototype views">
-    <span class="wf-proto-title">Web prototype &middot; 22 views</span>
+    <span class="wf-proto-title">Web prototype &middot; 27 views</span>
     <span class="wf-nav-group">List</span>
     <ul>
       <li><a href="#web/list-business" data-goto="list-business" data-platform="web">Business req.</a></li>
       <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional" data-platform="web">Non-functional req.</a></li>
       <li><a href="#web/backlog" data-goto="backlog" data-platform="web">Backlog</a></li>
+      <li><a href="#web/backlog-status-failed" data-goto="backlog-status-failed" data-platform="web">Status failed</a></li>
       <li><a href="#web/list-empty-project" data-goto="list-empty-project" data-platform="web">Empty project</a></li>
       <li><a href="#web/list-empty-type" data-goto="list-empty-type" data-platform="web">Empty category</a></li>
       <li><a href="#web/list-long" data-goto="list-long" data-platform="web">Long content</a></li>
@@ -983,50 +836,195 @@ body.wf-package .wf-btn[disabled] {
               <h1 class="wf-h1">Backlog</h1>
               <p class="wf-sub">Tasks grouped by milestone and status; releases separate milestones.</p>
 
-              <section class="wf-section" aria-label="Release REL-001">
-                <p class="wf-release-sep">REL-001 &mdash; Release 1.0</p>
+              <section class="wf-section" aria-label="Milestones without a release">
+                <h2 class="wf-h2">Milestones without a release</h2>
+                <details class="wf-milestone" open>
+                  <summary class="wf-milestone-head">MS-000 &mdash; Unreleased milestone (expanded by default)</summary>
+                  <div class="wf-kanban">
+                    <section class="wf-column" aria-label="To Do" data-drop-target="To Do">
+                      <h3 class="wf-h3">To Do</h3>
+                      <article class="wf-card" draggable="true">
+                        <span class="wf-drag" aria-hidden="true" title="Drag to change status">&#8942;&#8942;</span>
+                        <a href="#web/view-task" data-goto="view-task"><span class="wf-group-id">TASK-010</span> Unreleased task</a>
+                        <p class="wf-text">Assignee: carol</p>
+                        <label class="wf-help" for="status-010">Status</label>
+                        <select class="wf-status-control" id="status-010" aria-label="Change status for TASK-010">
+                          <option selected>To Do</option>
+                          <option>In Progress</option>
+                          <option>Done</option>
+                        </select>
+                      </article>
+                    </section>
+                    <section class="wf-column" aria-label="In Progress" data-drop-target="In Progress">
+                      <h3 class="wf-h3">In Progress</h3>
+                      <p class="wf-empty">No tasks in this status.</p>
+                    </section>
+                    <section class="wf-column" aria-label="Done" data-drop-target="Done">
+                      <h3 class="wf-h3">Done</h3>
+                      <p class="wf-empty">No tasks in this status.</p>
+                    </section>
+                  </div>
+                  <p class="wf-help">Drag a task card to another status column to change its status, or use the status control on the card.</p>
+                </details>
               </section>
 
-              <details class="wf-milestone" open>
-                <summary class="wf-milestone-head">MS-001 &mdash; Milestone one (expanded by default)</summary>
+              <section class="wf-section" aria-label="Release REL-001">
+                <p class="wf-release-sep">REL-001 &mdash; Release 1.0</p>
+                <details class="wf-milestone" open>
+                  <summary class="wf-milestone-head">MS-001 &mdash; Milestone one (expanded by default)</summary>
+                  <div class="wf-kanban">
+                    <section class="wf-column" aria-label="To Do" data-drop-target="To Do">
+                      <h3 class="wf-h3">To Do</h3>
+                      <article class="wf-card" draggable="true">
+                        <span class="wf-drag" aria-hidden="true" title="Drag to change status">&#8942;&#8942;</span>
+                        <a href="#web/view-task" data-goto="view-task"><span class="wf-group-id">TASK-001</span> Draft the release plan</a>
+                        <p class="wf-text">Assignee: alice &middot; Labels: <span class="wf-tag">backend</span> <span class="wf-tag">planning</span></p>
+                        <select class="wf-status-control" aria-label="Change status for TASK-001">
+                          <option selected>To Do</option>
+                          <option>In Progress</option>
+                          <option>Done</option>
+                        </select>
+                      </article>
+                    </section>
+                    <section class="wf-column" aria-label="In Progress" data-drop-target="In Progress">
+                      <h3 class="wf-h3">In Progress</h3>
+                      <article class="wf-card" draggable="true">
+                        <span class="wf-drag" aria-hidden="true" title="Drag to change status">&#8942;&#8942;</span>
+                        <a href="#web/view-task" data-goto="view-task"><span class="wf-group-id">TASK-003</span> A very long task title that wraps inside its row</a>
+                        <p class="wf-text">Assignee: bob</p>
+                        <select class="wf-status-control" aria-label="Change status for TASK-003">
+                          <option>To Do</option>
+                          <option selected>In Progress</option>
+                          <option>Done</option>
+                        </select>
+                      </article>
+                    </section>
+                    <section class="wf-column" aria-label="Done" data-drop-target="Done">
+                      <h3 class="wf-h3">Done</h3>
+                      <article class="wf-card" draggable="true">
+                        <span class="wf-drag" aria-hidden="true" title="Drag to change status">&#8942;&#8942;</span>
+                        <a href="#web/view-task" data-goto="view-task"><span class="wf-group-id">TASK-002</span> Review proposed ADR-0005</a>
+                        <p class="wf-text">Assignee: (none)</p>
+                        <select class="wf-status-control" aria-label="Change status for TASK-002">
+                          <option>To Do</option>
+                          <option>In Progress</option>
+                          <option selected>Done</option>
+                        </select>
+                      </article>
+                    </section>
+                  </div>
+                  <p class="wf-help">Drag a task card to another status column to change its status, or use the status control on the card.</p>
+                </details>
+
+                <details class="wf-milestone">
+                  <summary class="wf-milestone-head">MS-002 &mdash; Milestone two (collapsed)</summary>
+                  <div class="wf-kanban">
+                    <section class="wf-column" aria-label="To Do" data-drop-target="To Do">
+                      <h3 class="wf-h3">To Do</h3>
+                      <p class="wf-empty">No tasks in this status.</p>
+                    </section>
+                    <section class="wf-column" aria-label="In Progress" data-drop-target="In Progress">
+                      <h3 class="wf-h3">In Progress</h3>
+                      <p class="wf-empty">No tasks in this status.</p>
+                    </section>
+                    <section class="wf-column" aria-label="Done" data-drop-target="Done">
+                      <h3 class="wf-h3">Done</h3>
+                      <p class="wf-empty">No tasks in this status.</p>
+                    </section>
+                  </div>
+                </details>
+              </section>
+
+              <section class="wf-section" aria-label="Tasks without a milestone">
+                <h2 class="wf-h2">Tasks without a milestone</h2>
                 <div class="wf-kanban">
                   <section class="wf-column" aria-label="To Do" data-drop-target="To Do">
                     <h3 class="wf-h3">To Do</h3>
                     <article class="wf-card" draggable="true">
                       <span class="wf-drag" aria-hidden="true" title="Drag to change status">&#8942;&#8942;</span>
-                      <a href="#web/view-task" data-goto="view-task"><span class="wf-group-id">TASK-001</span> Draft the release plan</a>
-                      <p class="wf-text">Assignee: alice &middot; Labels: <span class="wf-tag">backend</span> <span class="wf-tag">planning</span></p>
+                      <a href="#web/view-task" data-goto="view-task"><span class="wf-group-id">TASK-009</span> Loose task without milestone</a>
+                      <p class="wf-text">Assignee: (none)</p>
+                      <select class="wf-status-control" aria-label="Change status for TASK-009">
+                        <option selected>To Do</option>
+                        <option>In Progress</option>
+                        <option>Done</option>
+                      </select>
                     </article>
                   </section>
                   <section class="wf-column" aria-label="In Progress" data-drop-target="In Progress">
                     <h3 class="wf-h3">In Progress</h3>
-                    <article class="wf-card" draggable="true">
-                      <span class="wf-drag" aria-hidden="true" title="Drag to change status">&#8942;&#8942;</span>
-                      <a href="#web/view-task" data-goto="view-task"><span class="wf-group-id">TASK-003</span> A very long task title that wraps inside its row</a>
-                      <p class="wf-text">Assignee: bob</p>
-                    </article>
+                    <p class="wf-empty">No tasks in this status.</p>
                   </section>
                   <section class="wf-column" aria-label="Done" data-drop-target="Done">
                     <h3 class="wf-h3">Done</h3>
-                    <article class="wf-card" draggable="true">
-                      <span class="wf-drag" aria-hidden="true" title="Drag to change status">&#8942;&#8942;</span>
-                      <a href="#web/view-task" data-goto="view-task"><span class="wf-group-id">TASK-002</span> Review proposed ADR-0005</a>
-                      <p class="wf-text">Assignee: (none)</p>
-                    </article>
-                  </section>
-                </div>
-                <p class="wf-help">Drag a task card to another status column to change its status.</p>
-              </details>
-
-              <details class="wf-milestone">
-                <summary class="wf-milestone-head">MS-002 &mdash; Milestone two (collapsed)</summary>
-                <div class="wf-kanban">
-                  <section class="wf-column" aria-label="To Do">
-                    <h3 class="wf-h3">To Do</h3>
                     <p class="wf-empty">No tasks in this status.</p>
                   </section>
                 </div>
-              </details>
+              </section>
+
+            </main>
+          </div>
+          <footer class="wf-footer">Papyrus local browser &mdash; every page is served from this project; no network access.</footer>
+        </div>
+      </section>
+
+      <section class="wf-screen" data-platform="web" data-screen="backlog-status-failed" hidden>
+        <div class="wf-app">
+          <header class="wf-header">
+            <div class="wf-brand">
+              <span class="wf-mark" aria-hidden="true">P</span>
+              <span><span class="wf-brand-name">Papyrus</span><span class="wf-project">papyrus project</span></span>
+            </div>
+            <p class="wf-top-meta">Local browser<br>offline &middot; 127.0.0.1:6420</p>
+          </header>
+          <div class="wf-layout">
+            <aside class="wf-sidebar" aria-label="Document types">
+              <p class="wf-sidebar-label">Document types</p>
+              <ul>
+                <li><a href="#web/list-business" data-goto="list-business">Business requirements</a></li>
+                <li><a href="#web/list-nonfunctional" data-goto="list-nonfunctional">Non-functional requirements</a></li>
+                <li><a href="#web/backlog" data-goto="backlog" aria-current="page">Backlog</a></li>
+              </ul>
+            </aside>
+            <main class="wf-main">
+
+              <h1 class="wf-h1">Backlog</h1>
+              <p class="wf-sub">Status change could not be persisted.</p>
+
+              <div class="wf-alert" role="alert">
+                <h2>Status change failed</h2>
+                <p>Could not change the status of TASK-001: the record changed on disk. The card remains in its original column (To Do). Reload the view and try again.</p>
+              </div>
+
+              <section class="wf-section" aria-label="Release REL-001">
+                <p class="wf-release-sep">REL-001 &mdash; Release 1.0</p>
+                <details class="wf-milestone" open>
+                  <summary class="wf-milestone-head">MS-001 &mdash; Milestone one</summary>
+                  <div class="wf-kanban">
+                    <section class="wf-column" aria-label="To Do" data-drop-target="To Do">
+                      <h3 class="wf-h3">To Do</h3>
+                      <article class="wf-card" draggable="true">
+                        <span class="wf-drag" aria-hidden="true" title="Drag to change status">&#8942;&#8942;</span>
+                        <a href="#web/view-task" data-goto="view-task"><span class="wf-group-id">TASK-001</span> Draft the release plan</a>
+                        <p class="wf-text">Assignee: alice &middot; Labels: <span class="wf-tag">backend</span> <span class="wf-tag">planning</span></p>
+                        <select class="wf-status-control" aria-label="Change status for TASK-001">
+                          <option selected>To Do</option>
+                          <option>In Progress</option>
+                          <option>Done</option>
+                        </select>
+                      </article>
+                    </section>
+                    <section class="wf-column" aria-label="In Progress" data-drop-target="In Progress">
+                      <h3 class="wf-h3">In Progress</h3>
+                      <p class="wf-empty">No tasks in this status.</p>
+                    </section>
+                    <section class="wf-column" aria-label="Done" data-drop-target="Done">
+                      <h3 class="wf-h3">Done</h3>
+                      <p class="wf-empty">No tasks in this status.</p>
+                    </section>
+                  </div>
+                </details>
+              </section>
 
             </main>
           </div>
