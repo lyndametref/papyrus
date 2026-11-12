@@ -80,7 +80,7 @@ fn milestone_and_release_basic_lifecycle() {
     assert!(out.status.success());
     let s = String::from_utf8_lossy(&out.stdout);
     assert!(s.contains("## Description\nmdesc"));
-    assert!(s.contains("## Release\nREL-001"));
+    assert!(s.contains("release: REL-001"), "got: {}", s);
 
     // edit remove release
     let out = bin()
@@ -101,7 +101,8 @@ fn milestone_and_release_basic_lifecycle() {
         .output()
         .unwrap();
     let s = String::from_utf8_lossy(&out.stdout);
-    assert!(!s.contains("## Release"));
+    assert!(!s.contains("## Release"), "got: {}", s);
+    assert!(!s.contains("release: REL-001"), "got: {}", s);
 
     // archive + view archived
     let out = bin()

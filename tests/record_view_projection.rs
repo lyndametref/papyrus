@@ -520,6 +520,11 @@ fn browser_noop_save_does_not_refresh_updated_date() {
     run_ok(&["--dir", &arg_dir(&dir), "init", "Proj", "--no-git"]);
     run_ok(&["--dir", &arg_dir(&dir), "task", "create", "Same"]);
     let path = task_path(&dir);
+    // Browser task saves still use the legacy section layout until TASK-97.
+    // Seed the section the browser would write so this remains a true no-op.
+    let mut seeded = fs::read_to_string(&path).unwrap();
+    seeded.push_str("## Status\nToDo\n");
+    fs::write(&path, seeded).unwrap();
     let server = Server::start(&dir);
     let edit = get(&server, "/doc/TASK-001/edit").text();
     let version = extract_version(&edit);

@@ -681,8 +681,15 @@ fn load_backlog_record(
             let (_id, title) =
                 crate::record::document::heading_id_title_with_frontmatter(&parsed_doc);
             let desc = crate::record::document::section_text(&parsed_doc, "Description");
-            let release = crate::record::document::section_text(&parsed_doc, "Release")
-                .map(|s| s.trim().to_string());
+            let release = match parsed_doc.front_matter.as_ref() {
+                Some(fm) if crate::record::frontmatter::contains_key(&fm.raw, "release") => {
+                    crate::record::frontmatter::current_value_string(&fm.raw, "release")
+                        .map(|value| value.trim().to_string())
+                        .filter(|value| !value.is_empty())
+                }
+                _ => crate::record::document::section_text(&parsed_doc, "Release")
+                    .map(|s| s.trim().to_string()),
+            };
             let title = if title.is_empty() {
                 stem.to_string()
             } else {

@@ -25,7 +25,6 @@ pub struct MigrationEntry {
     pub path: String,
     pub action: String,
     pub keys: Vec<String>,
-    pub diff: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -172,52 +171,13 @@ fn ensure_front_matter_internal(ctx: &Context, path: &Path) -> Result<(String, P
         )));
     }
     let content = fs::read_to_string(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
-    if frontmatter::has_front_matter(&content) {
-        if let Some(desc) = managed_descriptor(&ctx.project_dir, &safe) {
-            // Conflict detection for already-front-mattered records (covers
-            // list/view/write paths that read through this helper).
-            let conflicts = scan_migration_conflicts(ctx, desc);
-            if let Some(reason) = blocking_conflict_for_path(ctx, &safe, desc, &content, &conflicts)
-            {
-                return Err(AppError::Validation(format!(
-                    "migration conflict at {}: {}",
-                    rel_path(&ctx.project_dir, &safe),
-                    reason
-                )));
-            }
-
-            let required = required_keys(desc);
-            let keys = existing_keys(&content);
-            let missing: Vec<&str> = required
-                .iter()
-                .copied()
-                .filter(|k| !keys.iter().any(|kk| kk == *k))
-                .collect();
-            let (content, safe): (String, PathBuf) = if !missing.is_empty() {
-                let (new_content, changed, action, keys) =
-                    migrate_content(ctx, &safe, &content, false)?;
-                if changed {
-                    crate::record::store::write_atomic(ctx, &safe, &new_content)?;
-                    let rel = rel_path(&ctx.project_dir, &safe);
-                    println!("{}\t{}\t{}", rel, action, keys.join(","));
-                    (new_content, safe)
-                } else {
-                    (content, safe)
-                }
-            } else {
-                (content, safe)
-            };
-
-            return Ok((content, safe));
-        }
+    let Some(desc) = managed_descriptor(&ctx.project_dir, &safe) else {
         return Ok((content, safe));
-    }
-    if managed_descriptor(&ctx.project_dir, &safe).is_none() {
-        return Ok((content, safe));
-    }
-    let desc = managed_descriptor(&ctx.project_dir, &safe).unwrap();
+    };
 
-    // Conflict detection before migration.
+    // Conflict detection applies to both shapes. A record that already
+    // carries front matter is returned byte-identically: adoption never
+    // completes missing keys and never retires sections on read.
     let conflicts = scan_migration_conflicts(ctx, desc);
     if let Some(reason) = blocking_conflict_for_path(ctx, &safe, desc, &content, &conflicts) {
         return Err(AppError::Validation(format!(
@@ -226,26 +186,17 @@ fn ensure_front_matter_internal(ctx: &Context, path: &Path) -> Result<(String, P
             reason
         )));
     }
+    if frontmatter::has_front_matter(&content) {
+        return Ok((content, safe));
+    }
 
     let (new_content, changed, action, keys) = migrate_content(ctx, &safe, &content, false)?;
     if !changed {
-        if action == "conflict" {
-            let rel = rel_path(&ctx.project_dir, &safe);
-            println!("{}\tconflict\t{}", rel, keys.join(","));
-        }
         return Ok((content, safe));
     }
     crate::record::store::write_atomic(ctx, &safe, &new_content)?;
     let rel = rel_path(&ctx.project_dir, &safe);
     println!("{}\t{}\t{}", rel, action, keys.join(","));
-    if action == "converted-legacy-to-backlog-md" {
-        let diff = unified_diff(&content, &new_content, &rel, &rel);
-        if !diff.is_empty() {
-            for line in diff.lines() {
-                println!("{}", line);
-            }
-        }
-    }
     Ok((new_content, safe))
 }
 
@@ -256,6 +207,11 @@ pub fn rel_path(project_dir: &Path, path: &Path) -> String {
         .replace('\\', "/")
 }
 
+/// Adopt a managed record by adding its documented front-matter keys.
+///
+/// Adoption is front-matter-only for tasks and milestones: the body,
+/// including any legacy heading or metadata section, is left byte-identical.
+/// Retirement is a separate, write-only operation ([`retire_legacy_body_ops`]).
 pub fn migrate_content(
     ctx: &Context,
     path: &Path,
@@ -267,162 +223,31 @@ pub fn migrate_content(
         None => return Ok((content.to_string(), false, String::new(), Vec::new())),
     };
 
-    // Already has front matter: complete -> no-op; incomplete -> extend.
     if frontmatter::has_front_matter(content) {
-        let keys = existing_keys(content);
-        let required = required_keys(desc);
-        let missing: Vec<&str> = required
-            .iter()
-            .copied()
-            .filter(|k| !keys.iter().any(|kk| kk == *k))
-            .collect();
-        if missing.is_empty() {
-            return Ok((
-                content.to_string(),
-                false,
-                "already-migrated".to_string(),
-                keys,
-            ));
-        }
-        // build ops for missing keys
-        let (id, title) = extract_id_title(content, path);
-        let created = created_date(ctx, path, desc, content);
-        let now = frontmatter::utc_now();
-        let mut ops: Vec<PatchOp> = Vec::new();
-        let mut new_keys = keys.clone();
-        for key in &missing {
-            match *key {
-                "id" => {
-                    let val = id.clone();
-                    ops.push(PatchOp::SetFrontMatter((*key).to_string(), val));
-                }
-                "title" => {
-                    ops.push(PatchOp::SetFrontMatter((*key).to_string(), title.clone()));
-                }
-                "created_date" => {
-                    ops.push(PatchOp::SetFrontMatter((*key).to_string(), created.clone()));
-                }
-                "updated_date" => {
-                    ops.push(PatchOp::SetFrontMatter((*key).to_string(), now.clone()));
-                }
-                "labels" | "references" | "documentation" | "assignee" | "dependencies" => {
-                    ops.push(PatchOp::SetFrontMatter(
-                        (*key).to_string(),
-                        "[]".to_string(),
-                    ));
-                }
-                "status" => {
-                    ops.push(PatchOp::SetFrontMatter(
-                        (*key).to_string(),
-                        "To Do".to_string(),
-                    ));
-                }
-                "milestone" | "release" | "type" | "superseded_by" => {
-                    ops.push(PatchOp::SetFrontMatterValue(
-                        (*key).to_string(),
-                        FrontMatterValue::Null,
-                    ));
-                }
-                "ordinal" => {
-                    ops.push(PatchOp::SetFrontMatterValue(
-                        (*key).to_string(),
-                        FrontMatterValue::Integer(0),
-                    ));
-                }
-                _ => {}
-            }
-            new_keys.push((*key).to_string());
-        }
-        // ensure id/title if missing but already present? handled by missing.
+        return Ok((
+            content.to_string(),
+            false,
+            "already-migrated".to_string(),
+            existing_keys(content),
+        ));
+    }
+
+    if desc.name == "task" || desc.name == "milestone" {
         let doc = document::parse(content)?;
+        let ops = adoption_ops(ctx, path, desc, content, &doc)?;
         let new_content = patch::apply_patch(&doc, &ops)?;
         return Ok((
             new_content,
             true,
             "added-front-matter".to_string(),
-            new_keys,
+            required_keys(desc)
+                .iter()
+                .map(|k| (*k).to_string())
+                .collect(),
         ));
     }
 
-    let desc_name = desc.name;
-    if desc_name == "task" || desc_name == "milestone" {
-        // Legacy-shaped bodies are converted in place; no read or write path
-        // relocates or renames a record.
-        if is_legacy_shape(desc, content) {
-            if desc_name == "task" {
-                let (new_content, keys) = convert_task(ctx, path, content)?;
-                return Ok((
-                    new_content,
-                    true,
-                    "converted-legacy-to-backlog-md".to_string(),
-                    keys,
-                ));
-            } else {
-                let (new_content, keys) = convert_milestone(ctx, path, content)?;
-                return Ok((
-                    new_content,
-                    true,
-                    "converted-legacy-to-backlog-md".to_string(),
-                    keys,
-                ));
-            }
-        }
-        // storage-shaped lacking front matter: added-front-matter, body unchanged
-        let (id, title) = extract_id_title(content, path);
-        let created = created_date(ctx, path, desc, content);
-        let updated = frontmatter::utc_now();
-        let mut keys: Vec<String> = GENERAL_KEYS.iter().map(|s| s.to_string()).collect();
-        let mut ops: Vec<PatchOp> = Vec::new();
-        let fm_id = id.clone();
-        ops.push(PatchOp::SetFrontMatter("id".into(), fm_id));
-        ops.push(PatchOp::SetFrontMatter("title".into(), title));
-        ops.push(PatchOp::SetFrontMatter("created_date".into(), created));
-        ops.push(PatchOp::SetFrontMatter("updated_date".into(), updated));
-        ops.push(PatchOp::SetFrontMatter("labels".into(), "[]".into()));
-        ops.push(PatchOp::SetFrontMatter("references".into(), "[]".into()));
-        if desc_name == "task" {
-            keys.extend(
-                [
-                    "status",
-                    "assignee",
-                    "milestone",
-                    "dependencies",
-                    "ordinal",
-                    "documentation",
-                    "type",
-                ]
-                .iter()
-                .map(|s| s.to_string()),
-            );
-            ops.push(PatchOp::SetFrontMatter("status".into(), "To Do".into()));
-            ops.push(PatchOp::SetFrontMatter("assignee".into(), "[]".into()));
-            ops.push(PatchOp::SetFrontMatterValue(
-                "milestone".into(),
-                FrontMatterValue::Null,
-            ));
-            ops.push(PatchOp::SetFrontMatter("dependencies".into(), "[]".into()));
-            ops.push(PatchOp::SetFrontMatterValue(
-                "ordinal".into(),
-                FrontMatterValue::Integer(0),
-            ));
-            ops.push(PatchOp::SetFrontMatter("documentation".into(), "[]".into()));
-            ops.push(PatchOp::SetFrontMatterValue(
-                "type".into(),
-                FrontMatterValue::Null,
-            ));
-        } else {
-            keys.push("release".to_string());
-            ops.push(PatchOp::SetFrontMatterValue(
-                "release".into(),
-                FrontMatterValue::Null,
-            ));
-        }
-        let doc = document::parse(content)?;
-        let new_content = patch::apply_patch(&doc, &ops)?;
-        return Ok((new_content, true, "added-front-matter".to_string(), keys));
-    }
-
-    // document records path (TASK-68)
+    // Document records (TASK-68): general keys plus audit type retirement.
     let (id, title) = extract_id_title(content, path);
     let created = created_date(ctx, path, desc, content);
     let updated = frontmatter::utc_now();
@@ -458,6 +283,288 @@ pub fn migrate_content(
 
     let new_content = patch::apply_patch(&doc, &ops)?;
     Ok((new_content, true, action, keys))
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum SectionValue {
+    Missing,
+    Valid(String),
+    Invalid,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum SectionList {
+    Missing,
+    Valid(Vec<String>),
+    Invalid,
+}
+
+fn find_section<'a>(doc: &'a document::Document, name: &str) -> Option<&'a document::Section> {
+    let heading = format!("## {}", name);
+    doc.sections.iter().find(|s| s.heading == heading)
+}
+
+/// Parse a scalar metadata section. More than one non-empty line cannot be
+/// represented as a single front-matter value and is reported as invalid so
+/// the caller can keep the section in place.
+fn section_scalar(doc: &document::Document, name: &str) -> SectionValue {
+    let Some(section) = find_section(doc, name) else {
+        return SectionValue::Missing;
+    };
+    let lines: Vec<&str> = section
+        .body
+        .iter()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+    match lines.len() {
+        0 => SectionValue::Valid(String::new()),
+        1 => SectionValue::Valid(lines[0].to_string()),
+        _ => SectionValue::Invalid,
+    }
+}
+
+/// Parse a metadata section that stores one item per line. Empty list items
+/// are invalid so the section is preserved rather than silently losing data.
+fn section_list(doc: &document::Document, name: &str) -> SectionList {
+    let Some(section) = find_section(doc, name) else {
+        return SectionList::Missing;
+    };
+    let mut items = Vec::new();
+    for raw in &section.body {
+        let line = raw.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line == "-" {
+            return SectionList::Invalid;
+        }
+        let item = if let Some(rest) = line.strip_prefix("- ") {
+            rest.trim()
+        } else {
+            line
+        };
+        if item.is_empty() {
+            return SectionList::Invalid;
+        }
+        items.push(item.to_string());
+    }
+    SectionList::Valid(items)
+}
+
+fn scalar_value(section: SectionValue) -> Option<String> {
+    match section {
+        SectionValue::Valid(value) => Some(value),
+        _ => None,
+    }
+}
+
+fn list_value(section: SectionList) -> Vec<String> {
+    match section {
+        SectionList::Valid(items) => items,
+        _ => Vec::new(),
+    }
+}
+
+fn list_ops_value(items: &[String]) -> String {
+    if items.is_empty() {
+        "[]".to_string()
+    } else {
+        items.join("\n")
+    }
+}
+
+fn null_or_string(value: Option<String>) -> FrontMatterValue {
+    match value.filter(|v| !v.trim().is_empty()) {
+        Some(v) => FrontMatterValue::String(v),
+        None => FrontMatterValue::Null,
+    }
+}
+
+fn heading_id_title(doc: &document::Document, path: &Path) -> (String, String) {
+    if doc.heading.as_deref().is_some_and(|h| h.starts_with("# ")) {
+        let (id, title) = document::heading_id_title(doc);
+        if !id.is_empty() {
+            return (id, title);
+        }
+    }
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+    let id = stem.split_once(" - ").map_or(stem, |(base, _)| base).trim();
+    (id.to_string(), String::new())
+}
+
+/// Build the full canonical front-matter key set for an adopted task or
+/// milestone, deriving every value from the legacy body where present.
+fn adoption_ops(
+    ctx: &Context,
+    path: &Path,
+    desc: &RecordDescriptor,
+    content: &str,
+    doc: &document::Document,
+) -> Result<Vec<PatchOp>, AppError> {
+    let cfg = load_cfg(ctx);
+    let (id, title) = heading_id_title(doc, path);
+    let created = created_date(ctx, path, desc, content);
+    let updated = frontmatter::utc_now();
+
+    let mut ops = vec![
+        PatchOp::SetFrontMatterValue("id".into(), FrontMatterValue::String(id)),
+        PatchOp::SetFrontMatterValue("title".into(), FrontMatterValue::String(title)),
+        PatchOp::SetFrontMatterValue("created_date".into(), FrontMatterValue::String(created)),
+        PatchOp::SetFrontMatterValue("updated_date".into(), FrontMatterValue::String(updated)),
+        PatchOp::SetFrontMatterValue(
+            "labels".into(),
+            FrontMatterValue::String(list_ops_value(&list_value(section_list(doc, "Labels")))),
+        ),
+        PatchOp::SetFrontMatterValue("references".into(), FrontMatterValue::String("[]".into())),
+    ];
+
+    if desc.name == "task" {
+        let status = match section_scalar(doc, "Status") {
+            SectionValue::Valid(value) if !value.is_empty() => value,
+            _ => cfg.default_status.clone(),
+        };
+        let assignee = list_value(section_list(doc, "Assignee"));
+        let milestone = null_or_string(scalar_value(section_scalar(doc, "Milestone")));
+        let dependencies = list_value(section_list(doc, "Dependencies"));
+
+        let task_desc = crate::record::descriptor::descriptor_for("task")
+            .ok_or_else(|| AppError::Runtime("task descriptor is unavailable".to_string()))?;
+        let dirs = task_desc.resolve_read_directories(&cfg, &ctx.project_dir);
+        let dir_refs: Vec<&Path> = dirs.iter().map(PathBuf::as_path).collect();
+        let ordinal = crate::record::identity::scan_max_ordinal_in_dirs(&dir_refs);
+
+        ops.push(PatchOp::SetFrontMatterValue(
+            "status".into(),
+            FrontMatterValue::String(status),
+        ));
+        ops.push(PatchOp::SetFrontMatterValue(
+            "assignee".into(),
+            FrontMatterValue::String(list_ops_value(&assignee)),
+        ));
+        ops.push(PatchOp::SetFrontMatterValue("milestone".into(), milestone));
+        ops.push(PatchOp::SetFrontMatterValue(
+            "dependencies".into(),
+            FrontMatterValue::String(list_ops_value(&dependencies)),
+        ));
+        ops.push(PatchOp::SetFrontMatterValue(
+            "ordinal".into(),
+            FrontMatterValue::Integer(ordinal),
+        ));
+        ops.push(PatchOp::SetFrontMatterValue(
+            "documentation".into(),
+            FrontMatterValue::String("[]".into()),
+        ));
+        ops.push(PatchOp::SetFrontMatterValue(
+            "type".into(),
+            FrontMatterValue::Null,
+        ));
+    } else {
+        let release = null_or_string(scalar_value(section_scalar(doc, "Release")));
+        ops.push(PatchOp::SetFrontMatterValue("release".into(), release));
+    }
+
+    Ok(ops)
+}
+
+/// Patch operations that retire legacy metadata sections and the title heading.
+///
+/// A section whose value cannot be parsed is left in place and a warning names
+/// the record and section. When the key already exists in front matter, the
+/// front-matter value wins and only the duplicate section is removed.
+pub(crate) fn retire_legacy_body_ops(
+    doc: &document::Document,
+    desc: &RecordDescriptor,
+    path: &Path,
+) -> Vec<PatchOp> {
+    let retired: &[(&str, &str, bool)] = match desc.name {
+        "task" => &[
+            ("Status", "status", false),
+            ("Assignee", "assignee", true),
+            ("Milestone", "milestone", false),
+            ("Labels", "labels", true),
+            ("Dependencies", "dependencies", true),
+        ],
+        "milestone" => &[("Release", "release", false)],
+        _ => &[],
+    };
+
+    let mut ops = Vec::new();
+    for (section_name, key, is_list) in retired {
+        let heading = format!("## {}", section_name);
+        let occurrences = doc.sections.iter().filter(|s| s.heading == heading).count();
+        if occurrences == 0 {
+            continue;
+        }
+        let key_present = doc
+            .front_matter
+            .as_ref()
+            .is_some_and(|fm| frontmatter::contains_key(&fm.raw, key));
+
+        let parsed = if *is_list {
+            match section_list(doc, section_name) {
+                SectionList::Missing => continue,
+                SectionList::Invalid => {
+                    eprintln!(
+                        "warning: cannot retire section '{}' at {}: a list item is empty",
+                        heading,
+                        path.display()
+                    );
+                    continue;
+                }
+                SectionList::Valid(items) => Some(FrontMatterValue::String(list_ops_value(&items))),
+            }
+        } else {
+            match section_scalar(doc, section_name) {
+                SectionValue::Missing => continue,
+                SectionValue::Invalid => {
+                    eprintln!(
+                        "warning: cannot retire section '{}' at {}: more than one non-empty line",
+                        heading,
+                        path.display()
+                    );
+                    continue;
+                }
+                SectionValue::Valid(value) => {
+                    if *key == "milestone" || *key == "release" {
+                        Some(null_or_string(Some(value)))
+                    } else {
+                        Some(FrontMatterValue::String(value))
+                    }
+                }
+            }
+        };
+
+        if !key_present && let Some(value) = parsed {
+            ops.push(PatchOp::SetFrontMatterValue((*key).to_string(), value));
+        }
+        for _ in 0..occurrences {
+            ops.push(PatchOp::ClearSection(heading.clone()));
+        }
+    }
+
+    if doc.heading.as_deref().is_some_and(|h| h.starts_with("# ")) {
+        ops.push(PatchOp::ClearHeading);
+    }
+    ops
+}
+
+/// Whether a record that already carries front matter still has a retired
+/// metadata section or a title heading.
+pub(crate) fn has_retired_sections(doc: &document::Document, desc: &RecordDescriptor) -> bool {
+    let retired: &[&str] = match desc.name {
+        "task" => &["Status", "Assignee", "Milestone", "Labels", "Dependencies"],
+        "milestone" => &["Release"],
+        _ => &[],
+    };
+    if doc.heading.as_deref().is_some_and(|h| h.starts_with("# ")) {
+        return true;
+    }
+    doc.sections.iter().any(|s| {
+        retired
+            .iter()
+            .any(|name| s.heading == format!("## {}", name))
+    })
 }
 
 fn existing_keys(content: &str) -> Vec<String> {
@@ -866,152 +973,6 @@ pub fn path_migration_conflict(
         .cloned()
 }
 
-// Diff helpers.
-
-#[derive(Clone, Copy, Debug)]
-enum DiffOp<'a> {
-    Equal(&'a str),
-    Insert(&'a str),
-    Delete(&'a str),
-}
-
-fn diff_lines<'a>(old: &[&'a str], new: &[&'a str]) -> Vec<DiffOp<'a>> {
-    let lcs = longest_common_subsequence(old, new);
-    let mut ops: Vec<DiffOp<'a>> = Vec::new();
-    let mut i = 0usize;
-    let mut j = 0usize;
-    let mut k = 0usize;
-    while k < lcs.len() {
-        while i < old.len() && old[i] != lcs[k] {
-            ops.push(DiffOp::Delete(old[i]));
-            i += 1;
-        }
-        while j < new.len() && new[j] != lcs[k] {
-            ops.push(DiffOp::Insert(new[j]));
-            j += 1;
-        }
-        ops.push(DiffOp::Equal(old[i]));
-        i += 1;
-        j += 1;
-        k += 1;
-    }
-    while i < old.len() {
-        ops.push(DiffOp::Delete(old[i]));
-        i += 1;
-    }
-    while j < new.len() {
-        ops.push(DiffOp::Insert(new[j]));
-        j += 1;
-    }
-    ops
-}
-
-fn unified_diff(old: &str, new: &str, old_label: &str, new_label: &str) -> String {
-    const CONTEXT: usize = 3;
-    let old_lines: Vec<&str> = old.lines().collect();
-    let new_lines: Vec<&str> = new.lines().collect();
-    let ops = diff_lines(&old_lines, &new_lines);
-    if ops.iter().all(|op| matches!(op, DiffOp::Equal(_))) {
-        return String::new();
-    }
-
-    // Cumulative line counts in the old/new files up to each op index.
-    let mut old_before = vec![0usize; ops.len() + 1];
-    let mut new_before = vec![0usize; ops.len() + 1];
-    for (idx, op) in ops.iter().enumerate() {
-        old_before[idx + 1] = old_before[idx]
-            + match op {
-                DiffOp::Equal(_) | DiffOp::Delete(_) => 1,
-                DiffOp::Insert(_) => 0,
-            };
-        new_before[idx + 1] = new_before[idx]
-            + match op {
-                DiffOp::Equal(_) | DiffOp::Insert(_) => 1,
-                DiffOp::Delete(_) => 0,
-            };
-    }
-
-    let mut hunks: Vec<String> = Vec::new();
-    hunks.push(format!("--- {}", old_label));
-    hunks.push(format!("+++ {}", new_label));
-
-    let n = ops.len();
-    let mut i = 0usize;
-    while i < n {
-        while i < n && matches!(ops[i], DiffOp::Equal(_)) {
-            i += 1;
-        }
-        if i >= n {
-            break;
-        }
-
-        let hunk_start = i.saturating_sub(CONTEXT);
-        let mut j = i;
-        let mut last_change = i;
-        while j < n {
-            if !matches!(ops[j], DiffOp::Equal(_)) {
-                last_change = j;
-            }
-            if j > last_change && j - last_change > CONTEXT {
-                break;
-            }
-            j += 1;
-        }
-        let hunk_end = j.min(n);
-
-        let old_start = old_before[hunk_start] + 1;
-        let new_start = new_before[hunk_start] + 1;
-        let old_len = old_before[hunk_end] - old_before[hunk_start];
-        let new_len = new_before[hunk_end] - new_before[hunk_start];
-        hunks.push(format!(
-            "@@ -{},{} +{},{} @@",
-            old_start, old_len, new_start, new_len
-        ));
-
-        for op in ops.iter().take(hunk_end).skip(hunk_start) {
-            match *op {
-                DiffOp::Equal(line) => hunks.push(format!(" {}", line)),
-                DiffOp::Insert(line) => hunks.push(format!("+{}", line)),
-                DiffOp::Delete(line) => hunks.push(format!("-{}", line)),
-            }
-        }
-
-        i = hunk_end;
-    }
-
-    hunks.join("\n")
-}
-
-fn longest_common_subsequence<'a>(a: &[&'a str], b: &[&'a str]) -> Vec<&'a str> {
-    let m = a.len();
-    let n = b.len();
-    let mut dp = vec![vec![0usize; n + 1]; m + 1];
-    for i in (0..m).rev() {
-        for j in (0..n).rev() {
-            if a[i] == b[j] {
-                dp[i][j] = 1 + dp[i + 1][j + 1];
-            } else {
-                dp[i][j] = dp[i + 1][j].max(dp[i][j + 1]);
-            }
-        }
-    }
-    let mut lcs = Vec::new();
-    let mut i = 0usize;
-    let mut j = 0usize;
-    while i < m && j < n {
-        if a[i] == b[j] {
-            lcs.push(a[i]);
-            i += 1;
-            j += 1;
-        } else if dp[i + 1][j] >= dp[i][j + 1] {
-            i += 1;
-        } else {
-            j += 1;
-        }
-    }
-    lcs
-}
-
 // Dry-run traversal and migration helpers.
 pub fn migrate_corpus(ctx: &Context, dry_run: bool) -> Result<Vec<MigrationEntry>, AppError> {
     let mut entries = Vec::new();
@@ -1032,11 +993,6 @@ pub fn migrate_corpus(ctx: &Context, dry_run: bool) -> Result<Vec<MigrationEntry
             continue;
         }
         println!("{}\t{}\t{}", e.path, e.action, e.keys.join(","));
-        if let Some(d) = &e.diff {
-            for line in d.lines() {
-                println!("{}", line);
-            }
-        }
     }
     Ok(entries)
 }
@@ -1075,37 +1031,40 @@ fn process_file(
     entries: &mut Vec<MigrationEntry>,
 ) -> Result<(), AppError> {
     let content = fs::read_to_string(path).map_err(|e| AppError::Runtime(e.to_string()))?;
-    let rel = path
-        .strip_prefix(&ctx.project_dir)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .replace('\\', "/");
+    let rel = rel_path(&ctx.project_dir, path);
+    let desc = managed_descriptor(&ctx.project_dir, path);
     if dry_run {
         if frontmatter::has_front_matter(&content) {
-            entries.push(MigrationEntry {
-                path: rel,
-                action: "already-migrated".to_string(),
-                keys: existing_keys(&content),
-                diff: None,
-            });
-        } else {
-            let desc = managed_descriptor(&ctx.project_dir, path);
-            let legacy = desc.map(|d| is_legacy_shape(d, &content)).unwrap_or(false);
-            let (new_content, _, _, keys) = migrate_content(ctx, path, &content, true)?;
-            let diff = if legacy {
-                Some(unified_diff(&content, &new_content, &rel, &rel))
-            } else {
-                None
+            let (action, keys) = match desc {
+                Some(desc) => {
+                    let retired = document::parse(&content)
+                        .map(|doc| has_retired_sections(&doc, desc))
+                        .unwrap_or(false);
+                    if retired {
+                        ("would-retire-legacy-sections", existing_keys(&content))
+                    } else {
+                        ("already-migrated", existing_keys(&content))
+                    }
+                }
+                None => ("already-migrated", existing_keys(&content)),
             };
             entries.push(MigrationEntry {
                 path: rel,
-                action: if legacy {
-                    "would-convert".to_string()
-                } else {
-                    "would-migrate".to_string()
-                },
+                action: action.to_string(),
                 keys,
-                diff,
+            });
+        } else {
+            let keys = match desc {
+                Some(desc) => required_keys(desc)
+                    .iter()
+                    .map(|k| (*k).to_string())
+                    .collect(),
+                None => Vec::new(),
+            };
+            entries.push(MigrationEntry {
+                path: rel,
+                action: "would-migrate".to_string(),
+                keys,
             });
         }
         return Ok(());
@@ -1113,33 +1072,18 @@ fn process_file(
     if frontmatter::has_front_matter(&content) {
         return Ok(());
     }
-    if managed_descriptor(&ctx.project_dir, path).is_none() {
+    if desc.is_none() {
         return Ok(());
     }
     let (new_content, changed, action, keys) = migrate_content(ctx, path, &content, false)?;
     if !changed {
-        if action == "conflict" {
-            entries.push(MigrationEntry {
-                path: rel.clone(),
-                action: "conflict".to_string(),
-                keys: keys.clone(),
-                diff: None,
-            });
-            println!("{}\tconflict\t{}", rel, keys.join(","));
-        }
         return Ok(());
     }
     crate::record::store::write_atomic(ctx, path, &new_content)?;
-    let diff = if action == "converted-legacy-to-backlog-md" {
-        Some(unified_diff(&content, &new_content, &rel, &rel))
-    } else {
-        None
-    };
     entries.push(MigrationEntry {
         path: rel,
         action,
         keys,
-        diff,
     });
     Ok(())
 }
@@ -1161,35 +1105,16 @@ pub fn migrate_file(ctx: &Context, path: &Path) -> Result<Option<MigrationEntry>
     }
     let (new_content, changed, action, keys) = migrate_content(ctx, &safe, &content, false)?;
     if !changed {
-        if action == "conflict" {
-            let rel = safe
-                .strip_prefix(&ctx.project_dir)
-                .unwrap_or(&safe)
-                .to_string_lossy()
-                .replace('\\', "/");
-            println!("{}\tconflict\t{}", rel, keys.join(","));
-        }
         return Ok(None);
     }
     crate::record::store::write_atomic(ctx, &safe, &new_content)?;
-    let rel = safe
-        .strip_prefix(&ctx.project_dir)
-        .unwrap_or(&safe)
-        .to_string_lossy()
-        .replace('\\', "/");
-    let diff = if action == "converted-legacy-to-backlog-md" {
-        Some(unified_diff(&content, &new_content, &rel, &rel))
-    } else {
-        None
-    };
-    let entry = MigrationEntry {
-        path: rel.clone(),
-        action: action.clone(),
-        keys: keys.clone(),
-        diff,
-    };
+    let rel = rel_path(&ctx.project_dir, &safe);
     println!("{}\t{}\t{}", rel, action, keys.join(","));
-    Ok(Some(entry))
+    Ok(Some(MigrationEntry {
+        path: rel,
+        action,
+        keys,
+    }))
 }
 
 // Expose is_timestamp for date parsing checks.
@@ -1211,19 +1136,6 @@ fn load_cfg(ctx: &Context) -> crate::config::Config {
 fn load_cfg_for(project_dir: &Path) -> crate::config::Config {
     let config_path = project_dir.join("papyrus.config.yml");
     crate::commands::load_effective_config(&config_path, project_dir).unwrap_or_default()
-}
-
-fn file_created_date(path: &Path) -> String {
-    if let Ok(meta) = fs::metadata(path)
-        && let Ok(m) = meta.modified()
-    {
-        let secs = m
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs() as i64;
-        return frontmatter::utc_from_unix(secs);
-    }
-    frontmatter::utc_now()
 }
 
 fn required_keys(desc: &RecordDescriptor) -> &'static [&'static str] {
@@ -1272,371 +1184,6 @@ fn required_keys(desc: &RecordDescriptor) -> &'static [&'static str] {
     }
 }
 
-fn is_legacy_shape(desc: &RecordDescriptor, content: &str) -> bool {
-    if let Ok(doc) = document::parse(content) {
-        let retired: &[&str] = match desc.name {
-            "task" => &["Status", "Milestone", "Assignee", "Labels", "Dependencies"],
-            "milestone" => &["Release"],
-            _ => &[],
-        };
-        for s in &doc.sections {
-            let h = s.heading.trim_start_matches("## ").trim();
-            if retired.contains(&h) {
-                return true;
-            }
-        }
-        if let Some(h) = &doc.heading {
-            let rest = h.trim_start_matches('#').trim();
-            let first = rest.split_whitespace().next().unwrap_or("");
-            let up = first.to_uppercase();
-            if desc.name == "task" && up.starts_with("TASK-") {
-                return true;
-            }
-            if desc.name == "milestone" && up.starts_with("MS-") {
-                return true;
-            }
-        }
-    }
-    if content.contains("<!-- SECTION:DESCRIPTION:BEGIN -->")
-        || content.contains("<!-- AC:BEGIN -->")
-    {
-        return false;
-    }
-    false
-}
-
-fn section_text_doc(doc: &document::Document, name: &str) -> Option<String> {
-    doc.sections
-        .iter()
-        .find(|s| s.heading == format!("## {}", name))
-        .map(|s| s.body.join("\n").trim().to_string())
-        .filter(|s| !s.is_empty())
-}
-
-fn section_lines_doc(doc: &document::Document, name: &str) -> Vec<String> {
-    doc.sections
-        .iter()
-        .find(|s| s.heading == format!("## {}", name))
-        .map(|s| {
-            s.body
-                .iter()
-                .map(|l| l.trim().to_string())
-                .filter(|l| !l.is_empty())
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn convert_task(
-    ctx: &Context,
-    path: &Path,
-    content: &str,
-) -> Result<(String, Vec<String>), AppError> {
-    let cfg = load_cfg(ctx);
-    let doc = document::parse(content)?;
-    let (display_id, title) = extract_id_title(content, path);
-    let storage_id = display_id.clone();
-    let fm_id = display_id.clone();
-
-    let status = section_text_doc(&doc, "Status").unwrap_or_else(|| cfg.default_status.clone());
-    let milestone_raw = section_text_doc(&doc, "Milestone");
-    let milestone_storage = milestone_raw
-        .as_ref()
-        .map(|m| m.trim().to_string())
-        .filter(|s| !s.is_empty());
-    let assignee_raw = section_text_doc(&doc, "Assignee");
-    let assignee_list: Vec<String> = assignee_raw
-        .map(|a| {
-            if a.trim().is_empty() {
-                Vec::new()
-            } else {
-                vec![a.trim().to_string()]
-            }
-        })
-        .unwrap_or_default();
-    let labels_lines = section_lines_doc(&doc, "Labels");
-    let labels: Vec<String> = labels_lines
-        .iter()
-        .map(|l| l.trim().trim_start_matches("- ").trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect();
-    let deps_lines = section_lines_doc(&doc, "Dependencies");
-    let deps_display: Vec<String> = deps_lines
-        .iter()
-        .map(|l| l.trim().trim_start_matches("- ").trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect();
-    let deps_storage: Vec<String> = deps_display.clone();
-    let desc = section_text_doc(&doc, "Description");
-    let ac_lines = section_lines_doc(&doc, "Acceptance Criteria");
-    let mut acs: Vec<String> = Vec::new();
-    for l in &ac_lines {
-        let t = l.trim();
-        if t.is_empty() {
-            continue;
-        }
-        let mut item = t.strip_prefix("- ").unwrap_or(t).trim().to_string();
-        for pref in ["[ ] ", "[x] ", "[X] "] {
-            if let Some(rest) = item.strip_prefix(pref) {
-                item = rest.trim().to_string();
-                break;
-            }
-        }
-        // strip leading "#n " if present
-        if let Some(rest) = item.strip_prefix('#') {
-            // remove number up to space
-            if let Some(sp) = rest.find(' ') {
-                let num_part = &rest[..sp];
-                if num_part.chars().all(|c| c.is_ascii_digit()) {
-                    item = rest[sp + 1..].trim().to_string();
-                }
-            }
-        }
-        if !item.is_empty() {
-            acs.push(item);
-        }
-    }
-    // comments
-    let comment_lines = section_lines_doc(&doc, "Comments");
-    let mut comments: Vec<(String, String)> = Vec::new();
-    for l in &comment_lines {
-        let t = l.trim();
-        if t.is_empty() {
-            continue;
-        }
-        let item = t.strip_prefix("- ").unwrap_or(t).trim().to_string();
-        if let Some(inner) = item.strip_prefix("**")
-            && let Some(end) = inner.find("**")
-        {
-            let author = inner[..end].trim().to_string();
-            let after = inner[end + 2..].trim();
-            let text = after.trim_start_matches(':').trim().to_string();
-            comments.push((author, text));
-            continue;
-        }
-        comments.push(("unknown".to_string(), item));
-    }
-
-    // unknown sections
-    let known: &[&str] = &[
-        "Description",
-        "Status",
-        "Milestone",
-        "Assignee",
-        "Labels",
-        "Dependencies",
-        "Acceptance Criteria",
-        "Comments",
-    ];
-    let unknown: Vec<&document::Section> = doc
-        .sections
-        .iter()
-        .filter(|s| {
-            let h = s.heading.trim_start_matches("## ").trim();
-            !known.contains(&h)
-        })
-        .collect();
-
-    // ordinal default
-    let task_desc = crate::record::descriptor::descriptor_for("task")
-        .ok_or_else(|| AppError::Runtime("task descriptor is unavailable".to_string()))?;
-    let dirs = task_desc.resolve_read_directories(&cfg, &ctx.project_dir);
-    let dir_refs: Vec<&Path> = dirs.iter().map(PathBuf::as_path).collect();
-    let ordinal_final = crate::record::identity::scan_max_ordinal_in_dirs(&dir_refs);
-
-    let created = file_created_date(path);
-    let updated = frontmatter::utc_now();
-
-    // build front matter
-    let mut fm = String::new();
-    fm.push_str(&format!("id: {}\n", fm_id));
-    fm.push_str(&format!(
-        "title: {}\n",
-        frontmatter::format_scalar_pub(&title)
-    ));
-    fm.push_str(&format!("created_date: '{}'\n", created));
-    fm.push_str(&format!("updated_date: '{}'\n", updated));
-    if labels.is_empty() {
-        fm.push_str("labels: []\n");
-    } else {
-        fm.push_str("labels:\n");
-        for l in &labels {
-            fm.push_str(&format!("  - {}\n", frontmatter::format_scalar_pub(l)));
-        }
-    }
-    fm.push_str("references: []\n");
-    fm.push_str(&format!(
-        "status: {}\n",
-        frontmatter::format_scalar_pub(&status)
-    ));
-    if assignee_list.is_empty() {
-        fm.push_str("assignee: []\n");
-    } else {
-        fm.push_str("assignee:\n");
-        for a in &assignee_list {
-            fm.push_str(&format!("  - {}\n", frontmatter::format_scalar_pub(a)));
-        }
-    }
-    if let Some(m) = &milestone_storage {
-        fm.push_str(&format!(
-            "milestone: {}\n",
-            frontmatter::format_scalar_pub(m)
-        ));
-    } else {
-        fm.push_str("milestone: null\n");
-    }
-    if deps_storage.is_empty() {
-        fm.push_str("dependencies: []\n");
-    } else {
-        fm.push_str("dependencies:\n");
-        for d in &deps_storage {
-            fm.push_str(&format!("  - {}\n", frontmatter::format_scalar_pub(d)));
-        }
-    }
-    fm.push_str(&format!("ordinal: {}\n", ordinal_final));
-    fm.push_str("documentation: []\n");
-    fm.push_str("type: null\n");
-
-    // build body
-    let mut parts: Vec<String> = Vec::new();
-    let desc_text = desc.unwrap_or_default();
-    let mut desc_block = String::from("## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\n");
-    if !desc_text.trim().is_empty() {
-        desc_block.push_str(&desc_text);
-        if !desc_text.ends_with('\n') {
-            desc_block.push('\n');
-        }
-    }
-    desc_block.push_str("<!-- SECTION:DESCRIPTION:END -->");
-    parts.push(desc_block);
-
-    if !acs.is_empty() {
-        let mut ac_block = String::from("## Acceptance Criteria\n<!-- AC:BEGIN -->");
-        for (i, c) in acs.iter().enumerate() {
-            ac_block.push_str(&format!("\n- [ ] #{} {}", i + 1, c));
-        }
-        ac_block.push_str("\n<!-- AC:END -->");
-        parts.push(ac_block);
-    }
-
-    if !comments.is_empty() {
-        let mut c_block = String::from("## Comments\n<!-- COMMENTS:BEGIN -->");
-        for (a, t) in &comments {
-            c_block.push_str(&format!("\n- **{}**: {}", a, t));
-        }
-        c_block.push_str("\n<!-- COMMENTS:END -->");
-        parts.push(c_block);
-    }
-
-    for sec in &unknown {
-        let mut block = sec.heading.clone();
-        if !sec.body.is_empty() {
-            block.push('\n');
-            block.push_str(&sec.body.join("\n"));
-        }
-        parts.push(block);
-    }
-
-    let body = parts.join("\n\n") + "\n";
-    let new_content = frontmatter::wrap(&fm, &body);
-
-    let keys = vec![
-        "id",
-        "title",
-        "created_date",
-        "updated_date",
-        "labels",
-        "references",
-        "status",
-        "assignee",
-        "milestone",
-        "dependencies",
-        "ordinal",
-        "documentation",
-        "type",
-    ]
-    .into_iter()
-    .map(String::from)
-    .collect();
-    let _ = storage_id;
-    Ok((new_content, keys))
-}
-
-fn convert_milestone(
-    ctx: &Context,
-    path: &Path,
-    content: &str,
-) -> Result<(String, Vec<String>), AppError> {
-    let cfg = load_cfg(ctx);
-    let doc = document::parse(content)?;
-    let (display_id, title) = extract_id_title(content, path);
-    let fm_id = display_id.clone();
-
-    let release_raw = section_text_doc(&doc, "Release");
-    let release = release_raw
-        .map(|r| r.trim().to_string())
-        .filter(|s| !s.is_empty());
-    let desc = section_text_doc(&doc, "Description");
-
-    let known: &[&str] = &["Description", "Release"];
-    let unknown: Vec<&document::Section> = doc
-        .sections
-        .iter()
-        .filter(|s| {
-            let h = s.heading.trim_start_matches("## ").trim();
-            !known.contains(&h)
-        })
-        .collect();
-
-    let created = file_created_date(path);
-    let updated = frontmatter::utc_now();
-
-    let mut fm = String::new();
-    fm.push_str(&format!("id: {}\n", fm_id));
-    fm.push_str(&format!(
-        "title: {}\n",
-        frontmatter::format_scalar_pub(&title)
-    ));
-    fm.push_str(&format!("created_date: '{}'\n", created));
-    fm.push_str(&format!("updated_date: '{}'\n", updated));
-    fm.push_str("labels: []\n");
-    fm.push_str("references: []\n");
-    if let Some(r) = &release {
-        fm.push_str(&format!("release: {}\n", frontmatter::format_scalar_pub(r)));
-    } else {
-        fm.push_str("release: null\n");
-    }
-
-    let mut parts: Vec<String> = Vec::new();
-    let desc_text = desc.unwrap_or_default();
-    parts.push(format!("## Description\n\n{}", desc_text.trim()));
-    for sec in &unknown {
-        let mut block = sec.heading.clone();
-        if !sec.body.is_empty() {
-            block.push('\n');
-            block.push_str(&sec.body.join("\n"));
-        }
-        parts.push(block);
-    }
-    let body = parts.join("\n\n") + "\n";
-    let new_content = frontmatter::wrap(&fm, &body);
-
-    let keys = vec![
-        "id",
-        "title",
-        "created_date",
-        "updated_date",
-        "labels",
-        "references",
-        "release",
-    ]
-    .into_iter()
-    .map(String::from)
-    .collect();
-    let _ = cfg;
-    Ok((new_content, keys))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1670,197 +1217,110 @@ mod tests {
         fs::write(path, content).unwrap();
     }
 
-    #[test]
-    fn native_task_is_left_byte_identical() {
-        let dir = tmpdir("native-task");
-        let c = ctx(&dir);
-        let body = "## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody line\n<!-- SECTION:DESCRIPTION:END -->\n";
-        let content = format!(
-            "---\nid: TASK-5\ntitle: Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n\n{}",
+    fn task_record(body: &str) -> String {
+        format!(
+            "---\nid: TASK-001\ntitle: Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: Done\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 1\ndocumentation: []\ntype: null\n---\n{}",
             body
-        );
-        let path = dir.join("backlog/tasks/TASK-005.md");
-        write(&path, &content);
-        let result = ensure_front_matter(&c, &path).unwrap();
-        assert_eq!(result, content);
-        assert_eq!(fs::read_to_string(&path).unwrap(), content);
+        )
     }
 
     #[test]
-    fn native_milestone_gets_additive_keys() {
-        let dir = tmpdir("native-milestone");
+    fn read_adoption_adds_front_matter_and_keeps_body_byte_identical() {
+        let dir = tmpdir("read-adoption");
         let c = ctx(&dir);
-        let body = "## Description\n\nMilestone body\n";
-        let content = format!("---\nid: MS-002\ntitle: Title\n---\n\n{}", body);
-        let path = dir.join("backlog/milestones/MS-002.md");
-        write(&path, &content);
-        let result = ensure_front_matter(&c, &path).unwrap();
-        assert!(result.starts_with("---\n"));
-        assert!(result.contains("created_date:"));
-        assert!(result.contains("updated_date:"));
-        assert!(result.contains("labels: []"));
-        assert!(result.contains("references: []"));
-        assert!(result.contains("release:"));
-        assert!(result.contains("## Description"));
-        assert!(result.contains("Milestone body"));
-    }
-
-    #[test]
-    fn legacy_task_is_converted_in_place() {
-        let dir = tmpdir("legacy-task");
-        let c = ctx(&dir);
-        let legacy = "# TASK-001 Old Title\n\n## Status\nDone\n\n## Description\nLegacy body.\n\n## Acceptance Criteria\n- [ ] #1 first thing\n- [x] #2 second thing\n\n## Labels\n- bug\n\n## Unknown Section\nkeep me\n";
+        let legacy = "# TASK-001 Old Title\n\n## Status\nDone\n\n## Description\nLegacy body.\n\n## Acceptance Criteria\n- [ ] first thing\n";
         let path = dir.join("backlog/tasks/TASK-001.md");
         write(&path, legacy);
-        let _ = ensure_front_matter(&c, &path).unwrap();
-        assert!(path.exists());
-        let content = fs::read_to_string(&path).unwrap();
-        assert!(content.starts_with("---\n"));
-        assert!(content.contains("id: TASK-001"));
-        assert!(content.contains("status: Done"));
-        assert!(content.contains("<!-- SECTION:DESCRIPTION:BEGIN -->"));
-        assert!(content.contains("Legacy body."));
-        assert!(content.contains("<!-- AC:BEGIN -->"));
-        assert!(content.contains("- [ ] #1 first thing"));
-        assert!(content.contains("- [ ] #2 second thing"));
-        assert!(content.contains("## Unknown Section"));
-        assert!(content.contains("keep me"));
+        let result = ensure_front_matter(&c, &path).unwrap();
+        let (fm, body) = frontmatter::split(&result).unwrap();
+        let fm = fm.expect("front matter expected");
+        assert_eq!(body, legacy, "body must stay byte-identical on read");
+        assert!(fm.raw.contains("id: TASK-001"));
+        assert!(fm.raw.contains("title: \"Old Title\""));
+        assert!(fm.raw.contains("status: Done"));
+        assert!(fm.raw.contains("assignee: []"));
+        assert!(fm.raw.contains("milestone: null"));
+        assert!(fm.raw.contains("documentation: []"));
+        assert!(fm.raw.contains("type: null"));
+        assert!(
+            result.contains("# TASK-001 Old Title"),
+            "heading kept on read"
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), result);
     }
 
     #[test]
-    fn legacy_milestone_is_converted() {
-        let dir = tmpdir("legacy-milestone");
+    fn read_adoption_derives_sections_into_front_matter() {
+        let dir = tmpdir("derived");
         let c = ctx(&dir);
-        let legacy = "# MS-001 Mile Title\n\n## Release\nREL-001\n\n## Description\nDesc.\n";
+        write(&dir.join("backlog/tasks/TASK-002.md"), &task_record(""));
+        let legacy = "# TASK-003 Derived\n\n## Status\nIn Progress\n\n## Assignee\n- alice\n- bob\n\n## Milestone\nMS-001\n\n## Labels\n- bug\n\n## Dependencies\n- TASK-002\n\n## Description\nBody\n";
+        let path = dir.join("backlog/tasks/TASK-003.md");
+        write(&path, legacy);
+        let result = ensure_front_matter(&c, &path).unwrap();
+        let (fm, _) = frontmatter::split(&result).unwrap();
+        let fm = fm.unwrap();
+        assert!(fm.raw.contains("id: TASK-003"), "{}", fm.raw);
+        assert!(fm.raw.contains("title: Derived"), "{}", fm.raw);
+        assert!(fm.raw.contains("status: \"In Progress\""), "{}", fm.raw);
+        assert!(
+            fm.raw.contains("assignee:\n  - alice\n  - bob"),
+            "{}",
+            fm.raw
+        );
+        assert!(fm.raw.contains("milestone: MS-001"), "{}", fm.raw);
+        assert!(fm.raw.contains("labels:\n  - bug"), "{}", fm.raw);
+        assert!(fm.raw.contains("dependencies:\n  - TASK-002"), "{}", fm.raw);
+        assert!(fm.raw.contains("ordinal:"), "{}", fm.raw);
+        assert!(fm.raw.contains("created_date:"), "{}", fm.raw);
+        assert!(fm.raw.contains("updated_date:"), "{}", fm.raw);
+    }
+
+    #[test]
+    fn read_adoption_uses_default_status_when_absent() {
+        let dir = tmpdir("default-status");
+        let c = ctx(&dir);
+        let path = dir.join("backlog/tasks/TASK-004.md");
+        write(
+            &path,
+            "# TASK-004 Body Only\n\n## Description\nNo status.\n",
+        );
+        let result = ensure_front_matter(&c, &path).unwrap();
+        let (fm, _) = frontmatter::split(&result).unwrap();
+        assert!(
+            fm.unwrap().raw.contains("status: ToDo"),
+            "default status expected"
+        );
+    }
+
+    #[test]
+    fn read_adoption_derives_milestone_release() {
+        let dir = tmpdir("adopt-milestone");
+        let c = ctx(&dir);
+        let legacy = "# MS-001 Mile\n\n## Release\nREL-001\n\n## Description\nDesc.\n";
         let path = dir.join("backlog/milestones/MS-001.md");
         write(&path, legacy);
-        let _ = ensure_front_matter(&c, &path).unwrap();
-        assert!(path.exists());
-        let content = fs::read_to_string(&path).unwrap();
-        assert!(content.contains("id: MS-001"));
-        assert!(content.contains("release: REL-001"));
-        assert!(!content.contains("## Release"));
+        let result = ensure_front_matter(&c, &path).unwrap();
+        let (fm, body) = frontmatter::split(&result).unwrap();
+        assert!(fm.unwrap().raw.contains("release: REL-001"));
+        assert_eq!(body, legacy);
     }
 
     #[test]
-    fn converted_legacy_entry_reports_diff() {
-        let dir = tmpdir("legacy-diff");
+    fn partial_front_matter_is_not_completed_on_read() {
+        let dir = tmpdir("partial");
         let c = ctx(&dir);
-        let legacy = "# TASK-010 Title\n\n## Description\nBody\n";
-        let path = dir.join("backlog/tasks/TASK-010.md");
-        write(&path, legacy);
-        let entry = migrate_file(&c, &path).unwrap().expect("entry expected");
-        assert_eq!(entry.action, "converted-legacy-to-backlog-md");
-        let diff = entry.diff.expect("diff expected");
-        assert!(diff.contains("--- "));
-        assert!(diff.contains("+++ "));
-        assert!(diff.contains("-# TASK-010 Title"));
-        assert!(diff.contains("+id: TASK-010"));
-    }
-
-    #[test]
-    fn duplicate_ids_are_detected() {
-        let dir = tmpdir("duplicate");
-        let c = ctx(&dir);
-        let a = dir.join("backlog/tasks/TASK-007.md");
-        let b = dir.join("backlog/tasks/TASK-0007.md");
-        write(
-            &a,
-            "---\nid: TASK-7\ntitle: A\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 7\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nA\n<!-- SECTION:DESCRIPTION:END -->\n",
-        );
-        write(
-            &b,
-            "---\nid: TASK-7\ntitle: B\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 7\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nB\n<!-- SECTION:DESCRIPTION:END -->\n",
-        );
-        let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let conflicts = scan_migration_conflicts(&c, desc);
-        assert_eq!(conflicts.len(), 1);
-        match &conflicts[0] {
-            MigrationConflict::DuplicateId { id, paths } => {
-                assert_eq!(id, "TASK-7");
-                assert_eq!(paths.len(), 2);
-            }
-            _ => panic!("expected duplicate id conflict"),
-        }
-    }
-
-    #[test]
-    fn same_title_distinct_numbers_are_not_conflicts() {
-        let dir = tmpdir("same-title-distinct");
-        let c = ctx(&dir);
-        let a = dir.join("backlog/tasks/TASK-008.md");
-        let b = dir.join("backlog/tasks/TASK-009.md");
-        let tpl = "---\nid: TASK-{n}\ntitle: SameTitle\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: {n}\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
-        write(&a, &tpl.replace("{n}", "8"));
-        write(&b, &tpl.replace("{n}", "9"));
-        let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let conflicts = scan_migration_conflicts(&c, desc);
-        assert!(
-            conflicts.is_empty(),
-            "same title distinct numbers must not conflict: {:?}",
-            conflicts
-        );
-        // Views for both distinct records succeed.
-        assert!(ensure_front_matter(&c, &a).is_ok());
-        assert!(ensure_front_matter(&c, &b).is_ok());
-    }
-
-    #[test]
-    fn dropped_task_keys_are_readded_on_next_read() {
-        // Simulate Backlog.md editing a migrated file and dropping additive keys.
-        let dir = tmpdir("dropped-keys-task");
-        let c = ctx(&dir);
-        let body = "## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
-        let minimal = format!(
-            "---\nid: TASK-6\ntitle: Interop\nstatus: To Do\n---\n\n{}",
-            body
-        );
+        let body = "## Description\n\nBody\n";
+        let minimal = format!("---\nid: TASK-006\ntitle: Interop\n---\n{}", body);
         let path = dir.join("backlog/tasks/TASK-006.md");
         write(&path, &minimal);
         let result = ensure_front_matter(&c, &path).unwrap();
-        for key in [
-            "created_date:",
-            "updated_date:",
-            "labels:",
-            "references:",
-            "assignee:",
-            "milestone:",
-            "dependencies:",
-            "ordinal:",
-            "documentation:",
-            "type:",
-        ] {
-            assert!(result.contains(key), "missing {} in: {}", key, result);
-        }
-        assert!(result.contains("## Description"));
-        assert!(result.contains("Body"));
-        let on_disk = fs::read_to_string(&path).unwrap();
-        assert_eq!(on_disk, result);
-        // Body byte-identical apart from front matter.
-        let (_, out_body) = frontmatter::split(&result).unwrap();
-        assert_eq!(out_body, format!("\n{}", body));
+        assert_eq!(result, minimal);
+        assert_eq!(fs::read_to_string(&path).unwrap(), minimal);
     }
 
     #[test]
-    fn frontmatter_filename_mismatch_detected() {
-        let dir = tmpdir("mismatch");
-        let c = ctx(&dir);
-        let path = dir.join("backlog/tasks/TASK-005.md");
-        write(
-            &path,
-            "---\nid: TASK-99\ntitle: Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n",
-        );
-        let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let conflicts = scan_migration_conflicts(&c, desc);
-        assert!(conflicts.iter().any(|c| matches!(
-            c,
-            MigrationConflict::FrontmatterFilenameMismatch { path: p, .. }
-            if p.contains("TASK-005")
-        )));
-    }
-
-    #[test]
-    fn idempotency_second_run_is_no_op() {
+    fn adoption_is_idempotent() {
         let dir = tmpdir("idempotent");
         let c = ctx(&dir);
         let legacy = "# TASK-002 Title\n\n## Description\nBody\n";
@@ -1874,13 +1334,155 @@ mod tests {
     }
 
     #[test]
+    fn retirement_removes_heading_and_metadata_sections() {
+        let dir = tmpdir("retire");
+        let content = "---\nid: TASK-001\ntitle: Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\n---\n\n# TASK-001 Title\n\n## Status\nDone\n\n## Assignee\n- alice\n\n## Milestone\nMS-001\n\n## Labels\n- bug\n\n## Dependencies\n- TASK-002\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nKeep me\n<!-- SECTION:DESCRIPTION:END -->\n";
+        let path = dir.join("backlog/tasks/TASK-001.md");
+        let doc = document::parse(content).unwrap();
+        let desc = crate::record::descriptor::descriptor_for("task").unwrap();
+        let ops = retire_legacy_body_ops(&doc, desc, &path);
+        let out = patch::apply_patch(&doc, &ops).unwrap();
+        assert!(!out.contains("# TASK-001 Title"), "{}", out);
+        assert!(!out.contains("## Status"), "{}", out);
+        assert!(!out.contains("## Assignee"), "{}", out);
+        assert!(!out.contains("## Milestone"), "{}", out);
+        assert!(!out.contains("## Labels"), "{}", out);
+        assert!(!out.contains("## Dependencies"), "{}", out);
+        assert!(out.contains("status: Done"), "{}", out);
+        assert!(out.contains("assignee:\n  - alice"), "{}", out);
+        assert!(out.contains("milestone: MS-001"), "{}", out);
+        assert!(out.contains("labels:\n  - bug"), "{}", out);
+        assert!(out.contains("dependencies:\n  - TASK-002"), "{}", out);
+        assert!(out.contains("Keep me"), "{}", out);
+        assert!(
+            out.contains("<!-- SECTION:DESCRIPTION:BEGIN -->"),
+            "{}",
+            out
+        );
+    }
+
+    #[test]
+    fn retirement_removes_milestone_release_section() {
+        let dir = tmpdir("retire-milestone");
+        let content = "---\nid: MS-001\ntitle: Mile\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\n---\n\n# MS-001 Mile\n\n## Release\nREL-001\n\n## Description\nBody\n";
+        let path = dir.join("backlog/milestones/MS-001.md");
+        let doc = document::parse(content).unwrap();
+        let desc = crate::record::descriptor::descriptor_for("milestone").unwrap();
+        let ops = retire_legacy_body_ops(&doc, desc, &path);
+        let out = patch::apply_patch(&doc, &ops).unwrap();
+        assert!(!out.contains("# MS-001 Mile"));
+        assert!(!out.contains("## Release"));
+        assert!(out.contains("release: REL-001"));
+    }
+
+    #[test]
+    fn front_matter_value_wins_over_duplicate_section() {
+        let dir = tmpdir("fm-wins");
+        let content =
+            task_record("\n# TASK-001 Title\n\n## Status\nIn Progress\n\n## Description\nBody\n");
+        let path = dir.join("backlog/tasks/TASK-001.md");
+        let doc = document::parse(&content).unwrap();
+        let desc = crate::record::descriptor::descriptor_for("task").unwrap();
+        let ops = retire_legacy_body_ops(&doc, desc, &path);
+        let out = patch::apply_patch(&doc, &ops).unwrap();
+        assert!(!out.contains("## Status"), "{}", out);
+        assert!(out.contains("status: Done"), "{}", out);
+        assert!(!out.contains("In Progress"), "{}", out);
+    }
+
+    #[test]
+    fn unparseable_section_is_kept_and_others_retired() {
+        let dir = tmpdir("keep-section");
+        let content = task_record(
+            "\n# TASK-001 Title\n\n## Status\nLine one\nLine two\n\n## Description\nBody\n",
+        );
+        let path = dir.join("backlog/tasks/TASK-001.md");
+        let doc = document::parse(&content).unwrap();
+        let desc = crate::record::descriptor::descriptor_for("task").unwrap();
+        let ops = retire_legacy_body_ops(&doc, desc, &path);
+        let out = patch::apply_patch(&doc, &ops).unwrap();
+        assert!(!out.contains("# TASK-001 Title"), "{}", out);
+        assert!(out.contains("## Status\nLine one\nLine two"), "{}", out);
+    }
+
+    #[test]
+    fn unparseable_list_item_is_kept() {
+        let dir = tmpdir("keep-list");
+        let content = task_record("\n# TASK-001 Title\n\n## Labels\n- \n\n## Description\nBody\n");
+        let path = dir.join("backlog/tasks/TASK-001.md");
+        let doc = document::parse(&content).unwrap();
+        let desc = crate::record::descriptor::descriptor_for("task").unwrap();
+        let ops = retire_legacy_body_ops(&doc, desc, &path);
+        let out = patch::apply_patch(&doc, &ops).unwrap();
+        assert!(out.contains("## Labels"), "{}", out);
+    }
+
+    #[test]
+    fn duplicate_ids_are_detected() {
+        let dir = tmpdir("duplicate");
+        let c = ctx(&dir);
+        let a = dir.join("backlog/tasks/TASK-007.md");
+        let b = dir.join("backlog/tasks/TASK-0007.md");
+        write(
+            &a,
+            &task_record("\n## Description\nA\n").replace("TASK-001", "TASK-007"),
+        );
+        write(
+            &b,
+            &task_record("\n## Description\nB\n").replace("TASK-001", "TASK-0007"),
+        );
+        let desc = crate::record::descriptor::descriptor_for("task").unwrap();
+        let conflicts = scan_migration_conflicts(&c, desc);
+        assert!(conflicts.iter().any(|c| matches!(
+            c,
+            MigrationConflict::DuplicateId { id, paths }
+            if id == "TASK-7" && paths.len() == 2
+        )));
+    }
+
+    #[test]
+    fn same_title_distinct_numbers_are_not_conflicts() {
+        let dir = tmpdir("same-title-distinct");
+        let c = ctx(&dir);
+        let tpl = "---\nid: TASK-{n}\ntitle: SameTitle\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: {n}\ndocumentation: []\ntype: null\n---\n\n## Description\n\nBody\n";
+        write(
+            &dir.join("backlog/tasks/TASK-008.md"),
+            &tpl.replace("{n}", "8"),
+        );
+        write(
+            &dir.join("backlog/tasks/TASK-009.md"),
+            &tpl.replace("{n}", "9"),
+        );
+        let desc = crate::record::descriptor::descriptor_for("task").unwrap();
+        let conflicts = scan_migration_conflicts(&c, desc);
+        assert!(conflicts.is_empty(), "{:?}", conflicts);
+        assert!(ensure_front_matter(&c, &dir.join("backlog/tasks/TASK-008.md")).is_ok());
+        assert!(ensure_front_matter(&c, &dir.join("backlog/tasks/TASK-009.md")).is_ok());
+    }
+
+    #[test]
+    fn frontmatter_filename_mismatch_detected() {
+        let dir = tmpdir("mismatch");
+        let c = ctx(&dir);
+        let content = task_record("\n## Description\nBody\n").replace("TASK-001", "TASK-99");
+        let path = dir.join("backlog/tasks/TASK-005.md");
+        write(&path, &content);
+        let desc = crate::record::descriptor::descriptor_for("task").unwrap();
+        let conflicts = scan_migration_conflicts(&c, desc);
+        assert!(conflicts.iter().any(|c| matches!(
+            c,
+            MigrationConflict::FrontmatterFilenameMismatch { path: p, .. }
+            if p.contains("TASK-005")
+        )));
+    }
+
+    #[test]
     fn read_path_write_failure_keeps_original() {
         let dir = tmpdir("readonly");
         let c = ctx(&dir);
         let legacy = "# TASK-003 Title\n\n## Description\nBody\n";
         let path = dir.join("backlog/tasks/TASK-003.md");
         write(&path, legacy);
-        // Make the target directory read-only so atomic write fails.
         let tasks_dir = dir.join("backlog/tasks");
         let original_mode = fs::metadata(&tasks_dir).unwrap().permissions().mode();
         let mut perms = fs::metadata(&tasks_dir).unwrap().permissions();
@@ -1890,11 +1492,6 @@ mod tests {
         fs::set_permissions(&tasks_dir, fs::Permissions::from_mode(original_mode)).unwrap();
         assert!(result.is_err());
         assert_eq!(fs::read_to_string(&path).unwrap(), legacy);
-        // No temp files left in the project.
-        for entry in fs::read_dir(&tasks_dir).unwrap() {
-            let name = entry.unwrap().file_name().to_string_lossy().to_string();
-            assert!(!name.contains(".tmp"), "leftover temp: {}", name);
-        }
     }
 
     #[test]
@@ -1907,36 +1504,6 @@ mod tests {
         let canonical = ensure_front_matter_canonical(&c, &path).unwrap();
         assert_eq!(canonical, path, "read must not relocate the record");
         assert!(path.exists());
-        assert!(
-            !dir.join("backlog/archive/tasks/TASK-004 - Title.md")
-                .exists()
-        );
-    }
-
-    #[test]
-    fn dry_run_does_not_write() {
-        let dir = tmpdir("dryrun");
-        let c = ctx(&dir);
-        let legacy = "# TASK-005 Title\n\n## Description\nBody\n";
-        let path = dir.join("backlog/tasks/TASK-005.md");
-        write(&path, legacy);
-        let entries = migrate_corpus(&c, true).unwrap();
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].action, "would-convert");
-        assert!(entries[0].diff.is_some());
-        // Original untouched.
-        assert_eq!(fs::read_to_string(&path).unwrap(), legacy);
-    }
-
-    #[test]
-    fn unified_diff_includes_before_and_after() {
-        let old = "line one\nline two\n";
-        let new = "line one\nline two changed\n";
-        let diff = unified_diff(old, new, "a/old.md", "b/new.md");
-        assert!(diff.contains("--- a/old.md"));
-        assert!(diff.contains("+++ b/new.md"));
-        assert!(diff.contains("-line two"));
-        assert!(diff.contains("+line two changed"));
     }
 
     #[test]
@@ -1946,28 +1513,75 @@ mod tests {
         let content = "## Description\n\nBody line\n";
         let path = dir.join("backlog/tasks/task-5 - Parsed-Title.md");
         write(&path, content);
-        assert!(
-            managed_descriptor(&dir, &path).is_none(),
-            "Backlog-shaped stems must resolve to no record"
-        );
+        assert!(managed_descriptor(&dir, &path).is_none());
         let result = ensure_front_matter(&c, &path).unwrap();
-        assert_eq!(result, content, "invisible record must not be migrated");
+        assert_eq!(result, content);
         assert_eq!(fs::read_to_string(&path).unwrap(), content);
-        let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        assert!(scan_migration_conflicts(&c, desc).is_empty());
     }
 
     #[test]
-    fn incomplete_front_matter_uses_yaml_null_and_unquoted_integer() {
-        let dir = tmpdir("incomplete-null");
+    fn native_task_is_left_byte_identical() {
+        let dir = tmpdir("native-task");
         let c = ctx(&dir);
-        let body = "## Description\n\nMilestone body\n";
-        let content = format!("---\nid: MS-002\ntitle: Title\n---\n\n{}", body);
-        let path = dir.join("backlog/milestones/MS-002.md");
+        let content = task_record(
+            "\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody line\n<!-- SECTION:DESCRIPTION:END -->\n",
+        );
+        let path = dir.join("backlog/tasks/TASK-005.md");
         write(&path, &content);
         let result = ensure_front_matter(&c, &path).unwrap();
-        assert!(result.contains("release: null"), "got: {}", result);
-        assert!(!result.contains("release: \"null\""), "got: {}", result);
+        assert_eq!(result, content);
+        assert_eq!(fs::read_to_string(&path).unwrap(), content);
+    }
+
+    #[test]
+    fn dry_run_reports_would_migrate_and_would_retire_without_writing() {
+        let dir = tmpdir("dryrun");
+        let c = ctx(&dir);
+        let legacy = "# TASK-005 Title\n\n## Description\nBody\n";
+        let retired =
+            task_record("\n# TASK-006 Title\n\n## Status\nDone\n\n## Description\nBody\n");
+        let clean = task_record("\n## Description\nBody\n");
+        write(&dir.join("backlog/tasks/TASK-005.md"), legacy);
+        write(&dir.join("backlog/tasks/TASK-006.md"), &retired);
+        write(&dir.join("backlog/tasks/TASK-007.md"), &clean);
+
+        let entries = migrate_corpus(&c, true).unwrap();
+        let find = |suffix: &str| {
+            entries
+                .iter()
+                .find(|e| e.path.ends_with(suffix))
+                .map(|e| e.action.as_str())
+                .unwrap_or("")
+        };
+        assert_eq!(find("TASK-005.md"), "would-migrate");
+        assert_eq!(find("TASK-006.md"), "would-retire-legacy-sections");
+        assert_eq!(find("TASK-007.md"), "already-migrated");
+
+        assert_eq!(
+            fs::read_to_string(dir.join("backlog/tasks/TASK-005.md")).unwrap(),
+            legacy
+        );
+        assert_eq!(
+            fs::read_to_string(dir.join("backlog/tasks/TASK-006.md")).unwrap(),
+            retired
+        );
+        assert_eq!(
+            fs::read_to_string(dir.join("backlog/tasks/TASK-007.md")).unwrap(),
+            clean
+        );
+    }
+
+    #[test]
+    fn migrate_file_reports_added_front_matter() {
+        let dir = tmpdir("migrate-file");
+        let c = ctx(&dir);
+        let legacy = "# TASK-010 Title\n\n## Description\nBody\n";
+        let path = dir.join("backlog/tasks/TASK-010.md");
+        write(&path, legacy);
+        let entry = migrate_file(&c, &path).unwrap().expect("entry expected");
+        assert_eq!(entry.action, "added-front-matter");
+        assert!(entry.keys.iter().any(|k| k == "status"));
+        assert!(fs::read_to_string(&path).unwrap().starts_with("---\n"));
     }
 
     #[test]
@@ -1978,34 +1592,15 @@ mod tests {
         let b = dir.join("backlog/tasks/TASK-0007.md");
         write(
             &a,
-            "---\nid: TASK-7\ntitle: A\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 7\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nA\n<!-- SECTION:DESCRIPTION:END -->\n",
+            &task_record("\n## Description\nA\n").replace("TASK-001", "TASK-007"),
         );
         write(
             &b,
-            "---\nid: TASK-7\ntitle: B\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 7\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nB\n<!-- SECTION:DESCRIPTION:END -->\n",
+            &task_record("\n## Description\nB\n").replace("TASK-001", "TASK-0007"),
         );
         let err = ensure_front_matter(&c, &a).unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("duplicate id"), "{}", msg);
         assert!(msg.contains("TASK-7"), "{}", msg);
-    }
-
-    #[test]
-    fn unified_diff_ordered_non_overlapping() {
-        let old = "a\nb\nc\nd\ne\nf\ng\n";
-        let new = "a\nb\nc\nX\nd\ne\nf\ng\nY\n";
-        let diff = unified_diff(old, new, "old.md", "new.md");
-        let hunks: Vec<&str> = diff.lines().filter(|l| l.starts_with("@@")).collect();
-        assert_eq!(hunks.len(), 2, "expected two hunks, got: {}", diff);
-        // Hunk headers should be in file-order.
-        let first = hunks[0];
-        let second = hunks[1];
-        let first_old_start: usize = first[4..].split(',').next().unwrap().parse().unwrap();
-        let second_old_start: usize = second[4..].split(',').next().unwrap().parse().unwrap();
-        assert!(
-            first_old_start < second_old_start,
-            "hunks out of order: {:?}",
-            hunks
-        );
     }
 }

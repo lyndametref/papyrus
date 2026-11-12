@@ -375,6 +375,13 @@ fn report_unrecognised_status(cfg: &Config, id: &str, status: &str) {
 fn milestone_release(ctx: &Context, cfg: &Config, milestone_id: &str) -> Option<String> {
     let path = crate::milestone::resolve_milestone_entry(ctx, cfg, milestone_id)?;
     let content = fs::read_to_string(&path).ok()?;
+    if let Ok(Some(fm)) = crate::record::frontmatter::parse(&content)
+        && crate::record::frontmatter::contains_key(&fm.raw, "release")
+    {
+        return crate::record::frontmatter::current_value_string(&fm.raw, "release")
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+    }
     let lines: Vec<&str> = content.lines().collect();
     let mut i = 0usize;
     while i < lines.len() {
@@ -396,12 +403,7 @@ fn milestone_release(ctx: &Context, cfg: &Config, milestone_id: &str) -> Option<
         }
         i += 1;
     }
-    crate::record::frontmatter::parse(&content)
-        .ok()
-        .flatten()
-        .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, "release"))
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
+    None
 }
 
 #[derive(Clone, Debug, Default)]
@@ -418,47 +420,83 @@ pub(crate) struct TaskData {
     pub(crate) comments: Vec<(String, String)>,
 }
 
+fn document_frontmatter_scalar(
+    doc: &crate::record::document::Document,
+    key: &str,
+) -> Option<String> {
+    let fm = doc.front_matter.as_ref()?;
+    if !crate::record::frontmatter::contains_key(&fm.raw, key) {
+        return None;
+    }
+    crate::record::frontmatter::current_value_string(&fm.raw, key)
+}
+
+fn document_frontmatter_list(
+    doc: &crate::record::document::Document,
+    key: &str,
+) -> Option<Vec<String>> {
+    let fm = doc.front_matter.as_ref()?;
+    if !crate::record::frontmatter::contains_key(&fm.raw, key) {
+        return None;
+    }
+    let mut out = Vec::new();
+    if let Some(yaml_serde::Value::Sequence(seq)) =
+        fm.data.get(yaml_serde::Value::String(key.to_string()))
+    {
+        for value in seq {
+            if let yaml_serde::Value::String(s) = value {
+                out.push(s.clone());
+            }
+        }
+    }
+    Some(out)
+}
+
+fn section_list_values(doc: &crate::record::document::Document, name: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for line in crate::record::document::section_lines(doc, name) {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let item = trimmed
+            .strip_prefix("- ")
+            .unwrap_or(trimmed)
+            .trim()
+            .to_string();
+        if !item.is_empty() {
+            out.push(item);
+        }
+    }
+    out
+}
+
 pub(crate) fn task_from_document(doc: &crate::record::document::Document) -> TaskData {
     let (id, title) = crate::record::document::heading_id_title_with_frontmatter(doc);
     let desc = crate::record::document::section_text(doc, "Description");
-    let status = crate::record::document::section_text(doc, "Status")
-        .unwrap_or_default()
+    let status = document_frontmatter_scalar(doc, "status")
+        .unwrap_or_else(|| crate::record::document::section_text(doc, "Status").unwrap_or_default())
         .trim()
         .to_string();
-    let milestone =
-        crate::record::document::section_text(doc, "Milestone").map(|s| s.trim().to_string());
-    let assignee =
-        crate::record::document::section_text(doc, "Assignee").map(|s| s.trim().to_string());
-    let mut labels = Vec::new();
-    for line in crate::record::document::section_lines(doc, "Labels") {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
+    let milestone = match document_frontmatter_scalar(doc, "milestone") {
+        Some(value) => {
+            let value = value.trim().to_string();
+            (!value.is_empty()).then_some(value)
         }
-        let item = trimmed
-            .strip_prefix("- ")
-            .unwrap_or(trimmed)
-            .trim()
-            .to_string();
-        if !item.is_empty() {
-            labels.push(item);
+        None => {
+            crate::record::document::section_text(doc, "Milestone").map(|s| s.trim().to_string())
         }
-    }
-    let mut deps = Vec::new();
-    for line in crate::record::document::section_lines(doc, "Dependencies") {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
+    };
+    let assignee = match document_frontmatter_list(doc, "assignee") {
+        Some(items) => items.first().cloned(),
+        None => {
+            crate::record::document::section_text(doc, "Assignee").map(|s| s.trim().to_string())
         }
-        let item = trimmed
-            .strip_prefix("- ")
-            .unwrap_or(trimmed)
-            .trim()
-            .to_string();
-        if !item.is_empty() {
-            deps.push(item);
-        }
-    }
+    };
+    let labels = document_frontmatter_list(doc, "labels")
+        .unwrap_or_else(|| section_list_values(doc, "Labels"));
+    let deps = document_frontmatter_list(doc, "dependencies")
+        .unwrap_or_else(|| section_list_values(doc, "Dependencies"));
     let mut acs = Vec::new();
     for line in crate::record::document::section_lines(doc, "Acceptance Criteria") {
         let trimmed = line.trim();
@@ -524,58 +562,6 @@ fn body_document(td: &TaskData) -> crate::record::document::Document {
             body: vec![d.clone(), String::new()],
         });
     }
-    sections.push(crate::record::document::Section {
-        heading: "## Status".to_string(),
-        body: vec![td.status.clone(), String::new()],
-    });
-    if let Some(m) = &td.milestone
-        && !m.trim().is_empty()
-    {
-        sections.push(crate::record::document::Section {
-            heading: "## Milestone".to_string(),
-            body: vec![m.clone(), String::new()],
-        });
-    }
-    if let Some(a) = &td.assignee
-        && !a.trim().is_empty()
-    {
-        sections.push(crate::record::document::Section {
-            heading: "## Assignee".to_string(),
-            body: vec![a.clone(), String::new()],
-        });
-    }
-    if !td.labels.is_empty() {
-        sections.push(crate::record::document::Section {
-            heading: "## Labels".to_string(),
-            body: td
-                .labels
-                .iter()
-                .map(|l| format!("- {l}"))
-                .collect::<Vec<_>>()
-                .join("\n")
-                .split('\n')
-                .map(|s| s.to_string())
-                .collect::<Vec<_>>(),
-        });
-        let last = sections.last_mut().unwrap();
-        last.body.push(String::new());
-    }
-    if !td.deps.is_empty() {
-        sections.push(crate::record::document::Section {
-            heading: "## Dependencies".to_string(),
-            body: td
-                .deps
-                .iter()
-                .map(|d| format!("- {d}"))
-                .collect::<Vec<_>>()
-                .join("\n")
-                .split('\n')
-                .map(|s| s.to_string())
-                .collect::<Vec<_>>(),
-        });
-        let last = sections.last_mut().unwrap();
-        last.body.push(String::new());
-    }
     if !td.acs.is_empty() {
         sections.push(crate::record::document::Section {
             heading: "## Acceptance Criteria".to_string(),
@@ -610,7 +596,7 @@ fn body_document(td: &TaskData) -> crate::record::document::Document {
         source: String::new(),
         front_matter: None,
         frontmatter: None,
-        heading: Some(format!("# {} {}", td.id, td.title)),
+        heading: None,
         preamble: vec![String::new()],
         sections,
     }
@@ -889,10 +875,6 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
     Ok(crate::CommandOutput { text, json })
 }
 
-fn has_doc_section(doc: &crate::record::document::Document, heading: &str) -> bool {
-    doc.sections.iter().any(|s| s.heading == heading)
-}
-
 fn frontmatter_scalar(content: &str, key: &str) -> Option<String> {
     crate::record::frontmatter::parse(content)
         .ok()
@@ -1099,8 +1081,11 @@ pub fn edit(
         td.assignee = cleaned.first().cloned();
     }
 
-    // Build patch ops.
-    let mut ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    // Build patch ops. Legacy metadata sections and the title heading are
+    // retired on every write; user operations are applied afterwards so an
+    // explicit set or clear always wins.
+    let mut ops: Vec<crate::record::patch::PatchOp> =
+        crate::record::migrate::retire_legacy_body_ops(&doc, desc, &path);
 
     if let Some(t) = title_raw {
         let tv = sanitize_text(t)?;
@@ -1109,7 +1094,6 @@ pub fn edit(
             "title".into(),
             tv.clone(),
         ));
-        ops.push(crate::record::patch::PatchOp::SetHeadingTitle(tv));
     }
     if let Some(d) = desc_raw {
         let dv = sanitize::sanitize_path_string(d)
@@ -1136,14 +1120,8 @@ pub fn edit(
         td.status = st.clone();
         ops.push(crate::record::patch::PatchOp::SetFrontMatter(
             "status".into(),
-            st.clone(),
+            st,
         ));
-        if has_doc_section(&doc, "## Status") {
-            ops.push(crate::record::patch::PatchOp::SetSection(
-                "## Status".into(),
-                st,
-            ));
-        }
     }
     if let Some(m) = milestone_raw {
         let mid = sanitize_text(m)?;
@@ -1153,14 +1131,8 @@ pub fn edit(
         td.milestone = Some(mid.clone());
         ops.push(crate::record::patch::PatchOp::SetFrontMatter(
             "milestone".into(),
-            mid.clone(),
+            mid,
         ));
-        if has_doc_section(&doc, "## Milestone") {
-            ops.push(crate::record::patch::PatchOp::SetSection(
-                "## Milestone".into(),
-                mid,
-            ));
-        }
     }
     if let Some(no) = &no_milestone {
         match no {
@@ -1168,22 +1140,12 @@ pub fn edit(
                 ops.push(crate::record::patch::PatchOp::ClearFrontMatter(
                     "milestone".into(),
                 ));
-                if has_doc_section(&doc, "## Milestone") {
-                    ops.push(crate::record::patch::PatchOp::ClearSection(
-                        "## Milestone".into(),
-                    ));
-                }
             }
             None => {
                 td.milestone = None;
                 ops.push(crate::record::patch::PatchOp::ClearFrontMatter(
                     "milestone".into(),
                 ));
-                if has_doc_section(&doc, "## Milestone") {
-                    ops.push(crate::record::patch::PatchOp::ClearSection(
-                        "## Milestone".into(),
-                    ));
-                }
             }
         }
     }
@@ -1206,16 +1168,6 @@ pub fn edit(
             "dependencies".into(),
             new_deps.join("\n"),
         ));
-        if has_doc_section(&doc, "## Dependencies") {
-            ops.push(crate::record::patch::PatchOp::SetSection(
-                "## Dependencies".into(),
-                td.deps
-                    .iter()
-                    .map(|d| format!("- {}", d))
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-            ));
-        }
     }
     if !ac_raw.is_empty() {
         let mut items = ac_items_from_document(&doc);
@@ -1259,16 +1211,6 @@ pub fn edit(
             "labels".into(),
             fm_labels.join("\n"),
         ));
-        if has_doc_section(&doc, "## Labels") {
-            ops.push(crate::record::patch::PatchOp::SetSection(
-                "## Labels".into(),
-                td.labels
-                    .iter()
-                    .map(|l| format!("- {}", l))
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-            ));
-        }
     }
     // references append
     if !references_raw.is_empty() {
@@ -1333,14 +1275,6 @@ pub fn edit(
             "assignee".into(),
             cleaned.join("\n"),
         ));
-        if has_doc_section(&doc, "## Assignee")
-            && let Some(a) = &td.assignee
-        {
-            ops.push(crate::record::patch::PatchOp::SetSection(
-                "## Assignee".into(),
-                a.clone(),
-            ));
-        }
     }
     if !comments_raw.is_empty() {
         let author = match comment_author_raw {
@@ -1742,6 +1676,25 @@ fn move_record(
     fs::rename(&source_safe, &destination_safe).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
+/// Retire legacy metadata sections and refresh `updated_date` before a
+/// lifecycle write (archive/restore). The file is written once.
+fn retire_and_touch(ctx: &Context, path: &std::path::Path) -> Result<(), AppError> {
+    let content = fs::read_to_string(path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let doc = crate::record::document::parse(&content)?;
+    let desc = crate::record::descriptor::descriptor_for("task")
+        .ok_or_else(|| AppError::Runtime("task descriptor is unavailable".to_string()))?;
+    let mut ops = crate::record::migrate::retire_legacy_body_ops(&doc, desc, path);
+    ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+        "updated_date".into(),
+        crate::record::frontmatter::utc_now(),
+    ));
+    let new_content = crate::record::patch::apply_patch(&doc, &ops)?;
+    if new_content != content {
+        crate::record::store::write_atomic(ctx, path, &new_content)?;
+    }
+    Ok(())
+}
+
 pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
@@ -1754,6 +1707,7 @@ pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
     }
     reject_task_write_conflict(ctx, &path)?;
     let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
+    retire_and_touch(ctx, &path)?;
     let archive = archive_dir(ctx, &cfg)?;
     ensure_dir(&archive, &ctx.project_dir)?;
 
@@ -1783,6 +1737,7 @@ pub fn restore(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
     let path = resolve_task_path(ctx, &cfg, &id)?;
     reject_task_write_conflict(ctx, &path)?;
     let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
+    retire_and_touch(ctx, &path)?;
     let active = active_dir(ctx, &cfg)?;
     ensure_dir(&active, &ctx.project_dir)?;
 
@@ -1914,6 +1869,83 @@ mod tests {
     }
 
     #[test]
+    fn create_writes_front_matter_only_with_canonical_key_order() {
+        let dir = tmpdir("create-layout");
+        let c = ctx(&dir);
+        let id = create(
+            &c,
+            "New Task",
+            Some("Desc"),
+            &["first ac".to_string()],
+            &[],
+            None,
+            &["bug".to_string()],
+            &["docs/spec.md".to_string()],
+            &["doc-1".to_string()],
+            Some("chore"),
+            None,
+            &["alice".to_string(), "bob".to_string()],
+        )
+        .unwrap();
+        assert_eq!(id, "TASK-001");
+        let content = fs::read_to_string(dir.join("backlog/tasks/TASK-001.md")).unwrap();
+        assert!(content.starts_with("---\n"), "{}", content);
+        assert!(
+            !content.lines().any(|line| line.starts_with("# ")),
+            "new tasks must not have a title heading: {}",
+            content
+        );
+        for retired in [
+            "## Status",
+            "## Assignee",
+            "## Milestone",
+            "## Labels",
+            "## Dependencies",
+        ] {
+            assert!(
+                !content.contains(retired),
+                "retired {} in {}",
+                retired,
+                content
+            );
+        }
+        assert!(
+            content.contains("assignee:\n  - alice\n  - bob"),
+            "assignee must be a YAML list: {}",
+            content
+        );
+        let order = [
+            "id:",
+            "title:",
+            "created_date:",
+            "updated_date:",
+            "labels:",
+            "references:",
+            "status:",
+            "assignee:",
+            "milestone:",
+            "dependencies:",
+            "ordinal:",
+            "documentation:",
+            "type:",
+        ];
+        let mut last = 0usize;
+        for key in order {
+            let position = content
+                .find(key)
+                .unwrap_or_else(|| panic!("missing {key}: {content}"));
+            assert!(position >= last, "key {key} out of order: {content}");
+            last = position;
+        }
+        assert!(content.contains("## Description\nDesc"), "{}", content);
+        assert!(
+            content.contains("## Acceptance Criteria\n- [ ] first ac"),
+            "{}",
+            content
+        );
+    }
+
+    #[test]
     fn view_succeeds_via_canonical_frontmatter_id_on_mismatch() {
         let dir = tmpdir("mismatch-canonical-view");
         let c = ctx(&dir);
@@ -1988,7 +2020,7 @@ mod tests {
     }
 
     #[test]
-    fn backlog_md_dropped_keys_are_readded_on_view() {
+    fn partial_front_matter_is_not_completed_on_view() {
         let dir = tmpdir("interop-readd");
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
@@ -2000,36 +2032,8 @@ mod tests {
         let path = dir.join("backlog/tasks/TASK-006.md");
         fs::write(&path, &content).unwrap();
         let out = view(&c, "TASK-006").unwrap();
-        for key in [
-            "created_date:",
-            "updated_date:",
-            "labels:",
-            "references:",
-            "assignee:",
-            "milestone:",
-            "dependencies:",
-            "ordinal:",
-            "documentation:",
-            "type:",
-        ] {
-            assert!(
-                out.text.contains(key),
-                "missing {} after re-add: {}",
-                key,
-                out.text
-            );
-        }
-        let (_, out_body) = crate::record::frontmatter::split(&out.text).unwrap();
-        assert_eq!(out_body, body, "body changed: {:?} vs {:?}", out_body, body);
-        let on_disk = fs::read_to_string(&path).unwrap();
-        for key in ["ordinal:", "documentation:", "type:"] {
-            assert!(
-                on_disk.contains(key),
-                "missing {} on disk: {}",
-                key,
-                on_disk
-            );
-        }
+        assert_eq!(out.text, content, "view must not complete missing keys");
+        assert_eq!(fs::read_to_string(&path).unwrap(), content);
     }
 
     #[test]
@@ -2140,11 +2144,23 @@ mod tests {
 
         archive(&c, "TASK-001").unwrap();
         assert!(!dir.join("backlog/tasks/TASK-001.md").exists());
+        let archived_path = dir.join("backlog/archive/tasks/TASK-001.md");
         assert!(
-            dir.join("backlog/archive/tasks/TASK-001.md").exists(),
+            archived_path.exists(),
             "archive must use the canonical archive directory"
         );
         assert!(!dir.join("backlog/tasks/archived/TASK-001.md").exists());
+        let archived = fs::read_to_string(&archived_path).unwrap();
+        assert!(
+            !archived.contains("updated_date: '2026-01-01T00:00:00Z'"),
+            "archive must refresh updated_date: {}",
+            archived
+        );
+        assert!(
+            archived.contains("created_date: '2026-01-01T00:00:00Z'"),
+            "archive must not change created_date: {}",
+            archived
+        );
 
         restore(&c, "TASK-001").unwrap();
         assert!(dir.join("backlog/tasks/TASK-001.md").exists());
@@ -2152,7 +2168,7 @@ mod tests {
     }
 
     #[test]
-    fn restore_from_legacy_alias_moves_to_active_unchanged() {
+    fn restore_from_legacy_alias_moves_and_refreshes_updated_date() {
         let dir = tmpdir("legacy-alias-restore");
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/tasks/archived")).unwrap();
@@ -2166,7 +2182,31 @@ mod tests {
             restored.exists(),
             "restore must move to the active directory"
         );
-        assert_eq!(fs::read_to_string(&restored).unwrap(), content);
+        let after = fs::read_to_string(&restored).unwrap();
+        let (original_fm, original_body) = crate::record::frontmatter::split(&content).unwrap();
+        let (after_fm, after_body) = crate::record::frontmatter::split(&after).unwrap();
+        assert_eq!(after_body, original_body, "restore must not touch the body");
+        let original_fm = original_fm.unwrap();
+        let after_fm = after_fm.unwrap();
+        assert!(
+            after_fm
+                .raw
+                .contains("created_date: '2026-01-01T00:00:00Z'"),
+            "{}",
+            after_fm.raw
+        );
+        assert!(
+            !after_fm
+                .raw
+                .contains("updated_date: '2026-01-01T00:00:00Z'"),
+            "updated_date must be refreshed: {}",
+            after_fm.raw
+        );
+        assert!(
+            original_fm
+                .raw
+                .contains("updated_date: '2026-01-01T00:00:00Z'")
+        );
     }
 
     #[test]
