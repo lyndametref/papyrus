@@ -48,6 +48,7 @@ Add a read-only page to the offline, project-local web interface that lists the 
 1. The sidebar lists entries in this order: Business requirements, Business rules, Audit records, Technical specifications, Non-functional requirements, Backlog, Decisions, Glossary, UI specifications, UI mockups, Managed artifacts & lifecycles, Agent skills & workflows. Entries gated by `document_types` keep their existing gating; `Managed artifacts & lifecycles` and `Agent skills & workflows` are always present.
 2. At 320 CSS pixels the sidebar collapses behind the existing accessible toggle, matching the baseline.
 3. The page works with JavaScript disabled; the Copy affordance (section 6) is progressive enhancement only.
+4. The shared header branding follows section 4a of `docs/specifications/browser-requirements.md`: the project name renders large and bold, the "Papyrus" mention renders in smaller letters, and the "P" mark keeps its current size and styling. This specification references that rule rather than restating it.
 
 ### 3. Configuration in effect block
 
@@ -171,7 +172,7 @@ Each group contains the skill articles listed below. Each article is an element 
 
 ## Related artifacts
 
-- Requirement: `docs/requirements/business/REQ-06.005.md` (primary); `docs/requirements/business/REQ-06.002.md`; `docs/requirements/business/REQ-06.003.md`; `docs/requirements/non-functional/NFR-01.002.md`; `docs/requirements/non-functional/NFR-01.003.md`
+- Requirement: `docs/requirements/business/REQ-06.005.md` (primary); `docs/requirements/business/REQ-06.002.md`; `docs/requirements/business/REQ-06.003.md`; `docs/requirements/business/REQ-06.006.md`; `docs/requirements/business/REQ-06.007.md`; `docs/requirements/business/REQ-06.008.md`; `docs/requirements/business/REQ-06.009.md`; `docs/requirements/business/REQ-06.010.md`; `docs/requirements/business/REQ-06.011.md`; `docs/requirements/business/REQ-06.012.md`; `docs/requirements/non-functional/NFR-01.002.md`; `docs/requirements/non-functional/NFR-01.003.md`
 - Business rule: `docs/business-rules/BR-016-configuration-keys-and-precedence.md`
 - UI description: `docs/specifications/ui/browser-agent-skills-ui.md`
 - UI mockup: `docs/specifications/ui/mockups/MOCK-0011-browser-agent-skills-review.html` (approved)
@@ -179,5 +180,6 @@ Each group contains the skill articles listed below. Each article is an element 
 - Sibling lifecycle spec: `docs/specifications/browser-managed-artifacts-and-lifecycles.md`
 - Milestone: `m-12`
 - Dependency: TASK-76 (Done)
-- Related: TASK-19, TASK-20 (depend on this ticket)
+- Related: TASK-19, TASK-20 (depend on this ticket), TASK-86
+- ADR: ADR-0010, ADR-0012, ADR-0013
 path: /home/lyly/Documents/Dev/papyrus/docs/specifications/browser-agent-skills-and-workflows.md

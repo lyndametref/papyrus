@@ -24,6 +24,10 @@ In scope: sidebar entry?type=ui-spec, list/view/edit, JSON API, validation, atom
 7. Persistence: heading `# <ID> <title>`, sections `## View`, `## Description`, unknown sections preserved, atomic, save-then-reread.
 8. JSON API: `GET /api/ui-specs` (aliases /api/ui-specifications, /api/ui-spec) array {id,title}; `GET/POST /api/doc/{id}` full {id,kind:ui-spec,form:ui-spec,title,view,description,version,path}.
 
+## Shared layout and references (TASK-86)
+
+Record views in this specification follow the shared single record view layout defined in section 4c of `docs/specifications/browser-requirements.md` (summary card with ID, created date, updated date; labels as a taglist under the title; dependencies and references at the end as native disclosure sections), in addition to the type-specific fields above. Record references that resolve to Papyrus records follow the shared reference-link rule defined in section 4b of `docs/specifications/browser-requirements.md`.
+
 ## Investigation notes (AC #3)
 
 - Storage: active in `<doc_directory>/<document_types.ui-spec.directory>/` default `docs/specifications/ui/`.

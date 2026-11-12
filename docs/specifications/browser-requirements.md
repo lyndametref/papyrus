@@ -40,7 +40,7 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 
 ### 1. Command shape and option resolution
 
-1. The command is exactly `papyrus browser [--host <host>] [--port <port>] [--no-open]`. It has no positional arguments and no subcommands.
+1. The command is exactly `papyrus browser [--host <host>] [--port <port>] [--no-open] [--debug]`. It has no positional arguments and no subcommands. `--debug` is an option of the `browser` command only; it is not a global option and is not accepted by any other command.
 2. `--host <host>` takes one value. `--port <port>` takes one value. `--no-open` is a boolean flag with no value.
 3. Supplying an unknown option, an extra positional argument, or a flag without its required value is a usage error (exit 2).
 4. `--port` must be an integer in `1..=65535`. Non-numeric, negative, zero, and out-of-range values are usage errors (exit 2).
@@ -56,7 +56,7 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 10. Host validation (applies to the resolved value from any source): at most 255 bytes; no leading or trailing whitespace; no whitespace, NUL, other control characters, `/`, `\`, `@`, `?`, `#`, `,`, or `%`; must parse as `std::net::IpAddr` or match `^[A-Za-z0-9]([A-Za-z0-9.-]{0,253})$` and not end with `.` or `-`.
 11. A resolved host that is not a loopback address prints a warning to standard error before binding: `warning: binding to non-loopback address <host>; the interface is reachable from the network`. Loopback means an IPv4 address in `127.0.0.0/8`, the IPv6 address `::1`, or the literal host name `localhost` (case-insensitive). Host names other than `localhost` are never treated as loopback, and are never resolved for the purpose of the warning.
 12. A non-loopback host is allowed, not rejected (REQ-06.002, BR-004).
-13. Global options (`--json`, `--dir`, `--config`, `--no-color`) behave as for the existing commands. `--dir` and `--config` select the project directory and configuration file before the server starts; the project directory is canonicalized and every served path is checked against it (NFR-04.002).
+13. Global options (`--json`, `--dir`, `--config`, `--no-color`) behave as for the existing commands. `--dir` and `--config` select the project directory and configuration file before the server starts; the project directory is canonicalized and every served path is checked against it (NFR-04.002). `--debug` is not a global option: it is accepted only by the `browser` command.
 14. The command never writes to the configuration file.
 
 ### 2. Startup, opening, and lifecycle
@@ -74,7 +74,7 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 9. After startup the process serves requests until it is interrupted (SIGINT/SIGTERM) or a fatal listener error occurs. There is no graceful-shutdown protocol, no `--daemon`, no PID file, and no automatic exit after inactivity.
 10. A fatal accept-loop error (for example the listener becomes unusable) exits 1 with a runtime message.
 11. Standard output carries only the single startup line; per-request diagnostics go to standard error. Warnings are plain `warning: ...` lines on standard error in both text and `--json` modes, because they are diagnostics and not command output.
-12. Per-request logging is one line per request on standard error: `<METHOD> <path-without-query> <status>`. Logged paths are the decoded request path, truncated to 200 characters; request bodies, form values, and query strings are never logged. For the over-capacity rejection in section 3.2 the request is never read, so both the method and the path are logged as `-`, giving the line `- - 503`.
+12. By default the browser command outputs only errors to the console. Per-request logging is disabled unless `--debug` is set. With `--debug`, each received request is logged as exactly one line on standard error containing the method, the path (without query, decoded, truncated to 200 characters), the response status, and the duration. Request headers and bodies are never logged. Errors are output whether or not `--debug` is set. For the over-capacity rejection in section 3.2 the request is never read, so with `--debug` the method and path are logged as `-`, giving the line `- - 503`.
 
 ### 3. HTTP server behavior
 
@@ -129,7 +129,9 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 7. The sidebar selects exactly one document category at a time. The list page renders only the selected category; the other category is not rendered at all (not as an empty section, and not as a second section). The two document types are separate categories, not a filter over one combined list.
 8. The default category is business requirements: `GET /` and `GET /?type=req` render the same page.
 9. The selected category renders one section (`h2`) titled with the category name, showing the category's group count and requirement count. Each group is a row containing the group ID and title as one link to the group record, the group's member count, and its member requirements as nested links in ascending ID order; the group row links and the member links use link text "ID + title".
-10. A requirement whose `## Group` reference does not match an active group of the same type, and a requirement with no `## Group` section, is listed in a trailing "Other requirements" subsection (`h3`) of its category, with the group reference shown as text: an unresolved reference as `Group: REQ-99 (not found)`, and a missing reference as `Group: (none)`.
+10. For business requirements, a requirement whose `## Group` reference does not match an active group of the same type, and a requirement with no `## Group` section, is listed in a trailing "Other requirements" subsection (`h3`) of its category, with the group reference shown as text: an unresolved reference as `Group: REQ-99 (not found)`, and a missing reference as `Group: (none)`.
+
+10a. **Non-functional requirement grouping.** Non-functional atomic requirements are listed under their owning group entry, matching the grouping used for business requirements. There is no trailing "Other requirements" subsection and no catch-all section for the non-functional category. The owning group is derived in the browser from the requirement ID prefix: `REQ-XX.YYY` -> `REQ-XX`, `NFR-XX.YYY` -> `NFR-XX`. No `Group` field is added to non-functional atomic requirement files and the requirement file format is unchanged. A group heading shows the group record's title (for example `NFR-04 Persistence`); when the group record is missing, the group number is used (`NFR-04`). A group with no atomic requirements still renders as an entry with no children (an explicit empty state and a member count of "No requirements"). Every atomic requirement appears under exactly one group; none is dropped. The JSON index (`/api/requirements`, `type=nfr`) is ordered by group and then by requirement ID, consistent with the list page, and carries the resolved group title or `null` when the group record is missing (falling back to the group number in the rendered HTML).
 11. A group with no member requirements shows an explicit empty state in its row (for example "No requirements in this group") and a member count of "No requirements".
 12. The category selection is a query parameter on the list page: `type=req` (default) or `type=nfr`. `GET /` and `?type=req` select business requirements, `?type=nfr` selects non-functional requirements. There is no combined "all" view: any other value, including `all`, is `400`.
 13. Viewing a requirement shows: ID (read-only), record form (group or requirement), document type (business or non-functional), title, owning group ID and title (as a link to the group record when the group is active), user story for business-requirement records only, and description.
@@ -147,6 +149,44 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 21. No create, deprecate, restore, delete, move, or rename operation is offered. There is no "new record" control, and no control performs any of those actions.
 22. The interface is fully usable without internet access: every asset is served by the same process, and no page references an external origin (NFR-01.003).
 23. The edit form carries the optimistic-concurrency token in a hidden `version` input (section 7.12). The approved mockup (MOCK-0001) draws this as a visible, non-interactive dashed annotation on the edit form; the shipped wording is `Hidden field: version (optimistic-concurrency token)`. The annotation is static status text, not a form control: it is not focusable, never contains the token value, is never submitted, and its wording is fixed.
+
+### 4a. Shared header branding
+
+1. On every browser page, the project name renders large and bold.
+2. The "Papyrus" mention renders in smaller letters.
+3. The "P" mark keeps its current size and styling.
+4. The project name shown is the configured project name (REQ-01.002).
+5. The rule applies to the shared header of every page.
+6. Every per-type browser specification that describes the shared shell references this rule rather than restating it.
+
+### 4b. Record references as links
+
+1. Every rendered record reference that resolves to a Papyrus record is a hyperlink: task dependencies, a task's milestone, `references` values, and a sub-requirement's owning group.
+2. Activating a link navigates to the referenced record's view; the browser back button returns to the originating page.
+3. A reference that does not resolve to an existing record is rendered as plain text and raises no error.
+4. Links are generated in the page and work offline (NFR-01.003).
+5. Unresolved references are not styled as errors and do not produce 404 responses.
+
+### 4c. Single record view layout
+
+1. A summary card at the beginning of the view shows only the record ID, the created date, and the updated date.
+2. A sub-requirement additionally shows its owning group in the summary card, and nothing else is added to the card.
+3. Dependencies and references appear at the end of the view as collapsible sections, each shown only when the record has at least one such value.
+4. Collapsible sections use native HTML disclosure elements and work with JavaScript disabled (NFR-05.001).
+5. Labels are shown as a taglist under the title.
+6. The layout applies to every managed Markdown record type that has a single record view. UI mockup HTML views are excluded.
+7. The summary card does not show status, milestone, assignee, labels, or references; those remain in their existing locations outside the card, except labels which move to the taglist under the title.
+
+### 4d. Configuration view
+
+1. The browser serves a configuration view for the current project.
+2. Editing uses `papyrus config get/set`, so folder changes are relocated by the single relocation routine (REQ-01.002, ADR-0010 decision 8). The browser never moves a folder itself.
+3. No path outside the project directory can be defined; every path passes `Context::ensure_within`.
+4. The view shows effective configuration values, including values that come from built-in defaults, and marks which keys are explicitly set in `papyrus.config.yml`.
+5. Editable keys are exactly the keys `papyrus config set` accepts. The view applies the same keys, validation, and precedence as the CLI and cannot persist a key or value the CLI would reject (REQ-01.003).
+6. No configuration key is treated as secret in the current configuration, and the view never reads or displays environment-variable values as editable configuration.
+7. The view links to the lifecycle page for per-artifact read-only configuration and does not duplicate editing there.
+8. The route, sidebar entry, and form encoding are design decisions recorded here (recommended default: `/config`, with `/?type=config` as an alias; subject to TASK-87 approval). The recommended sidebar entry is labelled `Configuration` and is placed after the document types, consistent with the lifecycle and skills pages (OQ-1).
 
 ### 5. HTTP endpoints
 
@@ -330,7 +370,7 @@ Routes are exact. `{id}` is a record ID as defined in section 7.1.
 | `PAPYRUS_BROWSER_HOST` / `PAPYRUS_BROWSER_PORT` / `PAPYRUS_BROWSER_OPEN` | Environment tier of the precedence chain (OQ-1). |
 | `browser_host` / `browser_port` / `browser_open` | Configuration keys, defaults `127.0.0.1` / `6420` / `true`. |
 | Startup output | One line on stdout: `Serving http://<host>:<port>/` or the JSON object in section 2.4. |
-| Diagnostics | `warning: ...` lines and one request log line per request on stderr. |
+| Diagnostics | `warning: ...` lines; with `--debug`, one request log line per request on stderr (method, path, status, duration); errors always. |
 | HTTP responses | HTML pages, JSON documents, CSS, JS, and error pages per sections 3 and 5. |
 | Files written | Only record `.md` files inside the configured active type directories, written atomically. |
 | Exit status | `0` only if the server ends normally (not expected), `1` runtime/bind failure, `2` usage, `4` validation. `3` is never used. |
@@ -516,11 +556,11 @@ Each item has a specified default in this document, so none blocks implementatio
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06, REQ-06.002, REQ-05.001, REQ-05.002, REQ-05.007, REQ-01.003 |
-| Non-functional | NFR-01.002, NFR-01.003, NFR-02.001, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001 |
+| Requirement | REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012, REQ-05.001, REQ-05.002, REQ-05.007, REQ-01.002, REQ-01.003, REQ-01.005 |
+| Non-functional | NFR-01.002, NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001 |
 | Business rule | BR-004 (browser command behavior), BR-016 (configuration keys and precedence) |
-| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky), ADR-0004 (repository-root single crate) |
-| Ticket | TASK-6 |
+| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky), ADR-0004 (repository-root single crate), ADR-0010, ADR-0012, ADR-0013 |
+| Ticket | TASK-6, TASK-86 |
 | Increment boundary | REQ-06.002 covers both stores; this increment serves the documentation store only. Backlog-store browsing (tasks, milestones, releases) is delivered by TASK-11 under REQ-06.002, so the increment is not a requirement gap. |
 | UI mockups | MOCK-0001 — approved 2026-11-03 (UTC): [`docs/specifications/ui/mockups/MOCK-0001-browser-requirements-review.html`](ui/mockups/MOCK-0001-browser-requirements-review.html) (single self-contained review package: landing, design deck, 25-view web prototype) |
 | UI description | [`docs/specifications/ui/browser-requirements-ui.md`](ui/browser-requirements-ui.md) |

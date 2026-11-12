@@ -80,6 +80,8 @@ Use cases, test cases, and test reports are Markdown text records with the fixed
 
 ### 5. Record view
 
+Record views in this specification follow the shared single record view layout defined in section 4c of `docs/specifications/browser-requirements.md` (summary card with ID, created date, updated date; labels as a taglist under the title; dependencies and references at the end as native disclosure sections), in addition to the type-specific fields below. Record references that resolve to Papyrus records follow the shared reference-link rule defined in section 4b of `docs/specifications/browser-requirements.md`.
+
 1. The view page shows:
    - metadata block: Record ID (read-only, monospace), Title, Created date, Updated date, Labels, References (front-matter projection);
    - the title as the page title (`h1`);
@@ -301,11 +303,11 @@ UI mockups are required before any UI implementation work and must be approved b
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-05, REQ-05.007, REQ-05.010, REQ-05.012, REQ-05.013, REQ-05.014, REQ-06, REQ-06.002, REQ-06.004 |
+| Requirement | REQ-05, REQ-05.007, REQ-05.010, REQ-05.012, REQ-05.013, REQ-05.014, REQ-06, REQ-06.002, REQ-06.003, REQ-06.004, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012 |
 | Non-functional | NFR-01.002, NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001 |
 | Business rule | BR-004 (browser command behavior), BR-016 (configuration keys and precedence), BR-018 (use-case document type), BR-019 (test-case document type), BR-020 (test-report document type) |
-| ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0009 |
-| Ticket | TASK-6 (baseline), TASK-11, TASK-15, TASK-23, TASK-24, TASK-25, TASK-26, TASK-40, TASK-57, TASK-58, TASK-66, TASK-67, TASK-72, TASK-78, TASK-79, TASK-81 |
+| ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0009, ADR-0010, ADR-0012, ADR-0013 |
+| Ticket | TASK-6 (baseline), TASK-11, TASK-15, TASK-23, TASK-24, TASK-25, TASK-26, TASK-40, TASK-57, TASK-58, TASK-66, TASK-67, TASK-72, TASK-78, TASK-79, TASK-81, TASK-86 |
 | UI mockups | MOCK-0001…MOCK-0012 (approved baseline); MOCK-0013 (approved) — `docs/specifications/ui/mockups/MOCK-0013-browser-use-cases-test-cases-and-test-reports-review.html` |
 | UI description | `docs/specifications/ui/browser-use-cases-test-cases-and-test-reports-ui.md` (TASK-79) |
 | Related specification | `docs/specifications/browser-requirements.md` (TASK-6 baseline), `docs/specifications/use-cases-test-cases-and-test-reports-management.md` (TASK-78 record model and lifecycle), `docs/specifications/search-use-cases-test-cases-and-test-reports.md` (TASK-80), `docs/specifications/browser-technical-specifications.md` (TASK-57 sibling increment), `docs/specifications/browser-audit-records.md` (TASK-26 sibling increment), `docs/specifications/browser-business-rules.md` (TASK-25 sibling increment), `docs/specifications/render-one-metadata-projection-in-cli-and-browser-views.md` (TASK-67) |
