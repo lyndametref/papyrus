@@ -1,25 +1,27 @@
 # Feature Specification — Interactive Init Walkthrough for Artifact Activation
 
-**Ticket:** TASK-75
+**Ticket:** TASK-75 / TASK-85 (spec revision)
 **Milestone:** m-12 (Final Cross-Type Integration)
 **Status:** Refined (execution-ready)
 **UI mockups:** none
 
 ## Purpose
 
-Deliver the interactive walkthrough at `papyrus init <project_name>` required by REQ-01.006 (and REQ-01.001, REQ-01.002, REQ-01.007, BR-016): before writing `papyrus.config.yml`, present every available artifact, let the user choose which to activate, and prompt for the ID prefix and storage folder of each activated artifact. Non-interactive/CI environments (no TTY) use sensible defaults without prompting. The generated configuration validates successfully, including the `id_padding` range.
+Deliver the interactive walkthrough at `papyrus init <project_name>` required by REQ-01.006 (and REQ-01.001, REQ-01.002, REQ-01.007, BR-016): before writing `papyrus.config.yml`, present every available artifact in a single space-toggle list, let the user choose which to activate, and prompt for the ID prefix and storage folder of each activated artifact. Non-interactive/CI environments (no TTY) use sensible defaults without prompting. The generated configuration validates successfully, including the `id_padding` range.
+
+This specification was revised (TASK-85) so that the walkthrough matches REQ-01.006: a single space-toggle artifact list with task, milestone, and release always active; per-activated-artifact prefix/folder prompts; shared roots prompted once; defaults in brackets; validation hints naming the default equivalent; inactive types written with `enabled: false`; and TTY-only execution with no new flag or environment variable.
 
 ## Scope
 
 ### In scope
 
 - TTY detection and interactive vs. non-interactive execution paths in `init::run_init`.
-- Presentation and activation of all available artifacts:
-  - Core artifacts (always activated): task, milestone, release.
+- Presentation of all available artifacts as a single space-toggle list:
+  - Core artifacts (always active, shown as such): task, milestone, release.
   - Decision types: `adr`, `bdr`.
   - Document types: `req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `deploy`, `tech-spec`.
 - Per-activated-artifact ID prefix prompting with defaults and validation.
-- Storage folder prompting for shared roots and per-document-type directories.
+- Storage folder prompting for shared roots and per-document-type directories, for activated artifacts only.
 - Activation flags written as the existing `enabled` field for decision and document types (BR-016); inactive types are written with `enabled: false`.
 - Non-interactive/CI default behavior (all artifacts activated, default prefixes/folders, `id_padding` 3).
 - Preservation of `--force` and `--no-git` behavior (REQ-01.001).
@@ -39,54 +41,56 @@ Deliver the interactive walkthrough at `papyrus init <project_name>` required by
 
 ### 1. Mode selection
 
-1. Interactive mode runs only when `stdin` is a terminal (`std::io::IsTerminal`); otherwise the walkthrough is skipped and defaults are applied.
+1. Interactive mode runs only when standard input is a terminal (TTY); otherwise the walkthrough is skipped and defaults are applied. No new CLI flag or environment variable is required or introduced.
 2. In interactive mode, prompts are read line-by-line from `stdin`. An unexpected EOF on a prompt uses that prompt's default value and continues; the walkthrough never hangs.
 3. `--force` and `--no-git` behave exactly as documented (REQ-01.001) regardless of mode.
 
-### 2. Core artifacts (task, milestone, release)
+### 2. Artifact list presentation (single space-toggle list)
 
-1. Task, milestone, and release are always activated: the configuration schema has no `enabled` flag for them and their prefixes are required (BR-016).
-2. The walkthrough prompts for `task_prefix` (default `TASK`), `milestone_prefix` (default `MS`), and `release_prefix` (default `REL`), one per artifact, in that order.
-3. The shared `backlog_directory` (default `backlog/`) is prompted once because it stores task, milestone, and release records.
+1. The walkthrough presents all available artifacts in a single list. Decision types and document types can be toggled on/off with the space key.
+2. Task, milestone, and release are shown as always active because the configuration has no `enabled` flag for them (BR-016). They cannot be toggled off.
+3. The offered artifact set is task, milestone, release, the decision types (`adr`, `bdr`), and the document types defined in the configuration schema (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `deploy`, `tech-spec`), with the schema defaults as default selections.
+4. The schema defaults are the default selections (all activated).
 
-### 3. Decision types (`adr`, `bdr`)
+### 3. Shared roots and per-activated-artifact prompts
 
-1. For each decision type in key order, the walkthrough prints the artifact name and its default prefix, then prompts `Activate? [Y/n]` (default `Y`).
-2. An activated type is written with `enabled: true` and its prompted prefix; a deactivated type is written with `enabled: false` (prefix retained as configured/default).
-3. All decision types share `decision_directory` (default `decisions/`), prompted once if at least one decision type is activated; if none are activated, the default is still written.
+1. For each activated artifact, the walkthrough prompts for its ID prefix and storage folder before generating `papyrus.config.yml`. Details (prefix/folder) are prompted only for activated artifacts.
+2. The shared roots are prompted once:
+   - `backlog_directory` (default `backlog/`) is prompted once because it stores task, milestone, and release records.
+   - `decision_directory` (default `decisions/`) is prompted once if at least one decision type is activated; if none are activated, the default is still written.
+   - `doc_directory` (default `docs/`) is prompted once if at least one document type is activated; if none are activated, the default is still written.
+3. Core artifacts (task, milestone, release) are always activated; their prefixes (`task_prefix` default `TASK`, `milestone_prefix` default `MS`, `release_prefix` default `REL`) are prompted, and the shared `backlog_directory` is prompted once.
+4. For each activated decision type, its prefix is prompted; the shared `decision_directory` is prompted once (see above).
+5. For each activated document type, its prefix and its directory relative to `doc_directory` are prompted; the shared `doc_directory` is prompted once (see above).
+6. Inactive decision/document types are written with `enabled: false` (prefix retained as configured/default).
 
-### 4. Document types
+### 4. Prompt validation and re-prompting
 
-1. For each document type in key order, the walkthrough prints the artifact name, default prefix, and default directory, then prompts `Activate? [Y/n]` (default `Y`).
-2. An activated type is written with `enabled: true`, its prompted prefix, and its prompted directory (relative to `doc_directory`); a deactivated type is written with `enabled: false`.
-3. The documentation root `doc_directory` (default `docs/`) is prompted once if at least one document type is activated; if none are activated, the default is still written.
-4. Each activated document type additionally prompts for its directory relative to `doc_directory` (default as in `Config::default()`).
+1. Prompts show their default in brackets (for example `ID prefix [TASK]: `) and accept it with empty input.
+2. ID prefixes are validated: non-empty, no control characters, no path separators. An invalid prefix is rejected and re-prompted with a hint naming the default equivalent value (for example `invalid prefix; use TASK`).
+3. Storage folders are validated: non-empty, relative, free of traversal segments and backslashes. An invalid folder is rejected and re-prompted with a hint naming the default equivalent value (for example `invalid folder; use backlog/`).
+4. Activation prompts (where applicable) accept `y`, `yes`, `n`, `no`, or empty (default yes); any other value re-prompts.
 
-### 5. Prompt validation and re-prompting
-
-1. ID prefixes are validated with `sanitize::sanitize_name`: non-empty, no control characters, no path separators. An empty or invalid value re-prompts with a hint naming the default equivalent value (for example `invalid prefix; use TASK`).
-2. Storage folders are validated with `sanitize::sanitize_path_string`: non-empty, relative, no traversal segments, no backslashes. An invalid value re-prompts with a hint naming the default equivalent value (for example `invalid folder; use backlog/`).
-3. Activation prompts accept `y`, `yes`, `n`, `no`, or empty (default yes); any other value re-prompts.
-4. Prompts display the default in brackets, e.g. `ID prefix [TASK]: `.
-
-### 6. Configuration generation
+### 5. Configuration generation
 
 1. The walkthrough builds a `Config` with `project_name` set to the sanitized name and `id_padding` 3 (default), then applies the collected prefixes, folders, and `enabled` flags.
 2. Before writing, `Config::validate()` is called; a validation failure aborts `init` with exit code 4 and writes no configuration file.
-3. The YAML is serialized and written only if `papyrus.config.yml` does not already exist (existing files are never overwritten, including under `--force`).
+3. The YAML is serialized and written to `papyrus.config.yml`: if the file already exists and `--force` is absent, `init` fails with a conflict (exit code 4) and writes nothing; under `--force` the existing file is replaced in full, with no value from the previous file kept. `--force` never overwrites any other pre-existing file (REQ-01.001).
 
-### 7. Directory creation
+### 6. Directory creation
 
-1. Core directories are always created: configured `backlog_directory` with `tasks/`, `milestones/`, `releases/` subfolders; configured `decision_directory`; configured `doc_directory`.
-2. For decision types, `decision_directory` is created only if at least one decision type is activated.
-3. For document types, a type's directory (and its `deprecated/` subfolder) is created only if that type is activated.
+1. Core directories are always created: configured `backlog_directory` with `tasks/`, `milestones/`, `releases/` subfolders; configured `doc_directory`.
+2. The configured `decision_directory` is created only if at least one decision type is activated; if none are activated it is not created, but its configured (default) value is still written to `papyrus.config.yml`.
+3. For document types, a type's directory (relative to `doc_directory`) and its `deprecated/` subfolder are created only if that type is activated.
 4. Inactive artifacts' directories are not created by init.
 
-### 8. Non-interactive/CI defaults
+### 7. Non-interactive/CI defaults
 
-1. All artifacts are activated.
-2. All prefixes, folders, and `id_padding` use built-in defaults.
-3. No prompts are emitted and no `stdin` reads occur.
+1. Interactive mode runs only when standard input is a terminal (TTY); otherwise the walkthrough is skipped and defaults are written without prompting.
+2. All artifacts are activated.
+3. All prefixes, folders, and `id_padding` use built-in defaults.
+4. No prompts are emitted and no `stdin` reads occur.
+5. No new CLI flag or environment variable is required.
 
 ## Inputs and outputs
 
@@ -97,7 +101,7 @@ Deliver the interactive walkthrough at `papyrus init <project_name>` required by
 
 - Missing/invalid command usage → exit code 2.
 - Filesystem/IO failure or project-directory boundary violation → exit code 1.
-- Non-empty target directory without `--force` → exit code 4.
+- Existing `papyrus.config.yml` without `--force` → exit code 4.
 - Invalid project name (unnormalizable) → exit code 4.
 - Final configuration validation failure → exit code 4 (no file written).
 - Interactive invalid prefix/folder → re-prompt (not an abort).
@@ -111,6 +115,7 @@ Deliver the interactive walkthrough at `papyrus init <project_name>` required by
 - Assumption: Prompt text and ordering beyond the artifact key order are implementation-defined, but the artifact set and defaults follow `Config::default()`.
 - Assumption: No UI mockups are required (CLI-only ticket).
 - Assumption: README/manpage init section and BR-002 are updated to describe the walkthrough; BR-016 and the enabled-flag model are unchanged.
+- Assumption: The single space-toggle list presentation replaces the earlier per-artifact `Activate? [Y/n]` prompts (REQ-01.006).
 
 ## Open questions
 
@@ -122,8 +127,10 @@ Deliver the interactive walkthrough at `papyrus init <project_name>` required by
 
 | Artifact | Reference |
 |---|---|
-| Ticket | TASK-75 |
-| Requirements | REQ-01.006, REQ-01.001, REQ-01.002, REQ-01.007 |
+| Ticket | TASK-75, TASK-85 |
+| Requirements | REQ-01.006, REQ-01.001, REQ-01.002, REQ-01.003, REQ-01.007 |
 | Business rule | BR-016, BR-002 |
-| Related tickets | TASK-2 (config foundation), TASK-74 (id_padding constraint) |
+| ADR | ADR-0010 decision 8 (shared relocation routine), ADR-0013 stage 5 |
+| Related tickets | TASK-2 (config foundation), TASK-74 (id_padding constraint), TASK-85 (spec revision) |
 | UI mockups | none |
+path: docs/specifications/interactive-init-walkthrough-for-artifact-activation.md
