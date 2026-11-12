@@ -7,7 +7,7 @@
 
 ## Purpose
 
-Deliver ADR-0009 Stage 5: remove every legacy per-module record parser, renderer, and serializer and enforce the no-drift rule so that parsing, identity, and writing each have exactly one implementation under `src/record/`. This ticket implements REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.001, NFR-04.002, and NFR-04.003. It is a refactor with no intended change to command behavior, output, or exit codes; existing unit and integration tests keep their expected results. Native layout and one-way import verification — TASK-98.
+Deliver ADR-0013 Stage 7 (superseding ADR-0009): remove every legacy per-module record parser, renderer, and serializer and enforce the no-drift rule so that parsing, identity, and writing each have exactly one implementation under `src/record/`. This ticket implements REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.001, NFR-04.002, and NFR-04.004. It is a refactor with no intended change to command behavior, output, or exit codes; existing unit and integration tests keep their expected results. Native layout and one-way import verification — TASK-98.
 
 ## Scope
 
@@ -20,7 +20,7 @@ Deliver ADR-0009 Stage 5: remove every legacy per-module record parser, renderer
 - Remove the duplicate `src/record/descriptors.rs` module; `src/record/descriptor.rs` is the sole descriptor source.
 - Update search code to obtain record text and titles through the shared reader/envelope instead of module-local parsers.
 - Update the per-type search specifications under `docs/specifications/search-*.md` to state that matching runs over the whole persisted record text, including front matter, so metadata values are searchable.
-- Add no-drift checks to the test suite for the three ADR-0009 decision 7 conditions.
+- Add no-drift checks to the test suite for the three ADR-0013 decision 7 conditions.
 - Preserve all existing command behavior, JSON shapes, validation messages, and exit codes.
 
 ### Out of scope
@@ -48,7 +48,7 @@ Deliver ADR-0009 Stage 5: remove every legacy per-module record parser, renderer
 1. No managed Markdown record module keeps a `render_*` function that assembles a whole file.
 2. All field changes are expressed as `PatchOp` values applied through `record::patch::apply_patch`.
 3. Browser route handlers no longer call `records::apply_*_edit`; they construct the same patch operations (directly or through helpers located under `src/record/`) and persist with `record::store::write_atomic`.
-4. UI mockup HTML body rendering remains the only non-front-matter serializer exception because mockups are excluded from front matter by REQ-05.010 and ADR-0007 decision 11. It must not format or parse a `---` delimiter.
+4. UI mockup HTML body rendering remains the only non-front-matter serializer exception because mockups are excluded from front matter by REQ-05.010 and ADR-0012 decision 11. It must not format or parse a `---` delimiter.
 5. A write that changes no byte does not happen, so `updated_date` is not refreshed by a no-op.
 
 ### 3. Single owner of identity
@@ -123,8 +123,8 @@ The checks may be implemented as a test that shells out to `grep`/`rg` with docu
 | Artifact | Reference |
 |---|---|
 | Ticket | TASK-70 |
-| Requirements | REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.001, NFR-04.002, NFR-04.003 |
-| ADRs | ADR-0006, ADR-0007, ADR-0008, ADR-0009 |
+| Requirements | REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.001, NFR-04.002, NFR-04.004 |
+| ADRs | ADR-0006, ADR-0012, ADR-0013 |
 | Related tickets | TASK-63, TASK-64, TASK-65, TASK-66, TASK-67, TASK-68, TASK-69, TASK-71 |
 | Source | `src/audit.rs`, `src/decision.rs`, `src/glossary.rs`, `src/milestone.rs`, `src/release.rs`, `src/requirement.rs`, `src/rule.rs`, `src/task.rs`, `src/tech_spec.rs`, `src/ui_spec.rs`, `src/browser/records.rs`, `src/search.rs`, `src/record/*` |
 | Tests | `tests/*.rs`, `src/record/*` unit tests |

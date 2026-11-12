@@ -7,7 +7,7 @@
 
 ## Purpose
 
-Final integration increment of `papyrus search`: one query searches every documented record type that Papyrus manages, so that a contributor can find any project record without knowing which store or document family it lives in. The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, sanitization, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by every later search increment are reused unchanged; this increment adds no new `--type` value and no new option. It completes REQ-06.001 across all of REQ-05's document types plus REQ-02 (tasks), REQ-03 (milestones/releases), and REQ-04 (decisions), and advances BR-015. It also confirms that lazy front-matter migration (ADR-0007, ADR-0009) does not break or narrow search coverage.
+Final integration increment of `papyrus search`: one query searches every documented record type that Papyrus manages, so that a contributor can find any project record without knowing which store or document family it lives in. The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, sanitization, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by every later search increment are reused unchanged; this increment adds no new `--type` value and no new option. It completes REQ-06.001 across all of REQ-05's document types plus REQ-02 (tasks), REQ-03 (milestones/releases), and REQ-04 (decisions), and advances BR-015. It also confirms that lazy front-matter migration (ADR-0012, ADR-0013) does not break or narrow search coverage.
 
 ## Scope
 
@@ -70,7 +70,7 @@ Unchanged from `docs/specifications/search-requirements.md` sections 1 and 4 and
 7. An unreadable configured store directory is an IO error (exit 1). A record file that cannot be read as UTF-8 is skipped rather than aborting the search.
 8. A symbolic link that resolves outside the project directory is a boundary violation (exit 1) for every store, and the outside content is never read.
 9. Record ID is the file stem. Title is the text after the ID on the first heading line for Markdown records, or the text after the ID in the mockup's `<h1>` heading for HTML mockups; if that text is empty, the ID is used as the title. For task, milestone, and release records the front-matter `title` is the authoritative source when the body has no `#` heading, consistent with the task/milestone/release list commands.
-10. Lazy front-matter migration (ADR-0007, ADR-0009) may add a front-matter block to a record on first read. Search reads the file's persisted text after that read; a migration that cannot be applied safely leaves the file untouched and the record is still searched from its existing text. Search itself performs no writes.
+10. Lazy front-matter migration (ADR-0012, ADR-0013) may add a front-matter block to a record on first read. Search reads the file's persisted text after that read; a migration that cannot be applied safely leaves the file untouched and the record is still searched from its existing text. Search itself performs no writes.
 
 ### 3. Searchable text and matching
 
@@ -154,7 +154,7 @@ With `--json`, errors use the existing convention: a JSON object `{"error":{"cod
 
 ## Assumptions
 
-- Assumption: Rust 1.99.1 and the existing single-crate layout are retained (ADR-0001, ADR-0004). `search` is extended inside the existing crate; no new crate, application, technology stack, external interface, or dependency is introduced, so no new ADR or architecture contract is required for search behavior itself. Front-matter migration is governed by ADR-0007 and ADR-0009.
+- Assumption: Rust 1.99.1 and the existing single-crate layout are retained (ADR-0001, ADR-0004). `search` is extended inside the existing crate; no new crate, application, technology stack, external interface, or dependency is introduced, so no new ADR or architecture contract is required for search behavior itself. Front-matter migration is governed by ADR-0012 and ADR-0013.
 - Assumption: the man page (BR-015) and REQ-06.001 are the behavior contract; where they are silent, this specification fixes explicit defaults, recorded as open questions with recommended defaults.
 - Assumption: the `doc` type remains the only aggregate filter; no per-document-type filter value is added, consistent with REQ-06.001 and BR-015.
 - Assumption: archived task and milestone records are hidden from search, mirroring deprecated requirement records; a future increment may add an option to include them.
@@ -166,7 +166,7 @@ With `--json`, errors use the existing convention: a JSON object `{"error":{"cod
 - Assumption: unreadable individual record files are skipped; an unreadable configured directory or a boundary violation fails the command (exit 1).
 - Assumption: `search` performs no writes at all, including not creating missing configured directories and not triggering migrations itself beyond the read path's own lazy behavior.
 - Assumption: no UI mockups are needed because the increment is CLI-only.
-- Assumption: front-matter migration is lazy and per record (ADR-0007 decision 9); search must remain correct for both migrated and unmigrated records.
+- Assumption: front-matter migration is lazy and per record (ADR-0012 decision 9); search must remain correct for both migrated and unmigrated records.
 
 ## Open questions
 
@@ -185,7 +185,7 @@ None of these block implementation; each has a specified default in this documen
 |---|---|
 | Requirement | REQ-06, REQ-06.001, REQ-05, REQ-05.001–REQ-05.011, REQ-02, REQ-02.001, REQ-02.003, REQ-03, REQ-03.001, REQ-03.002, REQ-04, REQ-04.001, REQ-04.002 |
 | Non-functional | NFR-02.002 (sanitize input), NFR-04.001 (text-only persistence), NFR-04.002 (project-directory boundary), NFR-04.004 (Papyrus-native layout; no Backlog.md file compatibility) || Business rule | BR-015 (search command behavior), BR-005 (task), BR-006 (milestone), BR-007 (release), BR-008 (decision), BR-011 (glossary), BR-012 (UI specification), BR-013 (business rule), BR-014 (audit), BR-016 (configuration keys and precedence), BR-017 (technical specification) |
-| ADR | ADR-0001 (Rust), ADR-0004 (repository-root single crate), ADR-0007 (YAML front matter), ADR-0009 (shared record envelope) |
+| ADR | ADR-0001 (Rust), ADR-0004 (repository-root single crate), ADR-0012 (YAML front matter), ADR-0013 (shared record envelope) |
 | Ticket | TASK-18 |
 | UI mockups | none |
 | Domain model | `docs/domain-model/business-glossary/` (record-type terms) |

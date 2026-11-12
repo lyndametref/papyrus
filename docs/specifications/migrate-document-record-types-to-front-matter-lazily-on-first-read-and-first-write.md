@@ -7,7 +7,7 @@
 
 ## Purpose
 
-Deliver ADR-0009 Stage 3: lazy, per-record migration of the document record types (business requirement, non-functional requirement, glossary term, UI specification, technical specification, business rule, audit record, decision, release) so that each managed Markdown record gains a YAML front-matter block on its first read and on its first write, with no bulk migration command required. This ticket implements REQ-05.011 (lazy per-record migration) and REQ-05.010 (front matter on every managed record) for the document record family, building only on `record::patch` and `record::store` from TASK-63 and the option exposure from TASK-65. Task and milestone migration is out of scope (TASK-69). UI mockups and other HTML are excluded (REQ-05.008, ADR-0007 decision 11). Non-record prose Markdown is never modified (ADR-0007 decision 15).
+Deliver ADR-0013 Stage 3 (superseding ADR-0009): lazy, per-record migration of the document record types (business requirement, non-functional requirement, glossary term, UI specification, technical specification, business rule, audit record, decision, release) so that each managed Markdown record gains a YAML front-matter block on its first read and on its first write, with no bulk migration command required. This ticket implements REQ-05.011 (lazy per-record migration) and REQ-05.010 (front matter on every managed record) for the document record family, building only on `record::patch` and `record::store` from TASK-63 and the option exposure from TASK-65. Task and milestone migration is out of scope (TASK-69). UI mockups and other HTML are excluded (REQ-05.008, ADR-0012 decision 11). Non-record prose Markdown is never modified (ADR-0012 decision 15).
 
 ## Scope
 
@@ -30,11 +30,11 @@ Deliver ADR-0009 Stage 3: lazy, per-record migration of the document record type
 - Removal of legacy per-module parsers/writers and no-drift enforcement — TASK-70.
 - Native layout and one-way import verification — TASK-98.
 - Browser UI changes and metadata projection — TASK-66, TASK-67, TASK-72.
-- UI mockups and other HTML files — excluded by REQ-05.008 and ADR-0007 decision 11.
+- UI mockups and other HTML files — excluded by REQ-05.008 and ADR-0012 decision 11.
 - Backlog.md `docs` and `drafts` records — out of scope (REQ-05.010).
-- Prose Markdown not claimed by a descriptor (`docs/specifications/`, `docs/domain-model/`, `docs/business-processes/`, `README` files) — never modified (ADR-0007 decision 15).
-- A dedicated bulk migration command or subcommand — none is added (REQ-05.011, ADR-0007 decision 9).
-- Identity translation — TASK-64 (document records use Papyrus display IDs directly; no storage-ID translation).
+- Prose Markdown not claimed by a descriptor (`docs/specifications/`, `docs/domain-model/`, `docs/business-processes/`, `README` files) — never modified (ADR-0012 decision 15).
+- A dedicated bulk migration command or subcommand — none is added (REQ-05.011, ADR-0012 decision 9).
+- Identity translation — TASK-64 (document records use Papyrus IDs directly; no ID translation applies).
 - Corpus-wide committed migration — the repository's own records converge lazily.
 
 ## Behavior
@@ -61,7 +61,7 @@ Deliver ADR-0009 Stage 3: lazy, per-record migration of the document record type
 For each migrated record, the patch consists of:
 
 1. `SetFrontMatter` for the general keys in canonical order:
-   - `id` — from the existing `# <ID> <title>` heading or, if absent, from the filename (without extension). For document records this is the Papyrus display ID; no storage-ID translation applies.
+   - `id` — from the existing `# <ID> <title>` heading or, if absent, from the filename (without extension). For document records this is the Papyrus ID; no ID translation applies.
    - `title` — from the existing `# <ID> <title>` heading (the text after the ID). If no heading exists, an empty string.
    - `created_date` — sourced per section 4.
    - `updated_date` — the migration time.
@@ -149,8 +149,8 @@ For each migrated record, the patch consists of:
 | Artifact | Reference |
 |---|---|
 | Ticket | TASK-68 |
-| Requirements | REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.001, NFR-04.002, NFR-04.003 |
-| ADRs | ADR-0006, ADR-0007, ADR-0008, ADR-0009 |
+| Requirements | REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.001, NFR-04.002, NFR-04.004 |
+| ADRs | ADR-0006, ADR-0012, ADR-0013 |
 | Related tickets | TASK-63 (Done), TASK-64 (Done), TASK-65 (Done), TASK-69, TASK-70, TASK-71, TASK-72 |
 | Source | src/record/*, src/requirement.rs, src/glossary.rs, src/ui_spec.rs, src/tech_spec.rs, src/rule.rs, src/audit.rs, src/decision.rs, src/release.rs |
 | Tests | tests/*_cli.rs, tests/browser_cli.rs |
