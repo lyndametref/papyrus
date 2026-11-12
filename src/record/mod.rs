@@ -6,6 +6,7 @@ pub mod frontmatter;
 pub mod identity;
 pub mod migrate;
 pub mod patch;
+pub mod resolve;
 pub mod store;
 pub mod view;
 

@@ -46,9 +46,9 @@ Extend the offline, project-local, read-and-edit web interface delivered by TASK
 ### 2. Record sources and IDs
 
 1. Decision records are read from `<decision_directory>/` (active folder only). The directory is resolved from the effective configuration; prefixes and directories are never hardcoded.
-2. Only files directly inside that directory whose `.md` file stem is a valid record ID are records. The `archived/` subfolder, `index.html`, and non-`.md` files are ignored. There is no recursive traversal.
-3. Record IDs are the file stems (for example `ADR-001`, `BDR-001` by default prefixes). The document type and record form are derived from the directory that matched, never from the request.
-4. ID resolution is by exact, case-sensitive match against the active directory listing of the matching category. An ID that matches no active record is `404`; an ID that matches records in more than one category is `500` with a generic message (baseline section 7.1, extended to six categories).
+2. Only files directly inside that directory whose `.md` file stem carries a valid record ID prefix are records. The `archived/` subfolder, `index.html`, and non-`.md` files are ignored. There is no recursive traversal.
+3. Record IDs are the canonical Papyrus IDs encoded in the file stems: `<ID>.md` or `<ID>-<kebab-slug>.md` (for example `ADR-001` and `ADR-001-papyrus-native-record-layout` both carry ID `ADR-001`). The slug is never part of the ID, is never displayed as the ID, and is never used in a URL. The document type and record form are derived from the directory that matched, never from the request.
+4. ID resolution is by canonical Papyrus ID against the active directory listing of the matching category, with case-insensitive prefix matching and optional leading zeros. A slugged stem resolves to the ID before the first slug separator. An ID that matches no active record is `404`; an ID that matches records in more than one category is `500` with a generic message (baseline section 7.1, extended to six categories).
 5. Record ID, category, decision type, and supersession metadata that is not an editable field are never accepted from the request.
 
 ### 3. List page
@@ -184,6 +184,10 @@ UI mockups are required before any UI implementation work and must be approved b
 - **OQ-1 (pending)** — Whether the decision type should be filterable in the browser list (e.g. `?type=decision&decision-type=adr`) is unspecified; this specification lists all active decisions of all types in one view, with the type shown per row. If filtering is desired, the query parameter and empty-state copy change.
 - **OQ-2 (pending)** — Whether `status` should be editable to the bare value `superseded` in addition to using `superseded-by` is unspecified; this specification permits `superseded` as a valid status value without recording a superseding ID, consistent with decision-records-management.md OQ-1.
 - **OQ-3 (pending)** — MOCK-0003 is `pending` and its decision-record screen sections must be completed by `@ui-designer` and approved by the user before UI implementation. Until then, the mockup is not implementation-ready for the UI portions.
+
+## Revision notes
+
+- 2026-11-12 (TASK-88 alignment): section 2 now derives the canonical Papyrus ID from a native stem that may carry a kebab slug (`<ID>-<kebab-slug>.md`), displays and links the canonical ID, and resolves IDs by canonical ID rather than exact file stem (ADR-0010, `papyrus-native-record-layout-and-single-id-space.md`). Archived decisions remain hidden and unreachable.
 
 ## Traceability
 

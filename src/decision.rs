@@ -134,6 +134,62 @@ fn archived_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
     Context::ensure_within(&ctx.project_dir, &raw)
 }
 
+fn decision_prefixes(cfg: &Config) -> Vec<String> {
+    cfg.decision_types
+        .values()
+        .filter(|entry| entry.enabled && !entry.prefix.is_empty())
+        .map(|entry| entry.prefix.clone())
+        .collect()
+}
+
+/// Canonical ID of a decision reference, preserving the digit widths written
+/// in the source and ignoring any slug.
+pub fn canonical_id(cfg: &Config, value: &str) -> Option<String> {
+    decision_prefixes(cfg).iter().find_map(|prefix| {
+        crate::record::identity::parse_id_parts(value, prefix, false).map(|parts| parts.display)
+    })
+}
+
+/// Numeric identity key of a decision reference, used for tolerant matching.
+pub fn canonical_key(cfg: &Config, value: &str) -> Option<String> {
+    decision_prefixes(cfg).iter().find_map(|prefix| {
+        crate::record::identity::parse_id_parts(value, prefix, false).map(|parts| parts.key(prefix))
+    })
+}
+
+fn decision_dirs(ctx: &Context, cfg: &Config) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Ok(active) = active_dir(ctx, cfg) {
+        dirs.push(active);
+    }
+    if let Ok(archived) = archived_dir(ctx, cfg) {
+        dirs.push(archived);
+    }
+    dirs
+}
+
+fn resolve_decision(
+    ctx: &Context,
+    cfg: &Config,
+    id: &str,
+) -> Result<Option<crate::record::resolve::ResolvedRecord>, AppError> {
+    crate::record::resolve::resolve_in_dirs(
+        ctx,
+        &decision_dirs(ctx, cfg),
+        id,
+        &decision_prefixes(cfg),
+        false,
+    )
+}
+
+fn resolve_decision_required(
+    ctx: &Context,
+    cfg: &Config,
+    id: &str,
+) -> Result<crate::record::resolve::ResolvedRecord, AppError> {
+    resolve_decision(ctx, cfg, id)?.ok_or_else(|| AppError::NotFound(format!("not found: {}", id)))
+}
+
 fn ensure_dir(dir: &std::path::Path, project_dir: &std::path::Path) -> Result<(), AppError> {
     let safe = Context::ensure_within(project_dir, dir)?;
     fs::create_dir_all(&safe).map_err(|e| AppError::Runtime(e.to_string()))
@@ -384,7 +440,13 @@ pub fn create(
         ),
     ];
     let file_content = crate::record::patch::apply_patch(&parsed, &ops)?;
-    let file_path = active.join(format!("{}.md", id));
+    let slug = sanitize::kebab_slug(&dd.title);
+    let file_name = if slug.is_empty() {
+        format!("{}.md", id)
+    } else {
+        format!("{}-{}.md", id, slug)
+    };
+    let file_path = active.join(file_name);
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
     crate::record::store::write_atomic(ctx, &safe_path, &file_content)?;
     Ok(id)
@@ -407,34 +469,29 @@ pub fn list(
     let active = active_dir(ctx, &cfg)?;
     let _ = ensure_dir(&active, &ctx.project_dir);
 
+    let records =
+        crate::record::resolve::list_in_dir(ctx, &active, &decision_prefixes(&cfg), false)?;
     let mut items: Vec<(String, String, String)> = Vec::new();
-    if let Ok(rd) = fs::read_dir(&active) {
-        for e in rd.flatten() {
-            let path = e.path();
-            if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                continue;
-            }
-            let id = match path.file_stem().and_then(|s| s.to_str()) {
-                Some(s) => s.to_string(),
-                None => continue,
-            };
-            let included = if let Some((_, prefix)) = &type_filter {
-                id.starts_with(&format!("{}-", prefix))
-            } else {
-                type_key_for_id(&cfg, &id).is_some()
-            };
-            if !included {
-                continue;
-            }
-            let safe = Context::ensure_within(&ctx.project_dir, &path)?;
-            let content = fs::read_to_string(&safe).unwrap_or_default();
-            let title = crate::record::document::parse(&content)
-                .ok()
-                .map(|d| crate::record::document::heading_id_title(&d).1)
-                .unwrap_or_default();
-            let title = if title.is_empty() { id.clone() } else { title };
-            items.push((id, title, content));
+    for record in records {
+        let included = if let Some((_, prefix)) = &type_filter {
+            record.id.starts_with(&format!("{}-", prefix))
+        } else {
+            type_key_for_id(&cfg, &record.id).is_some()
+        };
+        if !included {
+            continue;
         }
+        let content = fs::read_to_string(&record.path).unwrap_or_default();
+        let title = crate::record::document::parse(&content)
+            .ok()
+            .map(|d| crate::record::document::heading_id_title(&d).1)
+            .unwrap_or_default();
+        let title = if title.is_empty() {
+            record.id.clone()
+        } else {
+            title
+        };
+        items.push((record.id, title, content));
     }
     items.sort_by(|a, b| a.0.cmp(&b.0));
 
@@ -467,35 +524,18 @@ pub fn list(
 pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
-    let archived = archived_dir(ctx, &cfg)?;
-    let _ = ensure_dir(&active, &ctx.project_dir);
+    let _ = ensure_dir(&active_dir(ctx, &cfg)?, &ctx.project_dir);
+    let record = resolve_decision_required(ctx, &cfg, &id)?;
+    let canonical = record.id.clone();
 
-    let active_path = active.join(format!("{}.md", id));
-    let archived_path = archived.join(format!("{}.md", id));
-    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
-    let archived_safe = if archived.exists() {
-        Context::ensure_within(&ctx.project_dir, &archived_path).ok()
-    } else {
-        None
-    };
-
-    let path = if active_safe.exists() {
-        active_safe
-    } else if archived_safe.as_ref().map(|p| p.exists()).unwrap_or(false) {
-        archived_safe.unwrap()
-    } else {
-        return Err(AppError::NotFound(format!("not found: {}", id)));
-    };
-
-    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
+    let content = crate::record::migrate::ensure_front_matter(ctx, &record.path)?;
     let text = content.clone();
     let json = if ctx.json {
         Some(serde_json::json!({
-            "id": id,
-            "path": path.display().to_string(),
+            "id": canonical,
+            "path": record.path.display().to_string(),
             "content": content,
-            "metadata": crate::record::view::RecordView::lenient(&content, &id).metadata_json(),
+            "metadata": crate::record::view::RecordView::lenient(&content, &canonical).metadata_json(),
         }))
     } else {
         None
@@ -515,28 +555,13 @@ pub fn edit(
     labels_raw: &[String],
     references_raw: &[String],
 ) -> Result<crate::CommandOutput, AppError> {
-    let id = sanitize_text(id_raw)?;
+    let requested = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
-    let archived = archived_dir(ctx, &cfg)?;
-    let _ = ensure_dir(&active, &ctx.project_dir);
-
-    let active_path = active.join(format!("{}.md", id));
-    let archived_path = archived.join(format!("{}.md", id));
-    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
-    let archived_safe = if archived.exists() {
-        Context::ensure_within(&ctx.project_dir, &archived_path).ok()
-    } else {
-        None
-    };
-
-    let path = if active_safe.exists() {
-        active_safe
-    } else if archived_safe.as_ref().map(|p| p.exists()).unwrap_or(false) {
-        archived_safe.unwrap()
-    } else {
-        return Err(AppError::NotFound(format!("not found: {}", id)));
-    };
+    let _ = ensure_dir(&active_dir(ctx, &cfg)?, &ctx.project_dir);
+    let record = resolve_decision_required(ctx, &cfg, &requested)?;
+    record.ensure_writable()?;
+    let id = record.id.clone();
+    let path = record.path.clone();
 
     let (doc, _token) = crate::record::store::read_document(ctx, &path)?;
     let content = doc.source.clone();
@@ -577,23 +602,9 @@ pub fn edit(
         dd.status = st;
     }
     if let Some(sup) = superseded_by_raw {
-        let sup_id = sanitize_text(sup)?;
-        let sup_active_path = active.join(format!("{}.md", sup_id));
-        let sup_archived_path = archived.join(format!("{}.md", sup_id));
-        let sup_active_safe = Context::ensure_within(&ctx.project_dir, &sup_active_path)?;
-        let sup_archived_safe = if archived.exists() {
-            Context::ensure_within(&ctx.project_dir, &sup_archived_path).ok()
-        } else {
-            None
-        };
-        if !sup_active_safe.exists()
-            && !sup_archived_safe
-                .as_ref()
-                .map(|p| p.exists())
-                .unwrap_or(false)
-        {
-            return Err(AppError::NotFound(format!("not found: {}", sup_id)));
-        }
+        let sup_requested = sanitize_text(sup)?;
+        let sup_record = resolve_decision_required(ctx, &cfg, &sup_requested)?;
+        let sup_id = sup_record.id;
         if sup_id == id {
             return Err(AppError::Validation(format!(
                 "decision cannot supersede itself: {}",
@@ -731,29 +742,25 @@ pub fn edit(
 }
 
 pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
-    let id = sanitize_text(id_raw)?;
+    let requested = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
     let archived = archived_dir(ctx, &cfg)?;
-    let _ = ensure_dir(&active, &ctx.project_dir);
+    let _ = ensure_dir(&active_dir(ctx, &cfg)?, &ctx.project_dir);
     ensure_dir(&archived, &ctx.project_dir)?;
 
-    let active_path = active.join(format!("{}.md", id));
-    let archived_path = archived.join(format!("{}.md", id));
-    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
-    let archived_safe = Context::ensure_within(&ctx.project_dir, &archived_path)?;
-
-    if !active_safe.exists() {
-        if archived_safe.exists() {
-            return Err(AppError::Validation(format!("already archived: {}", id)));
-        }
-        return Err(AppError::NotFound(format!("not found: {}", id)));
-    }
-    if archived_safe.exists() {
+    let record = resolve_decision_required(ctx, &cfg, &requested)?;
+    let id = record.id.clone();
+    record.ensure_writable()?;
+    let file_name = record
+        .path
+        .file_name()
+        .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?
+        .to_owned();
+    let archived_safe = Context::ensure_within(&ctx.project_dir, &archived.join(&file_name))?;
+    if record.path == archived_safe || archived_safe.exists() {
         return Err(AppError::Validation(format!("already archived: {}", id)));
     }
-
-    fs::rename(&active_safe, &archived_safe).map_err(|e| AppError::Runtime(e.to_string()))?;
+    fs::rename(&record.path, &archived_safe).map_err(|e| AppError::Runtime(e.to_string()))?;
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))
     } else {
@@ -801,5 +808,104 @@ mod tests {
         assert!(valid_transition("accepted", "superseded"));
         assert!(!valid_transition("accepted", "proposed"));
         assert!(!valid_transition("rejected", "accepted"));
+    }
+}
+
+#[cfg(test)]
+mod native_layout_tests {
+    use super::*;
+
+    fn tmpdir(name: &str) -> PathBuf {
+        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join(format!("decision-native-{}", name));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        base
+    }
+
+    fn ctx(dir: &std::path::Path) -> Context {
+        Context {
+            project_dir: dir.to_path_buf(),
+            config_path: dir.join("papyrus.config.yml"),
+            json: false,
+            no_color: true,
+        }
+    }
+
+    fn legacy_decision(id: &str, title: &str) -> String {
+        format!(
+            "# {id} {title}\n\n## Status\nproposed\n\n## Decision\nDo it\n\n## Context\nBecause\n\n## Consequences\nGood\n"
+        )
+    }
+
+    #[test]
+    fn create_writes_a_kebab_slug_and_list_view_archive_use_the_canonical_id() {
+        let dir = tmpdir("slug-lifecycle");
+        let c = ctx(&dir);
+        let id = create(&c, "First Decision", None, None, None, None, &[], &[]).unwrap();
+        assert_eq!(id, "ADR-001");
+        let created = dir.join("decisions/ADR-001-first-decision.md");
+        assert!(created.exists(), "new decisions carry a kebab slug");
+
+        let listed = list(&c, None).unwrap();
+        assert!(
+            listed.text.contains("ADR-001 First Decision"),
+            "list must report the canonical ID: {}",
+            listed.text
+        );
+        assert!(!listed.text.contains("ADR-001-first-decision"));
+
+        let viewed = view(&c, "ADR-1").unwrap();
+        assert!(viewed.text.contains("# ADR-001 First Decision"));
+
+        archive(&c, "ADR-001").unwrap();
+        assert!(!created.exists());
+        assert!(
+            dir.join("decisions/archived/ADR-001-first-decision.md")
+                .exists(),
+            "archive keeps the slugged file name"
+        );
+    }
+
+    #[test]
+    fn existing_unslugged_decision_is_readable_editable_and_archivable() {
+        let dir = tmpdir("legacy-unslugged");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("decisions")).unwrap();
+        let path = dir.join("decisions/ADR-002.md");
+        fs::write(&path, legacy_decision("ADR-002", "Legacy")).unwrap();
+
+        let viewed = view(&c, "ADR-002").unwrap();
+        assert!(viewed.text.contains("# ADR-002 Legacy"));
+
+        // A status edit is the in-place `## Status` line; it never moves or
+        // renames the file.
+        edit(
+            &c,
+            "ADR-2",
+            None,
+            None,
+            Some("accepted"),
+            None,
+            None,
+            None,
+            &[],
+            &[],
+        )
+        .unwrap();
+        assert!(path.exists(), "deprecation/status edit must stay in place");
+        assert!(
+            fs::read_to_string(&path)
+                .unwrap()
+                .contains("## Status\naccepted")
+        );
+
+        archive(&c, "ADR-002").unwrap();
+        assert!(!path.exists());
+        assert!(
+            dir.join("decisions/archived/ADR-002.md").exists(),
+            "archive keeps the existing unslugged name"
+        );
     }
 }

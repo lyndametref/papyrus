@@ -1719,6 +1719,19 @@ pub fn list(
     })
 }
 
+fn same_directory(left: &std::path::Path, right: &std::path::Path) -> bool {
+    left == right
+        || left
+            .canonicalize()
+            .ok()
+            .is_some_and(|l| right.canonicalize().ok().is_some_and(|r| l == r))
+}
+
+fn path_in_directory(path: &std::path::Path, dir: &std::path::Path) -> bool {
+    path.parent()
+        .is_some_and(|parent| same_directory(parent, dir))
+}
+
 fn move_record(
     ctx: &Context,
     source: &std::path::Path,
@@ -1733,6 +1746,12 @@ pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
     let id = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
     let path = resolve_task_path(ctx, &cfg, &id)?;
+    let active = active_dir(ctx, &cfg)?;
+    if !path_in_directory(&path, &active) {
+        // A record already in the canonical archive or a legacy alias is
+        // already archived; refuse before any write, move, or removal.
+        return Err(AppError::Validation(format!("already archived: {}", id)));
+    }
     reject_task_write_conflict(ctx, &path)?;
     let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
     let archive = archive_dir(ctx, &cfg)?;
@@ -2223,5 +2242,75 @@ mod tests {
             content,
             "an unrecognised status is preserved verbatim"
         );
+    }
+}
+
+#[cfg(test)]
+mod native_layout_tests {
+    use super::*;
+
+    fn tmpdir(name: &str) -> PathBuf {
+        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join(format!("task-native-{}", name));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        base
+    }
+
+    fn ctx(dir: &std::path::Path) -> Context {
+        Context {
+            project_dir: dir.to_path_buf(),
+            config_path: dir.join("papyrus.config.yml"),
+            json: false,
+            no_color: true,
+        }
+    }
+
+    fn record(id: &str, title: &str) -> String {
+        format!(
+            "---\nid: {id}\ntitle: {title}\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: ToDo\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 1\ndocumentation: []\ntype: null\n---\n\n## Description\n\nBody\n"
+        )
+    }
+
+    #[test]
+    fn archive_from_legacy_alias_is_refused_without_changing_the_file() {
+        let dir = tmpdir("legacy-archive-refusal");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/tasks/archived")).unwrap();
+        let path = dir.join("backlog/tasks/archived/TASK-005.md");
+        let before = record("TASK-005", "Five");
+        fs::write(&path, &before).unwrap();
+
+        let err = match archive(&c, "TASK-005") {
+            Err(err) => err,
+            Ok(_) => panic!("archive from a legacy alias must fail"),
+        };
+        assert!(
+            matches!(&err, AppError::Validation(message) if message.contains("already archived")),
+            "unexpected error: {err:?}"
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), before);
+        assert!(!dir.join("backlog/archive/tasks/TASK-005.md").exists());
+    }
+
+    #[test]
+    fn archive_from_canonical_archive_is_refused_without_changing_the_file() {
+        let dir = tmpdir("canonical-archive-refusal");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/archive/tasks")).unwrap();
+        let path = dir.join("backlog/archive/tasks/TASK-006.md");
+        let before = record("TASK-006", "Six");
+        fs::write(&path, &before).unwrap();
+
+        let err = match archive(&c, "TASK-006") {
+            Err(err) => err,
+            Ok(_) => panic!("archive from the canonical archive must fail"),
+        };
+        assert!(
+            matches!(&err, AppError::Validation(message) if message.contains("already archived")),
+            "unexpected error: {err:?}"
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), before);
     }
 }

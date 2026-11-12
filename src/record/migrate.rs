@@ -99,26 +99,22 @@ pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<&'static Re
     None
 }
 
-/// Parse the number of a native stem for a descriptor family.
-fn stem_number(desc: &RecordDescriptor, cfg: &crate::config::Config, stem: &str) -> Option<i64> {
+/// Canonical numeric key of a native stem for a descriptor family.
+///
+/// Dotted document IDs keep every numeric component, so `REQ-01.001` and
+/// `REQ-01.002` remain distinct.
+fn stem_key(desc: &RecordDescriptor, cfg: &crate::config::Config, stem: &str) -> Option<String> {
     desc.configured_prefixes(cfg)
         .iter()
-        .find_map(|prefix| crate::record::identity::id_number(stem, prefix).map(i64::from))
+        .find_map(|prefix| crate::record::identity::stem_key(stem, prefix, desc.is_dotted_id()))
 }
 
-/// Parse the number of a Papyrus ID value for a descriptor family.
-fn id_value_number(desc: &RecordDescriptor, cfg: &crate::config::Config, id: &str) -> Option<i64> {
+/// Canonical numeric key of a Papyrus ID value for a descriptor family.
+fn id_value_key(desc: &RecordDescriptor, cfg: &crate::config::Config, id: &str) -> Option<String> {
     desc.configured_prefixes(cfg).iter().find_map(|prefix| {
-        crate::record::identity::IdSpec::new(prefix.clone(), 1)
-            .parse_id(id)
-            .ok()
+        crate::record::identity::parse_id_parts(id, prefix, desc.is_dotted_id())
+            .map(|parts| parts.key(prefix))
     })
-}
-
-/// Canonical key for duplicate detection: the configured prefix plus the
-/// unpadded number, so `TASK-1`, `TASK-001`, and `task-001` collide.
-fn id_key(prefix: &str, number: i64) -> String {
-    format!("{}-{}", prefix.to_ascii_uppercase(), number)
 }
 
 fn candidate_id_key(
@@ -129,21 +125,11 @@ fn candidate_id_key(
 ) -> Option<String> {
     if let Some(content) = content
         && let Some(fm_id) = candidate_frontmatter_id(desc, content)
+        && let Some(key) = id_value_key(desc, cfg, &fm_id)
     {
-        for prefix in desc.configured_prefixes(cfg) {
-            if let Ok(number) =
-                crate::record::identity::IdSpec::new(prefix.clone(), 1).parse_id(&fm_id)
-            {
-                return Some(id_key(&prefix, number));
-            }
-        }
+        return Some(key);
     }
-    for prefix in desc.configured_prefixes(cfg) {
-        if let Some(number) = crate::record::identity::id_number(stem, &prefix) {
-            return Some(id_key(&prefix, i64::from(number)));
-        }
-    }
-    None
+    stem_key(desc, cfg, stem)
 }
 
 fn matching_prefix_of(
@@ -151,9 +137,9 @@ fn matching_prefix_of(
     cfg: &crate::config::Config,
     value: &str,
 ) -> Option<String> {
-    desc.configured_prefixes(cfg)
-        .into_iter()
-        .find(|prefix| crate::record::identity::id_number(value, prefix).is_some())
+    desc.configured_prefixes(cfg).into_iter().find(|prefix| {
+        crate::record::identity::parse_id_parts(value, prefix, desc.is_dotted_id()).is_some()
+    })
 }
 
 pub fn has_front_matter(content: &str) -> bool {
@@ -164,9 +150,10 @@ pub fn ensure_front_matter(ctx: &Context, path: &Path) -> Result<String, AppErro
     ensure_front_matter_internal(ctx, path).map(|(content, _)| content)
 }
 
-/// Like [`ensure_front_matter`], but returns the canonical path of the record
-/// after any migration or relocation. Callers that need to open the file by
-/// path after a first-read migration should use this helper.
+/// Like [`ensure_front_matter`], but returns the record path unchanged.
+///
+/// Lazy adoption never relocates or renames a record, so the returned path is
+/// always the path that was given.
 pub fn ensure_front_matter_canonical(ctx: &Context, path: &Path) -> Result<PathBuf, AppError> {
     ensure_front_matter_internal(ctx, path).map(|(_, canonical)| canonical)
 }
@@ -607,8 +594,8 @@ struct Candidate {
     path: PathBuf,
     rel: String,
     frontmatter_id: Option<String>,
-    frontmatter_number: Option<i64>,
-    stem_number: Option<i64>,
+    frontmatter_key: Option<String>,
+    stem_key: Option<String>,
     stem_prefix: Option<String>,
 }
 
@@ -669,17 +656,17 @@ fn collect_candidates_dir(
             .replace('\\', "/");
         let content = fs::read_to_string(&path).unwrap_or_default();
         let fm_id = candidate_frontmatter_id(desc, &content);
-        let fm_num = fm_id
+        let fm_key = fm_id
             .as_deref()
-            .and_then(|value| id_value_number(desc, cfg, value));
-        let number = stem_number(desc, cfg, stem);
+            .and_then(|value| id_value_key(desc, cfg, value));
+        let number = stem_key(desc, cfg, stem);
         let prefix = matching_prefix_of(desc, cfg, stem);
         out.push(Candidate {
             path,
             rel,
             frontmatter_id: fm_id,
-            frontmatter_number: fm_num,
-            stem_number: number,
+            frontmatter_key: fm_key,
+            stem_key: number,
             stem_prefix: prefix,
         });
     }
@@ -703,17 +690,25 @@ pub fn scan_migration_conflicts(ctx: &Context, desc: &RecordDescriptor) -> Vec<M
     // Front-matter / stem mismatch. Numbers are compared after normalization,
     // so optional leading zeros and case variants are not mismatches.
     for c in &candidates {
-        if let (Some(fm), Some(stem_number), Some(stem_prefix)) =
-            (&c.frontmatter_id, c.stem_number, &c.stem_prefix)
+        if let (Some(fm), Some(stem_key), Some(stem_prefix)) =
+            (&c.frontmatter_id, c.stem_key.as_ref(), &c.stem_prefix)
         {
-            let same = c.frontmatter_number == Some(stem_number)
-                && fm
-                    .split_once('-')
-                    .is_some_and(|(prefix, _)| prefix.eq_ignore_ascii_case(stem_prefix));
+            let same = c.frontmatter_key.as_ref() == Some(stem_key);
             if !same {
+                let stem = c
+                    .path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or_default();
+                let filename_id = crate::record::identity::canonical_stem_id(
+                    stem,
+                    stem_prefix,
+                    desc.is_dotted_id(),
+                )
+                .unwrap_or_else(|| stem.to_string());
                 conflicts.push(MigrationConflict::FrontmatterFilenameMismatch {
                     path: c.rel.clone(),
-                    filename_id: format!("{}-{}", stem_prefix, stem_number),
+                    filename_id,
                     frontmatter_id: fm.clone(),
                 });
             }
@@ -741,7 +736,7 @@ pub fn scan_migration_conflicts(ctx: &Context, desc: &RecordDescriptor) -> Vec<M
 
     // Unknown IDs: files whose stem or front-matter id cannot be parsed.
     for c in &candidates {
-        if c.frontmatter_id.is_none() && c.stem_number.is_none() {
+        if c.frontmatter_id.is_none() && c.stem_key.is_none() {
             let raw = c
                 .path
                 .file_stem()
@@ -772,20 +767,20 @@ pub(crate) fn check_conflicts_for_path(
         .and_then(|s| s.to_str())
         .unwrap_or_default();
 
-    if let (Some(fm_id), Some(stem_number), Some(stem_prefix)) = (
+    if let (Some(fm_id), Some(stem_key), Some(stem_prefix)) = (
         candidate_frontmatter_id(desc, content),
-        stem_number(desc, &cfg, stem),
+        stem_key(desc, &cfg, stem),
         matching_prefix_of(desc, &cfg, stem),
     ) {
-        let fm_number = id_value_number(desc, &cfg, &fm_id);
-        let same = fm_number == Some(stem_number)
-            && fm_id
-                .split_once('-')
-                .is_some_and(|(prefix, _)| prefix.eq_ignore_ascii_case(&stem_prefix));
+        let fm_key = id_value_key(desc, &cfg, &fm_id);
+        let same = fm_key.as_ref() == Some(&stem_key);
         if !same {
+            let filename_id =
+                crate::record::identity::canonical_stem_id(stem, &stem_prefix, desc.is_dotted_id())
+                    .unwrap_or_else(|| stem.to_string());
             return Some(format!(
-                "front-matter/filename mismatch: filename {}-{} vs front matter {}",
-                stem_prefix, stem_number, fm_id
+                "front-matter/filename mismatch: filename {} vs front matter {}",
+                filename_id, fm_id
             ));
         }
     }

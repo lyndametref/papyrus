@@ -482,6 +482,34 @@ fn active_entry(cfg: &Config, kind: Category) -> Option<crate::config::DocTypeEn
     }
 }
 
+fn record_canonical_id(cfg: &Config, kind: Category, value: &str) -> Option<String> {
+    if kind == Category::Decision {
+        return crate::decision::canonical_id(cfg, value);
+    }
+    let entry = active_entry(cfg, kind)?;
+    crate::record::identity::parse_id_parts(value, &entry.prefix, kind.is_requirement())
+        .or_else(|| {
+            kind.is_requirement()
+                .then(|| crate::record::identity::parse_id_parts(value, &entry.prefix, false))
+                .flatten()
+        })
+        .map(|parts| parts.display)
+}
+
+fn record_id_key(cfg: &Config, kind: Category, value: &str) -> Option<String> {
+    if kind == Category::Decision {
+        return crate::decision::canonical_key(cfg, value);
+    }
+    let entry = active_entry(cfg, kind)?;
+    crate::record::identity::parse_id_parts(value, &entry.prefix, kind.is_requirement())
+        .or_else(|| {
+            kind.is_requirement()
+                .then(|| crate::record::identity::parse_id_parts(value, &entry.prefix, false))
+                .flatten()
+        })
+        .map(|parts| parts.key(&entry.prefix))
+}
+
 fn active_dir(ctx: &Context, cfg: &Config, kind: Category) -> Option<PathBuf> {
     // Keep the enabled/prefix checks of the active entry, then resolve the
     // directory through the shared descriptor so no literal path is built
@@ -750,7 +778,7 @@ fn load_backlog_record(
     };
 
     Ok(Some(Record {
-        id: stem.to_string(),
+        id: record_canonical_id(&cfg, kind, stem).unwrap_or_else(|| stem.to_string()),
         kind,
         form,
         title,
@@ -853,7 +881,7 @@ fn load_decision_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
     let decision_type = crate::decision::type_key_for_id(&cfg, stem);
     let doc = parse_doc(&content);
     Ok(Some(Record {
-        id: stem.to_string(),
+        id: record_canonical_id(&cfg, Category::Decision, stem).unwrap_or_else(|| stem.to_string()),
         kind: Category::Decision,
         form: Form::Decision,
         title,
@@ -935,7 +963,7 @@ fn load_glossary_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
     };
     let definition = section_value(&doc, "## Definition");
     Ok(Some(Record {
-        id: stem.to_string(),
+        id: record_canonical_id(&cfg, Category::Glossary, stem).unwrap_or_else(|| stem.to_string()),
         kind: Category::Glossary,
         form: Form::Glossary,
         title,
@@ -1018,7 +1046,7 @@ fn load_ui_spec_record(ctx: &Context, path: &Path) -> Result<Option<Record>, App
     let view = section_value(&doc, "## View");
     let description = section_value(&doc, "## Description");
     Ok(Some(Record {
-        id: stem.to_string(),
+        id: record_canonical_id(&cfg, Category::UiSpec, stem).unwrap_or_else(|| stem.to_string()),
         kind: Category::UiSpec,
         form: Form::UiSpec,
         title,
@@ -1095,7 +1123,7 @@ fn load_ui_mockup_record(ctx: &Context, path: &Path) -> Result<Option<Record>, A
     let meta_record = crate::ui_mockup::parse_browser_metadata(&content, stem);
     let title = meta_record.title.clone();
     Ok(Some(Record {
-        id: stem.to_string(),
+        id: record_canonical_id(&cfg, Category::UiMockup, stem).unwrap_or_else(|| stem.to_string()),
         kind: Category::UiMockup,
         form: Form::UiMockup,
         title: title.clone(),
@@ -1133,7 +1161,8 @@ fn load_ui_mockup_record(ctx: &Context, path: &Path) -> Result<Option<Record>, A
         mockup_task: meta_record.task.clone(),
         audit_type: None,
         doc: Doc {
-            id: stem.to_string(),
+            id: record_canonical_id(&cfg, Category::UiMockup, stem)
+                .unwrap_or_else(|| stem.to_string()),
             title: title.clone(),
             heading: format!("# {} {}", stem, title),
             preamble: Vec::new(),
@@ -1193,7 +1222,8 @@ fn load_business_rule_record(ctx: &Context, path: &Path) -> Result<Option<Record
     // requirements from ## Requirements bullets
     let requirements = parse_rule_requirements(&doc);
     Ok(Some(Record {
-        id: stem.to_string(),
+        id: record_canonical_id(&cfg, Category::BusinessRule, stem)
+            .unwrap_or_else(|| stem.to_string()),
         kind: Category::BusinessRule,
         form: Form::BusinessRule,
         title,
@@ -1332,7 +1362,8 @@ fn load_audit_record(ctx: &Context, path: &Path) -> Result<Option<Record>, AppEr
         .and_then(|d| crate::record::document::section_text(&d, "Content"));
     // store content in doc only; audit_type in Record
     Ok(Some(Record {
-        id: stem.to_string(),
+        id: record_canonical_id(&cfg, Category::AuditRecord, stem)
+            .unwrap_or_else(|| stem.to_string()),
         kind: Category::AuditRecord,
         form: Form::AuditRecord,
         title,
@@ -1414,7 +1445,7 @@ fn load_tech_spec_record(ctx: &Context, path: &Path) -> Result<Option<Record>, A
     };
     let description = section_value(&doc, "## Description");
     Ok(Some(Record {
-        id: stem.to_string(),
+        id: record_canonical_id(&cfg, Category::TechSpec, stem).unwrap_or_else(|| stem.to_string()),
         kind: Category::TechSpec,
         form: Form::TechSpec,
         title,
@@ -1516,7 +1547,7 @@ fn load_simple_doc_record(
         .map(|v| v.list_value("references"))
         .unwrap_or_default();
     Ok(Some(Record {
-        id: stem.to_string(),
+        id: record_canonical_id(&cfg, kind, stem).unwrap_or_else(|| stem.to_string()),
         kind,
         form,
         title,
@@ -1618,8 +1649,19 @@ fn load_record_from_path(
     let Some(entry) = active_entry_owned(ctx, kind) else {
         return Ok(None);
     };
-    let Some(form) = form_for_stem(&entry.prefix, stem) else {
-        return Ok(None);
+    let form = if kind.is_requirement() {
+        match crate::record::identity::parse_id_parts(stem, &entry.prefix, true) {
+            Some(_) => Form::Requirement,
+            None => match form_for_stem(&entry.prefix, stem) {
+                Some(Form::Group) => Form::Group,
+                _ => return Ok(None),
+            },
+        }
+    } else {
+        let Some(form) = form_for_stem(&entry.prefix, stem) else {
+            return Ok(None);
+        };
+        form
     };
     let (group_id, group_title) = if form == Form::Requirement {
         parse_group(&doc)
@@ -1663,7 +1705,12 @@ fn load_record_from_path(
         ),
     };
     Ok(Some(Record {
-        id: stem.to_string(),
+        id: active_entry_owned(ctx, kind)
+            .and_then(|entry| {
+                crate::record::identity::parse_id_parts(stem, &entry.prefix, kind.is_requirement())
+                    .map(|parts| parts.display)
+            })
+            .unwrap_or_else(|| stem.to_string()),
         kind,
         form,
         title,
@@ -1752,18 +1799,16 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
             if !valid_id(stem) {
                 continue;
             }
-            if kind == Category::Decision {
-                if crate::decision::type_key_for_id(cfg, stem).is_none() {
-                    continue;
-                }
+            let valid = if kind == Category::Decision {
+                crate::decision::canonical_id(cfg, stem).is_some()
+            } else if kind.is_requirement() {
+                crate::record::identity::parse_id_parts(stem, &entry.prefix, true).is_some()
+                    || form_for_stem(&entry.prefix, stem) == Some(Form::Group)
             } else {
-                let rest = match stem.strip_prefix(&format!("{}-", entry.prefix)) {
-                    Some(r) => r,
-                    None => continue,
-                };
-                if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
-                    continue;
-                }
+                record_canonical_id(cfg, kind, stem).is_some()
+            };
+            if !valid {
+                continue;
             }
             if let Ok(Some(record)) = load_record_from_path(ctx, kind, &path) {
                 index.records.push(record);
@@ -1865,6 +1910,9 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
         let Some(dir) = active_dir(ctx, cfg, kind) else {
             continue;
         };
+        let Some(wanted) = record_id_key(cfg, kind, id) else {
+            continue;
+        };
         let Ok(read_dir) = fs::read_dir(&dir) else {
             continue;
         };
@@ -1877,32 +1925,18 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
             if !allowed {
                 continue;
             }
-            if path.file_stem().and_then(|s| s.to_str()) != Some(id) {
+            let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
                 continue;
-            }
-            let valid = if kind == Category::Decision {
-                crate::decision::type_key_for_id(cfg, id).is_some()
-            } else if kind == Category::Glossary
-                || kind == Category::UiSpec
-                || kind == Category::UiMockup
-                || kind == Category::BusinessRule
-                || kind == Category::AuditRecord
-                || kind == Category::TechSpec
-                || kind == Category::UseCase
-                || kind == Category::TestCase
-                || kind == Category::TestReport
-            {
-                id.strip_prefix(&format!("{}-", entry.prefix))
-                    .map(|r| !r.is_empty() && r.bytes().all(|b| b.is_ascii_digit()))
-                    .unwrap_or(false)
-            } else if kind.is_requirement() {
-                form_for_stem(&entry.prefix, id).is_some()
-            } else {
-                id.strip_prefix(&format!("{}-", entry.prefix))
-                    .map(|r| !r.is_empty() && r.bytes().all(|b| b.is_ascii_digit()))
-                    .unwrap_or(false)
             };
-            if !valid {
+            let candidate = if kind.is_requirement()
+                && form_for_stem(&entry.prefix, stem) == Some(Form::Group)
+            {
+                crate::record::identity::parse_id_parts(stem, &entry.prefix, false)
+                    .map(|parts| parts.key(&entry.prefix))
+            } else {
+                record_id_key(cfg, kind, stem)
+            };
+            if candidate.as_ref() != Some(&wanted) {
                 continue;
             }
             // Reject an entry that escapes the project directory.

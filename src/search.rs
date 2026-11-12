@@ -137,29 +137,22 @@ fn collect_type(
         if !allowed {
             continue;
         }
-        let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
-        // UI specifications and UI mockups share their directories with other
-        // documents (UI descriptions, HTML review packages); only `<prefix>-<digits>`
-        // files are records (BR-012, BR-016).
-        if key == "ui-spec"
-            || key == "ui-mockup"
-            || key == "rule"
-            || key == "audit"
-            || key == "tech-spec"
-            || key == "use-case"
-            || key == "test-case"
-            || key == "test-report"
-        {
-            let prefix = format!("{}-", entry.prefix);
-            let Some(rest) = id.strip_prefix(&prefix) else {
-                continue;
-            };
-            if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
-                continue;
-            }
-        }
+        // Only native stems are records; a document family keeps its dotted
+        // shape and may carry a legacy kebab slug, which is not part of the ID.
+        let dotted = matches!(key, "req" | "nfr");
+        let parsed =
+            crate::record::identity::parse_id_parts(stem, &entry.prefix, dotted).or_else(|| {
+                dotted
+                    .then(|| crate::record::identity::parse_id_parts(stem, &entry.prefix, false))
+                    .flatten()
+            });
+        let Some(id) = parsed.map(|parts| parts.display) else {
+            continue;
+        };
+        let id = id.as_str();
         let safe = Context::ensure_within(&ctx.project_dir, &path)?;
         let Ok(content) = fs::read_to_string(&safe) else {
             continue;
@@ -214,12 +207,16 @@ fn collect_backlog_store(
         if path.extension().and_then(|s| s.to_str()) != Some("md") {
             continue;
         }
-        let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
-        if !desc.matches_stem(cfg, id) {
+        let Some(id) = desc.configured_prefixes(cfg).iter().find_map(|prefix| {
+            crate::record::identity::parse_id_parts(stem, prefix, desc.is_dotted_id())
+                .map(|parts| parts.display)
+        }) else {
             continue;
-        }
+        };
+        let id = id.as_str();
         let safe = Context::ensure_within(&ctx.project_dir, &path)?;
         let Ok(content) = fs::read_to_string(&safe) else {
             continue;
@@ -269,30 +266,17 @@ fn collect_decision_store(
         if path.extension().and_then(|s| s.to_str()) != Some("md") {
             continue;
         }
-        let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
         // Boundary check before any eligibility/read, so symlink escapes
         // always surface as exit 1 regardless of type mapping.
         let safe = Context::ensure_within(&ctx.project_dir, &path)?;
-        // Only enabled decision types (delegate to decision module for
-        // consistent prefix matching, including hyphenated prefixes).
-        let Some(_type_key) = crate::decision::type_key_for_id(cfg, id) else {
+        // Canonical ID: the slug is cosmetic and never part of the identity.
+        let Some(id) = crate::decision::canonical_id(cfg, stem) else {
             continue;
         };
-        // Require a numeric ID form (e.g. ADR-001), so non-record files
-        // such as notes.md are ignored.
-        let decision_is_record = cfg.decision_types.iter().any(|(_, entry)| {
-            if !entry.enabled || entry.prefix.is_empty() {
-                return false;
-            }
-            id.strip_prefix(&format!("{}-", entry.prefix))
-                .map(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit()))
-                .unwrap_or(false)
-        });
-        if !decision_is_record {
-            continue;
-        }
+        let id = id.as_str();
         let Ok(content) = fs::read_to_string(&safe) else {
             continue;
         };

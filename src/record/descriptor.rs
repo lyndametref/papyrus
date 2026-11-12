@@ -48,6 +48,11 @@ impl RecordDescriptor {
         }
     }
 
+    /// Whether the family's IDs carry a dotted `<group>.<sequence>` shape.
+    pub fn is_dotted_id(&self) -> bool {
+        self.display_id_pattern.contains('.')
+    }
+
     /// Whether a file stem denotes a record of this family.
     ///
     /// Task, milestone, release, and decision families match a configured
@@ -60,13 +65,9 @@ impl RecordDescriptor {
                 .configured_prefixes(cfg)
                 .iter()
                 .any(|prefix| crate::record::identity::id_number(stem, prefix).is_some()),
-            _ => {
-                matches_pattern(stem, self.display_id_pattern)
-                    && self
-                        .configured_prefixes(cfg)
-                        .iter()
-                        .any(|prefix| crate::record::identity::id_number(stem, prefix).is_some())
-            }
+            _ => self.configured_prefixes(cfg).iter().any(|prefix| {
+                crate::record::identity::parse_id_parts(stem, prefix, self.is_dotted_id()).is_some()
+            }),
         }
     }
 
@@ -106,7 +107,7 @@ impl RecordDescriptor {
         project_dir: &std::path::Path,
     ) -> Option<Result<std::path::PathBuf, AppError>> {
         match self.record_type {
-            "task" | "milestone" | "release" => {
+            "task" | "milestone" => {
                 let raw = project_dir
                     .join(&cfg.backlog_directory)
                     .join("archive")
@@ -168,37 +169,6 @@ impl RecordDescriptor {
             dirs.push(dir);
         }
         dirs
-    }
-}
-
-/// A run of `#` in a pattern matches one or more ASCII digits.
-fn matches_pattern(stem: &str, pattern: &str) -> bool {
-    let stem_chars: Vec<char> = stem.chars().collect();
-    let pattern_chars: Vec<char> = pattern.chars().collect();
-    matches_from(&stem_chars, &pattern_chars, 0, 0)
-}
-
-fn matches_from(stem: &[char], pattern: &[char], si: usize, pi: usize) -> bool {
-    if pi == pattern.len() {
-        return si == stem.len();
-    }
-    if pattern[pi] == '#' {
-        let mut run_end = pi;
-        while run_end < pattern.len() && pattern[run_end] == '#' {
-            run_end += 1;
-        }
-        let mut k = 1usize;
-        while si + k <= stem.len() && stem[si + k - 1].is_ascii_digit() {
-            if matches_from(stem, pattern, si + k, run_end) {
-                return true;
-            }
-            k += 1;
-        }
-        false
-    } else if si < stem.len() && stem[si] == pattern[pi] {
-        matches_from(stem, pattern, si + 1, pi + 1)
-    } else {
-        false
     }
 }
 

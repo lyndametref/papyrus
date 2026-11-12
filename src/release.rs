@@ -97,6 +97,19 @@ fn releases_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
     desc.resolve_directory(cfg, &ctx.project_dir)
 }
 
+fn release_prefixes(cfg: &Config) -> Vec<String> {
+    vec![cfg.release_prefix.clone()]
+}
+
+fn resolve_release(
+    ctx: &Context,
+    cfg: &Config,
+    id: &str,
+) -> Result<Option<crate::record::resolve::ResolvedRecord>, AppError> {
+    let dir = releases_dir(ctx, cfg)?;
+    crate::record::resolve::resolve_in_dirs(ctx, &[dir], id, &release_prefixes(cfg), false)
+}
+
 fn ensure_dir(dir: &std::path::Path, project_dir: &std::path::Path) -> Result<(), AppError> {
     let safe = Context::ensure_within(project_dir, dir)?;
     fs::create_dir_all(&safe).map_err(|e| AppError::Runtime(e.to_string()))
@@ -230,26 +243,20 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
     let dir = releases_dir(ctx, &cfg)?;
     let _ = ensure_dir(&dir, &ctx.project_dir);
 
+    let records = crate::record::resolve::list_in_dir(ctx, &dir, &release_prefixes(&cfg), false)?;
     let mut items: Vec<(String, String, String)> = Vec::new();
-    if let Ok(rd) = fs::read_dir(&dir) {
-        for e in rd.flatten() {
-            let path = e.path();
-            if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                continue;
-            }
-            let id = match path.file_stem().and_then(|s| s.to_str()) {
-                Some(s) => s.to_string(),
-                None => continue,
-            };
-            let safe = Context::ensure_within(&ctx.project_dir, &path)?;
-            let content = fs::read_to_string(&safe).unwrap_or_default();
-            let title = crate::record::document::parse(&content)
-                .ok()
-                .map(|d| crate::record::document::heading_id_title(&d).1)
-                .unwrap_or_default();
-            let title = if title.is_empty() { id.clone() } else { title };
-            items.push((id, title, content));
-        }
+    for record in records {
+        let content = fs::read_to_string(&record.path).unwrap_or_default();
+        let title = crate::record::document::parse(&content)
+            .ok()
+            .map(|d| crate::record::document::heading_id_title(&d).1)
+            .unwrap_or_default();
+        let title = if title.is_empty() {
+            record.id.clone()
+        } else {
+            title
+        };
+        items.push((record.id, title, content));
     }
     items.sort_by(|a, b| a.0.cmp(&b.0));
 
@@ -281,23 +288,20 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
 }
 
 pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
-    let id = sanitize_text(id_raw)?;
+    let requested = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
     let dir = releases_dir(ctx, &cfg)?;
     let _ = ensure_dir(&dir, &ctx.project_dir);
-
-    let path_raw = dir.join(format!("{}.md", id));
-    let path = Context::ensure_within(&ctx.project_dir, &path_raw)?;
-    if !path.exists() {
-        return Err(AppError::NotFound(format!("not found: {}", id)));
-    }
-    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
+    let record = resolve_release(ctx, &cfg, &requested)?
+        .ok_or_else(|| AppError::NotFound(format!("not found: {}", requested)))?;
+    let id = record.id.clone();
+    let content = crate::record::migrate::ensure_front_matter(ctx, &record.path)?;
 
     let text = content.clone();
     let json = if ctx.json {
         Some(serde_json::json!({
             "id": id,
-            "path": path.display().to_string(),
+            "path": record.path.display().to_string(),
             "content": content,
             "metadata": crate::record::view::RecordView::lenient(&content, &id).metadata_json(),
         }))
@@ -315,16 +319,15 @@ pub fn edit(
     labels_raw: &[String],
     references_raw: &[String],
 ) -> Result<crate::CommandOutput, AppError> {
-    let id = sanitize_text(id_raw)?;
+    let requested = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
     let dir = releases_dir(ctx, &cfg)?;
     let _ = ensure_dir(&dir, &ctx.project_dir);
-
-    let path_raw = dir.join(format!("{}.md", id));
-    let path = Context::ensure_within(&ctx.project_dir, &path_raw)?;
-    if !path.exists() {
-        return Err(AppError::NotFound(format!("not found: {}", id)));
-    }
+    let record = resolve_release(ctx, &cfg, &requested)?
+        .ok_or_else(|| AppError::NotFound(format!("not found: {}", requested)))?;
+    record.ensure_writable()?;
+    let id = record.id.clone();
+    let path = record.path.clone();
 
     let (doc, _token) = crate::record::store::read_document(ctx, &path)?;
     let content = doc.source.clone();
@@ -427,4 +430,88 @@ pub fn edit(
         text: String::new(),
         json,
     })
+}
+
+#[cfg(test)]
+mod native_layout_tests {
+    use super::*;
+
+    fn tmpdir(name: &str) -> PathBuf {
+        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join(format!("release-native-{}", name));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        base
+    }
+
+    fn ctx(dir: &std::path::Path) -> Context {
+        Context {
+            project_dir: dir.to_path_buf(),
+            config_path: dir.join("papyrus.config.yml"),
+            json: false,
+            no_color: true,
+        }
+    }
+
+    #[test]
+    fn release_reads_resolve_by_canonical_id_with_tolerant_case_and_padding() {
+        let dir = tmpdir("tolerant-read");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog").join("releases")).unwrap();
+        fs::write(
+            dir.join("backlog/releases/REL-001.md"),
+            "---\nid: REL-001\ntitle: One\n---\n\n# REL-001 One\n",
+        )
+        .unwrap();
+
+        let cfg = Config::default();
+        let record = resolve_release(&c, &cfg, "REL-1").unwrap().unwrap();
+        assert_eq!(record.id, "REL-001");
+        assert_eq!(
+            record.path.file_name().and_then(|s| s.to_str()),
+            Some("REL-001.md")
+        );
+
+        // A Backlog-shaped unpadded lowercase stem is not a Papyrus record.
+        fs::write(
+            dir.join("backlog/releases/rel-2.md"),
+            "---\nid: REL-002\ntitle: Hidden\n---\n\n# REL-002 Hidden\n",
+        )
+        .unwrap();
+        assert!(resolve_release(&c, &cfg, "REL-002").unwrap().is_none());
+    }
+
+    #[test]
+    fn release_allocation_ignores_the_archive_directory() {
+        let dir = tmpdir("allocation-active-only");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog").join("releases")).unwrap();
+        let archive = dir.join("backlog").join("archive").join("releases");
+        fs::create_dir_all(&archive).unwrap();
+        fs::write(
+            dir.join("backlog/releases/REL-001.md"),
+            "---\nid: REL-001\ntitle: One\n---\n\n# REL-001 One\n",
+        )
+        .unwrap();
+        fs::write(
+            archive.join("REL-009.md"),
+            "---\nid: REL-009\ntitle: Old\n---\n\n# REL-009 Old\n",
+        )
+        .unwrap();
+
+        let id = create(&c, "Two", None, &[], &[]).unwrap();
+        assert_eq!(id, "REL-002", "releases allocate from the active directory");
+        assert!(!dir.join("backlog/releases/REL-010.md").exists());
+        assert!(!archive.join("REL-002.md").exists());
+        let cfg = Config::default();
+        let descriptor = crate::record::descriptor::descriptor_for("release").unwrap();
+        assert!(
+            !descriptor
+                .resolve_read_directories(&cfg, &dir)
+                .iter()
+                .any(|path| path.ends_with(std::path::Path::new("archive").join("releases"))),
+            "release archive directories are never read"
+        );
+    }
 }

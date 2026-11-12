@@ -123,6 +123,96 @@ impl fmt::Display for IdentityError {
 
 impl std::error::Error for IdentityError {}
 
+/// The numeric parts of a Papyrus ID and the ID as written in its source.
+///
+/// The `display` value keeps the digit widths of the source so an existing ID
+/// is never reformatted when configuration padding changes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ParsedId {
+    pub prefix: String,
+    pub numbers: Vec<i64>,
+    pub display: String,
+}
+
+impl ParsedId {
+    /// Stable key for duplicate detection: configured prefix plus every
+    /// numeric component, so padding and case never create a false duplicate
+    /// and dotted IDs keep their components distinct.
+    pub fn key(&self, configured_prefix: &str) -> String {
+        let mut key = format!(
+            "{}-{}",
+            configured_prefix.to_ascii_uppercase(),
+            self.numbers.first().copied().unwrap_or_default()
+        );
+        for number in self.numbers.iter().skip(1) {
+            key.push('.');
+            key.push_str(&number.to_string());
+        }
+        key
+    }
+}
+
+/// Parse an ID or record stem for a family. `dotted` selects the document
+/// family shape `<PREFIX>-<group>.<sequence>`; other families use
+/// `<PREFIX>-<number>`.
+///
+/// The prefix is matched case-insensitively and leading zeros are optional.
+/// A trailing `-<slug>` or ` - <slug>` is tolerated. Backlog-shaped stems
+/// resolve to `None`.
+pub fn parse_id_parts(value: &str, prefix: &str, dotted: bool) -> Option<ParsedId> {
+    let raw = value.trim();
+    let base = raw.split(" - ").next().unwrap_or(raw).trim();
+    let (stem_prefix, rest) = base.split_once('-')?;
+    if stem_prefix.is_empty() || !stem_prefix.eq_ignore_ascii_case(prefix) {
+        return None;
+    }
+    let first_end = rest
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(rest.len());
+    let first = &rest[..first_end];
+    if first.is_empty() || is_backlog_shaped(stem_prefix, first, prefix) {
+        return None;
+    }
+    let mut numbers = vec![first.parse::<i64>().ok()?];
+    let mut display = format!("{}-{}", prefix, first);
+    let remainder = &rest[first_end..];
+    if dotted {
+        let after_dot = remainder.strip_prefix('.')?;
+        let second_end = after_dot
+            .find(|c: char| !c.is_ascii_digit())
+            .unwrap_or(after_dot.len());
+        let second = &after_dot[..second_end];
+        if second.is_empty() {
+            return None;
+        }
+        numbers.push(second.parse::<i64>().ok()?);
+        display.push('.');
+        display.push_str(second);
+        let tail = &after_dot[second_end..];
+        if !tail.is_empty() && !tail.starts_with('-') {
+            return None;
+        }
+    } else if !remainder.is_empty() && !remainder.starts_with('-') {
+        return None;
+    }
+    Some(ParsedId {
+        prefix: prefix.to_string(),
+        numbers,
+        display,
+    })
+}
+
+/// Canonical ID portion of a record stem, including the prefix case and the
+/// digit widths of the source. The slug is never part of the result.
+pub fn canonical_stem_id(stem: &str, prefix: &str, dotted: bool) -> Option<String> {
+    parse_id_parts(stem, prefix, dotted).map(|parts| parts.display)
+}
+
+/// Canonical numeric key of a record stem, used for duplicate detection.
+pub fn stem_key(stem: &str, prefix: &str, dotted: bool) -> Option<String> {
+    parse_id_parts(stem, prefix, dotted).map(|parts| parts.key(prefix))
+}
+
 pub fn format_id(prefix: &str, number: i64, padding: usize) -> String {
     format!("{}-{}", prefix, pad_number(number, padding))
 }

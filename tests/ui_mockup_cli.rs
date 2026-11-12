@@ -160,7 +160,7 @@ fn basic_lifecycle() {
         assert_eq!(out.status.code(), Some(3), "args={:?}", args);
     }
 
-    // case-sensitive
+    // UI mockups are HTML records outside the Markdown ID layout.
     let out = run(&d, &["ui-mockup", "view", "mock-001"]);
     assert_eq!(out.status.code(), Some(3));
 

@@ -2881,7 +2881,20 @@ fn decision_fixture(name: &str) -> PathBuf {
 }
 
 fn decision_record_path(dir: &Path, id: &str) -> PathBuf {
-    dir.join("decisions").join(format!("{}.md", id))
+    let decisions = dir.join("decisions");
+    let prefix = format!("{}-", id);
+    if let Ok(entries) = fs::read_dir(&decisions) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            if stem == id || stem.starts_with(&prefix) {
+                return path;
+            }
+        }
+    }
+    decisions.join(format!("{}.md", id))
 }
 
 // T-15a
