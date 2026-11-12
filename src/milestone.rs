@@ -155,8 +155,7 @@ fn backlog_archive_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError>
 }
 
 fn resolve_milestone_path(ctx: &Context, cfg: &Config, id: &str) -> Result<PathBuf, AppError> {
-    let storage_id =
-        crate::record::identity::milestone_to_storage_id(id).unwrap_or_else(|_| id.to_lowercase());
+    let storage_id = id.to_string();
     for dir in [
         active_dir(ctx, cfg),
         archived_dir(ctx, cfg),
@@ -191,12 +190,9 @@ fn milestone_frontmatter_storage_id(content: &str) -> Option<String> {
     if id.is_empty() {
         return None;
     }
-    if let Ok(sid) = crate::record::identity::milestone_to_storage_id(id) {
-        return Some(sid);
-    }
     let spec = crate::record::identity::IdSpec::default_milestone();
-    spec.parse_storage_number(id).ok()?;
-    Some(id.to_lowercase())
+    spec.parse_id(id).ok()?;
+    Some(id.to_string())
 }
 
 fn reject_milestone_write_conflict(ctx: &Context, path: &std::path::Path) -> Result<(), AppError> {
@@ -234,8 +230,12 @@ pub(crate) fn find_milestone_file(dir: &std::path::Path, storage_id: &str) -> Op
         if base.eq_ignore_ascii_case(storage_id) {
             return Some(path.clone());
         }
-        if let Ok(sid) = crate::record::identity::milestone_to_storage_id(base)
-            && sid.eq_ignore_ascii_case(storage_id)
+        if base.eq_ignore_ascii_case(storage_id) {
+            return Some(path.clone());
+        }
+        let spec = crate::record::identity::IdSpec::default_milestone();
+        if let (Ok(a), Ok(b)) = (spec.parse_id(base), spec.parse_id(storage_id))
+            && a == b
         {
             return Some(path.clone());
         }
@@ -247,10 +247,14 @@ pub(crate) fn find_milestone_file(dir: &std::path::Path, storage_id: &str) -> Op
         let Ok(content) = fs::read_to_string(path) else {
             continue;
         };
-        if let Some(sid) = milestone_frontmatter_storage_id(&content)
-            && sid.eq_ignore_ascii_case(storage_id)
-        {
-            return Some(path.clone());
+        if let Some(sid) = milestone_frontmatter_storage_id(&content) {
+            let spec = crate::record::identity::IdSpec::default_milestone();
+            let same = sid.eq_ignore_ascii_case(storage_id)
+                || (spec.parse_id(&sid).ok() == spec.parse_id(storage_id).ok()
+                    && spec.parse_id(&sid).is_ok());
+            if same {
+                return Some(path.clone());
+            }
         }
     }
     None
@@ -824,13 +828,13 @@ mod tests {
         let dir = tmpdir("mismatch-canonical-view");
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
-        let content = "---\nid: m-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
-        fs::write(dir.join("backlog/milestones/m-2 - MileTwo.md"), content).unwrap();
+        let content = "---\nid: MS-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
+        fs::write(dir.join("backlog/milestones/MS-2 - MileTwo.md"), content).unwrap();
         // Canonical front-matter id m-99 -> display MS-100.
-        let out = view(&c, "MS-100").unwrap_or_else(|e| panic!("canonical view failed: {}", e));
-        assert!(out.text.contains("id: m-99"), "got: {}", out.text);
-        let out2 = view(&c, "MS-003").unwrap_or_else(|e| panic!("filename view failed: {}", e));
-        assert!(out2.text.contains("id: m-99"), "got: {}", out2.text);
+        let out = view(&c, "MS-99").unwrap_or_else(|e| panic!("canonical view failed: {}", e));
+        assert!(out.text.contains("id: MS-99"), "got: {}", out.text);
+        let out2 = view(&c, "MS-2").unwrap_or_else(|e| panic!("filename view failed: {}", e));
+        assert!(out2.text.contains("id: MS-99"), "got: {}", out2.text);
     }
 
     #[test]
@@ -838,9 +842,9 @@ mod tests {
         let dir = tmpdir("mismatch-canonical-edit");
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
-        let content = "---\nid: m-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
-        fs::write(dir.join("backlog/milestones/m-2 - MileTwo.md"), content).unwrap();
-        let err = edit(&c, "MS-100", Some("NewMile"), None, None, None, &[], &[])
+        let content = "---\nid: MS-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
+        fs::write(dir.join("backlog/milestones/MS-2 - MileTwo.md"), content).unwrap();
+        let err = edit(&c, "MS-99", Some("NewMile"), None, None, None, &[], &[])
             .err()
             .expect("expected error");
         let msg = err.to_string();
@@ -850,7 +854,7 @@ mod tests {
             msg
         );
         assert_eq!(
-            fs::read_to_string(dir.join("backlog/milestones/m-2 - MileTwo.md")).unwrap(),
+            fs::read_to_string(dir.join("backlog/milestones/MS-2 - MileTwo.md")).unwrap(),
             content
         );
     }
@@ -860,15 +864,15 @@ mod tests {
         let dir = tmpdir("mismatch-archive");
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
-        let content = "---\nid: m-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
-        fs::write(dir.join("backlog/milestones/m-2 - MileTwo.md"), content).unwrap();
-        let err = archive(&c, "MS-003").err().expect("expected error");
+        let content = "---\nid: MS-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
+        fs::write(dir.join("backlog/milestones/MS-2 - MileTwo.md"), content).unwrap();
+        let err = archive(&c, "MS-2").err().expect("expected error");
         assert!(
             err.to_string().contains("migration conflict"),
             "got: {}",
             err
         );
-        assert!(dir.join("backlog/milestones/m-2 - MileTwo.md").exists());
+        assert!(dir.join("backlog/milestones/MS-2 - MileTwo.md").exists());
     }
 
     #[test]
@@ -877,10 +881,10 @@ mod tests {
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
         let body = "\n## Description\n\nMile body\n";
-        let content = format!("---\nid: m-2\ntitle: MileTwo\n---\n{}", body);
-        let path = dir.join("backlog/milestones/m-2 - MileTwo.md");
+        let content = format!("---\nid: MS-2\ntitle: MileTwo\n---\n{}", body);
+        let path = dir.join("backlog/milestones/MS-2 - MileTwo.md");
         fs::write(&path, &content).unwrap();
-        let out = view(&c, "MS-003").unwrap();
+        let out = view(&c, "MS-2").unwrap();
         for key in [
             "created_date:",
             "updated_date:",
@@ -908,12 +912,12 @@ mod tests {
         fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
         let body = "\n## Description\n\nMile body UNIQUE-M\n";
         let content = format!(
-            "---\nid: m-2\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n{}",
+            "---\nid: MS-2\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n{}",
             body
         );
-        let path = dir.join("backlog/milestones/m-2 - MileTwo.md");
+        let path = dir.join("backlog/milestones/MS-2 - MileTwo.md");
         fs::write(&path, &content).unwrap();
-        edit(&c, "MS-003", Some("NewMile"), None, None, None, &[], &[]).unwrap();
+        edit(&c, "MS-2", Some("NewMile"), None, None, None, &[], &[]).unwrap();
         let after = fs::read_to_string(&path).unwrap();
         assert!(after.contains("title: NewMile"), "got: {}", after);
         let (_, after_body) = crate::record::frontmatter::split(&after).unwrap();

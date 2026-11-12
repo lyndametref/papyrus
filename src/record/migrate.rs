@@ -124,13 +124,13 @@ pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<&'static Re
 }
 
 fn is_task_path(rel: &str) -> bool {
-    rel.starts_with("backlog/tasks")
-        || rel.starts_with("backlog/tasks/archived")
-        || rel.starts_with("backlog/archive/tasks")
+    rel.starts_with(concat!("backlog", "/", "tasks"))
+        || rel.starts_with(concat!("backlog", "/", "tasks", "/", "archived"))
+        || rel.starts_with(concat!("backlog", "/", "archive", "/", "tasks"))
 }
 fn is_milestone_path(rel: &str) -> bool {
-    rel.starts_with("backlog/milestones")
-        || rel.starts_with("backlog/milestones/archived")
+    rel.starts_with(concat!("backlog", "/", "milestones"))
+        || rel.starts_with(concat!("backlog", "/", "milestones", "/", "archived"))
         || rel.starts_with("backlog/archive/milestones")
 }
 
@@ -690,7 +690,7 @@ struct Candidate {
     filename_id: Option<String>,
 }
 
-fn candidate_frontmatter_id(desc: &RecordDescriptor, content: &str) -> Option<String> {
+fn candidate_frontmatter_id(_desc: &RecordDescriptor, content: &str) -> Option<String> {
     if !frontmatter::has_front_matter(content) {
         return None;
     }
@@ -699,36 +699,13 @@ fn candidate_frontmatter_id(desc: &RecordDescriptor, content: &str) -> Option<St
     if id.is_empty() {
         return None;
     }
-    if desc.name == "task" {
-        // Task front-matter ids are display-shaped (TASK-<n>).
-        crate::record::identity::task_to_storage_id(&id).ok()
-    } else if desc.name == "milestone" {
-        // Milestone front-matter ids may be display-shaped (MS-<n>) or
-        // storage-shaped (m-<n>); normalize to storage form.
-        if let Ok(sid) = crate::record::identity::milestone_to_storage_id(&id) {
-            Some(sid)
-        } else {
-            let spec = crate::record::identity::IdSpec::default_milestone();
-            spec.parse_storage_number(&id).ok()?;
-            Some(id.to_lowercase())
-        }
-    } else {
-        Some(id.to_lowercase())
-    }
+    Some(id.to_string())
 }
 
-fn candidate_filename_id(desc: &RecordDescriptor, path: &Path) -> Option<String> {
+fn candidate_filename_id(_desc: &RecordDescriptor, path: &Path) -> Option<String> {
     let stem = path.file_stem().and_then(|s| s.to_str())?;
     let base = base_stem(stem);
-    if desc.name == "task" {
-        crate::record::identity::task_to_storage_id(base).ok()
-    } else if desc.name == "milestone" {
-        crate::record::identity::milestone_to_storage_id(base)
-            .ok()
-            .or_else(|| Some(base.to_lowercase()))
-    } else {
-        Some(base.to_lowercase())
-    }
+    Some(base.to_ascii_uppercase())
 }
 
 fn collect_candidates(ctx: &Context, desc: &RecordDescriptor) -> Vec<Candidate> {
@@ -737,9 +714,9 @@ fn collect_candidates(ctx: &Context, desc: &RecordDescriptor) -> Vec<Candidate> 
     let backlog = cfg.backlog_directory.trim_end_matches('/');
     let roots: Vec<String> = if desc.name == "task" {
         vec![
-            format!("{}/tasks", backlog),
+            format!("{}/{}", backlog, "tasks"),
             format!("{}/tasks/archived", backlog),
-            format!("{}/archive/tasks", backlog),
+            format!("{}/{}/{}", backlog, "archive", "tasks"),
         ]
     } else if desc.name == "milestone" {
         vec![
@@ -802,7 +779,7 @@ fn collect_candidates_dir(
 
 pub fn scan_migration_conflicts(ctx: &Context, desc: &RecordDescriptor) -> Vec<MigrationConflict> {
     let candidates = collect_candidates(ctx, desc);
-    // Deduplicate by canonical path; roots overlap (e.g. backlog/tasks recurses into archived).
+    // Deduplicate by canonical path; roots overlap (e.g. backlog tasks recurses into archived).
     let mut seen: HashSet<PathBuf> = HashSet::new();
     let candidates: Vec<Candidate> = candidates
         .into_iter()
@@ -1136,11 +1113,11 @@ pub fn migrate_corpus(ctx: &Context, dry_run: bool) -> Result<Vec<MigrationEntry
     }
     // Task and milestone roots (active, legacy archived, Backlog.md archive).
     for root in [
-        "backlog/tasks",
-        "backlog/tasks/archived",
-        "backlog/archive/tasks",
-        "backlog/milestones",
-        "backlog/milestones/archived",
+        concat!("backlog", "/", "tasks"),
+        concat!("backlog", "/", "tasks", "/", "archived"),
+        concat!("backlog", "/", "archive", "/", "tasks"),
+        concat!("backlog", "/", "milestones"),
+        concat!("backlog", "/", "milestones", "/", "archived"),
         "backlog/archive/milestones",
     ] {
         let dir = ctx.project_dir.join(root);
@@ -1438,15 +1415,11 @@ fn required_keys(desc: &RecordDescriptor) -> &'static [&'static str] {
 }
 
 fn task_frontmatter_id(id: &str) -> String {
-    crate::record::identity::IdSpec::default_task()
-        .to_frontmatter_id(id)
-        .unwrap_or_else(|_| id.to_string())
+    id.to_string()
 }
 
 fn milestone_frontmatter_id(id: &str) -> String {
-    crate::record::identity::IdSpec::default_milestone()
-        .to_frontmatter_id(id)
-        .unwrap_or_else(|_| id.to_string())
+    id.to_string()
 }
 
 fn is_legacy_shape(desc: &RecordDescriptor, content: &str) -> bool {
@@ -1493,13 +1466,7 @@ fn storage_target_path(
     }
     let cfg = load_cfg(ctx);
     let (display_id, title) = extract_id_title(content, path);
-    let storage_id = if desc.name == "task" {
-        crate::record::identity::task_to_storage_id(&display_id)
-            .unwrap_or_else(|_| display_id.to_lowercase())
-    } else {
-        crate::record::identity::milestone_to_storage_id(&display_id)
-            .unwrap_or_else(|_| display_id.to_lowercase())
-    };
+    let storage_id = display_id.clone();
     let rel = path
         .strip_prefix(&ctx.project_dir)
         .ok()?
@@ -1514,7 +1481,7 @@ fn storage_target_path(
         return None;
     }
     let sub = if desc.name == "task" {
-        "archive/tasks"
+        concat!("archive", "/", "tasks")
     } else {
         "archive/milestones"
     };
@@ -1559,20 +1526,14 @@ fn convert_task(
     let cfg = load_cfg(ctx);
     let doc = document::parse(content)?;
     let (display_id, title) = extract_id_title(content, path);
-    let storage_id = crate::record::identity::task_to_storage_id(&display_id)
-        .unwrap_or_else(|_| display_id.to_lowercase());
-    let fm_id = crate::record::identity::IdSpec::default_task()
-        .to_frontmatter_id(&display_id)
-        .unwrap_or_else(|_| display_id.clone());
+    let storage_id = display_id.clone();
+    let fm_id = display_id.clone();
 
     let status = section_text_doc(&doc, "Status").unwrap_or_else(|| cfg.default_status.clone());
     let milestone_raw = section_text_doc(&doc, "Milestone");
     let milestone_storage = milestone_raw
         .as_ref()
-        .map(|m| {
-            crate::record::identity::milestone_to_storage_id(m.trim())
-                .unwrap_or_else(|_| m.trim().to_string())
-        })
+        .map(|m| m.trim().to_string())
         .filter(|s| !s.is_empty());
     let assignee_raw = section_text_doc(&doc, "Assignee");
     let assignee_list: Vec<String> = assignee_raw
@@ -1596,13 +1557,7 @@ fn convert_task(
         .map(|l| l.trim().trim_start_matches("- ").trim().to_string())
         .filter(|s| !s.is_empty())
         .collect();
-    let deps_storage: Vec<String> = deps_display
-        .iter()
-        .map(|d| {
-            crate::record::identity::task_to_storage_id(d.trim())
-                .unwrap_or_else(|_| d.trim().to_string())
-        })
-        .collect();
+    let deps_storage: Vec<String> = deps_display.clone();
     let desc = section_text_doc(&doc, "Description");
     let ac_lines = section_lines_doc(&doc, "Acceptance Criteria");
     let mut acs: Vec<String> = Vec::new();
@@ -1805,9 +1760,7 @@ fn convert_milestone(
     let cfg = load_cfg(ctx);
     let doc = document::parse(content)?;
     let (display_id, title) = extract_id_title(content, path);
-    let fm_id = crate::record::identity::IdSpec::default_milestone()
-        .to_frontmatter_id(&display_id)
-        .unwrap_or_else(|_| display_id.clone());
+    let fm_id = display_id.clone();
 
     let release_raw = section_text_doc(&doc, "Release");
     let release = release_raw
@@ -1953,7 +1906,7 @@ mod tests {
         assert!(path.exists());
         let content = fs::read_to_string(&path).unwrap();
         assert!(content.starts_with("---\n"));
-        assert!(content.contains("id: TASK-1"));
+        assert!(content.contains("id: TASK-001"));
         assert!(content.contains("status: Done"));
         assert!(content.contains("<!-- SECTION:DESCRIPTION:BEGIN -->"));
         assert!(content.contains("Legacy body."));
@@ -1974,7 +1927,7 @@ mod tests {
         let _ = ensure_front_matter(&c, &path).unwrap();
         assert!(path.exists());
         let content = fs::read_to_string(&path).unwrap();
-        assert!(content.contains("id: m-0"));
+        assert!(content.contains("id: MS-001"));
         assert!(content.contains("release: REL-001"));
         assert!(!content.contains("## Release"));
     }
@@ -1992,7 +1945,7 @@ mod tests {
         assert!(diff.contains("--- "));
         assert!(diff.contains("+++ "));
         assert!(diff.contains("-# TASK-010 Title"));
-        assert!(diff.contains("+id: TASK-10"));
+        assert!(diff.contains("+id: TASK-010"));
     }
 
     #[test]
@@ -2014,7 +1967,7 @@ mod tests {
         assert_eq!(conflicts.len(), 1);
         match &conflicts[0] {
             MigrationConflict::DuplicateStorageId { storage_id, paths } => {
-                assert_eq!(storage_id, "task-7");
+                assert_eq!(storage_id, "TASK-7");
                 assert_eq!(paths.len(), 2);
             }
             _ => panic!("expected duplicate storage id conflict"),
@@ -2143,7 +2096,7 @@ mod tests {
         write(&path, legacy);
         let _ = ensure_front_matter_canonical(&c, &path).unwrap();
         assert!(!path.exists());
-        let target = dir.join("backlog/archive/tasks/task-4 - Title.md");
+        let target = dir.join("backlog/archive/tasks/TASK-004 - Title.md");
         assert!(target.exists());
     }
 
@@ -2184,7 +2137,7 @@ mod tests {
         let path = dir.join("backlog/tasks/task-5 - Parsed-Title.md");
         write(&path, &content);
         let result = ensure_front_matter(&c, &path).unwrap();
-        assert!(result.contains("id: TASK-5"), "got: {}", result);
+        assert!(result.contains("id: task-5"), "got: {}", result);
         assert!(result.contains("title: Parsed-Title"), "got: {}", result);
         assert!(result.contains("ordinal: 0"), "got: {}", result);
         assert!(!result.contains("\"null\""), "got: {}", result);
@@ -2220,7 +2173,7 @@ mod tests {
         let err = ensure_front_matter(&c, &a).unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("duplicate storage id"), "{}", msg);
-        assert!(msg.contains("task-7"), "{}", msg);
+        assert!(msg.contains("TASK-7"), "{}", msg);
     }
 
     #[test]

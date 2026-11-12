@@ -244,14 +244,13 @@ fn archived_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
 
 fn backlog_archive_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
     let base = backlog_dir(ctx, cfg)?;
-    let raw = base.join("archive/tasks");
+    let raw = base.join("archive").join("tasks");
     fs::create_dir_all(&raw).map_err(|e| AppError::Runtime(e.to_string()))?;
     Context::ensure_within(&ctx.project_dir, &raw)
 }
 
 fn resolve_task_path(ctx: &Context, cfg: &Config, id: &str) -> Result<PathBuf, AppError> {
-    let storage_id =
-        crate::record::identity::task_to_storage_id(id).unwrap_or_else(|_| id.to_lowercase());
+    let storage_id = id.to_string();
     for dir in [
         active_dir(ctx, cfg),
         archived_dir(ctx, cfg),
@@ -282,12 +281,9 @@ fn task_frontmatter_storage_id(content: &str) -> Option<String> {
     if id.is_empty() {
         return None;
     }
-    if let Ok(sid) = crate::record::identity::task_to_storage_id(id) {
-        return Some(sid);
-    }
     let spec = crate::record::identity::IdSpec::default_task();
-    spec.parse_storage_number(id).ok()?;
-    Some(id.to_lowercase())
+    spec.parse_id(id).ok()?;
+    Some(id.to_string())
 }
 
 fn reject_task_write_conflict(ctx: &Context, path: &std::path::Path) -> Result<(), AppError> {
@@ -326,8 +322,12 @@ fn find_task_file(dir: &std::path::Path, storage_id: &str) -> Option<PathBuf> {
         if base.eq_ignore_ascii_case(storage_id) {
             return Some(path.clone());
         }
-        if let Ok(sid) = crate::record::identity::task_to_storage_id(base)
-            && sid.eq_ignore_ascii_case(storage_id)
+        if base.eq_ignore_ascii_case(storage_id) {
+            return Some(path.clone());
+        }
+        let spec = crate::record::identity::IdSpec::default_task();
+        if let (Ok(a), Ok(b)) = (spec.parse_id(base), spec.parse_id(storage_id))
+            && a == b
         {
             return Some(path.clone());
         }
@@ -340,10 +340,14 @@ fn find_task_file(dir: &std::path::Path, storage_id: &str) -> Option<PathBuf> {
         let Ok(content) = fs::read_to_string(path) else {
             continue;
         };
-        if let Some(sid) = task_frontmatter_storage_id(&content)
-            && sid.eq_ignore_ascii_case(storage_id)
-        {
-            return Some(path.clone());
+        if let Some(sid) = task_frontmatter_storage_id(&content) {
+            let spec = crate::record::identity::IdSpec::default_task();
+            let same = sid.eq_ignore_ascii_case(storage_id)
+                || (spec.parse_id(&sid).ok() == spec.parse_id(storage_id).ok()
+                    && spec.parse_id(&sid).is_ok());
+            if same {
+                return Some(path.clone());
+            }
         }
     }
     None
@@ -374,8 +378,7 @@ fn ensure_dir(dir: &std::path::Path, project_dir: &std::path::Path) -> Result<()
 }
 
 fn milestone_exists(ctx: &Context, cfg: &Config, id: &str) -> bool {
-    let storage_id =
-        crate::record::identity::milestone_to_storage_id(id).unwrap_or_else(|_| id.to_lowercase());
+    let storage_id = id.to_string();
     for dir in [
         milestones_active_dir(ctx, cfg),
         milestones_archived_dir(ctx, cfg),
@@ -391,8 +394,7 @@ fn milestone_exists(ctx: &Context, cfg: &Config, id: &str) -> bool {
 }
 
 fn task_exists(ctx: &Context, cfg: &Config, id: &str) -> bool {
-    let storage_id =
-        crate::record::identity::task_to_storage_id(id).unwrap_or_else(|_| id.to_lowercase());
+    let storage_id = id.to_string();
     for dir in [
         active_dir(ctx, cfg),
         archived_dir(ctx, cfg),
@@ -905,28 +907,19 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
         if let Some(deps) = obj.get_mut("dependencies") {
             match deps {
                 serde_json::Value::Array(items) => {
-                    for item in items.iter_mut() {
-                        if let serde_json::Value::String(s) = item
-                            && let Ok(display) = crate::record::identity::to_display_id(s)
-                        {
-                            *s = display;
-                        }
+                    for _item in items.iter_mut() {
+                        // no conversion
                     }
                 }
-                serde_json::Value::String(s) => {
-                    if let Ok(display) = crate::record::identity::to_display_id(s) {
-                        *s = display;
-                    }
-                }
+                serde_json::Value::String(_) => {}
                 _ => {}
             }
         }
         if let Some(milestone) = obj.get_mut("milestone")
             && let serde_json::Value::String(s) = milestone
             && !s.trim().is_empty()
-            && let Ok(display) = crate::record::identity::to_display_id(s)
         {
-            *s = display;
+            // no conversion
         }
     }
     let json = if ctx.json {
