@@ -3,7 +3,7 @@
 **Ticket:** TASK-11
 **Specification:** [`../browser-tasks-milestones-and-releases.md`](../browser-tasks-milestones-and-releases.md) — sections 3–9 and UI design handoff
 **Mockup package:** [`mockups/MOCK-0002-browser-backlog-records-review.html`](mockups/MOCK-0002-browser-backlog-records-review.html) — one self-contained review package (review landing, design deck, web prototype); registry [`mockups/README.md`](mockups/README.md)
-**Status:** `approved` — explicitly approved by the user on 2026-11-04 (TASK-11).
+**Status:** `approved` — explicitly approved by the user on 2026-11-04 (TASK-11). Revisions required by TASK-101 (per-milestone kanban board, REQ-06.013); MOCK-0002 must be revised and re-approved under TASK-102 before implementation.
 
 ## 1. Purpose and scope
 
@@ -26,12 +26,16 @@ Header (product name, project name, static offline/bind note), persistent left s
 ## 4. Backlog view
 
 - Single view named "Backlog" combining tasks, milestones, and releases.
-- Releases are shown as separators between milestones.
-- Milestones are expandable/collapsible; by default only the first milestone that has a non-archived task is expanded.
-- Tasks are organised as a kanban board with one column per task status.
-- A task's status is changed by dragging its card into another status column (drag-and-drop); each card carries a drag handle and each column is a drop target, with a helper note stating the interaction.
-- Each task card shows ID + title link, assignee, and framed-tag labels.
+- Milestones are expandable and collapsible sections (existing behavior, retained); by default only the first milestone that has a non-archived task is expanded.
+- Expanding a milestone renders that milestone's tasks as a kanban board: one column per configured task status (REQ-01.002), laid out horizontally within the milestone, in configured status order, with empty-status columns still visible.
+- The board is nested inside the milestone section; milestones remain the grouping unit of the view.
+- Milestones assigned to a release appear under that release; milestones assigned to no release are grouped together before the first release. Each release boundary is a bold separator that names the release and does not rely on colour alone. Release ordering follows ascending release ID; milestones within a release follow ascending milestone ID; the no-release group precedes all releases.
+- Tasks that belong to no milestone appear in their own expandable section, placed after all milestone sections (including all release groups); cards in the section are ordered by ascending task ID and each shows the task ID and title and links to the task record view.
+- Cards are ordered by ascending task ID within a column and show at least the task ID and title, linking to the task record view (`/doc/{id}`). Card contents beyond the ID and title, column widths, separator styling, and empty-column placeholder text are design decisions.
+- A task's status is changed by dragging its card into another status column, or with an equivalent status control on the card that does not require dragging. Either action persists the status immediately to the task record through the existing browser write contract (ADR-0006 version token, ADR-0013 single write path); the board is not a staging area with a separate save step. The change alters only the status value and preserves every other field of the task. A change that cannot be persisted leaves the card in its original column and reports the failure to the user; after a successful change the value is still shown after the view is reloaded.
+- Archived tasks and archived milestones are not shown on the board.
 - Empty states and long-title wrapping as in MOCK-0001.
+- Presentation details that remain design decisions: card contents beyond the task ID and title; column widths; separator styling and weight beyond "bold" and "names the release"; the shape of the non-drag status control (select, buttons, menu); default expansion state of milestones; empty-column placeholder text. These are resolved by the MOCK-0002 revision (TASK-102) and recorded here.
 
 ## 5. Record views
 
@@ -64,4 +68,13 @@ List: sidebar links, task card links (including drag handle for status change), 
 
 | MOCK | Status |
 | --- | --- |
-| MOCK-0002 | `approved` — explicitly approved by the user on 2026-11-04 (TASK-11). |
+| MOCK-0002 | `approved` baseline (explicitly approved by the user on 2026-11-04, TASK-11); revision required and re-approval required under TASK-102 before implementation of the per-milestone kanban board (REQ-06.013). |
+
+## Traceability
+
+| Artifact | Reference |
+| --- | --- |
+| Requirement | REQ-06.013; REQ-06.002; REQ-06.003; REQ-01.002; REQ-02.001; REQ-02.002 |
+| ADR | ADR-0006; ADR-0013 |
+| Ticket | TASK-11; TASK-101; TASK-102 (mockup revision); TASK-103 (implementation) |
+| UI mockups | MOCK-0002 (approved baseline; revision and re-approval required under TASK-102) |
