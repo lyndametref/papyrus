@@ -1,10 +1,10 @@
 ---
 id: TASK-88
 title: Adopt the Papyrus-native record layout and single ID space
-status: Implemented
+status: Done
 assignee: []
 created_date: '2026-11-11T20:42:00Z'
-updated_date: '2026-11-12T20:04:00Z'
+updated_date: '2026-11-12T20:12:00Z'
 labels:
   - native-layout
   - identity
