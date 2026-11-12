@@ -70,13 +70,13 @@ Deliver the `decision` commands so a project contributor can create, list, view,
 
 1. `papyrus decision list` lists active decisions (not archived) of all enabled types.
 2. `papyrus decision list -t <type>` filters the listing to that type.
-3. List output includes at least the ID and title of each decision in a stable order (by ID ascending).
+3. List output includes at least the canonical ID and title of each decision in a stable order (by ID ascending). The ID is the Papyrus ID (`ADR-001`), never the slugged file stem.
 4. Archived decisions and decisions of disabled types are hidden from `list`.
 5. `--json` wraps the output as a JSON array.
 
 ### 5. View
 
-1. `papyrus decision view <id>` prints the full persisted text of the decision.
+1. `papyrus decision view <id>` prints the full persisted text of the decision. The ID resolves against the canonical Papyrus ID in both the active folder and `archived/`, whether the file is named `<ID>.md` or `<ID>-<kebab-slug>.md` (ADR-0010).
 2. Viewing an archived decision by ID is allowed and prints its persisted text.
 3. Viewing an unknown ID fails with exit code 3.
 4. `--json` wraps the output as a JSON object containing at least ID, path, and content.
@@ -104,14 +104,14 @@ Deliver the `decision` commands so a project contributor can create, list, view,
 
 ### 7. Archive
 
-1. `papyrus decision archive <id>` moves the decision file from the active folder to the `archived/` folder.
+1. `papyrus decision archive <id>` moves the decision file from the active folder to the `archived/` folder, keeping its file name (including any kebab slug) and its ID.
 2. Archiving an already-archived decision fails with exit code 4.
 3. Archiving an unknown ID fails with exit code 3.
 4. Archived decisions are hidden from `list` but remain viewable and editable by ID.
 
 ### 8. Persistence and sanitization
 
-1. Decisions are stored as UTF-8 Markdown text files named `<ID>.md` in the configured `decision_directory` (active) or its `archived/` subfolder (archived). The `archived/` subfolder is created on first archive if absent.
+1. Decisions are stored as UTF-8 Markdown text files under the configured `decision_directory` (active) or its `archived/` subfolder (archived). New decisions are named `<ID>-<kebab-slug>.md`, where the slug is derived once from the creation title; an existing `<ID>.md` decision created before this convention is read, edited, and archived under its existing name and is never renamed. Resolution and listing use the canonical `<ID>`, never the slugged stem (ADR-0010, `papyrus-native-record-layout-and-single-id-space.md`). The `archived/` subfolder is created on first archive if absent.
 2. File content follows the Nygard template: a top-level heading `# <ID> <title>`, then `## Status`, `## Decision`, `## Context`, and `## Consequences` sections. Empty optional fields are omitted. When a decision has been superseded, the `## Status` section reads `Superseded by <id>`.
 3. All user-controlled input (title, decision, context, consequences, type, ID) is sanitized by normalization/escaping before use (NFR-02.002).
 4. Values that cannot be normalized into a valid form fail with exit code 4 (NFR-02.002).
@@ -158,6 +158,10 @@ Deliver the `decision` commands so a project contributor can create, list, view,
 - OQ-1: Whether `--status superseded` (the bare word) should be permitted in addition to `--superseded-by` is unspecified; this specification permits it as a valid status value without recording a superseding ID.
 - OQ-2: Whether an archived decision's status can be changed via `--status`/`--superseded-by` is unspecified; this specification allows edits to archived decisions, including status changes, consistent with the milestone pattern.
 - OQ-3: The exact Markdown section order and omission of empty fields follow the Nygard template as listed in BR-008; tests verify field presence rather than byte-for-byte formatting.
+
+## Revision notes
+
+- 2026-11-12 (TASK-88 alignment): the storage file name follows ADR-0010 decision 3 (`<ID>-<kebab-slug>.md`, slug fixed at creation), while the command contract still accepts and reports the canonical `<ID>`. Existing `<ID>.md` decisions remain readable and are never renamed; `archive` keeps the existing file name. This supersedes the earlier `<ID>.md` naming statement in section 8.1. See `papyrus-native-record-layout-and-single-id-space.md` for the layout authority.
 
 ## Traceability
 

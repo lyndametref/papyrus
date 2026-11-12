@@ -130,46 +130,46 @@ fn load_config(ctx: &Context) -> Result<Config, AppError> {
     load_effective_config(&ctx.config_path, &ctx.project_dir)
 }
 
-fn backlog_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let raw = ctx.project_dir.join(&cfg.backlog_directory);
-    Context::ensure_within(&ctx.project_dir, &raw)
+fn milestone_descriptor() -> &'static crate::record::descriptor::RecordDescriptor {
+    crate::record::descriptor::descriptor_for("milestone").expect("milestone descriptor")
+}
+
+fn milestone_id_spec(cfg: &Config) -> crate::record::identity::IdSpec {
+    crate::record::identity::IdSpec::new(cfg.milestone_prefix.clone(), cfg.id_padding as usize)
 }
 
 fn active_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let base = backlog_dir(ctx, cfg)?;
-    let raw = base.join("milestones");
-    Context::ensure_within(&ctx.project_dir, &raw)
+    milestone_descriptor().resolve_directory(cfg, &ctx.project_dir)
 }
 
-fn archived_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let base = active_dir(ctx, cfg)?;
-    let raw = base.join("archived");
-    Context::ensure_within(&ctx.project_dir, &raw)
+fn archive_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
+    milestone_descriptor()
+        .resolve_archive_directory(cfg, &ctx.project_dir)
+        .transpose()?
+        .ok_or_else(|| {
+            AppError::Runtime("milestone archive directory is not configured".to_string())
+        })
 }
 
-fn backlog_archive_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let base = backlog_dir(ctx, cfg)?;
-    let raw = base.join("archive/milestones");
-    fs::create_dir_all(&raw).map_err(|e| AppError::Runtime(e.to_string()))?;
-    Context::ensure_within(&ctx.project_dir, &raw)
+fn read_dirs(ctx: &Context, cfg: &Config) -> Vec<PathBuf> {
+    milestone_descriptor().resolve_read_directories(cfg, &ctx.project_dir)
+}
+
+/// Resolve a milestone by its Papyrus ID in the configured read locations.
+pub(crate) fn resolve_milestone_entry(ctx: &Context, cfg: &Config, id: &str) -> Option<PathBuf> {
+    let spec = milestone_id_spec(cfg);
+    let wanted = spec.parse_id(id).ok()?;
+    for dir in read_dirs(ctx, cfg) {
+        if let Some(path) = find_milestone_file(&dir, &spec, wanted) {
+            return Some(path);
+        }
+    }
+    None
 }
 
 fn resolve_milestone_path(ctx: &Context, cfg: &Config, id: &str) -> Result<PathBuf, AppError> {
-    let storage_id =
-        crate::record::identity::milestone_to_storage_id(id).unwrap_or_else(|_| id.to_lowercase());
-    for dir in [
-        active_dir(ctx, cfg),
-        archived_dir(ctx, cfg),
-        backlog_archive_dir(ctx, cfg),
-    ]
-    .into_iter()
-    .flatten()
-    {
-        if let Some(path) = find_milestone_file(&dir, &storage_id) {
-            return Ok(path);
-        }
-    }
-    Err(AppError::NotFound(format!("not found: {}", id)))
+    resolve_milestone_entry(ctx, cfg, id)
+        .ok_or_else(|| AppError::NotFound(format!("not found: {}", id)))
 }
 
 fn resolve_milestone_path_migrated(
@@ -181,7 +181,7 @@ fn resolve_milestone_path_migrated(
     crate::record::migrate::ensure_front_matter_canonical(ctx, &path)
 }
 
-fn milestone_frontmatter_storage_id(content: &str) -> Option<String> {
+fn milestone_frontmatter_id(content: &str) -> Option<String> {
     if !crate::record::frontmatter::has_front_matter(content) {
         return None;
     }
@@ -191,17 +191,12 @@ fn milestone_frontmatter_storage_id(content: &str) -> Option<String> {
     if id.is_empty() {
         return None;
     }
-    if let Ok(sid) = crate::record::identity::milestone_to_storage_id(id) {
-        return Some(sid);
-    }
-    let spec = crate::record::identity::IdSpec::default_milestone();
-    spec.parse_storage_number(id).ok()?;
-    Some(id.to_lowercase())
+    Some(id.to_string())
 }
 
 fn reject_milestone_write_conflict(ctx: &Context, path: &std::path::Path) -> Result<(), AppError> {
     let content = fs::read_to_string(path).map_err(|e| AppError::Runtime(e.to_string()))?;
-    let desc = crate::record::descriptor::descriptor_for("milestone").unwrap();
+    let desc = milestone_descriptor();
     let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
     if let Some(reason) =
         crate::record::migrate::check_conflicts_for_path(ctx, path, desc, &content, &conflicts)
@@ -215,7 +210,16 @@ fn reject_milestone_write_conflict(ctx: &Context, path: &std::path::Path) -> Res
     Ok(())
 }
 
-pub(crate) fn find_milestone_file(dir: &std::path::Path, storage_id: &str) -> Option<PathBuf> {
+/// Find a milestone file by its Papyrus number under the configured prefix.
+///
+/// Backlog-shaped stems (for example `m-0`) resolve to no record. The
+/// front-matter `id` is authoritative on a stem mismatch, but only for a
+/// native stem.
+fn find_milestone_file(
+    dir: &std::path::Path,
+    spec: &crate::record::identity::IdSpec,
+    wanted: i64,
+) -> Option<PathBuf> {
     if !dir.exists() {
         return None;
     }
@@ -229,26 +233,30 @@ pub(crate) fn find_milestone_file(dir: &std::path::Path, storage_id: &str) -> Op
         entries.push(path);
     }
     for path in &entries {
-        let stem = path.file_stem().and_then(|s| s.to_str())?;
-        let base = stem.split(" - ").next().unwrap_or(stem).trim();
-        if base.eq_ignore_ascii_case(storage_id) {
-            return Some(path.clone());
-        }
-        if let Ok(sid) = crate::record::identity::milestone_to_storage_id(base)
-            && sid.eq_ignore_ascii_case(storage_id)
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if crate::record::identity::id_number(stem, &spec.prefix)
+            .is_some_and(|number| i64::from(number) == wanted)
         {
             return Some(path.clone());
         }
     }
     // ADR-0008 decision 3/9: front-matter id is canonical; resolve a record
-    // addressed by its front-matter ID even on mismatch. Reads succeed;
+    // addressed by its front-matter ID even on a stem mismatch. Reads succeed;
     // writes refuse via reject_milestone_write_conflict.
     for path in &entries {
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if crate::record::identity::id_number(stem, &spec.prefix).is_none() {
+            continue;
+        }
         let Ok(content) = fs::read_to_string(path) else {
             continue;
         };
-        if let Some(sid) = milestone_frontmatter_storage_id(&content)
-            && sid.eq_ignore_ascii_case(storage_id)
+        if let Some(fm_id) = milestone_frontmatter_id(&content)
+            && spec.parse_id(&fm_id).ok() == Some(wanted)
         {
             return Some(path.clone());
         }
@@ -257,9 +265,9 @@ pub(crate) fn find_milestone_file(dir: &std::path::Path, storage_id: &str) -> Op
 }
 
 fn releases_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let base = backlog_dir(ctx, cfg)?;
-    let raw = base.join("releases");
-    Context::ensure_within(&ctx.project_dir, &raw)
+    let desc = crate::record::descriptor::descriptor_for("release")
+        .ok_or_else(|| AppError::Runtime("release descriptor is unavailable".to_string()))?;
+    desc.resolve_directory(cfg, &ctx.project_dir)
 }
 
 fn ensure_dir(dir: &std::path::Path, project_dir: &std::path::Path) -> Result<(), AppError> {
@@ -371,12 +379,10 @@ pub fn create(
     }
 
     let active = active_dir(ctx, &cfg)?;
-    let archived = archived_dir(ctx, &cfg)?;
-    let archive = backlog_archive_dir(ctx, &cfg)?;
     ensure_dir(&active, &ctx.project_dir)?;
-    let _ = ensure_dir(&archived, &ctx.project_dir);
-
-    let next = crate::record::identity::next_milestone_number(&active, &archived, &archive);
+    let dirs = read_dirs(ctx, &cfg);
+    let dir_refs: Vec<&std::path::Path> = dirs.iter().map(PathBuf::as_path).collect();
+    let next = crate::record::identity::next_number_in_dirs(&dir_refs, &cfg.milestone_prefix);
     let id = crate::record::identity::format_id(
         &cfg.milestone_prefix,
         next as i64,
@@ -448,6 +454,10 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
                 Some(s) => s.to_string(),
                 None => continue,
             };
+            if crate::record::identity::id_number(&id, &cfg.milestone_prefix).is_none() {
+                // Backlog-shaped stems are not Papyrus records.
+                continue;
+            }
             let safe = Context::ensure_within(&ctx.project_dir, &path)?;
             let content = fs::read_to_string(&safe).unwrap_or_default();
             if let Some(conflict) = crate::record::migrate::path_migration_conflict(
@@ -460,12 +470,11 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
                 .ok()
                 .map(|d| crate::record::document::heading_id_title_with_frontmatter(&d))
                 .unwrap_or_default();
-            let has_id_shape = fm_id.rsplit_once('-').is_some_and(|(prefix, suffix)| {
-                !prefix.is_empty()
-                    && !suffix.is_empty()
-                    && suffix.chars().all(|c| c.is_ascii_digit())
-            });
-            let display_id = if has_id_shape { fm_id } else { id.clone() };
+            let display_id = if milestone_id_spec(&cfg).parse_id(&fm_id).is_ok() {
+                fm_id
+            } else {
+                id.clone()
+            };
             let title = if parsed_title.is_empty() {
                 display_id.clone()
             } else {
@@ -719,16 +728,33 @@ pub fn edit(
     })
 }
 
+fn same_directory(left: &std::path::Path, right: &std::path::Path) -> bool {
+    left == right
+        || left
+            .canonicalize()
+            .ok()
+            .is_some_and(|l| right.canonicalize().ok().is_some_and(|r| l == r))
+}
+
+fn path_in_directory(path: &std::path::Path, dir: &std::path::Path) -> bool {
+    path.parent()
+        .is_some_and(|parent| same_directory(parent, dir))
+}
+
 pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
     let path = resolve_milestone_path(ctx, &cfg, &id)?;
+    let active = active_dir(ctx, &cfg)?;
+    if !path_in_directory(&path, &active) {
+        return Err(AppError::Validation(format!("already archived: {}", id)));
+    }
     reject_milestone_write_conflict(ctx, &path)?;
     let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
-    let archived = archived_dir(ctx, &cfg)?;
-    ensure_dir(&archived, &ctx.project_dir)?;
+    let archive = archive_dir(ctx, &cfg)?;
+    ensure_dir(&archive, &ctx.project_dir)?;
 
-    let archived_path = archived.join(
+    let archived_path = archive.join(
         path.file_name()
             .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?,
     );
@@ -824,13 +850,13 @@ mod tests {
         let dir = tmpdir("mismatch-canonical-view");
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
-        let content = "---\nid: m-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
-        fs::write(dir.join("backlog/milestones/m-2 - MileTwo.md"), content).unwrap();
+        let content = "---\nid: MS-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
+        fs::write(dir.join("backlog/milestones/MS-2 - MileTwo.md"), content).unwrap();
         // Canonical front-matter id m-99 -> display MS-100.
-        let out = view(&c, "MS-100").unwrap_or_else(|e| panic!("canonical view failed: {}", e));
-        assert!(out.text.contains("id: m-99"), "got: {}", out.text);
-        let out2 = view(&c, "MS-003").unwrap_or_else(|e| panic!("filename view failed: {}", e));
-        assert!(out2.text.contains("id: m-99"), "got: {}", out2.text);
+        let out = view(&c, "MS-99").unwrap_or_else(|e| panic!("canonical view failed: {}", e));
+        assert!(out.text.contains("id: MS-99"), "got: {}", out.text);
+        let out2 = view(&c, "MS-2").unwrap_or_else(|e| panic!("filename view failed: {}", e));
+        assert!(out2.text.contains("id: MS-99"), "got: {}", out2.text);
     }
 
     #[test]
@@ -838,9 +864,9 @@ mod tests {
         let dir = tmpdir("mismatch-canonical-edit");
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
-        let content = "---\nid: m-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
-        fs::write(dir.join("backlog/milestones/m-2 - MileTwo.md"), content).unwrap();
-        let err = edit(&c, "MS-100", Some("NewMile"), None, None, None, &[], &[])
+        let content = "---\nid: MS-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
+        fs::write(dir.join("backlog/milestones/MS-2 - MileTwo.md"), content).unwrap();
+        let err = edit(&c, "MS-99", Some("NewMile"), None, None, None, &[], &[])
             .err()
             .expect("expected error");
         let msg = err.to_string();
@@ -850,7 +876,7 @@ mod tests {
             msg
         );
         assert_eq!(
-            fs::read_to_string(dir.join("backlog/milestones/m-2 - MileTwo.md")).unwrap(),
+            fs::read_to_string(dir.join("backlog/milestones/MS-2 - MileTwo.md")).unwrap(),
             content
         );
     }
@@ -860,15 +886,15 @@ mod tests {
         let dir = tmpdir("mismatch-archive");
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
-        let content = "---\nid: m-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
-        fs::write(dir.join("backlog/milestones/m-2 - MileTwo.md"), content).unwrap();
-        let err = archive(&c, "MS-003").err().expect("expected error");
+        let content = "---\nid: MS-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
+        fs::write(dir.join("backlog/milestones/MS-2 - MileTwo.md"), content).unwrap();
+        let err = archive(&c, "MS-2").err().expect("expected error");
         assert!(
             err.to_string().contains("migration conflict"),
             "got: {}",
             err
         );
-        assert!(dir.join("backlog/milestones/m-2 - MileTwo.md").exists());
+        assert!(dir.join("backlog/milestones/MS-2 - MileTwo.md").exists());
     }
 
     #[test]
@@ -877,10 +903,10 @@ mod tests {
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
         let body = "\n## Description\n\nMile body\n";
-        let content = format!("---\nid: m-2\ntitle: MileTwo\n---\n{}", body);
-        let path = dir.join("backlog/milestones/m-2 - MileTwo.md");
+        let content = format!("---\nid: MS-2\ntitle: MileTwo\n---\n{}", body);
+        let path = dir.join("backlog/milestones/MS-2 - MileTwo.md");
         fs::write(&path, &content).unwrap();
-        let out = view(&c, "MS-003").unwrap();
+        let out = view(&c, "MS-2").unwrap();
         for key in [
             "created_date:",
             "updated_date:",
@@ -908,15 +934,107 @@ mod tests {
         fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
         let body = "\n## Description\n\nMile body UNIQUE-M\n";
         let content = format!(
-            "---\nid: m-2\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n{}",
+            "---\nid: MS-2\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n{}",
             body
         );
-        let path = dir.join("backlog/milestones/m-2 - MileTwo.md");
+        let path = dir.join("backlog/milestones/MS-2 - MileTwo.md");
         fs::write(&path, &content).unwrap();
-        edit(&c, "MS-003", Some("NewMile"), None, None, None, &[], &[]).unwrap();
+        edit(&c, "MS-2", Some("NewMile"), None, None, None, &[], &[]).unwrap();
         let after = fs::read_to_string(&path).unwrap();
         assert!(after.contains("title: NewMile"), "got: {}", after);
         let (_, after_body) = crate::record::frontmatter::split(&after).unwrap();
         assert_eq!(after_body, body);
+    }
+
+    fn milestone_record(id: &str, title: &str) -> String {
+        format!(
+            "---\nid: {id}\ntitle: {title}\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nBody\n"
+        )
+    }
+
+    #[test]
+    fn archive_moves_to_canonical_milestone_archive() {
+        let dir = tmpdir("archive-canonical");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
+        fs::write(
+            dir.join("backlog/milestones/MS-001.md"),
+            milestone_record("MS-001", "One"),
+        )
+        .unwrap();
+        archive(&c, "MS-001").unwrap();
+        assert!(!dir.join("backlog/milestones/MS-001.md").exists());
+        assert!(dir.join("backlog/archive/milestones/MS-001.md").exists());
+        assert!(!dir.join("backlog/milestones/archived/MS-001.md").exists());
+        // No unarchive command exists: the lifecycle stays create, list,
+        // view, edit, archive, delete (REQ-03.001).
+        assert!(
+            matches!(resolve_milestone_entry(&c, &Config::default(), "MS-001"), Some(path) if path.ends_with("backlog/archive/milestones/MS-001.md"))
+        );
+    }
+
+    #[test]
+    fn backlog_shaped_milestone_stem_is_invisible() {
+        let dir = tmpdir("backlog-shape");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
+        fs::write(
+            dir.join("backlog/milestones/m-0 - Foundation.md"),
+            milestone_record("MS-0", "Foundation"),
+        )
+        .unwrap();
+        assert!(matches!(view(&c, "MS-000"), Err(AppError::NotFound(_))));
+        let out = list(&c).unwrap();
+        assert!(out.text.is_empty(), "got: {}", out.text);
+    }
+}
+
+#[cfg(test)]
+mod native_layout_tests {
+    use super::*;
+
+    fn tmpdir(name: &str) -> PathBuf {
+        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join(format!("milestone-native-{}", name));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        base
+    }
+
+    fn ctx(dir: &std::path::Path) -> Context {
+        Context {
+            project_dir: dir.to_path_buf(),
+            config_path: dir.join("papyrus.config.yml"),
+            json: false,
+            no_color: true,
+        }
+    }
+
+    fn record(id: &str, title: &str) -> String {
+        format!(
+            "---\nid: {id}\ntitle: {title}\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nBody\n"
+        )
+    }
+
+    #[test]
+    fn archive_from_legacy_alias_is_refused_without_changing_the_file() {
+        let dir = tmpdir("legacy-archive-refusal");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/milestones/archived")).unwrap();
+        let path = dir.join("backlog/milestones/archived/MS-005.md");
+        let before = record("MS-005", "Five");
+        fs::write(&path, &before).unwrap();
+
+        let err = match archive(&c, "MS-005") {
+            Err(err) => err,
+            Ok(_) => panic!("archive from a legacy alias must fail"),
+        };
+        assert!(
+            matches!(&err, AppError::Validation(message) if message.contains("already archived")),
+            "unexpected error: {err:?}"
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), before);
+        assert!(!dir.join("backlog/archive/milestones/MS-005.md").exists());
     }
 }

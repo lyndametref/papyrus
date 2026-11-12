@@ -1,6 +1,7 @@
 # Feature Specification — Papyrus-Native Record Layout and Single ID Space
 
-**Ticket:** TASK-83
+**Ticket:** TASK-83 (specification); refined for implementation TASK-88
+**Scope note (2026-11-12):** applies to every managed family; releases are verified rather than rebuilt, and the documented command set is unchanged.
 **Milestone:** m-16 (Release 1.0)
 **Status:** Refined (execution-ready)
 **UI mockups:** none
@@ -19,6 +20,7 @@ Define the Papyrus-native on-disk record layout and the single Papyrus ID space 
 - Front-matter `id` as the authoritative record identity; disagreement with the stem is a validation error that refuses writes.
 - Number allocation without offsets: `max(observed) + 1` over every active, archived, and deprecated location of a family; minimum 1; milestones start at 1.
 - Archive, restore, deprecate, restore as file moves that keep the file name and the ID.
+- Family-specific lifecycle behavior: tasks and milestones archive into the canonical archive directories, decisions archive into `<decision_directory>/archived/`, document records deprecate into `deprecated/`, and releases are never archived.
 - Atomic whole-folder relocation during `config set` (REQ-01.002).
 - The rule that Backlog.md storage stems (`task-18`, `m-0`, …) match no Papyrus record, so an unimported Backlog.md store is invisible to every Papyrus surface.
 
@@ -27,7 +29,8 @@ Define the Papyrus-native on-disk record layout and the single Papyrus ID space 
 - The one-way import itself — see `import-backlog-md-records.md`.
 - Front-matter field map and patching — ADR-0012 / `migrate-document-record-types-to-front-matter-lazily-on-first-read-and-first-write.md`.
 - UI mockups (HTML records) — excluded from this layout's Markdown rules.
-- Corpus-wide migration or renaming of existing records.
+- Corpus-wide migration or renaming of existing records, including existing unslugged decision files and slugged document files.
+- Adding lifecycle commands. The documented command set is unchanged: no release archive/restore, no milestone unarchive/restore, and no decision restore (BR-008, BR-007, REQ-03.001, `release-lifecycle.md`).
 
 ## Behavior
 
@@ -40,16 +43,18 @@ Define the Papyrus-native on-disk record layout and the single Papyrus ID space 
 
 ### 2. Configuration-driven directories
 
-1. Descriptors name a configuration key, never a literal path. The configured roots are the only source of locations.
+1. Descriptors name a configuration key, never a literal path. The configured roots are the only source of locations. A descriptor stores a key such as `backlog`, `decision`, or `doc` (plus, for a document type, the type entry), and the resolver appends only the fixed family subpath (`tasks/`, `milestones/`, `releases/`, `archive/...`, or the document type's configured `directory`); no descriptor or module may embed a full path literal such as `backlog/tasks`, `backlog/milestones`, `archive/tasks`, or `docs/decisions`, and no `concat!` (or equivalent) path construction may remain in `src/record/descriptor.rs`.
 2. Directory layout:
 
    | Record family | Active | Inactive (archive) | Deprecated |
    |---|---|---|---|
    | Task | `<backlog_directory>/tasks/` | `<backlog_directory>/archive/tasks/` | — |
    | Milestone | `<backlog_directory>/milestones/` | `<backlog_directory>/archive/milestones/` | — |
-   | Release | `<backlog_directory>/releases/` | `<backlog_directory>/archive/releases/` | — |
-   | Decision (ADR, BDR) | `<decision_directory>/` | — | in place via `## Status` |
-   | Document record (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `tech-spec`, `audit`, `deploy`, `use-case`, `test-case`, `test-report`) | `<doc_directory>/<type directory>/` | — | `<doc_directory>/<type directory>/deprecated/` |
+   | Release | `<backlog_directory>/releases/` | — (no archive command; status `released`) | — |
+   | Decision (ADR, BDR) | `<decision_directory>/` | `<decision_directory>/archived/` (explicit `papyrus decision archive` only) | in place via `## Status` (deprecation never moves the file) |
+   | Document record (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `tech-spec`, `audit`, `deploy`, `use-case`, `test-case`, `test-report`) | `<doc_directory>/<type directory>/` | — (no archive command) | `<doc_directory>/<type directory>/deprecated/` |
+
+   The `Inactive (archive)` column lists only locations an existing archive command writes. Releases are never archived (BR-007, `release-lifecycle.md`), and no `archive/releases/` path is read or written. Decision deprecation is the `## Status` line and never moves a file; the decision archive move is the separate documented `papyrus decision archive` command (BR-008, REQ-04.002). The `Inactive (archive)` destination is the only destination for a new archive in every family; the legacy alias directories of section 4.5 are read-only tolerances and are never written by an archive operation.
 
 3. `backlog_directory` and `decision_directory` are relative to the project directory; a document type's `directory` is relative to `doc_directory`.
 4. Every resolved path passes `Context::ensure_within` before any read or write (NFR-04.002).
@@ -58,39 +63,46 @@ Define the Papyrus-native on-disk record layout and the single Papyrus ID space 
 ### 3. File name
 
 1. Default: `<ID>.md`, where `<ID>` is the full Papyrus ID including the configured prefix and padding (`TASK-001.md`, `MS-001.md`, `REL-001.md`, `REQ-01.001.md`, `NFR-04.004.md`, `GLO-001.md`, `RUL-016.md`, `AUD-001.md`).
-2. Decisions keep a descriptive suffix because the ADR corpus convention and its external links require it: `<ID>-<kebab-case-slug>.md` (`ADR-0010-papyrus-native-on-disk-record-layout.md`). The slug is fixed at creation and is never regenerated.
-3. The slug is cosmetic. Resolution never uses it. No writer renames a file when a title changes.
-4. Document records that already carry a slug (for example this repository's `BR-016-<slug>.md`) keep their names when read and written; new records of those types use `<ID>.md` unless a later decision gives that type its own suffix rule.
+2. Decisions keep a descriptive suffix because the ADR corpus convention and its external links require it: `<ID>-<kebab-case-slug>.md` (`ADR-0010-papyrus-native-on-disk-record-layout.md`). At creation the writer derives the slug from the created title (see the assumption on slug derivation) and writes that name. The slug is fixed at creation and is never regenerated.
+3. The slug is cosmetic. Resolution never uses it: a decision is resolved by its `<ID>` part, and every CLI and browser surface reports the canonical ID (`ADR-0010`), never the slugged stem. No writer renames a file when a title changes. A decision file that already exists without a slug (for example one created before this convention) remains readable, editable, and archivable under its existing `<ID>.md` name and is never renamed.
+4. Document records are named `<ID>.md`. A document file that already carries a slug after its full canonical ID (`BR-016-<slug>.md`) is read as `<ID>` and keeps its name when read and written; new records of those types use `<ID>.md` unless a later decision gives that type its own suffix rule. A trailing suffix is stripped only when the prefix plus ID matches the family's full ID shape exactly, so a dotted ID component (`REQ-01.001` versus `REQ-01.002`) is never mistaken for a slug.
 
 ### 4. Resolution (read tolerance)
 
-1. A file inside a claimed directory whose stem is `<PREFIX>-<digits>` optionally followed by `-<slug>` or ` - <slug>` is a candidate record.
-2. The prefix is compared case-insensitively against the configured prefix; leading zeros are optional, so `TASK-1.md`, `TASK-001.md`, and `TASK-0001.md` all denote `TASK-001`.
-3. Backlog.md storage stems are **not** recognized. `task-18`, `m-0`, and any other Backlog storage prefix match no Papyrus record, so an unimported Backlog store is invisible to every Papyrus surface. This enforces "the import is the only bridge" (ADR-0011).
-4. Front-matter `id` is authoritative. If it disagrees with the stem after normalization, the record is read from front matter, is flagged invalid, and writes to it are refused until the file is fixed.
-5. Legacy archive aliases `<backlog_directory>/tasks/archived/` and `<backlog_directory>/milestones/archived/` are read as archived tasks and milestones. A read never relocates or renames them; archive/restore operations follow section 7.
+1. A file inside a claimed directory whose stem is `<PREFIX>-<digits>` optionally followed by `-<slug>` or ` - <slug>` is a candidate record. Decision stems follow this shape: `<ID>-<kebab-slug>` or `<ID>`. Document families use their full ID shape (`REQ-01.001`, `NFR-04.004`, `GLO-001`), optionally followed by `-<slug>` or ` - <slug>` after that complete ID.
+2. The prefix is compared case-insensitively against the configured prefix and leading zeros are optional, so `TASK-1.md`, `TASK-001.md`, and `TASK-0001.md` all denote `TASK-001`. Case-insensitive matching is retained for Papyrus prefixes (for example `Task-001` or `task-001` with a padded number).
+3. Backlog.md storage stems are **not** recognized. A stem is Backlog-shaped, and resolves to no record, when its prefix is the all-lowercase form of a configured prefix that contains at least one uppercase letter **and** its number has no leading zeros (the Backlog storage shape, e.g. `task-18`, `m-0`). Such a stem is invisible even though it case-folds to the configured prefix. Any other Backlog storage prefix has the same effect. This enforces "the import is the only bridge" (ADR-0011). All other case variants, including padded lowercase forms such as `task-001`, resolve normally. When the configured prefix is itself all lowercase, its unpadded stems cannot be distinguished from Backlog storage stems and are treated as native (see the assumption on prefix casing).
+4. Front-matter `id` is authoritative. If it disagrees with the stem's ID after normalization, the record is read from front matter, is flagged invalid, and writes to it are refused until the file is fixed. The normalized stem ID is the canonical ID part only, never the slug.
+5. Legacy archive aliases `<backlog_directory>/tasks/archived/` and `<backlog_directory>/milestones/archived/` are read as archived tasks and milestones. A read never relocates or renames them, and an archive never writes into these directories. Archiving a record found there fails as already archived without writing, moving, or removing it; restoring a record found there is the only operation that moves it, to the active directory, keeping the file name and the ID (section 7).
+6. Decisions are resolved by canonical ID across `<decision_directory>/` and `<decision_directory>/archived/`, regardless of whether the file is named `<ID>.md` or `<ID>-<slug>.md`. If both directories, or two files with the same ID and different slugs in one directory, hold the ID, the record is a duplicate: it is flagged invalid and writes are refused (section 7.4). Listing reads only the active directory.
+7. Document records are resolved by canonical ID across their active directory and its `deprecated/` subdirectory; a slugged stem resolves to the ID before the first slug separator, and every surface reports that ID. A duplicate ID across the two directories is flagged invalid and writes are refused (section 7.4).
 
 ### 5. Numbering and immutability
 
 1. Each record family has one number space: tasks, milestones, releases, and each decision prefix and document prefix separately.
 2. **Milestones start at 1 (`MS-001`); the Backlog `m-0` offset is gone.** Milestone renumbering is accepted as a user-visible consequence: a milestone stored as `m-N` is remapped into the Papyrus milestone space by allocation (see `import-backlog-md-records.md`), and the source `m-` number is never preserved.
-3. Allocation is `max(number present in every active, archived and deprecated location of that family) + 1`, minimum 1. A number is allocated once, at creation, and never recomputed.
+3. Allocation is `max(number present in every active, archived, archived/ and deprecated location of that family) + 1`, minimum 1. The scanned locations are: tasks and milestones — active, canonical archive, and the legacy alias; releases — active only; decisions — active and `archived/`; document records — active and `deprecated/`. A number is allocated once, at creation, and never recomputed.
 4. Deleting the highest-numbered record makes that number available again; existing records are never renumbered.
 5. Archive, restore, deprecate, restore, supersede, and title edits never change an ID or a file name.
 6. A configuration change to a prefix or `id_padding` affects only records created afterwards. Existing IDs, file names, and reference values are untouched, and padding remains a minimum (REQ-01.005, REQ-01.007).
 
 ### 6. No shape conversion, no renaming on read or write
 
-1. No path converts a record to a Backlog.md on-disk shape, writes a Backlog storage ID, or renames a file into another naming convention.
-2. Lazy adoption (REQ-05.011, ADR-0012) adds a front-matter block and may retire legacy metadata sections; it does not move, rename, or re-shape the file.
+1. No path converts a record to a Backlog.md on-disk shape, writes a Backlog storage ID, or renames a file into another naming convention. No read or write path relocates or renames a record; the legacy conversion and relocation path in `src/record/migrate.rs` is removed (relocation by TASK-88, body conversion by TASK-89).
+2. Lazy adoption (REQ-05.011, ADR-0012) adds a front-matter block and may retire legacy metadata sections; it does not move or rename the file and does not convert its body to the Backlog.md layout.
 3. A record that is not in the native layout stays where it is; the one-way import (`import-backlog-md-records.md`) is the supported way to bring a Backlog.md store into the native layout.
 
 ### 7. Archive, restore, deprecate, restore are moves
 
-1. An archive moves the file from the active directory to the archive directory of its family and an unarchive moves it back, keeping the file name and the ID.
-2. Deprecate and restore do the same between the active and `deprecated/` directories of a **document** type (REQ-05.007). Decision records are never moved on deprecation: their state is the `## Status` line, and keeping them in the decision directory keeps them in the ADR index.
+1. An archive moves the file from the active directory to the archive directory of its family and keeps the file name and the ID. The family destinations are:
+   - tasks → `<backlog_directory>/archive/tasks/`;
+   - milestones → `<backlog_directory>/archive/milestones/`;
+   - decisions → `<decision_directory>/archived/`, through the existing `papyrus decision archive` command (BR-008, REQ-04.002).
+   Releases and document records have no archive command. No milestone unarchive/restore command exists (REQ-03.001), no decision restore command exists (BR-008), and this specification adds none; task restore moves a record from the canonical archive or either legacy alias to the active directory.
+2. Deprecate and restore do the same between the active and `deprecated/` directories of a **document** type (REQ-05.007). Decision deprecation is not a move: it is the `## Status` line (`deprecated`, `rejected`, or `superseded`) in place, and keeping decisions in the decision directory keeps them in the ADR index. The decision archive move of section 7.1 is a separate, explicit command and does not by itself change `## Status`.
 3. A move inside the project uses a same-directory-or-same-filesystem rename where available, otherwise the ADR-0006 atomic write sequence (write the destination with `create_new`, `sync_all`, then remove the source).
-4. A failed move leaves the record readable at exactly one location and reports the error; it never duplicates a record silently. If both locations hold the file, the record is flagged invalid and writes are refused.
+4. A failed move leaves the record readable at exactly one location and reports the error; it never duplicates a record silently. If more than one of the active, archive, `archived/`, legacy alias, and deprecated locations of a family hold the same canonical ID, the record is flagged invalid and writes are refused. Duplicate detection is keyed by canonical ID, not by file name.
+5. Archiving a record that is already in its archive location or in a legacy alias directory is refused as already archived and performs no write, move, or removal. Only restore may move a record out of an archive or alias, and it targets the active directory.
 
 ### 8. Whole-folder relocation on `config set`
 
@@ -125,12 +137,22 @@ Define the Papyrus-native on-disk record layout and the single Papyrus ID space 
 
 - Assumption: configuration roots already exist (`backlog_directory`, `decision_directory`, `doc_directory`, and a `directory` per document type) and are relative to the project directory.
 - Assumption: `id_padding` is constrained to 1–6 and is a minimum width (REQ-01.007); existing IDs are never reformatted when padding changes.
-- Assumption: document records already follow `<ID>.md` and decisions `<ID>-<slug>.md`, so no renaming is needed for the document corpus.
-- Assumption: no UI design or mockup is required because this is a storage/path specification with no user-facing UI beyond existing command output.
+- Assumption: a decision's kebab slug is derived at creation from the sanitized title: lowercase ASCII alphanumerics, every run of other characters collapsed to a single `-`, leading and trailing `-` removed. If the result is empty, the file is written as `<ID>.md`. The slug is derived once and never recomputed.
+- Assumption: document records created after this layout use `<ID>.md`; document records that already carry `<ID>-<slug>.md` keep their names and are resolved by the ID part. No corpus rename is performed.
+- Assumption: the existing `papyrus decision archive` command and its `<decision_directory>/archived/` directory remain part of the documented command set (BR-008, REQ-04.002). This layout changes the decision file name and resolution rules, not the existence of the command.
+- Assumption: the Backlog-shaped exclusion of section 4.3 applies only when the configured prefix contains at least one uppercase letter. A project configured with an all-lowercase prefix is treated as Papyrus-native because Papyrus itself can emit an unpadded stem when `id_padding` is 1; such a project cannot distinguish a Backlog storage stem from its own record, and that limitation is accepted.
+- Assumption: no UI design or mockup is required; this is a storage/path and ID-derivation specification whose only visible effect is the ID and path shown by existing CLI and browser record views.
 
 ## Open questions
 
 - None. The layout, single ID space, and configuration-driven path convention were confirmed by the user on 2026-11-11 (ADR-0010).
+
+## Revision notes
+
+- 2026-11-12 (TASK-88 alignment): resolved four ambiguities left by the earlier refinement. (1) Decision file names follow ADR-0010 decision 3: creation writes `<ID>-<kebab-slug>.md`, resolution and reporting use the canonical `<ID>`, existing unslugged decision files stay readable and are never renamed. (2) TASK-88 covers all managed families: tasks and milestones are implemented, decisions and document records get the layout behavior specific to them, and releases are verified from the existing release implementation (native `<ID>.md`, configuration-driven directory, no translation) with no new lifecycle command; the ticket's ACs are now family-specific. (3) Archive and deprecation are distinct: decision deprecation is `## Status` in place, while the documented `papyrus decision archive` moves to `<decision_directory>/archived/`; releases and documents have no archive command. (4) Archiving an already archived record, including one in a legacy alias directory, fails without any write or move; restore is the only operation that moves a record to the active directory.
+- 2026-11-12 (TASK-88 refinement): confirmed the canonical archive target `<backlog_directory>/archive/<family>/` of section 2.2 and section 7.1; the legacy `tasks/archived/` and `milestones/archived/` locations are read-only aliases and a restore from them moves the file to the active directory. Confirmed that no milestone unarchive command exists, so section 7.1 adds none. Approved the section 2.1 and section 4.2–4.3 wording, including the all-lowercase/unpadded exclusion and the prefix-casing assumption. Recorded that the lazy relocation path is removed by TASK-88 and the lazy body conversion by TASK-89, and that lazy adoption never relocates or renames a file.
+- Note for architecture: ADR-0010's decision 2 table and decision 7 text should be aligned with this specification and the existing documented commands: remove `<backlog_directory>/archive/releases/` (releases are never archived, BR-007/`release-lifecycle.md`) and record the decision archive location `<decision_directory>/archived/` for the explicit `papyrus decision archive` command (BR-008, REQ-04.002), while keeping deprecation in place via `## Status`. ADR-0010 decision 4 also states the Backlog-shaped exclusion absolutely; this specification records its qualification for an all-lowercase configured prefix. Both points need architect sign-off; they do not change the ticket's behavior beyond the documented commands.
+- Specification conflicts resolved: `decision-records-management.md` section 8.1 is updated from `<ID>.md` to the ADR-0010 slug convention with canonical-ID resolution, and `browser-decision-records.md` section 2 now derives the canonical ID from a slugged stem instead of treating the stem as the ID.
 
 ## Sources
 
@@ -146,9 +168,11 @@ Define the Papyrus-native on-disk record layout and the single Papyrus ID space 
 
 | Artifact | Reference |
 |---|---|
-| Ticket | TASK-83 |
-| Requirements | REQ-01.005, REQ-01.002, REQ-01.007, REQ-05.010, REQ-05.011, REQ-06.008 |
+| Ticket | TASK-83 (specification), TASK-88 (implementation) |
+| Requirements | REQ-01.005, REQ-01.002, REQ-01.007, REQ-04.002, REQ-05.010, REQ-05.011, REQ-06.008 |
+| Business rules | BR-007 (release lifecycle), BR-008 (decision commands) |
 | ADRs | ADR-0010, ADR-0011, ADR-0012, ADR-0013 |
+| Related specifications | `decision-records-management.md`, `release-lifecycle.md`, `browser-decision-records.md` |
 | Related tickets | TASK-88, TASK-89, TASK-90, TASK-92, TASK-98, TASK-100 |
 | Source | src/record/identity.rs, src/record/descriptor.rs, src/record/store.rs, src/task.rs, src/milestone.rs, src/config.rs, src/context.rs |
 | UI mockups | none |

@@ -141,43 +141,12 @@ fn active_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
 }
 
 fn deprecated_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    Ok(active_dir(ctx, cfg)?.join("deprecated"))
+    let raw = active_dir(ctx, cfg)?.join("deprecated");
+    Context::ensure_within(&ctx.project_dir, &raw)
 }
 
 fn ensure_dirs(dir: &Path) -> Result<(), AppError> {
     fs::create_dir_all(dir).map_err(|e| AppError::Runtime(e.to_string()))
-}
-
-fn is_record_path(path: &Path, prefix: &str) -> bool {
-    path.extension().and_then(|s| s.to_str()) == Some("md")
-        && path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .is_some_and(|stem| crate::record::identity::is_record_stem(stem, prefix))
-}
-
-fn find_record(ctx: &Context, dir: &Path, id: &str) -> Result<Option<PathBuf>, AppError> {
-    let rd = match fs::read_dir(dir) {
-        Ok(rd) => rd,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(AppError::Runtime(e.to_string())),
-    };
-    for entry in rd {
-        let entry = entry.map_err(|e| AppError::Runtime(e.to_string()))?;
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
-        if path.extension().and_then(|s| s.to_str()) != Some("md") {
-            continue;
-        }
-        if path.file_stem().and_then(|s| s.to_str()) != Some(id) {
-            continue;
-        }
-        let safe = Context::ensure_within(&ctx.project_dir, &path)?;
-        return Ok(Some(safe));
-    }
-    Ok(None)
 }
 
 fn active_or_deprecated(
@@ -185,14 +154,17 @@ fn active_or_deprecated(
     active: &Path,
     deprecated: &Path,
     id: &str,
-) -> Result<PathBuf, AppError> {
-    if let Some(path) = find_record(ctx, active, id)? {
-        return Ok(path);
-    }
-    if let Some(path) = find_record(ctx, deprecated, id)? {
-        return Ok(path);
-    }
-    Err(AppError::NotFound(format!("not found: {}", id)))
+    prefix: &str,
+    dotted: bool,
+) -> Result<crate::record::resolve::ResolvedRecord, AppError> {
+    crate::record::resolve::resolve_in_dirs(
+        ctx,
+        &[active.to_path_buf(), deprecated.to_path_buf()],
+        id,
+        &[prefix.to_string()],
+        dotted,
+    )?
+    .ok_or_else(|| AppError::NotFound(format!("not found: {}", id)))
 }
 
 #[derive(Clone, Debug, Default)]
@@ -334,34 +306,32 @@ pub fn create(
 pub fn list(ctx: &Context) -> Result<CommandOutput, AppError> {
     let cfg = load_config(ctx)?;
     let entry = type_entry(&cfg)?;
+    let descriptor = crate::record::descriptor::descriptor_for_doc_type("audit")
+        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
+    let dotted = descriptor.is_dotted_id();
     let active = active_dir(ctx, &cfg)?;
     let _ = ensure_dirs(&active);
 
+    let records = crate::record::resolve::list_in_dir(
+        ctx,
+        &active,
+        std::slice::from_ref(&entry.prefix),
+        dotted,
+    )?;
     let mut items: Vec<(String, String, String)> = Vec::new();
-    if let Ok(rd) = fs::read_dir(&active) {
-        for e in rd {
-            let e = e.map_err(|err| AppError::Runtime(err.to_string()))?;
-            let path = e.path();
-            if !path.is_file() || !is_record_path(&path, &entry.prefix) {
-                continue;
-            }
-            let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
-                continue;
-            };
-            let safe = Context::ensure_within(&ctx.project_dir, &path)?;
-            let content =
-                fs::read_to_string(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
-            let title = crate::record::document::parse(&content)
-                .ok()
-                .map(|d| crate::record::document::heading_id_title(&d).1)
-                .unwrap_or_default();
-            let title = if title.is_empty() {
-                id.to_string()
-            } else {
-                title
-            };
-            items.push((id.to_string(), title, content));
-        }
+    for record in records {
+        let content =
+            fs::read_to_string(&record.path).map_err(|e| AppError::Runtime(e.to_string()))?;
+        let title = crate::record::document::parse(&content)
+            .ok()
+            .map(|d| crate::record::document::heading_id_title(&d).1)
+            .unwrap_or_default();
+        let title = if title.is_empty() {
+            record.id.clone()
+        } else {
+            title
+        };
+        items.push((record.id, title, content));
     }
     items.sort_by(|a, b| a.0.cmp(&b.0));
 
@@ -391,13 +361,20 @@ pub fn list(ctx: &Context) -> Result<CommandOutput, AppError> {
 }
 
 pub fn view(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
-    let id = sanitize_field(id_raw)?;
+    let requested = sanitize_field(id_raw)?;
     let cfg = load_config(ctx)?;
+    let entry = type_entry(&cfg)?;
+    let descriptor = crate::record::descriptor::descriptor_for_doc_type("audit")
+        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
+    let dotted = descriptor.is_dotted_id();
     let active = active_dir(ctx, &cfg)?;
     let deprecated = deprecated_dir(ctx, &cfg)?;
     let _ = ensure_dirs(&active);
     let _ = ensure_dirs(&deprecated);
-    let path = active_or_deprecated(ctx, &active, &deprecated, &id)?;
+    let record =
+        active_or_deprecated(ctx, &active, &deprecated, &requested, &entry.prefix, dotted)?;
+    let id = record.id.clone();
+    let path = record.path;
 
     let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
     let json = if ctx.json {
@@ -440,13 +417,21 @@ pub fn edit(
     references_raw: &[String],
     editor: bool,
 ) -> Result<CommandOutput, AppError> {
-    let id = sanitize_field(id_raw)?;
+    let requested = sanitize_field(id_raw)?;
     let cfg = load_config(ctx)?;
+    let entry = type_entry(&cfg)?;
+    let descriptor = crate::record::descriptor::descriptor_for_doc_type("audit")
+        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
+    let dotted = descriptor.is_dotted_id();
     let active = active_dir(ctx, &cfg)?;
     let deprecated = deprecated_dir(ctx, &cfg)?;
     let _ = ensure_dirs(&active);
     let _ = ensure_dirs(&deprecated);
-    let path = active_or_deprecated(ctx, &active, &deprecated, &id)?;
+    let resolved =
+        active_or_deprecated(ctx, &active, &deprecated, &requested, &entry.prefix, dotted)?;
+    resolved.ensure_writable()?;
+    let id = resolved.id.clone();
+    let path = resolved.path.clone();
 
     let editor_cmd = if editor {
         Some(
@@ -577,26 +562,34 @@ fn run_editor(command: &str, path: &Path) -> Result<(), AppError> {
 }
 
 pub fn deprecate(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
-    let id = sanitize_field(id_raw)?;
+    let requested = sanitize_field(id_raw)?;
     let cfg = load_config(ctx)?;
+    let entry = type_entry(&cfg)?;
+    let descriptor = crate::record::descriptor::descriptor_for_doc_type("audit")
+        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
+    let dotted = descriptor.is_dotted_id();
     let active = active_dir(ctx, &cfg)?;
     let deprecated = deprecated_dir(ctx, &cfg)?;
     let _ = ensure_dirs(&active);
     ensure_dirs(&deprecated)?;
 
-    let Some(path) = find_record(ctx, &active, &id)? else {
-        if find_record(ctx, &deprecated, &id)?.is_some() {
-            return Err(AppError::Validation(format!("already deprecated: {}", id)));
-        }
-        return Err(AppError::NotFound(format!("not found: {}", id)));
-    };
-
-    let file_name = path
+    let record =
+        active_or_deprecated(ctx, &active, &deprecated, &requested, &entry.prefix, dotted)?;
+    record.ensure_writable()?;
+    let id = record.id.clone();
+    if record.path.parent() != Some(active.as_path()) {
+        return Err(AppError::Validation(format!("already deprecated: {}", id)));
+    }
+    let file_name = record
+        .path
         .file_name()
-        .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?;
-    let destination = deprecated.join(file_name);
-    let destination = Context::ensure_within(&ctx.project_dir, &destination)?;
-    fs::rename(&path, &destination).map_err(|e| AppError::Runtime(e.to_string()))?;
+        .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?
+        .to_owned();
+    let destination = Context::ensure_within(&ctx.project_dir, &deprecated.join(file_name))?;
+    if destination.exists() {
+        return Err(AppError::Validation(format!("already deprecated: {}", id)));
+    }
+    fs::rename(&record.path, &destination).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))
@@ -610,26 +603,34 @@ pub fn deprecate(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError>
 }
 
 pub fn restore(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
-    let id = sanitize_field(id_raw)?;
+    let requested = sanitize_field(id_raw)?;
     let cfg = load_config(ctx)?;
+    let entry = type_entry(&cfg)?;
+    let descriptor = crate::record::descriptor::descriptor_for_doc_type("audit")
+        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
+    let dotted = descriptor.is_dotted_id();
     let active = active_dir(ctx, &cfg)?;
     let deprecated = deprecated_dir(ctx, &cfg)?;
     let _ = ensure_dirs(&active);
     let _ = ensure_dirs(&deprecated);
 
-    let Some(path) = find_record(ctx, &deprecated, &id)? else {
-        if find_record(ctx, &active, &id)?.is_some() {
-            return Err(AppError::Validation(format!("not deprecated: {}", id)));
-        }
-        return Err(AppError::NotFound(format!("not found: {}", id)));
-    };
-
-    let file_name = path
+    let record =
+        active_or_deprecated(ctx, &active, &deprecated, &requested, &entry.prefix, dotted)?;
+    record.ensure_writable()?;
+    let id = record.id.clone();
+    if record.path.parent() != Some(deprecated.as_path()) {
+        return Err(AppError::Validation(format!("not deprecated: {}", id)));
+    }
+    let file_name = record
+        .path
         .file_name()
-        .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?;
-    let destination = active.join(file_name);
-    let destination = Context::ensure_within(&ctx.project_dir, &destination)?;
-    fs::rename(&path, &destination).map_err(|e| AppError::Runtime(e.to_string()))?;
+        .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?
+        .to_owned();
+    let destination = Context::ensure_within(&ctx.project_dir, &active.join(file_name))?;
+    if destination.exists() {
+        return Err(AppError::Validation(format!("not deprecated: {}", id)));
+    }
+    fs::rename(&record.path, &destination).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))

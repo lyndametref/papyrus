@@ -61,13 +61,13 @@ pub fn run(
         }
     }
     if types.is_empty() || types.contains(&SearchType::Task) {
-        collect_backlog_store(ctx, &cfg, "tasks", "task", &needle, &mut hits)?;
+        collect_backlog_store(ctx, &cfg, "task", "task", &needle, &mut hits)?;
     }
     if types.is_empty() || types.contains(&SearchType::Milestone) {
-        collect_backlog_store(ctx, &cfg, "milestones", "milestone", &needle, &mut hits)?;
+        collect_backlog_store(ctx, &cfg, "milestone", "milestone", &needle, &mut hits)?;
     }
     if types.is_empty() || types.contains(&SearchType::Release) {
-        collect_backlog_store(ctx, &cfg, "releases", "release", &needle, &mut hits)?;
+        collect_backlog_store(ctx, &cfg, "release", "release", &needle, &mut hits)?;
     }
     if types.is_empty() || types.contains(&SearchType::Decision) {
         collect_decision_store(ctx, &cfg, &needle, &mut hits)?;
@@ -137,29 +137,22 @@ fn collect_type(
         if !allowed {
             continue;
         }
-        let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
-        // UI specifications and UI mockups share their directories with other
-        // documents (UI descriptions, HTML review packages); only `<prefix>-<digits>`
-        // files are records (BR-012, BR-016).
-        if key == "ui-spec"
-            || key == "ui-mockup"
-            || key == "rule"
-            || key == "audit"
-            || key == "tech-spec"
-            || key == "use-case"
-            || key == "test-case"
-            || key == "test-report"
-        {
-            let prefix = format!("{}-", entry.prefix);
-            let Some(rest) = id.strip_prefix(&prefix) else {
-                continue;
-            };
-            if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
-                continue;
-            }
-        }
+        // Only native stems are records; a document family keeps its dotted
+        // shape and may carry a legacy kebab slug, which is not part of the ID.
+        let dotted = matches!(key, "req" | "nfr");
+        let parsed =
+            crate::record::identity::parse_id_parts(stem, &entry.prefix, dotted).or_else(|| {
+                dotted
+                    .then(|| crate::record::identity::parse_id_parts(stem, &entry.prefix, false))
+                    .flatten()
+            });
+        let Some(id) = parsed.map(|parts| parts.display) else {
+            continue;
+        };
+        let id = id.as_str();
         let safe = Context::ensure_within(&ctx.project_dir, &path)?;
         let Ok(content) = fs::read_to_string(&safe) else {
             continue;
@@ -193,18 +186,18 @@ fn collect_type(
 fn collect_backlog_store(
     ctx: &Context,
     cfg: &Config,
-    folder: &str,
+    descriptor_name: &str,
     kind: &'static str,
     needle: &str,
     hits: &mut Vec<Hit>,
 ) -> Result<(), AppError> {
-    let backlog_raw = ctx.project_dir.join(&cfg.backlog_directory);
-    let backlog_safe = Context::ensure_within(&ctx.project_dir, &backlog_raw)?;
-    let dir_raw = backlog_safe.join(folder);
-    if !dir_raw.exists() {
+    let Some(desc) = crate::record::descriptor::descriptor_for(descriptor_name) else {
         return Ok(());
-    }
-    let dir = Context::ensure_within(&ctx.project_dir, &dir_raw)?;
+    };
+    let dir = match desc.resolve_directory(cfg, &ctx.project_dir) {
+        Ok(dir) if dir.exists() => dir,
+        _ => return Ok(()),
+    };
     let entries = fs::read_dir(&dir).map_err(|e| {
         AppError::Runtime(format!("cannot read directory {}: {}", dir.display(), e))
     })?;
@@ -214,12 +207,16 @@ fn collect_backlog_store(
         if path.extension().and_then(|s| s.to_str()) != Some("md") {
             continue;
         }
-        let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
-        if !accepted_backlog_stem(folder, cfg, id) {
+        let Some(id) = desc.configured_prefixes(cfg).iter().find_map(|prefix| {
+            crate::record::identity::parse_id_parts(stem, prefix, desc.is_dotted_id())
+                .map(|parts| parts.display)
+        }) else {
             continue;
-        }
+        };
+        let id = id.as_str();
         let safe = Context::ensure_within(&ctx.project_dir, &path)?;
         let Ok(content) = fs::read_to_string(&safe) else {
             continue;
@@ -269,30 +266,17 @@ fn collect_decision_store(
         if path.extension().and_then(|s| s.to_str()) != Some("md") {
             continue;
         }
-        let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
         // Boundary check before any eligibility/read, so symlink escapes
         // always surface as exit 1 regardless of type mapping.
         let safe = Context::ensure_within(&ctx.project_dir, &path)?;
-        // Only enabled decision types (delegate to decision module for
-        // consistent prefix matching, including hyphenated prefixes).
-        let Some(_type_key) = crate::decision::type_key_for_id(cfg, id) else {
+        // Canonical ID: the slug is cosmetic and never part of the identity.
+        let Some(id) = crate::decision::canonical_id(cfg, stem) else {
             continue;
         };
-        // Require a numeric ID form (e.g. ADR-001), so non-record files
-        // such as notes.md are ignored.
-        let decision_is_record = cfg.decision_types.iter().any(|(_, entry)| {
-            if !entry.enabled || entry.prefix.is_empty() {
-                return false;
-            }
-            id.strip_prefix(&format!("{}-", entry.prefix))
-                .map(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit()))
-                .unwrap_or(false)
-        });
-        if !decision_is_record {
-            continue;
-        }
+        let id = id.as_str();
         let Ok(content) = fs::read_to_string(&safe) else {
             continue;
         };
@@ -316,26 +300,6 @@ fn collect_decision_store(
         });
     }
     Ok(())
-}
-
-fn has_prefix_digits(base: &str, prefix: &str) -> bool {
-    let base_l = base.to_ascii_lowercase();
-    let prefix_l = prefix.to_ascii_lowercase();
-    let Some(rest) = base_l.strip_prefix(&format!("{}-", prefix_l)) else {
-        return false;
-    };
-    !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit())
-}
-
-fn accepted_backlog_stem(folder: &str, cfg: &Config, stem: &str) -> bool {
-    let base = stem.split(" - ").next().unwrap_or(stem).trim();
-    let prefixes: &[&str] = match folder {
-        "tasks" => &[cfg.task_prefix.as_str(), "task", "TASK"],
-        "milestones" => &[cfg.milestone_prefix.as_str(), "MS", "ms", "M", "m"],
-        "releases" => &[cfg.release_prefix.as_str(), "REL", "rel"],
-        _ => &[],
-    };
-    prefixes.iter().any(|p| has_prefix_digits(base, p))
 }
 
 fn active_dir(

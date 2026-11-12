@@ -44,7 +44,7 @@ Deliver the `task` commands so a project contributor can create, inspect, update
 1. Project directory and configuration file selection follow the precedence and canonicalization rules delivered by TASK-2 (REQ-01.003, NFR-04.002).
 2. For every command in this ticket, reads and writes stay within the canonicalized project directory (NFR-04.002).
 3. The effective configuration supplies `task_prefix` (default `TASK`), `id_padding` (default 3), `backlog_directory` (default `backlog/`), `statuses` (default `ToDo, Initiated, Refined, Implemented, Validated, Done`), and `default_status` (default `ToDo`).
-4. Task records are stored under the configured backlog directory: active tasks in `<backlog_directory>/tasks/`, archived tasks in `<backlog_directory>/tasks/archived/`. These directories are created as needed; `init` already creates the active task directory.
+4. Task records are stored under the configured backlog directory: active tasks in `<backlog_directory>/tasks/`, archived tasks in `<backlog_directory>/archive/tasks/` (Papyrus-native layout, ADR-0010), and legacy archives under `<backlog_directory>/tasks/archived/` are read as archived. These directories are created as needed; `init` already creates the active task directory.
 
 ### 2. Tasks — create
 
@@ -56,7 +56,7 @@ Deliver the `task` commands so a project contributor can create, inspect, update
 6. `--milestone <id>` optionally assigns the task to a milestone. The milestone ID is sanitized and must identify an existing milestone (active or archived); an unknown ID fails with exit code 3.
 7. `--label <label>` adds a label. Repeatable; each value is sanitized before use and appended to the existing set.
 8. `--assignee <name>` sets the assignee, sanitized before use.
-9. The task ID is generated as `<task_prefix>-<number>`, padded to `id_padding` digits (default `TASK-001`), where `<number>` is one greater than the highest existing task number found in both the active and `archived/` folders. IDs are never reused.
+9. The task ID is generated as `<task_prefix>-<number>`, padded to `id_padding` digits (default `TASK-001`), where `<number>` is one greater than the highest existing task number found in every active, archived (including legacy alias), and deprecated location. IDs are never reused.
 10. A created task uses the configured `default_status` (default `ToDo`) and has no milestone, dependencies, labels, assignee, description, acceptance criteria, or comments unless supplied.
 11. On success the generated task ID is printed (text mode) or returned as JSON.
 
@@ -105,7 +105,7 @@ Deliver the `task` commands so a project contributor can create, inspect, update
 
 ### 6. Tasks — archive, restore, and delete
 
-1. `papyrus task archive <id>` moves the task file from the active folder to the `archived/` folder. Archiving an already-archived task fails with exit code 4.
+1. `papyrus task archive <id>` moves the task file from the active folder to `<backlog_directory>/archive/tasks/`. Archiving an already-archived task fails with exit code 4.
 2. Archiving an unknown ID fails with exit code 3.
 3. Archiving preserves the task ID, status, dependencies, and all other fields.
 4. `papyrus task restore <id>` moves an archived task back to the active folder with the same ID and its previous status. Restoring an active task fails with exit code 4.
@@ -178,8 +178,8 @@ Deliver the `task` commands so a project contributor can create, inspect, update
 ## Assumptions
 
 - Assumption: Rust 1.99.1 via rustup and Cargo are available (ADR-0001).
-- Assumption: `init` already creates `backlog/tasks/`; this ticket creates `backlog/tasks/archived/` on first archive if absent.
-- Assumption: archive moves the task file into `backlog/tasks/archived/` rather than recording status in place, consistent with milestone handling (TASK-8) and keeping archived tasks out of `list`.
+- Assumption: `init` already creates `backlog/tasks/`; this ticket creates `backlog/archive/tasks/` on first archive if absent.
+- Assumption: archive moves the task file into `backlog/archive/tasks/` rather than recording status in place, consistent with milestone handling (TASK-8) and keeping archived tasks out of `list`. A legacy `backlog/tasks/archived/` file is read as archived and is restored to the active folder unchanged.
 - Assumption: task dependencies are not validated for cycles; a task may not depend on itself.
 - Assumption: dependency IDs must identify existing tasks (active or archived); otherwise the command fails with exit code 3.
 - Assumption: milestone and release references that become dangling are preserved and reported on view rather than silently cleared.
@@ -194,7 +194,7 @@ Deliver the `task` commands so a project contributor can create, inspect, update
 - OQ-1: Whether `--watch` should exit on a key press in addition to interrupt is unspecified; this specification assumes interrupt (Ctrl+C / SIGINT) only.
 - OQ-2: Whether dependency removal should be supported is not documented in BR-005; this specification does not add it.
 - OQ-3: Whether task references to requirements, specifications, audit records, and business rules should become CLI-managed is deferred; BR-005 defines no flags for them.
-- OQ-4: The exact archive folder name and whether archived tasks remain editable are implementation choices documented as assumptions above.
+- OQ-4: Resolved by ADR-0010 — the canonical archive folder is `<backlog_directory>/archive/tasks/`; archived tasks remain editable.
 
 ## Traceability
 

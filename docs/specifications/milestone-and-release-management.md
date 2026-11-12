@@ -43,7 +43,7 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 1. Project directory and configuration file selection follow the precedence and canonicalization rules delivered by TASK-2 (REQ-01.003, NFR-04.002).
 2. For every command in this ticket, reads and writes stay within the canonicalized project directory (NFR-04.002).
 3. The effective configuration supplies `milestone_prefix` (default `MS`), `release_prefix` (default `REL`), `id_padding` (default 3), and `backlog_directory` (default `backlog/`).
-4. Milestone and release records are stored under the configured backlog directory: active milestones in `<backlog_directory>/milestones/`, archived milestones in `<backlog_directory>/milestones/archived/`, and releases in `<backlog_directory>/releases/`. These directories are created as needed; `init` already creates the active milestone and release directories.
+4. Milestone and release records are stored under the configured backlog directory: active milestones in `<backlog_directory>/milestones/`, archived milestones in `<backlog_directory>/archive/milestones/` (Papyrus-native layout, ADR-0010), and releases in `<backlog_directory>/releases/`. Legacy archives under `<backlog_directory>/milestones/archived/` are read as archived. These directories are created as needed; `init` already creates the active milestone and release directories.
 
 ### 2. Milestones — create
 
@@ -51,7 +51,7 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 2. `<title>` is required and is sanitized before use.
 3. `-d, --description <text>` sets an optional description, sanitized before use.
 4. `--release <id>` optionally assigns the milestone to a release. The release ID is sanitized and must identify an existing release; an unknown release ID fails with exit code 3.
-5. The milestone ID is generated as `<milestone_prefix>-<number>`, padded to `id_padding` digits (default `MS-001`), where `<number>` is one greater than the highest existing milestone number found in both the active and `archived/` folders. IDs are never reused.
+5. The milestone ID is generated as `<milestone_prefix>-<number>`, padded to `id_padding` digits (default `MS-001`), where `<number>` is one greater than the highest existing milestone number found in every active, archived (including legacy alias), and deprecated location. IDs are never reused.
 6. A created milestone is active and has no release assignment unless `--release` is supplied.
 7. On success the generated milestone ID is printed (text mode) or returned as JSON.
 
@@ -81,7 +81,7 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 
 ### 6. Milestones — archive and delete
 
-1. `papyrus milestone archive <id>` moves the milestone file from the active folder to the `archived/` folder and marks it archived. Archiving an already-archived milestone fails with exit code 4.
+1. `papyrus milestone archive <id>` moves the milestone file from the active folder to `<backlog_directory>/archive/milestones/` and marks it archived. Archiving an already-archived milestone fails with exit code 4.
 2. Archiving an unknown ID fails with exit code 3.
 3. `papyrus milestone delete <id> [--force]` permanently deletes the milestone file (from either the active or `archived/` folder).
 4. Without `--force`, the command prompts for confirmation on standard input and aborts (exit 0, no change) unless the user confirms.
@@ -165,8 +165,8 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 ## Assumptions
 
 - Assumption: Rust 1.99.1 via rustup and Cargo are available (ADR-0001).
-- Assumption: `init` already creates `backlog/milestones/` and `backlog/releases/`; this ticket creates `backlog/milestones/archived/` on first archive if absent.
-- Assumption: archive moves the milestone file into `backlog/milestones/archived/` rather than recording status in place, consistent with the deprecation pattern used for requirements (TASK-3) and keeping archived milestones out of `list`.
+- Assumption: `init` already creates `backlog/milestones/` and `backlog/releases/`; this ticket creates `backlog/archive/milestones/` on first archive if absent.
+- Assumption: archive moves the milestone file into `backlog/archive/milestones/` rather than recording status in place, consistent with the deprecation pattern used for requirements (TASK-3) and keeping archived milestones out of `list`. A legacy `backlog/milestones/archived/` file is read as archived.
 - Assumption: release records have no status field and are implicitly active; no transition to `released` is implemented because no mechanism is documented (REQ-03.002, TASK-22). A future ticket may define the transition.
 - Assumption: milestone `delete` prompts on standard input unless `--force` is given; in non-interactive contexts callers should pass `--force`.
 - Assumption: a milestone assigned to a missing release is reported as dangling on view rather than silently cleared.
@@ -178,7 +178,7 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 
 - OQ-1: How a release transitions from `active` to `released` is not documented (no status option on `papyrus release edit` and no dedicated command). Whether the state is set explicitly or derived from milestone/task completion remains unresolved; recorded in REQ-03.002 and `docs/specifications/release-lifecycle.md`. This ticket does not implement a transition.
 - OQ-2: Whether `released` is a stored release attribute or derived from the completion of its milestones remains unresolved.
-- OQ-3: The exact archive folder name and whether archived milestones remain editable are implementation choices documented as assumptions above; if the project later standardizes on a different folder, the spec must be updated.
+- OQ-3: Resolved by ADR-0010 — the canonical archive folder is `<backlog_directory>/archive/milestones/`; archived milestones remain editable. No milestone unarchive command is defined, so a legacy alias record is only read as archived (REQ-03.001).
 - OQ-4: Whether deleting a release (not documented) should ever be supported is out of scope; if required, it needs a new requirement and command.
 
 ## Traceability

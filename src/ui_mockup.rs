@@ -954,13 +954,7 @@ mod tests {
 
     #[test]
     fn browser_metadata_reads_comments_only_and_stem_id() {
-        let content = concat!(
-            "<title>MOCK-006 &mdash; Review package</title>",
-            "<body><!-- specs: UI-001 UI-002 --><!-- refs: docs/a.md -->",
-            "<!-- task: TASK-1 --><!-- status: approved --><!-- superseded-by: MOCK-002 -->",
-            "<p>UI specifications: WRONG</p>",
-            "<h1>TASK-41 Landing heading</h1></body>"
-        );
+        let content = "<title>MOCK-006 &mdash; Review package</title><body><!-- specs: UI-001 UI-002 --><!-- refs: docs/a.md --><!-- task: TASK-1 --><!-- status: approved --><!-- superseded-by: MOCK-002 --><p>UI specifications: WRONG</p><h1>TASK-41 Landing heading</h1></body>";
         let meta = parse_browser_metadata(content, "MOCK-006");
         assert_eq!(meta.title, "Review package");
         assert_eq!(meta.specs, vec!["UI-001", "UI-002"]);
@@ -978,10 +972,7 @@ mod tests {
 
     #[test]
     fn parse_record_uses_stem_and_title_tag_not_landing_h1() {
-        let content = concat!(
-            "<title>MOCK-006 &mdash; Browser UI mockups review package</title>",
-            "<body><h1>TASK-41 Landing heading</h1></body>"
-        );
+        let content = "<title>MOCK-006 &mdash; Browser UI mockups review package</title><body><h1>TASK-41 Landing heading</h1></body>";
         assert_eq!(
             extract_title(content, "MOCK-006"),
             "Browser UI mockups review package"

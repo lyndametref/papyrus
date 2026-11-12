@@ -153,9 +153,15 @@ fn use_case_basic_lifecycle() {
         assert_eq!(out.status.code(), Some(3), "args={:?}", args);
     }
 
-    // IDs are matched case-sensitively.
-    let out = run(&d, &["use-case", "view", "tech-001"]);
-    assert_eq!(out.status.code(), Some(3));
+    // IDs resolve case-insensitively and report the canonical ID.
+    let out = run(&d, &["use-case", "view", "uc-001"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let shown = String::from_utf8_lossy(&out.stdout);
+    assert!(shown.contains("UC-001"));
 
     let _ = fs::remove_dir_all(&d);
 }

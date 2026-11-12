@@ -128,16 +128,22 @@ pub fn heading_id_title(doc: &Document) -> (String, String) {
     (id, title)
 }
 
+/// Heading ID and title, with the front-matter `id` and `title` taking
+/// precedence. The front-matter ID is the authoritative record identity.
 pub fn heading_id_title_with_frontmatter(doc: &Document) -> (String, String) {
-    let (id, title) = heading_id_title(doc);
-    let title = if let Some(fm) = &doc.front_matter {
-        crate::record::frontmatter::current_value_string(&fm.raw, "title")
+    let (heading_id, heading_title) = heading_id_title(doc);
+    if let Some(fm) = &doc.front_matter {
+        let id = crate::record::frontmatter::current_value_string(&fm.raw, "id")
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or(heading_id);
+        let title = crate::record::frontmatter::current_value_string(&fm.raw, "title")
             .filter(|t| !t.is_empty())
-            .unwrap_or(title)
+            .unwrap_or(heading_title);
+        (id, title)
     } else {
-        title
-    };
-    (id, title)
+        (heading_id, heading_title)
+    }
 }
 
 pub fn section_text(doc: &Document, name: &str) -> Option<String> {

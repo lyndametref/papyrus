@@ -141,7 +141,17 @@ fn decision_basic_lifecycle() {
     );
 
     assert!(d.join("decisions/archived").exists());
-    assert!(d.join("decisions/archived/ADR-001.md").exists());
+    let archived: Vec<String> = fs::read_dir(d.join("decisions/archived"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+        .collect();
+    assert!(
+        archived.iter().any(|name| name
+            .strip_prefix("ADR-001")
+            .is_some_and(|rest| rest.starts_with('-') && rest.ends_with(".md"))),
+        "archive keeps the slugged file name: {:?}",
+        archived
+    );
 
     let out = bin()
         .args(["--dir", p, "decision", "view", "ADR-001"])

@@ -30,8 +30,8 @@ pub struct MigrationEntry {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MigrationConflict {
-    DuplicateStorageId {
-        storage_id: String,
+    DuplicateId {
+        id: String,
         paths: Vec<String>,
     },
     FrontmatterFilenameMismatch {
@@ -48,8 +48,8 @@ pub enum MigrationConflict {
 impl std::fmt::Display for MigrationConflict {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MigrationConflict::DuplicateStorageId { storage_id, paths } => {
-                write!(f, "duplicate storage id {}: {:?}", storage_id, paths)
+            MigrationConflict::DuplicateId { id, paths } => {
+                write!(f, "duplicate id {}: {:?}", id, paths)
             }
             MigrationConflict::FrontmatterFilenameMismatch {
                 path,
@@ -73,137 +73,73 @@ pub fn is_managed_path(project_dir: &Path, path: &Path) -> bool {
     managed_descriptor(project_dir, path).is_some()
 }
 
+/// Resolve the descriptor of a managed record.
+///
+/// A path is managed when it sits directly in one of the descriptor's
+/// configured read locations (active, archive, legacy alias, or deprecated)
+/// and its stem is a native Papyrus stem for that family. Backlog-shaped
+/// stems resolve to no descriptor and are therefore invisible.
 pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<&'static RecordDescriptor> {
-    let rel = path.strip_prefix(project_dir).ok()?;
-    let rel_str = rel.to_string_lossy().replace('\\', "/");
-    // ADR decision records (frozen bodies).
-    if rel_str.starts_with("docs/architecture/adr/") {
-        let name = path.file_name()?.to_string_lossy();
-        if (name.starts_with("ADR-") || name.starts_with("BDR-"))
-            && path.extension().and_then(|e| e.to_str()) == Some("md")
-        {
-            return crate::record::descriptor::descriptor_for("decision");
-        }
+    if path.extension().and_then(|e| e.to_str()) != Some("md") {
+        return None;
     }
-    // Task and milestone special handling (TASK-69).
-    let rel_norm = rel_str.clone();
-    if is_task_path(&rel_norm) {
-        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-        if accepted_task_stem(stem) {
-            return crate::record::descriptor::descriptor_for("task");
-        }
-    }
-    if is_milestone_path(&rel_norm) {
-        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-        if accepted_milestone_stem(stem) {
-            return crate::record::descriptor::descriptor_for("milestone");
-        }
-    }
-
+    let stem = path.file_stem()?.to_str()?;
+    let cfg = load_cfg_for(project_dir);
+    let parent = path.parent()?;
     for desc in crate::record::descriptor::descriptors() {
-        if desc.name == "task" || desc.name == "milestone" {
+        if !desc.matches_stem(&cfg, stem) {
             continue;
         }
-        let dir = desc.directory;
-        if !rel_str.starts_with(dir) {
-            continue;
-        }
-        // ensure it's directly under dir or subdirectory
-        let stem = path.file_stem()?.to_string_lossy().to_string();
-        if path.extension().and_then(|e| e.to_str()) != Some("md") {
-            continue;
-        }
-        if matches_pattern(&stem, desc.display_id_pattern)
-            || (desc.name == "decision" && (stem.starts_with("ADR-") || stem.starts_with("BDR-")))
-        {
-            // For decision descriptor also allow ADR/BDR stems via special case above.
-            return Some(desc);
+        for dir in desc.resolve_read_directories(&cfg, project_dir) {
+            if dir == parent {
+                return Some(desc);
+            }
         }
     }
     None
 }
 
-fn is_task_path(rel: &str) -> bool {
-    rel.starts_with("backlog/tasks")
-        || rel.starts_with("backlog/tasks/archived")
-        || rel.starts_with("backlog/archive/tasks")
-}
-fn is_milestone_path(rel: &str) -> bool {
-    rel.starts_with("backlog/milestones")
-        || rel.starts_with("backlog/milestones/archived")
-        || rel.starts_with("backlog/archive/milestones")
+/// Canonical numeric key of a native stem for a descriptor family.
+///
+/// Dotted document IDs keep every numeric component, so `REQ-01.001` and
+/// `REQ-01.002` remain distinct.
+fn stem_key(desc: &RecordDescriptor, cfg: &crate::config::Config, stem: &str) -> Option<String> {
+    desc.configured_prefixes(cfg)
+        .iter()
+        .find_map(|prefix| crate::record::identity::stem_key(stem, prefix, desc.is_dotted_id()))
 }
 
-fn strip_prefix_ignore_case<'a>(s: &'a str, prefix: &str) -> Option<&'a str> {
-    if s.len() >= prefix.len() && s[..prefix.len()].eq_ignore_ascii_case(prefix) {
-        Some(&s[prefix.len()..])
-    } else {
-        None
+/// Canonical numeric key of a Papyrus ID value for a descriptor family.
+fn id_value_key(desc: &RecordDescriptor, cfg: &crate::config::Config, id: &str) -> Option<String> {
+    desc.configured_prefixes(cfg).iter().find_map(|prefix| {
+        crate::record::identity::parse_id_parts(id, prefix, desc.is_dotted_id())
+            .map(|parts| parts.key(prefix))
+    })
+}
+
+fn candidate_id_key(
+    desc: &RecordDescriptor,
+    cfg: &crate::config::Config,
+    content: Option<&str>,
+    stem: &str,
+) -> Option<String> {
+    if let Some(content) = content
+        && let Some(fm_id) = candidate_frontmatter_id(desc, content)
+        && let Some(key) = id_value_key(desc, cfg, &fm_id)
+    {
+        return Some(key);
     }
+    stem_key(desc, cfg, stem)
 }
 
-fn base_stem(stem: &str) -> &str {
-    stem.split(" - ").next().unwrap_or(stem).trim()
-}
-
-fn accepted_task_stem(stem: &str) -> bool {
-    let base = base_stem(stem);
-    if let Some(rest) = strip_prefix_ignore_case(base, "TASK-") {
-        !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit())
-    } else if let Some(rest) = strip_prefix_ignore_case(base, "task-") {
-        !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit())
-    } else {
-        false
-    }
-}
-
-fn accepted_milestone_stem(stem: &str) -> bool {
-    let base = base_stem(stem);
-    if let Some(rest) = strip_prefix_ignore_case(base, "MS-") {
-        !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit())
-    } else if let Some(rest) = strip_prefix_ignore_case(base, "m-") {
-        !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit())
-    } else {
-        false
-    }
-}
-
-fn matches_pattern(stem: &str, pattern: &str) -> bool {
-    // A run of '#' in the pattern matches one or more ASCII digits, so
-    // identifiers with variable digit counts (e.g. REQ-01.001, NFR-04.001)
-    // are recognized. Literal characters must match exactly.
-    let stem_chars: Vec<char> = stem.chars().collect();
-    let pattern_chars: Vec<char> = pattern.chars().collect();
-    matches_from(&stem_chars, &pattern_chars, 0, 0)
-}
-
-fn matches_from(stem: &[char], pattern: &[char], si: usize, pi: usize) -> bool {
-    if pi == pattern.len() {
-        return si == stem.len();
-    }
-    if pattern[pi] == '#' {
-        // Consume the entire run of '#' as a single digit placeholder.
-        let mut run_end = pi;
-        while run_end < pattern.len() && pattern[run_end] == '#' {
-            run_end += 1;
-        }
-        // Try every non-empty run of digits.
-        let mut k = 1usize;
-        while si + k <= stem.len() && stem[si + k - 1].is_ascii_digit() {
-            if matches_from(stem, pattern, si + k, run_end) {
-                return true;
-            }
-            k += 1;
-            if si + k > stem.len() {
-                break;
-            }
-        }
-        false
-    } else if si < stem.len() && stem[si] == pattern[pi] {
-        matches_from(stem, pattern, si + 1, pi + 1)
-    } else {
-        false
-    }
+fn matching_prefix_of(
+    desc: &RecordDescriptor,
+    cfg: &crate::config::Config,
+    value: &str,
+) -> Option<String> {
+    desc.configured_prefixes(cfg).into_iter().find(|prefix| {
+        crate::record::identity::parse_id_parts(value, prefix, desc.is_dotted_id()).is_some()
+    })
 }
 
 pub fn has_front_matter(content: &str) -> bool {
@@ -214,9 +150,10 @@ pub fn ensure_front_matter(ctx: &Context, path: &Path) -> Result<String, AppErro
     ensure_front_matter_internal(ctx, path).map(|(content, _)| content)
 }
 
-/// Like [`ensure_front_matter`], but returns the canonical path of the record
-/// after any migration or relocation. Callers that need to open the file by
-/// path after a first-read migration should use this helper.
+/// Like [`ensure_front_matter`], but returns the record path unchanged.
+///
+/// Lazy adoption never relocates or renames a record, so the returned path is
+/// always the path that was given.
 pub fn ensure_front_matter_canonical(ctx: &Context, path: &Path) -> Result<PathBuf, AppError> {
     ensure_front_matter_internal(ctx, path).map(|(_, canonical)| canonical)
 }
@@ -298,15 +235,8 @@ fn ensure_front_matter_internal(ctx: &Context, path: &Path) -> Result<(String, P
         }
         return Ok((content, safe));
     }
-    let target = storage_target_path(ctx, &safe, &content, desc).unwrap_or_else(|| safe.clone());
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent).map_err(|e| AppError::Runtime(e.to_string()))?;
-    }
-    crate::record::store::write_atomic(ctx, &target, &new_content)?;
-    if target != safe {
-        fs::remove_file(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
-    }
-    let rel = rel_path(&ctx.project_dir, &target);
+    crate::record::store::write_atomic(ctx, &safe, &new_content)?;
+    let rel = rel_path(&ctx.project_dir, &safe);
     println!("{}\t{}\t{}", rel, action, keys.join(","));
     if action == "converted-legacy-to-backlog-md" {
         let diff = unified_diff(&content, &new_content, &rel, &rel);
@@ -316,7 +246,7 @@ fn ensure_front_matter_internal(ctx: &Context, path: &Path) -> Result<(String, P
             }
         }
     }
-    Ok((new_content, target))
+    Ok((new_content, safe))
 }
 
 pub fn rel_path(project_dir: &Path, path: &Path) -> String {
@@ -363,13 +293,7 @@ pub fn migrate_content(
         for key in &missing {
             match *key {
                 "id" => {
-                    let val = if desc.name == "task" {
-                        task_frontmatter_id(&id)
-                    } else if desc.name == "milestone" {
-                        milestone_frontmatter_id(&id)
-                    } else {
-                        id.clone()
-                    };
+                    let val = id.clone();
                     ops.push(PatchOp::SetFrontMatter((*key).to_string(), val));
                 }
                 "title" => {
@@ -422,21 +346,9 @@ pub fn migrate_content(
 
     let desc_name = desc.name;
     if desc_name == "task" || desc_name == "milestone" {
-        // conflict: frontmatter/filename mismatch not applicable without fm.
-        // legacy vs storage-shaped
+        // Legacy-shaped bodies are converted in place; no read or write path
+        // relocates or renames a record.
         if is_legacy_shape(desc, content) {
-            // conflict if target exists
-            if let Some(target) = storage_target_path(ctx, path, content, desc)
-                && target.exists()
-                && target != path
-            {
-                return Ok((
-                    content.to_string(),
-                    false,
-                    "conflict".to_string(),
-                    Vec::new(),
-                ));
-            }
             if desc_name == "task" {
                 let (new_content, keys) = convert_task(ctx, path, content)?;
                 return Ok((
@@ -461,11 +373,7 @@ pub fn migrate_content(
         let updated = frontmatter::utc_now();
         let mut keys: Vec<String> = GENERAL_KEYS.iter().map(|s| s.to_string()).collect();
         let mut ops: Vec<PatchOp> = Vec::new();
-        let fm_id = if desc_name == "task" {
-            task_frontmatter_id(&id)
-        } else {
-            milestone_frontmatter_id(&id)
-        };
+        let fm_id = id.clone();
         ops.push(PatchOp::SetFrontMatter("id".into(), fm_id));
         ops.push(PatchOp::SetFrontMatter("title".into(), title));
         ops.push(PatchOp::SetFrontMatter("created_date".into(), created));
@@ -685,74 +593,30 @@ fn is_date(s: &str) -> bool {
 struct Candidate {
     path: PathBuf,
     rel: String,
-    storage_id: Option<String>,
     frontmatter_id: Option<String>,
-    filename_id: Option<String>,
+    frontmatter_key: Option<String>,
+    stem_key: Option<String>,
+    stem_prefix: Option<String>,
 }
 
-fn candidate_frontmatter_id(desc: &RecordDescriptor, content: &str) -> Option<String> {
+fn candidate_frontmatter_id(_desc: &RecordDescriptor, content: &str) -> Option<String> {
     if !frontmatter::has_front_matter(content) {
         return None;
     }
     let fm = frontmatter::parse(content).ok().flatten()?;
     let id = frontmatter::current_value_string(&fm.raw, "id")?;
+    let id = id.trim();
     if id.is_empty() {
         return None;
     }
-    if desc.name == "task" {
-        // Task front-matter ids are display-shaped (TASK-<n>).
-        crate::record::identity::task_to_storage_id(&id).ok()
-    } else if desc.name == "milestone" {
-        // Milestone front-matter ids may be display-shaped (MS-<n>) or
-        // storage-shaped (m-<n>); normalize to storage form.
-        if let Ok(sid) = crate::record::identity::milestone_to_storage_id(&id) {
-            Some(sid)
-        } else {
-            let spec = crate::record::identity::IdSpec::default_milestone();
-            spec.parse_storage_number(&id).ok()?;
-            Some(id.to_lowercase())
-        }
-    } else {
-        Some(id.to_lowercase())
-    }
-}
-
-fn candidate_filename_id(desc: &RecordDescriptor, path: &Path) -> Option<String> {
-    let stem = path.file_stem().and_then(|s| s.to_str())?;
-    let base = base_stem(stem);
-    if desc.name == "task" {
-        crate::record::identity::task_to_storage_id(base).ok()
-    } else if desc.name == "milestone" {
-        crate::record::identity::milestone_to_storage_id(base)
-            .ok()
-            .or_else(|| Some(base.to_lowercase()))
-    } else {
-        Some(base.to_lowercase())
-    }
+    Some(id.to_string())
 }
 
 fn collect_candidates(ctx: &Context, desc: &RecordDescriptor) -> Vec<Candidate> {
     let mut out = Vec::new();
     let cfg = load_cfg(ctx);
-    let backlog = cfg.backlog_directory.trim_end_matches('/');
-    let roots: Vec<String> = if desc.name == "task" {
-        vec![
-            format!("{}/tasks", backlog),
-            format!("{}/tasks/archived", backlog),
-            format!("{}/archive/tasks", backlog),
-        ]
-    } else if desc.name == "milestone" {
-        vec![
-            format!("{}/milestones", backlog),
-            format!("{}/milestones/archived", backlog),
-            format!("{}/archive/milestones", backlog),
-        ]
-    } else {
-        vec![desc.directory.to_string()]
-    };
-    for root in roots {
-        let dir = ctx.project_dir.join(&root);
-        collect_candidates_dir(ctx, desc, &dir, &mut out);
+    for dir in desc.resolve_read_directories(&cfg, &ctx.project_dir) {
+        collect_candidates_dir(ctx, desc, &cfg, &dir, &mut out);
     }
     out
 }
@@ -760,6 +624,7 @@ fn collect_candidates(ctx: &Context, desc: &RecordDescriptor) -> Vec<Candidate> 
 fn collect_candidates_dir(
     ctx: &Context,
     desc: &RecordDescriptor,
+    cfg: &crate::config::Config,
     dir: &Path,
     out: &mut Vec<Candidate>,
 ) {
@@ -772,7 +637,7 @@ fn collect_candidates_dir(
     for e in rd.flatten() {
         let path = e.path();
         if path.is_dir() {
-            collect_candidates_dir(ctx, desc, &path, out);
+            collect_candidates_dir(ctx, desc, cfg, &path, out);
             continue;
         }
         if path.extension().and_then(|e| e.to_str()) != Some("md") {
@@ -781,6 +646,9 @@ fn collect_candidates_dir(
         if !is_managed_path(&ctx.project_dir, &path) {
             continue;
         }
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
         let rel = path
             .strip_prefix(&ctx.project_dir)
             .unwrap_or(&path)
@@ -788,21 +656,27 @@ fn collect_candidates_dir(
             .replace('\\', "/");
         let content = fs::read_to_string(&path).unwrap_or_default();
         let fm_id = candidate_frontmatter_id(desc, &content);
-        let fn_id = candidate_filename_id(desc, &path);
-        let storage_id = fm_id.clone().or(fn_id.clone());
+        let fm_key = fm_id
+            .as_deref()
+            .and_then(|value| id_value_key(desc, cfg, value));
+        let number = stem_key(desc, cfg, stem);
+        let prefix = matching_prefix_of(desc, cfg, stem);
         out.push(Candidate {
             path,
             rel,
-            storage_id,
             frontmatter_id: fm_id,
-            filename_id: fn_id,
+            frontmatter_key: fm_key,
+            stem_key: number,
+            stem_prefix: prefix,
         });
     }
 }
 
 pub fn scan_migration_conflicts(ctx: &Context, desc: &RecordDescriptor) -> Vec<MigrationConflict> {
+    let cfg = load_cfg(ctx);
     let candidates = collect_candidates(ctx, desc);
-    // Deduplicate by canonical path; roots overlap (e.g. backlog/tasks recurses into archived).
+    // Deduplicate by canonical path; read directories never overlap, but a
+    // symlink could still surface the same file twice.
     let mut seen: HashSet<PathBuf> = HashSet::new();
     let candidates: Vec<Candidate> = candidates
         .into_iter()
@@ -813,38 +687,56 @@ pub fn scan_migration_conflicts(ctx: &Context, desc: &RecordDescriptor) -> Vec<M
         .collect();
     let mut conflicts = Vec::new();
 
-    // Front-matter / filename mismatch.
+    // Front-matter / stem mismatch. Numbers are compared after normalization,
+    // so optional leading zeros and case variants are not mismatches.
     for c in &candidates {
-        if let (Some(fm), Some(fn_id)) = (&c.frontmatter_id, &c.filename_id)
-            && fm != fn_id
+        if let (Some(fm), Some(stem_key), Some(stem_prefix)) =
+            (&c.frontmatter_id, c.stem_key.as_ref(), &c.stem_prefix)
         {
-            conflicts.push(MigrationConflict::FrontmatterFilenameMismatch {
-                path: c.rel.clone(),
-                filename_id: fn_id.clone(),
-                frontmatter_id: fm.clone(),
-            });
+            let same = c.frontmatter_key.as_ref() == Some(stem_key);
+            if !same {
+                let stem = c
+                    .path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or_default();
+                let filename_id = crate::record::identity::canonical_stem_id(
+                    stem,
+                    stem_prefix,
+                    desc.is_dotted_id(),
+                )
+                .unwrap_or_else(|| stem.to_string());
+                conflicts.push(MigrationConflict::FrontmatterFilenameMismatch {
+                    path: c.rel.clone(),
+                    filename_id,
+                    frontmatter_id: fm.clone(),
+                });
+            }
         }
     }
 
-    // Duplicate storage IDs (includes reused numbers).
+    // Duplicate IDs across every read location of the family.
     let mut groups: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for c in &candidates {
-        if let Some(sid) = &c.storage_id {
-            groups.entry(sid.clone()).or_default().push(c.rel.clone());
+        let content = fs::read_to_string(&c.path).unwrap_or_default();
+        let stem = c
+            .path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default();
+        if let Some(key) = candidate_id_key(desc, &cfg, Some(&content), stem) {
+            groups.entry(key).or_default().push(c.rel.clone());
         }
     }
-    for (sid, paths) in groups {
+    for (id, paths) in groups {
         if paths.len() > 1 {
-            conflicts.push(MigrationConflict::DuplicateStorageId {
-                storage_id: sid,
-                paths,
-            });
+            conflicts.push(MigrationConflict::DuplicateId { id, paths });
         }
     }
 
-    // Unknown IDs: files whose filename or front-matter id cannot be parsed.
+    // Unknown IDs: files whose stem or front-matter id cannot be parsed.
     for c in &candidates {
-        if c.filename_id.is_none() && c.frontmatter_id.is_none() {
+        if c.frontmatter_id.is_none() && c.stem_key.is_none() {
             let raw = c
                 .path
                 .file_stem()
@@ -868,30 +760,36 @@ pub(crate) fn check_conflicts_for_path(
     content: &str,
     conflicts: &[MigrationConflict],
 ) -> Option<String> {
-    let rel = path
-        .strip_prefix(&ctx.project_dir)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .replace('\\', "/");
+    let cfg = load_cfg(ctx);
+    let rel = rel_path(&ctx.project_dir, path);
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default();
 
-    if frontmatter::has_front_matter(content)
-        && let (Some(fm_id), Some(fn_id)) = (
-            candidate_frontmatter_id(desc, content),
-            candidate_filename_id(desc, path),
-        )
-        && fm_id != fn_id
-    {
-        return Some(format!(
-            "front-matter/filename mismatch: filename {} vs front matter {}",
-            fn_id, fm_id
-        ));
+    if let (Some(fm_id), Some(stem_key), Some(stem_prefix)) = (
+        candidate_frontmatter_id(desc, content),
+        stem_key(desc, &cfg, stem),
+        matching_prefix_of(desc, &cfg, stem),
+    ) {
+        let fm_key = id_value_key(desc, &cfg, &fm_id);
+        let same = fm_key.as_ref() == Some(&stem_key);
+        if !same {
+            let filename_id =
+                crate::record::identity::canonical_stem_id(stem, &stem_prefix, desc.is_dotted_id())
+                    .unwrap_or_else(|| stem.to_string());
+            return Some(format!(
+                "front-matter/filename mismatch: filename {} vs front matter {}",
+                filename_id, fm_id
+            ));
+        }
     }
 
-    let sid = candidate_storage_id_for(desc, content, path);
+    let sid = candidate_id_key(desc, &cfg, Some(content), stem);
     for c in conflicts {
         match c {
-            MigrationConflict::DuplicateStorageId { storage_id, paths } => {
-                if Some(storage_id.clone()) == sid && paths.iter().any(|p| p == &rel) {
+            MigrationConflict::DuplicateId { id, paths } => {
+                if Some(id.clone()) == sid && paths.iter().any(|p| p == &rel) {
                     return Some(c.to_string());
                 }
             }
@@ -917,13 +815,9 @@ pub(crate) fn check_conflicts_for_path(
     None
 }
 
-fn candidate_storage_id_for(desc: &RecordDescriptor, content: &str, path: &Path) -> Option<String> {
-    candidate_frontmatter_id(desc, content).or(candidate_filename_id(desc, path))
-}
-
 /// Conflicts that must block a read or write of a single record. A
 /// front-matter/filename mismatch is intentionally not blocking on the read
-/// path: the front-matter ID is canonical (ADR-0008 decision 9).
+/// path: the front-matter ID is canonical.
 pub(crate) fn blocking_conflict_for_path(
     ctx: &Context,
     path: &Path,
@@ -934,10 +828,7 @@ pub(crate) fn blocking_conflict_for_path(
     let rel = rel_path(&ctx.project_dir, path);
     for c in conflicts {
         match c {
-            MigrationConflict::DuplicateStorageId {
-                storage_id: _,
-                paths,
-            } => {
+            MigrationConflict::DuplicateId { id: _, paths } => {
                 if paths.iter().any(|p| p == &rel) {
                     return Some(c.to_string());
                 }
@@ -968,7 +859,7 @@ pub fn path_migration_conflict(
     conflicts
         .iter()
         .find(|c| match c {
-            MigrationConflict::DuplicateStorageId { paths, .. } => paths.iter().any(|p| p == &rel),
+            MigrationConflict::DuplicateId { paths, .. } => paths.iter().any(|p| p == &rel),
             MigrationConflict::FrontmatterFilenameMismatch { path: p, .. } => p == &rel,
             MigrationConflict::UnknownId { path: p, .. } => p == &rel,
         })
@@ -1124,51 +1015,26 @@ fn longest_common_subsequence<'a>(a: &[&'a str], b: &[&'a str]) -> Vec<&'a str> 
 // Dry-run traversal and migration helpers.
 pub fn migrate_corpus(ctx: &Context, dry_run: bool) -> Result<Vec<MigrationEntry>, AppError> {
     let mut entries = Vec::new();
-    // descriptor dirs
+    let cfg = load_cfg(ctx);
+    let mut seen: HashSet<PathBuf> = HashSet::new();
     for desc in crate::record::descriptor::descriptors() {
-        if desc.name == "task" || desc.name == "milestone" {
+        for dir in desc.resolve_read_directories(&cfg, &ctx.project_dir) {
+            let canon = dir.canonicalize().unwrap_or_else(|_| dir.clone());
+            if !seen.insert(canon) || !dir.exists() {
+                continue;
+            }
+            collect_dir(ctx, &dir, dry_run, &mut entries)?;
+        }
+    }
+    let verbose = dry_run;
+    for e in &entries {
+        if !verbose && e.action == "already-migrated" {
             continue;
         }
-        let dir = ctx.project_dir.join(desc.directory);
-        if dir.exists() {
-            collect_dir(ctx, &dir, dry_run, &mut entries)?;
-        }
-    }
-    // Task and milestone roots (active, legacy archived, Backlog.md archive).
-    for root in [
-        "backlog/tasks",
-        "backlog/tasks/archived",
-        "backlog/archive/tasks",
-        "backlog/milestones",
-        "backlog/milestones/archived",
-        "backlog/archive/milestones",
-    ] {
-        let dir = ctx.project_dir.join(root);
-        if dir.exists() {
-            collect_dir(ctx, &dir, dry_run, &mut entries)?;
-        }
-    }
-    // ADR decision records
-    let adr_dir = ctx.project_dir.join("docs/architecture/adr");
-    if adr_dir.exists() {
-        collect_adr_dir(ctx, &adr_dir, dry_run, &mut entries)?;
-    }
-    // print lines for dry-run and live? Live corpus migration not a command, but print changed.
-    for e in &entries {
-        if dry_run {
-            println!("{}\t{}\t{}", e.path, e.action, e.keys.join(","));
-            if let Some(d) = &e.diff {
-                for line in d.lines() {
-                    println!("{}", line);
-                }
-            }
-        } else if e.action != "already-migrated" {
-            // live entries are changed files only; print
-            println!("{}\t{}\t{}", e.path, e.action, e.keys.join(","));
-            if let Some(d) = &e.diff {
-                for line in d.lines() {
-                    println!("{}", line);
-                }
+        println!("{}\t{}\t{}", e.path, e.action, e.keys.join(","));
+        if let Some(d) = &e.diff {
+            for line in d.lines() {
+                println!("{}", line);
             }
         }
     }
@@ -1200,15 +1066,6 @@ fn collect_dir(
         process_file(ctx, &path, dry_run, entries)?;
     }
     Ok(())
-}
-
-fn collect_adr_dir(
-    ctx: &Context,
-    dir: &Path,
-    dry_run: bool,
-    entries: &mut Vec<MigrationEntry>,
-) -> Result<(), AppError> {
-    collect_dir(ctx, dir, dry_run, entries)
 }
 
 fn process_file(
@@ -1256,10 +1113,9 @@ fn process_file(
     if frontmatter::has_front_matter(&content) {
         return Ok(());
     }
-    let desc = match managed_descriptor(&ctx.project_dir, path) {
-        Some(d) => d,
-        None => return Ok(()),
-    };
+    if managed_descriptor(&ctx.project_dir, path).is_none() {
+        return Ok(());
+    }
     let (new_content, changed, action, keys) = migrate_content(ctx, path, &content, false)?;
     if !changed {
         if action == "conflict" {
@@ -1269,30 +1125,13 @@ fn process_file(
                 keys: keys.clone(),
                 diff: None,
             });
-            let cand = storage_target_path(ctx, path, &content, desc);
             println!("{}\tconflict\t{}", rel, keys.join(","));
-            if let Some(c) = cand {
-                println!("{}", c.display());
-            }
         }
         return Ok(());
     }
-    let target =
-        storage_target_path(ctx, path, &content, desc).unwrap_or_else(|| path.to_path_buf());
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent).map_err(|e| AppError::Runtime(e.to_string()))?;
-    }
-    crate::record::store::write_atomic(ctx, &target, &new_content)?;
-    if target != path {
-        fs::remove_file(path).map_err(|e| AppError::Runtime(e.to_string()))?;
-    }
-    let target_rel = target
-        .strip_prefix(&ctx.project_dir)
-        .unwrap_or(&target)
-        .to_string_lossy()
-        .replace('\\', "/");
+    crate::record::store::write_atomic(ctx, path, &new_content)?;
     let diff = if action == "converted-legacy-to-backlog-md" {
-        Some(unified_diff(&content, &new_content, &rel, &target_rel))
+        Some(unified_diff(&content, &new_content, &rel, &rel))
     } else {
         None
     };
@@ -1302,7 +1141,6 @@ fn process_file(
         keys,
         diff,
     });
-    let _ = target_rel;
     Ok(())
 }
 
@@ -1318,10 +1156,9 @@ pub fn migrate_file(ctx: &Context, path: &Path) -> Result<Option<MigrationEntry>
     if frontmatter::has_front_matter(&content) {
         return Ok(None);
     }
-    let desc = match managed_descriptor(&ctx.project_dir, &safe) {
-        Some(d) => d,
-        None => return Ok(None),
-    };
+    if managed_descriptor(&ctx.project_dir, &safe).is_none() {
+        return Ok(None);
+    }
     let (new_content, changed, action, keys) = migrate_content(ctx, &safe, &content, false)?;
     if !changed {
         if action == "conflict" {
@@ -1334,17 +1171,10 @@ pub fn migrate_file(ctx: &Context, path: &Path) -> Result<Option<MigrationEntry>
         }
         return Ok(None);
     }
-    let target = storage_target_path(ctx, &safe, &content, desc).unwrap_or_else(|| safe.clone());
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent).map_err(|e| AppError::Runtime(e.to_string()))?;
-    }
-    crate::record::store::write_atomic(ctx, &target, &new_content)?;
-    if target != safe {
-        fs::remove_file(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
-    }
-    let rel = target
+    crate::record::store::write_atomic(ctx, &safe, &new_content)?;
+    let rel = safe
         .strip_prefix(&ctx.project_dir)
-        .unwrap_or(&target)
+        .unwrap_or(&safe)
         .to_string_lossy()
         .replace('\\', "/");
     let diff = if action == "converted-legacy-to-backlog-md" {
@@ -1376,6 +1206,11 @@ pub fn is_timestamp_pub(v: &str) -> bool {
 
 fn load_cfg(ctx: &Context) -> crate::config::Config {
     crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir).unwrap_or_default()
+}
+
+fn load_cfg_for(project_dir: &Path) -> crate::config::Config {
+    let config_path = project_dir.join("papyrus.config.yml");
+    crate::commands::load_effective_config(&config_path, project_dir).unwrap_or_default()
 }
 
 fn file_created_date(path: &Path) -> String {
@@ -1437,18 +1272,6 @@ fn required_keys(desc: &RecordDescriptor) -> &'static [&'static str] {
     }
 }
 
-fn task_frontmatter_id(id: &str) -> String {
-    crate::record::identity::IdSpec::default_task()
-        .to_frontmatter_id(id)
-        .unwrap_or_else(|_| id.to_string())
-}
-
-fn milestone_frontmatter_id(id: &str) -> String {
-    crate::record::identity::IdSpec::default_milestone()
-        .to_frontmatter_id(id)
-        .unwrap_or_else(|_| id.to_string())
-}
-
 fn is_legacy_shape(desc: &RecordDescriptor, content: &str) -> bool {
     if let Ok(doc) = document::parse(content) {
         let retired: &[&str] = match desc.name {
@@ -1482,53 +1305,6 @@ fn is_legacy_shape(desc: &RecordDescriptor, content: &str) -> bool {
     false
 }
 
-fn storage_target_path(
-    ctx: &Context,
-    path: &Path,
-    content: &str,
-    desc: &RecordDescriptor,
-) -> Option<std::path::PathBuf> {
-    if !is_legacy_shape(desc, content) {
-        return None;
-    }
-    let cfg = load_cfg(ctx);
-    let (display_id, title) = extract_id_title(content, path);
-    let storage_id = if desc.name == "task" {
-        crate::record::identity::task_to_storage_id(&display_id)
-            .unwrap_or_else(|_| display_id.to_lowercase())
-    } else {
-        crate::record::identity::milestone_to_storage_id(&display_id)
-            .unwrap_or_else(|_| display_id.to_lowercase())
-    };
-    let rel = path
-        .strip_prefix(&ctx.project_dir)
-        .ok()?
-        .to_string_lossy()
-        .replace('\\', "/");
-    let archived = rel.contains("/archived/") || rel.contains("/archive/");
-    // Only relocate files that are already in an archive path. Active records
-    // are converted in place so existing browsers/indexers that expect the
-    // legacy display-ID filename keep working until the browser layer is
-    // updated to index storage-shaped filenames (TASK-70 follow-up).
-    if !archived {
-        return None;
-    }
-    let sub = if desc.name == "task" {
-        "archive/tasks"
-    } else {
-        "archive/milestones"
-    };
-    let backlog = cfg.backlog_directory.trim_end_matches('/');
-    let dir = ctx.project_dir.join(backlog).join(sub);
-    let slug = title.replace(' ', "-");
-    let filename = if slug.trim().is_empty() {
-        format!("{}.md", storage_id)
-    } else {
-        format!("{} - {}.md", storage_id, slug)
-    };
-    Some(dir.join(filename))
-}
-
 fn section_text_doc(doc: &document::Document, name: &str) -> Option<String> {
     doc.sections
         .iter()
@@ -1559,20 +1335,14 @@ fn convert_task(
     let cfg = load_cfg(ctx);
     let doc = document::parse(content)?;
     let (display_id, title) = extract_id_title(content, path);
-    let storage_id = crate::record::identity::task_to_storage_id(&display_id)
-        .unwrap_or_else(|_| display_id.to_lowercase());
-    let fm_id = crate::record::identity::IdSpec::default_task()
-        .to_frontmatter_id(&display_id)
-        .unwrap_or_else(|_| display_id.clone());
+    let storage_id = display_id.clone();
+    let fm_id = display_id.clone();
 
     let status = section_text_doc(&doc, "Status").unwrap_or_else(|| cfg.default_status.clone());
     let milestone_raw = section_text_doc(&doc, "Milestone");
     let milestone_storage = milestone_raw
         .as_ref()
-        .map(|m| {
-            crate::record::identity::milestone_to_storage_id(m.trim())
-                .unwrap_or_else(|_| m.trim().to_string())
-        })
+        .map(|m| m.trim().to_string())
         .filter(|s| !s.is_empty());
     let assignee_raw = section_text_doc(&doc, "Assignee");
     let assignee_list: Vec<String> = assignee_raw
@@ -1596,13 +1366,7 @@ fn convert_task(
         .map(|l| l.trim().trim_start_matches("- ").trim().to_string())
         .filter(|s| !s.is_empty())
         .collect();
-    let deps_storage: Vec<String> = deps_display
-        .iter()
-        .map(|d| {
-            crate::record::identity::task_to_storage_id(d.trim())
-                .unwrap_or_else(|_| d.trim().to_string())
-        })
-        .collect();
+    let deps_storage: Vec<String> = deps_display.clone();
     let desc = section_text_doc(&doc, "Description");
     let ac_lines = section_lines_doc(&doc, "Acceptance Criteria");
     let mut acs: Vec<String> = Vec::new();
@@ -1674,10 +1438,11 @@ fn convert_task(
         .collect();
 
     // ordinal default
-    let backlog = cfg.backlog_directory.trim_end_matches('/');
-    let active_dir = ctx.project_dir.join(backlog).join("tasks");
-    let archived_dir = active_dir.join("archived");
-    let ordinal_final = crate::record::identity::scan_max_ordinal(&active_dir, &archived_dir);
+    let task_desc = crate::record::descriptor::descriptor_for("task")
+        .ok_or_else(|| AppError::Runtime("task descriptor is unavailable".to_string()))?;
+    let dirs = task_desc.resolve_read_directories(&cfg, &ctx.project_dir);
+    let dir_refs: Vec<&Path> = dirs.iter().map(PathBuf::as_path).collect();
+    let ordinal_final = crate::record::identity::scan_max_ordinal_in_dirs(&dir_refs);
 
     let created = file_created_date(path);
     let updated = frontmatter::utc_now();
@@ -1805,9 +1570,7 @@ fn convert_milestone(
     let cfg = load_cfg(ctx);
     let doc = document::parse(content)?;
     let (display_id, title) = extract_id_title(content, path);
-    let fm_id = crate::record::identity::IdSpec::default_milestone()
-        .to_frontmatter_id(&display_id)
-        .unwrap_or_else(|_| display_id.clone());
+    let fm_id = display_id.clone();
 
     let release_raw = section_text_doc(&doc, "Release");
     let release = release_raw
@@ -1908,15 +1671,15 @@ mod tests {
     }
 
     #[test]
-    fn storage_shaped_task_is_left_byte_identical() {
-        let dir = tmpdir("storage-task");
+    fn native_task_is_left_byte_identical() {
+        let dir = tmpdir("native-task");
         let c = ctx(&dir);
         let body = "## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody line\n<!-- SECTION:DESCRIPTION:END -->\n";
         let content = format!(
             "---\nid: TASK-5\ntitle: Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n\n{}",
             body
         );
-        let path = dir.join("backlog/tasks/task-5 - Title.md");
+        let path = dir.join("backlog/tasks/TASK-005.md");
         write(&path, &content);
         let result = ensure_front_matter(&c, &path).unwrap();
         assert_eq!(result, content);
@@ -1924,12 +1687,12 @@ mod tests {
     }
 
     #[test]
-    fn storage_shaped_milestone_gets_additive_keys() {
-        let dir = tmpdir("storage-milestone");
+    fn native_milestone_gets_additive_keys() {
+        let dir = tmpdir("native-milestone");
         let c = ctx(&dir);
         let body = "## Description\n\nMilestone body\n";
-        let content = format!("---\nid: m-2\ntitle: Title\n---\n\n{}", body);
-        let path = dir.join("backlog/milestones/m-2 - Title.md");
+        let content = format!("---\nid: MS-002\ntitle: Title\n---\n\n{}", body);
+        let path = dir.join("backlog/milestones/MS-002.md");
         write(&path, &content);
         let result = ensure_front_matter(&c, &path).unwrap();
         assert!(result.starts_with("---\n"));
@@ -1953,7 +1716,7 @@ mod tests {
         assert!(path.exists());
         let content = fs::read_to_string(&path).unwrap();
         assert!(content.starts_with("---\n"));
-        assert!(content.contains("id: TASK-1"));
+        assert!(content.contains("id: TASK-001"));
         assert!(content.contains("status: Done"));
         assert!(content.contains("<!-- SECTION:DESCRIPTION:BEGIN -->"));
         assert!(content.contains("Legacy body."));
@@ -1974,7 +1737,7 @@ mod tests {
         let _ = ensure_front_matter(&c, &path).unwrap();
         assert!(path.exists());
         let content = fs::read_to_string(&path).unwrap();
-        assert!(content.contains("id: m-0"));
+        assert!(content.contains("id: MS-001"));
         assert!(content.contains("release: REL-001"));
         assert!(!content.contains("## Release"));
     }
@@ -1992,15 +1755,15 @@ mod tests {
         assert!(diff.contains("--- "));
         assert!(diff.contains("+++ "));
         assert!(diff.contains("-# TASK-010 Title"));
-        assert!(diff.contains("+id: TASK-10"));
+        assert!(diff.contains("+id: TASK-010"));
     }
 
     #[test]
-    fn duplicate_storage_ids_are_detected() {
+    fn duplicate_ids_are_detected() {
         let dir = tmpdir("duplicate");
         let c = ctx(&dir);
-        let a = dir.join("backlog/tasks/task-7 - A.md");
-        let b = dir.join("backlog/tasks/task-7 - B.md");
+        let a = dir.join("backlog/tasks/TASK-007.md");
+        let b = dir.join("backlog/tasks/TASK-0007.md");
         write(
             &a,
             "---\nid: TASK-7\ntitle: A\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 7\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nA\n<!-- SECTION:DESCRIPTION:END -->\n",
@@ -2013,11 +1776,11 @@ mod tests {
         let conflicts = scan_migration_conflicts(&c, desc);
         assert_eq!(conflicts.len(), 1);
         match &conflicts[0] {
-            MigrationConflict::DuplicateStorageId { storage_id, paths } => {
-                assert_eq!(storage_id, "task-7");
+            MigrationConflict::DuplicateId { id, paths } => {
+                assert_eq!(id, "TASK-7");
                 assert_eq!(paths.len(), 2);
             }
-            _ => panic!("expected duplicate storage id conflict"),
+            _ => panic!("expected duplicate id conflict"),
         }
     }
 
@@ -2025,8 +1788,8 @@ mod tests {
     fn same_title_distinct_numbers_are_not_conflicts() {
         let dir = tmpdir("same-title-distinct");
         let c = ctx(&dir);
-        let a = dir.join("backlog/tasks/task-8 - SameTitle.md");
-        let b = dir.join("backlog/tasks/task-9 - SameTitle.md");
+        let a = dir.join("backlog/tasks/TASK-008.md");
+        let b = dir.join("backlog/tasks/TASK-009.md");
         let tpl = "---\nid: TASK-{n}\ntitle: SameTitle\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: {n}\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
         write(&a, &tpl.replace("{n}", "8"));
         write(&b, &tpl.replace("{n}", "9"));
@@ -2052,7 +1815,7 @@ mod tests {
             "---\nid: TASK-6\ntitle: Interop\nstatus: To Do\n---\n\n{}",
             body
         );
-        let path = dir.join("backlog/tasks/task-6 - Interop.md");
+        let path = dir.join("backlog/tasks/TASK-006.md");
         write(&path, &minimal);
         let result = ensure_front_matter(&c, &path).unwrap();
         for key in [
@@ -2082,7 +1845,7 @@ mod tests {
     fn frontmatter_filename_mismatch_detected() {
         let dir = tmpdir("mismatch");
         let c = ctx(&dir);
-        let path = dir.join("backlog/tasks/task-5 - Title.md");
+        let path = dir.join("backlog/tasks/TASK-005.md");
         write(
             &path,
             "---\nid: TASK-99\ntitle: Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n",
@@ -2092,7 +1855,7 @@ mod tests {
         assert!(conflicts.iter().any(|c| matches!(
             c,
             MigrationConflict::FrontmatterFilenameMismatch { path: p, .. }
-            if p.contains("task-5")
+            if p.contains("TASK-005")
         )));
     }
 
@@ -2135,16 +1898,19 @@ mod tests {
     }
 
     #[test]
-    fn legacy_archive_is_relocated_to_backlog_archive() {
+    fn legacy_archive_is_read_in_place_not_relocated() {
         let dir = tmpdir("legacy-archive");
         let c = ctx(&dir);
         let legacy = "# TASK-004 Title\n\n## Description\nBody\n";
         let path = dir.join("backlog/tasks/archived/TASK-004.md");
         write(&path, legacy);
-        let _ = ensure_front_matter_canonical(&c, &path).unwrap();
-        assert!(!path.exists());
-        let target = dir.join("backlog/archive/tasks/task-4 - Title.md");
-        assert!(target.exists());
+        let canonical = ensure_front_matter_canonical(&c, &path).unwrap();
+        assert_eq!(canonical, path, "read must not relocate the record");
+        assert!(path.exists());
+        assert!(
+            !dir.join("backlog/archive/tasks/TASK-004 - Title.md")
+                .exists()
+        );
     }
 
     #[test]
@@ -2160,8 +1926,6 @@ mod tests {
         assert!(entries[0].diff.is_some());
         // Original untouched.
         assert_eq!(fs::read_to_string(&path).unwrap(), legacy);
-        // No target created.
-        assert!(!dir.join("backlog/tasks/task-5 - Title.md").exists());
     }
 
     #[test]
@@ -2176,18 +1940,21 @@ mod tests {
     }
 
     #[test]
-    fn storage_shaped_task_without_front_matter_parses_filename() {
-        let dir = tmpdir("storage-no-fm");
+    fn backlog_shaped_stem_is_not_managed() {
+        let dir = tmpdir("backlog-shaped");
         let c = ctx(&dir);
-        let body = "## Description\n\nBody line\n";
-        let content = body.to_string();
+        let content = "## Description\n\nBody line\n";
         let path = dir.join("backlog/tasks/task-5 - Parsed-Title.md");
-        write(&path, &content);
+        write(&path, content);
+        assert!(
+            managed_descriptor(&dir, &path).is_none(),
+            "Backlog-shaped stems must resolve to no record"
+        );
         let result = ensure_front_matter(&c, &path).unwrap();
-        assert!(result.contains("id: TASK-5"), "got: {}", result);
-        assert!(result.contains("title: Parsed-Title"), "got: {}", result);
-        assert!(result.contains("ordinal: 0"), "got: {}", result);
-        assert!(!result.contains("\"null\""), "got: {}", result);
+        assert_eq!(result, content, "invisible record must not be migrated");
+        assert_eq!(fs::read_to_string(&path).unwrap(), content);
+        let desc = crate::record::descriptor::descriptor_for("task").unwrap();
+        assert!(scan_migration_conflicts(&c, desc).is_empty());
     }
 
     #[test]
@@ -2195,8 +1962,8 @@ mod tests {
         let dir = tmpdir("incomplete-null");
         let c = ctx(&dir);
         let body = "## Description\n\nMilestone body\n";
-        let content = format!("---\nid: m-2\ntitle: Title\n---\n\n{}", body);
-        let path = dir.join("backlog/milestones/m-2 - Title.md");
+        let content = format!("---\nid: MS-002\ntitle: Title\n---\n\n{}", body);
+        let path = dir.join("backlog/milestones/MS-002.md");
         write(&path, &content);
         let result = ensure_front_matter(&c, &path).unwrap();
         assert!(result.contains("release: null"), "got: {}", result);
@@ -2207,8 +1974,8 @@ mod tests {
     fn conflict_check_fails_for_front_mattered_duplicate() {
         let dir = tmpdir("frontmatter-conflict");
         let c = ctx(&dir);
-        let a = dir.join("backlog/tasks/task-7 - A.md");
-        let b = dir.join("backlog/tasks/task-7 - B.md");
+        let a = dir.join("backlog/tasks/TASK-007.md");
+        let b = dir.join("backlog/tasks/TASK-0007.md");
         write(
             &a,
             "---\nid: TASK-7\ntitle: A\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 7\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nA\n<!-- SECTION:DESCRIPTION:END -->\n",
@@ -2219,8 +1986,8 @@ mod tests {
         );
         let err = ensure_front_matter(&c, &a).unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("duplicate storage id"), "{}", msg);
-        assert!(msg.contains("task-7"), "{}", msg);
+        assert!(msg.contains("duplicate id"), "{}", msg);
+        assert!(msg.contains("TASK-7"), "{}", msg);
     }
 
     #[test]
@@ -2240,24 +2007,5 @@ mod tests {
             "hunks out of order: {:?}",
             hunks
         );
-    }
-
-    #[test]
-    fn relocation_removal_error_propagated() {
-        let dir = tmpdir("removal-error");
-        let c = ctx(&dir);
-        let legacy = "# TASK-004 Title\n\n## Description\nBody\n";
-        let path = dir.join("backlog/tasks/archived/TASK-004.md");
-        write(&path, legacy);
-        // Remove write permission from the legacy archive dir so removal fails.
-        let archived_dir = dir.join("backlog/tasks/archived");
-        let original_mode = fs::metadata(&archived_dir).unwrap().permissions().mode();
-        let mut perms = fs::metadata(&archived_dir).unwrap().permissions();
-        perms.set_readonly(true);
-        fs::set_permissions(&archived_dir, perms).unwrap();
-        let result = ensure_front_matter_canonical(&c, &path);
-        fs::set_permissions(&archived_dir, fs::Permissions::from_mode(original_mode)).unwrap();
-        assert!(result.is_err());
-        assert!(path.exists(), "original should remain when removal fails");
     }
 }

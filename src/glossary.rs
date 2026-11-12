@@ -136,7 +136,31 @@ fn active_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
 }
 
 fn deprecated_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    Ok(active_dir(ctx, cfg)?.join("deprecated"))
+    let raw = active_dir(ctx, cfg)?.join("deprecated");
+    Context::ensure_within(&ctx.project_dir, &raw)
+}
+
+fn glossary_ids(cfg: &Config) -> Result<(String, bool), AppError> {
+    let entry = type_entry(cfg)?;
+    let descriptor = crate::record::descriptor::descriptor_for_doc_type("glossary")
+        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
+    Ok((entry.prefix, descriptor.is_dotted_id()))
+}
+
+fn resolve_glossary(
+    ctx: &Context,
+    cfg: &Config,
+    id: &str,
+) -> Result<crate::record::resolve::ResolvedRecord, AppError> {
+    let (prefix, dotted) = glossary_ids(cfg)?;
+    crate::record::resolve::resolve_in_dirs(
+        ctx,
+        &[active_dir(ctx, cfg)?, deprecated_dir(ctx, cfg)?],
+        id,
+        &[prefix],
+        dotted,
+    )?
+    .ok_or_else(|| AppError::NotFound(format!("not found: {}", id)))
 }
 
 fn ensure_dirs(dir: &std::path::Path) -> Result<(), AppError> {
@@ -255,31 +279,25 @@ pub fn create(
 
 pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
     let cfg = load_config(ctx)?;
+    let (prefix, dotted) = glossary_ids(&cfg)?;
     let active = active_dir(ctx, &cfg)?;
     let _ = ensure_dirs(&active);
-    let deprecated = deprecated_dir(ctx, &cfg)?;
-    let _ = deprecated;
 
+    let records = crate::record::resolve::list_in_dir(ctx, &active, &[prefix], dotted)?;
     let mut items: Vec<(String, String, String)> = Vec::new();
-    if let Ok(rd) = fs::read_dir(&active) {
-        for e in rd.flatten() {
-            let path = e.path();
-            if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                continue;
-            }
-            let id = match path.file_stem().and_then(|s| s.to_str()) {
-                Some(s) => s.to_string(),
-                None => continue,
-            };
-            let safe = Context::ensure_within(&ctx.project_dir, &path)?;
-            let content = fs::read_to_string(&safe).unwrap_or_default();
-            let term = crate::record::document::parse(&content)
-                .ok()
-                .map(|d| crate::record::document::heading_id_title(&d).1)
-                .unwrap_or_default();
-            let term = if term.is_empty() { id.clone() } else { term };
-            items.push((id, term, content));
-        }
+    for record in records {
+        let content =
+            fs::read_to_string(&record.path).map_err(|e| AppError::Runtime(e.to_string()))?;
+        let term = crate::record::document::parse(&content)
+            .ok()
+            .map(|d| crate::record::document::heading_id_title(&d).1)
+            .unwrap_or_default();
+        let term = if term.is_empty() {
+            record.id.clone()
+        } else {
+            term
+        };
+        items.push((record.id, term, content));
     }
     items.sort_by(|a, b| a.0.cmp(&b.0));
 
@@ -311,26 +329,11 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
 }
 
 pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
-    let id = sanitize_text(id_raw)?;
+    let requested = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
-    let deprecated = deprecated_dir(ctx, &cfg)?;
-    let _ = ensure_dirs(&active);
-    let _ = ensure_dirs(&deprecated);
-
-    let active_path = active.join(format!("{}.md", id));
-    let deprecated_path = deprecated.join(format!("{}.md", id));
-
-    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
-    let deprecated_safe = Context::ensure_within(&ctx.project_dir, &deprecated_path)?;
-
-    let path = if active_safe.exists() {
-        active_safe
-    } else if deprecated_safe.exists() {
-        deprecated_safe
-    } else {
-        return Err(AppError::NotFound(format!("not found: {}", id)));
-    };
+    let record = resolve_glossary(ctx, &cfg, &requested)?;
+    let id = record.id.clone();
+    let path = record.path;
 
     let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
     let text = content.clone();
@@ -371,26 +374,12 @@ pub fn edit(
     references_raw: &[String],
     editor: bool,
 ) -> Result<crate::CommandOutput, AppError> {
-    let id = sanitize_text(id_raw)?;
+    let requested = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
-    let deprecated = deprecated_dir(ctx, &cfg)?;
-    let _ = ensure_dirs(&active);
-    let _ = ensure_dirs(&deprecated);
-
-    let active_path = active.join(format!("{}.md", id));
-    let deprecated_path = deprecated.join(format!("{}.md", id));
-
-    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
-    let deprecated_safe = Context::ensure_within(&ctx.project_dir, &deprecated_path)?;
-
-    let path = if active_safe.exists() {
-        active_safe
-    } else if deprecated_safe.exists() {
-        deprecated_safe
-    } else {
-        return Err(AppError::NotFound(format!("not found: {}", id)));
-    };
+    let resolved = resolve_glossary(ctx, &cfg, &requested)?;
+    resolved.ensure_writable()?;
+    let id = resolved.id.clone();
+    let path = resolved.path.clone();
 
     let (doc, _token) = crate::record::store::read_document(ctx, &path)?;
     let content = doc.source.clone();
@@ -510,27 +499,29 @@ pub fn edit(
 }
 
 pub fn deprecate(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
-    let id = sanitize_text(id_raw)?;
+    let requested = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
     let active = active_dir(ctx, &cfg)?;
     let deprecated = deprecated_dir(ctx, &cfg)?;
     let _ = ensure_dirs(&active);
     ensure_dirs(&deprecated)?;
 
-    let active_path = active.join(format!("{}.md", id));
-    let deprecated_path = deprecated.join(format!("{}.md", id));
-
-    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
-    let deprecated_safe = Context::ensure_within(&ctx.project_dir, &deprecated_path)?;
-
-    if deprecated_safe.exists() && !active_safe.exists() {
+    let record = resolve_glossary(ctx, &cfg, &requested)?;
+    record.ensure_writable()?;
+    let id = record.id.clone();
+    if record.path.parent() != Some(active.as_path()) {
         return Err(AppError::Validation(format!("already deprecated: {}", id)));
     }
-    if !active_safe.exists() {
-        return Err(AppError::NotFound(format!("not found: {}", id)));
+    let file_name = record
+        .path
+        .file_name()
+        .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?
+        .to_owned();
+    let destination = Context::ensure_within(&ctx.project_dir, &deprecated.join(file_name))?;
+    if destination.exists() {
+        return Err(AppError::Validation(format!("already deprecated: {}", id)));
     }
-
-    fs::rename(&active_safe, &deprecated_safe).map_err(|e| AppError::Runtime(e.to_string()))?;
+    fs::rename(&record.path, &destination).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))
@@ -544,27 +535,29 @@ pub fn deprecate(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, Ap
 }
 
 pub fn restore(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
-    let id = sanitize_text(id_raw)?;
+    let requested = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
     let active = active_dir(ctx, &cfg)?;
     let deprecated = deprecated_dir(ctx, &cfg)?;
     let _ = ensure_dirs(&active);
     let _ = ensure_dirs(&deprecated);
 
-    let active_path = active.join(format!("{}.md", id));
-    let deprecated_path = deprecated.join(format!("{}.md", id));
-
-    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
-    let deprecated_safe = Context::ensure_within(&ctx.project_dir, &deprecated_path)?;
-
-    if active_safe.exists() && !deprecated_safe.exists() {
+    let record = resolve_glossary(ctx, &cfg, &requested)?;
+    record.ensure_writable()?;
+    let id = record.id.clone();
+    if record.path.parent() != Some(deprecated.as_path()) {
         return Err(AppError::Validation(format!("not deprecated: {}", id)));
     }
-    if !deprecated_safe.exists() {
-        return Err(AppError::NotFound(format!("not found: {}", id)));
+    let file_name = record
+        .path
+        .file_name()
+        .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?
+        .to_owned();
+    let destination = Context::ensure_within(&ctx.project_dir, &active.join(file_name))?;
+    if destination.exists() {
+        return Err(AppError::Validation(format!("not deprecated: {}", id)));
     }
-
-    fs::rename(&deprecated_safe, &active_safe).map_err(|e| AppError::Runtime(e.to_string()))?;
+    fs::rename(&record.path, &destination).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))

@@ -98,3 +98,40 @@ pub fn sanitize_documentation(input: &str) -> Option<String> {
 pub fn sanitize_path_value(input: &str) -> Option<String> {
     sanitize_path_string(input)
 }
+
+/// Derive a kebab-case file-name slug from a record title.
+///
+/// Lowercase ASCII alphanumerics are kept, every other run collapses to a
+/// single `-`, and leading/trailing `-` are removed. An empty result means the
+/// caller should write the bare `<ID>.md` name.
+pub fn kebab_slug(input: &str) -> String {
+    let mut out = String::new();
+    let mut pending_separator = false;
+    for ch in input.chars() {
+        if ch.is_ascii_alphanumeric() {
+            if pending_separator && !out.is_empty() {
+                out.push('-');
+            }
+            pending_separator = false;
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            pending_separator = true;
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod slug_tests {
+    use super::kebab_slug;
+
+    #[test]
+    fn derives_kebab_slug_from_title() {
+        assert_eq!(
+            kebab_slug("Papyrus-native on-disk record layout"),
+            "papyrus-native-on-disk-record-layout"
+        );
+        assert_eq!(kebab_slug("  A/B: C!  "), "a-b-c");
+        assert_eq!(kebab_slug("!!!"), "");
+    }
+}

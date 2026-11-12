@@ -225,42 +225,36 @@ fn load_config(ctx: &Context) -> Result<Config, AppError> {
     load_effective_config(&ctx.config_path, &ctx.project_dir)
 }
 
-fn backlog_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let raw = ctx.project_dir.join(&cfg.backlog_directory);
-    Context::ensure_within(&ctx.project_dir, &raw)
+fn task_descriptor() -> &'static crate::record::descriptor::RecordDescriptor {
+    crate::record::descriptor::descriptor_for("task").expect("task descriptor")
+}
+
+fn task_id_spec(cfg: &Config) -> crate::record::identity::IdSpec {
+    crate::record::identity::IdSpec::new(cfg.task_prefix.clone(), cfg.id_padding as usize)
 }
 
 fn active_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let base = backlog_dir(ctx, cfg)?;
-    let raw = base.join("tasks");
-    Context::ensure_within(&ctx.project_dir, &raw)
+    task_descriptor().resolve_directory(cfg, &ctx.project_dir)
 }
 
-fn archived_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let base = active_dir(ctx, cfg)?;
-    let raw = base.join("archived");
-    Context::ensure_within(&ctx.project_dir, &raw)
+fn archive_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
+    task_descriptor()
+        .resolve_archive_directory(cfg, &ctx.project_dir)
+        .transpose()?
+        .ok_or_else(|| AppError::Runtime("task archive directory is not configured".to_string()))
 }
 
-fn backlog_archive_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let base = backlog_dir(ctx, cfg)?;
-    let raw = base.join("archive/tasks");
-    fs::create_dir_all(&raw).map_err(|e| AppError::Runtime(e.to_string()))?;
-    Context::ensure_within(&ctx.project_dir, &raw)
+fn read_dirs(ctx: &Context, cfg: &Config) -> Vec<PathBuf> {
+    task_descriptor().resolve_read_directories(cfg, &ctx.project_dir)
 }
 
 fn resolve_task_path(ctx: &Context, cfg: &Config, id: &str) -> Result<PathBuf, AppError> {
-    let storage_id =
-        crate::record::identity::task_to_storage_id(id).unwrap_or_else(|_| id.to_lowercase());
-    for dir in [
-        active_dir(ctx, cfg),
-        archived_dir(ctx, cfg),
-        backlog_archive_dir(ctx, cfg),
-    ]
-    .into_iter()
-    .flatten()
-    {
-        if let Some(path) = find_task_file(&dir, &storage_id) {
+    let spec = task_id_spec(cfg);
+    let wanted = spec
+        .parse_id(id)
+        .map_err(|_| AppError::NotFound(format!("not found: {}", id)))?;
+    for dir in read_dirs(ctx, cfg) {
+        if let Some(path) = find_task_file(&dir, &spec, wanted) {
             return Ok(path);
         }
     }
@@ -272,7 +266,7 @@ fn resolve_task_path_migrated(ctx: &Context, cfg: &Config, id: &str) -> Result<P
     crate::record::migrate::ensure_front_matter_canonical(ctx, &path)
 }
 
-fn task_frontmatter_storage_id(content: &str) -> Option<String> {
+fn task_frontmatter_id(content: &str) -> Option<String> {
     if !crate::record::frontmatter::has_front_matter(content) {
         return None;
     }
@@ -282,17 +276,12 @@ fn task_frontmatter_storage_id(content: &str) -> Option<String> {
     if id.is_empty() {
         return None;
     }
-    if let Ok(sid) = crate::record::identity::task_to_storage_id(id) {
-        return Some(sid);
-    }
-    let spec = crate::record::identity::IdSpec::default_task();
-    spec.parse_storage_number(id).ok()?;
-    Some(id.to_lowercase())
+    Some(id.to_string())
 }
 
 fn reject_task_write_conflict(ctx: &Context, path: &std::path::Path) -> Result<(), AppError> {
     let content = fs::read_to_string(path).map_err(|e| AppError::Runtime(e.to_string()))?;
-    let desc = crate::record::descriptor::descriptor_for("task").unwrap();
+    let desc = task_descriptor();
     let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
     if let Some(reason) =
         crate::record::migrate::check_conflicts_for_path(ctx, path, desc, &content, &conflicts)
@@ -306,7 +295,16 @@ fn reject_task_write_conflict(ctx: &Context, path: &std::path::Path) -> Result<(
     Ok(())
 }
 
-fn find_task_file(dir: &std::path::Path, storage_id: &str) -> Option<PathBuf> {
+/// Find a task file by its Papyrus number under the configured prefix.
+///
+/// The stem must be a native Papyrus stem: Backlog-shaped stems (for example
+/// `task-18`) are invisible. The front-matter `id` is authoritative and lets a
+/// record resolve even when its stem disagrees, but only for a native stem.
+fn find_task_file(
+    dir: &std::path::Path,
+    spec: &crate::record::identity::IdSpec,
+    wanted: i64,
+) -> Option<PathBuf> {
     if !dir.exists() {
         return None;
     }
@@ -319,53 +317,36 @@ fn find_task_file(dir: &std::path::Path, storage_id: &str) -> Option<PathBuf> {
         }
         entries.push(path);
     }
-    // First pass: filename stem.
     for path in &entries {
-        let stem = path.file_stem().and_then(|s| s.to_str())?;
-        let base = stem.split(" - ").next().unwrap_or(stem).trim();
-        if base.eq_ignore_ascii_case(storage_id) {
-            return Some(path.clone());
-        }
-        if let Ok(sid) = crate::record::identity::task_to_storage_id(base)
-            && sid.eq_ignore_ascii_case(storage_id)
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if crate::record::identity::id_number(stem, &spec.prefix)
+            .is_some_and(|number| i64::from(number) == wanted)
         {
             return Some(path.clone());
         }
     }
-    // Second pass (ADR-0008 decision 3/9): front-matter id is canonical on
-    // mismatch, so a record addressed by its front-matter ID must resolve
-    // even when the filename disagrees. Reads succeed; writes refuse via
-    // check_conflicts_for_path at the mutation call sites.
+    // Front-matter id is authoritative (ADR-0008 decision 3/9): resolve a
+    // record addressed by its front-matter ID even on a stem mismatch. Reads
+    // succeed; writes refuse via reject_task_write_conflict.
     for path in &entries {
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if crate::record::identity::id_number(stem, &spec.prefix).is_none() {
+            continue;
+        }
         let Ok(content) = fs::read_to_string(path) else {
             continue;
         };
-        if let Some(sid) = task_frontmatter_storage_id(&content)
-            && sid.eq_ignore_ascii_case(storage_id)
+        if let Some(fm_id) = task_frontmatter_id(&content)
+            && spec.parse_id(&fm_id).ok() == Some(wanted)
         {
             return Some(path.clone());
         }
     }
     None
-}
-
-fn milestones_active_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let base = backlog_dir(ctx, cfg)?;
-    let raw = base.join("milestones");
-    Context::ensure_within(&ctx.project_dir, &raw)
-}
-
-fn milestones_archived_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let base = milestones_active_dir(ctx, cfg)?;
-    let raw = base.join("archived");
-    Context::ensure_within(&ctx.project_dir, &raw)
-}
-
-fn milestones_backlog_archive_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let base = backlog_dir(ctx, cfg)?;
-    let raw = base.join("archive/milestones");
-    fs::create_dir_all(&raw).map_err(|e| AppError::Runtime(e.to_string()))?;
-    Context::ensure_within(&ctx.project_dir, &raw)
 }
 
 fn ensure_dir(dir: &std::path::Path, project_dir: &std::path::Path) -> Result<(), AppError> {
@@ -374,79 +355,53 @@ fn ensure_dir(dir: &std::path::Path, project_dir: &std::path::Path) -> Result<()
 }
 
 fn milestone_exists(ctx: &Context, cfg: &Config, id: &str) -> bool {
-    let storage_id =
-        crate::record::identity::milestone_to_storage_id(id).unwrap_or_else(|_| id.to_lowercase());
-    for dir in [
-        milestones_active_dir(ctx, cfg),
-        milestones_archived_dir(ctx, cfg),
-        milestones_backlog_archive_dir(ctx, cfg),
-    ] {
-        if let Ok(d) = dir
-            && crate::milestone::find_milestone_file(&d, &storage_id).is_some()
-        {
-            return true;
-        }
-    }
-    false
+    crate::milestone::resolve_milestone_entry(ctx, cfg, id).is_some()
 }
 
 fn task_exists(ctx: &Context, cfg: &Config, id: &str) -> bool {
-    let storage_id =
-        crate::record::identity::task_to_storage_id(id).unwrap_or_else(|_| id.to_lowercase());
-    for dir in [
-        active_dir(ctx, cfg),
-        archived_dir(ctx, cfg),
-        backlog_archive_dir(ctx, cfg),
-    ] {
-        if let Ok(d) = dir
-            && find_task_file(&d, &storage_id).is_some()
-        {
-            return true;
-        }
+    resolve_task_path(ctx, cfg, id).is_ok()
+}
+
+fn report_unrecognised_status(cfg: &Config, id: &str, status: &str) {
+    if status.is_empty() || cfg.statuses.iter().any(|known| known == status) {
+        return;
     }
-    false
+    eprintln!(
+        "warning: unrecognised status '{}' on {} (preserved verbatim)",
+        status, id
+    );
 }
 
 fn milestone_release(ctx: &Context, cfg: &Config, milestone_id: &str) -> Option<String> {
-    for dir in [
-        milestones_active_dir(ctx, cfg),
-        milestones_archived_dir(ctx, cfg),
-    ] {
-        if let Ok(d) = dir {
-            let path = d.join(format!("{}.md", milestone_id));
-            if let Ok(safe) = Context::ensure_within(&ctx.project_dir, &path)
-                && safe.exists()
-            {
-                let content = fs::read_to_string(&safe).unwrap_or_default();
-                let lines: Vec<&str> = content.lines().collect();
-                let mut i = 0usize;
-                while i < lines.len() {
-                    if lines[i].trim() == "## Release" {
-                        i += 1;
-                        let mut buf = Vec::new();
-                        while i < lines.len() && !lines[i].starts_with("## ") {
-                            buf.push(lines[i]);
-                            i += 1;
-                        }
-                        while buf.first().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                            buf.remove(0);
-                        }
-                        while buf.last().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                            buf.pop();
-                        }
-                        let text = buf.join("\n").trim().to_string();
-                        if !text.is_empty() {
-                            return Some(text);
-                        }
-                        return None;
-                    }
-                    i += 1;
-                }
-                return None;
+    let path = crate::milestone::resolve_milestone_entry(ctx, cfg, milestone_id)?;
+    let content = fs::read_to_string(&path).ok()?;
+    let lines: Vec<&str> = content.lines().collect();
+    let mut i = 0usize;
+    while i < lines.len() {
+        if lines[i].trim() == "## Release" {
+            i += 1;
+            let mut buf = Vec::new();
+            while i < lines.len() && !lines[i].starts_with("## ") {
+                buf.push(lines[i]);
+                i += 1;
             }
+            while buf.first().map(|s| s.trim().is_empty()).unwrap_or(false) {
+                buf.remove(0);
+            }
+            while buf.last().map(|s| s.trim().is_empty()).unwrap_or(false) {
+                buf.pop();
+            }
+            let text = buf.join("\n").trim().to_string();
+            return (!text.is_empty()).then_some(text);
         }
+        i += 1;
     }
-    None
+    crate::record::frontmatter::parse(&content)
+        .ok()
+        .flatten()
+        .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, "release"))
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 #[derive(Clone, Debug, Default)]
@@ -773,12 +728,10 @@ pub fn create(
     };
 
     let active = active_dir(ctx, &cfg)?;
-    let archived = archived_dir(ctx, &cfg)?;
-    let archive = backlog_archive_dir(ctx, &cfg)?;
     ensure_dir(&active, &ctx.project_dir)?;
-    let _ = ensure_dir(&archived, &ctx.project_dir);
-
-    let next = crate::record::identity::next_task_number(&active, &archived, &archive);
+    let dirs = read_dirs(ctx, &cfg);
+    let dir_refs: Vec<&std::path::Path> = dirs.iter().map(PathBuf::as_path).collect();
+    let next = crate::record::identity::next_number_in_dirs(&dir_refs, &cfg.task_prefix);
     let id =
         crate::record::identity::format_id(&cfg.task_prefix, next as i64, cfg.id_padding as usize);
 
@@ -798,7 +751,11 @@ pub fn create(
     // ordinal default
     let ordinal_final = match ordinal_val {
         Some(n) => n,
-        None => crate::record::identity::scan_max_ordinal(&active, &archived),
+        None => {
+            let dirs = read_dirs(ctx, &cfg);
+            let dir_refs: Vec<&std::path::Path> = dirs.iter().map(PathBuf::as_path).collect();
+            crate::record::identity::scan_max_ordinal_in_dirs(&dir_refs)
+        }
     };
 
     let now = crate::record::frontmatter::utc_now();
@@ -893,6 +850,8 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
     let path = resolve_task_path_migrated(ctx, &cfg, &id)?;
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let status = frontmatter_scalar(&content, "status").unwrap_or_default();
+    report_unrecognised_status(&cfg, &id, status.trim());
     let text = content.clone();
     let version = fs::metadata(&path)
         .map(|m| crate::record::store::version_token(&m))
@@ -905,28 +864,19 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
         if let Some(deps) = obj.get_mut("dependencies") {
             match deps {
                 serde_json::Value::Array(items) => {
-                    for item in items.iter_mut() {
-                        if let serde_json::Value::String(s) = item
-                            && let Ok(display) = crate::record::identity::to_display_id(s)
-                        {
-                            *s = display;
-                        }
+                    for _item in items.iter_mut() {
+                        // no conversion
                     }
                 }
-                serde_json::Value::String(s) => {
-                    if let Ok(display) = crate::record::identity::to_display_id(s) {
-                        *s = display;
-                    }
-                }
+                serde_json::Value::String(_) => {}
                 _ => {}
             }
         }
         if let Some(milestone) = obj.get_mut("milestone")
             && let serde_json::Value::String(s) = milestone
             && !s.trim().is_empty()
-            && let Ok(display) = crate::record::identity::to_display_id(s)
         {
-            *s = display;
+            // no conversion
         }
     }
     let json = if ctx.json {
@@ -1600,6 +1550,10 @@ pub fn list(
                     Some(s) => s.to_string(),
                     None => continue,
                 };
+                if crate::record::identity::id_number(&id, &cfg.task_prefix).is_none() {
+                    // Backlog-shaped stems are not Papyrus records.
+                    continue;
+                }
                 let safe = match Context::ensure_within(&ctx.project_dir, &path) {
                     Ok(p) => p,
                     Err(_) => continue,
@@ -1657,16 +1611,12 @@ pub fn list(
                     .ok()
                     .and_then(|m| m.created().ok())
                     .unwrap_or(SystemTime::UNIX_EPOCH);
-                let has_id_shape = td.id.rsplit_once('-').is_some_and(|(prefix, suffix)| {
-                    !prefix.is_empty()
-                        && !suffix.is_empty()
-                        && suffix.chars().all(|c| c.is_ascii_digit())
-                });
-                let display_id = if has_id_shape {
+                let display_id = if task_id_spec(cfg).parse_id(&td.id).is_ok() {
                     td.id.clone()
                 } else {
                     id.clone()
                 };
+                report_unrecognised_status(cfg, &display_id, &td.status);
                 let title = if td.title.is_empty() {
                     display_id.clone()
                 } else {
@@ -1769,28 +1719,53 @@ pub fn list(
     })
 }
 
+fn same_directory(left: &std::path::Path, right: &std::path::Path) -> bool {
+    left == right
+        || left
+            .canonicalize()
+            .ok()
+            .is_some_and(|l| right.canonicalize().ok().is_some_and(|r| l == r))
+}
+
+fn path_in_directory(path: &std::path::Path, dir: &std::path::Path) -> bool {
+    path.parent()
+        .is_some_and(|parent| same_directory(parent, dir))
+}
+
+fn move_record(
+    ctx: &Context,
+    source: &std::path::Path,
+    destination: &std::path::Path,
+) -> Result<(), AppError> {
+    let source_safe = Context::ensure_within(&ctx.project_dir, source)?;
+    let destination_safe = Context::ensure_within(&ctx.project_dir, destination)?;
+    fs::rename(&source_safe, &destination_safe).map_err(|e| AppError::Runtime(e.to_string()))
+}
+
 pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
     let path = resolve_task_path(ctx, &cfg, &id)?;
+    let active = active_dir(ctx, &cfg)?;
+    if !path_in_directory(&path, &active) {
+        // A record already in the canonical archive or a legacy alias is
+        // already archived; refuse before any write, move, or removal.
+        return Err(AppError::Validation(format!("already archived: {}", id)));
+    }
     reject_task_write_conflict(ctx, &path)?;
     let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
-    let archived = archived_dir(ctx, &cfg)?;
-    ensure_dir(&archived, &ctx.project_dir)?;
+    let archive = archive_dir(ctx, &cfg)?;
+    ensure_dir(&archive, &ctx.project_dir)?;
 
-    let archived_path = archived.join(
-        path.file_name()
-            .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?,
-    );
-    let archived_safe = Context::ensure_within(&ctx.project_dir, &archived_path)?;
-    if archived_safe == path {
-        return Err(AppError::Validation(format!("already archived: {}", id)));
-    }
-    if archived_safe.exists() {
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?;
+    let archived_path = Context::ensure_within(&ctx.project_dir, &archive.join(file_name))?;
+    if archived_path == path || archived_path.exists() {
         return Err(AppError::Validation(format!("already archived: {}", id)));
     }
 
-    fs::rename(&path, &archived_safe).map_err(|e| AppError::Runtime(e.to_string()))?;
+    move_record(ctx, &path, &archived_path)?;
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))
     } else {
@@ -1809,21 +1784,17 @@ pub fn restore(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
     reject_task_write_conflict(ctx, &path)?;
     let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
     let active = active_dir(ctx, &cfg)?;
-    let _ = ensure_dir(&active, &ctx.project_dir);
+    ensure_dir(&active, &ctx.project_dir)?;
 
-    let active_path = active.join(
-        path.file_name()
-            .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?,
-    );
-    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
-    if active_safe == path {
-        return Err(AppError::Validation(format!("already active: {}", id)));
-    }
-    if active_safe.exists() {
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?;
+    let active_path = Context::ensure_within(&ctx.project_dir, &active.join(file_name))?;
+    if active_path == path || active_path.exists() {
         return Err(AppError::Validation(format!("already active: {}", id)));
     }
 
-    fs::rename(&path, &active_safe).map_err(|e| AppError::Runtime(e.to_string()))?;
+    move_record(ctx, &path, &active_path)?;
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))
     } else {
@@ -1906,13 +1877,9 @@ mod tests {
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
         let content = "---\nid: TASK-5\ntitle: Front-Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
-        fs::write(dir.join("backlog/tasks/task-5 - File-Title.md"), content).unwrap();
+        fs::write(dir.join("backlog/tasks/TASK-005.md"), content).unwrap();
         let out = list(&c, None, None, None, None, None, None, None, None, false).unwrap();
-        assert!(
-            out.text.contains("task-5 - File-Title Front-Title"),
-            "got: {}",
-            out.text
-        );
+        assert!(out.text.contains("TASK-5 Front-Title"), "got: {}", out.text);
     }
 
     #[test]
@@ -1924,7 +1891,7 @@ mod tests {
         fs::create_dir_all(dir.join("backlog/archive/tasks")).unwrap();
         let archived = "---\nid: TASK-1\ntitle: Archived\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: Done\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 1\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
         fs::write(
-            dir.join("backlog/archive/tasks/task-1 - Archived.md"),
+            dir.join("backlog/archive/tasks/TASK-1 - Archived.md"),
             archived,
         )
         .unwrap();
@@ -1952,7 +1919,7 @@ mod tests {
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
         let content = "---\nid: TASK-99\ntitle: Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
-        fs::write(dir.join("backlog/tasks/task-5 - Title.md"), content).unwrap();
+        fs::write(dir.join("backlog/tasks/TASK-005.md"), content).unwrap();
         let out = view(&c, "TASK-099").unwrap_or_else(|e| panic!("canonical view failed: {}", e));
         assert!(out.text.contains("id: TASK-99"), "got: {}", out.text);
         let out2 = view(&c, "TASK-005").unwrap_or_else(|e| panic!("filename view failed: {}", e));
@@ -1965,7 +1932,7 @@ mod tests {
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
         let content = "---\nid: TASK-99\ntitle: Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
-        fs::write(dir.join("backlog/tasks/task-5 - Title.md"), content).unwrap();
+        fs::write(dir.join("backlog/tasks/TASK-005.md"), content).unwrap();
         let err = edit(
             &c,
             "TASK-099",
@@ -1995,7 +1962,7 @@ mod tests {
             msg
         );
         assert_eq!(
-            fs::read_to_string(dir.join("backlog/tasks/task-5 - Title.md")).unwrap(),
+            fs::read_to_string(dir.join("backlog/tasks/TASK-005.md")).unwrap(),
             content
         );
     }
@@ -2006,7 +1973,7 @@ mod tests {
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
         let content = "---\nid: TASK-99\ntitle: Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
-        fs::write(dir.join("backlog/tasks/task-5 - Title.md"), content).unwrap();
+        fs::write(dir.join("backlog/tasks/TASK-005.md"), content).unwrap();
         let err = archive(&c, "TASK-005").err().expect("expected error");
         let msg = err.to_string();
         assert!(
@@ -2015,7 +1982,7 @@ mod tests {
             msg
         );
         assert!(
-            dir.join("backlog/tasks/task-5 - Title.md").exists(),
+            dir.join("backlog/tasks/TASK-005.md").exists(),
             "file must not move on refusal"
         );
     }
@@ -2030,7 +1997,7 @@ mod tests {
             "---\nid: TASK-6\ntitle: Interop\nstatus: To Do\n---\n{}",
             body
         );
-        let path = dir.join("backlog/tasks/task-6 - Interop.md");
+        let path = dir.join("backlog/tasks/TASK-006.md");
         fs::write(&path, &content).unwrap();
         let out = view(&c, "TASK-006").unwrap();
         for key in [
@@ -2075,7 +2042,7 @@ mod tests {
             "---\nid: TASK-5\ntitle: OldTitle\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n{}",
             body
         );
-        let path = dir.join("backlog/tasks/task-5 - OldTitle.md");
+        let path = dir.join("backlog/tasks/TASK-005.md");
         fs::write(&path, &content).unwrap();
         edit(
             &c,
@@ -2122,7 +2089,7 @@ mod tests {
             "---\nid: TASK-5\ntitle: OldTitle\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n{}",
             body
         );
-        let path = dir.join("backlog/tasks/task-5 - OldTitle.md");
+        let path = dir.join("backlog/tasks/TASK-005.md");
         fs::write(&path, &content).unwrap();
         edit(
             &c,
@@ -2152,5 +2119,198 @@ mod tests {
             after_body, body,
             "body must stay byte-identical when title unchanged"
         );
+    }
+
+    fn task_record(id: &str, title: &str) -> String {
+        format!(
+            "---\nid: {id}\ntitle: {title}\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: ToDo\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 1\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n"
+        )
+    }
+
+    #[test]
+    fn archive_moves_to_canonical_archive_and_restore_round_trips() {
+        let dir = tmpdir("archive-round-trip");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
+        fs::write(
+            dir.join("backlog/tasks/TASK-001.md"),
+            task_record("TASK-001", "One"),
+        )
+        .unwrap();
+
+        archive(&c, "TASK-001").unwrap();
+        assert!(!dir.join("backlog/tasks/TASK-001.md").exists());
+        assert!(
+            dir.join("backlog/archive/tasks/TASK-001.md").exists(),
+            "archive must use the canonical archive directory"
+        );
+        assert!(!dir.join("backlog/tasks/archived/TASK-001.md").exists());
+
+        restore(&c, "TASK-001").unwrap();
+        assert!(dir.join("backlog/tasks/TASK-001.md").exists());
+        assert!(!dir.join("backlog/archive/tasks/TASK-001.md").exists());
+    }
+
+    #[test]
+    fn restore_from_legacy_alias_moves_to_active_unchanged() {
+        let dir = tmpdir("legacy-alias-restore");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/tasks/archived")).unwrap();
+        let content = task_record("TASK-002", "Two");
+        fs::write(dir.join("backlog/tasks/archived/TASK-002.md"), &content).unwrap();
+
+        restore(&c, "TASK-002").unwrap();
+        assert!(!dir.join("backlog/tasks/archived/TASK-002.md").exists());
+        let restored = dir.join("backlog/tasks/TASK-002.md");
+        assert!(
+            restored.exists(),
+            "restore must move to the active directory"
+        );
+        assert_eq!(fs::read_to_string(&restored).unwrap(), content);
+    }
+
+    #[test]
+    fn backlog_shaped_task_stem_is_invisible() {
+        let dir = tmpdir("backlog-shape-invisible");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
+        fs::write(
+            dir.join("backlog/tasks/task-18 - Hidden.md"),
+            task_record("TASK-18", "Hidden"),
+        )
+        .unwrap();
+        assert!(matches!(view(&c, "TASK-018"), Err(AppError::NotFound(_))));
+        let out = list(&c, None, None, None, None, None, None, None, None, false).unwrap();
+        assert!(out.text.is_empty(), "got: {}", out.text);
+    }
+
+    #[test]
+    fn allocation_scans_active_archive_and_legacy_alias() {
+        let dir = tmpdir("allocation-dirs");
+        let c = ctx(&dir);
+        for sub in [
+            "backlog/tasks",
+            "backlog/archive/tasks",
+            "backlog/tasks/archived",
+        ] {
+            fs::create_dir_all(dir.join(sub)).unwrap();
+        }
+        fs::write(
+            dir.join("backlog/tasks/TASK-001.md"),
+            task_record("TASK-001", "Active"),
+        )
+        .unwrap();
+        fs::write(
+            dir.join("backlog/archive/tasks/TASK-002.md"),
+            task_record("TASK-002", "Archived"),
+        )
+        .unwrap();
+        fs::write(
+            dir.join("backlog/tasks/archived/TASK-003.md"),
+            task_record("TASK-003", "Legacy"),
+        )
+        .unwrap();
+        let id = create(
+            &c,
+            "New",
+            None,
+            &[],
+            &[],
+            None,
+            &[],
+            &[],
+            &[],
+            None,
+            None,
+            &[],
+        )
+        .unwrap();
+        assert_eq!(id, "TASK-004");
+    }
+
+    #[test]
+    fn unrecognised_status_is_preserved_on_view() {
+        let dir = tmpdir("unknown-status");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
+        let content = task_record("TASK-001", "One").replace("status: ToDo", "status: Weird");
+        fs::write(dir.join("backlog/tasks/TASK-001.md"), &content).unwrap();
+        let out = view(&c, "TASK-001").unwrap();
+        assert!(out.text.contains("status: Weird"));
+        assert_eq!(
+            fs::read_to_string(dir.join("backlog/tasks/TASK-001.md")).unwrap(),
+            content,
+            "an unrecognised status is preserved verbatim"
+        );
+    }
+}
+
+#[cfg(test)]
+mod native_layout_tests {
+    use super::*;
+
+    fn tmpdir(name: &str) -> PathBuf {
+        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join(format!("task-native-{}", name));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        base
+    }
+
+    fn ctx(dir: &std::path::Path) -> Context {
+        Context {
+            project_dir: dir.to_path_buf(),
+            config_path: dir.join("papyrus.config.yml"),
+            json: false,
+            no_color: true,
+        }
+    }
+
+    fn record(id: &str, title: &str) -> String {
+        format!(
+            "---\nid: {id}\ntitle: {title}\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: ToDo\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 1\ndocumentation: []\ntype: null\n---\n\n## Description\n\nBody\n"
+        )
+    }
+
+    #[test]
+    fn archive_from_legacy_alias_is_refused_without_changing_the_file() {
+        let dir = tmpdir("legacy-archive-refusal");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/tasks/archived")).unwrap();
+        let path = dir.join("backlog/tasks/archived/TASK-005.md");
+        let before = record("TASK-005", "Five");
+        fs::write(&path, &before).unwrap();
+
+        let err = match archive(&c, "TASK-005") {
+            Err(err) => err,
+            Ok(_) => panic!("archive from a legacy alias must fail"),
+        };
+        assert!(
+            matches!(&err, AppError::Validation(message) if message.contains("already archived")),
+            "unexpected error: {err:?}"
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), before);
+        assert!(!dir.join("backlog/archive/tasks/TASK-005.md").exists());
+    }
+
+    #[test]
+    fn archive_from_canonical_archive_is_refused_without_changing_the_file() {
+        let dir = tmpdir("canonical-archive-refusal");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/archive/tasks")).unwrap();
+        let path = dir.join("backlog/archive/tasks/TASK-006.md");
+        let before = record("TASK-006", "Six");
+        fs::write(&path, &before).unwrap();
+
+        let err = match archive(&c, "TASK-006") {
+            Err(err) => err,
+            Ok(_) => panic!("archive from the canonical archive must fail"),
+        };
+        assert!(
+            matches!(&err, AppError::Validation(message) if message.contains("already archived")),
+            "unexpected error: {err:?}"
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), before);
     }
 }
