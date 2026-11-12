@@ -181,16 +181,18 @@ pub fn format_seq_id(group: &str, number: i64, padding: usize) -> String {
 
 pub fn id_number(stem: &str, prefix: &str) -> Option<u32> {
     let base = stem.split(" - ").next().unwrap_or(stem).trim();
-    let prefix_with_dash = format!("{}-", prefix);
-    if !base
-        .to_ascii_lowercase()
-        .starts_with(&prefix_with_dash.to_ascii_lowercase())
-    {
+    let (stem_prefix, rest) = base.split_once('-')?;
+    if stem_prefix.is_empty() || !stem_prefix.eq_ignore_ascii_case(prefix) {
         return None;
     }
-    let rest = &base[prefix.len() + 1..];
     let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
     if digits.is_empty() {
+        return None;
+    }
+    if stem_prefix.chars().all(|c| c.is_ascii_lowercase())
+        && prefix.chars().any(|c| c.is_ascii_uppercase())
+        && !(digits.len() > 1 && digits.starts_with('0'))
+    {
         return None;
     }
     digits.parse::<u32>().ok()

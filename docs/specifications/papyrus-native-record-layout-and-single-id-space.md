@@ -40,7 +40,7 @@ Define the Papyrus-native on-disk record layout and the single Papyrus ID space 
 
 ### 2. Configuration-driven directories
 
-1. Descriptors name a configuration key, never a literal path. The configured roots are the only source of locations.
+1. Descriptors name a configuration key, never a literal path. The configured roots are the only source of locations. A descriptor stores a key such as `backlog`, `decision`, or `doc` (plus, for a document type, the type entry), and the resolver appends only the fixed family subpath (`tasks/`, `milestones/`, `releases/`, `archive/...`, or the document type's configured `directory`); no descriptor or module may embed a full path literal such as `backlog/tasks`, `backlog/milestones`, `archive/tasks`, or `docs/decisions`, and no `concat!` (or equivalent) path construction may remain in `src/record/descriptor.rs`.
 2. Directory layout:
 
    | Record family | Active | Inactive (archive) | Deprecated |
@@ -65,8 +65,8 @@ Define the Papyrus-native on-disk record layout and the single Papyrus ID space 
 ### 4. Resolution (read tolerance)
 
 1. A file inside a claimed directory whose stem is `<PREFIX>-<digits>` optionally followed by `-<slug>` or ` - <slug>` is a candidate record.
-2. The prefix is compared case-insensitively against the configured prefix; leading zeros are optional, so `TASK-1.md`, `TASK-001.md`, and `TASK-0001.md` all denote `TASK-001`.
-3. Backlog.md storage stems are **not** recognized. `task-18`, `m-0`, and any other Backlog storage prefix match no Papyrus record, so an unimported Backlog store is invisible to every Papyrus surface. This enforces "the import is the only bridge" (ADR-0011).
+2. The prefix is compared case-insensitively against the configured prefix and leading zeros are optional, so `TASK-1.md`, `TASK-001.md`, and `TASK-0001.md` all denote `TASK-001`. Case-insensitive matching is retained for Papyrus prefixes (for example `Task-001` or `task-001` with a padded number).
+3. Backlog.md storage stems are **not** recognized. A stem is Backlog-shaped, and resolves to no record, when its prefix is the all-lowercase form of a configured prefix that contains at least one uppercase letter **and** its number has no leading zeros (the Backlog storage shape, e.g. `task-18`, `m-0`). Such a stem is invisible even though it case-folds to the configured prefix. Any other Backlog storage prefix has the same effect. This enforces "the import is the only bridge" (ADR-0011). All other case variants, including padded lowercase forms such as `task-001`, resolve normally.
 4. Front-matter `id` is authoritative. If it disagrees with the stem after normalization, the record is read from front matter, is flagged invalid, and writes to it are refused until the file is fixed.
 5. Legacy archive aliases `<backlog_directory>/tasks/archived/` and `<backlog_directory>/milestones/archived/` are read as archived tasks and milestones. A read never relocates or renames them; archive/restore operations follow section 7.
 

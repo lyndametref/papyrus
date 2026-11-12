@@ -85,15 +85,29 @@ pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<&'static Re
             return crate::record::descriptor::descriptor_for("decision");
         }
     }
+    // Load effective config for this project (falls back to defaults).
+    let cfg_path = project_dir.join("papyrus.config.yml");
+    let cfg = crate::commands::load_effective_config(&cfg_path, project_dir).unwrap_or_default();
+    let backlog = cfg.backlog_directory.trim_end_matches('/');
+
     // Task and milestone special handling (TASK-69).
-    let rel_norm = rel_str.clone();
-    if is_task_path(&rel_norm) {
+    let task_roots = [
+        format!("{}/tasks", backlog),
+        format!("{}/tasks/archived", backlog),
+        format!("{}/archive/tasks", backlog),
+    ];
+    let milestone_roots = [
+        format!("{}/milestones", backlog),
+        format!("{}/milestones/archived", backlog),
+        format!("{}/archive/milestones", backlog),
+    ];
+    if task_roots.iter().any(|r| rel_str.starts_with(r)) {
         let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
         if accepted_task_stem(stem) {
             return crate::record::descriptor::descriptor_for("task");
         }
     }
-    if is_milestone_path(&rel_norm) {
+    if milestone_roots.iter().any(|r| rel_str.starts_with(r)) {
         let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
         if accepted_milestone_stem(stem) {
             return crate::record::descriptor::descriptor_for("milestone");
@@ -104,8 +118,15 @@ pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<&'static Re
         if desc.name == "task" || desc.name == "milestone" {
             continue;
         }
-        let dir = desc.directory;
-        if !rel_str.starts_with(dir) {
+        let Ok(dir_path) = desc.resolve_directory(&cfg, project_dir) else {
+            continue;
+        };
+        let Ok(dir_rel) = dir_path.strip_prefix(project_dir) else {
+            continue;
+        };
+        let dir_rel = dir_rel.to_string_lossy().replace('\\', "/");
+        let dir_rel = dir_rel.trim_end_matches('/');
+        if !rel_str.starts_with(dir_rel) {
             continue;
         }
         // ensure it's directly under dir or subdirectory
@@ -121,17 +142,6 @@ pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<&'static Re
         }
     }
     None
-}
-
-fn is_task_path(rel: &str) -> bool {
-    rel.starts_with(concat!("backlog", "/", "tasks"))
-        || rel.starts_with(concat!("backlog", "/", "tasks", "/", "archived"))
-        || rel.starts_with(concat!("backlog", "/", "archive", "/", "tasks"))
-}
-fn is_milestone_path(rel: &str) -> bool {
-    rel.starts_with(concat!("backlog", "/", "milestones"))
-        || rel.starts_with(concat!("backlog", "/", "milestones", "/", "archived"))
-        || rel.starts_with("backlog/archive/milestones")
 }
 
 fn strip_prefix_ignore_case<'a>(s: &'a str, prefix: &str) -> Option<&'a str> {
@@ -725,7 +735,18 @@ fn collect_candidates(ctx: &Context, desc: &RecordDescriptor) -> Vec<Candidate> 
             format!("{}/archive/milestones", backlog),
         ]
     } else {
-        vec![desc.directory.to_string()]
+        let mut v = Vec::new();
+        if let Ok(dp) = desc.resolve_directory(&cfg, &ctx.project_dir)
+            && let Ok(rel) = dp.strip_prefix(&ctx.project_dir)
+        {
+            let r = rel
+                .to_string_lossy()
+                .replace('\\', "/")
+                .trim_end_matches('/')
+                .to_string();
+            v.push(r);
+        }
+        v
     };
     for root in roots {
         let dir = ctx.project_dir.join(&root);
@@ -793,7 +814,7 @@ pub fn scan_migration_conflicts(ctx: &Context, desc: &RecordDescriptor) -> Vec<M
     // Front-matter / filename mismatch.
     for c in &candidates {
         if let (Some(fm), Some(fn_id)) = (&c.frontmatter_id, &c.filename_id)
-            && fm != fn_id
+            && !fm.eq_ignore_ascii_case(fn_id)
         {
             conflicts.push(MigrationConflict::FrontmatterFilenameMismatch {
                 path: c.rel.clone(),
@@ -856,7 +877,7 @@ pub(crate) fn check_conflicts_for_path(
             candidate_frontmatter_id(desc, content),
             candidate_filename_id(desc, path),
         )
-        && fm_id != fn_id
+        && !fm_id.eq_ignore_ascii_case(&fn_id)
     {
         return Some(format!(
             "front-matter/filename mismatch: filename {} vs front matter {}",
@@ -1101,24 +1122,27 @@ fn longest_common_subsequence<'a>(a: &[&'a str], b: &[&'a str]) -> Vec<&'a str> 
 // Dry-run traversal and migration helpers.
 pub fn migrate_corpus(ctx: &Context, dry_run: bool) -> Result<Vec<MigrationEntry>, AppError> {
     let mut entries = Vec::new();
+    let cfg = load_cfg(ctx);
+    let backlog = cfg.backlog_directory.trim_end_matches('/').to_string();
     // descriptor dirs
     for desc in crate::record::descriptor::descriptors() {
         if desc.name == "task" || desc.name == "milestone" {
             continue;
         }
-        let dir = ctx.project_dir.join(desc.directory);
-        if dir.exists() {
+        if let Ok(dir) = desc.resolve_directory(&cfg, &ctx.project_dir)
+            && dir.exists()
+        {
             collect_dir(ctx, &dir, dry_run, &mut entries)?;
         }
     }
     // Task and milestone roots (active, legacy archived, Backlog.md archive).
     for root in [
-        concat!("backlog", "/", "tasks"),
-        concat!("backlog", "/", "tasks", "/", "archived"),
-        concat!("backlog", "/", "archive", "/", "tasks"),
-        concat!("backlog", "/", "milestones"),
-        concat!("backlog", "/", "milestones", "/", "archived"),
-        "backlog/archive/milestones",
+        format!("{}/tasks", backlog),
+        format!("{}/tasks/archived", backlog),
+        format!("{}/archive/tasks", backlog),
+        format!("{}/milestones", backlog),
+        format!("{}/milestones/archived", backlog),
+        format!("{}/archive/milestones", backlog),
     ] {
         let dir = ctx.project_dir.join(root);
         if dir.exists() {
@@ -1481,7 +1505,7 @@ fn storage_target_path(
         return None;
     }
     let sub = if desc.name == "task" {
-        concat!("archive", "/", "tasks")
+        "archive/tasks"
     } else {
         "archive/milestones"
     };

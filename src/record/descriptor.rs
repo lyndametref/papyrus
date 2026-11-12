@@ -1,5 +1,9 @@
 //! Record descriptors for managed Markdown record types.
 
+use crate::config::Config;
+use crate::context::Context;
+use crate::error::AppError;
+
 use std::fmt;
 
 #[derive(Clone, Copy, Debug)]
@@ -10,6 +14,8 @@ pub struct RecordDescriptor {
     pub label: &'static str,
     pub display_id_pattern: &'static str,
     pub directory: &'static str,
+    pub subpath: &'static str,
+    pub doc_type_key: Option<&'static str>,
     pub frontmatter_keys: &'static [&'static str],
     pub sections: &'static [&'static str],
 }
@@ -17,6 +23,51 @@ pub struct RecordDescriptor {
 impl RecordDescriptor {
     pub fn has_frontmatter_key(&self, key: &str) -> bool {
         self.frontmatter_keys.contains(&key)
+    }
+
+    pub fn resolve_directory(
+        &self,
+        cfg: &Config,
+        project_dir: &std::path::Path,
+    ) -> Result<std::path::PathBuf, AppError> {
+        let base = match self.directory {
+            "backlog" => project_dir.join(&cfg.backlog_directory),
+            "decision" => project_dir.join(&cfg.decision_directory),
+            "doc" => project_dir.join(&cfg.doc_directory),
+            other => project_dir.join(other),
+        };
+        let raw = if let Some(key) = self.doc_type_key {
+            if let Some(entry) = cfg.document_types.get(key) {
+                base.join(&entry.directory)
+            } else {
+                if self.subpath.is_empty() {
+                    base
+                } else {
+                    base.join(self.subpath)
+                }
+            }
+        } else if self.subpath.is_empty() {
+            base
+        } else {
+            base.join(self.subpath)
+        };
+        Context::ensure_within(project_dir, &raw)
+    }
+
+    // Aliases for callers/tests that prefer other names.
+    pub fn resolve_dir(
+        &self,
+        cfg: &Config,
+        project_dir: &std::path::Path,
+    ) -> Result<std::path::PathBuf, AppError> {
+        self.resolve_directory(cfg, project_dir)
+    }
+    pub fn directory_path(
+        &self,
+        cfg: &Config,
+        project_dir: &std::path::Path,
+    ) -> Result<std::path::PathBuf, AppError> {
+        self.resolve_directory(cfg, project_dir)
     }
 }
 
@@ -70,7 +121,9 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         type_name: "task",
         label: "Task",
         display_id_pattern: "TASK-###",
-        directory: concat!("backlog", "/", "tasks"),
+        directory: "backlog",
+        subpath: "tasks",
+        doc_type_key: None,
         frontmatter_keys: &[
             "status",
             "assignee",
@@ -88,7 +141,9 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         type_name: "milestone",
         label: "Milestone",
         display_id_pattern: "MS-###",
-        directory: concat!("backlog", "/", "milestones"),
+        directory: "backlog",
+        subpath: "milestones",
+        doc_type_key: None,
         frontmatter_keys: &["release"],
         sections: MILESTONE_SECTIONS,
     },
@@ -98,7 +153,9 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         type_name: "release",
         label: "Release",
         display_id_pattern: "REL-###",
-        directory: "backlog/releases",
+        directory: "backlog",
+        subpath: "releases",
+        doc_type_key: None,
         frontmatter_keys: &[],
         sections: RELEASE_SECTIONS,
     },
@@ -108,7 +165,9 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         type_name: "decision",
         label: "Decision",
         display_id_pattern: "DEC-###",
-        directory: concat!("docs", "/", "decisions"),
+        directory: "decision",
+        subpath: "",
+        doc_type_key: None,
         frontmatter_keys: &["superseded_by"],
         sections: DECISION_SECTIONS,
     },
@@ -118,7 +177,9 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         type_name: "requirement",
         label: "Business requirement",
         display_id_pattern: "REQ-###.###",
-        directory: "docs/requirements/business",
+        directory: "doc",
+        subpath: "",
+        doc_type_key: Some("req"),
         frontmatter_keys: &[],
         sections: REQUIREMENT_SECTIONS,
     },
@@ -128,7 +189,9 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         type_name: "nfr",
         label: "Non-functional requirement",
         display_id_pattern: "NFR-###.###",
-        directory: "docs/requirements/non-functional",
+        directory: "doc",
+        subpath: "",
+        doc_type_key: Some("nfr"),
         frontmatter_keys: &[],
         sections: REQUIREMENT_SECTIONS,
     },
@@ -138,7 +201,9 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         type_name: "glossary",
         label: "Glossary term",
         display_id_pattern: "GLO-###",
-        directory: "docs/glossary",
+        directory: "doc",
+        subpath: "",
+        doc_type_key: Some("glossary"),
         frontmatter_keys: &[],
         sections: GLOSSARY_SECTIONS,
     },
@@ -148,7 +213,9 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         type_name: "ui_spec",
         label: "UI specification",
         display_id_pattern: "UI-###",
-        directory: "docs/specifications/ui",
+        directory: "doc",
+        subpath: "",
+        doc_type_key: Some("ui-spec"),
         frontmatter_keys: &[],
         sections: UI_SPEC_SECTIONS,
     },
@@ -158,7 +225,9 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         type_name: "tech_spec",
         label: "Technical specification",
         display_id_pattern: "TECH-###",
-        directory: "docs/technical",
+        directory: "doc",
+        subpath: "",
+        doc_type_key: Some("tech-spec"),
         frontmatter_keys: &[],
         sections: TECH_SPEC_SECTIONS,
     },
@@ -168,7 +237,9 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         type_name: "rule",
         label: "Business rule",
         display_id_pattern: "RUL-###",
-        directory: "docs/business-rules",
+        directory: "doc",
+        subpath: "",
+        doc_type_key: Some("rule"),
         frontmatter_keys: &[],
         sections: RULE_SECTIONS,
     },
@@ -178,7 +249,9 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         type_name: "audit",
         label: "Audit record",
         display_id_pattern: "AUD-###",
-        directory: "docs/audit-records",
+        directory: "doc",
+        subpath: "",
+        doc_type_key: Some("audit"),
         frontmatter_keys: &["type"],
         sections: AUDIT_SECTIONS,
     },
@@ -188,7 +261,9 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         type_name: "use_case",
         label: "Use case",
         display_id_pattern: "UC-###",
-        directory: "docs/use-cases",
+        directory: "doc",
+        subpath: "",
+        doc_type_key: Some("use-case"),
         frontmatter_keys: &[],
         sections: USE_CASE_SECTIONS,
     },
@@ -198,7 +273,9 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         type_name: "test_case",
         label: "Test case",
         display_id_pattern: "TC-###",
-        directory: "docs/test-cases",
+        directory: "doc",
+        subpath: "",
+        doc_type_key: Some("test-case"),
         frontmatter_keys: &[],
         sections: TEST_CASE_SECTIONS,
     },
@@ -208,7 +285,9 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         type_name: "test_report",
         label: "Test report",
         display_id_pattern: "TR-###",
-        directory: "docs/test-reports",
+        directory: "doc",
+        subpath: "",
+        doc_type_key: Some("test-report"),
         frontmatter_keys: &[],
         sections: TEST_REPORT_SECTIONS,
     },

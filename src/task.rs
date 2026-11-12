@@ -1917,7 +1917,7 @@ mod tests {
         fs::create_dir_all(dir.join("backlog/archive/tasks")).unwrap();
         let archived = "---\nid: TASK-1\ntitle: Archived\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: Done\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 1\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
         fs::write(
-            dir.join("backlog/archive/tasks/task-1 - Archived.md"),
+            dir.join("backlog/archive/tasks/TASK-1 - Archived.md"),
             archived,
         )
         .unwrap();
