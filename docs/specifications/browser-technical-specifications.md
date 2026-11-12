@@ -77,6 +77,8 @@ Technical specifications are Markdown text records with a fixed template (`# <ID
 
 ### 5. Record view
 
+Record views in this specification follow the shared single record view layout defined in section 4c of `docs/specifications/browser-requirements.md` (summary card with ID, created date, updated date; labels as a taglist under the title; dependencies and references at the end as native disclosure sections), in addition to the type-specific fields below. Record references that resolve to Papyrus records follow the shared reference-link rule defined in section 4b of `docs/specifications/browser-requirements.md`.
+
 1. The view page shows:
    - metadata block: Record ID (read-only, monospace), Record form (`Technical specification`), Category (`Technical Specifications`);
    - the title as the page title (`h1`);
@@ -248,11 +250,10 @@ UI mockups are required before any UI implementation work and must be approved b
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-05, REQ-05.009, REQ-05.007, REQ-06, REQ-06.002 |
-| Non-functional | NFR-01.002, NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001 |
+| Requirement | REQ-05, REQ-05.009, REQ-05.007, REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012 |
 | Business rule | BR-004 (browser command behavior), BR-016 (configuration keys and precedence), BR-017 (tech-spec command behavior) |
-| ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006 |
-| Ticket | TASK-6 (baseline), TASK-11, TASK-15, TASK-23, TASK-24, TASK-40, TASK-25 (sibling), TASK-26 (sibling), TASK-55 (record model), TASK-58 (UI design), TASK-57 |
+| ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0010, ADR-0012, ADR-0013 |
+| Ticket | TASK-6 (baseline), TASK-11, TASK-15, TASK-23, TASK-24, TASK-40, TASK-25 (sibling), TASK-26 (sibling), TASK-55 (record model), TASK-58 (UI design), TASK-57, TASK-86 |
 | UI mockups | MOCK-0001…MOCK-0008 (approved baseline); MOCK-0009 (approved) — `docs/specifications/ui/mockups/MOCK-0009-browser-technical-specifications-review.html` |
 | UI description | `docs/specifications/ui/browser-technical-specifications-ui.md` (TASK-58) |
 | Related specification | `docs/specifications/browser-requirements.md` (TASK-6 baseline), `docs/specifications/technical-specifications-management.md` (TASK-55 record model and lifecycle), `docs/specifications/search-technical-specifications.md` (TASK-56), `docs/specifications/browser-audit-records.md` (TASK-26 sibling increment), `docs/specifications/browser-business-rules.md` (TASK-25 sibling increment) |

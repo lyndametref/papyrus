@@ -78,6 +78,15 @@ Each section's lifecycle paragraph uses the documented lifecycle for that type:
 2. The page does not state that a release becomes released when its milestone set is complete, that a milestone closes when its tasks are complete, that documents move through a Draft → Approved phase, or that audit records are immutable; none of those is documented.
 3. All lifecycle sentences are static text; they are not derived from project data.
 
+### 4a. Per-artifact descriptions and read-only configuration (TASK-86)
+
+1. Description text is curated content shipped with the browser binary, written for the page, available offline (NFR-01.003), and not derived from requirement files, record content, or configuration.
+2. Each of the twelve fixed sections includes a good description of its artifact on top of its lifecycle and existing status.
+3. Each section shows read-only effective configuration: the artifact's `enabled` state, its ID prefix, and its storage folder. The task section additionally shows the configured statuses.
+4. Configuration values on this page are display-only. Changes are made only through the configuration view (section 4d of `browser-requirements.md`).
+5. The page points to the configuration view for changes, and does not offer editing.
+6. The covered set remains fixed and is not derived from configured `document_types`.
+
 ### 5. Exclusions statement
 
 1. The subtitle (section 1.5) states that Backlog.md `docs`, `drafts`, and project configuration files are not covered.
@@ -121,11 +130,12 @@ Each section's lifecycle paragraph uses the documented lifecycle for that type:
 
 ## Related artifacts
 
-- Requirement: `docs/requirements/business/REQ-06.003.md` (primary); `docs/requirements/business/REQ-01.002.md`; `docs/requirements/business/REQ-03.001.md`; `docs/requirements/business/REQ-03.002.md`; `docs/requirements/business/REQ-04.001.md`; `docs/requirements/business/REQ-05.006.md`; `docs/requirements/business/REQ-05.007.md`; `docs/requirements/business/REQ-05.008.md`; `docs/requirements/non-functional/NFR-01.002.md`
+- Requirement: `docs/requirements/business/REQ-06.003.md` (primary); `docs/requirements/business/REQ-06.006.md`; `docs/requirements/business/REQ-06.007.md`; `docs/requirements/business/REQ-06.008.md`; `docs/requirements/business/REQ-06.009.md`; `docs/requirements/business/REQ-06.010.md`; `docs/requirements/business/REQ-06.011.md`; `docs/requirements/business/REQ-06.012.md`; `docs/requirements/business/REQ-01.002.md`; `docs/requirements/business/REQ-01.003.md`; `docs/requirements/business/REQ-03.001.md`; `docs/requirements/business/REQ-03.002.md`; `docs/requirements/business/REQ-04.001.md`; `docs/requirements/business/REQ-05.006.md`; `docs/requirements/business/REQ-05.007.md`; `docs/requirements/business/REQ-05.008.md`; `docs/requirements/non-functional/NFR-01.002.md`; `docs/requirements/non-functional/NFR-01.003.md`
 - UI description: `docs/specifications/ui/browser-front-matter-and-lifecycle-ui.md`
 - UI mockup: `docs/specifications/ui/mockups/MOCK-0010-browser-front-matter-and-lifecycle-review.html` (approved)
 - Baseline browser spec: `docs/specifications/browser-requirements.md`
 - Task status source: `docs/business-rules/BR-001-papyrus-command-behavior.md`, `docs/business-rules/BR-006-papyrus-milestone-command-behavior.md`, `docs/business-rules/BR-007-papyrus-release-command-behavior.md`, `docs/business-rules/BR-008-papyrus-decision-command-behavior.md`
 - Milestone: `m-12`
-- Dependency: TASK-66 (Done)
+- Dependency: TASK-66 (Done), TASK-86
+- ADR: ADR-0010, ADR-0012, ADR-0013
 path: /home/lyly/Documents/Dev/papyrus/docs/specifications/browser-managed-artifacts-and-lifecycles.md

@@ -61,7 +61,17 @@ Extend the offline, project-local, read-and-edit web interface delivered by TASK
 4. Empty state and long-title wrapping as in the baseline (section 10.4).
 5. Deprecated terms are never listed.
 
+### 3a. Glossary landing page revisions (TASK-86)
+
+1. The glossary landing (list) page omits created and updated dates.
+2. Labels are shown as a list of tags on the glossary landing page, using the same taglist presentation as the single record view layout (section 4c of `browser-requirements.md`).
+3. References are not shown on the glossary landing page.
+4. Glossary detail views are unchanged by this requirement and follow the single record view layout (section 4c of `browser-requirements.md`).
+5. Other document-type landing pages are unchanged.
+
 ### 4. Record view
+
+Glossary detail views follow the shared single record view layout defined in section 4c of `docs/specifications/browser-requirements.md` (summary card with ID, created date, updated date; labels as a taglist under the title; dependencies and references at the end as native disclosure sections), in addition to the type-specific fields below.
 
 1. Glossary view shows:
    - ID (read-only), record form (`Glossary term`), category (`Glossary`);
@@ -108,6 +118,10 @@ Extend the offline, project-local, read-and-edit web interface delivered by TASK
 2. `GET /api/doc/{id}` and `POST /api/doc/{id}` work for glossary IDs in addition to requirement, backlog, and decision IDs, returning the full record shape: `{"id","kind":"glossary","form":"glossary","title","definition","version","path"}`.
 3. `POST /api/doc/{id}` accepts a JSON object with `version` (required), `title` (required, mapped to term), and the editable fields for that record type. Omitted fields are left unchanged; an explicit `null` clears an optional field. Unknown members are ignored; a non-object body or a member of the wrong type receives `400`.
 4. Error responses follow baseline section 5.3 (HTML error page or JSON error object with `code`/`message`).
+
+### 8a. Record references as links (TASK-86)
+
+Glossary records that render record references follow the shared reference-link rule defined in section 4b of `docs/specifications/browser-requirements.md`: every rendered record reference that resolves to a Papyrus record is a hyperlink; unresolved references render as plain text without an error; links work offline.
 
 ### 9. Assets, rendering, security, and accessibility
 
@@ -211,11 +225,10 @@ The following records where glossary terms appear in the browser, the route shap
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06, REQ-06.002, REQ-05, REQ-05.003, REQ-05.007 |
-| Non-functional | NFR-01.002, NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001 |
+| Requirement | REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012, REQ-05, REQ-05.003, REQ-05.007 |
 | Business rule | BR-004 (browser command behavior), BR-011 (glossary command behavior), BR-016 (configuration keys and precedence) |
-| ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006 |
-| Ticket | TASK-6 (baseline), TASK-11, TASK-15, TASK-23, TASK-30, TASK-32 |
+| ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0010, ADR-0012, ADR-0013 |
+| Ticket | TASK-6 (baseline), TASK-11, TASK-15, TASK-23, TASK-30, TASK-32, TASK-86 |
 | UI mockups | MOCK-0001 (approved baseline); MOCK-0002 (approved); MOCK-0003 (approved); MOCK-0004 (approved) — `docs/specifications/ui/mockups/MOCK-0004-browser-glossary-terms-review.html` |
 | Related specification | `docs/specifications/browser-requirements.md` (TASK-6 baseline), `docs/specifications/browser-tasks-milestones-and-releases.md` (TASK-11), `docs/specifications/browser-decision-records.md` (TASK-15), `docs/specifications/glossary-terms-management.md` (TASK-30), `docs/specifications/search-glossary-terms.md` (TASK-31), `docs/specifications/ui/browser-glossary-terms-ui.md` (UI description, TASK-32) |
 | Domain model | `docs/domain-model/business-glossary/glossary-term.md` (if present) |

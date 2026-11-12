@@ -4,10 +4,10 @@ title: >-
   Revise the browser specifications for requirements grouping, verbosity,
   configuration view, branding, links, glossary landing, record layout, and
   per-artifact configuration
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-11T20:41:00Z'
-updated_date: '2026-11-11T20:57:00Z'
+updated_date: '2026-11-12T07:11:00Z'
 labels:
   - specification
   - browser
@@ -26,6 +26,7 @@ references:
   - docs/specifications/browser-requirements.md
   - docs/specifications/browser-managed-artifacts-and-lifecycles.md
   - docs/specifications/browser-glossary-terms.md
+  - docs/specifications/browser-spec-revisions-task-86.md
 priority: high
 type: docs
 ordinal: 39030
@@ -34,7 +35,7 @@ ordinal: 39030
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-REQ-06.003 was extended and REQ-06.006 to REQ-06.012 were added on 2026-11-11. The browser specifications still describe a catch-all Other requirements section, verbose console output, configuration that cannot be edited from the browser, an undifferentiated record view, plain-text dependencies, and a glossary landing page with dates and references. Implementation cannot start on those surfaces without a specification and an approved mockup, so this task states the new browser contract and identifies the mockup work.
+Revise the browser specification corpus for the Release 1.0 contract changes introduced by REQ-06.003 (extended) and REQ-06.006 through REQ-06.012: NFR grouping under owning groups; error-only console with a browser-only --debug flag; editable configuration view; shared-header branding; record references as links; concise glossary landing page; shared single record view layout; curated per-artifact descriptions and read-only configuration on the lifecycle page; Papyrus IDs only in routes, links, form values, and JSON. Specification work only; no code, requirements, or business rules change. Implementation is delivered by TASK-93, TASK-94, and TASK-95; UI approval by TASK-87. Feature spec: docs/specifications/browser-spec-revisions-task-86.md.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -49,3 +50,20 @@ REQ-06.003 was extended and REQ-06.006 to REQ-06.012 were added on 2026-11-11. T
 - [ ] #8 The managed artifacts and lifecycle browser specification defines curated per-artifact description text shipped with the binary and available offline, plus read-only effective configuration per section (enabled, ID prefix, storage folder, and configured statuses for tasks) that points to the configuration view for changes.
 - [ ] #9 Revised browser specifications use Papyrus IDs only in routes, links, form values, and JSON, and identify which mockup packages need revision or creation.
 <!-- AC:END -->
+
+## Definition of Done
+<!-- DOD:BEGIN -->
+- [ ] #1 All target browser specifications revised and internally consistent.
+- [ ] #2 Shared single record view layout and reference-link rule are defined once in browser-requirements.md and referenced by per-type specs.
+- [ ] #3 NFR grouping, console verbosity, configuration view, branding, links, glossary landing, and per-artifact config are stated in the relevant specs.
+- [ ] #4 No Backlog.md storage-ID wording remains in revised browser specs.
+- [ ] #5 Traceability sections cite REQ-06.003, REQ-06.006 through REQ-06.012, ADR-0010, ADR-0012, and ADR-0013.
+- [ ] #6 Mockup impact (revisions and new package under TASK-87) is recorded.
+- [ ] #7 Requirements and business rules files are unchanged.
+<!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Applied browser specification revisions per docs/specifications/browser-spec-revisions-task-86.md. Updated browser-requirements.md (NFR grouping, console verbosity, configuration view, shared header branding, reference links, single record view layout), browser-glossary-terms.md (glossary landing, single record view layout, reference links), browser-managed-artifacts-and-lifecycles.md (curated descriptions, read-only per-section config), and all other browser specs (shared layout/reference links, ID-only wording, traceability). Neutralized storage-ID wording.
+<!-- SECTION:NOTES:END -->
