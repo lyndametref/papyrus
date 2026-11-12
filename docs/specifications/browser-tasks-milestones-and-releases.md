@@ -3,7 +3,7 @@
 **Ticket:** TASK-11
 **Milestone:** m-2 (Backlog Discovery and Management)
 **Status:** Refined (execution-ready; UI mockup approved)
-**UI mockups:** [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html) (approved) — extends the approved baseline [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html); see [UI design handoff](#ui-design-handoff)
+**UI mockups:** [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html) (approved baseline) — revision required and re-approval required under TASK-102 before implementation; extends the approved baseline [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html); see [UI design handoff](#ui-design-handoff)
 
 ## Purpose
 
@@ -52,11 +52,67 @@ Extend the first browser increment (TASK-6, `docs/specifications/browser-require
 
 ### 3. List page
 
-1. For `task`, `milestone`, and `release` categories the list page renders one section (`h2`) titled with the category name, showing the category's record count, followed by one row per record in ascending ID order.
-2. Each row's primary link text is `ID + title` and links to `/doc/{id}`.
-3. Task rows additionally show, as read-only text in the row: status, milestone ID (if any), and assignee (if any). Milestone rows additionally show the release ID (if any). Release rows show no extra metadata.
-4. Empty states: a project with no records of the selected category shows the category's empty state; a category with records but none matching a (future) filter shows the same empty state. (No filtering is offered in this increment; filtering remains CLI-only.)
-5. Long titles wrap inside their row (baseline section 10.4).
+The combined Backlog view (`/?type=task`, sidebar entry "Backlog") is the per-milestone kanban board required by REQ-06.013. The milestone (`?type=milestone`) and release (`?type=release`) category pages are unchanged by this revision and continue to render one section per category with one row per record in ascending ID order (milestone rows show the release ID; release rows show no extra metadata), with the empty states and long-title wrapping of the baseline.
+
+**Board layout**
+
+1. Milestones remain expandable and collapsible sections (existing behavior, retained).
+2. Expanding a milestone renders that milestone's tasks as a kanban board: one column per configured task status (REQ-01.002), laid out horizontally within the milestone.
+3. Columns appear in configured status order exactly; no reordering, no omission.
+4. A status that has no tasks for that milestone keeps its column visible (empty column with an explicit empty state).
+5. The board is nested inside the milestone section; milestones remain the grouping unit of the view.
+
+**Release grouping**
+
+1. Milestones assigned to a release appear under that release.
+2. Milestones assigned to no release are grouped together before the first release.
+3. Each release boundary is marked by a bold separator that names the release and does not rely on colour alone.
+4. Release ordering follows ascending release ID; milestones within a release follow ascending milestone ID; the no-release group precedes all releases.
+
+**Tasks without a milestone**
+
+1. Tasks that belong to no milestone appear in their own expandable section.
+2. That section is placed after all milestone sections (including all release groups).
+3. Cards in the section are ordered by ascending task ID.
+4. Each card shows the task ID and title and links to the task record view.
+
+**Card order and contents**
+
+1. Cards are ordered by ascending task ID within a column.
+2. Each card shows at least the task ID and title and links to the task record view (`/doc/{id}`).
+3. Card contents beyond the ID and title (assignee, labels, and similar) are design decisions and are not fixed by this specification.
+4. Column widths, separator styling, and empty-column presentation details are design decisions.
+
+**Status change from the board**
+
+1. A task's status is changed by dragging its card into another status column.
+2. Each card also offers an equivalent status control that performs the same change without dragging (pointer-free operable).
+3. Either action persists the status immediately to the task record; the board is not a staging area with a separate save step.
+4. Persistence uses the existing browser write contract: the version token of ADR-0006 and the single write path of ADR-0013. No second write path, endpoint, or ADR is introduced.
+5. The change alters only the status value and preserves every other field of the task.
+6. A change that cannot be persisted leaves the card in its original column and reports the failure to the user.
+7. After a successful change the value is still shown after the view is reloaded (save-then-reread).
+
+**Archived exclusion**
+
+1. Archived tasks and archived milestones are not shown on the board.
+2. Archived exclusion is consistent with the rest of the browser backlog views.
+
+**Presentation details that remain design decisions**
+
+1. Card contents beyond the task ID and title.
+2. Column widths.
+3. Separator styling and weight beyond "bold" and "names the release".
+4. The shape of the non-drag status control (select, buttons, menu).
+5. Default expansion state of milestones.
+6. Empty-column placeholder text.
+
+These are resolved by TASK-102 (mockup revision) and recorded in the UI description.
+
+**Empty states and wrapping**
+
+1. Empty states: a project with no records of the selected category shows the category's empty state; a category with records but none matching a (future) filter shows the same empty state. (No filtering is offered in this increment; filtering remains CLI-only.)
+2. Long titles wrap inside their row/card (baseline section 10.4).
 
 ### 4. Record view
 
@@ -167,7 +223,7 @@ UI mockups are required before any UI implementation work and must be approved b
 ### Screens to be covered by the extension package
 
 1. **Shared shell** (reused from MOCK-0001): header, sidebar with three entries (Business requirements, Non-functional requirements, Backlog), `main`, footer, one `h1`.
-2. **Task list** (`/?type=task`): rows with ID + title link, status, milestone, assignee; empty state; long titles.
+2. **Backlog board** (`/?type=task`): milestones as expandable/collapsible sections grouped by release with a bold named separator, each expanded milestone showing its tasks as a kanban board (one column per configured status, empty columns visible), a tasks-without-milestone section after all milestones, cards showing ID + title link, drag and non-drag status change, the failed-persistence state, and 320 px layout.
 3. **Milestone list** (`/?type=milestone`): rows with ID + title link, release; empty state.
 4. **Release list** (`/?type=release`): rows with ID + title link; empty state.
 5. **Task view** (`/doc/{id}`): metadata block (ID, form, category, status, milestone, assignee, labels, dependencies, acceptance criteria, comments), description, breadcrumb `Tasks › ID`, single `Edit` action.
@@ -210,11 +266,11 @@ UI mockups are required before any UI implementation work and must be approved b
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012, REQ-02, REQ-02.001, REQ-02.002, REQ-02.003, REQ-02.004, REQ-03, REQ-03.001, REQ-03.002, REQ-05.001, REQ-05.002, REQ-05.007 |
+| Requirement | REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012, REQ-06.013, REQ-02, REQ-02.001, REQ-02.002, REQ-02.003, REQ-02.004, REQ-03, REQ-03.001, REQ-03.002, REQ-05.001, REQ-05.002, REQ-05.007, REQ-01.002 |
 | Business rule | BR-004 (browser command behavior), BR-005 (task command behavior), BR-006 (milestone command behavior), BR-007 (release command behavior), BR-016 (configuration keys and precedence) |
 | ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0010, ADR-0012, ADR-0013 |
-| Ticket | TASK-6 (baseline), TASK-8, TASK-9, TASK-11, TASK-86 |
+| Ticket | TASK-6 (baseline), TASK-8, TASK-9, TASK-11, TASK-86, TASK-101 |
 | Increment boundary | REQ-06.002 covers both stores; the documentation-store part was delivered by TASK-6/TASK-7, the backlog-store part by this ticket. |
-| UI mockups | MOCK-0001 (approved baseline); MOCK-0002 (approved) — `docs/specifications/ui/mockups/MOCK-0002-browser-backlog-records-review.html` |
+| UI mockups | MOCK-0001 (approved baseline); MOCK-0002 (approved baseline; revision and re-approval required under TASK-102) — `docs/specifications/ui/mockups/MOCK-0002-browser-backlog-records-review.html` |
 | Related specification | `docs/specifications/browser-requirements.md` (TASK-6 baseline), `docs/specifications/task-management.md` (TASK-9), `docs/specifications/milestone-and-release-management.md` (TASK-8) |
 | Related specification | `docs/specifications/search-requirements.md` (TASK-5/TASK-10) |
