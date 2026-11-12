@@ -7,7 +7,7 @@
 
 ## Purpose
 
-Package the complete Papyrus feature set delivered by milestones m-0 through m-12 as one final installable amd64 Debian increment, and verify in an isolated Debian Forky environment that the packaged binary installs, uninstalls, and provides every supported record family, unified search across all documented record types, and the offline local browser over all Papyrus content, including the cross-type inventory, metadata projection, managed-artifact lifecycle and agent-skills pages, interactive init walkthrough, ID padding validation, lazy front-matter migration, and Backlog.md round-trip interoperability. This is the last task of milestone m-12 and closes its "ship the final installable increment" goal.
+Package the complete Papyrus feature set delivered by milestones m-0 through m-12 as one final installable amd64 Debian increment, and verify in an isolated Debian Forky environment that the packaged binary installs, uninstalls, and provides every supported record family, unified search across all documented record types, and the offline local browser over all Papyrus content, including the cross-type inventory, metadata projection, managed-artifact lifecycle and agent-skills pages, interactive init walkthrough, ID padding validation, lazy front-matter migration, and the native layout and one-way import. This is the last task of milestone m-12 and closes its "ship the final installable increment" goal.
 
 This is a packaging and verification task: no new product behavior is added. Work is limited to building, packaging, verifying, documenting, and adding one milestone-level integration test.
 
@@ -20,7 +20,7 @@ This is a packaging and verification task: no new product behavior is added. Wor
 - Verify package contents contain only the binary and the copyright file — in particular, no runtime asset, template, configuration, or man files are packaged, because assets are compiled into the binary.
 - Install and uninstall the package in an isolated Debian Forky environment without modifying the host.
 - Smoke-test the installed binary across every supported record family: business requirements, non-functional requirements, tasks, milestones, releases, decisions, glossary terms, UI specifications, UI mockups, business rules, audit records, and technical specifications — create, list, view, edit (and deprecate/restore or archive/restore where documented), search, and browser view/edit.
-- Smoke-test the cross-type capabilities delivered by m-12: unified search across all record types, the browser inventory hub, the final sidebar order, cross-type ID resolution, deprecated-record hiding, disabled-type gating, front-matter metadata projection, the managed artifacts and lifecycles page, the agent skills and workflows page, the interactive init walkthrough, ID padding validation (1–6), lazy front-matter migration on first read/write, and Backlog.md round-trip with no drift.
+- Smoke-test the cross-type capabilities delivered by m-12: unified search across all record types, the browser inventory hub, the final sidebar order, cross-type ID resolution, deprecated-record hiding, disabled-type gating, front-matter metadata projection, the managed artifacts and lifecycles page, the agent skills and workflows page, the interactive init walkthrough, ID padding validation (1–6), lazy front-matter migration on first read/write, and the native layout and one-way import.
 - Verify offline operation: search and browser work with no internet access, using only loopback and locally served assets.
 - Verify the browser configuration keys (`browser_host`, `browser_port`, `browser_open`) behave as documented in the installed binary.
 - Re-run the Rust quality gates: `cargo build --release`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check` with Rust 1.99.1.
@@ -105,7 +105,7 @@ For each family the installed binary exercises at least create → list → view
 
 6. Edit changes only the supplied fields and preserves IDs; unknown IDs exit 3; validation failures exit 4; missing required arguments exit 2.
 7. ID padding is constrained to 1–6: `config set id_padding 0` and `config set id_padding 7` exit 4 and leave the configuration file unchanged; valid values 1–6 are accepted and reflected in subsequent IDs.
-8. The Backlog.md round-trip is verified in the installed binary: a task and milestone created by Papyrus remain readable after a Backlog.md-style edit of their front matter, and `papyrus` reports no drift (consistent with TASK-71); no legacy serializer is invoked.
+8. The native layout and one-way import are verified in the installed binary: imported records use Papyrus IDs and no legacy serializer is invoked.
 
 #### 3.3 Unified search (all record types)
 
@@ -159,10 +159,10 @@ For each family the installed binary exercises at least create → list → view
 2. The package contains no asset, template, or documentation files beyond the copyright file (section 1.7).
 3. Removing or renaming nothing outside the package is required: the installed binary runs with only `/usr/bin/papyrus` and the project directory.
 
-#### 3.8 Lazy migration and round-trip
+#### 3.8 Lazy migration
 
 1. A record written by an older serializer form is migrated to front matter on first read and remains searchable and viewable; a migration that cannot be applied safely leaves the file untouched and the record is still searched from its existing text.
-2. After a Backlog.md-style edit of a task or milestone file, Papyrus reads and writes the record without drift and reports no conflict; the on-disk file remains valid Backlog.md content.
+2. After an external edit of a task or milestone file that keeps it valid Papyrus-native content, Papyrus reads and writes the record without drift and reports no conflict; no Backlog.md file-compatibility is asserted (NFR-04.004, ADR-0010).
 
 ### 4. Automated integration test
 
@@ -187,8 +187,7 @@ For each family the installed binary exercises at least create → list → view
 
 | Input / output | Description |
 |---|---|
-| Source tree | Post-m-12 state: all record families, unified search, complete browser access, metadata projection, managed artifacts and skills pages, init walkthrough, id padding, migration, round-trip. |
-| Toolchain | Rust 1.99.1 via `rust-toolchain.toml`; `dpkg-deb`, `fakeroot`; Debian Forky amd64. |
+| Source tree | Post-m-12 state: all record families, unified search, complete browser access, metadata projection, managed artifacts and skills pages, init walkthrough, id padding, migration. || Toolchain | Rust 1.99.1 via `rust-toolchain.toml`; `dpkg-deb`, `fakeroot`; Debian Forky amd64. |
 | `scripts/build-deb.sh` | Unchanged packaging script; reads the version from `Cargo.toml`. |
 | `papyrus_<version>_amd64.deb` | Built package in the project root. |
 | Isolated root/admin | `./.tmp/` directories for `dpkg --instdir/--admindir`; removed after the run. |
@@ -226,7 +225,7 @@ For each family the installed binary exercises at least create → list → view
 | T-20-06 | Installs and uninstalls in an isolated Debian Forky environment, host untouched | `fakeroot dpkg --instdir/--admindir -i`, `-r`, `--purge`; host `dpkg -l` before/after |
 | T-20-07 | Installed binary is on `PATH` at `/usr/bin/papyrus` and runs | `PATH`-prefixed `papyrus --version` |
 | T-20-08 | Baseline CLI, init, interactive walkthrough, and record-family lifecycle across all twelve families | Installed-binary smoke commands and exit codes |
-| T-20-09 | ID padding constrained to 1–6 and Backlog.md round-trip without drift | Installed-binary config commands and round-trip check |
+| T-20-09 | ID padding constrained to 1–6 and native layout without drift | Installed-binary config commands and layout check |
 | T-20-10 | Unified search across all record types: quoted phrase, `--type`, `--limit`, `--json`, empty, deprecation/archival visibility, disabled types, no writes | Installed-binary search commands |
 | T-20-11 | Browser: startup with `--no-open`, inventory hub, sidebar final order, `aria-current`, per-type lists, record views, edit round-trip | Installed-binary browser commands plus HTTP requests |
 | T-20-12 | Browser: cross-type ID resolution (single, multi → 500, deprecated/unknown → 404), disabled types, empty states | Installed-binary browser commands plus HTTP requests |
@@ -234,7 +233,7 @@ For each family the installed binary exercises at least create → list → view
 | T-20-14 | 320 px markup and no external references | Markup/asset assertions on served content |
 | T-20-15 | Front-matter metadata projection in CLI and browser | Installed-binary view/edit assertions |
 | T-20-16 | Managed artifacts and lifecycles page and agent skills and workflows page render | Installed-binary browser assertions |
-| T-20-17 | Lazy migration and Backlog.md round-trip in the installed binary | Installed-binary read/write assertions |
+| T-20-17 | Lazy migration and native layout in the installed binary | Installed-binary read/write assertions |
 | T-20-18 | Offline operation with no internet access | `unshare -rn` run with a failing outbound connection, then search + browser smoke |
 | T-20-19 | Browser configuration keys work in the installed binary | `config list/get/set/unset` and startup-line assertions |
 | T-20-20 | Milestone-level integration test added without duplicating per-type contract tests | `tests/content_management_smoke.rs`; `cargo test` |
@@ -265,8 +264,7 @@ None of these blocks implementation; each has a specified default. OQ-1 is recom
 - **OQ-3 (recommended default: a new `tests/content_management_smoke.rs`)** — Whether the milestone test belongs in an existing smoke file or a new one. Default: a new file keeps each milestone's smoke coverage separate. Non-blocking.
 - **OQ-4 (recommended default: keep version 0.1.0)** — No m-12 release version is defined in the requirements. Default: package the current Cargo version unchanged; a bump belongs to release orchestration (TASK-73). Non-blocking.
 - **OQ-5 (recommended default: repeat the full record-family lifecycle smoke in this milestone package)** — End-to-end proof of the complete m-12 increment, even though earlier milestone packages verified subsets. Non-blocking.
-- **OQ-6 (recommended default: verify lazy migration and round-trip at markup/CLI level only)** — Real Backlog.md interoperability edge cases are already covered by TASK-71; this ticket re-checks them in the installed binary without re-implementing. Non-blocking.
-
+- **OQ-6 (recommended default: verify lazy migration at markup/CLI level only)** — Real Backlog.md interoperability edge cases are out of scope under NFR-04.004; this ticket re-checks lazy front-matter migration in the installed binary without re-implementing. Non-blocking.
 ## Traceability
 
 | Artifact | Reference |
@@ -277,6 +275,6 @@ None of these blocks implementation; each has a specified default. OQ-1 is recom
 | ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only), ADR-0004 (repository-root single crate), ADR-0005 (embedded dependency-free HTTP server and server-rendered UI), ADR-0006 (optimistic concurrency and atomic writes), ADR-0007 (YAML front matter), ADR-0009 (shared record envelope) |
 | Ticket | TASK-20 |
 | UI mockups | none new; MOCK-0001 (approved baseline), MOCK-0010, MOCK-0011, MOCK-0012 (approved 2026-11-10) remain the layout references |
-| Related specifications | `docs/specifications/search-complete-unified.md` (TASK-18), `docs/specifications/browser-complete-access.md` (TASK-19), `docs/specifications/technical-specifications-milestone-packaging-and-verification.md` (TASK-59), `docs/specifications/backlog-discovery-milestone-packaging-and-verification.md` (TASK-12), `docs/specifications/search-browser-milestone-packaging-and-verification.md` (TASK-7), `docs/specifications/cli-milestone-packaging-and-verification.md` (TASK-62), `docs/specifications/migrate-document-record-types-to-front-matter-lazily-on-first-read-and-first-write.md` (TASK-68), `docs/specifications/migrate-tasks-and-milestones-to-the-backlog-md-layout.md` (TASK-69), `docs/specifications/remove-legacy-record-serializers-and-enforce-the-no-drift-rule.md` (TASK-70), `docs/specifications/verify-backlog-md-round-trip-interoperability.md` (TASK-71), `docs/specifications/render-one-metadata-projection-in-cli-and-browser-views.md` (TASK-67), `docs/specifications/browser-managed-artifacts-and-lifecycles.md` (TASK-72), `docs/specifications/browser-agent-skills-and-workflows.md` (TASK-77), `docs/specifications/interactive-init-walkthrough-for-artifact-activation.md` (TASK-75), `docs/specifications/constrain-id-padding-to-1-6-in-configuration-validation.md` (TASK-74) |
+| Related specifications | `docs/specifications/search-complete-unified.md` (TASK-18), `docs/specifications/browser-complete-access.md` (TASK-19), `docs/specifications/technical-specifications-milestone-packaging-and-verification.md` (TASK-59), `docs/specifications/backlog-discovery-milestone-packaging-and-verification.md` (TASK-12), `docs/specifications/search-browser-milestone-packaging-and-verification.md` (TASK-7), `docs/specifications/cli-milestone-packaging-and-verification.md` (TASK-62), `docs/specifications/migrate-document-record-types-to-front-matter-lazily-on-first-read-and-first-write.md` (TASK-68), `docs/specifications/papyrus-native-record-layout-and-single-id-space.md` (TASK-83), `docs/specifications/remove-legacy-record-serializers-and-enforce-the-no-drift-rule.md` (TASK-70), `docs/specifications/import-backlog-md-records.md` (TASK-83), `docs/specifications/render-one-metadata-projection-in-cli-and-browser-views.md` (TASK-67), `docs/specifications/browser-managed-artifacts-and-lifecycles.md` (TASK-72), `docs/specifications/browser-agent-skills-and-workflows.md` (TASK-77), `docs/specifications/interactive-init-walkthrough-for-artifact-activation.md` (TASK-75), `docs/specifications/constrain-id-padding-to-1-6-in-configuration-validation.md` (TASK-74) |
 | Packaging documentation | `docs/packaging.md` |
 | Domain model | `docs/domain-model/business-glossary/` (record-type terms) |

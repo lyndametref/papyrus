@@ -7,21 +7,19 @@
 
 ## Purpose
 
-Deliver ADR-0009 decision 5: a single `RecordView` projection that is the only source for record metadata in every read surface, so that CLI list/view text and `--json`, browser list/detail JSON, and browser HTML present identical metadata values for the same record. This ticket implements REQ-06.004 (CLI and browser read front matter), REQ-05.010 (front-matter field map), REQ-05.011 (metadata maintained through all commands), and REQ-01.005 (display/storage ID split), on top of the shared envelope and identity translation delivered by TASK-63 and TASK-64 and the option exposure delivered by TASK-65. It does not migrate the corpus (TASK-68, TASK-69), remove legacy serializers (TASK-70), or add the lifecycle page (TASK-72).
+Deliver ADR-0009 decision 5: a single `RecordView` projection that is the only source for record metadata in every read surface, so that CLI list/view text and `--json`, browser list/detail JSON, and browser HTML present identical metadata values for the same record. This ticket implements REQ-06.004 (CLI and browser read front matter), REQ-05.010 (front-matter field map), REQ-05.011 (metadata maintained through all commands), and REQ-01.005 (single Papyrus ID space), on top of the shared envelope and Papyrus identity delivered by TASK-63 and TASK-64 and the option exposure delivered by TASK-65. It does not migrate the corpus (TASK-68, TASK-69), remove legacy serializers (TASK-70), or add the lifecycle page (TASK-72).
 
 ## Scope
 
 ### In scope
 
 - Definition of a single `RecordView` type (or equivalent shared projection) that exposes:
-  - the record identity as the Papyrus display ID;
-  - a `metadata` object that is the ordered map of the record's front-matter keys exactly as stored (general keys first, then type-specific keys), where `metadata.id` is the Backlog.md storage ID;
+  - the record identity as the Papyrus ID;  - a `metadata` object that is the ordered map of the record's front-matter keys exactly as stored (general keys first, then type-specific keys), where `metadata.id` is the Papyrus ID;
   - the typed document fields already rendered by each surface (title, description, status, milestone, assignee, labels, dependencies, acceptance criteria, comments, release, audit type, superseded_by, and the other type-specific fields).
 - Refactoring every CLI `list`/`view` text renderer and every `--json` serializer for every managed record type to render from `RecordView` instead of re-parsing or re-formatting metadata.
 - Refactoring every browser list/detail JSON serializer and every browser HTML renderer to render from the same `RecordView`.
 - Adding the `metadata` object to CLI `--json` output and to browser list/detail JSON output, in canonical front-matter key order.
-- Keeping the top-level identity field as the display ID in every surface; the storage ID appears only inside `metadata` and in labelled diagnostics.
-- Keeping the browser editable field set unchanged; `created_date` and `updated_date` are rendered read-only (disabled inputs) in the browser edit form.
+- Keeping the top-level identity field as the Papyrus ID on every surface; `metadata.id` carries the same Papyrus ID, and no second identity is printed.- Keeping the browser editable field set unchanged; `created_date` and `updated_date` are rendered read-only (disabled inputs) in the browser edit form.
 - Routing every browser save through the shared patcher/writer so that a metadata-backed edit writes the new value into front matter, preserves the other front-matter keys and the rest of the file, refreshes `updated_date`, and never copies metadata into the body.
 - Parity, round-trip, read-only-timestamp, and identity-position tests.
 - Correction of the three browser specification pages that currently describe front matter as content preserved content-identically (see section 7).
@@ -30,7 +28,7 @@ Deliver ADR-0009 decision 5: a single `RecordView` projection that is the only s
 
 - Lazy migration of document or task/milestone records — TASK-68, TASK-69.
 - Removal of legacy per-module parsers/writers and no-drift grep enforcement — TASK-70.
-- Backlog.md round-trip verification — TASK-71.
+- Native layout and one-way import verification — TASK-98.
 - The managed-artifacts-and-lifecycles browser page — TASK-72.
 - Complete browser access for all content — TASK-19 (this ticket only supplies the projection it consumes).
 - UI mockup changes — MOCK-0010 is already approved and is reused.
@@ -43,21 +41,18 @@ Deliver ADR-0009 decision 5: a single `RecordView` projection that is the only s
 
 1. A single `RecordView` type (or an equivalent shared projection) is defined in `src/record/` and is the only type used to carry record metadata from the reader to any renderer. No surface re-parses front matter or re-derives metadata after the reader returns.
 2. `RecordView` contains at least:
-   - `id: String` — the Papyrus display ID. This is the record identity on every surface.
-   - `metadata: Vec<(String, Value)>` (or an equivalent ordered map) — the front-matter keys exactly as stored, in canonical key order (general keys first, then type-specific keys). `metadata.id` is the Backlog.md storage ID. Unknown foreign keys are retained in their stored position.
+   - `id: String` — the Papyrus ID. This is the record identity on every surface.   - `metadata: Vec<(String, Value)>` (or an equivalent ordered map) — the front-matter keys exactly as stored, in canonical key order (general keys first, then type-specific keys). `metadata.id` is the Papyrus ID. Unknown foreign keys are retained in their stored position.
    - the typed document fields the surfaces already render for the record type (title, description, status, milestone, assignee, labels, dependencies, acceptance criteria, comments, release, audit type, superseded_by, documentation, ordinal, type, and the general fields). These fields are projections of the same parsed document, not a second parse.
 3. `RecordView` also carries the ADR-0006 version token (`version: String`) for browser surfaces; CLI surfaces may ignore it. The version token is not part of `metadata`.
-4. The reader builds one `RecordView` per record read, applying identity translation (TASK-64) so that `id` is the display ID and `metadata.id` is the storage ID. No other code path translates IDs for display.
+4. The reader builds one `RecordView` per record read. `id` and `metadata.id` carry the same Papyrus ID. No other code path translates IDs.
 5. A record that lacks front matter is still projected: the reader's legacy fallback supplies the metadata fields from the document body/heading, and the projection marks the record as unmigrated only through the existing migration path (TASK-68/TASK-69). This ticket does not add migration.
-
 ### 2. CLI rendering
 
 1. `papyrus <type> list` and `papyrus <type> view` plain-text output is rendered from `RecordView`. The metadata values printed are taken from `RecordView`, not from a second parse of the file.
 2. CLI list output continues to print at least the ID and title of each record; where the command already prints additional metadata (status, milestone, assignee, etc.) it prints the same values as before, now sourced from `RecordView`.
 3. `papyrus <type> view` prints the full record. In addition to the existing body rendering, the metadata block (id, title, created_date, updated_date, labels, references, plus type-specific keys) is available to the renderer from `RecordView`. The exact plain-text layout of the metadata block follows the existing per-type view layout; this ticket does not redesign CLI text formatting.
-4. `--json` output for every managed record type gains a `metadata` object whose keys are the front-matter keys in canonical order and whose values are the stored values (strings, lists, or null as stored). The top-level `id` field remains the display ID and is not replaced or duplicated by `metadata.id`.
-5. The storage ID appears in `--json` only as `metadata.id` and in labelled diagnostics; it never appears as the top-level `id` or as any other top-level identity-like field.
-6. `--json` remains a stable public contract: existing keys keep their meaning and type; `metadata` is additive only. Changes to `metadata` are additive only (ADR-0009 decision 5).
+4. `--json` output for every managed record type gains a `metadata` object whose keys are the front-matter keys in canonical order and whose values are the stored values (strings, lists, or null as stored). The top-level `id` field is the Papyrus ID; `metadata.id` carries the same value and is not a second identity.
+5. The Papyrus ID appears in `--json` as the top-level `id` and as `metadata.id`, and in labelled diagnostics; no other top-level identity-like field is added.6. `--json` remains a stable public contract: existing keys keep their meaning and type; `metadata` is additive only. Changes to `metadata` are additive only (ADR-0009 decision 5).
 7. A no-op read (a record already carrying front matter) produces byte-identical file content and an identical `RecordView` on repeated reads.
 
 ### 3. Browser rendering
@@ -81,13 +76,11 @@ Deliver ADR-0009 decision 5: a single `RecordView` projection that is the only s
 8. Optimistic concurrency (ADR-0006) is unchanged: missing/malformed `version` → 400, stale token → 409 with "record changed on disk; reload the form", matching token proceeds. After a successful write the server keeps no cached copy and the redirect target re-reads the file (save-then-reread).
 9. `created_date` and `updated_date` are never accepted from the request; a submitted value for either is ignored (not an error), matching the exemption in REQ-05.011.
 
-### 5. Display/storage ID handling
-
-1. The top-level identity on every surface is the display ID. The storage ID never appears in the identity position of any CLI text line, CLI `--json` top-level field, browser JSON top-level field, or browser HTML heading/primary link.
-2. `metadata.id` is the storage ID and is the only place the storage ID may appear in structured output. Labelled diagnostics may also print it with an explicit `storage id:` label and the file path.
-3. ID-typed metadata fields that store storage IDs (`milestone`, `dependencies`, `release`, `superseded_by`) are rendered to users as display IDs in CLI text and browser HTML. In the raw `metadata` object (CLI `--json` and browser JSON) they remain in storage form, consistent with `metadata.id`. A renderer that needs the display form applies the same translation uniformly.
-4. Reference resolution (whether a milestone or dependency resolves) uses the storage form internally and displays the resolved record's display ID.
-
+### 5. Papyrus ID handling
+1. The top-level identity on every surface is the Papyrus ID. It appears in CLI text, CLI `--json` top-level fields, browser JSON top-level fields, and browser HTML headings/primary links.
+2. `metadata.id` carries the same Papyrus ID. No surface prints a second identity.
+3. ID-typed metadata fields that store Papyrus IDs (`milestone`, `dependencies`, `release`, `superseded_by`) are rendered as Papyrus IDs in CLI text and browser HTML, and remain Papyrus IDs in the raw `metadata` object. No translation is applied.
+4. Reference resolution (whether a milestone or dependency resolves) uses the Papyrus ID internally and displays the resolved record's Papyrus ID.
 ### 6. Read-only timestamps and field exemption
 
 1. `created_date` is set at creation and is never changed by any path, including browser save, migration, or edit.
@@ -142,7 +135,7 @@ Correction is owned by `business-analyst`/`tech-writer` and is a prerequisite fo
 - OQ-1: Whether `RecordView` is a generic struct with an `extra: BTreeMap` for type-specific fields or a per-type enum variant. Either is acceptable provided there is exactly one projection type and no surface re-parses metadata. (Implementation choice; not blocking.)
 - OQ-2: Whether the CLI plain-text metadata block is printed as a separate labelled section or inline with the existing per-type fields. The existing per-type view layout is retained; only the data source changes. (Not blocking.)
 - OQ-3: Whether browser list rows show all metadata keys or the subset named in MOCK-0010 section 4 ("at least id, title, created_date, updated_date, labels, references, plus type-specific keys"). MOCK-0010 requires at least those; showing more is allowed. (Not blocking.)
-- OQ-4: Whether ID-typed metadata fields in the raw `metadata` object should be accompanied by a display-form alias (for example `metadata_display`). ADR-0009 decision 5 forbids a second top-level identity field; an alias inside `metadata` would be a contract change and is deferred unless a consumer requires it. (Not blocking; default: no alias.)
+- OQ-4: Whether ID-typed metadata fields in the raw `metadata` object should be accompanied by an alias (for example `metadata_display`). A second identity field is forbidden; an alias inside `metadata` would be a contract change and is deferred unless a consumer requires it. (Not blocking; default: no alias.)
 
 ## Traceability
 

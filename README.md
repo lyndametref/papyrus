@@ -108,6 +108,31 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        <b style="color: light-dark(#1a7f37, #3fb950);">--no-open</b>
        Do not open the default browser automatically.
 
+<b style="color: light-dark(#0969da, #58a6ff);">import</b>
+
+        One-way import of Backlog.md task and milestone records into the Papyrus-native layout. This is a one-time bridge: it reads a Backlog.md store read-only, allocates fresh Papyrus IDs, and writes Papyrus records. Re-running the command against the same source allocates new numbers and duplicates records. Backlog.md `docs`, `drafts`, and `decisions` are not imported; only `backlog/tasks`, `backlog/milestones`, and their `archive/` counterparts are in scope.
+        <code style="font-weight: bold;">
+        papyrus import backlog --from &lt;source-project-dir&gt; [--source-backlog-dir &lt;dir&gt;] [--dry-run] [--allow-existing] [--report &lt;path&gt;]
+        </code>
+        <b style="color: light-dark(#1a7f37, #3fb950);">--from &lt;source-project-dir&gt;</b>
+        Backlog.md project root. Required.
+
+        <b style="color: light-dark(#1a7f37, #3fb950);">--source-backlog-dir &lt;dir&gt;</b>
+        Source backlog directory. Default: <b>&lt;source-project-dir&gt;/backlog</b>.
+
+        <b style="color: light-dark(#1a7f37, #3fb950);">--dry-run</b>
+        Perform planning and ID allocation and print the plan and report without writing anything.
+
+        <b style="color: light-dark(#1a7f37, #3fb950);">--allow-existing</b>
+        Required when the target already holds records of a family being imported. Without it the command refuses before writing.
+
+        <b style="color: light-dark(#1a7f37, #3fb950);">--report &lt;path&gt;</b>
+        Write the same report to a path inside the project directory only. A path outside the project directory is a validation error.
+
+        <b>One-way caveat:</b> the source is opened read-only and left byte-identical. No mapping file, sidecar, marker, or extra front-matter field is written; the printed plan is the only record of the source-to-Papyrus mapping. Imported records receive fresh Papyrus IDs (task IDs and milestone numbers are reallocated; the source `m-` number is not preserved). Keep the source store until the import is verified; after import Papyrus owns the records. There is no reverse export and no re-import reconciliation.
+
+        <b>Excluded scope:</b> Backlog.md `docs`, `drafts`, `decisions`, configuration, and locks are not read as records.
+
 <b style="color: light-dark(#0969da, #58a6ff);">task</b>
 
         Manage tasks (<b>TASK-001</b>, ...). A task may be assigned to zero or one milestone, may depend on zero or more tasks, and may reference zero or more business requirements, non-functional requirements, UI specifications, technical specifications, audit records, and business rules.

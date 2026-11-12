@@ -184,8 +184,7 @@ None of these block implementation; each has a specified default in this documen
 | Artifact | Reference |
 |---|---|
 | Requirement | REQ-06, REQ-06.001, REQ-05, REQ-05.001–REQ-05.011, REQ-02, REQ-02.001, REQ-02.003, REQ-03, REQ-03.001, REQ-03.002, REQ-04, REQ-04.001, REQ-04.002 |
-| Non-functional | NFR-02.002 (sanitize input), NFR-04.001 (text-only persistence), NFR-04.002 (project-directory boundary), NFR-04.003 (Backlog.md task/milestone interoperability) |
-| Business rule | BR-015 (search command behavior), BR-005 (task), BR-006 (milestone), BR-007 (release), BR-008 (decision), BR-011 (glossary), BR-012 (UI specification), BR-013 (business rule), BR-014 (audit), BR-016 (configuration keys and precedence), BR-017 (technical specification) |
+| Non-functional | NFR-02.002 (sanitize input), NFR-04.001 (text-only persistence), NFR-04.002 (project-directory boundary), NFR-04.004 (Papyrus-native layout; no Backlog.md file compatibility) || Business rule | BR-015 (search command behavior), BR-005 (task), BR-006 (milestone), BR-007 (release), BR-008 (decision), BR-011 (glossary), BR-012 (UI specification), BR-013 (business rule), BR-014 (audit), BR-016 (configuration keys and precedence), BR-017 (technical specification) |
 | ADR | ADR-0001 (Rust), ADR-0004 (repository-root single crate), ADR-0007 (YAML front matter), ADR-0009 (shared record envelope) |
 | Ticket | TASK-18 |
 | UI mockups | none |

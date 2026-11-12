@@ -65,7 +65,7 @@ Use cases, test cases, and test reports are Markdown text records with the fixed
 3. `description` is read from the body of the `## Description` section. When the section is absent or its body is empty, the value is empty/`null`; the view then shows `(none)`, and the edit form requires a non-empty value before saving.
 4. `applicability` is read from the body of the `## Applicability` section. When the section is absent or its body is empty, the value is empty/`null`.
 5. Unknown and editor-added sections, the preamble, and any content not covered by the two body fields are preserved on save and are never displayed as editable fields.
-6. The front-matter metadata (`id`, `title`, `created_date`, `updated_date`, `labels`, `references`) is projected through the shared `RecordView` (TASK-67): `id` is the storage ID, `title` is the display title, `created_date` and `updated_date` are ISO-8601 UTC strings as stored, and `labels`/`references` are string arrays.
+6. The front-matter metadata (`id`, `title`, `created_date`, `updated_date`, `labels`, `references`) is projected through the shared `RecordView` (TASK-67): `id` is the Papyrus ID, `title` is the display title, `created_date` and `updated_date` are ISO-8601 UTC strings as stored, and `labels`/`references` are string arrays.
 7. The record form labels are `Use case`, `Test case`, and `Test report`; the category labels are `Use Cases`, `Test Cases`, and `Test Reports`.
 
 ### 4. List page
