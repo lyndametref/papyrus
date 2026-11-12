@@ -102,6 +102,37 @@ fn task_and_milestone_round_trip_from_native_and_legacy_shapes() {
         );
     }
 
+    // Read adoption is front-matter-only: the legacy body is untouched.
+    let task_after_view = fs::read_to_string(dir.join("backlog/tasks/TASK-002.md")).unwrap();
+    assert!(task_after_view.starts_with("---\n"), "{task_after_view}");
+    assert!(
+        task_after_view.contains("# TASK-002 Legacy Task"),
+        "read adoption must keep the heading: {task_after_view}"
+    );
+    assert!(
+        task_after_view.contains("## Status\nIn Progress"),
+        "read adoption must keep legacy sections: {task_after_view}"
+    );
+    assert!(
+        !task_after_view.contains("<!-- SECTION:DESCRIPTION:BEGIN -->")
+            && !task_after_view.contains("<!-- AC:BEGIN -->"),
+        "read adoption must not convert the body: {task_after_view}"
+    );
+    let ms_after_view = fs::read_to_string(dir.join("backlog/milestones/MS-002.md")).unwrap();
+    assert!(ms_after_view.starts_with("---\n"), "{ms_after_view}");
+    assert!(
+        ms_after_view.contains("release: REL-001"),
+        "{ms_after_view}"
+    );
+    assert!(
+        ms_after_view.contains("# MS-002 Legacy Milestone"),
+        "read adoption must keep the heading: {ms_after_view}"
+    );
+    assert!(
+        ms_after_view.contains("## Release\nREL-001"),
+        "read adoption must keep legacy sections: {ms_after_view}"
+    );
+
     // Edit round-trip.
     let out = bin()
         .args([
@@ -153,6 +184,26 @@ fn task_and_milestone_round_trip_from_native_and_legacy_shapes() {
         .unwrap();
     assert!(out.status.success());
     assert!(String::from_utf8_lossy(&out.stdout).contains("Legacy Milestone Updated"));
+
+    // First write retires the heading and legacy metadata sections.
+    let task_after_edit = fs::read_to_string(dir.join("backlog/tasks/TASK-002.md")).unwrap();
+    assert!(!task_after_edit.contains("# TASK-002"), "{task_after_edit}");
+    assert!(!task_after_edit.contains("## Status"), "{task_after_edit}");
+    assert!(
+        task_after_edit.contains("status: \"In Progress\""),
+        "derived status must survive the write: {task_after_edit}"
+    );
+    assert!(
+        task_after_edit.contains("## Acceptance Criteria\n- [ ] first"),
+        "content section must be preserved: {task_after_edit}"
+    );
+    let ms_after_edit = fs::read_to_string(dir.join("backlog/milestones/MS-002.md")).unwrap();
+    assert!(!ms_after_edit.contains("# MS-002"), "{ms_after_edit}");
+    assert!(!ms_after_edit.contains("## Release"), "{ms_after_edit}");
+    assert!(
+        ms_after_edit.contains("release: REL-001"),
+        "front-matter release must survive the write: {ms_after_edit}"
+    );
 
     // Files keep their names and stay in their directories.
     for path in [

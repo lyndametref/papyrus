@@ -88,8 +88,8 @@ fn task_basic_lifecycle() {
     assert!(out.status.success());
     let s = String::from_utf8_lossy(&out.stdout);
     assert!(s.contains("## Description\ndesc"));
-    assert!(s.contains("## Assignee\nalice"));
-    assert!(s.contains("## Labels\n- l"));
+    assert!(s.contains("assignee:\n  - alice"), "got: {}", s);
+    assert!(s.contains("labels:\n  - l"), "got: {}", s);
     assert!(s.contains("## Acceptance Criteria\n- [ ] ac1"));
 
     // shorthand

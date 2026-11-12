@@ -306,16 +306,22 @@ fn milestone_from_document(
 ) -> (String, String, Option<String>, Option<String>) {
     let (id, title) = crate::record::document::heading_id_title_with_frontmatter(doc);
     let desc = crate::record::document::section_text(doc, "Description");
-    let release =
-        crate::record::document::section_text(doc, "Release").map(|s| s.trim().to_string());
+    let release = match doc.front_matter.as_ref() {
+        Some(fm) if crate::record::frontmatter::contains_key(&fm.raw, "release") => {
+            crate::record::frontmatter::current_value_string(&fm.raw, "release")
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+        }
+        _ => crate::record::document::section_text(doc, "Release").map(|s| s.trim().to_string()),
+    };
     (id, title, desc, release)
 }
 
 fn body_document(
-    id: &str,
-    title: &str,
+    _id: &str,
+    _title: &str,
     desc: Option<&str>,
-    release: Option<&str>,
+    _release: Option<&str>,
 ) -> crate::record::document::Document {
     let mut sections = Vec::new();
     if let Some(d) = desc {
@@ -324,17 +330,11 @@ fn body_document(
             body: vec![d.to_string(), String::new()],
         });
     }
-    if let Some(r) = release {
-        sections.push(crate::record::document::Section {
-            heading: "## Release".to_string(),
-            body: vec![r.to_string()],
-        });
-    }
     crate::record::document::Document {
         source: String::new(),
         front_matter: None,
         frontmatter: None,
-        heading: Some(format!("# {id} {title}")),
+        heading: None,
         preamble: vec![String::new()],
         sections,
     }
@@ -575,8 +575,7 @@ pub fn edit(
         parsed_title
     };
     let mut desc_val = parsed_desc;
-    let mut release_val = parsed_release
-        .or_else(|| crate::record::frontmatter::current_value_string(&content, "release"));
+    let mut release_val = parsed_release;
 
     if let Some(t) = title_raw {
         title_val = sanitize_text(t)?;
@@ -614,13 +613,13 @@ pub fn edit(
     } else {
         parsed_id
     };
-    let mut ops: Vec<crate::record::patch::PatchOp> = Vec::new();
+    // Retire the legacy title heading and `## Release` section on every
+    // write; explicit user operations are applied afterwards so they win.
+    let mut ops: Vec<crate::record::patch::PatchOp> =
+        crate::record::migrate::retire_legacy_body_ops(&doc, desc, &path);
     if title_raw.is_some() {
         ops.push(crate::record::patch::PatchOp::SetFrontMatter(
             "title".into(),
-            title_val.clone(),
-        ));
-        ops.push(crate::record::patch::PatchOp::SetHeadingTitle(
             title_val.clone(),
         ));
     }
@@ -643,22 +642,11 @@ pub fn edit(
             "release".into(),
             r.clone(),
         ));
-        if doc.sections.iter().any(|s| s.heading == "## Release") {
-            ops.push(crate::record::patch::PatchOp::SetSection(
-                "## Release".into(),
-                r.clone(),
-            ));
-        }
     }
     if no_release.is_some() {
         ops.push(crate::record::patch::PatchOp::ClearFrontMatter(
             "release".into(),
         ));
-        if doc.sections.iter().any(|s| s.heading == "## Release") {
-            ops.push(crate::record::patch::PatchOp::ClearSection(
-                "## Release".into(),
-            ));
-        }
     }
     if !labels_raw.is_empty() {
         let mut fm_labels = frontmatter_list_ms(&content, "labels");
@@ -672,17 +660,6 @@ pub fn edit(
             "labels".into(),
             fm_labels.join("\n"),
         ));
-        if doc.sections.iter().any(|s| s.heading == "## Labels") {
-            let body = fm_labels
-                .iter()
-                .map(|l| format!("- {}", l))
-                .collect::<Vec<_>>()
-                .join("\n");
-            ops.push(crate::record::patch::PatchOp::SetSection(
-                "## Labels".into(),
-                body,
-            ));
-        }
     }
     if !references_raw.is_empty() {
         let mut fm_refs = frontmatter_list_ms(&content, "references");
@@ -741,6 +718,25 @@ fn path_in_directory(path: &std::path::Path, dir: &std::path::Path) -> bool {
         .is_some_and(|parent| same_directory(parent, dir))
 }
 
+/// Retire legacy metadata sections and refresh `updated_date` before an
+/// archive move. The file is written once.
+fn retire_and_touch(ctx: &Context, path: &std::path::Path) -> Result<(), AppError> {
+    let content = fs::read_to_string(path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let doc = crate::record::document::parse(&content)?;
+    let desc = crate::record::descriptor::descriptor_for("milestone")
+        .ok_or_else(|| AppError::Runtime("milestone descriptor is unavailable".to_string()))?;
+    let mut ops = crate::record::migrate::retire_legacy_body_ops(&doc, desc, path);
+    ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+        "updated_date".into(),
+        crate::record::frontmatter::utc_now(),
+    ));
+    let new_content = crate::record::patch::apply_patch(&doc, &ops)?;
+    if new_content != content {
+        crate::record::store::write_atomic(ctx, path, &new_content)?;
+    }
+    Ok(())
+}
+
 pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
@@ -751,6 +747,7 @@ pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
     }
     reject_milestone_write_conflict(ctx, &path)?;
     let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
+    retire_and_touch(ctx, &path)?;
     let archive = archive_dir(ctx, &cfg)?;
     ensure_dir(&archive, &ctx.project_dir)?;
 
@@ -898,7 +895,7 @@ mod tests {
     }
 
     #[test]
-    fn backlog_md_dropped_keys_are_readded_on_view() {
+    fn partial_front_matter_is_not_completed_on_view() {
         let dir = tmpdir("interop-readd");
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
@@ -907,24 +904,56 @@ mod tests {
         let path = dir.join("backlog/milestones/MS-2 - MileTwo.md");
         fs::write(&path, &content).unwrap();
         let out = view(&c, "MS-2").unwrap();
-        for key in [
+        assert_eq!(out.text, content, "view must not complete missing keys");
+        assert_eq!(fs::read_to_string(&path).unwrap(), content);
+    }
+
+    #[test]
+    fn create_writes_front_matter_only_without_release_section() {
+        let dir = tmpdir("create-layout");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/releases")).unwrap();
+        fs::write(
+            dir.join("backlog/releases/REL-001.md"),
+            "---\nid: REL-001\ntitle: R1\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\n---\n\n## Description\nRelease\n",
+        )
+        .unwrap();
+        let id = create(
+            &c,
+            "New Milestone",
+            Some("Milestone desc"),
+            Some("REL-001"),
+            &["m16".to_string()],
+            &[],
+        )
+        .unwrap();
+        assert_eq!(id, "MS-001");
+        let content = fs::read_to_string(dir.join("backlog/milestones/MS-001.md")).unwrap();
+        assert!(content.starts_with("---\n"), "{}", content);
+        assert!(
+            !content.lines().any(|line| line.starts_with("# ")),
+            "new milestones must not have a title heading: {}",
+            content
+        );
+        assert!(!content.contains("## Release"), "{}", content);
+        assert!(content.contains("release: REL-001"), "{}", content);
+        let order = [
+            "id:",
+            "title:",
             "created_date:",
             "updated_date:",
             "labels:",
             "references:",
             "release:",
-        ] {
-            assert!(
-                out.text.contains(key),
-                "missing {} after re-add: {}",
-                key,
-                out.text
-            );
+        ];
+        let mut last = 0usize;
+        for key in order {
+            let position = content
+                .find(key)
+                .unwrap_or_else(|| panic!("missing {key}: {content}"));
+            assert!(position >= last, "key {key} out of order: {content}");
+            last = position;
         }
-        let (_, out_body) = crate::record::frontmatter::split(&out.text).unwrap();
-        assert_eq!(out_body, body);
-        let on_disk = fs::read_to_string(&path).unwrap();
-        assert!(on_disk.contains("release:"), "got: {}", on_disk);
     }
 
     #[test]
@@ -953,6 +982,24 @@ mod tests {
     }
 
     #[test]
+    fn no_op_edit_does_not_write_or_refresh_updated_date() {
+        let dir = tmpdir("no-op-edit");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
+        let content = milestone_record("MS-001", "One");
+        let path = dir.join("backlog/milestones/MS-001.md");
+        fs::write(&path, &content).unwrap();
+
+        edit(&c, "MS-001", None, None, None, None, &[], &[]).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            content,
+            "an edit that changes nothing must not write or refresh updated_date"
+        );
+    }
+
+    #[test]
     fn archive_moves_to_canonical_milestone_archive() {
         let dir = tmpdir("archive-canonical");
         let c = ctx(&dir);
@@ -964,8 +1011,20 @@ mod tests {
         .unwrap();
         archive(&c, "MS-001").unwrap();
         assert!(!dir.join("backlog/milestones/MS-001.md").exists());
-        assert!(dir.join("backlog/archive/milestones/MS-001.md").exists());
+        let archived_path = dir.join("backlog/archive/milestones/MS-001.md");
+        assert!(archived_path.exists());
         assert!(!dir.join("backlog/milestones/archived/MS-001.md").exists());
+        let archived = fs::read_to_string(&archived_path).unwrap();
+        assert!(
+            !archived.contains("updated_date: '2026-01-01T00:00:00Z'"),
+            "archive must refresh updated_date: {}",
+            archived
+        );
+        assert!(
+            archived.contains("created_date: '2026-01-01T00:00:00Z'"),
+            "archive must not change created_date: {}",
+            archived
+        );
         // No unarchive command exists: the lifecycle stays create, list,
         // view, edit, archive, delete (REQ-03.001).
         assert!(

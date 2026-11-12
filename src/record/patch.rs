@@ -12,6 +12,7 @@ pub enum PatchOp {
     SetSection(String, String),
     ClearSection(String),
     SetHeadingTitle(String),
+    ClearHeading,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -196,6 +197,13 @@ pub fn apply_patch(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> 
                 }
                 heading_changed = true;
             }
+            PatchOp::ClearHeading => {
+                if heading.is_some() {
+                    heading = None;
+                    changed = true;
+                    heading_changed = true;
+                }
+            }
         }
     }
 
@@ -307,8 +315,28 @@ mod tests {
             PatchOp::SetSection("## S".into(), "v".into()),
             PatchOp::ClearSection("## S".into()),
             PatchOp::SetHeadingTitle("t".into()),
+            PatchOp::ClearHeading,
         ];
-        assert_eq!(ops.len(), 5);
+        assert_eq!(ops.len(), 6);
+    }
+
+    #[test]
+    fn clear_heading_removes_heading_and_preserves_body() {
+        let input = "---\nid: TASK-1\ntitle: Old\n---\n\n# TASK-1 Old\n\n## Description\nBody\n";
+        let doc = document::parse(input).unwrap();
+        let out = apply_patch(&doc, &[PatchOp::ClearHeading]).unwrap();
+        assert!(!out.contains("# TASK-1 Old"), "got: {}", out);
+        assert!(out.contains("## Description\nBody"), "got: {}", out);
+        let (_, body) = crate::record::frontmatter::split(&out).unwrap();
+        assert_eq!(body, "\n\n## Description\nBody\n");
+    }
+
+    #[test]
+    fn clear_heading_no_op_when_absent() {
+        let input = "---\nid: TASK-1\ntitle: T\n---\n\n## Description\nBody\n";
+        let doc = document::parse(input).unwrap();
+        let out = apply_patch(&doc, &[PatchOp::ClearHeading]).unwrap();
+        assert_eq!(out, input);
     }
 
     #[test]

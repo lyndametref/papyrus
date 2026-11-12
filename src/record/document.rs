@@ -52,7 +52,7 @@ pub fn parse(content: &str) -> Result<Document, AppError> {
         preamble.push(lines[i].to_string());
         i += 1;
     }
-    let heading = if i < lines.len() {
+    let heading = if i < lines.len() && lines[i].starts_with("# ") {
         let h = Some(lines[i].to_string());
         i += 1;
         h
@@ -218,6 +218,26 @@ mod tests {
                 .raw
                 .contains("foreign: 42")
         );
+    }
+
+    #[test]
+    fn heading_less_task_body_parses_description_section() {
+        let input = "---\nid: TASK-1\ntitle: T\n---\n\n## Description\nBody\n\n## Acceptance Criteria\n- [ ] one\n";
+        let doc = parse(input).unwrap();
+        assert!(doc.heading.is_none());
+        assert_eq!(doc.sections[0].heading, "## Description");
+        assert_eq!(doc.sections[1].heading, "## Acceptance Criteria");
+        assert_eq!(render(&doc), input);
+    }
+
+    #[test]
+    fn heading_less_milestone_body_parses_description_section() {
+        let input = "---\nid: MS-1\ntitle: T\n---\n\n## Description\nMilestone body\n";
+        let doc = parse(input).unwrap();
+        assert!(doc.heading.is_none());
+        assert_eq!(doc.sections.len(), 1);
+        assert_eq!(doc.sections[0].heading, "## Description");
+        assert_eq!(render(&doc), input);
     }
 
     #[test]

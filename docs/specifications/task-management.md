@@ -4,6 +4,7 @@
 **Milestone:** m-2 (Backlog Discovery and Management)
 **Status:** Refined (execution-ready)
 **UI mockups:** none
+**Revision:** 2026-11-12 (TASK-89) — persistence now uses Papyrus-owned front matter, the task heading and retired metadata sections are gone.
 
 ## Purpose
 
@@ -142,7 +143,7 @@ Deliver the `task` commands so a project contributor can create, inspect, update
 ### 10. Persistence and sanitization
 
 1. Tasks are stored as UTF-8 Markdown text files named `<ID>.md` in their respective folders (NFR-04.001).
-2. File content uses the following style: a top-level heading `# <ID> <title>`, then `## Description` (when provided), `## Status` (always), `## Milestone` (when assigned), `## Assignee` (when set), `## Labels` (when any, one per line as `- <label>`), `## Dependencies` (when any, one per line as `- <id>`), `## Acceptance Criteria` (when any, one per line as `- [ ] <criteria>`), and `## Comments` (when any, one entry per comment as `- **<author>**: <text>`). Empty optional fields are omitted. Status is always present.
+2. File content begins with a YAML front-matter block (REQ-05.010, ADR-0012): the general keys `id`, `title`, `created_date`, `updated_date`, `labels`, `references` in canonical order, followed by the task keys `status`, `assignee` (YAML list), `milestone`, `dependencies`, `ordinal`, `documentation`, `type`. Tasks have no `# <ID> <title>` heading. The body contains only content sections: `## Description` (when provided), `## Acceptance Criteria` (when any, one per line as `- [ ] <criteria>`), and `## Comments` (when any, one entry per comment as `- **<author>**: <text>`). Metadata is never mirrored into sections. A write to a legacy record moves its values to front matter and retires the title heading and the `## Status`, `## Assignee`, `## Milestone`, `## Labels`, and `## Dependencies` sections (ADR-0012 decisions 4 and 5). Read adoption adds the block only and leaves the legacy body byte-identical (ADR-0012 decision 9).
 3. All user-controlled input (title, description, status, milestone ID, dependency IDs, labels, assignee, acceptance criteria, comments, comment author) is sanitized by normalization/escaping before use (NFR-02.002).
 4. Values that cannot be normalized into a valid form fail with exit code 4 (NFR-02.002).
 5. No reads or writes occur outside the canonicalized project directory (NFR-04.002).

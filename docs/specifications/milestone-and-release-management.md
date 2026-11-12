@@ -4,6 +4,7 @@
 **Milestone:** m-2 (Backlog Discovery and Management)
 **Status:** Refined (execution-ready)
 **UI mockups:** none
+**Revision:** 2026-11-12 (TASK-89) — milestone persistence now uses Papyrus-owned front matter, the milestone heading and retired `## Release` section are gone.
 
 ## Purpose
 
@@ -129,7 +130,7 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 ### 12. Persistence and sanitization
 
 1. Milestones and releases are stored as UTF-8 Markdown text files named `<ID>.md` in their respective folders (NFR-04.001).
-2. File content follows a simple style: a top-level heading `# <ID> <title>`, then `## Description` (when provided), and for milestones `## Release` (when assigned) recording the owning release ID. Empty optional fields are omitted.
+2. File content begins with a YAML front-matter block (REQ-05.010, ADR-0012): the general keys `id`, `title`, `created_date`, `updated_date`, `labels`, `references` in canonical order, followed by `release` for a milestone. Milestones have no `# <ID> <title>` heading; their body contains only `## Description` (when provided). Metadata is never mirrored into sections. A write to a legacy milestone moves its value to front matter and retires the title heading and the `## Release` section (ADR-0012 decisions 4 and 5); read adoption adds the block only and leaves the legacy body byte-identical (ADR-0012 decision 9). Releases keep their `# <ID> <title>` heading and `## Description` body.
 3. All user-controlled input (title, description, release ID, milestone ID) is sanitized by normalization/escaping before use (NFR-02.002).
 4. Values that cannot be normalized into a valid form fail with exit code 4 (NFR-02.002).
 5. No reads or writes occur outside the canonicalized project directory (NFR-04.002).
@@ -170,7 +171,7 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 - Assumption: release records have no status field and are implicitly active; no transition to `released` is implemented because no mechanism is documented (REQ-03.002, TASK-22). A future ticket may define the transition.
 - Assumption: milestone `delete` prompts on standard input unless `--force` is given; in non-interactive contexts callers should pass `--force`.
 - Assumption: a milestone assigned to a missing release is reported as dangling on view rather than silently cleared.
-- Assumption: relationship data is stored only on the milestone (`## Release`), so releases do not need updating when milestones are created, edited, archived, or deleted.
+- Assumption: relationship data is stored only in the milestone front-matter `release` key, so releases do not need updating when milestones are created, edited, archived, or deleted.
 - Assumption: no UI mockups are required; this is a CLI-only ticket.
 - Assumption: single-crate layout (`src/main.rs` + `src/lib.rs`) is retained; new modules `milestone` and `release` (or a combined `backlog` module) may be added within the crate without a new ADR.
 

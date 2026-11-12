@@ -187,17 +187,8 @@ pub const GENERAL_FRONTMATTER_KEYS: &[&str] = &[
     "references",
 ];
 
-const TASK_SECTIONS: &[&str] = &[
-    "## Description",
-    "## Status",
-    "## Milestone",
-    "## Assignee",
-    "## Labels",
-    "## Dependencies",
-    "## Acceptance Criteria",
-    "## Comments",
-];
-const MILESTONE_SECTIONS: &[&str] = &["## Description", "## Release"];
+const TASK_SECTIONS: &[&str] = &["## Description", "## Acceptance Criteria", "## Comments"];
+const MILESTONE_SECTIONS: &[&str] = &["## Description"];
 const RELEASE_SECTIONS: &[&str] = &["## Description"];
 const DECISION_SECTIONS: &[&str] = &["## Status", "## Decision", "## Context", "## Consequences"];
 const REQUIREMENT_SECTIONS: &[&str] = &["## User Story", "## Group", "## Description"];
