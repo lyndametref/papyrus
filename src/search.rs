@@ -61,13 +61,13 @@ pub fn run(
         }
     }
     if types.is_empty() || types.contains(&SearchType::Task) {
-        collect_backlog_store(ctx, &cfg, "tasks", "task", &needle, &mut hits)?;
+        collect_backlog_store(ctx, &cfg, "task", "task", &needle, &mut hits)?;
     }
     if types.is_empty() || types.contains(&SearchType::Milestone) {
-        collect_backlog_store(ctx, &cfg, "milestones", "milestone", &needle, &mut hits)?;
+        collect_backlog_store(ctx, &cfg, "milestone", "milestone", &needle, &mut hits)?;
     }
     if types.is_empty() || types.contains(&SearchType::Release) {
-        collect_backlog_store(ctx, &cfg, "releases", "release", &needle, &mut hits)?;
+        collect_backlog_store(ctx, &cfg, "release", "release", &needle, &mut hits)?;
     }
     if types.is_empty() || types.contains(&SearchType::Decision) {
         collect_decision_store(ctx, &cfg, &needle, &mut hits)?;
@@ -193,18 +193,18 @@ fn collect_type(
 fn collect_backlog_store(
     ctx: &Context,
     cfg: &Config,
-    folder: &str,
+    descriptor_name: &str,
     kind: &'static str,
     needle: &str,
     hits: &mut Vec<Hit>,
 ) -> Result<(), AppError> {
-    let backlog_raw = ctx.project_dir.join(&cfg.backlog_directory);
-    let backlog_safe = Context::ensure_within(&ctx.project_dir, &backlog_raw)?;
-    let dir_raw = backlog_safe.join(folder);
-    if !dir_raw.exists() {
+    let Some(desc) = crate::record::descriptor::descriptor_for(descriptor_name) else {
         return Ok(());
-    }
-    let dir = Context::ensure_within(&ctx.project_dir, &dir_raw)?;
+    };
+    let dir = match desc.resolve_directory(cfg, &ctx.project_dir) {
+        Ok(dir) if dir.exists() => dir,
+        _ => return Ok(()),
+    };
     let entries = fs::read_dir(&dir).map_err(|e| {
         AppError::Runtime(format!("cannot read directory {}: {}", dir.display(), e))
     })?;
@@ -217,7 +217,7 @@ fn collect_backlog_store(
         let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
-        if !accepted_backlog_stem(folder, cfg, id) {
+        if !desc.matches_stem(cfg, id) {
             continue;
         }
         let safe = Context::ensure_within(&ctx.project_dir, &path)?;
@@ -316,26 +316,6 @@ fn collect_decision_store(
         });
     }
     Ok(())
-}
-
-fn has_prefix_digits(base: &str, prefix: &str) -> bool {
-    let base_l = base.to_ascii_lowercase();
-    let prefix_l = prefix.to_ascii_lowercase();
-    let Some(rest) = base_l.strip_prefix(&format!("{}-", prefix_l)) else {
-        return false;
-    };
-    !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit())
-}
-
-fn accepted_backlog_stem(folder: &str, cfg: &Config, stem: &str) -> bool {
-    let base = stem.split(" - ").next().unwrap_or(stem).trim();
-    let prefixes: &[&str] = match folder {
-        "tasks" => &[cfg.task_prefix.as_str(), "task", "TASK"],
-        "milestones" => &[cfg.milestone_prefix.as_str(), "MS", "ms", "M", "m"],
-        "releases" => &[cfg.release_prefix.as_str(), "REL", "rel"],
-        _ => &[],
-    };
-    prefixes.iter().any(|p| has_prefix_digits(base, p))
 }
 
 fn active_dir(

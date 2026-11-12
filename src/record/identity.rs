@@ -1,66 +1,27 @@
 //! Papyrus ID parse, format, validate, and allocation helpers.
+//!
+//! A Papyrus ID is `<PREFIX>-<padded number>`; there is one ID space per
+//! record family and no storage/display translation.
 
 use std::fmt;
 use std::path::Path;
 
-pub const DEFAULT_TASK_PREFIX: &str = "TASK";
-pub const DEFAULT_MILESTONE_PREFIX: &str = "MS";
-pub const DEFAULT_RELEASE_PREFIX: &str = "REL";
-pub const DEFAULT_ID_PADDING: usize = 3;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub enum RecordKind {
-    Task,
-    Milestone,
-}
-
-impl RecordKind {
-    pub fn default_prefix(self) -> &'static str {
-        match self {
-            RecordKind::Task => DEFAULT_TASK_PREFIX,
-            RecordKind::Milestone => DEFAULT_MILESTONE_PREFIX,
-        }
-    }
-    pub fn default_spec(self) -> IdSpec {
-        match self {
-            RecordKind::Task => IdSpec::task(self.default_prefix(), DEFAULT_ID_PADDING),
-            RecordKind::Milestone => IdSpec::milestone(self.default_prefix(), DEFAULT_ID_PADDING),
-        }
-    }
-    pub fn default_base_number(self) -> i64 {
-        1
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct IdSpec {
-    pub kind: RecordKind,
     pub prefix: String,
     pub padding: usize,
 }
 
 impl IdSpec {
-    pub fn task(prefix: impl Into<String>, padding: usize) -> Self {
+    pub fn new(prefix: impl Into<String>, padding: usize) -> Self {
         Self {
-            kind: RecordKind::Task,
             prefix: prefix.into(),
             padding: padding.max(1),
         }
-    }
-    pub fn milestone(prefix: impl Into<String>, padding: usize) -> Self {
-        Self {
-            kind: RecordKind::Milestone,
-            prefix: prefix.into(),
-            padding: padding.max(1),
-        }
-    }
-    pub fn default_task() -> Self {
-        Self::task(DEFAULT_TASK_PREFIX, DEFAULT_ID_PADDING)
-    }
-    pub fn default_milestone() -> Self {
-        Self::milestone(DEFAULT_MILESTONE_PREFIX, DEFAULT_ID_PADDING)
     }
 
+    /// Parse a Papyrus ID and return its number. The prefix is matched
+    /// case-insensitively and leading zeros are optional.
     pub fn parse_id(&self, id: &str) -> Result<i64, IdentityError> {
         let raw = id.trim();
         let (prefix, number) = split_id(raw)?;
@@ -70,23 +31,29 @@ impl IdSpec {
                 found: prefix.to_string(),
             });
         }
+        if is_backlog_shaped(&prefix, &number, &self.prefix) {
+            return Err(IdentityError::BacklogShape(raw.to_string()));
+        }
         parse_number(&number)
     }
-    pub fn parse_display_number(&self, id: &str) -> Result<i64, IdentityError> {
-        self.parse_id(id)
-    }
-    pub fn parse_storage_number(&self, id: &str) -> Result<i64, IdentityError> {
-        self.parse_id(id)
-    }
+
     pub fn format_id(&self, number: i64) -> String {
-        format!("{}-{}", self.prefix, pad_number(number, self.padding))
+        format_id(&self.prefix, number, self.padding)
     }
+
     pub fn validate_input(&self, input: &str) -> Result<(), IdentityError> {
         self.parse_id(input).map(|_| ())
     }
-    pub fn normalize(&self, id: &str) -> Result<i64, IdentityError> {
-        self.parse_id(id)
-    }
+}
+
+/// A file stem is Backlog-shaped, and therefore not a Papyrus record, when
+/// its prefix is the all-lowercase form of a configured prefix that contains
+/// at least one uppercase letter and its number is unpadded.
+pub fn is_backlog_shaped(stem_prefix: &str, number: &str, configured_prefix: &str) -> bool {
+    !stem_prefix.is_empty()
+        && stem_prefix.chars().all(|c| c.is_ascii_lowercase())
+        && configured_prefix.chars().any(|c| c.is_ascii_uppercase())
+        && !(number.len() > 1 && number.starts_with('0'))
 }
 
 fn split_id(raw: &str) -> Result<(String, String), IdentityError> {
@@ -132,18 +99,10 @@ pub fn pad_number(n: i64, padding: usize) -> String {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IdentityError {
     InvalidFormat(String),
-    InvalidPrefix {
-        expected: String,
-        found: String,
-    },
+    InvalidPrefix { expected: String, found: String },
     NonNumeric(String),
     OutOfRange(String),
-    StorageInput {
-        storage_id: String,
-        display_id: String,
-    },
-    Conflict(String),
-    NotFound(String),
+    BacklogShape(String),
 }
 
 impl fmt::Display for IdentityError {
@@ -155,16 +114,9 @@ impl fmt::Display for IdentityError {
             }
             IdentityError::NonNumeric(v) => write!(f, "non-numeric id component: {}", v),
             IdentityError::OutOfRange(v) => write!(f, "id out of range: {}", v),
-            IdentityError::StorageInput {
-                storage_id,
-                display_id,
-            } => write!(
-                f,
-                "storage id '{}' is not accepted as input; use display id '{}'",
-                storage_id, display_id
-            ),
-            IdentityError::Conflict(v) => write!(f, "conflict: {}", v),
-            IdentityError::NotFound(v) => write!(f, "not found: {}", v),
+            IdentityError::BacklogShape(v) => {
+                write!(f, "Backlog.md storage id is not a Papyrus id: {}", v)
+            }
         }
     }
 }
@@ -179,6 +131,11 @@ pub fn format_seq_id(group: &str, number: i64, padding: usize) -> String {
     format!("{}.{}", group, pad_number(number, padding))
 }
 
+/// Return the number of a record stem for the configured prefix.
+///
+/// Accepted stems are `<PREFIX>-<digits>`, optionally followed by `-<slug>`
+/// or ` - <slug>`. Prefix comparison is case-insensitive, leading zeros are
+/// optional, and Backlog.md storage stems resolve to `None`.
 pub fn id_number(stem: &str, prefix: &str) -> Option<u32> {
     let base = stem.split(" - ").next().unwrap_or(stem).trim();
     let (stem_prefix, rest) = base.split_once('-')?;
@@ -186,30 +143,10 @@ pub fn id_number(stem: &str, prefix: &str) -> Option<u32> {
         return None;
     }
     let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
-    if digits.is_empty() {
-        return None;
-    }
-    if stem_prefix.chars().all(|c| c.is_ascii_lowercase())
-        && prefix.chars().any(|c| c.is_ascii_uppercase())
-        && !(digits.len() > 1 && digits.starts_with('0'))
-    {
+    if digits.is_empty() || is_backlog_shaped(stem_prefix, &digits, prefix) {
         return None;
     }
     digits.parse::<u32>().ok()
-}
-
-pub fn strip_prefix_number<'a>(stem: &'a str, prefix: &str) -> Option<&'a str> {
-    let base = stem.split(" - ").next().unwrap_or(stem).trim();
-    if base
-        .to_ascii_lowercase()
-        .starts_with(&format!("{}-", prefix).to_ascii_lowercase())
-    {
-        let rest = &base[prefix.len() + 1..];
-        let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
-        if digits.is_empty() { None } else { Some(base) }
-    } else {
-        None
-    }
 }
 
 pub fn is_record_stem(stem: &str, prefix: &str) -> bool {
@@ -241,79 +178,16 @@ pub fn observed_numbers_in_dirs(dirs: &[&Path], prefix: &str) -> Vec<i64> {
 }
 
 pub fn next_number_in_dirs(dirs: &[&Path], prefix: &str) -> u32 {
-    let observed = observed_numbers_in_dirs(dirs, prefix);
-    allocate_next_storage_number(&observed, 1) as u32
+    allocate_next(&observed_numbers_in_dirs(dirs, prefix)) as u32
 }
 
-pub fn scan_max_in_dirs(dirs: &[&Path], prefix: &str) -> u32 {
-    observed_numbers_in_dirs(dirs, prefix)
-        .into_iter()
-        .map(|n| n as u32)
-        .max()
-        .unwrap_or(0)
+pub fn next_number(active: &Path, deprecated: &Path, prefix: &str) -> u32 {
+    next_number_in_dirs(&[active, deprecated], prefix)
 }
 
-pub fn scan_max(active: &Path, deprecated: &Path, prefix: &str) -> u32 {
-    scan_max_in_dirs(&[active, deprecated], prefix)
-}
-
-pub fn scan_max_single(dir: &Path, prefix: &str) -> u32 {
-    scan_max_in_dirs(&[dir], prefix)
-}
-
-pub fn scan_max_task(active: &Path, archived: &Path, archive: &Path) -> u32 {
-    let mut max = 0u32;
-    for dir in [active, archived, archive] {
-        if let Ok(rd) = std::fs::read_dir(dir) {
-            for e in rd.flatten() {
-                let path = e.path();
-                if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                    continue;
-                }
-                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                if let Some(n) = id_number(stem, DEFAULT_TASK_PREFIX)
-                    && n > max
-                {
-                    max = n;
-                }
-            }
-        }
-    }
-    max
-}
-
-pub fn scan_max_milestone(active: &Path, archived: &Path, archive: &Path) -> u32 {
-    let mut max = 0u32;
-    for dir in [active, archived, archive] {
-        if let Ok(rd) = std::fs::read_dir(dir) {
-            for e in rd.flatten() {
-                let path = e.path();
-                if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                    continue;
-                }
-                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                if let Some(n) = id_number(stem, DEFAULT_MILESTONE_PREFIX)
-                    && n > max
-                {
-                    max = n;
-                }
-            }
-        }
-    }
-    max
-}
-
-pub fn task_number_from_stem(stem: &str) -> Option<u32> {
-    id_number(stem, DEFAULT_TASK_PREFIX)
-}
-
-pub fn milestone_number_from_stem(stem: &str) -> Option<u32> {
-    id_number(stem, DEFAULT_MILESTONE_PREFIX)
-}
-
-pub fn scan_max_ordinal(active: &Path, archived: &Path) -> i64 {
+pub fn scan_max_ordinal_in_dirs(dirs: &[&Path]) -> i64 {
     let mut max: Option<i64> = None;
-    for dir in [active, archived] {
+    for dir in dirs {
         if let Ok(rd) = std::fs::read_dir(dir) {
             for e in rd.flatten() {
                 let path = e.path();
@@ -332,35 +206,6 @@ pub fn scan_max_ordinal(active: &Path, archived: &Path) -> i64 {
         }
     }
     max.map_or(0, |m| m + 1)
-}
-
-pub fn scan_max_group(active: &Path, deprecated: &Path, prefix: &str) -> u32 {
-    scan_max(active, deprecated, prefix)
-}
-
-pub fn scan_max_seq(active: &Path, deprecated: &Path, group_id: &str) -> u32 {
-    let mut max = 0u32;
-    let prefix = format!("{group_id}.");
-    for dir in [active, deprecated] {
-        if let Ok(rd) = std::fs::read_dir(dir) {
-            for e in rd.flatten() {
-                let path = e.path();
-                if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                    continue;
-                }
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
-                    && let Some(rest) = stem.strip_prefix(&prefix)
-                    && !rest.is_empty()
-                    && rest.chars().all(|c| c.is_ascii_digit())
-                    && let Ok(n) = rest.parse::<u32>()
-                    && n > max
-                {
-                    max = n;
-                }
-            }
-        }
-    }
-    max
 }
 
 pub fn is_group_id(id: &str, prefix: &str) -> bool {
@@ -395,56 +240,6 @@ pub fn observed_numbers_in_dirs_ext(dirs: &[&Path], prefix: &str, extension: &st
     observed
 }
 
-pub fn scan_max_in_dirs_ext(dirs: &[&Path], prefix: &str, extension: &str) -> u32 {
-    observed_numbers_in_dirs_ext(dirs, prefix, extension)
-        .into_iter()
-        .map(|n| n as u32)
-        .max()
-        .unwrap_or(0)
-}
-
-pub fn next_number(active: &Path, deprecated: &Path, prefix: &str) -> u32 {
-    next_number_in_dirs(&[active, deprecated], prefix)
-}
-
-pub fn next_task_number(active: &Path, archived: &Path, archive: &Path) -> u32 {
-    let mut observed: Vec<i64> = Vec::new();
-    for dir in [active, archived, archive] {
-        if let Ok(rd) = std::fs::read_dir(dir) {
-            for e in rd.flatten() {
-                let path = e.path();
-                if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                    continue;
-                }
-                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                if let Some(n) = task_number_from_stem(stem) {
-                    observed.push(n as i64);
-                }
-            }
-        }
-    }
-    allocate_next_storage_number(&observed, 1) as u32
-}
-
-pub fn next_milestone_number(active: &Path, archived: &Path, archive: &Path) -> u32 {
-    let mut observed: Vec<i64> = Vec::new();
-    for dir in [active, archived, archive] {
-        if let Ok(rd) = std::fs::read_dir(dir) {
-            for e in rd.flatten() {
-                let path = e.path();
-                if path.extension().and_then(|s| s.to_str()) != Some("md") {
-                    continue;
-                }
-                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                if let Some(n) = milestone_number_from_stem(stem) {
-                    observed.push(n as i64);
-                }
-            }
-        }
-    }
-    allocate_next_storage_number(&observed, 1) as u32
-}
-
 pub fn next_seq_number(active: &Path, deprecated: &Path, group_id: &str) -> u32 {
     let prefix = format!("{group_id}.");
     let mut observed: Vec<i64> = Vec::new();
@@ -466,48 +261,20 @@ pub fn next_seq_number(active: &Path, deprecated: &Path, group_id: &str) -> u32 
             }
         }
     }
-    allocate_next_storage_number(&observed, 1) as u32
+    allocate_next(&observed) as u32
 }
 
 pub fn next_html_number(active: &Path, deprecated: &Path, prefix: &str) -> u32 {
     let observed = observed_numbers_in_dirs_ext(&[active, deprecated], prefix, "html");
-    allocate_next_storage_number(&observed, 1) as u32
+    allocate_next(&observed) as u32
 }
 
-pub fn allocate_next_storage_number(observed: &[i64], base: i64) -> i64 {
-    let max = observed.iter().copied().max();
-    match max {
-        Some(m) if m >= base => m + 1,
-        Some(m) => {
-            if m + 1 > base {
-                m + 1
-            } else {
-                base
-            }
-        }
-        None => base,
-    }
-}
-
-pub fn allocate_next_number(observed: &[i64]) -> i64 {
-    allocate_next_storage_number(observed, 1)
-}
+/// Allocate `max(observed) + 1`, with a minimum of 1.
 pub fn allocate_next(observed: &[i64]) -> i64 {
-    allocate_next_number(observed)
-}
-
-pub fn allocate_next_storage_number_for(kind: RecordKind, observed: &[i64]) -> i64 {
-    allocate_next_storage_number(observed, kind.default_base_number())
-}
-
-pub fn allocate_next_display_number(
-    kind: RecordKind,
-    observed_storage_numbers: &[i64],
-    padding: usize,
-    display_prefix: &str,
-) -> String {
-    let storage = allocate_next_storage_number_for(kind, observed_storage_numbers);
-    format!("{}-{}", display_prefix, pad_number(storage, padding))
+    match observed.iter().copied().max() {
+        Some(m) if m >= 1 => m + 1,
+        _ => 1,
+    }
 }
 
 pub fn allocate_from_observed_ids(
@@ -518,165 +285,120 @@ pub fn allocate_from_observed_ids(
     for id in observed_ids {
         observed.push(spec.parse_id(id)?);
     }
-    let storage = allocate_next_storage_number(&observed, 1);
-    Ok(spec.format_id(storage))
+    Ok(spec.format_id(allocate_next(&observed)))
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RecordCandidate {
-    pub path: String,
-    pub kind: RecordKind,
-    pub filename_id: Option<String>,
-    pub frontmatter_id: Option<String>,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Conflict {
-    DuplicateStorageId {
-        storage_id: String,
-        paths: Vec<String>,
-    },
-    FrontmatterFilenameMismatch {
-        path: String,
-        filename_id: String,
-        frontmatter_id: String,
-    },
-}
+    fn spec(prefix: &str) -> IdSpec {
+        IdSpec::new(prefix, 3)
+    }
 
-impl fmt::Display for Conflict {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Conflict::DuplicateStorageId { storage_id, paths } => {
-                write!(f, "duplicate id {}: {:?}", storage_id, paths)
+    #[test]
+    fn parse_and_format_round_trip() {
+        let s = spec("TASK");
+        assert_eq!(s.parse_id("TASK-001").unwrap(), 1);
+        assert_eq!(s.parse_id("Task-1").unwrap(), 1);
+        assert_eq!(s.parse_id("task-0001").unwrap(), 1);
+        assert_eq!(s.format_id(7), "TASK-007");
+    }
+
+    #[test]
+    fn parse_rejects_foreign_prefix_and_backlog_shape() {
+        let s = spec("TASK");
+        assert!(s.parse_id("MS-001").is_err());
+        assert!(matches!(
+            s.parse_id("task-18"),
+            Err(IdentityError::BacklogShape(_))
+        ));
+        assert!(matches!(
+            s.parse_id("task-0"),
+            Err(IdentityError::BacklogShape(_))
+        ));
+        // Padded lowercase is a native case variant.
+        assert_eq!(s.parse_id("task-018").unwrap(), 18);
+    }
+
+    #[test]
+    fn backlog_shaped_stems_resolve_to_no_record() {
+        assert_eq!(id_number("task-18", "TASK"), None);
+        assert_eq!(id_number("m-0", "MS"), None);
+        assert_eq!(id_number("task-001", "TASK"), Some(1));
+        assert_eq!(id_number("Task-18", "TASK"), Some(18));
+        assert_eq!(id_number("TASK-001", "TASK"), Some(1));
+        assert_eq!(id_number("TASK-001 - Some title", "TASK"), Some(1));
+        assert_eq!(id_number("TASK-001-some-title", "TASK"), Some(1));
+    }
+
+    #[test]
+    fn all_lowercase_configured_prefix_treats_unpadded_as_native() {
+        assert_eq!(id_number("task-18", "task"), Some(18));
+        assert_eq!(id_number("TASK-18", "task"), Some(18));
+    }
+
+    #[test]
+    fn custom_prefix_is_used_for_lookup_and_allocation() {
+        let s = spec("PAP");
+        assert_eq!(s.parse_id("PAP-009").unwrap(), 9);
+        assert_eq!(s.parse_id("TASK-009").unwrap_err(), {
+            IdentityError::InvalidPrefix {
+                expected: "PAP".to_string(),
+                found: "TASK".to_string(),
             }
-            Conflict::FrontmatterFilenameMismatch {
-                path,
-                filename_id,
-                frontmatter_id,
-            } => {
-                write!(
-                    f,
-                    "front-matter/filename mismatch at {}: {} vs {}",
-                    path, filename_id, frontmatter_id
-                )
-            }
-        }
-    }
-}
-
-pub fn detect_conflicts(candidates: &[RecordCandidate]) -> Vec<Conflict> {
-    let mut conflicts = Vec::new();
-
-    for c in candidates {
-        if let (Some(f), Some(fm)) = (&c.filename_id, &c.frontmatter_id)
-            && f != fm
-        {
-            let spec = c.kind.default_spec();
-            let nf = spec.parse_id(f).ok();
-            let nfm = spec.parse_id(fm).ok();
-            match (nf, nfm) {
-                (Some(a), Some(b)) if a != b => {
-                    conflicts.push(Conflict::FrontmatterFilenameMismatch {
-                        path: c.path.clone(),
-                        filename_id: f.clone(),
-                        frontmatter_id: fm.clone(),
-                    });
-                }
-                (None, None) if f != fm => {
-                    conflicts.push(Conflict::FrontmatterFilenameMismatch {
-                        path: c.path.clone(),
-                        filename_id: f.clone(),
-                        frontmatter_id: fm.clone(),
-                    });
-                }
-                _ => {}
-            }
-        }
+        });
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join("identity-custom-prefix");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("PAP-004.md"), "x").unwrap();
+        std::fs::write(dir.join("TASK-099.md"), "x").unwrap();
+        std::fs::write(dir.join("task-18.md"), "x").unwrap();
+        assert_eq!(next_number_in_dirs(&[&dir], "PAP"), 5);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
-    use std::collections::BTreeMap;
-    let mut groups: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for c in candidates {
-        let spec = c.kind.default_spec();
-        let raw = c.frontmatter_id.as_ref().or(c.filename_id.as_ref());
-        if let Some(raw) = raw
-            && let Ok(n) = spec.parse_id(raw)
-        {
-            let key = format!("{:?}:{}", c.kind, n);
-            groups.entry(key).or_default().push(c.path.clone());
+    #[test]
+    fn allocation_scans_all_dirs_without_offset() {
+        let base = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join("identity-allocation");
+        let _ = std::fs::remove_dir_all(&base);
+        for dir in ["active", "legacy", "archive"] {
+            std::fs::create_dir_all(base.join(dir)).unwrap();
         }
-    }
-    for (key, paths) in groups {
-        if paths.len() > 1 {
-            conflicts.push(Conflict::DuplicateStorageId {
-                storage_id: key,
-                paths,
-            });
-        }
+        std::fs::write(base.join("active/MS-001.md"), "x").unwrap();
+        std::fs::write(base.join("legacy/MS-007.md"), "x").unwrap();
+        std::fs::write(base.join("archive/MS-003.md"), "x").unwrap();
+        let next = next_number_in_dirs(
+            &[
+                &base.join("active"),
+                &base.join("legacy"),
+                &base.join("archive"),
+            ],
+            "MS",
+        );
+        assert_eq!(next, 8);
+        assert_eq!(
+            spec("MS").format_id(next as i64),
+            "MS-008",
+            "milestones start at 1 with no Backlog offset"
+        );
+        let _ = std::fs::remove_dir_all(&base);
     }
 
-    conflicts
-}
+    #[test]
+    fn empty_family_starts_at_one() {
+        assert_eq!(allocate_next(&[]), 1);
+        assert_eq!(IdSpec::new("MS", 3).format_id(1), "MS-001");
+    }
 
-pub fn find_conflicts(candidates: &[RecordCandidate]) -> Vec<Conflict> {
-    detect_conflicts(candidates)
-}
-pub fn conflicts(candidates: &[RecordCandidate]) -> Vec<Conflict> {
-    detect_conflicts(candidates)
-}
-pub fn check_conflicts(candidates: &[RecordCandidate]) -> Vec<Conflict> {
-    detect_conflicts(candidates)
-}
-
-pub fn detect_duplicate_ids(kind: RecordKind, entries: &[(String, String)]) -> Vec<Conflict> {
-    let spec = kind.default_spec();
-    use std::collections::BTreeMap;
-    let mut groups: BTreeMap<i64, Vec<String>> = BTreeMap::new();
-    for (path, raw) in entries {
-        if let Ok(n) = spec.parse_id(raw) {
-            groups.entry(n).or_default().push(path.clone());
-        }
+    #[test]
+    fn allocate_from_observed_ids_uses_spec() {
+        let s = spec("PAP");
+        let id = allocate_from_observed_ids(&s, &["PAP-002", "PAP-7"]).unwrap();
+        assert_eq!(id, "PAP-008");
     }
-    let mut out = Vec::new();
-    for (n, paths) in groups {
-        if paths.len() > 1 {
-            out.push(Conflict::DuplicateStorageId {
-                storage_id: format!("{}-{}", spec.prefix, n),
-                paths,
-            });
-        }
-    }
-    out
-}
-pub fn detect_duplicates(kind: RecordKind, entries: &[(String, String)]) -> Vec<Conflict> {
-    detect_duplicate_ids(kind, entries)
-}
-
-pub fn validate_input(input: &str) -> Result<(), IdentityError> {
-    for spec in [IdSpec::default_task(), IdSpec::default_milestone()] {
-        if spec.validate_input(input).is_ok() {
-            return Ok(());
-        }
-    }
-    Err(IdentityError::InvalidFormat(input.to_string()))
-}
-pub fn validate_input_for(kind: RecordKind, input: &str) -> Result<(), IdentityError> {
-    kind.default_spec().validate_input(input)
-}
-pub fn validate_input_with(spec: &IdSpec, input: &str) -> Result<(), IdentityError> {
-    spec.validate_input(input)
-}
-pub fn task_validate_input(input: &str) -> Result<(), IdentityError> {
-    IdSpec::default_task().validate_input(input)
-}
-pub fn milestone_validate_input(input: &str) -> Result<(), IdentityError> {
-    IdSpec::default_milestone().validate_input(input)
-}
-pub fn normalize(id: &str) -> Result<i64, IdentityError> {
-    for spec in [IdSpec::default_task(), IdSpec::default_milestone()] {
-        if let Ok(n) = spec.parse_id(id) {
-            return Ok(n);
-        }
-    }
-    Err(IdentityError::InvalidFormat(id.to_string()))
 }

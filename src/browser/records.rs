@@ -416,22 +416,22 @@ fn active_entry(cfg: &Config, kind: Category) -> Option<crate::config::DocTypeEn
             .filter(|entry| entry.enabled && !entry.prefix.is_empty()),
         Category::Task => Some(crate::config::DocTypeEntry {
             prefix: cfg.task_prefix.clone(),
-            directory: "tasks".to_string(),
+            directory: String::new(),
             enabled: true,
         }),
         Category::Milestone => Some(crate::config::DocTypeEntry {
             prefix: cfg.milestone_prefix.clone(),
-            directory: "milestones".to_string(),
+            directory: String::new(),
             enabled: true,
         }),
         Category::Release => Some(crate::config::DocTypeEntry {
             prefix: cfg.release_prefix.clone(),
-            directory: "releases".to_string(),
+            directory: String::new(),
             enabled: true,
         }),
         Category::Decision => Some(crate::config::DocTypeEntry {
             prefix: String::new(),
-            directory: cfg.decision_directory.clone(),
+            directory: String::new(),
             enabled: true,
         }),
         Category::Glossary => cfg
@@ -483,26 +483,37 @@ fn active_entry(cfg: &Config, kind: Category) -> Option<crate::config::DocTypeEn
 }
 
 fn active_dir(ctx: &Context, cfg: &Config, kind: Category) -> Option<PathBuf> {
+    // Keep the enabled/prefix checks of the active entry, then resolve the
+    // directory through the shared descriptor so no literal path is built
+    // here.
     let entry = active_entry(cfg, kind)?;
-    let base = match kind {
-        Category::Req
-        | Category::Nfr
-        | Category::Glossary
-        | Category::UiSpec
-        | Category::UiMockup
-        | Category::BusinessRule
-        | Category::AuditRecord
-        | Category::TechSpec
-        | Category::UseCase
-        | Category::TestCase
-        | Category::TestReport => ctx.project_dir.join(&cfg.doc_directory),
-        Category::Task | Category::Milestone | Category::Release => {
-            ctx.project_dir.join(&cfg.backlog_directory)
+    let descriptor_name = match kind {
+        Category::Task => "task",
+        Category::Milestone => "milestone",
+        Category::Release => "release",
+        Category::Decision => "decision",
+        Category::Req => "requirement",
+        Category::Nfr => "nfr",
+        Category::Glossary => "glossary",
+        Category::UiSpec => "ui-spec",
+        Category::BusinessRule => "rule",
+        Category::AuditRecord => "audit",
+        Category::TechSpec => "tech-spec",
+        Category::UseCase => "use-case",
+        Category::TestCase => "test-case",
+        Category::TestReport => "test-report",
+        Category::UiMockup => {
+            // UI mockups are HTML records and are not a managed descriptor.
+            let raw = ctx
+                .project_dir
+                .join(&cfg.doc_directory)
+                .join(&entry.directory);
+            return Context::ensure_within(&ctx.project_dir, &raw).ok();
         }
-        Category::Decision => ctx.project_dir.clone(),
     };
-    let raw = base.join(&entry.directory);
-    Context::ensure_within(&ctx.project_dir, &raw).ok()
+    crate::record::descriptor::descriptor_for(descriptor_name)?
+        .resolve_directory(cfg, &ctx.project_dir)
+        .ok()
 }
 
 /// Format the optimistic-concurrency token from file metadata.

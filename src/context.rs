@@ -76,10 +76,36 @@ impl Context {
                 canon_parent.join(resolved.file_name().unwrap_or_default())
             }
         } else {
-            let parent = target.parent().unwrap_or(project_dir);
-            let canon_parent =
-                std::fs::canonicalize(parent).map_err(|e| AppError::Runtime(e.to_string()))?;
-            canon_parent.join(target.file_name().unwrap_or_default())
+            // Walk up to the nearest existing ancestor so that a not-yet
+            // created directory chain (for example the canonical archive
+            // directory) is resolved and containment is still verified.
+            let mut missing: Vec<std::ffi::OsString> = Vec::new();
+            let mut current = target;
+            let existing = loop {
+                if current.exists() {
+                    break current;
+                }
+                let Some(name) = current.file_name() else {
+                    break current;
+                };
+                if name == ".." || name == "." {
+                    return Err(AppError::Runtime(format!(
+                        "path resolves outside project directory: {}",
+                        target.display()
+                    )));
+                }
+                missing.push(name.to_os_string());
+                match current.parent() {
+                    Some(parent) => current = parent,
+                    None => break current,
+                }
+            };
+            let mut canon =
+                std::fs::canonicalize(existing).map_err(|e| AppError::Runtime(e.to_string()))?;
+            for name in missing.into_iter().rev() {
+                canon.push(name);
+            }
+            canon
         };
         if !canon.starts_with(&project_canon) {
             return Err(AppError::Runtime(format!(

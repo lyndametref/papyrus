@@ -25,6 +25,51 @@ impl RecordDescriptor {
         self.frontmatter_keys.contains(&key)
     }
 
+    /// Configured ID prefixes that belong to this record family.
+    ///
+    /// Tasks, milestones, and releases have one prefix each. Decisions have
+    /// one prefix per enabled decision type, and document records use the
+    /// prefix of their document type entry.
+    pub fn configured_prefixes(&self, cfg: &Config) -> Vec<String> {
+        match self.record_type {
+            "task" => vec![cfg.task_prefix.clone()],
+            "milestone" => vec![cfg.milestone_prefix.clone()],
+            "release" => vec![cfg.release_prefix.clone()],
+            "decision" => cfg
+                .decision_types
+                .values()
+                .map(|entry| entry.prefix.clone())
+                .collect(),
+            _ => self
+                .doc_type_key
+                .and_then(|key| cfg.document_types.get(key))
+                .map(|entry| vec![entry.prefix.clone()])
+                .unwrap_or_default(),
+        }
+    }
+
+    /// Whether a file stem denotes a record of this family.
+    ///
+    /// Task, milestone, release, and decision families match a configured
+    /// prefix with tolerant case, padding, and slug handling, excluding
+    /// Backlog-shaped stems. Document families keep their
+    /// `display_id_pattern` shape.
+    pub fn matches_stem(&self, cfg: &Config, stem: &str) -> bool {
+        match self.record_type {
+            "task" | "milestone" | "release" | "decision" => self
+                .configured_prefixes(cfg)
+                .iter()
+                .any(|prefix| crate::record::identity::id_number(stem, prefix).is_some()),
+            _ => {
+                matches_pattern(stem, self.display_id_pattern)
+                    && self
+                        .configured_prefixes(cfg)
+                        .iter()
+                        .any(|prefix| crate::record::identity::id_number(stem, prefix).is_some())
+            }
+        }
+    }
+
     pub fn resolve_directory(
         &self,
         cfg: &Config,
@@ -34,18 +79,18 @@ impl RecordDescriptor {
             "backlog" => project_dir.join(&cfg.backlog_directory),
             "decision" => project_dir.join(&cfg.decision_directory),
             "doc" => project_dir.join(&cfg.doc_directory),
-            other => project_dir.join(other),
+            other => {
+                return Err(AppError::Validation(format!(
+                    "unknown directory configuration key: {}",
+                    other
+                )));
+            }
         };
         let raw = if let Some(key) = self.doc_type_key {
-            if let Some(entry) = cfg.document_types.get(key) {
-                base.join(&entry.directory)
-            } else {
-                if self.subpath.is_empty() {
-                    base
-                } else {
-                    base.join(self.subpath)
-                }
-            }
+            let entry = cfg.document_types.get(key).ok_or_else(|| {
+                AppError::Validation(format!("unknown document type configuration key: {}", key))
+            })?;
+            base.join(&entry.directory)
         } else if self.subpath.is_empty() {
             base
         } else {
@@ -54,20 +99,106 @@ impl RecordDescriptor {
         Context::ensure_within(project_dir, &raw)
     }
 
-    // Aliases for callers/tests that prefer other names.
-    pub fn resolve_dir(
+    /// Canonical archive location of a backlog family, if the family has one.
+    pub fn resolve_archive_directory(
         &self,
         cfg: &Config,
         project_dir: &std::path::Path,
-    ) -> Result<std::path::PathBuf, AppError> {
-        self.resolve_directory(cfg, project_dir)
+    ) -> Option<Result<std::path::PathBuf, AppError>> {
+        match self.record_type {
+            "task" | "milestone" | "release" => {
+                let raw = project_dir
+                    .join(&cfg.backlog_directory)
+                    .join("archive")
+                    .join(self.subpath);
+                Some(Context::ensure_within(project_dir, &raw))
+            }
+            _ => None,
+        }
     }
-    pub fn directory_path(
+
+    /// Legacy archive alias of a backlog family, read-only.
+    pub fn resolve_legacy_archive_directory(
         &self,
         cfg: &Config,
         project_dir: &std::path::Path,
-    ) -> Result<std::path::PathBuf, AppError> {
-        self.resolve_directory(cfg, project_dir)
+    ) -> Option<Result<std::path::PathBuf, AppError>> {
+        match self.record_type {
+            "task" | "milestone" => {
+                let raw = project_dir
+                    .join(&cfg.backlog_directory)
+                    .join(self.subpath)
+                    .join("archived");
+                Some(Context::ensure_within(project_dir, &raw))
+            }
+            _ => None,
+        }
+    }
+
+    /// Deprecated location of a document family, if the family has one.
+    pub fn resolve_deprecated_directory(
+        &self,
+        cfg: &Config,
+        project_dir: &std::path::Path,
+    ) -> Option<Result<std::path::PathBuf, AppError>> {
+        self.doc_type_key?;
+        let active = self.resolve_directory(cfg, project_dir).ok()?;
+        let raw = active.join("deprecated");
+        Some(Context::ensure_within(project_dir, &raw))
+    }
+
+    /// All locations a family may be read from: active, archive, legacy
+    /// alias, and deprecated.
+    pub fn resolve_read_directories(
+        &self,
+        cfg: &Config,
+        project_dir: &std::path::Path,
+    ) -> Vec<std::path::PathBuf> {
+        let mut dirs = Vec::new();
+        if let Ok(dir) = self.resolve_directory(cfg, project_dir) {
+            dirs.push(dir);
+        }
+        if let Some(Ok(dir)) = self.resolve_archive_directory(cfg, project_dir) {
+            dirs.push(dir);
+        }
+        if let Some(Ok(dir)) = self.resolve_legacy_archive_directory(cfg, project_dir) {
+            dirs.push(dir);
+        }
+        if let Some(Ok(dir)) = self.resolve_deprecated_directory(cfg, project_dir) {
+            dirs.push(dir);
+        }
+        dirs
+    }
+}
+
+/// A run of `#` in a pattern matches one or more ASCII digits.
+fn matches_pattern(stem: &str, pattern: &str) -> bool {
+    let stem_chars: Vec<char> = stem.chars().collect();
+    let pattern_chars: Vec<char> = pattern.chars().collect();
+    matches_from(&stem_chars, &pattern_chars, 0, 0)
+}
+
+fn matches_from(stem: &[char], pattern: &[char], si: usize, pi: usize) -> bool {
+    if pi == pattern.len() {
+        return si == stem.len();
+    }
+    if pattern[pi] == '#' {
+        let mut run_end = pi;
+        while run_end < pattern.len() && pattern[run_end] == '#' {
+            run_end += 1;
+        }
+        let mut k = 1usize;
+        while si + k <= stem.len() && stem[si + k - 1].is_ascii_digit() {
+            if matches_from(stem, pattern, si + k, run_end) {
+                return true;
+            }
+            k += 1;
+        }
+        false
+    } else if si < stem.len() && stem[si] == pattern[pi] {
+        matches_from(stem, pattern, si + 1, pi + 1)
+    } else {
+        false
     }
 }
 
@@ -313,6 +444,12 @@ pub fn descriptor_for(name: &str) -> Option<&'static RecordDescriptor> {
             || d.type_name.to_lowercase() == needle
             || d.label.to_lowercase() == needle
     })
+}
+
+pub fn descriptor_for_doc_type(key: &str) -> Option<&'static RecordDescriptor> {
+    DESCRIPTORS
+        .iter()
+        .find(|descriptor| descriptor.doc_type_key == Some(key))
 }
 
 pub fn is_managed_record(name: &str) -> bool {

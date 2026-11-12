@@ -91,15 +91,10 @@ fn load_config(ctx: &Context) -> Result<Config, AppError> {
     load_effective_config(&ctx.config_path, &ctx.project_dir)
 }
 
-fn backlog_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let raw = ctx.project_dir.join(&cfg.backlog_directory);
-    Context::ensure_within(&ctx.project_dir, &raw)
-}
-
 fn releases_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let base = backlog_dir(ctx, cfg)?;
-    let raw = base.join("releases");
-    Context::ensure_within(&ctx.project_dir, &raw)
+    let desc = crate::record::descriptor::descriptor_for("release")
+        .ok_or_else(|| AppError::Runtime("release descriptor is unavailable".to_string()))?;
+    desc.resolve_directory(cfg, &ctx.project_dir)
 }
 
 fn ensure_dir(dir: &std::path::Path, project_dir: &std::path::Path) -> Result<(), AppError> {

@@ -70,26 +70,36 @@ pub fn run_init_with_io<R: BufRead, W: Write>(
     // Validate before writing.
     config.validate().map_err(AppError::Validation)?;
 
-    // Create directories.
-    let backlog_dir = project_dir.join(&config.backlog_directory);
-    let _ = fs::create_dir_all(&backlog_dir);
-    let _ = fs::create_dir_all(backlog_dir.join("tasks"));
-    let _ = fs::create_dir_all(backlog_dir.join("milestones"));
-    let _ = fs::create_dir_all(backlog_dir.join("releases"));
-
-    let any_decision = config.decision_types.values().any(|v| v.enabled);
-    if any_decision {
-        let decision_dir = project_dir.join(&config.decision_directory);
-        let _ = fs::create_dir_all(&decision_dir);
+    // Create directories through the shared record descriptors so the layout
+    // has one source of truth.
+    for name in ["task", "milestone", "release"] {
+        if let Some(desc) = crate::record::descriptor::descriptor_for(name)
+            && let Ok(dir) = desc.resolve_directory(&config, &project_dir)
+        {
+            let _ = fs::create_dir_all(dir);
+        }
     }
 
-    let doc_dir = project_dir.join(&config.doc_directory);
-    let _ = fs::create_dir_all(&doc_dir);
-    for dt in config.document_types.values() {
-        if dt.enabled {
-            let d = doc_dir.join(&dt.directory);
-            let _ = fs::create_dir_all(&d);
-            let _ = fs::create_dir_all(d.join("deprecated"));
+    let any_decision = config.decision_types.values().any(|v| v.enabled);
+    if any_decision
+        && let Some(desc) = crate::record::descriptor::descriptor_for("decision")
+        && let Ok(dir) = desc.resolve_directory(&config, &project_dir)
+    {
+        let _ = fs::create_dir_all(dir);
+    }
+
+    for (key, dt) in &config.document_types {
+        if !dt.enabled {
+            continue;
+        }
+        let Some(desc) = crate::record::descriptor::descriptor_for_doc_type(key) else {
+            continue;
+        };
+        if let Ok(dir) = desc.resolve_directory(&config, &project_dir) {
+            let _ = fs::create_dir_all(&dir);
+        }
+        if let Some(Ok(deprecated)) = desc.resolve_deprecated_directory(&config, &project_dir) {
+            let _ = fs::create_dir_all(deprecated);
         }
     }
 
