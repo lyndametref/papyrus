@@ -128,7 +128,7 @@ fn plural(count: usize, singular: &str, plural: &str) -> String {
 
 /// Sidebar fragment. Only enabled document types are listed.
 pub fn sidebar(selected: Option<Category>, cfg: &Config) -> String {
-    build_sidebar(selected, cfg, false, false)
+    build_sidebar(selected, cfg, false, false, false)
 }
 
 /// Sidebar fragment with optional lifecycle-page active state.
@@ -137,7 +137,7 @@ pub fn sidebar_with_lifecycle(
     cfg: &Config,
     lifecycle_active: bool,
 ) -> String {
-    build_sidebar(selected, cfg, lifecycle_active, false)
+    build_sidebar(selected, cfg, false, lifecycle_active, false)
 }
 
 /// Sidebar fragment with optional skills-page active state.
@@ -146,12 +146,22 @@ pub fn sidebar_with_skills(
     cfg: &Config,
     skills_active: bool,
 ) -> String {
-    build_sidebar(selected, cfg, false, skills_active)
+    build_sidebar(selected, cfg, false, false, skills_active)
+}
+
+/// Sidebar fragment with optional configuration-page active state.
+pub fn sidebar_with_config(
+    selected: Option<Category>,
+    cfg: &Config,
+    config_active: bool,
+) -> String {
+    build_sidebar(selected, cfg, config_active, false, false)
 }
 
 fn build_sidebar(
     selected: Option<Category>,
     cfg: &Config,
+    config_active: bool,
     lifecycle_active: bool,
     skills_active: bool,
 ) -> String {
@@ -337,6 +347,16 @@ fn build_sidebar(
             current
         ));
     }
+    // Configuration (always present, not gated by document_types)
+    let config_current = if config_active {
+        " aria-current=\"page\""
+    } else {
+        ""
+    };
+    items.push_str(&format!(
+        "<li><a href=\"/config\"{}>Configuration</a></li>",
+        config_current
+    ));
     // Managed artifacts & lifecycles (always present, not gated by document_types)
     let lifecycle_current = if lifecycle_active {
         " aria-current=\"page\""
@@ -3976,6 +3996,40 @@ pub struct InventoryCard {
 }
 
 /// Render the inventory hub at `GET /`.
+/// Render the configuration view page.
+pub fn config_page(chrome: Chrome<'_>, section_html: &str, sidebar_html: &str) -> String {
+    let title = "Papyrus \u{2014} Configuration".to_string();
+    let subheading = "Effective configuration for the current project. Values come from built-in defaults and the config file.";
+    render_template(
+        LIST_TEMPLATE,
+        &[
+            ("title", &title),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+            ("heading", "Configuration"),
+            ("subheading", subheading),
+        ],
+        &[("sidebar", sidebar_html), ("section", section_html)],
+    )
+}
+
+/// Render the single-key configuration edit page.
+pub fn config_edit_page(chrome: Chrome<'_>, sidebar_html: &str, section_html: &str) -> String {
+    let title = "Papyrus \u{2014} Edit configuration".to_string();
+    let subheading = "Edit one configuration key.";
+    render_template(
+        LIST_TEMPLATE,
+        &[
+            ("title", &title),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+            ("heading", "Edit configuration"),
+            ("subheading", subheading),
+        ],
+        &[("sidebar", sidebar_html), ("section", section_html)],
+    )
+}
+
 pub fn inventory_page(cfg: &Config, chrome: Chrome<'_>, cards: &[InventoryCard]) -> String {
     let mut section = String::from("<section class=\"inventory\">");
     for card in cards {
