@@ -147,8 +147,15 @@ fn run_backlog(
         )));
     }
 
-    // Report path containment.
-    let report_safe = if let Some(rp) = &report {
+    // Report path containment. Resolve relative paths against the project dir.
+    let report_resolved = report.as_ref().map(|rp| {
+        if rp.is_absolute() {
+            rp.clone()
+        } else {
+            ctx.project_dir.join(rp)
+        }
+    });
+    let report_safe = if let Some(rp) = &report_resolved {
         Some(Context::ensure_within(&ctx.project_dir, rp).map_err(|_| {
             AppError::Validation(format!(
                 "report path resolves outside project directory: {}",
@@ -769,7 +776,7 @@ fn run_backlog(
             // Build converted body.
             let body_text = match rec.family {
                 Family::Task => convert_task_body(&rec.body),
-                Family::Milestone => rec.body.clone(),
+                Family::Milestone => convert_milestone_body(&rec.body),
             };
 
             // Parse body into document (no front matter).
@@ -1251,6 +1258,55 @@ fn convert_task_body(src: &str) -> String {
     out
 }
 
+fn convert_milestone_body(src: &str) -> String {
+    // Remove marker comment lines.
+    let mut lines: Vec<String> = src
+        .lines()
+        .filter(|l| !is_marker_comment(l.trim()))
+        .map(|l| l.to_string())
+        .collect();
+    // Trim leading/trailing blank lines.
+    while lines.first().is_some_and(|l| l.trim().is_empty()) {
+        lines.remove(0);
+    }
+    while lines.last().is_some_and(|l| l.trim().is_empty()) {
+        lines.pop();
+    }
+    // Strip a leading "## Description" heading if present, to avoid duplication.
+    if lines
+        .first()
+        .map(|l| l.trim() == "## Description")
+        .unwrap_or(false)
+    {
+        lines.remove(0);
+        while lines.first().is_some_and(|l| l.trim().is_empty()) {
+            lines.remove(0);
+        }
+    }
+    let text = lines.join(
+        "
+",
+    );
+    if text.trim().is_empty() {
+        "## Description
+"
+        .to_string()
+    } else {
+        format!(
+            "## Description
+
+{}
+",
+            text.trim_end()
+        )
+    }
+}
+
+fn is_marker_comment(line: &str) -> bool {
+    line.starts_with("<!--") && line.contains(":BEGIN")
+        || line.starts_with("<!--") && line.contains(":END")
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum MarkerKind {
     Description,
@@ -1353,17 +1409,7 @@ fn heading_precedes_marker(lines: &[&str], i: usize) -> bool {
     if j >= lines.len() {
         return false;
     }
-    let kind = match begin_marker(lines[j].trim()) {
-        Some(k) => k,
-        None => return false,
-    };
-    let target = match kind {
-        MarkerKind::Description => "## Description",
-        MarkerKind::Ac => "## Acceptance Criteria",
-        MarkerKind::Dod => "## Definition of Done",
-        MarkerKind::Plan => "## Implementation Notes",
-        MarkerKind::Notes => "## Notes",
-        MarkerKind::Comments => "## Comments",
-    };
-    heading == target
+    // Drop any heading that immediately precedes a recognized marker block;
+    // the converter emits its own target heading for that marker.
+    begin_marker(lines[j].trim()).is_some()
 }
