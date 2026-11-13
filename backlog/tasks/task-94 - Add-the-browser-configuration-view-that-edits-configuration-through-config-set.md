@@ -1,11 +1,11 @@
 ---
 id: TASK-94
 title: Add the browser configuration view that edits configuration through config set
-status: Implemented
+status: Done
 assignee:
   - '@rust-dev'
 created_date: '2026-11-11T20:43:00Z'
-updated_date: '2026-11-13T06:56:00Z'
+updated_date: '2026-11-13T07:03:00Z'
 labels:
   - browser
   - configuration
