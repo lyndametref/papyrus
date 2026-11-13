@@ -258,6 +258,12 @@ fn build_context(
                 config_path.display()
             ))
         })?;
+    if !config_path.exists() {
+        return Err(error::AppError::Runtime(format!(
+            "configuration file not found: {}; run `papyrus init` to create it",
+            config_path.display()
+        )));
+    }
     Ok(context::Context {
         project_dir,
         config_path,

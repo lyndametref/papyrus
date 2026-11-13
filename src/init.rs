@@ -45,14 +45,12 @@ pub fn run_init_with_io<R: BufRead, W: Write>(
     let project_dir =
         fs::canonicalize(&project_dir_raw).map_err(|e| AppError::Runtime(e.to_string()))?;
 
-    // Non-empty check.
-    let is_empty = fs::read_dir(&project_dir)
-        .map_err(|e| AppError::Runtime(e.to_string()))?
-        .next()
-        .is_none();
-    if !is_empty && !opts.force {
+    let config_path = project_dir.join("papyrus.config.yml");
+
+    // Conflict check: existing config blocks init without --force; writes nothing.
+    if config_path.exists() && !opts.force {
         return Err(AppError::Validation(
-            "target directory is not empty; use --force to initialize anyway".to_string(),
+            "papyrus.config.yml already exists; use --force to replace it".to_string(),
         ));
     }
 
@@ -71,7 +69,7 @@ pub fn run_init_with_io<R: BufRead, W: Write>(
     config.validate().map_err(AppError::Validation)?;
 
     // Create directories through the shared record descriptors so the layout
-    // has one source of truth.
+    // has one source of truth. Directory creation follows activation.
     for name in ["task", "milestone", "release"] {
         if let Some(desc) = crate::record::descriptor::descriptor_for(name)
             && let Ok(dir) = desc.resolve_directory(&config, &project_dir)
@@ -79,6 +77,9 @@ pub fn run_init_with_io<R: BufRead, W: Write>(
             let _ = fs::create_dir_all(dir);
         }
     }
+
+    // Always ensure the documentation root exists.
+    let _ = fs::create_dir_all(project_dir.join(&config.doc_directory));
 
     let any_decision = config.decision_types.values().any(|v| v.enabled);
     if any_decision
@@ -103,12 +104,9 @@ pub fn run_init_with_io<R: BufRead, W: Write>(
         }
     }
 
-    // Write config file if absent.
-    let config_path = project_dir.join("papyrus.config.yml");
-    if !config_path.exists() {
-        let yaml = yaml_serde::to_string(&config).map_err(|e| AppError::Runtime(e.to_string()))?;
-        fs::write(&config_path, yaml.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
-    }
+    // Write config file (full replace under --force or when absent).
+    let yaml = yaml_serde::to_string(&config).map_err(|e| AppError::Runtime(e.to_string()))?;
+    fs::write(&config_path, yaml.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     // Git init unless suppressed.
     if !opts.no_git {
@@ -144,66 +142,105 @@ fn build_config_interactive<R: BufRead, W: Write>(
         ..Config::default()
     };
 
+    // Default activation: everything active.
+    let mut active_decisions: BTreeMap<String, bool> = defaults
+        .decision_types
+        .keys()
+        .map(|k| (k.clone(), true))
+        .collect();
+    let mut active_docs: BTreeMap<String, bool> = defaults
+        .document_types
+        .keys()
+        .map(|k| (k.clone(), true))
+        .collect();
+
+    // Single artifact list presentation.
     let _ = writeln!(
         writer,
-        "Core artifacts (always activated): task, milestone, release"
+        "Artifacts (space to toggle; Enter to accept defaults):"
     );
+    for key in ["task", "milestone", "release"] {
+        let _ = writeln!(writer, "  [x] {} (always active)", key);
+    }
+    for key in defaults.decision_types.keys() {
+        let _ = writeln!(writer, "  [x] {}", key);
+    }
+    for key in defaults.document_types.keys() {
+        let _ = writeln!(writer, "  [x] {}", key);
+    }
+
+    // Space-toggle input (line-based): tokens toggle activation.
+    let _ = write!(
+        writer,
+        "Toggle artifacts (space-separated, Enter to keep defaults): "
+    );
+    let _ = writer.flush();
+    let mut toggle_line = String::new();
+    let _ = reader.read_line(&mut toggle_line);
+    for token in toggle_line.split_whitespace() {
+        let t = token.to_lowercase();
+        if let Some(v) = active_decisions.get_mut(&t) {
+            *v = !*v;
+        } else if let Some(v) = active_docs.get_mut(&t) {
+            *v = !*v;
+        }
+    }
+
+    let default_task_prefix = defaults.task_prefix.clone();
     let task_prefix = prompt_value(
         reader,
         writer,
-        "Task ID prefix [TASK]: ",
-        &defaults.task_prefix,
+        &format!("Task ID prefix [{}]: ", default_task_prefix),
+        &default_task_prefix,
         sanitize_name,
-        &format!("invalid prefix; use {}", defaults.task_prefix),
+        &format!("invalid prefix; use {}", default_task_prefix),
     )?;
+    let default_milestone_prefix = defaults.milestone_prefix.clone();
     let milestone_prefix = prompt_value(
         reader,
         writer,
-        "Milestone ID prefix [MS]: ",
-        &defaults.milestone_prefix,
+        &format!("Milestone ID prefix [{}]: ", default_milestone_prefix),
+        &default_milestone_prefix,
         sanitize_name,
-        &format!("invalid prefix; use {}", defaults.milestone_prefix),
+        &format!("invalid prefix; use {}", default_milestone_prefix),
     )?;
+    let default_release_prefix = defaults.release_prefix.clone();
     let release_prefix = prompt_value(
         reader,
         writer,
-        "Release ID prefix [REL]: ",
-        &defaults.release_prefix,
+        &format!("Release ID prefix [{}]: ", default_release_prefix),
+        &default_release_prefix,
         sanitize_name,
-        &format!("invalid prefix; use {}", defaults.release_prefix),
+        &format!("invalid prefix; use {}", default_release_prefix),
     )?;
+    let default_backlog_directory = defaults.backlog_directory.clone();
     let backlog_directory = prompt_value(
         reader,
         writer,
-        "Backlog directory [backlog/]: ",
-        &defaults.backlog_directory,
+        &format!("Backlog directory [{}]: ", default_backlog_directory),
+        &default_backlog_directory,
         sanitize_path_string,
-        &format!("invalid folder; use {}", defaults.backlog_directory),
+        &format!("invalid folder; use {}", default_backlog_directory),
     )?;
 
-    let _ = writeln!(writer, "Decision types:");
-    let mut decision_activated: BTreeMap<String, bool> = BTreeMap::new();
-    for (key, entry) in &defaults.decision_types {
-        let _ = writeln!(writer, "  {} (default prefix: {})", key, entry.prefix);
-        let activated = prompt_activation(reader, writer, "  Activate? [Y/n]: ")?;
-        decision_activated.insert(key.clone(), activated);
-    }
-    let any_decision = decision_activated.values().any(|v| *v);
+    // Decision types.
+    let any_decision = active_decisions.values().any(|v| *v);
+    let default_decision_directory = defaults.decision_directory.clone();
     let decision_directory = if any_decision {
         prompt_value(
             reader,
             writer,
-            "Decision directory [decisions/]: ",
-            &defaults.decision_directory,
+            &format!("Decision directory [{}]: ", default_decision_directory),
+            &default_decision_directory,
             sanitize_path_string,
-            &format!("invalid folder; use {}", defaults.decision_directory),
+            &format!("invalid folder; use {}", default_decision_directory),
         )?
     } else {
-        defaults.decision_directory.clone()
+        default_decision_directory.clone()
     };
 
     for (key, entry) in &defaults.decision_types {
-        let activated = decision_activated.get(key).copied().unwrap_or(true);
+        let activated = active_decisions.get(key).copied().unwrap_or(true);
         if activated {
             let prefix = prompt_value(
                 reader,
@@ -222,33 +259,24 @@ fn build_config_interactive<R: BufRead, W: Write>(
         }
     }
 
-    let _ = writeln!(writer, "Document types:");
-    let mut doc_activated: BTreeMap<String, bool> = BTreeMap::new();
-    for (key, entry) in &defaults.document_types {
-        let _ = writeln!(
-            writer,
-            "  {} (default prefix: {}, directory: {})",
-            key, entry.prefix, entry.directory
-        );
-        let activated = prompt_activation(reader, writer, "  Activate? [Y/n]: ")?;
-        doc_activated.insert(key.clone(), activated);
-    }
-    let any_doc = doc_activated.values().any(|v| *v);
+    // Document types.
+    let any_doc = active_docs.values().any(|v| *v);
+    let default_doc_directory = defaults.doc_directory.clone();
     let doc_directory = if any_doc {
         prompt_value(
             reader,
             writer,
-            "Documentation root [docs/]: ",
-            &defaults.doc_directory,
+            &format!("Documentation root [{}]: ", default_doc_directory),
+            &default_doc_directory,
             sanitize_path_string,
-            &format!("invalid folder; use {}", defaults.doc_directory),
+            &format!("invalid folder; use {}", default_doc_directory),
         )?
     } else {
-        defaults.doc_directory.clone()
+        default_doc_directory.clone()
     };
 
     for (key, entry) in &defaults.document_types {
-        let activated = doc_activated.get(key).copied().unwrap_or(true);
+        let activated = active_docs.get(key).copied().unwrap_or(true);
         if activated {
             let prefix = prompt_value(
                 reader,
@@ -313,31 +341,5 @@ fn prompt_value<R: BufRead, W: Write>(
             return Ok(v);
         }
         writeln!(writer, "{}", hint).map_err(|e| AppError::Runtime(e.to_string()))?;
-    }
-}
-
-fn prompt_activation<R: BufRead, W: Write>(
-    reader: &mut R,
-    writer: &mut W,
-    prompt: &str,
-) -> Result<bool, AppError> {
-    loop {
-        write!(writer, "{}", prompt).map_err(|e| AppError::Runtime(e.to_string()))?;
-        writer
-            .flush()
-            .map_err(|e| AppError::Runtime(e.to_string()))?;
-        let mut input = String::new();
-        reader
-            .read_line(&mut input)
-            .map_err(|e| AppError::Runtime(e.to_string()))?;
-        let ans = input.trim().to_lowercase();
-        if ans.is_empty() || ans == "y" || ans == "yes" {
-            return Ok(true);
-        }
-        if ans == "n" || ans == "no" {
-            return Ok(false);
-        }
-        writeln!(writer, "invalid choice; enter y, yes, n, or no")
-            .map_err(|e| AppError::Runtime(e.to_string()))?;
     }
 }

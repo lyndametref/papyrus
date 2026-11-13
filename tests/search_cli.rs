@@ -641,8 +641,7 @@ fn t17_search_creates_no_files_or_directories() {
     let d = tmpdir("t17-uninitialized");
     let before = snapshot(&d);
     let out = search(&d, &["anything"]);
-    assert_eq!(out.status.code(), Some(0), "stderr={}", stderr(&out));
-    assert_eq!(stdout(&out), "");
+    assert_eq!(out.status.code(), Some(1), "stderr={}", stderr(&out));
     assert_eq!(before, snapshot(&d));
 
     // Initialized project whose configured type directory is missing.

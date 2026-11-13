@@ -68,7 +68,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        Do not initialize a Git repository.
 
        <b style="color: light-dark(#1a7f37, #3fb950);">--force</b>
-       Allow initialization in a non-empty directory. Existing files are never overwritten.
+       Allow initialization in a non-empty directory and replace an existing <b>papyrus.config.yml</b> in full. No other existing file is overwritten.
 
 <b style="color: light-dark(#0969da, #58a6ff);">config</b>
 

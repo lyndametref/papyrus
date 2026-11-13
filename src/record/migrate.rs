@@ -1204,7 +1204,13 @@ mod tests {
     fn ctx(dir: &Path) -> Context {
         Context {
             project_dir: dir.to_path_buf(),
-            config_path: dir.join("papyrus.config.yml"),
+            config_path: {
+                let p = dir.join("papyrus.config.yml");
+                if !p.exists() {
+                    let _ = std::fs::write(&p, "project_name: Test\n");
+                }
+                p
+            },
             json: false,
             no_color: true,
         }
