@@ -166,6 +166,7 @@ The release that introduces the native layout must ship the import command in th
 3. That task IDs and milestone numbers are reallocated (ADR-0010 section 5): imported milestones are remapped into the Papyrus milestone space and source numbers are not preserved.
 4. That the source store must be kept until the import is verified.
 5. That after import Papyrus owns the records.
+6. The published notes live at `docs/release-1.0-upgrade-notes.md` and are linked from the README section "Upgrading to Release 1.0".
 
 ### 12. README command documentation
 
@@ -210,7 +211,7 @@ The README command documentation (man page) must carry:
 
 | Artifact | Reference |
 |---|---|
-| Ticket | TASK-83 (specification); TASK-92 (implementation) |
+| Ticket | TASK-83 (specification); TASK-92 (implementation); TASK-99 (upgrade notes) |
 | Requirements | NFR-04.004, REQ-01.005, REQ-01.002, REQ-01.003, REQ-01.004, REQ-05.010, NFR-04.002 |
 | ADRs | ADR-0010, ADR-0011, ADR-0012, ADR-0013 |
 | Related tickets | TASK-88, TASK-89, TASK-90, TASK-92, TASK-97, TASK-98, TASK-99, TASK-100 |

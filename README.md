@@ -8,6 +8,14 @@ Papyrus is inspired by and builds on the ideas of **[Backlog.md](https://github.
 
 ---
 
+## Upgrading to Release 1.0
+
+Release 1.0 stops reading the Backlog.md on-disk layout. If your project's backlog records are still stored as `backlog/tasks/task-N - <slug>.md` or `backlog/milestones/m-N - <slug>.md`, run the one-time import before you rely on the new version: no import runs automatically, and the new version does not list, view, or search unimported records.
+
+Run it explicitly: `papyrus import backlog --from <source-project-dir> --dry-run`. Review the printed plan, keep the source store until the import is verified, then run the same command without `--dry-run`. Imported records receive fresh Papyrus IDs and milestone numbers; `papyrus import backlog` is the only bridge from a Backlog.md store. Full instructions, options, caveats, and the rest of the Release 1.0 change summary: [Release 1.0 upgrade notes](docs/release-1.0-upgrade-notes.md).
+
+---
+
 ## Man Page (`papyrus(1)`)
 
 <pre>
