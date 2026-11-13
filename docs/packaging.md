@@ -1288,7 +1288,7 @@ Observed results:
 - **No Backlog-shaped write** — after create, edit, archive, restore, deprecate,
   adopt, and import, every written record path was `<ID>.md` (decisions
   `<ID>-<kebab-slug>.md`); no Backlog stem, `## Status` metadata section, or
-  storage-ID key was written. The eight mechanical checks in `tests/no_drift.rs`
+  storage-ID key was written. The ten mechanical checks in `tests/no_drift.rs`
   passed in the same `cargo test` run.
 - **Invisibility / import** — an unimported store copied into an initialised project
   was invisible to CLI list/view/search, their `--json` forms, browser list, JSON

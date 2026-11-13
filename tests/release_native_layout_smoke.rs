@@ -835,6 +835,16 @@ fn t98_02_adoption_and_noop_writes_are_byte_identical() {
     );
     assert!(legacy_task.exists(), "adoption must not rename the file");
 
+    // A read after retirement and the equal-value write changes no byte,
+    // mode, or mtime.
+    sleep_until_mtime_can_change();
+    run_ok(&project, &["task", "view", "TASK-010"]);
+    assert_eq!(
+        snapshot(&legacy_task),
+        canonical,
+        "post-retirement task read changed the file"
+    );
+
     // A legacy milestone behaves the same way: adoption prepends the block
     // only, then the first write retires the heading and `## Release`.
     let legacy_ms = project.join("backlog/milestones/MS-010.md");
@@ -893,6 +903,16 @@ fn t98_02_adoption_and_noop_writes_are_byte_identical() {
         "equal-value write after retirement changed the file"
     );
 
+    // A read after retirement and the equal-value write changes no byte,
+    // mode, or mtime.
+    sleep_until_mtime_can_change();
+    run_ok(&project, &["milestone", "view", "MS-010"]);
+    assert_eq!(
+        snapshot(&legacy_ms),
+        canonical,
+        "post-retirement milestone read changed the file"
+    );
+
     // A legacy document record type adopts front matter on first read and is
     // then idempotent; adoption again changes only the prepended block.
     let legacy_spec = project.join("docs/technical/TECH-010.md");
@@ -912,6 +932,15 @@ fn t98_02_adoption_and_noop_writes_are_byte_identical() {
         snapshot(&legacy_spec),
         adopted,
         "second legacy document adoption changed the file"
+    );
+
+    // A read after the document write changes no byte, mode, or mtime.
+    sleep_until_mtime_can_change();
+    run_ok(&project, &["tech-spec", "view", "TECH-010"]);
+    assert_eq!(
+        snapshot(&legacy_spec),
+        adopted,
+        "post-write legacy document read changed the file"
     );
 
     // A read that cannot adopt safely reports the error and leaves the file
