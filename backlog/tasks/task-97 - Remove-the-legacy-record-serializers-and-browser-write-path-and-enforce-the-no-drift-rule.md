@@ -3,10 +3,10 @@ id: TASK-97
 title: >-
   Remove the legacy record serializers and browser write path and enforce the
   no-drift rule
-status: Implemented
+status: Done
 assignee: []
 created_date: '2026-11-11T20:44:00Z'
-updated_date: '2026-11-13T10:33:00Z'
+updated_date: '2026-11-13T10:40:00Z'
 labels:
   - native-layout
   - refactor
