@@ -2669,11 +2669,19 @@ fn api_requirements(request: &Request, state: &ServerState) -> Result<Response, 
         .groups
         .iter()
         .map(|group| {
+            // A missing (synthesised) NFR group carries a null title rather
+            // than echoing its ID prefix; a present group record keeps its
+            // title.
+            let title = if kind == Category::Nfr && group.title.trim().is_empty() {
+                serde_json::Value::Null
+            } else {
+                serde_json::Value::String(group.title.clone())
+            };
             serde_json::json!({
                 "id": group.id,
                 "kind": kind.key(),
                 "form": "group",
-                "title": group.title,
+                "title": title,
                 "metadata": record_metadata_json(group),
             })
         })

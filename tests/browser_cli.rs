@@ -7128,3 +7128,126 @@ fn t81n_quality_gates() {
         );
     }
 }
+
+// T-93 (record view layout, reference links, NFR grouping, glossary landing, branding)
+#[test]
+fn t93_header_rendering() {
+    let dir = test_root("t93-header");
+    init_project(&dir);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/").text();
+    assert!(html.contains("<span class=\"mark\" aria-hidden=\"true\">P</span>"));
+    assert!(html.contains("<span class=\"brand-name\">Papyrus</span>"));
+    assert!(html.contains("<span class=\"project\">Proj</span>"));
+    let css = get(&server, "/assets/app.css").text();
+    assert!(css.contains(".brand-name { display: block; font-size: 12px; color: var(--muted);"));
+    assert!(css.contains(".project { display: block; font-size: 20px; font-weight: 700;"));
+    let err = get(&server, "/doc/NOPE").text();
+    assert!(err.contains("<span class=\"project\">Proj</span>"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn t93_disclosure_sections_and_unresolved_refs() {
+    let dir = test_root("t93-disclosure");
+    init_project(&dir);
+    create_req_group(&dir, "Payments Group");
+    create_req(&dir, "Capture payment", "REQ-001");
+    let rules_dir = dir.join("docs/business-rules");
+    fs::create_dir_all(&rules_dir).unwrap();
+    fs::write(
+        rules_dir.join("RUL-001.md"),
+        "---\nid: RUL-001\ntitle: Rule\ncreated_date: '2026-11-13T06:43:23Z'\nupdated_date: '2026-11-13T06:43:23Z'\nlabels: []\nreferences: []\n---\n# RUL-001 Rule\n\n## Description\nDesc\n\n## Rationale\nRat\n\n## Applicability\nApp\n\n## Requirements\n- REQ-001.001\n- NOPE-001\n",
+    )
+    .unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/doc/RUL-001").text();
+    assert!(html.contains("<details"));
+    assert!(html.contains("</details>"));
+    assert!(html.contains("NOPE-001"));
+    assert!(html.contains("href=\"/doc/REQ-001.001\""));
+    assert!(!html.contains("href=\"/doc/NOPE-001\""));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn t93_glossary_landing() {
+    let dir = test_root("t93-glossary");
+    init_project(&dir);
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "glossary",
+        "create",
+        "--term",
+        "Alpha",
+        "--definition",
+        "Def A",
+        "--label",
+        "tag1",
+        "--reference",
+        "REF-1",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=glossary").text();
+    assert!(html.contains("GLO-001"));
+    assert!(html.contains("tag1"));
+    assert!(!html.contains("row-meta"));
+    assert!(!html.contains("REF-1"));
+    let detail = get(&server, "/doc/GLO-001").text();
+    assert!(detail.contains("Record ID"));
+    assert!(detail.contains("tag1"));
+    assert!(detail.contains("<details"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn t93_nfr_grouping_and_derivation() {
+    let dir = test_root("t93-nfr");
+    init_project(&dir);
+    create_nfr_group(&dir, "Persist");
+    create_nfr(&dir, "Restrict access", "NFR-001");
+    create_nfr_group(&dir, "Empty Group");
+    let nfr_dir = dir.join("docs/requirements/non-functional");
+    fs::create_dir_all(&nfr_dir).unwrap();
+    fs::write(
+        nfr_dir.join("NFR-003.001.md"),
+        "---\nid: NFR-003.001\ntitle: Ungrp\ncreated_date: '2026-11-13T06:43:23Z'\nupdated_date: '2026-11-13T06:43:23Z'\nlabels: []\nreferences: []\n---\n# NFR-003.001 Ungrp\n\n## Group\nNFR-002 Missing\n\n## Description\ndesc\n",
+    )
+    .unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=nfr").text();
+    assert!(html.contains("NFR-001"));
+    assert!(html.contains("Persist"));
+    assert!(html.contains("Empty Group"));
+    assert!(html.contains("No requirements in this group"));
+    assert!(html.contains("NFR-003"));
+    assert!(!html.contains("Other requirements"));
+    let json_text = get(&server, "/api/requirements?type=nfr").text();
+    assert!(json_text.contains("\"id\":\"NFR-003\""));
+    assert!(json_text.contains("\"title\":null"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn t93_papyrus_id_only_routing() {
+    let dir = test_root("t93-ids");
+    init_project(&dir);
+    create_req_group(&dir, "Payments Group");
+    create_req(&dir, "Capture payment", "REQ-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let list = get(&server, "/?type=req").text();
+    assert!(list.contains("href=\"/doc/REQ-001\""));
+    assert!(list.contains("href=\"/doc/REQ-001.001\""));
+    assert_eq!(get(&server, "/doc/REQ-001.001").status, 200);
+    let json_text = get(&server, "/api/doc/REQ-001.001").text();
+    let doc: serde_json::Value = serde_json::from_str(&json_text).unwrap();
+    assert_eq!(doc["id"], "REQ-001.001");
+    assert!(!list.contains("task-"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}

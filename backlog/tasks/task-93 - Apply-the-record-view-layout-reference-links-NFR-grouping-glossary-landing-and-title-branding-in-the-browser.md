@@ -6,7 +6,7 @@ title: >-
 status: Implemented
 assignee: []
 created_date: '2026-11-11T20:43:00Z'
-updated_date: '2026-11-13T06:38:00Z'
+updated_date: '2026-11-13T06:47:00Z'
 labels:
   - browser
   - release-1.0
@@ -70,23 +70,23 @@ Open questions:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every single record view shows a summary card with only the record ID, created date, and updated date, plus the owning group for a sub-requirement.
-- [ ] #2 Labels render as a taglist under the title, and dependencies and references render at the end as native disclosure sections that appear only when the record has at least one value and work with JavaScript disabled.
-- [ ] #3 Task dependencies, a task milestone, references values, and a sub-requirement owning group render as links to the referenced record; an unresolved value renders as plain text without an error; links are local and work offline.
-- [ ] #4 Non-functional atomic requirements are listed under their owning group with the group title, a missing group falls back to the group number, an empty group still renders, and no Other requirements catch-all remains.
-- [ ] #5 The glossary landing page omits created and updated dates and references and shows labels as tags, while glossary detail views follow the record view layout.
-- [ ] #6 The shared header renders the configured project name in large bold type and the Papyrus mention smaller on every page, leaving the P mark unchanged.
-- [ ] #7 Routes, links, form values, and JSON carry Papyrus IDs only.
-- [ ] #8 Tests or fixtures cover the group derivation, unresolved references, disclosure sections, and header rendering.
+- [x] #1 Every single record view shows a summary card with only the record ID, created date, and updated date, plus the owning group for a sub-requirement.
+- [x] #2 Labels render as a taglist under the title, and dependencies and references render at the end as native disclosure sections that appear only when the record has at least one value and work with JavaScript disabled.
+- [x] #3 Task dependencies, a task milestone, references values, and a sub-requirement owning group render as links to the referenced record; an unresolved value renders as plain text without an error; links are local and work offline.
+- [x] #4 Non-functional atomic requirements are listed under their owning group with the group title, a missing group falls back to the group number, an empty group still renders, and no Other requirements catch-all remains.
+- [x] #5 The glossary landing page omits created and updated dates and references and shows labels as tags, while glossary detail views follow the record view layout.
+- [x] #6 The shared header renders the configured project name in large bold type and the Papyrus mention smaller on every page, leaving the P mark unchanged.
+- [x] #7 Routes, links, form values, and JSON carry Papyrus IDs only.
+- [x] #8 Tests or fixtures cover the group derivation, unresolved references, disclosure sections, and header rendering.
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Implementation follows approved MOCK-0014 for all five surfaces; no UI is invented outside the approved mockup.
-- [ ] #2 cargo build succeeds with no warnings introduced by this change.
-- [ ] #3 cargo test passes, including new or updated browser tests for group derivation, unresolved references, disclosure sections, header rendering, glossary landing, NFR grouping, and Papyrus-ID-only routing.
-- [ ] #4 cargo clippy --all-targets -- -D warnings and cargo fmt --check pass.
-- [ ] #5 No requirement or business-rule files were modified.
+- [x] #1 Implementation follows approved MOCK-0014 for all five surfaces; no UI is invented outside the approved mockup.
+- [x] #2 cargo build succeeds with no warnings introduced by this change.
+- [x] #3 cargo test passes, including new or updated browser tests for group derivation, unresolved references, disclosure sections, header rendering, glossary landing, NFR grouping, and Papyrus-ID-only routing.
+- [x] #4 cargo clippy --all-targets -- -D warnings and cargo fmt --check pass.
+- [x] #5 No requirement or business-rule files were modified.
 <!-- DOD:END -->
 
 ## Implementation Plan
