@@ -13,7 +13,7 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 
 ### In scope
 
-- `papyrus browser [--host <host>] [--port <port>] [--no-open]` exactly as documented in `papyrus(1)` (BR-004, REQ-06.002).
+- `papyrus browser [--host <host>] [--port <port>] [--no-open] [--debug]` exactly as documented in `papyrus(1)` (BR-004, REQ-06.002, REQ-06.007).
 - Option resolution with precedence command line > environment > configuration file > built-in defaults, defaults `127.0.0.1` / `6420` / open enabled, and a warning for a non-loopback bind address (REQ-06.002, REQ-01.003).
 - A blocking HTTP/1.1 server over `std::net::TcpListener` in the existing crate, with request limits, timeouts, deterministic error responses, and no outbound network access (NFR-01.003, NFR-02.002).
 - Listing, viewing, and editing active business-requirement and non-functional-requirement groups and requirements in the browser, with save-then-reread persistence (REQ-05.001, REQ-05.002, NFR-01.002).
@@ -74,7 +74,7 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 9. After startup the process serves requests until it is interrupted (SIGINT/SIGTERM) or a fatal listener error occurs. There is no graceful-shutdown protocol, no `--daemon`, no PID file, and no automatic exit after inactivity.
 10. A fatal accept-loop error (for example the listener becomes unusable) exits 1 with a runtime message.
 11. Standard output carries only the single startup line; per-request diagnostics go to standard error. Warnings are plain `warning: ...` lines on standard error in both text and `--json` modes, because they are diagnostics and not command output.
-12. By default the browser command outputs only errors to the console. Per-request logging is disabled unless `--debug` is set. With `--debug`, each received request is logged as exactly one line on standard error containing the method, the path (without query, decoded, truncated to 200 characters), the response status, and the duration. Request headers and bodies are never logged. Errors are output whether or not `--debug` is set. For the over-capacity rejection in section 3.2 the request is never read, so with `--debug` the method and path are logged as `-`, giving the line `- - 503`.
+12. By default the browser command outputs only errors to the console. Per-request logging is disabled unless `--debug` is set. With `--debug`, each received request is logged as exactly one line on standard error, formatted as `<method> <path> <status> <duration>ms`, containing the method, the path (without query, decoded, truncated to 200 characters), the response status, and the duration as whole milliseconds measured from the start of connection handling to the end of the response write (`0ms` is allowed). Request headers and bodies are never logged. Errors are output whether or not `--debug` is set. Always-on error output means warnings, bind/startup/runtime failures, and pre-parse rejection lines of the form `- - <status>`; parsed requests that return a 4xx or 5xx response are responses, not console errors, and are logged only with `--debug`. For the over-capacity rejection in section 3.2 the request is never read, so the method and path are logged as `-` and the duration is omitted, giving the exact line `- - 503`, with or without `--debug`. Per-request and error lines are always written to standard error, never to standard output, so `--json` output remains the single startup object.
 
 ### 3. HTTP server behavior
 
@@ -367,6 +367,7 @@ Routes are exact. `{id}` is a record ID as defined in section 7.1.
 | `--host <host>` | Bind address; IP literal or DNS name; default `127.0.0.1`. |
 | `--port <port>` | TCP port `1..=65535`; default `6420`. |
 | `--no-open` | Suppress opening the default browser. |
+| `--debug` | Browser-only flag; log one line per received request to stderr (method, path, status, duration). Not a global option. |
 | `PAPYRUS_BROWSER_HOST` / `PAPYRUS_BROWSER_PORT` / `PAPYRUS_BROWSER_OPEN` | Environment tier of the precedence chain (OQ-1). |
 | `browser_host` / `browser_port` / `browser_open` | Configuration keys, defaults `127.0.0.1` / `6420` / `true`. |
 | Startup output | One line on stdout: `Serving http://<host>:<port>/` or the JSON object in section 2.4. |
@@ -487,7 +488,7 @@ The approved package is the authoritative layout reference for this increment. W
 
 | Check | Verifies | How it is verified |
 |---|---|---|
-| T-01 | Command shape is exactly `papyrus browser [--host] [--port] [--no-open]` | `papyrus browser --help`; parse tests for valid and invalid invocations |
+| T-01 | Command shape is exactly `papyrus browser [--host] [--port] [--no-open] [--debug]` | `papyrus browser --help`; parse tests for valid and invalid invocations, including that `--debug` is accepted only by `browser` |
 | T-02 | Defaults are `127.0.0.1`, `6420`, open enabled | Startup line and JSON startup object with no options and no config |
 | T-03 | Precedence is CLI > environment > config > defaults per setting | Matrix test overriding each tier and asserting the effective URL and open flag |
 | T-04 | `--no-open` and `browser_open: false` suppress opening; default opens | Fake opener script on `PATH` writing a marker file; marker present/absent |

@@ -20,7 +20,7 @@ use std::net::{IpAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const MAX_CONNECTIONS: usize = 16;
 const IO_TIMEOUT: Duration = Duration::from_secs(5);
@@ -126,6 +126,7 @@ struct ServerState {
     config_path: PathBuf,
     host: String,
     port: u16,
+    debug: bool,
 }
 
 impl ServerState {
@@ -153,6 +154,7 @@ pub fn run(
     cli_host: Option<&str>,
     cli_port: Option<u16>,
     no_open: bool,
+    debug: bool,
 ) -> Result<CommandOutput, AppError> {
     let cfg = load_effective_config(&ctx.config_path, &ctx.project_dir)?;
     let options = resolve_options(cli_host, cli_port, no_open, &read_env(), &cfg)?;
@@ -199,6 +201,7 @@ pub fn run(
         config_path: ctx.config_path.clone(),
         host: options.host.clone(),
         port: options.port,
+        debug,
     });
     serve(listener, state)?;
     Ok(CommandOutput {
@@ -269,6 +272,7 @@ fn reject_over_capacity(mut stream: TcpStream) {
 }
 
 fn handle_connection(mut stream: TcpStream, state: &ServerState) {
+    let started = Instant::now();
     let _ = stream.set_read_timeout(Some(IO_TIMEOUT));
     let _ = stream.set_write_timeout(Some(IO_TIMEOUT));
 
@@ -295,8 +299,11 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) {
         Err(error) => error_response(error.status, api, state),
     };
 
-    eprintln!("{} {} {}", method, log_path, response.status);
     let _ = http::write_response(&mut stream, &response, head_only);
+    if state.debug {
+        let duration = started.elapsed().as_millis();
+        eprintln!("{} {} {} {}ms", method, log_path, response.status, duration);
+    }
 }
 
 fn allowed_host_values(state: &ServerState) -> Vec<String> {
