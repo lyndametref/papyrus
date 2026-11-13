@@ -165,6 +165,38 @@ fn sleep_until_mtime_can_change() {
     std::thread::sleep(Duration::from_millis(1100));
 }
 
+/// Assert that adoption prepended a well-formed front-matter block and left
+/// every body byte unchanged.
+///
+/// The adopted bytes must be exactly the block followed by the original bytes,
+/// so any dropped, added, reordered, or re-encoded body byte fails here.
+fn assert_adoption_only_prepends_front_matter(original: &str, adopted: &str, id: &str) {
+    let prefix = adopted.strip_suffix(original).unwrap_or_else(|| {
+        panic!("adoption read changed the body bytes of {id}\nadopted: {adopted:?}")
+    });
+    assert!(
+        prefix.starts_with("---\n"),
+        "adoption did not prepend a front-matter block to {id}: {prefix:?}"
+    );
+    assert_eq!(
+        prefix.lines().filter(|line| *line == "---").count(),
+        2,
+        "adopted front-matter block for {id} is malformed: {prefix:?}"
+    );
+    assert!(
+        prefix.contains(&format!("id: {id}")),
+        "adopted front-matter block for {id} has no id: {prefix:?}"
+    );
+    let close = prefix
+        .find("\n---\n")
+        .unwrap_or_else(|| panic!("front-matter block for {id} is not closed: {prefix:?}"))
+        + "\n---\n".len();
+    assert!(
+        prefix[close..].chars().all(|c| c == '\n'),
+        "adoption added body content beyond the block for {id}: {prefix:?}"
+    );
+}
+
 /// Every `task-<n>` / `m-<n>` form in captured output, ignoring word-internal
 /// matches such as `form-1`.
 fn backlog_id_forms(text: &str) -> Vec<String> {
@@ -744,20 +776,25 @@ fn t98_02_adoption_and_noop_writes_are_byte_identical() {
         "no-op task read/edit changed the file"
     );
 
-    // A legacy task adopts front matter on first read; the second read and an
-    // equal-value write are byte-, mode-, and mtime-identical no-ops.
+    // A legacy task adopts front matter on first read. Adoption adds only the
+    // front-matter block: every byte of the original body is preserved.
     let legacy_task = project.join("backlog/tasks/TASK-010.md");
-    write(
-        &legacy_task,
-        "# TASK-010 Legacy Task\n\n## Status\nDone\n\n## Description\nLegacy task body.\n",
-    );
+    let legacy_task_body =
+        "# TASK-010 Legacy Task\n\n## Status\nDone\n\n## Description\nLegacy task body.\n";
+    write(&legacy_task, legacy_task_body);
     run_ok(&project, &["task", "view", "TASK-010"]);
+    let adopted_text = fs::read_to_string(&legacy_task).unwrap();
+    assert_adoption_only_prepends_front_matter(legacy_task_body, &adopted_text, "TASK-010");
     assert!(
-        fs::read_to_string(&legacy_task)
-            .unwrap()
-            .starts_with("---\nid: TASK-010\n"),
-        "legacy task was not adopted"
+        adopted_text.contains("status: Done"),
+        "adoption did not move the legacy ## Status value into front matter: {adopted_text}"
     );
+    assert!(
+        adopted_text.contains("# TASK-010 Legacy Task"),
+        "adoption read must keep the legacy heading: {adopted_text}"
+    );
+
+    // A repeated adoption read changes no byte, mode, or mtime.
     sleep_until_mtime_can_change();
     let adopted = snapshot(&legacy_task);
     run_ok(&project, &["task", "view", "TASK-010"]);
@@ -766,11 +803,29 @@ fn t98_02_adoption_and_noop_writes_are_byte_identical() {
         adopted,
         "second legacy task read changed the file"
     );
-    // A write to a legacy body retires its title heading and metadata section
-    // (TASK-89 / ADR-0012). That documented first-write transformation is
-    // recorded as a finding against the release notes. Once retired, an
-    // equal-value write is byte-identical.
+
+    // The first write retires the legacy title heading and the `## Status`
+    // metadata section (ADR-0012 decision 4, TASK-89); content sections stay.
     run_ok(&project, &["task", "edit", "TASK-010", "--status", "Done"]);
+    let retired_task = fs::read_to_string(&legacy_task).unwrap();
+    assert!(
+        !retired_task.lines().any(|line| line.starts_with("# ")),
+        "first write left a legacy title heading: {retired_task}"
+    );
+    assert!(
+        !retired_task
+            .lines()
+            .any(|line| line.trim_end() == "## Status"),
+        "first write left the legacy ## Status section: {retired_task}"
+    );
+    assert!(
+        retired_task.contains("## Description\nLegacy task body.\n"),
+        "first write dropped a retained content section: {retired_task}"
+    );
+    assert!(
+        retired_task.contains("status: Done"),
+        "first write lost the front-matter status value: {retired_task}"
+    );
     let canonical = snapshot(&legacy_task);
     run_ok(&project, &["task", "edit", "TASK-010", "--status", "Done"]);
     assert_eq!(
@@ -780,13 +835,22 @@ fn t98_02_adoption_and_noop_writes_are_byte_identical() {
     );
     assert!(legacy_task.exists(), "adoption must not rename the file");
 
-    // A legacy milestone behaves the same way.
+    // A legacy milestone behaves the same way: adoption prepends the block
+    // only, then the first write retires the heading and `## Release`.
     let legacy_ms = project.join("backlog/milestones/MS-010.md");
-    write(
-        &legacy_ms,
-        "# MS-010 Legacy Milestone\n\n## Description\nLegacy milestone body.\n",
-    );
+    let legacy_ms_body = "# MS-010 Legacy Milestone\n\n## Release\nREL-001\n\n## Description\nLegacy milestone body.\n";
+    write(&legacy_ms, legacy_ms_body);
     run_ok(&project, &["milestone", "view", "MS-010"]);
+    let adopted_text = fs::read_to_string(&legacy_ms).unwrap();
+    assert_adoption_only_prepends_front_matter(legacy_ms_body, &adopted_text, "MS-010");
+    assert!(
+        adopted_text.contains("release: REL-001"),
+        "adoption did not move the legacy ## Release value into front matter: {adopted_text}"
+    );
+    assert!(
+        adopted_text.contains("# MS-010 Legacy Milestone"),
+        "adoption read must keep the legacy heading: {adopted_text}"
+    );
     sleep_until_mtime_can_change();
     let adopted = snapshot(&legacy_ms);
     run_ok(&project, &["milestone", "view", "MS-010"]);
@@ -798,6 +862,25 @@ fn t98_02_adoption_and_noop_writes_are_byte_identical() {
     run_ok(
         &project,
         &["milestone", "edit", "MS-010", "--title", "Legacy Milestone"],
+    );
+    let retired_ms = fs::read_to_string(&legacy_ms).unwrap();
+    assert!(
+        !retired_ms.lines().any(|line| line.starts_with("# ")),
+        "first milestone write left a legacy title heading: {retired_ms}"
+    );
+    assert!(
+        !retired_ms
+            .lines()
+            .any(|line| line.trim_end() == "## Release"),
+        "first milestone write left the legacy ## Release section: {retired_ms}"
+    );
+    assert!(
+        retired_ms.contains("## Description\nLegacy milestone body.\n"),
+        "first milestone write dropped a retained content section: {retired_ms}"
+    );
+    assert!(
+        retired_ms.contains("release: REL-001"),
+        "first milestone write lost the front-matter release value: {retired_ms}"
     );
     let canonical = snapshot(&legacy_ms);
     run_ok(
@@ -811,13 +894,13 @@ fn t98_02_adoption_and_noop_writes_are_byte_identical() {
     );
 
     // A legacy document record type adopts front matter on first read and is
-    // then idempotent.
+    // then idempotent; adoption again changes only the prepended block.
     let legacy_spec = project.join("docs/technical/TECH-010.md");
-    write(
-        &legacy_spec,
-        "# TECH-010 Legacy Spec\n\n## Description\nLegacy specification body.\n",
-    );
+    let legacy_spec_body = "# TECH-010 Legacy Spec\n\n## Description\nLegacy specification body.\n";
+    write(&legacy_spec, legacy_spec_body);
     run_ok(&project, &["tech-spec", "view", "TECH-010"]);
+    let adopted_text = fs::read_to_string(&legacy_spec).unwrap();
+    assert_adoption_only_prepends_front_matter(legacy_spec_body, &adopted_text, "TECH-010");
     sleep_until_mtime_can_change();
     let adopted = snapshot(&legacy_spec);
     run_ok(&project, &["tech-spec", "view", "TECH-010"]);

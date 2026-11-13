@@ -6,7 +6,7 @@ title: >-
 status: Implemented
 assignee: []
 created_date: '2026-11-11T20:44:00Z'
-updated_date: '2026-11-13T11:31:00Z'
+updated_date: '2026-11-13T11:37:00Z'
 labels:
   - verification
   - packaging
@@ -147,4 +147,6 @@ Quality-gate follow-up (2026-11-13 12:29 CET):
 (3) TASK-99 upgrade notes were unavailable at verification time (TASK-99 status To Do), so the one-time upgrade procedure was executed from the release specification section 6, the import specification section 11 contract, and the shipped `papyrus import backlog --help`; no TASK-99 wording could be cross-checked. This is recorded in docs/packaging.md and flagged for the TASK-99/TASK-73 owner to confirm once the notes are published.
 (4) Removed the staged package tree target/deb/papyrus_0.1.0_amd64; the built papyrus_0.1.0_amd64.deb remains (1,197,168 bytes, SHA-256 96acf96b672522bbd718dab94552e1e817b1743745a11ad42a5d75744a0985b2). All ./.tmp scratch created by this follow-up was removed.
 (5) Docs-only change; cargo check --all-targets PASS and cargo test PASS (633 passed, 0 failed, 0 ignored, including the 9 release_native_layout_smoke tests). No implementation change was needed.
+
+AC#2 evidence strengthening (2026-11-13 12:37 CET, Debian Forky amd64, rustc/cargo 1.99.1). t98_02_adoption_and_noop_writes_are_byte_identical now asserts, for a legacy task, a legacy milestone, and a legacy technical specification: (a) the adopted file is exactly the prepended front-matter block followed by the original bytes, so every remaining body byte is compared byte-for-byte (any dropped, added, reordered, or re-encoded body byte fails); the block opens/closes with --- and carries the record id, nothing beyond the block is added, and the legacy heading and metadata values are still present after the read; (b) the first write removes every level-1 title heading and the ## Status / ## Release metadata section, keeps the ## Description content section and its body, and keeps the moved front-matter status/release values; the subsequent equal-value write is then byte-, mode-, and mtime-identical. The prior assertions (native equal-value read/write identity with no byte, mode, or mtime change, and non-zero exit with byte-identical file on failed adoption) are retained. docs/packaging.md TASK-98 now states these exact assertions in the Adoption / no-op identity bullet and the F-98-1 resolution text; the earlier broader wording was replaced rather than re-explained. Gates re-run after the change: cargo build --release PASS; cargo test PASS = 633 passed, 0 failed, 0 ignored, including the 9 release_native_layout_smoke tests and tests/no_drift.rs; cargo clippy --all-targets -- -D warnings PASS (0 warnings); cargo fmt --check PASS. Test-only and documentation change; no src/ change, no new dependency.
 <!-- SECTION:NOTES:END -->

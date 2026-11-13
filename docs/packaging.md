@@ -1270,17 +1270,20 @@ release are **not claimed or verified**; no other architecture is claimed.
 
 Observed results:
 
-- **Adoption / no-op identity** — an adoption read of a legacy task, a legacy
-  milestone, and a legacy technical specification added only the front-matter block
-  and left every remaining body byte unchanged. A record that already carried
+- **Adoption / no-op identity** — `t98_02_adoption_and_noop_writes_are_byte_identical`
+  asserts both record states explicitly. **Adoption read:** for a legacy task, a
+  legacy milestone, and a legacy technical specification, the adopted file must be
+  exactly the prepended front-matter block followed by the original bytes, so every
+  remaining body byte is compared byte-for-byte; the block must open and close with
+  `---` and carry the record's `id`, and nothing beyond the block may be added. The
+  legacy title heading, the `## Status`/`## Release` sections, and the content
+  sections are still present after the read. **First write:** the first write to the legacy record must
+  remove every level-1 title heading and the `## Status`/`## Release` metadata
+  section, keep the `## Description` content section and its body, and keep the moved
+  front-matter values; the following equal-value write must then be byte-, mode-, and
+  mtime-identical, with `updated_date` not refreshed. A record that already carried
   native front matter was read twice and written with equal values without changing
-  any byte, mode, `updated_date`, or mtime; the same identity held for every read
-  and equal-value write after a legacy record's first write. The first write to a
-  legacy record retired its legacy title heading and metadata sections per ADR-0012
-  decision 4 (the documented TASK-89 behaviour), after which the file was native
-  front-matter-only and every further read and equal-value write was byte-identical.
-  `t98_02_adoption_and_noop_writes_are_byte_identical` asserts this documented
-  retirement plus post-retirement identity. A read-only directory failed adoption
+  any byte, mode, `updated_date`, or mtime. A read-only directory failed adoption
   with a non-zero exit and left the file byte-identical.
 - **No Backlog-shaped write** — after create, edit, archive, restore, deprecate,
   adopt, and import, every written record path was `<ID>.md` (decisions
@@ -1386,11 +1389,13 @@ Observed results:
   the first write to a legacy body retires its title heading and metadata section
   (documented by TASK-89 in `task-management.md` and
   `milestone-and-release-management.md`), so that first write is not byte-identical;
-  after retirement, equal-value writes are byte-identical. The new test asserts the
-  documented retirement plus post-retirement identity. **Resolved in the quality-gate
-  wording fix:** AC#2 and specification §2.2 now state adoption-read identity,
-  native equal-value write identity, and the documented first-write retirement; the
-  shipped assertion already matched and no implementation change was needed.
+  after retirement, equal-value writes are byte-identical. The new test asserts
+  adoption-read byte-for-byte body identity, the documented first-write retirement
+  (level-1 heading and metadata sections removed, content sections kept), and
+  post-retirement identity. **Resolved in the quality-gate wording fix:** AC#2 and
+  specification §2.2 now state adoption-read identity, native equal-value write
+  identity, and the documented first-write retirement; the strengthened `t98_02`
+  assertions match the reworded criteria, and no implementation change was needed.
 - **Finding F-98-2 (for TASK-73).** The browser has no search endpoint; the release
   specification's "CLI and browser" search wording is satisfied only by the CLI
   search plus the browser record view/API exposure of the matching metadata.
