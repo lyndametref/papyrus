@@ -3,7 +3,7 @@ id: doc-1
 title: Papyrus Feature Roadmap
 type: specification
 created_date: '2026-11-04T19:22:00Z'
-updated_date: '2026-11-13T16:17:00Z'
+updated_date: '2026-11-13T21:29:00Z'
 ---
 # Papyrus Feature Roadmap
 
@@ -26,6 +26,7 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 - m-15: Use Cases and Test Documentation — manage use cases, test cases, and test reports from the CLI (TASK-78), search (TASK-80), browser exposure (TASK-81), design review mockup (TASK-79), packaging and verification (TASK-82). Should-have document types (REQ-05.012/013/014); lifecycle active → deprecated; front-matter required. Placed before Release 1.0.
 - m-14: Release 1.0 — two tasks, both Low priority: the release-level upgrade notes TASK-99 (ordinal 39160) and the release gate TASK-73 (labelled release, ordinal 40000, last). m-14 holds no implementation or specification work and stays open and isolated so more requirements can be added before 1.0 without redefining the gate. Closing it requires the feature milestone m-16 to be fully Done plus TASK-20 (m-12) and TASK-82 (m-15), with build/tests passing and the security audit complete; TASK-104 (m-16) is part of the feature milestone and must be accepted by the gate before it closes.
 - m-16: Release 1.0 - Native Layout, Import, and Browser Refinements — the extension feature milestone, 20 tasks, all High priority: specifications TASK-83 to TASK-86, design review TASK-87, native layout TASK-88, task and milestone adoption TASK-89, relocation TASK-90, init/config TASK-91, cursor-driven init walkthrough conformance TASK-104 (ordinal 39085, directly after TASK-91), import TASK-92, browser surfaces TASK-93 to TASK-96, serializer removal TASK-97, backlog kanban board specification TASK-101, mockup revision TASK-102 and implementation TASK-103, verification and packaging TASK-98. Placed before the release milestone; TASK-73 depends on its final tasks.
+- m-17: Config-Defined Document Types and Artifact Categories — REQ-07.001/002/003/004 plus REQ-06.014 and the REQ-01.002 list-valued keys; one feature milestone after Release 1.0, thirteen tasks TASK-105 to TASK-117, all High priority, ordinals 41000-41110. Delivers the runtime artifact registry and descriptors, the dynamic `papyrus <slug>` family with `status`, fail-closed `document_types` validation and repair, the generic content model, registry-derived search and browser views, init defaults without `deploy`, and the upgrade documentation. Man-page work is excluded: ADR-0021 is Proposed and NFR-03.003 remains a recorded release risk. No release gate is created; whether this ships as Release 1.1 or folds into an open release is an owner decision.
 
 ## Removed
 
@@ -179,3 +180,71 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 - Specification drift found while checking coverage: `docs/specifications/interactive-init-walkthrough-for-artifact-activation.md` section 2 states only a space-toggle list without the cursor contract, section 1.2 says prompts are read line-by-line, and section 4.4 keeps `y`/`yes`/`n`/`no` activation prompts. Correlating the specification with the requirement is an acceptance criterion of TASK-104 rather than a separate specification task, because the text changes only describe the one implementation being corrected.
 - Requirement coverage: REQ-01.006 -> TASK-85 (specification), TASK-91 (delivered walkthrough), TASK-104 (cursor-driven conformance). REQ-01.001 and REQ-01.007 remain covered by TASK-91 and are unchanged; BR-016 behavior (only activated types enabled) is unchanged.
 - No other roadmap item changes: milestones, priorities, ordinals of existing tasks, and all other requirement coverage are unaffected.
+
+## Requirement change update (2026-11-13) — artifact categories and config-defined document types
+
+- Changed requirement set (validated, all Pass): REQ-07.001 Artifact categories and status model, REQ-07.002 Configure document types and slugs, REQ-07.003 Dispatch config-defined document commands, REQ-07.004 Generic content model, REQ-06.014 Browser views for config-defined types, and the REQ-01.002 list-valued configuration keys. Architecture: ADR-0016 to ADR-0020 and ADR-0022 to ADR-0024 accepted 2026-11-13. ADR-0021 (man pages) is Proposed and deferred by the owner; no man-page work is planned, and NFR-03.003 is recorded as a release risk.
+- Roadmap entry (owner top priority): **Config-defined document types**, one ordered feature spanning registry/descriptors, command dispatch, configuration validation and repair, the generic document handler, search, browser, init defaults, tests, and documentation. Source requirement IDs: REQ-07.001, REQ-07.002, REQ-07.003, REQ-07.004, REQ-06.014, REQ-01.002. Rationale: the four current partial models (record descriptors, per-type clap enums, browser Category, hard-coded search keys) make a configured type unreachable; one registry-backed model is the only way to satisfy "add a type without code" consistently across every surface.
+- Milestone decision: a single feature milestone, **m-17 Config-Defined Document Types and Artifact Categories**. It is not merged into m-14 (release-only) or m-16 (Release 1.0 feature scope, delivered): this is an artifact-model change after Release 1.0, and a second milestone would only split one coherent increment. No release milestone or release ticket is created; the release vehicle is an owner decision (see Open Questions).
+- Task set (13 tasks, all High priority, all To Do): TASK-105 registry and descriptors; TASK-106 ADR-0019 correction; TASK-107 record-layer archive/status refactor; TASK-110 generic document handler; TASK-108 command-tree cutover, built-in table, help, static command and `nfreq` removal; TASK-109 fail-closed configuration validation and repair mode; TASK-111 list-valued configuration keys; TASK-112 init defaults and status seeding; TASK-113 search integration; TASK-114 browser registry-derived views and filters; TASK-115 business-rule updates; TASK-116 upgrade notes and README; TASK-117 cross-surface and packaged verification.
+
+### Task order
+
+| Ordinal | Task | Depends on | Assignee |
+|---|---|---|---|
+| 41000 | TASK-105 Introduce the artifact registry and type descriptors | — | rust-dev |
+| 41005 | TASK-106 Correct the stale stricter-than-requirement notes in ADR-0019 | — | architect |
+| 41010 | TASK-107 Refactor the record layer for document archive and status | TASK-105 | rust-dev |
+| 41020 | TASK-110 Implement the generic document handler for every document type | TASK-105, TASK-107 | rust-dev |
+| 41030 | TASK-108 Replace static document commands with registry-derived dispatch | TASK-105, TASK-110 | rust-dev |
+| 41040 | TASK-109 Validate document-type configuration fail-closed with a repair mode | TASK-105, TASK-108 | rust-dev |
+| 41050 | TASK-111 Support list-valued configuration keys in config set, get, and list | TASK-109 | rust-dev |
+| 41060 | TASK-112 Update init defaults and seed document statuses | TASK-105, TASK-109 | rust-dev |
+| 41070 | TASK-113 Integrate config-defined document types into search | TASK-107, TASK-110 | rust-dev |
+| 41080 | TASK-114 Serve registry-derived browser views for every enabled document type | TASK-109, TASK-110 | rust-dev |
+| 41090 | TASK-115 Update business rules for artifact categories and config-defined document types | TASK-108, TASK-109, TASK-110, TASK-111, TASK-112 | business-analyst |
+| 41100 | TASK-116 Write upgrade notes and align the README with dynamic document commands | TASK-108, TASK-109, TASK-111, TASK-112, TASK-114, TASK-115 | tech-writer |
+| 41110 | TASK-117 Verify the config-defined document type release end to end and in the package | TASK-110, TASK-112, TASK-113, TASK-114, TASK-116 | rust-dev |
+
+### Ordering rationale
+
+- The registry (TASK-105) is first because every later surface consumes its descriptor set. The ADR-0019 correction (TASK-106) is independent and can run in parallel; it is not allowed to change an architecture decision.
+- The record layer (TASK-107) changes the storage and status contract before any handler, browser, or search code consumes it. The generic handler (TASK-110) then implements the baseline family against that contract.
+- The command-tree cutover (TASK-108) follows the handler so `document::run` exists before the static variants are deleted. Static commands and the `nfreq` alias are removed in the same task; keeping them beside the dynamic tree would create duplicate names and an ambiguous help surface.
+- Validation (TASK-109) follows the cutover because its reserved-name set is `cli::BUILTIN_COMMANDS`. List values (TASK-111) and init defaults (TASK-112) follow validation because both must validate the configuration they produce.
+- Search (TASK-113) and browser (TASK-114) follow the record layer and handler. The browser also follows validation because it cannot start on an invalid configuration. They can proceed in parallel.
+- Business rules (TASK-115) follow the delivered CLI/config/handler behavior; upgrade notes and README (TASK-116) follow the rules and the browser surface. Verification (TASK-117) is last and re-runs the cross-surface and packaged scenarios.
+
+### Dependency and ordering rules
+
+- All dependencies are inside m-17; no m-17 task depends on m-14, m-16, or a later milestone. The Release 1.0 gate and its archived release ticket are unaffected.
+- The `--help` surface must not change before TASK-108. No earlier task may add, hide, or rename a top-level command; TASK-105 to TASK-107 and TASK-110 are internal.
+- TASK-108 is the single cutover: the dynamic tree, the built-in table, generated help, the removal of the eleven static document variants, and the removal of `nfreq` land together.
+- TASK-109 is the only validator; TASK-111 and TASK-112 may not add a second validation path. TASK-114 and the startup path consume its result.
+- No task may reference `deprecated/`, a document restore, or a static per-type command after TASK-107 and TASK-108; TASK-117 enforces the no-drift rule.
+
+### Coverage
+
+- REQ-07.001 — TASK-105 (category and status models), TASK-107 (main status, archive operation, no restore, tolerant read), TASK-110 (status command), TASK-114 (status display and filter), TASK-115 (rules).
+- REQ-07.002 — TASK-105 (document_types model), TASK-109 (slug/prefix/directory/status validation, duplicate keys, whole-map, repair), TASK-111 (list values), TASK-112 (default set without deploy), TASK-108 (slug dispatch and help), TASK-115 (BR-016).
+- REQ-07.003 — TASK-108 (dynamic command family, help, exit 2, static removal), TASK-110 (baseline verbs and extensions), TASK-112 (default entries usable as commands), TASK-115 (BR-001), TASK-117 (CLI verification).
+- REQ-07.004 — TASK-105 (generic descriptor), TASK-110 (generic content model and ID/path rules), TASK-114 (generic browser views), TASK-117 (end-to-end).
+- REQ-06.014 — TASK-114 (list/detail/edit, status filter, visibility), TASK-113 (search visibility), TASK-117 (browser verification).
+- REQ-01.002 — TASK-105 (config fields), TASK-109 (load/repair), TASK-111 (list-valued set/get), TASK-112 (init output).
+- NFR-02.002 and NFR-04.002 — TASK-109 (reject-only validation and containment); NFR-01.003 — TASK-114 offline views; NFR-03.003 — no task, release risk recorded by TASK-116 and TASK-117.
+
+### Risks and sequencing notes
+
+- **Help surface:** changes only in TASK-108, in one commit sequence. Any documentation or test that asserts the old static command list must change there, not earlier.
+- **NFR-03.003:** config-defined slugs have no man page. ADR-0021 is Proposed and deferred, so the release notes must not claim compliance for those slugs; TASK-116 records the gap and TASK-117 verifies the package without asserting such a page.
+- **Upgrade data:** `deprecated/` folders become inert and are not migrated; users must move files and edit metadata by hand. This is accepted by REQ-05.007/ADR-0022 and must be prominent in the upgrade notes.
+- **Configuration break:** whole-map `document_types` removes the implicit default merge, and `deploy` disappears from new and existing effective sets unless declared. The aggregated validator message and `init --force` are the recovery path.
+- **Parallel work:** after TASK-109, TASK-111 and TASK-112 can run in parallel; TASK-113 and TASK-114 can run in parallel; TASK-115 can run alongside TASK-113/TASK-114 once TASK-108/109/110/111/112 are done.
+- **Split candidates during refinement:** TASK-108 (tree + help + removal), TASK-110 (handler + typed delegation), TASK-114 (4.4k-line browser refactor), and TASK-117 (five test surfaces + packaging). TASK-109 can split validation from repair mode if the change set is too large for one review.
+
+### Open questions
+
+- Release vehicle: whether m-17 ships as Release 1.1 or folds into an open release. No release milestone or ticket is created until the owner decides.
+- ADR-0021: man-page generation and the NFR-03.003 interpretation remain undecided. No man-page task is created; TASK-116 and TASK-117 only record the risk.
+- Specification pages that describe static per-type commands and per-category browser pages will be stale after TASK-108 and TASK-114. No specification task was in the requested scope; decide whether to add one before implementation or accept the ADRs and business rules as the contract.
+- REQ-06.014 leaves navigation grouping and display names open; TASK-114 follows ADR-0020's grouped default and slug-derived labels.

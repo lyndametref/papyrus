@@ -26,7 +26,8 @@ Sensible defaults are kept for non-interactive/CI environments: interactive mode
 - Prompts show the default in brackets and accept it with empty input.
 - Choices are validated: an ID prefix must be non-empty, contain no control characters, and contain no path separators; a folder must be non-empty, relative, and free of traversal segments and backslashes.
 - An invalid prefix or folder is rejected and re-prompted with a hint naming the default equivalent value (for example `invalid prefix; use TASK`).
-- The offered artifact set is task, milestone, release, the decision types (`adr`, `bdr`), and the document types defined in the configuration schema (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `deploy`, `tech-spec`, `use-case`, `test-case`, `test-report`), with the schema defaults as default selections.
+- The offered artifact set is task, milestone, release, the decision types (`adr`, `bdr`), and the default document types (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`), with the defaults as default selections (REQ-07.002).
+- The walkthrough offers only the default set; a document type added after initialization is configured by editing `papyrus.config.yml` or with `papyrus config set`, not through the walkthrough.
 - Interactive mode runs only when standard input is a terminal (TTY); otherwise the walkthrough is skipped and defaults are written without prompting (all artifacts activated, default prefixes/folders, `id_padding` 3), and no new CLI flag or environment variable is required.
 - `--force` and `--no-git` continue to behave as documented (REQ-01.001).
 - The generated configuration validates successfully (including `id_padding` range, REQ-01.007).
@@ -47,3 +48,4 @@ Sensible defaults are kept for non-interactive/CI environments: interactive mode
 - BR-018 — Use Case Document Type Behavior, BR-019 — Test Case Document Type Behavior, BR-020 — Test Report Document Type Behavior (document types offered in the list)
 - docs/specifications/interactive-init-walkthrough-for-artifact-activation.md — Interactive Init Walkthrough for Artifact Activation
 - Maintainer decision 2026-11-13 (validation): the list highlight starts on the first selectable artifact; the offered document-type set includes `use-case`, `test-case`, and `test-report` because the configuration schema defaults enable them; core-artifact prefixes are prompted even though core rows are never highlighted.
+- Project-owner decision 2026-11-13 (D2): `deploy` is removed from the default document-type set, so the walkthrough no longer offers it; custom document statuses are not part of the walkthrough (REQ-07.002).

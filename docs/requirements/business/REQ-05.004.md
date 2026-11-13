@@ -10,13 +10,16 @@ REQ-05 Project Documentation Management
 Must have
 
 ## Description
-The user can create a UI specification with a title, associated view, and description; list, view, and edit it; and deprecate or restore it. Deprecated specifications are hidden from lists, search, and the web UI, and restored records retain their IDs.
+The user can create a UI specification with a title, associated view, and description; list, view, and edit it; and archive or delete it under the common document rules (REQ-05.007). Archived specifications are hidden from lists, search, and the web UI, and archiving preserves their IDs.
 
 ## Acceptance Criteria
 - A UI specification can be created with the required title, view, and description.
 - UI specifications can be listed, viewed, and edited for view and description.
-- Deprecation hides a specification from lists, search, and the web UI.
-- Restoration returns a specification to its original folder with its ID preserved.
+- Archiving hides a specification from lists, search, and the web UI, moves it to the type's `archived/` subfolder, and preserves its ID (REQ-05.007).
+- Deleting a specification permanently removes it under the document deletion rules (REQ-05.007).
 
 ## Traceability
 - README.md, `papyrus(1)` → COMMANDS → ui-spec and Documents lifecycle (lines 566–610, 778–784)
+- Project-owner decision 2026-11-13: document state `archived` replaces `deprecated`, and no restore command exists (REQ-05.007).
+- REQ-05.007 — Manage Document Archive State and Deletion
+- REQ-07.002 — Configure Document Types and Slugs

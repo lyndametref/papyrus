@@ -10,7 +10,7 @@ REQ-01 Project Setup and CLI Access
 Must have
 
 ## Description
-Papyrus generates record IDs automatically. IDs remain stable across archive/restore and deprecate/restore cycles. Configurable prefixes and padding determine the format for task, milestone, and release IDs; the man page gives `TASK-001`, `MS-001`, and `REL-001` as default examples.
+Papyrus generates record IDs automatically. IDs remain stable across archive/restore cycles for tasks and milestones and across archiving for documents. Configurable prefixes and padding determine the generated ID format: task, milestone, and release IDs, and records of a document type that uses the generic content model, whose IDs use that type's `prefix` with the shared `id_padding` (REQ-07.004). Document types with type-specific content keep their documented ID forms, such as the hierarchical `REQ-XX.XXX` of business requirements (REQ-05.001). The man page gives `TASK-001`, `MS-001`, and `REL-001` as default examples.
 
 Papyrus keeps a single ID space. The Papyrus ID is the record identity everywhere: in the front-matter `id`, in the CLI and browser output, and as command input. Papyrus does not maintain a second, tool-specific storage ID and does not translate between ID spaces, because file-level interoperability with Backlog.md is renounced (NFR-04.004); the on-disk file-name convention is an architecture decision. Records brought into Papyrus by the one-way Backlog.md import script (NFR-04.004) receive Papyrus IDs on import, and no Backlog.md ID is accepted as command input.
 
@@ -18,8 +18,9 @@ The `id_padding` configuration is constrained to 1-6 characters (REQ-01.007). Va
 
 ## Acceptance Criteria
 - Creating a supported record automatically assigns it an ID.
-- Archiving and restoring a record, or deprecating and restoring a document, does not change its ID.
+- Archiving a document, or archiving and restoring a task or milestone, does not change its ID; documents have no restore command (REQ-05.007).
 - With default configuration, task, milestone, and release IDs use the documented prefixes and three-digit examples (`TASK-001`, `MS-001`, `REL-001`); the configured prefix and padding control their format.
+- A record of a document type that uses the generic content model is identified by its type's configured `prefix` and the configured `id_padding`, following the same padding rules (REQ-07.004).
 - Papyrus uses a single ID space: the same Papyrus ID is written to the front-matter `id` and displayed by CLI and browser output, and it is the only accepted command input form for that record.
 - No Backlog.md storage ID (for example `task-18` or `m-0`) is treated as a Papyrus record identity or accepted as command input.
 - Records imported from a Backlog.md store receive Papyrus IDs; the import does not create or preserve a parallel Papyrus-visible ID space.
@@ -33,4 +34,7 @@ The `id_padding` configuration is constrained to 1-6 characters (REQ-01.007). Va
 - Maintainer decision 2026-11-11: file-level Backlog.md compatibility is renounced, so Papyrus IDs are the only record identity on disk and in commands. This supersedes the 2026-11-08 dual-ID-space and CLI-ID-input decisions and ADR-0008's storage-ID translation; ADR-0008 is still referenced only for the display-width resolution (padding is a minimum).
 - ADR-0008 — Adopt the Backlog.md On-Disk Layout for Task and Milestone Records (display-width resolution only)
 - REQ-05.010 — Record Metadata in YAML Front Matter (`id` in front matter)
+- REQ-05.001 — Manage Business Requirements (hierarchical type-specific ID form)
+- REQ-05.007 — Manage Document Archive State and Deletion (archive, no restore)
+- REQ-07.004 — Provide a Generic Content Model for Config-Defined Document Types (`prefix` + `id_padding`)
 - REQ-01.007 — ID Padding Constraint for File IDs

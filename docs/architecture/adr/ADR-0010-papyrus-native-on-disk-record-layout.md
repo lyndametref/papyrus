@@ -2,11 +2,11 @@
 
 ## Status
 
-Accepted — approved by explicit user confirmation on 2026-11-11
+Superseded by ADR-0023 on 2026-11-13 — ADR-0023 restates the native layout and identity contract with `archived/` as the only inactive document location (no `deprecated/` read or migration, no document restore) and the current front-matter field map, so this ADR's deprecate/restore clauses and its allocation scope are no longer in force. Body frozen; the still-valid path, identity, naming, resolution, relocation, import, and atomic-move decisions are restated in ADR-0023.
 
 ## Date
 
-2026-11-11 (status: Accepted, 2026-11-11)
+2026-11-11 (status: Accepted, 2026-11-11; status: Superseded, 2026-11-13)
 
 ## Context
 

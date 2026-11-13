@@ -10,14 +10,18 @@ REQ-03 Milestone and Release Planning
 Must have
 
 ## Description
-The user can create, list, view, and edit releases. A release has a title and may have a description. A release may contain multiple milestones, while each milestone may be assigned to zero or one release. Release IDs use the configured prefix and padding (default example `REL-001`). The release lifecycle is `active -> released`: `released` represents delivery completion and is distinct from archiving (record management); releases are not archived. The transition from `active` to `released` is performed by an explicit status command, `papyrus release edit ... --status released`; `released` is a stored release attribute, not derived from milestone or task completion.
+The user can create, list, view, edit, and close releases. A release has a title and may have a description. A release may contain multiple milestones, while each milestone may be assigned to zero or one release. Release IDs use the configured prefix and padding (default example `REL-001`).
+
+The release lifecycle is fixed by the backlog category (REQ-07.001): `planned -> released`. A release starts `planned`, is stored with its lifecycle state in the front-matter `status` field (REQ-05.010), and becomes `released` through `papyrus release close <id>`. `released` represents delivery completion and is distinct from archiving; releases are not archived. There is no configurable release status list, no `--status` edit option, and no release restore command.
 
 ## Acceptance Criteria
 - The documented release commands create, list, view, and edit release title and description.
 - A release can be associated with multiple milestones, and each milestone is associated with at most one release.
 - With default settings, a generated release ID follows the `REL-001` format.
-- The release lifecycle is documented as `active -> released`; `released` is delivery completion, distinct from archiving, and releases are not archived.
-- The active-to-released transition is performed explicitly via `papyrus release edit ... --status released`, and `released` is stored as a release attribute rather than derived from milestone or task completion.
+- A release starts `planned` and its lifecycle state is stored in the front-matter `status` field.
+- `papyrus release close <id>` changes the release from `planned` to `released`.
+- The release lifecycle is documented as `planned -> released`; `released` is delivery completion, distinct from archiving, and releases are not archived.
+- The lifecycle is not configurable, no `--status` option performs the transition, and no restore command exists.
 
 ## Traceability
 - README.md, `papyrus(1)` → COMMANDS → release (lines 279–305), STATUSES → Releases (lines 737–741)
@@ -26,3 +30,7 @@ The user can create, list, view, and edit releases. A release has a title and ma
 - docs/domain-model/object-model/business-object-model.md — Release object description lifecycle wording
 - docs/specifications/release-lifecycle.md — Release Lifecycle Semantics
 - README.md, `papyrus-config(5)` → General keys (lines 949–962)
+- Project-owner decision 2026-11-13: release lifecycle is `planned -> released`, transitioned by `papyrus release close <id>`; the state is stored in front matter; the `--status released` option is removed.
+- REQ-05.010 — Record Metadata in YAML Front Matter (release `status`)
+- REQ-07.001 — Organize Artifacts into Three Categories
+- BR-007 — release Command Behavior (needs revision: close replaces `--status released`)

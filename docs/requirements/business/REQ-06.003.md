@@ -1,7 +1,7 @@
 # REQ-06.003 Describe Managed Artifacts and Their Lifecycles in the Browser
 
 ## User Story
-As a project contributor, I want a browser page that describes every artifact and document managed in the project and its lifecycle so that I can understand what each record type is and how it moves through its states.
+As a project contributor, I want a browser page that describes every artifact and document type managed in the project and its lifecycle so that I can understand what each record type is and how it moves through its states.
 
 ## Group
 REQ-06 Search and Local Web Interface
@@ -10,32 +10,45 @@ REQ-06 Search and Local Web Interface
 Should have
 
 ## Description
-The local web interface provides a page that describes the artifact and document types managed in the current project, with one section per type, and explains the lifecycle of each type. The page covers a fixed set of record types: tasks, milestones, releases, decisions, business requirements, non-functional requirements, glossary terms, UI specifications, technical specifications, UI mockups, business rules, and audit records. The set is fixed by this requirement and is not derived from the configured `document_types`. The task section's states and transitions are derived from the configured statuses (REQ-01.002); every other type uses the lifecycle documented for that type. Backlog.md `docs`, `drafts`, and project configuration files are not covered. The page route, navigation entry, and format are design decisions and are not constrained by this requirement. Each section provides a good description of its artifact on top of the lifecycle and the existing status, and represents the configuration associated to that artifact.
+The local web interface provides a page that describes the artifact and document types managed in the current project, with one section per type, and explains the lifecycle of each type. The page covers the three artifact categories (REQ-07.001):
 
-Description text is curated content shipped with the browser: it is written for the page, works offline (NFR-01.003), and is not derived from requirement files, from record content, or from configuration. The configuration shown per section is read-only and consists of the artifact's effective `enabled` state, its ID prefix, and its storage folder; the task section additionally presents the configured statuses. Configuration values on this page are display-only: changes are made only through the browser configuration view (REQ-06.008).
+- **backlog** — tasks, milestones, and releases.
+- **decision** — decision records.
+- **document** — every document type declared in `document_types`, enabled or not, including the default entries and any type added by configuration (REQ-07.002).
+
+The document sections are therefore derived from the effective configuration and are not a fixed list. The task section's states and transitions are derived from the configured statuses (REQ-01.002); the milestone section shows the fixed `open -> closed` lifecycle; the release section shows the fixed `planned -> released` lifecycle; the decision section shows the five Nygard statuses (REQ-04.001); every document section shows the main `active -> archived` storage lifecycle (REQ-05.007) together with the custom statuses declared for that type (REQ-07.002), and the UI mockup section shows `pending -> approved -> archived` (REQ-05.008). Backlog.md `docs`, `drafts`, and project configuration files are not covered. The page route, navigation entry, and format are design decisions.
+
+Each section provides a good description of its artifact on top of the lifecycle and the existing status, and represents the configuration associated to that artifact. Description text is curated content shipped with the browser for the default types, works offline (NFR-01.003), and is not derived from requirement files, record content, or configuration; a document type added by configuration is described by the shared document lifecycle and its configured prefix and folder, since no curated text is shipped for it. The configuration shown per section is read-only and consists of the artifact's effective `enabled` state, its ID prefix, and its storage folder; the task section additionally presents the configured task statuses, and a document section presents the statuses declared for that document type. Configuration values on this page are display-only: changes are made only through the browser configuration view (REQ-06.008).
 
 ## Acceptance Criteria
-- The local web interface serves a page that describes every managed artifact/document type in a separate section.
-- The page covers tasks, milestones, releases, decisions, business requirements, non-functional requirements, glossary terms, UI specifications, technical specifications, UI mockups, business rules, and audit records.
-- The covered set is fixed and does not change with the configured `document_types`.
+- The local web interface serves a page that describes every managed artifact and document type in a separate section, grouped by the three artifact categories.
+- The page covers tasks, milestones, releases, decision records, and every document type declared in `document_types`, including types added by configuration.
+- The document sections are derived from the effective configuration and are not a fixed list.
 - The task section's states and transitions reflect the configured task statuses.
-- Each other section explains the lifecycle documented for its type, including the states and the transitions between states, and agrees with that type's lifecycle requirements (REQ-03.002, REQ-04.001, REQ-05.007).
+- The milestone section shows the fixed `open -> closed` lifecycle and the release section the fixed `planned -> released` lifecycle.
+- The decision section shows `proposed`, `accepted`, `rejected`, `deprecated`, and `superseded` with the documented transitions.
+- Every front-matter-backed document section shows the main `active -> archived` storage lifecycle and the custom statuses declared for that type; the UI mockup section shows `pending -> approved -> archived`.
 - Backlog.md `docs` and `drafts` records and project configuration files are not described by the page.
 - Each section provides a good description of its artifact on top of its lifecycle and existing status.
-- Each section shows the artifact's effective `enabled` state, ID prefix, and storage folder; the task section also shows the configured statuses.
+- Each section shows the artifact's effective `enabled` state, ID prefix, and storage folder; the task section also shows the configured task statuses, and each document section shows its declared custom statuses.
+- A document type added by configuration is described by the shared document lifecycle and its configured prefix and folder, without requiring curated description text.
 - Description text is curated static content shipped with the browser and does not depend on requirement files, record content, configuration, or an internet connection.
 - Configuration values on this page are read-only; changing them is done through the browser configuration view (REQ-06.008).
 
 ## Traceability
 - Source: customer-feedback handoff — Internal team discussion, Item 5 (medium), raw quote:
   - "on the browser add a page describing all the artifacts/document managed in the current project (one section each) and explain the life cycle of each type"
-- User decision 2026-11-08: fixed record-type set independent of configured `document_types`, task states derived from configured statuses, other types use their documented lifecycles, route/format left to design.
+- User decision 2026-11-08: task states derived from configured statuses, other types use their documented lifecycles, route/format left to design.
 - Maintainer decision 2026-11-11: descriptions are curated static browser content (offline); per-section configuration is read-only (enabled, prefix, folder, plus statuses for tasks) and edits happen only in REQ-06.008.
+- Project-owner decision 2026-11-13 (Item 10 refinement): the page follows the three-category model and derives document sections from `document_types` instead of a fixed record-type list; the earlier "fixed set independent of configured document_types" decision is superseded.
+- Project-owner decision 2026-11-13 (D5): document sections show the main `active -> archived` storage lifecycle plus the custom statuses declared for the type, which are front-matter values only (REQ-07.001).
 - REQ-01.002 — Read and Edit Project Configuration (configured task statuses)
+- REQ-02 — Task and Board Management
+- REQ-03.001 — Manage Milestones, REQ-03.002 — Manage Releases
+- REQ-04.001 — Create and Inspect Decisions
+- REQ-05.007 — Manage Document Archive State and Deletion
+- REQ-05.008 — Manage UI Mockups
 - REQ-06.002 — Serve the Local Web Interface
-- REQ-05 — Project Documentation Management (managed record types)
-- REQ-02 — Task and Board Management (task lifecycle)
-- REQ-03.002 — Manage Releases (release lifecycle)
-- REQ-04.001 — Create and Inspect Decisions (decision statuses)
-- REQ-05.007 — Manage Documentation Record Lifecycle
+- REQ-07.001 — Organize Artifacts into Three Categories
+- REQ-07.002 — Configure Document Types and Slugs
 - NFR-01.002 — Display, View, and Edit All Papyrus Content in a Local Browser

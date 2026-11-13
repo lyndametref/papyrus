@@ -10,13 +10,16 @@ REQ-05 Project Documentation Management
 Must have
 
 ## Description
-The user can create glossary terms with a term and definition, list and view terms, edit either field, and deprecate or restore terms. Deprecated terms are hidden from lists, search, and the web UI; restored terms retain their IDs.
+The user can create glossary terms with a term and definition, list and view terms, and edit either field. Terms can be archived and deleted under the common document rules (REQ-05.007). Archived terms are hidden from lists, search, and the web UI, and archiving preserves their IDs.
 
 ## Acceptance Criteria
 - A glossary term can be created with the required term and definition.
 - Terms can be listed, viewed, and edited for term and definition.
-- Deprecation hides a term from lists, search, and the web UI.
-- Restoration returns a term to its original folder with its ID preserved.
+- Archiving hides a term from lists, search, and the web UI, moves it to the type's `archived/` subfolder, and preserves its ID (REQ-05.007).
+- Deleting a term permanently removes it under the document deletion rules (REQ-05.007).
 
 ## Traceability
 - README.md, `papyrus(1)` → COMMANDS → glossary and Documents lifecycle (lines 520–564, 778–784)
+- Project-owner decision 2026-11-13: document state `archived` replaces `deprecated`, and no restore command exists (REQ-05.007).
+- REQ-05.007 — Manage Document Archive State and Deletion
+- REQ-07.002 — Configure Document Types and Slugs

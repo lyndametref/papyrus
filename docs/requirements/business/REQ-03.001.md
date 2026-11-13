@@ -10,14 +10,23 @@ REQ-03 Milestone and Release Planning
 Must have
 
 ## Description
-The user can create, list, view, edit, archive, and delete milestones. A milestone has a title, optional description, and may be assigned to zero or one release. Milestone IDs use the configured prefix and padding (default example `MS-001`). The man page specifies archive but does not describe a milestone restore command.
+The user can create, list, view, edit, close, and delete milestones. A milestone has a title, optional description, and may be assigned to zero or one release. Milestone IDs use the configured prefix and padding (default example `MS-001`).
+
+The milestone lifecycle is fixed by the backlog category (REQ-07.001): `open -> closed`. A milestone starts `open`, is stored with its lifecycle state in the front-matter `status` field (REQ-05.010), and becomes `closed` through `papyrus milestone close <id>`. There is no configurable milestone status list and no milestone restore command. Deleting a milestone permanently removes it, with `--force` skipping confirmation.
 
 ## Acceptance Criteria
 - The documented milestone commands create, list, view, and edit milestones, including title, description, and optional release assignment.
 - A milestone can be assigned to no more than one release.
-- Archive marks a milestone archived; delete permanently deletes it, with `--force` skipping confirmation.
+- A milestone starts `open` and its lifecycle state is stored in the front-matter `status` field.
+- `papyrus milestone close <id>` changes the milestone from `open` to `closed`.
+- The milestone lifecycle is fixed to `open -> closed`; it is not configurable and has no restore command.
+- Deleting a milestone permanently deletes it, with `--force` skipping confirmation.
 - With default settings, a generated milestone ID follows the `MS-001` format.
 
 ## Traceability
 - README.md, `papyrus(1)` → COMMANDS → milestone (lines 229–277), STATUSES → Milestones (lines 759–764)
 - README.md, `papyrus-config(5)` → General keys (lines 949–962)
+- Project-owner decision 2026-11-13: milestone lifecycle is `open -> closed`, transitioned by `papyrus milestone close <id>`, replacing the `archive` command; the state is stored in front matter.
+- REQ-05.010 — Record Metadata in YAML Front Matter (milestone `status`)
+- REQ-07.001 — Organize Artifacts into Three Categories
+- BR-006 — milestone Command Behavior (needs revision: archive becomes close)

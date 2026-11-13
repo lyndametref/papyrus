@@ -2,11 +2,11 @@
 
 ## Status
 
-Accepted — approved by explicit user confirmation on 2026-11-11
+Superseded by ADR-0023 on 2026-11-13 — ADR-0023 restates the front-matter field map with `status` for milestone, release, and front-matter document types and the document `status` exemption from the create/update-option rule, which this ADR's field map and option rule do not carry. Body frozen; the metadata, patch, adoption, serialization, heading, and scoping decisions are restated in ADR-0023.
 
 ## Date
 
-2026-11-11 (status: Accepted, 2026-11-11)
+2026-11-11 (status: Accepted, 2026-11-11; status: Superseded, 2026-11-13)
 
 ## Context
 
