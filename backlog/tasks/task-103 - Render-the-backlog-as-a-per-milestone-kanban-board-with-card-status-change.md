@@ -1,10 +1,10 @@
 ---
 id: TASK-103
 title: Render the backlog as a per-milestone kanban board with card status change
-status: Implemented
+status: Done
 assignee: []
 created_date: '2026-11-11T21:15:00Z'
-updated_date: '2026-11-13T11:00:00Z'
+updated_date: '2026-11-13T11:08:00Z'
 labels:
   - browser
   - release-1.0
