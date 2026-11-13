@@ -4,7 +4,7 @@ title: 'Release 1.0: verify, audit, and close the release'
 status: To Do
 assignee: []
 created_date: '2026-11-08T15:06:00Z'
-updated_date: '2026-11-11T21:16:00Z'
+updated_date: '2026-11-13T11:51:00Z'
 labels:
   - release
 milestone: m-14
@@ -51,6 +51,19 @@ Revision (planner, 2026-11-11, user decision): TASK-99 (upgrade notes) moved int
 
 Requirement change (planner, 2026-11-11): REQ-06.013 (per-milestone kanban board in the Backlog view) is planned into m-16 as TASK-101 (specification, 39035), TASK-102 (mockup revision and approval, 39045), and TASK-103 (implementation, 39145). No change to this gate's dependency list: TASK-103 depends on TASK-97 and TASK-98 now depends on TASK-103, so the gate's existing dependency on TASK-98 covers the new work transitively, and the gate's acceptance criteria (m-16 fully Done plus build, tests, re-audit, upgrade notes) already require it.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @task-refiner
+created: 2026-11-13T11:51:00Z
+
+---
+
+Escalation from TASK-99 (2026-11-13): the exit-code wording in `docs/specifications/import-backlog-md-records.md` §1.6 item 6 and `docs/architecture/adr/ADR-0011-one-way-backlog-md-import.md` decision 6 is stale. Both say "`0` when every in-scope source record was imported (or planned, for a dry run); `1` runtime/validation failure". Shipped behaviour follows REQ-01.004 with four codes: `0` success/planned, `1` runtime failure (including refusal without `--allow-existing` and skipped records), `2` usage error, `4` validation/conflict (e.g. `--report` resolving outside the project directory) - confirmed by `src/main.rs`, `src/error.rs` (`Runtime => 1`, `Validation => 4`) and `src/import.rs`. TASK-99's upgrade notes publish the shipped mapping; the specification and ADR need a release-owner correction or an ADR amendment. Not edited by TASK-99, which is documentation-scoped and must not change ADR or requirement text.
+
+---
+<!-- COMMENTS:END -->
 
 ## Final Summary
 
