@@ -5,7 +5,7 @@ status: Implemented
 assignee:
   - '@rust-dev'
 created_date: '2026-11-13T16:17:00Z'
-updated_date: '2026-11-13T16:41:00Z'
+updated_date: '2026-11-13T16:46:00Z'
 labels:
   - configuration
   - init
@@ -89,8 +89,38 @@ Specification: `docs/specifications/interactive-init-walkthrough-for-artifact-ac
 - [x] #8 The feature specification and the ticket still agree after implementation; any deviation is recorded as a task comment or a follow-up task rather than silently absorbed.
 <!-- DOD:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Architecture of record: ADR-0015 (`docs/architecture/adr/ADR-0015-cursor-driven-init-list-via-stty-raw-mode.md`, Accepted). ADR-0014 is the superseded rejected alternative.
+
+1. Terminal seam (single crate, no new dependency, works on Linux/Debian per ADR-0002/0003):
+   1.1 `struct SttyTerminalMode` implements `trait TerminalMode` (`enter` -> guard, guard `restore`): save settings with `stty -g`, switch to cbreak/no-echo for the list only, restore via a guard on both the success and error paths and before the first line prompt.
+   1.2 On `enter` failure (no `stty`, unusable terminal): emit one stderr warning, render the list once, ask a single "press Enter to continue" line that cannot change activation, then continue with the normal prefix/folder prompts. No second input mechanism, never blocks, never leaves the terminal modified.
+   1.3 Restore failure prints `warning: could not restore terminal settings; run `stty sane``.
+
+2. Key decoding over the existing `reader`:
+   2.1 `enum Key { Up, Down, Enter, Eof, Interrupt, Char(char), Unknown }` and `trait KeySource { fn next_key(&mut self) -> io::Result<Key> }`.
+   2.2 `ByteKeySource<R: BufRead>` reads single bytes from the same reader the later prompts use (no typeahead loss, no second stdin handle): Up/Down from CSI and SS3 sequences, `k`/`j`/Space as chars, CR/LF as Enter, `0x03` as Interrupt, `0x04` or read-0 as Eof, `EINTR` retried, lone/truncated escape sequences ignored.
+   2.3 Interrupt maps to `AppError::Interrupted` (exit 130, nothing written); Eof confirms the current state and continues.
+
+3. Pure list state machine (`ArtifactList`, no IO):
+   3.1 Rows: three core rows (task, milestone, release; fixed `[x]`, "always active", never selectable) then the decision types then the document types in `Config::default()` key order.
+   3.2 State: `Vec<Row>` plus `selectable: Vec<usize>` and a cursor index; `up`/`down` clamp within selectable rows only; `toggle` flips only the cursor row.
+   3.3 `render` writes the full list per frame (cursor marker plus every `[x]`/`[ ]`), so each keypress produces a complete, capturable redraw; unrelated keys redraw without state change.
+   3.4 `into_activation` yields the decision/document activation maps consumed by the existing prefix/folder flow.
+
+4. Wiring in `src/init.rs`: `run_init_with_io` keeps its signature and non-interactive branch; the interactive branch reaches the list through `build_config_interactive_with_mode` and `run_artifact_list`, then the existing `build_config_with_activation` (prefixes, shared roots, per-type folders, `enabled` flags) and the unchanged validate/write/directory/git steps.
+
+5. Tests: unit tests in `src/init.rs` drive the list through a test-local `ScriptedKeySource` and a `Vec<u8>` writer, asserting frames and the written `papyrus.config.yml` (initial cursor, movement, clamping, toggle, core rows unreachable, unrelated keys, Enter, EOF, Ctrl-C, degraded path); `tests/cli.rs` keeps covering the non-TTY defaults path; the real keyboard path is verified manually on a TTY and recorded in the notes.
+
+6. Documentation: REQ-01.006 conformance plus specification section 2 rewrite and section 1.2/4.4 cleanup (done during refinement); ADR-0015 records the decision and ADR-0014 its rejection. README/BR-002 wording is unchanged because the current manpage text stays accurate.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Test-name to AC mapping (DoD 7): AC1 rows_follow_the_required_artifact_order; AC2 initial_cursor_is_adr_and_every_row_is_active; AC3 down_and_j_move_to_the_next_selectable_row, byte_key_source_parses_keys_and_escape_sequences, lone_escape_and_truncated_sequences_are_ignored; AC4 cursor_clamps_at_both_ends_without_wrapping; AC5 space_toggles_only_the_highlighted_row; AC6 core_rows_are_never_reachable_or_toggleable; AC7 every_keypress_redraws_the_whole_list, unrelated_keys_do_not_change_activation; AC8 enter_confirms_the_state_shown_on_screen, activation_from_the_list_reaches_the_generated_config; AC9 end_of_input_confirms_the_current_state, stty_failure_degrades_to_one_render_and_line_confirmation; AC10 typed_tokens_do_not_change_activation, degraded_path_never_activates_from_typed_tokens, legacy_typed_token_prompt_text_is_absent; AC11 non-TTY path in tests/cli.rs init cases; AC12 20 init unit tests via ScriptedKeySource; AC13 spec review; AC14 ctrl_c_maps_to_interrupted_exit_code_130, interrupted_reads_are_retried, fake_mode_success_relies_on_the_real_key_source_and_restores plus real-TTY evidence.
+
+Real-TTY verification (PTY via script, ADR-0015): Arrow/j/k + Space + Enter confirmed (selected rows written enabled:false, exit 0); Ctrl-D/end-of-input confirmed current state, exit 0, config written with all 14 enabled; Ctrl-C exit 130, no papyrus.config.yml, no artifact directories, stty -g byte-identical before/after (terminal restored); stty-failure degraded path rendered once, line-confirmed, all active. ADR-0015 (accepted) governs the stty cbreak route; ADR-0014 is superseded and not implemented.
 <!-- SECTION:NOTES:END -->

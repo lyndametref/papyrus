@@ -116,7 +116,8 @@ This specification was revised (TASK-85) so that the walkthrough matches REQ-01.
 - Invalid project name (unnormalizable) → exit code 4.
 - Final configuration validation failure → exit code 4 (no file written).
 - Interactive invalid prefix/folder → re-prompt (not an abort).
-- Terminal raw/cbreak mode entry failure (if that strategy is used) → follow the architecture decision for TASK-104; the walkthrough must still terminate and must not leave the terminal in a modified mode. No configuration is left half-written.
+- Ctrl-C on the artifact list → exit code 130 (interrupt), no `papyrus.config.yml` written for that run, and the terminal input mode restored before exit.
+- Terminal cbreak-mode entry failure (keypress navigation unavailable; ADR-0015) → one stderr warning, the list rendered once with all artifacts active, a single line-based "press Enter to continue" confirmation that cannot change activation, and the walkthrough then continues into the normal prefix/folder prompts. The walkthrough always terminates and never leaves the terminal in a modified input mode.
 
 ## Verification
 
