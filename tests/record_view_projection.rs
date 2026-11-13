@@ -402,8 +402,10 @@ fn browser_and_cli_metadata_parity() {
     run_ok(&["--dir", &arg_dir(&dir), "init", "Proj", "--no-git"]);
     let d = arg_dir(&dir);
     run_ok(&["--dir", &d, "task", "create", "Parity", "--label", "bug"]);
+    run_ok(&["--dir", &d, "milestone", "create", "Parity milestone"]);
 
     let cli = json_ok(&["--dir", &d, "--json", "task", "view", "TASK-001"]);
+    let cli_milestone = json_ok(&["--dir", &d, "--json", "milestone", "view", "MS-001"]);
     let server = Server::start(&dir);
     let api: serde_json::Value =
         serde_json::from_str(&get(&server, "/api/doc/TASK-001").text()).unwrap();
@@ -411,10 +413,20 @@ fn browser_and_cli_metadata_parity() {
         api["metadata"], cli["metadata"],
         "browser detail JSON metadata equals CLI view metadata"
     );
-    // List page shows the same metadata values.
-    let list_html = get(&server, "/?type=task").text();
-    let created = cli["metadata"]["created_date"].as_str().unwrap();
-    assert!(list_html.contains(created), "list HTML shows created_date");
+    let api_milestone: serde_json::Value =
+        serde_json::from_str(&get(&server, "/api/doc/MS-001").text()).unwrap();
+    assert_eq!(
+        api_milestone["metadata"], cli_milestone["metadata"],
+        "milestone detail JSON metadata equals CLI view metadata"
+    );
+    // The board cards do not print dates; the milestone row list remains the
+    // row-list parity surface and shows the same metadata values.
+    let list_html = get(&server, "/?type=milestone").text();
+    let created = cli_milestone["metadata"]["created_date"].as_str().unwrap();
+    assert!(
+        list_html.contains(created),
+        "milestone list shows created_date"
+    );
     let detail_html = get(&server, "/doc/TASK-001").text();
     assert!(
         detail_html.contains("Created date"),

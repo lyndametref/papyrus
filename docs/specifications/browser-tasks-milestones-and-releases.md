@@ -3,7 +3,7 @@
 **Ticket:** TASK-11
 **Milestone:** m-2 (Backlog Discovery and Management)
 **Status:** Refined (execution-ready; UI mockup approved)
-**UI mockups:** [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html) (approved baseline) — revision required and re-approval required under TASK-102 before implementation; extends the approved baseline [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html); see [UI design handoff](#ui-design-handoff)
+**UI mockups:** [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html) (approved; kanban-board revision approved 2026-11-12 UTC under TASK-102) — extends the approved baseline [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html); see [UI design handoff](#ui-design-handoff)
 
 ## Purpose
 
@@ -61,6 +61,8 @@ The combined Backlog view (`/?type=task`, sidebar entry "Backlog") is the per-mi
 3. Columns appear in configured status order exactly; no reordering, no omission.
 4. A status that has no tasks for that milestone keeps its column visible (empty column with an explicit empty state).
 5. The board is nested inside the milestone section; milestones remain the grouping unit of the view.
+6. A task whose stored status is not one of the configured statuses (or is absent) is shown in a trailing `Unconfigured status` column that appears only when at least one such task exists, so no active task disappears from the board.
+7. Exactly one milestone is expanded by default: the first milestone in render order that has at least one active task. `GET /?type=task&expand={milestone-id}` expands that milestone instead; the parameter is honoured only for an active milestone ID and is otherwise ignored.
 
 **Release grouping**
 
@@ -68,6 +70,7 @@ The combined Backlog view (`/?type=task`, sidebar entry "Backlog") is the per-mi
 2. Milestones assigned to no release are grouped together before the first release.
 3. Each release boundary is marked by a bold separator that names the release and does not rely on colour alone.
 4. Release ordering follows ascending release ID; milestones within a release follow ascending milestone ID; the no-release group precedes all releases.
+5. A release with no active milestones still renders its separator and an explicit empty state for the group.
 
 **Tasks without a milestone**
 
@@ -75,6 +78,7 @@ The combined Backlog view (`/?type=task`, sidebar entry "Backlog") is the per-mi
 2. That section is placed after all milestone sections (including all release groups).
 3. Cards in the section are ordered by ascending task ID.
 4. Each card shows the task ID and title and links to the task record view.
+5. A task whose stored milestone value is absent or does not resolve to an active milestone belongs to this section. The section is omitted when no task belongs to it.
 
 **Card order and contents**
 
@@ -92,6 +96,8 @@ The combined Backlog view (`/?type=task`, sidebar entry "Backlog") is the per-mi
 5. The change alters only the status value and preserves every other field of the task.
 6. A change that cannot be persisted leaves the card in its original column and reports the failure to the user.
 7. After a successful change the value is still shown after the view is reloaded (save-then-reread).
+8. The board submits its status change as a status-only form POST to the existing `/doc/{id}` endpoint: the form carries the version token, the new `status`, and a status-only marker. The endpoint applies a status-only patch — the `status` front-matter key when the record carries front matter, otherwise the `## Status` section — and changes nothing else apart from the routine `updated_date` refresh. No new route, endpoint, or write path is added.
+9. A successful status change redirects `303` to `/?type=task`, carrying `expand={milestone-id}` when the card belongs to a milestone so that the changed card stays visible. A failed change re-renders the board from the current stored data with the card in its stored column and an alert that names the failure: `409` for a stale version token, `422` for a status that is not configured, and `500` for a write failure.
 
 **Archived exclusion**
 
@@ -107,7 +113,7 @@ The combined Backlog view (`/?type=task`, sidebar entry "Backlog") is the per-mi
 5. Default expansion state of milestones.
 6. Empty-column placeholder text.
 
-These are resolved by TASK-102 (mockup revision) and recorded in the UI description.
+These are resolved by TASK-102 (mockup revision), with the no-JavaScript submission affordance refined under TASK-103, and recorded in the UI description: cards show assignee and labels; columns are equal thirds; the release separator is bold with a 2 px bottom border; the non-drag control is a labelled select plus a `Change status` submit button; the first milestone with active tasks is expanded; an empty column reads `No tasks in this status.`
 
 **Empty states and wrapping**
 
@@ -218,7 +224,7 @@ UI mockups are required before any UI implementation work and must be approved b
 
 **Baseline artifact:** MOCK-0001 — [`docs/specifications/ui/mockups/MOCK-0001-browser-requirements-review.html`](ui/mockups/MOCK-0001-browser-requirements-review.html), approved 2026-11-03 (UTC). It remains the authoritative layout reference for the requirement categories and the shared shell.
 
-**Extension artifact (TASK-11):** MOCK-0002 — produced by `@ui-designer` as a self-contained review package that reuses the MOCK-0001 shell and adds the unified Backlog view (tasks, milestones, releases) with list, view, edit, empty, error, and 320 px states. MOCK-0001 is not modified in place. Its status is `approved` (explicitly approved by the user on 2026-11-04, TASK-11).
+**Extension artifact (TASK-11):** MOCK-0002 — produced by `@ui-designer` as a self-contained review package that reuses the MOCK-0001 shell and adds the unified Backlog view (tasks, milestones, releases) with list, view, edit, empty, error, and 320 px states. MOCK-0001 is not modified in place. Its status is `approved`, most recently for the kanban-board revision on 2026-11-12 UTC (TASK-102), which supersedes the baseline approval of 2026-11-04 (TASK-11).
 
 ### Screens to be covered by the extension package
 
@@ -269,8 +275,8 @@ UI mockups are required before any UI implementation work and must be approved b
 | Requirement | REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012, REQ-06.013, REQ-02, REQ-02.001, REQ-02.002, REQ-02.003, REQ-02.004, REQ-03, REQ-03.001, REQ-03.002, REQ-05.001, REQ-05.002, REQ-05.007, REQ-01.002 |
 | Business rule | BR-004 (browser command behavior), BR-005 (task command behavior), BR-006 (milestone command behavior), BR-007 (release command behavior), BR-016 (configuration keys and precedence) |
 | ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0010, ADR-0012, ADR-0013 |
-| Ticket | TASK-6 (baseline), TASK-8, TASK-9, TASK-11, TASK-86, TASK-101 |
+| Ticket | TASK-6 (baseline), TASK-8, TASK-9, TASK-11, TASK-86, TASK-101, TASK-102, TASK-103 |
 | Increment boundary | REQ-06.002 covers both stores; the documentation-store part was delivered by TASK-6/TASK-7, the backlog-store part by this ticket. |
-| UI mockups | MOCK-0001 (approved baseline); MOCK-0002 (approved baseline; revision and re-approval required under TASK-102) — `docs/specifications/ui/mockups/MOCK-0002-browser-backlog-records-review.html` |
+| UI mockups | MOCK-0001 (approved baseline); MOCK-0002 (approved; kanban-board revision approved 2026-11-12 UTC under TASK-102) — `docs/specifications/ui/mockups/MOCK-0002-browser-backlog-records-review.html` |
 | Related specification | `docs/specifications/browser-requirements.md` (TASK-6 baseline), `docs/specifications/task-management.md` (TASK-9), `docs/specifications/milestone-and-release-management.md` (TASK-8) |
 | Related specification | `docs/specifications/search-requirements.md` (TASK-5/TASK-10) |
