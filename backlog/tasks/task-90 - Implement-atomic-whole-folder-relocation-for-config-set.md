@@ -1,10 +1,10 @@
 ---
 id: TASK-90
 title: Implement atomic whole-folder relocation for config set
-status: Implemented
+status: Done
 assignee: []
 created_date: '2026-11-11T20:42:00Z'
-updated_date: '2026-11-13T05:36:00Z'
+updated_date: '2026-11-13T05:45:00Z'
 labels:
   - configuration
   - relocation
