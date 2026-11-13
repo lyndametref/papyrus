@@ -3,10 +3,10 @@ id: TASK-95
 title: >-
   Add per-artifact descriptions and read-only configuration to the browser
   lifecycle page
-status: Implemented
+status: Done
 assignee: []
 created_date: '2026-11-11T20:43:00Z'
-updated_date: '2026-11-13T07:08:00Z'
+updated_date: '2026-11-13T09:07:00Z'
 labels:
   - browser
   - release-1.0
@@ -97,10 +97,12 @@ References:
 
 <!-- SECTION:NOTES:BEGIN -->
 Implemented lifecycle_page per-artifact descriptions and read-only config in src/browser/render.rs. 12 sections unchanged order. Config values derived from Config; storage folders join base+subpath and strip trailing slashes. Disabled/missing doc type reports false/empty. Link to /config included; no editing controls. Verified cargo build/test/clippy/fmt and browser_cli 148 passed.
+
+AC #6: added t95a_lifecycle_disabled_document_type (disabled tech-spec renders enabled: false, 200, twelve sections, no form/input) and t95b_lifecycle_renamed_prefix_and_folder (BRQ prefix and documentation/requirements/business-rules folder in the read-only config line, curated description unchanged). Updated spec §7 with items 5-7. cargo test --test browser_cli: 150 passed; cargo build, clippy -D warnings, fmt --check clean.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Updated src/browser/render.rs lifecycle_page to emit curated description, existing lifecycle sentence, and read-only effective configuration (enabled, ID prefix, storage folder) for all 12 fixed artifact sections; task section retains configured statuses. Values derived from Config; storage folders join base directory with type subpath and strip trailing slashes. Page links to /config and has no editing controls. cargo test --test browser_cli: 148 passed; cargo check/clippy/fmt clean.
+Updated src/browser/render.rs lifecycle_page to emit curated description, existing lifecycle sentence, and read-only effective configuration (enabled, ID prefix, storage folder) for all 12 fixed artifact sections; task section retains configured statuses. Values derive from Config; storage folders join the base directory with the type subpath and strip trailing slashes. Page links to /config and has no editing controls. AC #6 tests: t95a (disabled tech-spec renders enabled: false, 200, twelve sections) and t95b (renamed BRQ prefix and documentation/requirements/business-rules folder reflected with curated description intact) in tests/browser_cli.rs; spec §7 items 5-7 added. Verification: cargo test --test browser_cli 150 passed; cargo build, clippy -D warnings, fmt --check clean.
 <!-- SECTION:FINAL_SUMMARY:END -->
