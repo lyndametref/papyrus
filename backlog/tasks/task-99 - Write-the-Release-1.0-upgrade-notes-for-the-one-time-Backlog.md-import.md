@@ -1,10 +1,10 @@
 ---
 id: TASK-99
 title: Write the Release 1.0 upgrade notes for the one-time Backlog.md import
-status: Implemented
+status: Done
 assignee: []
 created_date: '2026-11-11T20:44:00Z'
-updated_date: '2026-11-13T11:56:00Z'
+updated_date: '2026-11-13T11:59:00Z'
 labels:
   - documentation
   - import
@@ -66,31 +66,31 @@ The notes must be self-contained and executable by a user who has never read an 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 `docs/release-1.0-upgrade-notes.md` exists, and `README.md` contains an "Upgrading to Release 1.0" section whose relative link to that file resolves.
-- [ ] #2 The notes state up front who must act — every project still holding Backlog.md-layout records — and that the upgrade performs no automatic import, keeps those records on disk unrecognised by the new version, and offers no transitional reader or compatibility mode.
-- [ ] #3 The notes name all four affected source directories (`backlog/tasks`, `backlog/milestones`, `backlog/archive/tasks`, `backlog/archive/milestones`) and state that `docs`, `drafts`, `decisions`, `config.yml`, and `.locks` are excluded.
-- [ ] #4 The notes give the literal procedure: initialize or select a project with `papyrus.config.yml`, run `papyrus import backlog --from <source-project-dir> --dry-run`, review the printed plan and report, save it with `--report <path inside the project>`, then run the same command without `--dry-run`; they state that a dry run imports no records, that a dry run with `--report` still writes that report file, and that a dry run without `--report` writes nothing.
-- [ ] #5 The notes contain a command reference whose options (`--from`, `--source-backlog-dir`, `--dry-run`, `--allow-existing`, `--report`), global-option statement, and exit codes match the shipped `papyrus import backlog --help` output and REQ-01.004: `0` success (imported, or planned under `--dry-run`); `1` runtime failure, including refusal without `--allow-existing`, and skipped records (listed in the summary); `2` usage error; `4` validation/conflict, for example `--report` resolving outside the project directory.
-- [ ] #6 The notes state that task IDs are reallocated as fresh `TASK-nnn` numbers continuing from the target maximum, that milestones continue from the highest milestone number already present in the target using `MS-001` only when the target holds no milestone records (ADR-0010 decision 5), that no source number is preserved or accepted later, and that the printed plan and optional report are the only mapping record.
-- [ ] #7 The notes state that the source store is opened read-only and left byte-identical, must be kept until the import is verified, and that Papyrus owns the records afterwards.
-- [ ] #8 The notes state that Backlog.md file compatibility is renounced, that `papyrus import backlog` is the only bridge, that re-running against the same source duplicates records under new IDs, and that `--allow-existing` is required when the target already holds records of an imported family (refused before writing otherwise).
-- [ ] #9 The notes document the import caveats: unmatched statuses preserved verbatim with a warning, unresolvable dependency or milestone references dropped with a warning, invalid timestamps replaced by import time and reported as approximate, a mid-import failure leaving a partial import with no rollback, and `--report` restricted to paths inside the project.
-- [ ] #10 The notes include a post-import verification checklist: imported tasks and milestones are listable, viewable, and searchable by their new Papyrus IDs, the source tree is unchanged, and a second run without `--allow-existing` is refused.
-- [ ] #11 The notes include an "Other user-visible changes in Release 1.0" section covering the shared single record view layout, the editable browser configuration view (including atomic `config set backlog_directory` relocation), non-functional requirement grouping, the quiet browser console with browser-only `--debug` request logging, and the removal of the `storage_id`, `display_id`, and `storage_path` fields in favour of Papyrus IDs.
-- [ ] #12 The documented command, options, caveats, and exit codes were cross-checked against `papyrus import backlog --help` and the shipped exit-code mapping; the checked help output and any divergence are recorded in the ticket notes, with divergences escalated to TASK-73.
-- [ ] #13 No requirement file, business rule, ADR, packaging script, or source file was modified; the only changed files are `README.md`, the new notes file, the import specification §11 location bullet and traceability cell, this ticket, and the escalation comment added to the TASK-73 ticket as required by AC12 — no other ticket is edited.
+- [x] #1 `docs/release-1.0-upgrade-notes.md` exists, and `README.md` contains an "Upgrading to Release 1.0" section whose relative link to that file resolves.
+- [x] #2 The notes state up front who must act — every project still holding Backlog.md-layout records — and that the upgrade performs no automatic import, keeps those records on disk unrecognised by the new version, and offers no transitional reader or compatibility mode.
+- [x] #3 The notes name all four affected source directories (`backlog/tasks`, `backlog/milestones`, `backlog/archive/tasks`, `backlog/archive/milestones`) and state that `docs`, `drafts`, `decisions`, `config.yml`, and `.locks` are excluded.
+- [x] #4 The notes give the literal procedure: initialize or select a project with `papyrus.config.yml`, run `papyrus import backlog --from <source-project-dir> --dry-run`, review the printed plan and report, save it with `--report <path inside the project>`, then run the same command without `--dry-run`; they state that a dry run imports no records, that a dry run with `--report` still writes that report file, and that a dry run without `--report` writes nothing.
+- [x] #5 The notes contain a command reference whose options (`--from`, `--source-backlog-dir`, `--dry-run`, `--allow-existing`, `--report`), global-option statement, and exit codes match the shipped `papyrus import backlog --help` output and REQ-01.004: `0` success (imported, or planned under `--dry-run`); `1` runtime failure, including refusal without `--allow-existing`, and skipped records (listed in the summary); `2` usage error; `4` validation/conflict, for example `--report` resolving outside the project directory.
+- [x] #6 The notes state that task IDs are reallocated as fresh `TASK-nnn` numbers continuing from the target maximum, that milestones continue from the highest milestone number already present in the target using `MS-001` only when the target holds no milestone records (ADR-0010 decision 5), that no source number is preserved or accepted later, and that the printed plan and optional report are the only mapping record.
+- [x] #7 The notes state that the source store is opened read-only and left byte-identical, must be kept until the import is verified, and that Papyrus owns the records afterwards.
+- [x] #8 The notes state that Backlog.md file compatibility is renounced, that `papyrus import backlog` is the only bridge, that re-running against the same source duplicates records under new IDs, and that `--allow-existing` is required when the target already holds records of an imported family (refused before writing otherwise).
+- [x] #9 The notes document the import caveats: unmatched statuses preserved verbatim with a warning, unresolvable dependency or milestone references dropped with a warning, invalid timestamps replaced by import time and reported as approximate, a mid-import failure leaving a partial import with no rollback, and `--report` restricted to paths inside the project.
+- [x] #10 The notes include a post-import verification checklist: imported tasks and milestones are listable, viewable, and searchable by their new Papyrus IDs, the source tree is unchanged, and a second run without `--allow-existing` is refused.
+- [x] #11 The notes include an "Other user-visible changes in Release 1.0" section covering the shared single record view layout, the editable browser configuration view (including atomic `config set backlog_directory` relocation), non-functional requirement grouping, the quiet browser console with browser-only `--debug` request logging, and the removal of the `storage_id`, `display_id`, and `storage_path` fields in favour of Papyrus IDs.
+- [x] #12 The documented command, options, caveats, and exit codes were cross-checked against `papyrus import backlog --help` and the shipped exit-code mapping; the checked help output and any divergence are recorded in the ticket notes, with divergences escalated to TASK-73.
+- [x] #13 No requirement file, business rule, ADR, packaging script, or source file was modified; the only changed files are `README.md`, the new notes file, the import specification §11 location bullet and traceability cell, this ticket, and the escalation comment added to the TASK-73 ticket as required by AC12 — no other ticket is edited.
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 `docs/release-1.0-upgrade-notes.md` is present, self-contained, and readable without any ADR or ticket; it covers every required content item in the description.
-- [ ] #2 The README "Upgrading to Release 1.0" section links the notes with a relative path that resolves in the repository.
-- [ ] #3 The notes' command reference and exit-code statements match the shipped `papyrus import backlog --help` output recorded in the ticket notes.
-- [ ] #4 The notes agree with the TASK-98 upgrade-path evidence in `docs/packaging.md`; any divergence is recorded and escalated to TASK-73 instead of being silently resolved.
-- [ ] #5 The change summary statements are traceable to the specifications and tickets named in the plan.
-- [ ] #6 The ticket notes record the help output used, the cross-check results, and any open items for TASK-73.
-- [ ] #7 No scratch files remain under `./.tmp/` after the work.
-- [ ] #8 Only README.md, docs/release-1.0-upgrade-notes.md, docs/specifications/import-backlog-md-records.md (§11 bullet + traceability cell), this ticket, and the TASK-73 escalation comment changed; no requirement, business-rule, ADR, packaging-script, or source-code change.
+- [x] #1 `docs/release-1.0-upgrade-notes.md` is present, self-contained, and readable without any ADR or ticket; it covers every required content item in the description.
+- [x] #2 The README "Upgrading to Release 1.0" section links the notes with a relative path that resolves in the repository.
+- [x] #3 The notes' command reference and exit-code statements match the shipped `papyrus import backlog --help` output recorded in the ticket notes.
+- [x] #4 The notes agree with the TASK-98 upgrade-path evidence in `docs/packaging.md`; any divergence is recorded and escalated to TASK-73 instead of being silently resolved.
+- [x] #5 The change summary statements are traceable to the specifications and tickets named in the plan.
+- [x] #6 The ticket notes record the help output used, the cross-check results, and any open items for TASK-73.
+- [x] #7 No scratch files remain under `./.tmp/` after the work.
+- [x] #8 Only README.md, docs/release-1.0-upgrade-notes.md, docs/specifications/import-backlog-md-records.md (§11 bullet + traceability cell), this ticket, and the TASK-73 escalation comment changed; no requirement, business-rule, ADR, packaging-script, or source-code change.
 <!-- DOD:END -->
 
 ## Implementation Plan
