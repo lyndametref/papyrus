@@ -1218,3 +1218,160 @@ statuses follow the existing contract: `0` success, `1` IO/boundary, `2` usage,
 - Size: 1136804 bytes
 - SHA-256: `b5f01d4e33fe100232b39bbf2adfc1c4f2d5767cd64adeec4c11771fa2051592`
 - Test count: 565 (including `use_cases_test_cases_test_reports_smoke` 2)
+
+## TASK-98 — Release 1.0 native layout, import, relocation, single ID space, and packaging verification
+
+**Supported platform statement.** Debian **Forky amd64** is the supported and verified
+release target for this package (ADR-0003, NFR-03.002). Debian Trixie and every other
+release are **not claimed or verified**; no other architecture is claimed.
+
+### Environment
+
+| Item | Value |
+|---|---|
+| Host | Debian GNU/Linux forky/sid, amd64 |
+| Date and timezone | 2026-11-13 12:21 CET (UTC+01:00) |
+| glibc | 2.43-7 |
+| rustc / cargo | 1.99.1 (pinned by `rust-toolchain.toml`) |
+| clippy / rustfmt | 0.1.99 / 1.10.0-stable |
+| dpkg / dpkg-deb | 1.23.11 |
+| Tooling | `fakeroot`, `unshare`, `ip`, `curl` available |
+| Package toolchain | `./scripts/build-deb.sh` unchanged |
+
+### Isolation method
+
+- The sample Backlog.md project fixture and every scratch project were created under
+  `./.tmp/task98-*` by `tests/release_native_layout_smoke.rs` and removed by its
+  `Scratch` guard (also on panic). The installed-binary smoke used `./.tmp/task98/`.
+- The repository's own `backlog/` store was never an import source and was not
+  rewritten: its content hash (116 files, excluding the TASK-98 ticket metadata
+  updated through the Backlog CLI) was unchanged, and `git status --porcelain --
+  backlog` reported only the expected TASK-98 ticket file.
+- The package was installed in an isolated dpkg root with
+  `fakeroot dpkg --instdir=./.tmp/task98/inst --admindir=./.tmp/task98/adm
+  --force-depends -i`; the host `dpkg -l papyrus` output was recorded before and
+  after and was identical.
+
+### Automated verification
+
+`tests/release_native_layout_smoke.rs` (new, 9 tests):
+
+| Test | Acceptance criterion |
+|---|---|
+| `t98_01_fixture_inventory_and_repository_store_untouched` | T-98-01 |
+| `t98_02_adoption_and_noop_writes_are_byte_identical` | T-98-02 |
+| `t98_03_no_backlog_shaped_write_anywhere` | T-98-03 |
+| `t98_04_invisible_before_import_readable_after` | T-98-04 |
+| `t98_05_single_id_space_on_every_surface` | T-98-05 |
+| `t98_06_import_fidelity` | T-98-06 |
+| `t98_07_documented_upgrade_path` | T-98-07 |
+| `t98_08_relocation_atomicity_and_browser_path` | T-98-08 |
+| `t98_09_search_indexes_front_matter_without_writes` | T-98-09 |
+
+Observed results:
+
+- **Adoption / no-op identity** — an already-front-matter task, a legacy task, a
+  legacy milestone, and a legacy technical specification were read twice and saved
+  with equal values without changing bytes, mode, `updated_date`, or mtime. A
+  read-only directory failed adoption with a non-zero exit and left the file
+  byte-identical.
+- **No Backlog-shaped write** — after create, edit, archive, restore, deprecate,
+  adopt, and import, every written record path was `<ID>.md` (decisions
+  `<ID>-<kebab-slug>.md`); no Backlog stem, `## Status` metadata section, or
+  storage-ID key was written. The eight mechanical checks in `tests/no_drift.rs`
+  passed in the same `cargo test` run.
+- **Invisibility / import** — an unimported store copied into an initialised project
+  was invisible to CLI list/view/search, their `--json` forms, browser list, JSON
+  API, and record views while a requirement record stayed visible. After
+  `papyrus import backlog --from <fixture>` every in-scope record was readable by
+  its Papyrus ID and the fixture source tree hash was unchanged (before import,
+  after import, and after CLI/browser reads).
+- **Single ID space** — CLI text, `--json`, board HTML, `/api/tasks`,
+  `/api/milestones`, `/api/doc/<ID>`, and rendered links carried only Papyrus IDs;
+  no `storage_id`, `display_id`, or `storage_path` field appeared;
+  `task view task-1` and `milestone view m-0` exited 3.
+- **Import fidelity** — `task-1…task-5` became `TASK-001…TASK-005` in source-number
+  order (milestones `m-0…m-2` became `MS-001…MS-003`, archived destinations
+  preserved); fields, unknown key, and body markers mapped as specified; AC
+  ordinals were dropped with checkbox states kept; unknown section and free text
+  were preserved verbatim; `docs=1 drafts=1 decisions=1 config=1 locks=1` were
+  reported as excluded and not imported. The status mismatch (`In Progress`) and
+  dangling milestone (`m-999`) were warned about and preserved/dropped as specified.
+- **Upgrade path** — `init`, a dry run that changed no project or source byte, a real
+  import with a saved report, normal CLI/browser use (including a board status change
+  persisted to the record), refusal of a second run without `--allow-existing`
+  (exit 1), and duplication with new IDs when it was supplied. The source store was
+  kept and byte-identical.
+- **Relocation** — a multi-segment destination moved all files including unmanaged
+  files/subfolders and removed the empty source; the browser configuration view
+  produced the same result. Conflict, unwritable, and out-of-project destinations
+  exited 4, moved nothing, and left the configuration file byte-identical.
+- **Search** — the front-matter-only query `fm-only-label` (a label present only in
+  TASK-001's front matter) returned TASK-001 on the CLI and was visible in the
+  browser record view and `/api/doc/TASK-001`; quoted phrases, `--type`, `--limit`,
+  `--json`, empty results, archived-hidden, deprecated-hidden, and restored-visible
+  behaviour matched the documented search behaviour. The project hash was unchanged
+  after the search run. Review note: the product has no browser search endpoint;
+  search is the documented CLI surface, and the browser record view/API expose the
+  matching metadata.
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| `cargo build --release` (Rust 1.99.1) | PASS — `target/release/papyrus` |
+| `target/release/papyrus --help` lists `task`, `import`, `browser`, `search` | PASS |
+| `target/release/papyrus --version` | PASS — `papyrus 0.1.0` |
+| `cargo test` | PASS — **633 tests** (0 failed, 0 ignored; includes the new 9 and `tests/no_drift.rs`) |
+| `cargo clippy --all-targets -- -D warnings` | PASS — 0 warnings |
+| `cargo fmt --check` | PASS |
+
+### Package artifact
+
+- File: `papyrus_0.1.0_amd64.deb`
+- Size: 1,197,168 bytes
+- SHA-256: `96acf96b672522bbd718dab94552e1e817b1743745a11ad42a5d75744a0985b2`
+- `dpkg-deb -I`: `Package: papyrus`, `Version: 0.1.0`, `Architecture: amd64`,
+  `Depends: libc6 (>= 2.34)`, `Section: utils`, `Priority: optional`,
+  `Maintainer: Papyrus Maintainers <maintainers@papyrus.example>`.
+- `dpkg-deb -c`: only `/usr/bin/papyrus` (0755) and
+  `/usr/share/doc/papyrus/copyright` (0644, 865 bytes) plus their directories; the
+  copyright declares `GPL-3.0-or-later`.
+
+### Installed-binary smoke on Debian Forky amd64
+
+| Check | Result |
+|---|---|
+| Isolated `fakeroot dpkg --instdir/--admindir` install | PASS (exit 0) |
+| Installed file owner/mode (fakeroot view) | PASS — `root:root` 0755 |
+| Installed binary prints the package version | PASS — `papyrus 0.1.0` |
+| Installed `init`, invisibility before import, `import backlog --from` | PASS — 1 task, 1 milestone; source kept |
+| Browser board: per-milestone section and configured status columns | PASS — `MS-001` board section, six columns |
+| Browser task record view | PASS — HTTP 200, body present |
+| Board status change persisted to the record | PASS — HTTP 303, `status: Initiated` in `TASK-001.md` |
+| JSON API `/api/tasks`, `/api/milestones` | PASS — HTTP 200, Papyrus IDs |
+| Embedded assets `/assets/app.css`, `/assets/app.js` | PASS — HTTP 200, 14,151 and 7,795 bytes |
+| Offline `unshare -rn` (loopback up) | PASS — outbound TCP failed; list, record view, status change (303, `status: Refined`), API, CSS, and JS over loopback succeeded |
+| `dpkg -r papyrus` | PASS — binary removed from the isolated root |
+| `dpkg --purge papyrus` | PASS — admin entry removed, 0 files left |
+| Host package database and filesystem | PASS — unchanged before/after |
+
+### Recorded limitations and findings
+
+- **OQ-1 — no real-GUI browser run.** Verification is HTTP, markup, and asset level;
+  Firefox, Edge, and Safari were not driven in a GUI.
+- **Forky only.** No Debian Trixie or other release was installed or verified.
+- **Package version.** The package keeps `Cargo.toml` version `0.1.0` (OQ-2); the
+  release owner decides any bump.
+- **Offline namespace.** `unshare -rn` was available and the offline run passed.
+- **Finding F-98-1 (for TASK-73/TASK-99, not edited here).**
+  `release-1.0-native-layout-verification-and-packaging.md` §2.2 says a legacy
+  record's equal-value write produces byte-identical content. Observed behaviour:
+  the first write to a legacy body retires its title heading and metadata section
+  (documented by TASK-89 in `task-management.md` and
+  `milestone-and-release-management.md`), so that first write is not byte-identical;
+  after retirement, equal-value writes are byte-identical. The new test asserts the
+  documented retirement plus post-retirement identity.
+- **Finding F-98-2 (for TASK-73).** The browser has no search endpoint; the release
+  specification's "CLI and browser" search wording is satisfied only by the CLI
+  search plus the browser record view/API exposure of the matching metadata.
