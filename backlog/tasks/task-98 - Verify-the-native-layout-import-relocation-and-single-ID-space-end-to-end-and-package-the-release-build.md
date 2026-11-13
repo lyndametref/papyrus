@@ -6,7 +6,7 @@ title: >-
 status: Implemented
 assignee: []
 created_date: '2026-11-11T20:44:00Z'
-updated_date: '2026-11-13T11:42:00Z'
+updated_date: '2026-11-13T11:43:00Z'
 labels:
   - verification
   - packaging
@@ -62,7 +62,7 @@ Feature specification: docs/specifications/release-1.0-native-layout-verificatio
 <!-- AC:BEGIN -->
 - [ ] #1 An isolated sample Backlog.md project fixture is generated for the run under ./.tmp/ with active and archived tasks and milestones, docs, drafts, decisions, config.yml, .locks, every body marker family, an unknown section, and free text; it is removed afterwards, and this repository own backlog/ store is neither used as an import source nor modified (unchanged git status and recursive hash before and after).
 - [ ] #2 Byte identity is asserted per record state: an adoption read of a legacy record adds only the front-matter block and leaves every remaining body byte unchanged; repeated adoption reads and equal-value writes of a native front-matter record change no byte, mode, or modification time and do not refresh updated_date; and the first write to a legacy record retires the legacy title heading and metadata sections per ADR-0012 decision 4 (TASK-89 behaviour), after which every further read and equal-value write is byte-identical.
-- [ ] #3 No code path writes a Backlog.md shape: after the exercised create/edit/adopt/archive/restore/deprecate/import flows every written record path is native (<ID>.md, decisions <ID>-<slug>.md), no Backlog stem, storage ID, legacy ## Status metadata section, or storage-ID metadata key is written, and the ten tests/no_drift.rs checks pass in the same suite run.
+- [ ] #3 No code path writes a Backlog.md shape: after the exercised create/edit/adopt/archive/restore/deprecate/import flows every written record path is native (<ID>.md, decisions <ID>-<slug>.md), no Backlog stem, storage ID, legacy ## Status metadata section, or storage-ID metadata key is written, and the eight mechanical checks in tests/no_drift.rs (ten tests including the scanner-coverage regression tests) pass in the same suite run.
 - [ ] #4 An unimported Backlog.md store inside an initialised project is invisible to every surface (CLI list/view/search, --json forms, browser list, API, record views) while other families stay visible; after papyrus import backlog every in-scope record is readable with its allocated Papyrus ID and the source tree is byte-identical.
 - [ ] #5 CLI text, CLI --json, browser JSON, browser HTML, and browser URLs expose only the Papyrus ID; no storage_id/display_id/storage_path field appears, and a Backlog ID passed as input (task view task-1, milestone view m-0) exits 3 as an unknown record.
 - [ ] #6 Import fidelity matches ADR-0011 on the fixture: consecutive unique allocation from 1 in source-number order with milestones in the MS- space, field mapping including normalized status and translated milestone/dependency references, body mapping with acceptance-criteria ordinals dropped and unknown content preserved verbatim, archived destinations, and docs/drafts/decisions counted as excluded and not imported.
