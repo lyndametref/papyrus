@@ -969,6 +969,15 @@ fn load_glossary_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
         doc.title.clone()
     };
     let definition = section_value(&doc, "## Definition");
+    let view = crate::record::view::RecordView::from_content(&content, stem, "").ok();
+    let labels = view
+        .as_ref()
+        .map(|v| v.list_value("labels"))
+        .unwrap_or_default();
+    let refs = view
+        .as_ref()
+        .map(|v| v.list_value("references"))
+        .unwrap_or_default();
     Ok(Some(Record {
         id: record_canonical_id(&cfg, Category::Glossary, stem).unwrap_or_else(|| stem.to_string()),
         kind: Category::Glossary,
@@ -987,7 +996,7 @@ fn load_glossary_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
         milestone_id: None,
         milestone_title: None,
         assignee: None,
-        labels: Vec::new(),
+        labels,
         dependencies: Vec::new(),
         acceptance_criteria: Vec::new(),
         comments: Vec::new(),
@@ -1000,7 +1009,7 @@ fn load_glossary_record(ctx: &Context, path: &Path) -> Result<Option<Record>, Ap
         superseded_by: None,
         superseded_title: None,
         specs: Vec::new(),
-        refs: Vec::new(),
+        refs,
         mockup_task: String::new(),
         audit_type: None,
         doc,
@@ -1680,6 +1689,11 @@ fn load_record_from_path(
     } else {
         doc.title.clone()
     };
+    let view_for_req = if kind.is_requirement() {
+        crate::record::view::RecordView::from_content(&content, stem, "").ok()
+    } else {
+        None
+    };
     let (
         status,
         milestone_id,
@@ -1694,7 +1708,10 @@ fn load_record_from_path(
             None,
             None,
             None,
-            Vec::new(),
+            view_for_req
+                .as_ref()
+                .map(|v| v.list_value("labels"))
+                .unwrap_or_default(),
             Vec::new(),
             Vec::new(),
             Vec::new(),
@@ -1710,6 +1727,16 @@ fn load_record_from_path(
             Vec::new(),
             None,
         ),
+    };
+    // Parse references from front matter for requirement records so the
+    // shared record view can render them as a disclosure section.
+    let req_refs = if kind.is_requirement() {
+        view_for_req
+            .as_ref()
+            .map(|v| v.list_value("references"))
+            .unwrap_or_default()
+    } else {
+        Vec::new()
     };
     Ok(Some(Record {
         id: active_entry_owned(ctx, kind)
@@ -1747,7 +1774,7 @@ fn load_record_from_path(
         superseded_by: None,
         superseded_title: None,
         specs: Vec::new(),
-        refs: Vec::new(),
+        refs: req_refs,
         mockup_task: String::new(),
         audit_type: None,
         doc,
@@ -1869,20 +1896,104 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
         .map(|(position, group)| (group.id.clone(), position))
         .collect();
     for (position, requirement) in index.requirements.iter().enumerate() {
-        match requirement
-            .group_id
-            .as_ref()
-            .and_then(|id| group_ids.get(id))
-        {
-            Some(_) => {
-                index
-                    .members
-                    .entry(requirement.group_id.clone().unwrap_or_default())
-                    .or_default()
-                    .push(position);
-            }
-            None => index.other.push(position),
+        let derived_group = if kind == Category::Nfr {
+            // Derive owning group from the ID prefix (NFR-XX.YYY -> NFR-XX).
+            requirement
+                .id
+                .split('.')
+                .next()
+                .unwrap_or(&requirement.id)
+                .to_string()
+        } else {
+            requirement.group_id.clone().unwrap_or_default()
+        };
+        if derived_group.is_empty() {
+            index.other.push(position);
+            continue;
         }
+        // For NFR, do not require a stored group record; members are grouped
+        // by prefix. For other kinds keep the existing resolved-group rule.
+        let resolved = if kind == Category::Nfr {
+            true
+        } else {
+            group_ids.contains_key(&derived_group)
+        };
+        if resolved {
+            index
+                .members
+                .entry(derived_group)
+                .or_default()
+                .push(position);
+        } else {
+            index.other.push(position);
+        }
+    }
+    // NFR: synthesize fallback group entries for prefixes that have no group
+    // record, so they render with the group number and their members.
+    if kind == Category::Nfr {
+        let prefixes: std::collections::BTreeSet<String> = index
+            .requirements
+            .iter()
+            .map(|r| r.id.split('.').next().unwrap_or(&r.id).to_string())
+            .collect();
+        // Include existing groups prefixes too (already present).
+        let existing: std::collections::BTreeSet<String> =
+            index.groups.iter().map(|g| g.id.clone()).collect();
+        for prefix in &prefixes {
+            if !existing.contains(prefix) {
+                // synthetic fallback group record
+                let mut rec = Record {
+                    id: prefix.clone(),
+                    kind: Category::Nfr,
+                    form: Form::Group,
+                    title: String::new(),
+                    story: None,
+                    group_id: None,
+                    group_title: None,
+                    description: None,
+                    rationale: None,
+                    applicability: None,
+                    requirements: Vec::new(),
+                    definition: None,
+                    view: None,
+                    status: None,
+                    milestone_id: None,
+                    milestone_title: None,
+                    assignee: None,
+                    labels: Vec::new(),
+                    dependencies: Vec::new(),
+                    acceptance_criteria: Vec::new(),
+                    comments: Vec::new(),
+                    release_id: None,
+                    release_title: None,
+                    decision: None,
+                    context: None,
+                    consequences: None,
+                    decision_type: None,
+                    superseded_by: None,
+                    superseded_title: None,
+                    specs: Vec::new(),
+                    refs: Vec::new(),
+                    mockup_task: String::new(),
+                    audit_type: None,
+                    doc: Doc {
+                        id: prefix.clone(),
+                        title: String::new(),
+                        heading: format!("# {} {}", prefix, prefix),
+                        preamble: Vec::new(),
+                        sections: Vec::new(),
+                        front_matter: None,
+                        source: String::new(),
+                    },
+                    path: std::path::PathBuf::new(),
+                    rel_path: String::new(),
+                    version: String::new(),
+                };
+                let _ = &mut rec;
+                index.groups.push(rec);
+            }
+        }
+        index.groups.sort_by(|a, b| a.id.cmp(&b.id));
     }
     index
 }

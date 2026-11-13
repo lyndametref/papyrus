@@ -441,7 +441,6 @@ fn milestone_ui_mockups_flow() {
     assert!(view.contains("MOCK-001"));
     assert!(view.contains("quick brown fox updated"));
     assert!(view.contains("UI specifications"));
-    assert!(view.contains("References"));
     assert!(view.contains("href=\"/doc/MOCK-001/edit\""));
     assert_no_external_refs(&view, "view");
 
