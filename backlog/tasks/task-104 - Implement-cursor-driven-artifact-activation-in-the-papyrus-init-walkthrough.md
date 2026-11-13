@@ -5,7 +5,7 @@ status: Implemented
 assignee:
   - '@rust-dev'
 created_date: '2026-11-13T16:17:00Z'
-updated_date: '2026-11-13T16:37:00Z'
+updated_date: '2026-11-13T16:41:00Z'
 labels:
   - configuration
   - init
@@ -92,5 +92,5 @@ Specification: `docs/specifications/interactive-init-walkthrough-for-artifact-ac
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Real-TTY verification (PTY via script): Arrow/j/k + Space + Enter confirmed (adr/bdr written enabled:false, exit 0); Ctrl-D/end-of-input confirmed current state, exit 0, config written with all 14 enabled; Ctrl-C exit 130, no papyrus.config.yml, no artifact directories, stty -g byte-identical before/after (terminal restored); stty-failure degraded path renders once and line-confirms, all active. Automated coverage: 20 init unit tests via ScriptedKeySource + fake TerminalMode; existing tests/cli.rs init tests for non-TTY. No interactive integration test required by AC12 (injected key source is the required seam); real-TTY evidence recorded here. ADR-0015 constraint 7 corrected so only Ctrl-C leaves config unwritten; EOF and stty failure continue and write.
+Test-name to AC mapping (DoD 7): AC1 rows_follow_the_required_artifact_order; AC2 initial_cursor_is_adr_and_every_row_is_active; AC3 down_and_j_move_to_the_next_selectable_row, byte_key_source_parses_keys_and_escape_sequences, lone_escape_and_truncated_sequences_are_ignored; AC4 cursor_clamps_at_both_ends_without_wrapping; AC5 space_toggles_only_the_highlighted_row; AC6 core_rows_are_never_reachable_or_toggleable; AC7 every_keypress_redraws_the_whole_list, unrelated_keys_do_not_change_activation; AC8 enter_confirms_the_state_shown_on_screen, activation_from_the_list_reaches_the_generated_config; AC9 end_of_input_confirms_the_current_state, stty_failure_degrades_to_one_render_and_line_confirmation; AC10 typed_tokens_do_not_change_activation, degraded_path_never_activates_from_typed_tokens, legacy_typed_token_prompt_text_is_absent; AC11 non-TTY path in tests/cli.rs init cases; AC12 20 init unit tests via ScriptedKeySource; AC13 spec review; AC14 ctrl_c_maps_to_interrupted_exit_code_130, interrupted_reads_are_retried, fake_mode_success_relies_on_the_real_key_source_and_restores plus real-TTY evidence.
 <!-- SECTION:NOTES:END -->
