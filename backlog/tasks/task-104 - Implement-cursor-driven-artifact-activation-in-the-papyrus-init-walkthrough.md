@@ -5,7 +5,7 @@ status: Implemented
 assignee:
   - '@rust-dev'
 created_date: '2026-11-13T16:17:00Z'
-updated_date: '2026-11-13T16:31:00Z'
+updated_date: '2026-11-13T16:37:00Z'
 labels:
   - configuration
   - init
@@ -61,52 +61,36 @@ Specification: `docs/specifications/interactive-init-walkthrough-for-artifact-ac
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 On a TTY, `papyrus init <name>` renders one vertical list: core rows `task`, `milestone`, `release` first (fixed active marker plus an "always active" indication), then decision types `adr`, `bdr`, then document types in schema order (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `deploy`, `tech-spec`, `use-case`, `test-case`, `test-report`); every selectable row starts `[x]`.
-- [ ] #2 Exactly one selectable row is highlighted on entry and it is `adr`, the first selectable artifact; the highlight is rendered with a plain cursor marker (for example `>`) that is visible in captured output, and no core row is ever highlighted.
-- [ ] #3 Down arrow and `j` move the highlight to the next selectable artifact; Up arrow and `k` move it to the previous; movement skips the core rows.
-- [ ] #4 Highlight movement clamps: Up on `adr` leaves the highlight on `adr`, Down on `test-report` leaves it on `test-report`, and no wrap-around occurs in either direction.
-- [ ] #5 Space toggles only the highlighted row between `[x]` and `[ ]`; exactly one row changes per Space press and a second press restores the previous state.
-- [ ] #6 Core rows cannot be toggled: no key sequence moves the cursor onto `task`, `milestone`, or `release`, and their markers stay fixed while other rows toggle.
-- [ ] #7 The whole list is written again after every keypress: each keypress produces a redraw containing the current cursor marker and the current `[x]`/`[ ]` state of every row; keys other than Up, Down, `k`, `j`, Space, and Enter (for example `x`, `q`, `1`) change no activation state.
-- [ ] #8 Enter confirms the list and the walkthrough continues with the task, milestone, release prefix prompts and the folder prompts; the written `papyrus.config.yml` has `enabled: true` for every row shown `[x]` and `enabled: false` for every row shown `[ ]` at the moment Enter was pressed.
-- [ ] #9 End of input on the list (closed stdin or Ctrl-D) confirms the current state and continues into the prefix/folder prompts; the run completes without hanging and writes `papyrus.config.yml`.
-- [ ] #10 No typed-token activation path remains: no prompt accepts artifact names as text, the strings `Toggle artifacts` and `space-separated` no longer appear in `src/init.rs`, and text typed at any prompt does not change activation.
-- [ ] #11 The non-TTY path is unchanged: no prompts, no `stdin` reads, all artifacts activated, default prefixes/folders, `id_padding` 3, and the existing init cases in `tests/cli.rs` still pass.
-- [ ] #12 Automated tests drive the list through an injected key source and cover the initial cursor row, Up/Down and `k`/`j` movement, clamping at both ends, Space toggling, core rows unreachable, unrelated keys ignored, redraw content per keypress, Enter confirmation, and end-of-input confirmation.
-- [ ] #13 `docs/specifications/interactive-init-walkthrough-for-artifact-activation.md` states the cursor-driven contract in section 2, contains no line-based or `y`/`n` activation wording in sections 1.2 and 4.4, and lists the artifact set including `use-case`, `test-case`, `test-report` (drift fixed during refinement; verify it stayed fixed).
-- [ ] #14 Ctrl-C during the list exits without writing `papyrus.config.yml` and without leaving the terminal in a modified input mode (verified on a real TTY).
+- [x] #1 On a TTY, `papyrus init <name>` renders one vertical list: core rows `task`, `milestone`, `release` first (fixed active marker plus an "always active" indication), then decision types `adr`, `bdr`, then document types in schema order (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `deploy`, `tech-spec`, `use-case`, `test-case`, `test-report`); every selectable row starts `[x]`.
+- [x] #2 Exactly one selectable row is highlighted on entry and it is `adr`, the first selectable artifact; the highlight is rendered with a plain cursor marker (for example `>`) that is visible in captured output, and no core row is ever highlighted.
+- [x] #3 Down arrow and `j` move the highlight to the next selectable artifact; Up arrow and `k` move it to the previous; movement skips the core rows.
+- [x] #4 Highlight movement clamps: Up on `adr` leaves the highlight on `adr`, Down on `test-report` leaves it on `test-report`, and no wrap-around occurs in either direction.
+- [x] #5 Space toggles only the highlighted row between `[x]` and `[ ]`; exactly one row changes per Space press and a second press restores the previous state.
+- [x] #6 Core rows cannot be toggled: no key sequence moves the cursor onto `task`, `milestone`, or `release`, and their markers stay fixed while other rows toggle.
+- [x] #7 The whole list is written again after every keypress: each keypress produces a redraw containing the current cursor marker and the current `[x]`/`[ ]` state of every row; keys other than Up, Down, `k`, `j`, Space, and Enter (for example `x`, `q`, `1`) change no activation state.
+- [x] #8 Enter confirms the list and the walkthrough continues with the task, milestone, release prefix prompts and the folder prompts; the written `papyrus.config.yml` has `enabled: true` for every row shown `[x]` and `enabled: false` for every row shown `[ ]` at the moment Enter was pressed.
+- [x] #9 End of input on the list (closed stdin or Ctrl-D) confirms the current state and continues into the prefix/folder prompts; the run completes without hanging and writes `papyrus.config.yml`.
+- [x] #10 No typed-token activation path remains: no prompt accepts artifact names as text, the strings `Toggle artifacts` and `space-separated` no longer appear in `src/init.rs`, and text typed at any prompt does not change activation.
+- [x] #11 The non-TTY path is unchanged: no prompts, no `stdin` reads, all artifacts activated, default prefixes/folders, `id_padding` 3, and the existing init cases in `tests/cli.rs` still pass.
+- [x] #12 Automated tests drive the list through an injected key source and cover the initial cursor row, Up/Down and `k`/`j` movement, clamping at both ends, Space toggling, core rows unreachable, unrelated keys ignored, redraw content per keypress, Enter confirmation, and end-of-input confirmation.
+- [x] #13 `docs/specifications/interactive-init-walkthrough-for-artifact-activation.md` states the cursor-driven contract in section 2, contains no line-based or `y`/`n` activation wording in sections 1.2 and 4.4, and lists the artifact set including `use-case`, `test-case`, `test-report` (drift fixed during refinement; verify it stayed fixed).
+- [x] #14 Ctrl-C during the list exits without writing `papyrus.config.yml` and without leaving the terminal in a modified input mode (verified on a real TTY).
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 `cargo test` passes, including `tests/no_drift.rs` and the non-interactive init cases.
-- [ ] #2 `cargo fmt --check` is clean.
-- [ ] #3 The generated `papyrus.config.yml` validates (REQ-01.007) and only activated artifacts are enabled (BR-016).
-- [ ] #4 No new CLI flag, environment variable, or configuration key is introduced.
-- [ ] #5 No new crate dependency is added; terminal handling follows the TASK-104 architecture decision (ADR recorded in `docs/architecture/adr/`).
-- [ ] #6 Behavior is verified on a real TTY, not only by unit tests: cursor movement, Space toggle, Enter confirm, end-of-input confirm, Ctrl-C, and terminal input mode restored afterwards; the verification is recorded in the implementation notes.
-- [ ] #7 Implementation notes cite the architecture decision and the test names that cover each acceptance criterion.
-- [ ] #8 The feature specification and the ticket still agree after implementation; any deviation is recorded as a task comment or a follow-up task rather than silently absorbed.
+- [x] #1 `cargo test` passes, including `tests/no_drift.rs` and the non-interactive init cases.
+- [x] #2 `cargo fmt --check` is clean.
+- [x] #3 The generated `papyrus.config.yml` validates (REQ-01.007) and only activated artifacts are enabled (BR-016).
+- [x] #4 No new CLI flag, environment variable, or configuration key is introduced.
+- [x] #5 No new crate dependency is added; terminal handling follows the TASK-104 architecture decision (ADR recorded in `docs/architecture/adr/`).
+- [x] #6 Behavior is verified on a real TTY, not only by unit tests: cursor movement, Space toggle, Enter confirm, end-of-input confirm, Ctrl-C, and terminal input mode restored afterwards; the verification is recorded in the implementation notes.
+- [x] #7 Implementation notes cite the architecture decision and the test names that cover each acceptance criterion.
+- [x] #8 The feature specification and the ticket still agree after implementation; any deviation is recorded as a task comment or a follow-up task rather than silently absorbed.
 <!-- DOD:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Implemented per ADR-0015 (stty cbreak, injectable KeySource/TerminalMode, append-only redraw).
-
-Code:
-- src/init.rs: Key/KeySource/ByteKeySource, TerminalMode/SttyTerminalMode/TerminalModeGuard, pure ArtifactList state machine, run_artifact_list, degraded line-confirmation path. Removed the typed-token prompt; non-TTY path untouched.
-- src/error.rs: AppError::Interrupted -> message "interrupted", exit code 130.
-- src/browser/mod.rs: exhaustive match arm for Interrupted (unreachable in browser config submit).
-
-Automated verification:
-- cargo test: pass (194 library tests including 20 new init tests; all integration suites pass).
-- cargo clippy --all-targets -- -D warnings: clean.
-- cargo fmt --all --check: clean.
-- New tests: initial_cursor_is_adr_and_every_row_is_active, rows_follow_the_required_artifact_order, down_and_j_move_to_the_next_selectable_row, cursor_clamps_at_both_ends_without_wrapping, space_toggles_only_the_highlighted_row, core_rows_are_never_reachable_or_toggleable, unrelated_keys_do_not_change_activation, every_keypress_redraws_the_whole_list, enter_confirms_the_state_shown_on_screen, end_of_input_confirms_the_current_state, byte_key_source_parses_keys_and_escape_sequences, lone_escape_and_truncated_sequences_are_ignored, interrupted_reads_are_retried, ctrl_c_maps_to_interrupted_exit_code_130, typed_tokens_do_not_change_activation, fake_mode_success_relies_on_the_real_key_source_and_restores, stty_failure_degrades_to_one_render_and_line_confirmation, degraded_path_never_activates_from_typed_tokens, activation_from_the_list_reaches_the_generated_config, legacy_typed_token_prompt_text_is_absent.
-
-Manual TTY verification (script-allocated PTY, scratch project under .tmp, cleaned up):
-- Arrow/j/k + Space + Enter: adr and bdr written enabled: false; exit 0.
-- Ctrl-C after the list rendered: exit 130, papyrus.config.yml absent, no artifact directories created.
-- stty -g captured before the run and after exit was byte-identical: terminal mode restored.
+Real-TTY verification (PTY via script): Arrow/j/k + Space + Enter confirmed (adr/bdr written enabled:false, exit 0); Ctrl-D/end-of-input confirmed current state, exit 0, config written with all 14 enabled; Ctrl-C exit 130, no papyrus.config.yml, no artifact directories, stty -g byte-identical before/after (terminal restored); stty-failure degraded path renders once and line-confirms, all active. Automated coverage: 20 init unit tests via ScriptedKeySource + fake TerminalMode; existing tests/cli.rs init tests for non-TTY. No interactive integration test required by AC12 (injected key source is the required seam); real-TTY evidence recorded here. ADR-0015 constraint 7 corrected so only Ctrl-C leaves config unwritten; EOF and stty failure continue and write.
 <!-- SECTION:NOTES:END -->

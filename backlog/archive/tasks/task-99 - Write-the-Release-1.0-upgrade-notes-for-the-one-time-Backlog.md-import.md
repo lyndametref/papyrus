@@ -1,10 +1,10 @@
 ---
 id: TASK-99
 title: Write the Release 1.0 upgrade notes for the one-time Backlog.md import
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-11-11T20:44:00Z'
-updated_date: '2026-11-13T11:59:00Z'
+updated_date: '2026-11-13T15:35:00Z'
 labels:
   - documentation
   - import
@@ -25,7 +25,7 @@ references:
   - docs/requirements/business/REQ-01.004.md
 priority: low
 type: docs
-ordinal: 39160
+ordinal: 2000
 ---
 
 ## Description
