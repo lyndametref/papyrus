@@ -5,6 +5,7 @@ pub enum AppError {
     Runtime(String),
     NotFound(String),
     Validation(String),
+    Interrupted,
 }
 
 impl AppError {
@@ -13,6 +14,7 @@ impl AppError {
             AppError::Runtime(_) => 1,
             AppError::NotFound(_) => 3,
             AppError::Validation(_) => 4,
+            AppError::Interrupted => 130,
         }
     }
 
@@ -21,6 +23,7 @@ impl AppError {
             AppError::Runtime(m) => m,
             AppError::NotFound(m) => m,
             AppError::Validation(m) => m,
+            AppError::Interrupted => "interrupted",
         }
     }
 }

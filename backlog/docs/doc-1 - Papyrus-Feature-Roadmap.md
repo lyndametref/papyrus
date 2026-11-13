@@ -3,7 +3,7 @@ id: doc-1
 title: Papyrus Feature Roadmap
 type: specification
 created_date: '2026-11-04T19:22:00Z'
-updated_date: '2026-11-11T21:16:00Z'
+updated_date: '2026-11-13T16:17:00Z'
 ---
 # Papyrus Feature Roadmap
 
@@ -24,8 +24,8 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 - m-11: Technical Specifications — domain model (TASK-21), search (TASK-56), browser (TASK-57), design review (TASK-58), packaging (TASK-59).
 - m-12: Final Cross-Type Integration and Record Metadata — shared record envelope (TASK-63), identity translation (TASK-64), CLI front-matter options (TASK-65), design review (TASK-66), metadata projection (TASK-67), document-record migration (TASK-68), task/milestone migration (TASK-69), legacy removal (TASK-70), Backlog.md round-trip gate (TASK-71), lifecycle page (TASK-72), final cross-type design review (TASK-60), unified search (TASK-18), cross-type browser (TASK-19), packaging (TASK-20), id_padding constraint (TASK-74), interactive init walkthrough (TASK-75), browser skills design review (TASK-76), browser skills page (TASK-77).
 - m-15: Use Cases and Test Documentation — manage use cases, test cases, and test reports from the CLI (TASK-78), search (TASK-80), browser exposure (TASK-81), design review mockup (TASK-79), packaging and verification (TASK-82). Should-have document types (REQ-05.012/013/014); lifecycle active → deprecated; front-matter required. Placed before Release 1.0.
-- m-14: Release 1.0 — two tasks, both Low priority: the release-level upgrade notes TASK-99 (ordinal 39160) and the release gate TASK-73 (labelled release, ordinal 40000, last). m-14 holds no implementation or specification work and stays open and isolated so more requirements can be added before 1.0 without redefining the gate. Closing it requires the feature milestone m-16 to be fully Done plus TASK-20 (m-12) and TASK-82 (m-15), with build/tests passing and the security audit complete.
-- m-16: Release 1.0 - Native Layout, Import, and Browser Refinements — the extension feature milestone, 19 tasks, all High priority: specifications TASK-83 to TASK-86, design review TASK-87, native layout TASK-88, task and milestone adoption TASK-89, relocation TASK-90, init/config TASK-91, import TASK-92, browser surfaces TASK-93 to TASK-96, serializer removal TASK-97, backlog kanban board specification TASK-101, mockup revision TASK-102 and implementation TASK-103, verification and packaging TASK-98. Placed before the release milestone; TASK-73 depends on its final tasks.
+- m-14: Release 1.0 — two tasks, both Low priority: the release-level upgrade notes TASK-99 (ordinal 39160) and the release gate TASK-73 (labelled release, ordinal 40000, last). m-14 holds no implementation or specification work and stays open and isolated so more requirements can be added before 1.0 without redefining the gate. Closing it requires the feature milestone m-16 to be fully Done plus TASK-20 (m-12) and TASK-82 (m-15), with build/tests passing and the security audit complete; TASK-104 (m-16) is part of the feature milestone and must be accepted by the gate before it closes.
+- m-16: Release 1.0 - Native Layout, Import, and Browser Refinements — the extension feature milestone, 20 tasks, all High priority: specifications TASK-83 to TASK-86, design review TASK-87, native layout TASK-88, task and milestone adoption TASK-89, relocation TASK-90, init/config TASK-91, cursor-driven init walkthrough conformance TASK-104 (ordinal 39085, directly after TASK-91), import TASK-92, browser surfaces TASK-93 to TASK-96, serializer removal TASK-97, backlog kanban board specification TASK-101, mockup revision TASK-102 and implementation TASK-103, verification and packaging TASK-98. Placed before the release milestone; TASK-73 depends on its final tasks.
 
 ## Removed
 
@@ -52,7 +52,7 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 - m-11 search/design/browser/packaging -> TASK-55 (CLI); TASK-21 -> TASK-1 (foundation, completed).
 - m-12 TASK-66 -> TASK-59 (m-11); TASK-60 -> TASK-66 and TASK-76; TASK-18 -> search tasks (TASK-31, TASK-35, TASK-39, TASK-44, TASK-48, TASK-56) plus TASK-14 (m-3) and TASK-68; TASK-19 -> TASK-60 plus browser tasks (TASK-23, TASK-24, TASK-25, TASK-26), TASK-67, TASK-72, and TASK-77; TASK-74 -> (none); TASK-75 -> TASK-74; TASK-76 -> TASK-66; TASK-77 -> TASK-76, TASK-72, TASK-67; TASK-20 -> TASK-18, TASK-19, TASK-60, TASK-59, TASK-69, TASK-70, TASK-71, TASK-72, TASK-74, TASK-75, TASK-77.
 - m-15 TASK-78 -> TASK-20 (m-12); TASK-80 -> TASK-78; TASK-79 -> TASK-78; TASK-81 -> TASK-78 and TASK-79; TASK-82 -> TASK-78, TASK-80, TASK-81.
-- m-16 all 19 tasks depend only on tasks inside m-16; the entry tasks TASK-83 to TASK-86 and TASK-101 follow. TASK-101 -> TASK-86; TASK-102 -> TASK-101; TASK-103 -> TASK-97, TASK-101, TASK-102; TASK-98 -> TASK-97, TASK-103. No m-16 task depends on m-12, m-15, or m-14 work, and none depends on a later milestone.
+- m-16 all 20 tasks depend only on tasks inside m-16; the entry tasks TASK-83 to TASK-86 and TASK-101 follow. TASK-101 -> TASK-86; TASK-102 -> TASK-101; TASK-103 -> TASK-97, TASK-101, TASK-102; TASK-98 -> TASK-97, TASK-103; TASK-104 -> TASK-91. No m-16 task depends on m-12, m-15, or m-14 work, and none depends on a later milestone.
 - m-14 TASK-99 -> TASK-83 (m-16) and TASK-92 (m-16); TASK-73 -> TASK-99 (m-14), TASK-98 (m-16), TASK-91 (m-16), TASK-20 (m-12), TASK-82 (m-15). The release milestone depends on the feature milestone; no m-16 task depends on m-14 or on a later milestone.
 - New m-12 internal order: TASK-63 -> TASK-64 -> TASK-65 -> TASK-67; TASK-63/TASK-65 -> TASK-68 -> TASK-69; TASK-67/TASK-69 -> TASK-70 -> TASK-71; TASK-66 -> TASK-67, TASK-72, TASK-60, TASK-76; TASK-74 -> TASK-75; TASK-76 -> TASK-77; TASK-60/TASK-67/TASK-72/TASK-77 -> TASK-19; TASK-20 last.
 
@@ -74,7 +74,7 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 
 - REQ-01.001 — Initialize a Papyrus Project: TASK-2 (baseline, done), TASK-75 (interactive walkthrough).
 - REQ-01.005 — Stable Record IDs and two ID spaces: TASK-64 (translation), TASK-67 (display ID in every projection), TASK-74 (id_padding constraint).
-- REQ-01.006 — Interactive Init Walkthrough: TASK-75.
+- REQ-01.006 — Interactive Init Walkthrough: TASK-75 (first implementation), TASK-85 (specification), TASK-91 (space-toggle walkthrough, nonconforming presentation), TASK-104 (cursor-driven conformance).
 - REQ-01.007 — ID Padding Constraint for File IDs: TASK-74.
 - REQ-06.005 — Browser Skills Page for Agent Workflow Configuration: TASK-76 (design review), TASK-77 (implementation).
 
@@ -135,7 +135,7 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 - REQ-01.001 — TASK-85 (specification), TASK-91 (non-empty directory, --force replacement).
 - REQ-01.002 — TASK-85, TASK-90 (relocation), TASK-94 (browser delegates to config set).
 - REQ-01.003 — TASK-85, TASK-91 (missing-configuration runtime error).
-- REQ-01.006 — TASK-85, TASK-91 (space-toggle TTY walkthrough).
+- REQ-01.006 — TASK-85, TASK-91 (space-toggle TTY walkthrough), TASK-104 (cursor-driven presentation, navigation, clamping, Enter/EOF confirmation).
 - REQ-06.003 — TASK-86, TASK-87, TASK-95.
 - REQ-06.006 — TASK-86, TASK-93.
 - REQ-06.007 — TASK-86, TASK-96.
@@ -168,3 +168,14 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 - Release gate: no change to TASK-73's dependency list. TASK-98 gains TASK-103, so the packaged build and the verification cover the board, and TASK-73's existing dependency on TASK-98 covers the new work transitively. TASK-99 is unaffected.
 - Hard constraints encoded: the status change uses the existing browser write contract (ADR-0006 version token, ADR-0013 single writer) and introduces no new module, stack, or non-functional requirement; the specification drift in browser-backlog-records-ui.md section 4 and browser-tasks-milestones-and-releases.md section 3 is fixed before implementation; a materially revised mockup requires explicit user approval before implementation starts.
 - Requirement coverage: REQ-06.013 -> TASK-101, TASK-102, TASK-103; REQ-01.002 (configured statuses drive the columns) -> TASK-101, TASK-103; REQ-02.002 (status change and field preservation) -> TASK-103; REQ-06.002 and NFR-01.002 (served in the local browser) -> TASK-103; NFR-05.001 (named browsers) -> TASK-103 tests.
+
+## Requirement change update (2026-11-13) — REQ-01.006 cursor-driven init walkthrough
+
+- Changed requirement: REQ-01.006 Interactive Init Walkthrough at `papyrus init <project_name>` (Should have, validated). The artifact-activation step must be a single cursor-driven list: exactly one highlighted selectable row starting on the first selectable artifact, Up/Down or `k`/`j` navigation, Space toggles the highlighted artifact, Enter confirms and continues, redraw after every keypress, navigation clamped at both ends, task/milestone/release shown as always active and never highlighted or toggled, typed space-separated tokens explicitly rejected, and end of input on the list confirms and continues. No NFR or integration impact; no new flag or environment variable.
+- Classification: conformance gap, not a new requirement. TASK-91 delivered the space-toggle list as a static render plus a one-line token prompt (`src/init.rs`, `build_config_interactive`), so REQ-01.006 was only partly met when TASK-91 was closed Done. TASK-91 is not reopened and not re-scoped; the correction is a separate task so its other delivered behavior (non-empty-directory init, `--force`, missing-config failure) is not disturbed.
+- Placement (no new milestone): TASK-104 goes to m-16, the feature milestone that delivered the init work, and reopens that milestone from 14/14 to 14/15 Done. Creating a milestone after m-16 would sit between the feature work and the release gate for a single CLI defect, and m-14 stays release-only per the 2026-11-11 decision.
+- Ordering: ordinal 39085, immediately after TASK-91 (39080) and before TASK-92 (39090), so the init surface is corrected before the import and browser surfaces that were ordered after it. Dependencies: TASK-104 -> TASK-91 only. Priority High, matching every m-16 task; REQ-01.006 criticality (Should have) is not changed and order inside the milestone is expressed by ordinal.
+- Verification: TASK-98 (packaging and verification) is already Done and is not re-scoped. TASK-104 carries its own pseudo-TTY test coverage and a real-TTY check, and the release gate TASK-73 must accept TASK-104 before closing. TASK-73 is currently archived in To Do; restoring it and adding the dependency is a status change owned by the user through `orchestrator`, so the dependency is recorded here rather than edited into the archived ticket.
+- Specification drift found while checking coverage: `docs/specifications/interactive-init-walkthrough-for-artifact-activation.md` section 2 states only a space-toggle list without the cursor contract, section 1.2 says prompts are read line-by-line, and section 4.4 keeps `y`/`yes`/`n`/`no` activation prompts. Correlating the specification with the requirement is an acceptance criterion of TASK-104 rather than a separate specification task, because the text changes only describe the one implementation being corrected.
+- Requirement coverage: REQ-01.006 -> TASK-85 (specification), TASK-91 (delivered walkthrough), TASK-104 (cursor-driven conformance). REQ-01.001 and REQ-01.007 remain covered by TASK-91 and are unchanged; BR-016 behavior (only activated types enabled) is unchanged.
+- No other roadmap item changes: milestones, priorities, ordinals of existing tasks, and all other requirement coverage are unaffected.
