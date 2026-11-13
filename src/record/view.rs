@@ -3,12 +3,10 @@
 //! A single projection is the only source of record metadata for every CLI
 //! and browser surface (planned ticket TASK-67, ADR-0009 decision 5):
 //!
-//! * `id` is the Papyrus display ID and is the record identity on every
-//!   surface;
+//! * `id` is the Papyrus ID and is the record identity on every surface;
 //! * `metadata` is the record's front-matter keys exactly as stored, in
 //!   canonical front-matter key order (general keys first, then
-//!   type-specific keys). The Backlog.md storage ID lives only at
-//!   `metadata["id"]`;
+//!   type-specific keys). `metadata["id"]` is the same Papyrus ID;
 //! * `version` is the ADR-0006 optimistic-concurrency token; it is not
 //!   part of `metadata`.
 
@@ -217,7 +215,7 @@ mod tests {
     use super::*;
 
     const SAMPLE: &str = r#"---
-id: task-1
+id: TASK-001
 title: Alpha task
 created_date: '2026-11-08T15:06:00Z'
 updated_date: '2026-11-08T15:06:00Z'
@@ -269,13 +267,13 @@ Desc
     }
 
     #[test]
-    fn identity_is_display_id_and_storage_id_stays_in_metadata() {
+    fn metadata_id_is_the_papyrus_id() {
         let view = RecordView::from_content(SAMPLE, "TASK-001", "1").unwrap();
         assert_eq!(view.id, "TASK-001");
         assert_eq!(
             view.str_value("id").as_deref(),
-            Some("task-1"),
-            "storage ID belongs inside metadata only"
+            Some("TASK-001"),
+            "metadata.id is the Papyrus ID"
         );
     }
 

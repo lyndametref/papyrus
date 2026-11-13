@@ -164,6 +164,9 @@ pub struct Record {
     pub refs: Vec<String>,
     pub mockup_task: String,
     pub doc: Document,
+    /// Record content exactly as stored on disk, before line-ending
+    /// normalization. It is the byte comparison baseline for a save.
+    pub stored_source: String,
     pub path: PathBuf,
     pub rel_path: String,
     pub version: String,
@@ -459,6 +462,7 @@ fn default_record(
         refs: Vec::new(),
         mockup_task: String::new(),
         doc,
+        stored_source: String::new(),
         path,
         rel_path,
         version,
@@ -494,13 +498,15 @@ fn load_record(ctx: &Context, kind: Category, path: &Path) -> Result<Option<Reco
     if kind == Category::Decision && crate::decision::type_key_for_id(&cfg, &stem).is_none() {
         return Ok(None);
     }
-    let Ok((doc, version)) = crate::record::store::read_document(ctx, &safe) else {
+    let Ok(read) = crate::record::store::read_document_normalized(ctx, &safe) else {
         return Ok(None);
     };
     let id = canonical_id(&cfg, kind, &stem).unwrap_or_else(|| stem.clone());
-    let view = RecordView::from_content(&doc.source, &id, &version).ok();
+    let view = RecordView::from_content(&read.document.source, &id, &read.version).ok();
     let rel_path = relative_path(&ctx.project_dir, &safe);
-    let mut record = default_record(id, kind, form, doc, safe, rel_path, version);
+    let version = read.version;
+    let mut record = default_record(id, kind, form, read.document, safe, rel_path, version);
+    record.stored_source = read.stored_source;
     let content = record.doc.source.clone();
     match kind {
         Category::Task => {
@@ -727,6 +733,7 @@ fn load_ui_mockup(ctx: &Context, path: &Path) -> Result<Option<Record>, AppError
     record.specs = meta_record.specs.clone();
     record.refs = meta_record.refs.clone();
     record.mockup_task = meta_record.task.clone();
+    record.stored_source = record.doc.source.clone();
     Ok(Some(record))
 }
 
@@ -936,7 +943,7 @@ pub fn validate_title(raw: &str) -> Result<String, String> {
 /// Validate a multi-line field and return the stored value, or `None` when the
 /// value is empty (specification sections 7.3 and 7.4).
 pub fn validate_multiline(label: &str, raw: &str) -> Result<Option<String>, String> {
-    let normalized = raw.replace("\r\n", "\n").replace('\r', "\n");
+    let normalized = crate::record::line_endings::unify(raw);
     let value = normalized.trim();
     if value.is_empty() {
         return Ok(None);
@@ -959,7 +966,7 @@ pub fn validate_multiline(label: &str, raw: &str) -> Result<Option<String>, Stri
 /// Validate a list field (one value per line) and return the parsed items.
 pub fn validate_list_items(label: &str, raw: &str) -> Result<Vec<String>, String> {
     let mut items: Vec<String> = Vec::new();
-    let normalized = raw.replace("\r\n", "\n").replace('\r', "\n");
+    let normalized = crate::record::line_endings::unify(raw);
     for line in normalized.lines() {
         let value = line.trim();
         if value.is_empty() {

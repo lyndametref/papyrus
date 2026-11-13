@@ -5,6 +5,7 @@ pub mod document;
 pub mod edit;
 pub mod frontmatter;
 pub mod identity;
+pub mod line_endings;
 pub mod migrate;
 pub mod patch;
 pub mod relocate;
@@ -19,7 +20,10 @@ pub use document::{Document, Section, parse as parse_document, render as render_
 pub use frontmatter::FrontMatter;
 pub use identity::*;
 pub use patch::{Patch, PatchOp, apply_patch};
-pub use store::{Store, read as read_record, read_document, resolve_path, write_atomic};
+pub use store::{
+    NormalizedRead, Store, read as read_record, read_document, read_document_normalized,
+    resolve_path, write_atomic,
+};
 pub use view::RecordView;
 
 pub use relocate::{RelocationReport, move_folder, relocate, relocate_folder};

@@ -1,9 +1,12 @@
 //! Mechanical no-drift checks for ADR-0013 decision 7 (TASK-97).
 //!
 //! Each check scans production `.rs` files under `src/` and fails the default
-//! `cargo test` run. Test modules (`#[cfg(test)]` to end of file) are excluded
-//! as documented. Allowlists are the minimum required by the feature
-//! specification:
+//! `cargo test` run. Every `#[cfg(test)]`-annotated item (`mod`, `fn`, `impl`,
+//! macro block, or expression) is excluded by tracking brace depth from the
+//! attribute, and scanning resumes after the item closes; production lines after
+//! a mid-file test module are therefore scanned (decision D4).
+//!
+//! Allowlists are the minimum required by the feature specification:
 //!
 //! | # | Condition | Allowlist |
 //! |---|---|---|
@@ -40,22 +43,151 @@ fn src_files() -> Vec<PathBuf> {
     out
 }
 
-/// Split a source file into production lines, dropping everything from the
-/// first `#[cfg(test)]` attribute to end of file (test modules are excluded).
+/// Split a source file into production lines, excluding every
+/// `#[cfg(test)]`-annotated item and resuming after it closes (D4).
 fn production_lines(path: &Path) -> Vec<(usize, String)> {
     let content = fs::read_to_string(path).unwrap_or_default();
+    production_lines_in(&content)
+}
+
+fn production_lines_in(content: &str) -> Vec<(usize, String)> {
+    let lines: Vec<&str> = content.lines().collect();
     let mut out = Vec::new();
-    let mut in_test = false;
-    for (i, line) in content.lines().enumerate() {
-        if line.contains("#[cfg(test)]") {
-            in_test = true;
-        }
-        if in_test {
+    let mut index = 0;
+    while index < lines.len() {
+        if lines[index].trim_start().starts_with("#[cfg(test)]") {
+            index = skip_cfg_test_item(&lines, index + 1);
             continue;
         }
-        out.push((i + 1, line.to_string()));
+        out.push((index + 1, lines[index].to_string()));
+        index += 1;
     }
     out
+}
+
+/// Return the index of the first line after the `#[cfg(test)]` item starting at
+/// `index`. The item ends at its closing brace, or after a semicolon when the
+/// annotated item is a statement.
+fn skip_cfg_test_item(lines: &[&str], mut index: usize) -> usize {
+    let mut depth = 0i32;
+    let mut opened = false;
+    while index < lines.len() {
+        let line = lines[index];
+        let delta = brace_delta(line);
+        if delta > 0 {
+            opened = true;
+        }
+        depth += delta;
+        index += 1;
+        let closed = if opened {
+            depth <= 0
+        } else {
+            line.trim_end().ends_with(';')
+        };
+        if closed {
+            break;
+        }
+    }
+    index
+}
+
+/// Net brace balance on one line, ignoring braces inside comments, string
+/// literals, raw strings, and character literals.
+fn brace_delta(line: &str) -> i32 {
+    let bytes = line.as_bytes();
+    let mut delta = 0i32;
+    let mut i = 0usize;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'/' if bytes.get(i + 1) == Some(&b'/') => break,
+            b'/' if bytes.get(i + 1) == Some(&b'*') => match line[i + 2..].find("*/") {
+                Some(end) => i += 2 + end + 2,
+                None => break,
+            },
+            b'r' if is_raw_string_start(bytes, i) => i = skip_raw_string(bytes, i),
+            b'"' => i = skip_quoted(bytes, i, b'"'),
+            b'\'' => i = skip_char(bytes, i),
+            b'{' => {
+                delta += 1;
+                i += 1;
+            }
+            b'}' => {
+                delta -= 1;
+                i += 1;
+            }
+            _ => i += 1,
+        }
+    }
+    delta
+}
+
+fn is_raw_string_start(bytes: &[u8], start: usize) -> bool {
+    if bytes.get(start) != Some(&b'r') {
+        return false;
+    }
+    let mut i = start + 1;
+    while bytes.get(i) == Some(&b'#') {
+        i += 1;
+    }
+    bytes.get(i) == Some(&b'"')
+}
+
+fn skip_raw_string(bytes: &[u8], start: usize) -> usize {
+    let mut hashes = 0usize;
+    let mut i = start + 1;
+    while bytes.get(i) == Some(&b'#') {
+        hashes += 1;
+        i += 1;
+    }
+    i += 1;
+    while i < bytes.len() {
+        if bytes[i] == b'"' {
+            let mut j = i + 1;
+            let mut matched = 0usize;
+            while matched < hashes && bytes.get(j) == Some(&b'#') {
+                matched += 1;
+                j += 1;
+            }
+            if matched == hashes {
+                return j;
+            }
+        }
+        i += 1;
+    }
+    bytes.len()
+}
+
+fn skip_quoted(bytes: &[u8], start: usize, quote: u8) -> usize {
+    let mut i = start + 1;
+    while i < bytes.len() {
+        if bytes[i] == b'\\' {
+            i += 2;
+            continue;
+        }
+        if bytes[i] == quote {
+            return i + 1;
+        }
+        i += 1;
+    }
+    bytes.len()
+}
+
+fn skip_char(bytes: &[u8], start: usize) -> usize {
+    if bytes.get(start + 1) == Some(&b'\\') {
+        if bytes.get(start + 2) == Some(&b'u') {
+            let mut i = start + 3;
+            while i < bytes.len() && bytes[i] != b'}' {
+                i += 1;
+            }
+            return (i + 1).min(bytes.len());
+        }
+        return (start + 3).min(bytes.len());
+    }
+    if bytes.get(start + 2) == Some(&b'\'') {
+        return start + 3;
+    }
+    // A lifetime such as `'a`, not a character literal.
+    start + 1
 }
 
 fn relative(path: &Path) -> String {
@@ -63,13 +195,28 @@ fn relative(path: &Path) -> String {
 }
 
 fn check(label: &str, allowed: &[&str], matches: impl Fn(&str) -> bool) -> Result<(), String> {
+    let files: Vec<(String, String)> = src_files()
+        .into_iter()
+        .map(|path| {
+            let content = fs::read_to_string(&path).unwrap_or_default();
+            (relative(&path), content)
+        })
+        .collect();
+    scan_files(label, allowed, &files, matches)
+}
+
+fn scan_files(
+    label: &str,
+    allowed: &[&str],
+    files: &[(String, String)],
+    matches: impl Fn(&str) -> bool,
+) -> Result<(), String> {
     let mut violations = Vec::new();
-    for path in src_files() {
-        let rel = relative(&path);
+    for (rel, content) in files {
         if allowed.iter().any(|prefix| rel.starts_with(prefix)) {
             continue;
         }
-        for (lineno, line) in production_lines(&path) {
+        for (lineno, line) in production_lines_in(content) {
             if matches(&line) {
                 violations.push(format!("{}:{}: {}", rel, lineno, line.trim()));
             }
@@ -213,4 +360,87 @@ fn no_second_section_parser() {
         },
     )
     .unwrap();
+}
+
+// TASK-97 D4: a violation after a mid-file test module is reported, and nested
+// `#[cfg(test)]` items inside the module do not resume scanning early.
+#[test]
+fn scanner_reports_violations_after_a_mid_file_test_module() {
+    let fixture = "\
+fn before() {}\n\
+\n\
+#[cfg(test)]\n\
+mod tests {\n\
+    #[cfg(test)]\n\
+    mod nested {\n\
+        fn inner() { let _ = \"{\"; }\n\
+    }\n\
+    #[test]\n\
+    fn helper() { let _ = r#\"{ unbalanced\"#; }\n\
+}\n\
+\n\
+fn after() {\n\
+    let _ = fs::write(\"record.md\", \"x\");\n\
+}\n\
+";
+    let production = production_lines_in(fixture);
+    assert!(
+        production
+            .iter()
+            .any(|(_, line)| line.contains("fn before")),
+        "production before the test module is scanned"
+    );
+    assert!(
+        !production
+            .iter()
+            .any(|(_, line)| line.contains("fn helper")),
+        "the test module must be excluded"
+    );
+    assert!(
+        production.iter().any(|(_, line)| line.contains("fn after")),
+        "scanning must resume after the test module"
+    );
+    let files = [("fixture.rs".to_string(), fixture.to_string())];
+    let error = scan_files("fixture violation:", &[], &files, |line| {
+        line.contains("fs::write")
+    })
+    .unwrap_err();
+    assert!(
+        error.contains("fixture.rs:14:"),
+        "violation after the test module must report file:line, got: {error}"
+    );
+    assert!(error.contains("fs::write"), "got: {error}");
+}
+
+// TASK-97 D4: the src/browser/render.rs production tail after its test module is
+// scanned, not truncated at the `#[cfg(test)]` attribute.
+#[test]
+fn scanner_covers_production_after_the_render_test_module() {
+    let source = fs::read_to_string("src/browser/render.rs").expect("render.rs is readable");
+    let test_module_line = source
+        .lines()
+        .position(|line| line.trim_start().starts_with("#[cfg(test)]"))
+        .map(|index| index + 1)
+        .expect("render.rs has a test module");
+    let production = production_lines(Path::new("src/browser/render.rs"));
+    assert!(
+        production
+            .iter()
+            .all(|(lineno, _)| *lineno != test_module_line),
+        "the test attribute must not be a production line"
+    );
+    for marker in [
+        "pub fn lifecycle_page",
+        "pub fn config_page",
+        "pub fn inventory_page",
+    ] {
+        let (lineno, _) = production
+            .iter()
+            .find(|(_, line)| line.contains(marker))
+            .unwrap_or_else(|| panic!("{marker} must be scanned"));
+        assert!(
+            *lineno > test_module_line,
+            "{marker} at line {lineno} must be scanned after the test module at {test_module_line}"
+        );
+    }
 }

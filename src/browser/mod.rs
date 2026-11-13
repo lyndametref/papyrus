@@ -973,13 +973,16 @@ fn save_ops(
     ops: Vec<crate::record::patch::PatchOp>,
 ) -> Result<(), HttpError> {
     let content = edit::apply(&record.doc, &ops).map_err(|_| HttpError::new(500))?;
+    // Browser saves use LF with exactly one trailing newline (ADR-0013 D2).
+    let content = crate::record::line_endings::normalize(&content);
     save_content(ctx, record, content)
 }
 
-/// Write already-rendered content only when it differs from the source. A
-/// no-op save performs no write and does not refresh `updated_date`.
+/// Write already-rendered content only when it differs from the bytes stored on
+/// disk. A no-op save performs no write and does not refresh `updated_date`;
+/// the first save of a CRLF record still performs the one-time LF conversion.
 fn save_content(ctx: &Context, record: &Record, content: String) -> Result<(), HttpError> {
-    if content != record.doc.source {
+    if content != record.stored_source {
         crate::record::store::write_atomic(ctx, &record.path, &content)
             .map_err(|_| HttpError::new(500))?;
     }
@@ -4058,6 +4061,7 @@ mod tests {
             mockup_task: "TASK-1".to_string(),
             audit_type: None,
             doc: crate::record::document::parse("# MOCK-001 Login\n").unwrap(),
+            stored_source: String::new(),
             path: std::path::PathBuf::from("docs/specifications/ui/mockups/MOCK-001.html"),
             rel_path: "docs/specifications/ui/mockups/MOCK-001.html".to_string(),
             version: "1.2.3".to_string(),
@@ -4128,6 +4132,7 @@ mod tests {
             mockup_task: String::new(),
             audit_type: None,
             doc: crate::record::document::parse("# TECH-001 Offline architecture\n").unwrap(),
+            stored_source: String::new(),
             path: std::path::PathBuf::from("docs/technical/TECH-001.md"),
             rel_path: "docs/technical/TECH-001.md".to_string(),
             version: "1.2.3".to_string(),

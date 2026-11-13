@@ -5572,6 +5572,80 @@ fn t57_read_adoption_is_idempotent() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+// TASK-97 AC #12 / D2: a CRLF record normalizes to LF on the first save and the
+// next identical save writes nothing.
+#[test]
+fn t57_crlf_save_normalizes_to_lf_once() {
+    let dir = tech_spec_fixture("t57-crlf");
+    let path = tech_spec_path(&dir, "TECH-001");
+    let lf = fs::read_to_string(&path).unwrap();
+    assert!(!lf.contains('\r'), "fixture starts with LF");
+    fs::write(&path, lf.replace('\n', "\r\n")).unwrap();
+
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let edit = get(&server, "/doc/TECH-001/edit").text();
+    assert!(
+        !edit.contains('\r'),
+        "read normalization strips carriage returns from headings and bodies"
+    );
+    let version = extract_version(&edit);
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Offline architecture"),
+        ("description", "Defines the local browser."),
+    ]);
+    assert_eq!(post_form(&server, "/doc/TECH-001", &body).status, 303);
+
+    let after_first = fs::read(&path).unwrap();
+    let text = String::from_utf8(after_first.clone()).unwrap();
+    assert!(!text.contains('\r'), "first save writes LF: {text:?}");
+    assert!(
+        text.ends_with('\n') && !text.ends_with("\n\n"),
+        "first save writes exactly one trailing newline: {text:?}"
+    );
+    assert_eq!(
+        text.matches("## Description").count(),
+        1,
+        "the section heading appears exactly once: {text:?}"
+    );
+    let updated_after_first = text
+        .lines()
+        .find(|line| line.starts_with("updated_date:"))
+        .map(str::to_string);
+    let mtime_after_first = fs::metadata(&path).unwrap().modified().unwrap();
+
+    // A second, immediately repeated identical save must perform no write.
+    let edit = get(&server, "/doc/TECH-001/edit").text();
+    let version = extract_version(&edit);
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Offline architecture"),
+        ("description", "Defines the local browser."),
+    ]);
+    assert_eq!(post_form(&server, "/doc/TECH-001", &body).status, 303);
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        after_first,
+        "the second identical save must leave the file byte-identical"
+    );
+    assert_eq!(
+        fs::metadata(&path).unwrap().modified().unwrap(),
+        mtime_after_first,
+        "the second identical save must not write and refresh updated_date"
+    );
+    assert_eq!(
+        fs::read_to_string(&path)
+            .unwrap()
+            .lines()
+            .find(|line| line.starts_with("updated_date:"))
+            .map(str::to_string),
+        updated_after_first
+    );
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 // T-57f
 #[test]
 fn t57f_validation_422_no_write() {
