@@ -54,9 +54,11 @@ This is a verification and packaging ticket. Product behaviour must not change; 
 ### 2. Adoption idempotency and byte identity
 
 1. A record that already carries front matter is read twice and written with a patch whose values equal the current ones; the file's bytes, mode, and modification time are unchanged, and `updated_date` is not refreshed.
-2. A legacy-shaped record without front matter is adopted on first read or first write for a document record type and for a task and a milestone; the second read and an equal-value write produce byte-identical content, and the file name and ID are unchanged by adoption.
-3. The same checks are repeated with the installed binary from the built package.
-4. A read that cannot adopt safely (read-only file or directory) reports the error, leaves the file byte-identical, and keeps the record readable from its existing text.
+2. Adoption read of a legacy-shaped record without front matter (document record type, task, and milestone) is byte-identical: the front-matter block is added and every remaining body byte is unchanged; the file name and ID are unchanged by adoption.
+3. The first write to a legacy record retires the legacy title heading and metadata sections per ADR-0012 decision 4 (the documented TASK-89 behaviour), so the written file is native front-matter-only; every subsequent read and equal-value write of that record is byte-identical, with mode and modification time unchanged and `updated_date` not refreshed.
+4. An equal-value write to a record that already carries native front matter (never legacy-shaped) is byte-identical in the same sense.
+5. A read that cannot adopt safely (read-only file or directory) reports the error, leaves the file byte-identical, and keeps the record readable from its existing text.
+6. The same checks are repeated with the installed binary from the built package.
 
 ### 3. No Backlog-shaped write
 
@@ -99,12 +101,13 @@ This is a verification and packaging ticket. Product behaviour must not change; 
 4. The browser configuration view reaches the same relocation path: the same move performed through the view produces the same on-disk result and configuration value as the CLI, and the view never moves a folder itself.
 5. Success and conflict are re-verified through the installed binary; `tests/config_relocation_cli.rs` remains authoritative for the exhaustive case matrix.
 
-### 8. Search over whole persisted text
+### 8. Search over whole persisted text (CLI) and browser record exposure
 
-1. Search matches case-insensitive substrings of the whole persisted record text, including front matter, so a query matching only a metadata value (for example a label, an assignee, or a title stored in front matter) returns the record.
-2. Quoted phrases, `--type` filters, `--limit`, `--json`, empty results, and deprecated/archived visibility behave as documented in `search-complete-unified.md` and the per-type search specifications.
-3. A search run writes no file: the project hash is unchanged afterwards.
-4. The evidence records the exact front-matter-only query used, so the claim is reproducible.
+1. `papyrus search` matches case-insensitive substrings of the whole persisted record text, including front matter, so a query matching only a metadata value (for example a label, an assignee, or a title stored in front matter) returns the record in the CLI text and `--json` output.
+2. Search is a CLI surface only: the browser exposes no search endpoint, page, or query parameter. The browser half of this check is the record view and the JSON API returning the record that the CLI query found, under its Papyrus ID.
+3. Quoted phrases, `--type` filters, `--limit`, `--json`, empty results, and deprecated/archived visibility behave as documented in `search-complete-unified.md` and the per-type search specifications.
+4. A search run writes no file: the project hash is unchanged afterwards.
+5. The evidence records the exact front-matter-only query used, so the claim is reproducible.
 
 ### 9. Rust quality gates
 
@@ -155,7 +158,7 @@ This is a verification and packaging ticket. Product behaviour must not change; 
 | Fixture source tree is not byte-identical after the run | Blocked; import wrote to its source. |
 | Any surface shows a Backlog ID, or accepts one as input | Blocked; single-ID claim fails. |
 | Any written file is Backlog-shaped, or a storage-ID key appears | Blocked; no-drift claim fails. |
-| A second adoption or equal-value write changes a byte, mode, or timestamp | Blocked; idempotency claim fails. |
+| A repeated adoption, or an equal-value write to a native front-matter record (including a record after its first-write retirement), changes a byte, mode, or timestamp | Blocked; idempotency claim fails. |
 | Import fidelity mismatch against fixture expectations | Blocked; record the record, field, and expected/actual values. |
 | Relocation moves a partial plan, or persists configuration on failure | Blocked. |
 | Front-matter-only search query returns nothing | Blocked; search claim fails. |
@@ -173,14 +176,14 @@ This is a verification and packaging ticket. Product behaviour must not change; 
 | Check | Verifies | How it is verified |
 |---|---|---|
 | T-98-01 | Isolated fixture complete and repository store untouched | Fixture inventory, `git status --porcelain backlog/`, recursive hash before/after |
-| T-98-02 | Adoption and no-op writes are byte-identical | Repeated adoption and equal-value patch writes with byte/mode/mtime comparison |
+| T-98-02 | Adoption read byte-identical; native equal-value writes byte-identical; first legacy write retires sections | Repeated adoption and equal-value patch writes with byte/mode/mtime comparison; first-write retirement of a legacy record asserted separately, with post-retirement identity |
 | T-98-03 | No Backlog-shaped write anywhere | Written-path inspection over create/edit/adopt/archive/restore/import; `tests/no_drift.rs` in the passing suite |
 | T-98-04 | Unimported store invisible, readable after import, source immutable | CLI and browser checks before/after import; source hash |
 | T-98-05 | One Papyrus ID on every surface; Backlog ID rejected | Captured CLI text, `--json`, browser HTML, JSON API, URLs; `task view task-1` exits 3 |
 | T-98-06 | Import fidelity, bodies, destinations, excluded scope | Fixture-expectation comparison of every in-scope record and the excluded counts |
 | T-98-07 | Documented upgrade path executes as written | Literal procedure run on the isolated project; plan/report kept; findings recorded |
 | T-98-08 | Relocation atomicity, conflict, containment, browser path | CLI `config set` success/conflict, hash comparisons, browser view equivalence, installed-binary re-check |
-| T-98-09 | Search indexes front matter; no write | Front-matter-only query on CLI and browser; project hash unchanged |
+| T-98-09 | Search indexes front matter on the CLI; browser exposes the record | Front-matter-only query via `papyrus search` (text and `--json`); the same record rendered by the browser record view and the JSON API; project hash unchanged |
 | T-98-10 | Rust quality gates pass | `cargo build --release`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check` |
 | T-98-11 | Debian package metadata and contents | `./scripts/build-deb.sh`, `dpkg-deb -I`, `dpkg-deb -c`, copyright inspection |
 | T-98-12 | Installed binary imports and serves the browser on Forky | Isolated `dpkg` install, CLI import, browser board/view/status change/API/assets, offline check, `-r`, `--purge` |

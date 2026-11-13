@@ -1270,11 +1270,18 @@ release are **not claimed or verified**; no other architecture is claimed.
 
 Observed results:
 
-- **Adoption / no-op identity** — an already-front-matter task, a legacy task, a
-  legacy milestone, and a legacy technical specification were read twice and saved
-  with equal values without changing bytes, mode, `updated_date`, or mtime. A
-  read-only directory failed adoption with a non-zero exit and left the file
-  byte-identical.
+- **Adoption / no-op identity** — an adoption read of a legacy task, a legacy
+  milestone, and a legacy technical specification added only the front-matter block
+  and left every remaining body byte unchanged. A record that already carried
+  native front matter was read twice and written with equal values without changing
+  any byte, mode, `updated_date`, or mtime; the same identity held for every read
+  and equal-value write after a legacy record's first write. The first write to a
+  legacy record retired its legacy title heading and metadata sections per ADR-0012
+  decision 4 (the documented TASK-89 behaviour), after which the file was native
+  front-matter-only and every further read and equal-value write was byte-identical.
+  `t98_02_adoption_and_noop_writes_are_byte_identical` asserts this documented
+  retirement plus post-retirement identity. A read-only directory failed adoption
+  with a non-zero exit and left the file byte-identical.
 - **No Backlog-shaped write** — after create, edit, archive, restore, deprecate,
   adopt, and import, every written record path was `<ID>.md` (decisions
   `<ID>-<kebab-slug>.md`); no Backlog stem, `## Status` metadata section, or
@@ -1349,6 +1356,8 @@ Observed results:
 | Browser board: per-milestone section and configured status columns | PASS — `MS-001` board section, six columns |
 | Browser task record view | PASS — HTTP 200, body present |
 | Board status change persisted to the record | PASS — HTTP 303, `status: Initiated` in `TASK-001.md` |
+| Installed `config set backlog_directory` success | PASS — multi-segment `native/store/`; the unmanaged file and subfolder moved, the empty source was removed, and the new value was persisted |
+| Installed `config set backlog_directory` conflict | PASS — exit 4, `destination entry conflict: unmanaged.txt`; nothing moved, both trees intact, configuration byte-identical |
 | JSON API `/api/tasks`, `/api/milestones` | PASS — HTTP 200, Papyrus IDs |
 | Embedded assets `/assets/app.css`, `/assets/app.js` | PASS — HTTP 200, 14,151 and 7,795 bytes |
 | Offline `unshare -rn` (loopback up) | PASS — outbound TCP failed; list, record view, status change (303, `status: Refined`), API, CSS, and JS over loopback succeeded |
@@ -1364,6 +1373,13 @@ Observed results:
 - **Package version.** The package keeps `Cargo.toml` version `0.1.0` (OQ-2); the
   release owner decides any bump.
 - **Offline namespace.** `unshare -rn` was available and the offline run passed.
+- **TASK-99 upgrade notes unavailable at verification time.** The Release 1.0
+  upgrade notes (TASK-99) did not exist in the repository when this verification ran
+  (TASK-99 was in `To Do`), so the documented one-time import procedure was executed
+  from the release specification §6, the import specification §11 contract, and the
+  shipped `papyrus import backlog --help` instead of from TASK-99's notes. No TASK-99
+  wording could be cross-checked; the TASK-99/TASK-73 owner must confirm the notes,
+  once published, against this evidence.
 - **Finding F-98-1 (for TASK-73/TASK-99, not edited here).**
   `release-1.0-native-layout-verification-and-packaging.md` §2.2 says a legacy
   record's equal-value write produces byte-identical content. Observed behaviour:
@@ -1371,7 +1387,13 @@ Observed results:
   (documented by TASK-89 in `task-management.md` and
   `milestone-and-release-management.md`), so that first write is not byte-identical;
   after retirement, equal-value writes are byte-identical. The new test asserts the
-  documented retirement plus post-retirement identity.
+  documented retirement plus post-retirement identity. **Resolved in the quality-gate
+  wording fix:** AC#2 and specification §2.2 now state adoption-read identity,
+  native equal-value write identity, and the documented first-write retirement; the
+  shipped assertion already matched and no implementation change was needed.
 - **Finding F-98-2 (for TASK-73).** The browser has no search endpoint; the release
   specification's "CLI and browser" search wording is satisfied only by the CLI
   search plus the browser record view/API exposure of the matching metadata.
+  **Resolved in the quality-gate wording fix:** AC#9 and specification §8.1/§8.2
+  scope search to the CLI with the browser limited to the record view and JSON API;
+  no implementation change was needed.
