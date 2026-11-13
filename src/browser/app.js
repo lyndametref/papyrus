@@ -160,4 +160,97 @@
       });
     })(addButtons[a]);
   }
+
+  /* Backlog board: drag-and-drop is enhancement only. The visible select and
+     Change status button remain the complete no-script path. */
+  var boardCards = document.querySelectorAll(".board-card");
+  var boardColumns = document.querySelectorAll(".board-column");
+  if (boardCards.length && boardColumns.length) {
+    var draggedTask = null;
+
+    function clearDropTargets() {
+      for (var c = 0; c < boardColumns.length; c++) {
+        boardColumns[c].removeAttribute("data-drop-target");
+      }
+    }
+
+    function boardCardFor(taskId) {
+      for (var i = 0; i < boardCards.length; i++) {
+        if (boardCards[i].getAttribute("data-task") === taskId) {
+          return boardCards[i];
+        }
+      }
+      return null;
+    }
+
+    for (var i = 0; i < boardCards.length; i++) {
+      (function (card) {
+        card.addEventListener("dragstart", function (event) {
+          if (!event.dataTransfer) {
+            return;
+          }
+          draggedTask = card.getAttribute("data-task");
+          event.dataTransfer.effectAllowed = "move";
+          try {
+            event.dataTransfer.setData("text/plain", draggedTask || "");
+          } catch (err) {
+            /* Some browsers restrict dataTransfer in synthetic events. */
+          }
+        });
+        card.addEventListener("dragend", function () {
+          draggedTask = null;
+          clearDropTargets();
+        });
+      })(boardCards[i]);
+    }
+
+    for (var c = 0; c < boardColumns.length; c++) {
+      (function (column) {
+        column.addEventListener("dragover", function (event) {
+          if (draggedTask === null) {
+            return;
+          }
+          event.preventDefault();
+          if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = "move";
+          }
+          column.setAttribute("data-drop-target", "true");
+        });
+        column.addEventListener("dragleave", function () {
+          column.removeAttribute("data-drop-target");
+        });
+        column.addEventListener("drop", function (event) {
+          event.preventDefault();
+          column.removeAttribute("data-drop-target");
+          if (draggedTask === null) {
+            return;
+          }
+          var status = column.getAttribute("data-status");
+          var card = boardCardFor(draggedTask);
+          draggedTask = null;
+          if (!status || !card) {
+            return;
+          }
+          var form = card.querySelector("form.card-status");
+          var select = form ? form.querySelector("select[name=\"status\"]") : null;
+          if (!form || !select) {
+            return;
+          }
+          var available = false;
+          for (var o = 0; o < select.options.length; o++) {
+            if (select.options[o].value === status) {
+              available = true;
+              break;
+            }
+          }
+          if (!available) {
+            return;
+          }
+          select.value = status;
+          form.submit();
+        });
+      })(boardColumns[c]);
+    }
+  }
+
 })();

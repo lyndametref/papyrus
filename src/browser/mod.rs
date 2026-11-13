@@ -923,9 +923,36 @@ fn inventory_page(state: &ServerState) -> Result<Response, HttpError> {
     ))
 }
 
+/// Render the Backlog board from freshly read task, milestone, and release
+/// indexes. Used by both the GET route and every failed status submission.
+fn render_board_page(
+    state: &ServerState,
+    cfg: &Config,
+    expand: Option<&str>,
+    alert: Option<render::BoardAlert<'_>>,
+) -> String {
+    let ctx = state.context();
+    let tasks = records::build_index(&ctx, cfg, Category::Task);
+    let milestones = records::build_index(&ctx, cfg, Category::Milestone);
+    let releases = records::build_index(&ctx, cfg, Category::Release);
+    let (project, bind_note) = chrome_for(cfg, state);
+    let chrome = render::Chrome {
+        project: &project,
+        bind_note: &bind_note,
+    };
+    render::board_page(cfg, &tasks, &milestones, &releases, expand, alert, chrome)
+}
+
 fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpError> {
     let kind = category_from_query(request)?;
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    if kind == Category::Task {
+        let expand = http::query_param(&request.target.query, "expand")?;
+        return Ok(Response::html(
+            200,
+            render_board_page(state, &cfg, expand.as_deref(), None),
+        ));
+    }
     let ctx = state.context();
     let index = records::build_index(&ctx, &cfg, kind);
     let other_has_records = if kind.is_requirement() {
@@ -1561,6 +1588,94 @@ fn form_fields(fields: &[(String, String)], name: &str) -> Vec<String> {
         .collect()
 }
 
+/// Re-render the whole board after a failed status submission. The affected
+/// milestone stays open when the form named it (or when the stored task names
+/// one); every card is re-read from disk so no failed value is shown.
+fn board_failure_response(
+    status_code: u16,
+    state: &ServerState,
+    cfg: &Config,
+    record: &Record,
+    fields: &[(String, String)],
+    message: &str,
+) -> Response {
+    let submitted_expand = form_field(fields, "expand").unwrap_or("").trim();
+    let expand = if submitted_expand.is_empty() {
+        record.milestone_id.clone()
+    } else {
+        Some(submitted_expand.to_string())
+    };
+    let html = render_board_page(
+        state,
+        cfg,
+        expand.as_deref(),
+        Some(render::BoardAlert {
+            heading: "Status change failed",
+            message,
+        }),
+    );
+    Response::html(status_code, html)
+}
+
+/// Handle the board's status-only form submission after media-type, token
+/// syntax, and record resolution checks. No other field is read or written.
+fn board_status_submit(
+    record: &Record,
+    cfg: &Config,
+    state: &ServerState,
+    fields: &[(String, String)],
+) -> Result<Response, HttpError> {
+    if record.kind != Category::Task {
+        return Err(HttpError::new(400));
+    }
+    let version = form_field(fields, "version").unwrap_or("");
+    if version != record.version {
+        let stored_status = record.status.as_deref().unwrap_or("(none)");
+        let message = format!(
+            "Could not change the status of {}: the record changed on disk. The card remains in its original column ({}). Reload the view and try again.",
+            record.id, stored_status
+        );
+        return Ok(board_failure_response(
+            409, state, cfg, record, fields, &message,
+        ));
+    }
+    let status = form_field(fields, "status").unwrap_or("").trim();
+    if !cfg.statuses.iter().any(|configured| configured == status) {
+        return Ok(board_failure_response(
+            422,
+            state,
+            cfg,
+            record,
+            fields,
+            "Status is not a configured status.",
+        ));
+    }
+    let ctx = state.context();
+    if save_ops(&ctx, record, edit::task_status_ops(&record.doc, status)).is_err() {
+        let message = format!(
+            "Could not change the status of {}. Nothing was saved. Try again.",
+            record.id
+        );
+        return Ok(board_failure_response(
+            500, state, cfg, record, fields, &message,
+        ));
+    }
+    // Save-then-reread: the redirect target reads the files again. The success
+    // location restores the card's milestone only when it is still active.
+    let milestones = records::build_index(&ctx, cfg, Category::Milestone);
+    let expand = record.milestone_id.as_deref().filter(|milestone_id| {
+        milestones
+            .records
+            .iter()
+            .any(|milestone| milestone.id == *milestone_id)
+    });
+    let location = match expand {
+        Some(milestone_id) => format!("/?type=task&expand={}", milestone_id),
+        None => "/?type=task".to_string(),
+    };
+    Ok(Response::redirect(&location))
+}
+
 fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response, HttpError> {
     if media_type(&request) != "application/x-www-form-urlencoded" {
         return Err(HttpError::new(415));
@@ -1577,6 +1692,10 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
         project: &project,
         bind_note: &bind_note,
     };
+
+    if form_field(&fields, "status_change") == Some("1") {
+        return board_status_submit(&record, &cfg, state, &fields);
+    }
 
     if version != record.version {
         if record.kind == Category::UiMockup {

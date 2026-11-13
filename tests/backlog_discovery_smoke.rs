@@ -360,6 +360,8 @@ fn milestone_backlog_discovery_flow() {
     }
     let task_page = server.get("/?type=task").text();
     assert!(task_page.contains("TASK-001"), "{task_page}");
+    assert!(task_page.contains("class=\"board-card\""), "{task_page}");
+    assert!(task_page.contains("Change status</button>"), "{task_page}");
     let milestone_page = server.get("/?type=milestone").text();
     assert!(milestone_page.contains("MS-001"), "{milestone_page}");
     let release_page = server.get("/?type=release").text();

@@ -196,6 +196,19 @@ pub fn requirement_ops(
     finish(doc, fm_ops, &sections)
 }
 
+/// Patch list for one status-only task change from the backlog board.
+///
+/// The board never edits any other field. A record with front matter keeps its
+/// `status` key; a legacy record without front matter uses its `## Status`
+/// section. The returned list always contains exactly one operation.
+pub fn task_status_ops(doc: &Document, status: &str) -> Vec<PatchOp> {
+    if doc.front_matter.is_some() {
+        vec![PatchOp::SetFrontMatter("status".into(), status.to_string())]
+    } else {
+        vec![PatchOp::SetSection("## Status".into(), status.to_string())]
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn task_ops(
     doc: &Document,
@@ -675,4 +688,67 @@ fn render_list_items(items: &[String], prefix: &str) -> String {
         .map(|v| format!("{} {}", prefix, v))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FRONT_MATTER_TASK: &str = "---\nid: TASK-001\ntitle: One\ntype: task\nstatus: ToDo\nupdated_date: 2020-01-01\n---\n# TASK-001 One\n\n## Description\n\nBody\n";
+
+    const SECTION_TASK: &str = "# TASK-001 One\n\n## Description\n\nBody\n\n## Status\n\nToDo\n";
+
+    #[test]
+    fn task_status_ops_uses_front_matter_when_present() {
+        let doc = Document::parse(FRONT_MATTER_TASK).unwrap();
+        let ops = task_status_ops(&doc, "Refined");
+        assert_eq!(ops.len(), 1);
+        assert!(matches!(
+            &ops[0],
+            PatchOp::SetFrontMatter(key, value) if key == "status" && value == "Refined"
+        ));
+        let output = apply(&doc, &ops).unwrap();
+        assert!(output.contains("status: Refined"));
+        assert!(!output.contains("\n## Status\n"));
+    }
+
+    #[test]
+    fn task_status_ops_uses_status_section_without_front_matter() {
+        let doc = Document::parse(SECTION_TASK).unwrap();
+        let ops = task_status_ops(&doc, "Done");
+        assert_eq!(ops.len(), 1);
+        assert!(matches!(
+            &ops[0],
+            PatchOp::SetSection(heading, value) if heading == "## Status" && value == "Done"
+        ));
+        let output = apply(&doc, &ops).unwrap();
+        assert!(output.contains("## Status"));
+        assert!(output.contains("Done"));
+        assert!(!output.contains("ToDo"));
+        assert!(output.find("## Description").unwrap() < output.find("## Status").unwrap());
+    }
+
+    #[test]
+    fn task_status_ops_changes_only_status_and_updated_date() {
+        let doc = Document::parse(FRONT_MATTER_TASK).unwrap();
+        let output = apply(&doc, &task_status_ops(&doc, "Implemented")).unwrap();
+        let before: Vec<&str> = FRONT_MATTER_TASK.lines().collect();
+        let after: Vec<&str> = output.lines().collect();
+        assert_eq!(before.len(), after.len());
+        for (old, new) in before.iter().zip(after.iter()) {
+            if *old != *new {
+                assert!(
+                    old.starts_with("status:") || old.starts_with("updated_date:"),
+                    "unexpected changed line: {old:?} -> {new:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn task_status_ops_same_value_is_byte_identical() {
+        let doc = Document::parse(FRONT_MATTER_TASK).unwrap();
+        let output = apply(&doc, &task_status_ops(&doc, "ToDo")).unwrap();
+        assert_eq!(output, FRONT_MATTER_TASK);
+    }
 }

@@ -1022,6 +1022,283 @@ fn record_view_backlog_row_meta(record: &Record) -> String {
     record_view_list_meta(record, skip)
 }
 
+/// One failure message shown above the backlog board groups.
+#[derive(Clone, Copy)]
+pub struct BoardAlert<'a> {
+    pub heading: &'a str,
+    pub message: &'a str,
+}
+
+fn board_milestone_for<'a>(task: &Record, milestones: &'a Index) -> Option<&'a Record> {
+    task.milestone_id.as_deref().and_then(|id| {
+        milestones
+            .records
+            .iter()
+            .find(|milestone| milestone.id == id)
+    })
+}
+
+fn board_card(task: &Record, cfg: &Config, expand: Option<&str>) -> String {
+    let mut card = format!(
+        "<article class=\"board-card\" draggable=\"true\" data-task=\"{}\">",
+        escape(&task.id)
+    );
+    card.push_str(&format!(
+        "<p class=\"board-card-title\"><a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a></p>",
+        escape(&task.id),
+        escape(&task.id),
+        escape(&task.title)
+    ));
+    let assignee = task
+        .assignee
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("(none)");
+    card.push_str(&format!(
+        "<p class=\"board-assignee\">Assignee: {}</p>",
+        escape(assignee)
+    ));
+    if !task.labels.is_empty() {
+        let tags = task
+            .labels
+            .iter()
+            .map(|label| format!("<span class=\"tag\">{}</span>", escape(label)))
+            .collect::<Vec<_>>()
+            .join("");
+        card.push_str(&format!(
+            "<p class=\"board-labels\">Labels: <span class=\"taglist\">{}</span></p>",
+            tags
+        ));
+    }
+    let mut options = String::new();
+    for status in &cfg.statuses {
+        let selected = if task.status.as_deref() == Some(status.as_str()) {
+            " selected"
+        } else {
+            ""
+        };
+        options.push_str(&format!(
+            "<option value=\"{}\"{}>{}</option>",
+            escape(status),
+            selected,
+            escape(status)
+        ));
+    }
+    let expand_value = expand.unwrap_or("");
+    card.push_str(&format!(
+        "<form method=\"post\" action=\"/doc/{}\" class=\"card-status\">\
+<input type=\"hidden\" name=\"version\" value=\"{}\">\
+<input type=\"hidden\" name=\"status_change\" value=\"1\">\
+<input type=\"hidden\" name=\"expand\" value=\"{}\">\
+<label for=\"status-{}\">Status</label>\
+<select id=\"status-{}\" name=\"status\" aria-label=\"Status for {}\">{}</select>\
+<button type=\"submit\">Change status</button>\
+</form>",
+        escape(&task.id),
+        escape(&task.version),
+        escape(expand_value),
+        escape(&task.id),
+        escape(&task.id),
+        escape(&task.id),
+        options
+    ));
+    card.push_str("</article>");
+    card
+}
+
+fn board_columns(cfg: &Config, tasks: &[&Record], expand: Option<&str>) -> String {
+    let mut html = String::from("<div class=\"board-columns\">");
+    for status in &cfg.statuses {
+        let matching: Vec<&Record> = tasks
+            .iter()
+            .copied()
+            .filter(|task| task.status.as_deref() == Some(status.as_str()))
+            .collect();
+        html.push_str(&format!(
+            "<section class=\"board-column\" data-status=\"{}\"><h3 class=\"h3\">{}</h3>",
+            escape(status),
+            escape(status)
+        ));
+        if matching.is_empty() {
+            html.push_str("<p class=\"board-empty\">No tasks in this status.</p>");
+        } else {
+            for task in matching {
+                html.push_str(&board_card(task, cfg, expand));
+            }
+        }
+        html.push_str("</section>");
+    }
+    let unconfigured: Vec<&Record> = tasks
+        .iter()
+        .copied()
+        .filter(|task| match task.status.as_deref() {
+            Some(status) => !cfg.statuses.iter().any(|configured| configured == status),
+            None => true,
+        })
+        .collect();
+    if !unconfigured.is_empty() {
+        html.push_str(
+            "<section class=\"board-column\" data-status=\"\"><h3 class=\"h3\">Unconfigured status</h3>",
+        );
+        for task in unconfigured {
+            html.push_str(&board_card(task, cfg, None));
+        }
+        html.push_str("</section>");
+    }
+    html.push_str("</div>");
+    html
+}
+
+fn board_milestone_section(
+    milestone: &Record,
+    tasks: &[&Record],
+    cfg: &Config,
+    open: bool,
+) -> String {
+    format!(
+        "<details class=\"board-milestone\"{}><summary>{} \u{2014} {}</summary>{}</details>",
+        if open { " open" } else { "" },
+        escape(&milestone.id),
+        escape(&milestone.title),
+        board_columns(cfg, tasks, Some(milestone.id.as_str()))
+    )
+}
+
+/// Render the combined Backlog board at `GET /?type=task`.
+#[allow(clippy::too_many_arguments)]
+pub fn board_page(
+    cfg: &Config,
+    tasks: &Index,
+    milestones: &Index,
+    releases: &Index,
+    expand: Option<&str>,
+    alert: Option<BoardAlert<'_>>,
+    chrome: Chrome<'_>,
+) -> String {
+    let mut section = String::new();
+    if let Some(alert) = alert {
+        section.push_str(&format!(
+            "<div class=\"alert\" role=\"alert\"><h2>{}</h2><p>{}</p></div>",
+            escape(alert.heading),
+            escape(alert.message)
+        ));
+    }
+
+    if tasks.is_empty() && milestones.is_empty() {
+        section.push_str(&backlog_list_section(Category::Task, tasks));
+    } else {
+        // The no-release group comes first, then every active release in
+        // ascending ID order. A dangling release reference belongs to the
+        // no-release group because it names no active release.
+        let mut groups: Vec<(Option<&Record>, Vec<&Record>)> = Vec::new();
+        let no_release: Vec<&Record> = milestones
+            .records
+            .iter()
+            .filter(|milestone| match milestone.release_id.as_deref() {
+                Some(release_id) => !releases
+                    .records
+                    .iter()
+                    .any(|release| release.id == release_id),
+                None => true,
+            })
+            .collect();
+        if !no_release.is_empty() {
+            groups.push((None, no_release));
+        }
+        for release in &releases.records {
+            let group: Vec<&Record> = milestones
+                .records
+                .iter()
+                .filter(|milestone| milestone.release_id.as_deref() == Some(release.id.as_str()))
+                .collect();
+            groups.push((Some(release), group));
+        }
+
+        // Exactly one milestone is open: the valid `expand` target, otherwise
+        // the first milestone in render order that has at least one active task.
+        let first_open: Option<String> = groups
+            .iter()
+            .flat_map(|(_, group)| group.iter())
+            .find(|milestone| {
+                tasks
+                    .records
+                    .iter()
+                    .any(|task| task.milestone_id.as_deref() == Some(milestone.id.as_str()))
+            })
+            .map(|milestone| milestone.id.clone());
+        let open_id: Option<&str> = expand
+            .filter(|value| {
+                milestones
+                    .records
+                    .iter()
+                    .any(|milestone| milestone.id == *value)
+            })
+            .or(first_open.as_deref());
+
+        for (release, group) in &groups {
+            match release {
+                None => section.push_str(
+                    "<h2 class=\"h2 board-group-head\">Milestones without a release</h2>",
+                ),
+                Some(release) => section.push_str(&format!(
+                    "<h2 class=\"h2 release-sep\">{} \u{2014} {}</h2>",
+                    escape(&release.id),
+                    escape(&release.title)
+                )),
+            }
+            if release.is_some() && group.is_empty() {
+                section.push_str("<p class=\"board-empty\">No milestones in this release.</p>");
+            }
+            for milestone in group {
+                let milestone_tasks: Vec<&Record> = tasks
+                    .records
+                    .iter()
+                    .filter(|task| task.milestone_id.as_deref() == Some(milestone.id.as_str()))
+                    .collect();
+                section.push_str(&board_milestone_section(
+                    milestone,
+                    &milestone_tasks,
+                    cfg,
+                    open_id == Some(milestone.id.as_str()),
+                ));
+            }
+        }
+
+        let unassigned: Vec<&Record> = tasks
+            .records
+            .iter()
+            .filter(|task| board_milestone_for(task, milestones).is_none())
+            .collect();
+        if !unassigned.is_empty() {
+            section.push_str(&format!(
+                "<details class=\"board-milestone\" open><summary>Tasks without a milestone</summary>{}</details>",
+                board_columns(cfg, &unassigned, None)
+            ));
+        }
+    }
+
+    let subheading = if alert.is_some() {
+        "Status change could not be persisted."
+    } else {
+        "Tasks grouped by milestone and status; releases separate milestones."
+    };
+    render_template(
+        LIST_TEMPLATE,
+        &[
+            ("title", "Papyrus \u{2014} Backlog"),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+            ("heading", "Backlog"),
+            ("subheading", subheading),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(Category::Task), cfg)),
+            ("section", &section),
+        ],
+    )
+}
+
 pub fn list_page(
     kind: Category,
     index: &Index,

@@ -2382,6 +2382,11 @@ fn t11a_list_backlog_by_type() {
         ("release", "REL-001", "REL-002"),
     ] {
         let html = get(&server, &format!("/?type={}", ty)).text();
+        if ty == "task" {
+            assert!(html.contains("<h1 class=\"h1\">Backlog</h1>"));
+            assert!(html.contains("class=\"board-card\""));
+            assert!(!html.contains("Task records in this project."));
+        }
         assert!(html.contains(id1), "type={} missing {}", ty, id1);
         assert!(html.contains(id2), "type={} missing {}", ty, id2);
         assert!(
@@ -2820,6 +2825,450 @@ fn t11i_json_api_backlog() {
         415
     );
 
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// ---- T-103 backlog board scenarios ----
+
+fn create_milestone_no_release(dir: &Path, title: &str) -> String {
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "milestone",
+        "create",
+        title,
+        "-d",
+        "Milestone description",
+    ])
+}
+
+fn create_task_no_milestone(dir: &Path, title: &str) -> String {
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "task",
+        "create",
+        title,
+        "-d",
+        "Task description",
+        "--ac",
+        "Acceptance one",
+        "--label",
+        "bug",
+        "--assignee",
+        "alice",
+    ])
+}
+
+fn set_task_status(dir: &Path, id: &str, status: &str) {
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "task",
+        "edit",
+        id,
+        "--status",
+        status,
+    ]);
+}
+
+/// Board fixture: one milestone without a release, three releases (one with no
+/// active milestone), a released and a no-release milestone with tasks, a
+/// dangling milestone reference, an archived milestone reference, an archived
+/// task, and an escaped title. The first milestone in render order with a task
+/// is MS-002 (the no-release group comes first).
+fn board_fixture(name: &str) -> PathBuf {
+    let dir = test_root(name);
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_release(&dir, "Release Two");
+    create_release(&dir, "Release Three");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    create_milestone_no_release(&dir, "Milestone Two");
+    create_milestone(&dir, "Milestone Three", "REL-002");
+    create_task(&dir, "Task One", "MS-001"); // TASK-001 ToDo
+    create_task(&dir, "Task Two", "MS-001"); // TASK-002
+    set_task_status(&dir, "TASK-002", "Initiated");
+    create_task(&dir, "Task Three", "MS-002"); // TASK-003
+    set_task_status(&dir, "TASK-003", "Implemented");
+    create_task(&dir, "Task Four", "MS-002"); // TASK-004 ToDo
+    create_task_no_milestone(&dir, "Task Five"); // TASK-005
+    create_milestone(&dir, "Dangling Milestone", "REL-002"); // MS-004
+    create_milestone(&dir, "Archived Milestone", "REL-002"); // MS-005
+    create_task(&dir, "Task Six", "MS-004"); // TASK-006
+    create_task(&dir, "Task Seven", "MS-005"); // TASK-007
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "milestone",
+        "delete",
+        "MS-004",
+        "--force",
+    ]);
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "milestone",
+        "archive",
+        "MS-005",
+    ]);
+    create_task(&dir, "Task Eight", "MS-001"); // TASK-008, archived below
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "task",
+        "archive",
+        "TASK-008",
+    ]);
+    create_task(&dir, "Quote & <Angle>", "MS-001"); // TASK-009
+    dir
+}
+
+fn extract_card_version(html: &str, task_id: &str) -> String {
+    let marker = format!("data-task=\"{}\"", task_id);
+    let start = html
+        .find(&marker)
+        .unwrap_or_else(|| panic!("card {}", task_id));
+    extract_version(&html[start..])
+}
+
+fn column_containing<'a>(html: &'a str, status: &str) -> &'a str {
+    let marker = format!("data-status=\"{}\"", status);
+    let start = html
+        .find(&marker)
+        .unwrap_or_else(|| panic!("column {}", status));
+    let end = html[start..]
+        .find("</section>")
+        .map(|offset| start + offset)
+        .unwrap_or(html.len());
+    &html[start..end]
+}
+
+#[test]
+fn t103a_board_layout_columns_and_cards() {
+    let dir = board_fixture("t103a");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+
+    assert!(html.contains("<h1 class=\"h1\">Backlog</h1>"));
+    assert!(html.contains("Tasks grouped by milestone and status; releases separate milestones."));
+    assert!(html.contains("<a href=\"/?type=task\" aria-current=\"page\">Backlog</a>"));
+    assert!(!html.contains("Task records in this project."));
+
+    // Every configured status has a column in configured order.
+    let mut cursor = 0;
+    for status in [
+        "ToDo",
+        "Initiated",
+        "Refined",
+        "Implemented",
+        "Validated",
+        "Done",
+    ] {
+        let marker = format!("data-status=\"{}\"", status);
+        let next = html[cursor..]
+            .find(&marker)
+            .unwrap_or_else(|| panic!("column {} in order", status));
+        cursor += next;
+    }
+    assert!(html.contains("No tasks in this status."));
+
+    // MS-001 cards are ordered by ascending ID, link to the record view, show
+    // the assignee and framed labels, and escape record text.
+    let ms1_start = html
+        .find("<summary>MS-001 \u{2014} Milestone One</summary>")
+        .unwrap();
+    let ms1_end = html[ms1_start..].find("</details>").unwrap() + ms1_start;
+    let ms1 = &html[ms1_start..ms1_end];
+    let first = ms1.find("data-task=\"TASK-001\"").unwrap();
+    let second = ms1.find("data-task=\"TASK-009\"").unwrap();
+    assert!(first < second, "cards ordered by ID");
+    assert!(ms1.contains("href=\"/doc/TASK-001\""));
+    assert!(ms1.contains("Assignee: alice"));
+    assert!(ms1.contains("<span class=\"tag\">bug</span>"));
+    assert!(ms1.contains("Quote &amp; &lt;Angle&gt;"));
+    assert!(ms1.contains("<label for=\"status-TASK-001\">Status</label>"));
+    assert!(ms1.contains("aria-label=\"Status for TASK-001\""));
+
+    // Every card has a labelled select and a visible button; the page adds no
+    // inline handler or style.
+    let cards = html.matches("class=\"board-card\"").count();
+    assert!(cards > 0);
+    assert_eq!(html.matches("Change status</button>").count(), cards);
+    assert_eq!(html.matches("name=\"status\"").count(), cards);
+    assert!(html.contains("draggable=\"true\""));
+    assert!(!html.contains("onclick="));
+    assert!(!html.contains(" onchange="));
+    assert!(!html.contains(" style="));
+
+    let css = get(&server, "/assets/app.css").text();
+    assert!(css.contains(".board-columns"));
+    assert!(css.contains(".card-status"));
+    assert!(css.contains("@media (max-width: 480px)"));
+    let js = get(&server, "/assets/app.js").text();
+    assert!(js.contains("dragstart"));
+    assert!(js.contains("form.submit()"));
+    assert!(!js.contains("fetch("));
+    assert!(!js.contains("select.addEventListener(\"change\""));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn t103b_release_grouping_and_expand() {
+    let dir = board_fixture("t103b");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+
+    let no_release = html.find("Milestones without a release").unwrap();
+    let rel1 = html.find("REL-001 \u{2014} Release One").unwrap();
+    let rel2 = html.find("REL-002 \u{2014} Release Two").unwrap();
+    let rel3 = html.find("REL-003 \u{2014} Release Three").unwrap();
+    let unassigned = html.find("Tasks without a milestone").unwrap();
+    assert!(no_release < rel1 && rel1 < rel2 && rel2 < rel3);
+    assert!(rel3 < unassigned, "without-milestone section comes last");
+    assert!(html.contains("No milestones in this release."));
+    assert!(html.find("MS-002 \u{2014} Milestone Two").unwrap() < rel1);
+    assert!(rel1 < html.find("MS-001 \u{2014} Milestone One").unwrap());
+    assert!(rel2 < html.find("MS-003 \u{2014} Milestone Three").unwrap());
+
+    // Default open: first milestone in render order with a task (MS-002).
+    assert!(html.contains(
+        "class=\"board-milestone\" open><summary>MS-002 \u{2014} Milestone Two</summary>"
+    ));
+    assert!(!html.contains("open><summary>MS-001 \u{2014} Milestone One</summary>"));
+
+    let expanded = get(&server, "/?type=task&expand=MS-001").text();
+    assert!(expanded.contains("open><summary>MS-001 \u{2014} Milestone One</summary>"));
+    assert!(!expanded.contains("open><summary>MS-002 \u{2014} Milestone Two</summary>"));
+
+    // Unknown or archived milestone IDs fall back to the default.
+    for value in ["MS-999", "MS-005", "not-an-id"] {
+        let page = get(&server, &format!("/?type=task&expand={}", value)).text();
+        assert!(
+            page.contains("open><summary>MS-002 \u{2014} Milestone Two</summary>"),
+            "expand={} fallback",
+            value
+        );
+    }
+
+    // Archived and dangling milestones never render; their tasks fall into the
+    // tasks-without-a-milestone section with the archived task excluded.
+    assert!(!html.contains("MS-004"));
+    assert!(!html.contains("MS-005"));
+    assert!(!html.contains("TASK-008"));
+    let section = &html[unassigned..];
+    assert!(section.contains("TASK-005"));
+    assert!(section.contains("TASK-006"));
+    assert!(section.contains("TASK-007"));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn t103c_unconfigured_status_and_empty_project() {
+    let dir = backlog_fixture("t103c");
+    set_task_status(&dir, "TASK-001", "Refined");
+    set_statuses(&dir, &["ToDo", "Initiated", "Implemented"], "ToDo");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+
+    assert!(html.contains("data-status=\"\""));
+    assert!(html.contains("Unconfigured status"));
+    let unconfigured = column_containing(&html, "");
+    assert!(unconfigured.contains("TASK-001"));
+    assert!(!html.contains("value=\"Refined\" selected"));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+
+    let empty = test_root("t103c-empty");
+    init_project(&empty);
+    let server = Server::start(&empty, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(html.contains("No tasks in this project."));
+    assert!(!html.contains("board-milestone"));
+    drop(server);
+    let _ = fs::remove_dir_all(&empty);
+}
+
+#[test]
+fn t103d_status_change_and_noop() {
+    let dir = backlog_fixture("t103d");
+    let path = backlog_record_path(&dir, "tasks", "TASK-001");
+    let before = fs::read_to_string(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    let version = extract_card_version(&html, "TASK-001");
+    let body = form_body(&[
+        ("version", &version),
+        ("status_change", "1"),
+        ("status", "Initiated"),
+        ("expand", "MS-001"),
+    ]);
+    let response = post_form(&server, "/doc/TASK-001", &body);
+    assert_eq!(response.status, 303);
+    assert_eq!(
+        response.header("Location"),
+        Some("/?type=task&expand=MS-001")
+    );
+
+    let after = fs::read_to_string(&path).unwrap();
+    assert!(after.contains("status: Initiated"));
+    assert!(!after.contains("status: ToDo"));
+    let before_lines: Vec<&str> = before.lines().collect();
+    let after_lines: Vec<&str> = after.lines().collect();
+    assert_eq!(before_lines.len(), after_lines.len());
+    for (old, new) in before_lines.iter().zip(after_lines.iter()) {
+        if old != new {
+            assert!(
+                old.starts_with("status:") || old.starts_with("updated_date:"),
+                "unexpected changed line: {old:?} -> {new:?}"
+            );
+        }
+    }
+
+    let reloaded = get(&server, "/?type=task&expand=MS-001").text();
+    assert!(column_containing(&reloaded, "Initiated").contains("TASK-001"));
+    assert!(get(&server, "/doc/TASK-001").text().contains("Initiated"));
+
+    // Same-value submit is byte-identical: no write, no updated_date refresh.
+    let version = extract_card_version(&reloaded, "TASK-001");
+    let body = form_body(&[
+        ("version", &version),
+        ("status_change", "1"),
+        ("status", "Initiated"),
+        ("expand", "MS-001"),
+    ]);
+    let response = post_form(&server, "/doc/TASK-001", &body);
+    assert_eq!(response.status, 303);
+    assert_eq!(fs::read_to_string(&path).unwrap(), after);
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn t103e_status_change_failures() {
+    let dir = backlog_fixture("t103e");
+    let path = backlog_record_path(&dir, "tasks", "TASK-001");
+    let before = fs::read_to_string(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    let version = extract_card_version(&html, "TASK-001");
+
+    // Stale token: 409, board alert, original column, no write.
+    let concurrent = format!("{}\n## Out of band\nchanged\n", before);
+    fs::write(&path, &concurrent).unwrap();
+    let body = form_body(&[
+        ("version", &version),
+        ("status_change", "1"),
+        ("status", "Initiated"),
+        ("expand", "MS-001"),
+    ]);
+    let response = post_form(&server, "/doc/TASK-001", &body);
+    assert_eq!(response.status, 409);
+    let html = response.text();
+    assert!(html.contains("role=\"alert\""));
+    assert!(html.contains("Status change failed"));
+    assert!(html.contains("the record changed on disk"));
+    assert!(html.contains("original column (ToDo)"));
+    assert!(column_containing(&html, "ToDo").contains("TASK-001"));
+    assert_eq!(fs::read_to_string(&path).unwrap(), concurrent);
+
+    // A freshly read token still rejects an unconfigured status.
+    let html = get(&server, "/?type=task").text();
+    let version = extract_card_version(&html, "TASK-001");
+    let body = form_body(&[
+        ("version", &version),
+        ("status_change", "1"),
+        ("status", "Nope"),
+        ("expand", "MS-001"),
+    ]);
+    let response = post_form(&server, "/doc/TASK-001", &body);
+    assert_eq!(response.status, 422);
+    assert!(
+        response
+            .text()
+            .contains("Status is not a configured status.")
+    );
+    assert_eq!(fs::read_to_string(&path).unwrap(), concurrent);
+
+    // Unknown and archived IDs are 404.
+    let unknown = form_body(&[
+        ("version", "1.0.1"),
+        ("status_change", "1"),
+        ("status", "ToDo"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/TASK-999", &unknown).status, 404);
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "task",
+        "archive",
+        "TASK-002",
+    ]);
+    let response = post_form(&server, "/doc/TASK-002", &unknown);
+    assert_eq!(response.status, 404);
+
+    // The marker on a non-task record is 400 and writes nothing.
+    let ms_path = backlog_record_path(&dir, "milestones", "MS-001");
+    let ms_before = fs::read(&ms_path).unwrap();
+    let ms_version = extract_version(&get(&server, "/doc/MS-001/edit").text());
+    let body = form_body(&[
+        ("version", &ms_version),
+        ("status_change", "1"),
+        ("status", "ToDo"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/MS-001", &body).status, 400);
+    assert_eq!(fs::read(&ms_path).unwrap(), ms_before);
+
+    // Wrong media type is 415.
+    let response = request(
+        server.port,
+        "POST",
+        "/doc/TASK-001",
+        &[("Content-Type", "text/plain")],
+        Some(b"status_change=1"),
+    );
+    assert_eq!(response.status, 415);
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[cfg(unix)]
+#[test]
+fn t103f_status_change_write_failure() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = backlog_fixture("t103f");
+    let tasks_dir = dir.join("backlog/tasks");
+    let path = backlog_record_path(&dir, "tasks", "TASK-001");
+    let before = fs::read_to_string(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    let version = extract_card_version(&html, "TASK-001");
+
+    let original = fs::metadata(&tasks_dir).unwrap().permissions();
+    let mut readonly = original.clone();
+    readonly.set_mode(0o555);
+    fs::set_permissions(&tasks_dir, readonly).unwrap();
+    let body = form_body(&[
+        ("version", &version),
+        ("status_change", "1"),
+        ("status", "Initiated"),
+        ("expand", "MS-001"),
+    ]);
+    let response = post_form(&server, "/doc/TASK-001", &body);
+    fs::set_permissions(&tasks_dir, original).unwrap();
+
+    assert_eq!(response.status, 500);
+    assert!(response.text().contains("Nothing was saved."));
+    assert_eq!(fs::read_to_string(&path).unwrap(), before);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
