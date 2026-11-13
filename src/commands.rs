@@ -312,7 +312,8 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
     crate::config::write_config_file(&ctx.config_path, &out_str)?;
 
     let text = if relocation_cross_device {
-        "relocation: a single rename was impossible; used copy-then-remove".to_string()
+        "relocation: non-atomic operation (a single rename was impossible; used copy-then-remove)"
+            .to_string()
     } else {
         String::new()
     };

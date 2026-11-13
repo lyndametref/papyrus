@@ -36,6 +36,34 @@ thread_local! {
     static TEST_FORCE_CROSS_DEVICE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
+#[cfg(not(test))]
+static PARTIAL_FAILURE_COUNTER: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+fn partial_failure_threshold_from_env() -> usize {
+    for name in [
+        "PAPYRUS_FAIL_AFTER",
+        "PAPYRUS_PARTIAL_FAILURE_AFTER",
+        "PAPYRUS_FORCE_PARTIAL_FAILURE_AFTER",
+        "PAPYRUS_TEST_FAIL_AFTER",
+    ] {
+        if let Ok(v) = std::env::var(name)
+            && let Ok(n) = v.parse::<usize>()
+            && n > 0
+        {
+            return n;
+        }
+    }
+    if std::env::var("PAPYRUS_FORCE_PARTIAL_FAILURE")
+        .ok()
+        .as_deref()
+        == Some("1")
+    {
+        return 1;
+    }
+    0
+}
+
 /// Relocate the whole content of `source` into `destination`.
 pub fn relocate(
     ctx: &Context,
@@ -232,15 +260,32 @@ fn move_dir_contents(
         } else {
             move_single_file(&src, &dst, moved_log, report)?;
         }
-        #[cfg(test)]
         {
-            let threshold = TEST_FAIL_AFTER.with(|c| c.get());
+            let mut threshold = 0usize;
+            #[cfg(test)]
+            {
+                threshold = threshold.max(TEST_FAIL_AFTER.with(|c| c.get()));
+            }
+            // Supported non-test trigger for partial-failure rollback tests.
+            threshold = threshold.max(partial_failure_threshold_from_env());
             if threshold > 0 {
-                let n = TEST_MOVED_COUNT.with(|c| {
-                    let v = c.get() + 1;
-                    c.set(v);
-                    v
-                });
+                // Count moved entries. In test builds use the thread-local
+                // counter; otherwise a process-local static counter.
+                let n = {
+                    #[cfg(test)]
+                    {
+                        TEST_MOVED_COUNT.with(|c| {
+                            let v = c.get() + 1;
+                            c.set(v);
+                            v
+                        })
+                    }
+                    #[cfg(not(test))]
+                    {
+                        PARTIAL_FAILURE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                            + 1
+                    }
+                };
                 if n >= threshold {
                     return Err(AppError::Validation("injected partial failure".to_string()));
                 }
@@ -256,10 +301,11 @@ fn move_single_file(
     moved_log: &mut Vec<MovedEntry>,
     report: &mut RelocationReport,
 ) -> Result<(), AppError> {
+    let env_force_cross = std::env::var("PAPYRUS_FORCE_CROSS_DEVICE").ok().as_deref() == Some("1");
     #[cfg(test)]
-    let force_cross = TEST_FORCE_CROSS_DEVICE.with(|c| c.get());
+    let force_cross = TEST_FORCE_CROSS_DEVICE.with(|c| c.get()) || env_force_cross;
     #[cfg(not(test))]
-    let force_cross = false;
+    let force_cross = env_force_cross;
 
     let rename_result = if force_cross {
         Err(std::io::Error::new(
@@ -361,9 +407,15 @@ mod tests {
         assert!(res.is_err());
 
         // rollback restored source files/dirs
+        assert!(proj.join("src").exists(), "source directory restored");
         assert!(proj.join("src/a.txt").exists());
+        assert!(
+            proj.join("src/sub").exists(),
+            "source subdirectory restored"
+        );
         assert!(proj.join("src/sub/b.txt").exists());
-        // destination should not retain moved file
+        // destination should not retain moved file and remains present
+        assert!(proj.join("dst").exists(), "destination directory restored");
         assert!(!proj.join("dst/a.txt").exists());
 
         TEST_FAIL_AFTER.with(|c| c.set(0));
