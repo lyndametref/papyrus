@@ -648,6 +648,40 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
             }
         };
     }
+    if path == "/config" {
+        return match method {
+            Method::Get | Method::Head => config_page(state),
+            Method::Post => config_submit(request, state),
+            _ => {
+                let cfg = state.config().unwrap_or_default();
+                let (project, bind_note) = chrome_for(&cfg, state);
+                let chrome = render::Chrome {
+                    project: &project,
+                    bind_note: &bind_note,
+                };
+                let mut response = Response::html(405, render::error_page(405, &cfg, chrome, None));
+                response = response.with_header("Allow", "GET, HEAD, POST");
+                Ok(response)
+            }
+        };
+    }
+    if path == "/config/edit" {
+        return match method {
+            Method::Get | Method::Head => config_edit(request, state),
+            _ => {
+                let cfg = state.config().unwrap_or_default();
+                let (project, bind_note) = chrome_for(&cfg, state);
+                let chrome = render::Chrome {
+                    project: &project,
+                    bind_note: &bind_note,
+                };
+                let mut response = Response::html(405, render::error_page(405, &cfg, chrome, None));
+                response = response.with_header("Allow", "GET, HEAD");
+                Ok(response)
+            }
+        };
+    }
+
     if path == "/" {
         // Alias: /?type=skills serves the agent skills page.
         if http::query_param(&request.target.query, "type")
@@ -691,6 +725,30 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
                     let mut response =
                         Response::html(405, render::error_page(405, &cfg, chrome, None));
                     response = response.with_header("Allow", "GET, HEAD");
+                    Ok(response)
+                }
+            };
+        }
+        // Alias: /?type=config serves the configuration view.
+        if http::query_param(&request.target.query, "type")
+            .ok()
+            .flatten()
+            .as_deref()
+            == Some("config")
+        {
+            return match method {
+                Method::Get | Method::Head => config_page(state),
+                Method::Post => config_submit(request, state),
+                _ => {
+                    let cfg = state.config().unwrap_or_default();
+                    let (project, bind_note) = chrome_for(&cfg, state);
+                    let chrome = render::Chrome {
+                        project: &project,
+                        bind_note: &bind_note,
+                    };
+                    let mut response =
+                        Response::html(405, render::error_page(405, &cfg, chrome, None));
+                    response = response.with_header("Allow", "GET, HEAD, POST");
                     Ok(response)
                 }
             };
@@ -899,6 +957,193 @@ fn resolved_group<'a>(record: &Record, index: &'a records::Index) -> Option<&'a 
     }
     let group_id = record.group_id.as_deref()?;
     index.groups.iter().find(|group| group.id == group_id)
+}
+
+fn build_config_form(key: &str, value: &str, error: Option<&str>) -> String {
+    let mut form = String::new();
+    if let Some(msg) = error {
+        form.push_str(&format!(
+            "<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul><li>{}</li></ul><p>Nothing was saved. Your typed values are kept below.</p></div>",
+            render::escape(msg)
+        ));
+    }
+    form.push_str(&format!(
+        "<form class=\"form\" method=\"post\" action=\"/config\"><input type=\"hidden\" name=\"key\" value=\"{}\"><div class=\"field\"><label for=\"value\">Value</label><input class=\"input\" id=\"value\" name=\"value\" type=\"text\" value=\"{}\"></div><div class=\"field\"><label><input type=\"checkbox\" name=\"unset\" value=\"on\"> Clear this key (unset)</label></div><div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/config\">Cancel</a></div></form>",
+        render::escape(key),
+        render::escape(value)
+    ));
+    form
+}
+
+fn config_page(state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let ctx = state.context();
+    let raw_text = std::fs::read_to_string(&ctx.config_path).unwrap_or_default();
+    let raw_value: yaml_serde::Value = yaml_serde::from_str(&raw_text)
+        .unwrap_or_else(|_| yaml_serde::Value::Mapping(yaml_serde::Mapping::new()));
+    let raw_value = if matches!(raw_value, yaml_serde::Value::Mapping(_)) {
+        raw_value
+    } else {
+        yaml_serde::Value::Mapping(yaml_serde::Mapping::new())
+    };
+
+    let flattened = cfg.flattened(&ctx.project_dir);
+    let mut section = String::new();
+    section.push_str(
+        "<table class=\"table\"><thead><tr><th>Key</th><th>Effective value</th><th>Source</th><th></th></tr></thead><tbody>",
+    );
+    for (key, value) in &flattened {
+        let explicit = crate::config::yaml_get(&raw_value, key).is_some();
+        let badge = if explicit { "explicit" } else { "default" };
+        let editable = key != "statuses";
+        let action = if editable {
+            format!(
+                "<a class=\"btn\" href=\"/config/edit?key={}\">Edit</a>",
+                key
+            )
+        } else {
+            "read-only".to_string()
+        };
+        section.push_str(&format!(
+            "<tr><td>{}</td><td>{}</td><td><span class=\"badge\">{}</span></td><td>{}</td></tr>",
+            render::escape(key),
+            render::escape(value),
+            badge,
+            action
+        ));
+    }
+    section.push_str("</tbody></table>");
+    section.push_str(
+        "<p>Editable keys are exactly those <code>papyrus config set</code> accepts; the view applies the same validation and precedence. No key is secret; environment values are never shown as editable config.</p>",
+    );
+    section.push_str(
+        "<p>Changing a folder key relocates the folder through the single relocation routine (REQ-01.002); the browser never moves a folder itself. Every path passes the project-directory boundary check.</p>",
+    );
+    section.push_str(
+        "<p><a class=\"link\" href=\"/lifecycle\">Per-artifact (read-only) configuration \u{2192} Managed artifacts &amp; lifecycles</a></p>",
+    );
+
+    let (project, bind_note) = chrome_for(&cfg, state);
+    let chrome = render::Chrome {
+        project: &project,
+        bind_note: &bind_note,
+    };
+    let sidebar_html = render::sidebar_with_config(None, &cfg, true);
+    Ok(Response::html(
+        200,
+        render::config_page(chrome, &section, &sidebar_html),
+    ))
+}
+
+fn config_edit(request: Request, state: &ServerState) -> Result<Response, HttpError> {
+    let key = http::query_param(&request.target.query, "key")
+        .ok()
+        .flatten()
+        .ok_or_else(|| HttpError::new(400))?;
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let ctx = state.context();
+    let flattened = cfg.flattened(&ctx.project_dir);
+    let current = flattened
+        .iter()
+        .find(|(k, _)| k == &key)
+        .map(|(_, v)| v.clone());
+    let Some(current) = current else {
+        return Err(HttpError::new(404));
+    };
+    if key == "statuses" {
+        return Err(HttpError::new(404));
+    }
+    let (project, bind_note) = chrome_for(&cfg, state);
+    let chrome = render::Chrome {
+        project: &project,
+        bind_note: &bind_note,
+    };
+    let sidebar_html = render::sidebar_with_config(None, &cfg, true);
+    let form = build_config_form(&key, &current, None);
+    Ok(Response::html(
+        200,
+        render::config_edit_page(chrome, &sidebar_html, &form),
+    ))
+}
+
+fn config_submit(request: Request, state: &ServerState) -> Result<Response, HttpError> {
+    let body = String::from_utf8_lossy(&request.body).to_string();
+    let mut key: Option<String> = None;
+    let mut value = String::new();
+    let mut unset = false;
+    for pair in body.split('&') {
+        if pair.is_empty() {
+            continue;
+        }
+        let (raw_k, raw_v) = match pair.split_once('=') {
+            Some((k, v)) => (k, v),
+            None => (pair, ""),
+        };
+        let k = http::decode_component(raw_k).map_err(|_| HttpError::new(400))?;
+        let v = http::decode_component(raw_v).map_err(|_| HttpError::new(400))?;
+        match k.as_str() {
+            "key" => key = Some(v),
+            "value" => value = v,
+            "unset" | "clear" | "unset_flag" | "action"
+                if v.is_empty() || v == "on" || v == "true" || v == "1" || v == "unset" =>
+            {
+                unset = true;
+            }
+            _ => {}
+        }
+    }
+    let key = key.ok_or_else(|| HttpError::new(400))?;
+
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let ctx = state.context();
+    let flattened = cfg.flattened(&ctx.project_dir);
+    let entry = flattened.iter().find(|(k, _)| k == &key);
+    if entry.is_none() || key == "statuses" {
+        return Err(HttpError::new(404));
+    }
+
+    let result = if unset {
+        crate::commands::config_unset(&ctx, &key)
+    } else {
+        crate::commands::config_set(&ctx, &key, &value)
+    };
+
+    match result {
+        Ok(_) => Ok(Response::redirect("/config")),
+        Err(AppError::Validation(msg)) => {
+            let cfg = state.config().unwrap_or_default();
+            let (project, bind_note) = chrome_for(&cfg, state);
+            let chrome = render::Chrome {
+                project: &project,
+                bind_note: &bind_note,
+            };
+            let sidebar_html = render::sidebar_with_config(None, &cfg, true);
+            let form = build_config_form(&key, &value, Some(&msg));
+            Ok(Response::html(
+                422,
+                render::config_edit_page(chrome, &sidebar_html, &form),
+            ))
+        }
+        Err(AppError::NotFound(_)) => Err(HttpError::new(404)),
+        Err(AppError::Runtime(msg)) => {
+            if msg.contains("outside project directory") {
+                let cfg = state.config().unwrap_or_default();
+                let (project, bind_note) = chrome_for(&cfg, state);
+                let chrome = render::Chrome {
+                    project: &project,
+                    bind_note: &bind_note,
+                };
+                let sidebar_html = render::sidebar_with_config(None, &cfg, true);
+                let form = build_config_form(&key, &value, Some(&msg));
+                Ok(Response::html(
+                    422,
+                    render::config_edit_page(chrome, &sidebar_html, &form),
+                ))
+            } else {
+                Err(HttpError::new(500))
+            }
+        }
+    }
 }
 
 fn lifecycle_page(state: &ServerState) -> Result<Response, HttpError> {

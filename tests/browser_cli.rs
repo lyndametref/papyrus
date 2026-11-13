@@ -7251,3 +7251,115 @@ fn t93_papyrus_id_only_routing() {
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
+
+// TASK-94: browser configuration view
+#[test]
+fn browser_config_route_and_alias() {
+    let dir = test_root("browser-config-route");
+    init_project(&dir);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let direct = get(&server, "/config");
+    let alias = get(&server, "/?type=config");
+    assert_eq!(direct.status, 200);
+    assert_eq!(alias.status, 200);
+    let html = direct.text();
+    assert!(
+        html.contains("<a href=\"/config\""),
+        "sidebar config link missing"
+    );
+    assert!(
+        html.contains("Configuration</a>"),
+        "Configuration label missing"
+    );
+    let config_pos = html.find("Configuration</a>").expect("config pos");
+    let lifecycle_pos = html.find("Managed artifacts").expect("lifecycle pos");
+    assert!(
+        config_pos < lifecycle_pos,
+        "Configuration not before lifecycle"
+    );
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn browser_config_effective_vs_explicit_badges() {
+    let dir = test_root("browser-config-badges");
+    init_project(&dir);
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "config",
+        "unset",
+        "browser_open",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/config").text();
+    assert!(html.contains(
+        "<td>browser_host</td><td>127.0.0.1</td><td><span class=\"badge\">explicit</span>"
+    ));
+    assert!(
+        html.contains("<td>browser_open</td><td>true</td><td><span class=\"badge\">default</span>")
+    );
+    assert!(html.contains("<td>statuses</td>"));
+    assert!(html.contains("read-only"));
+    assert!(html.contains("href=\"/lifecycle\""));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn browser_config_rejection_parity() {
+    let dir = test_root("browser-config-reject");
+    init_project(&dir);
+    let config_path = dir.join("papyrus.config.yml");
+    let before = fs::read_to_string(&config_path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let body = form_body(&[("key", "browser_port"), ("value", "70000")]);
+    let resp = post_form(&server, "/config", &body);
+    assert_eq!(resp.status, 422);
+    assert_eq!(fs::read_to_string(&config_path).unwrap(), before);
+    assert!(resp.text().contains("70000"));
+    assert_eq!(get(&server, "/config/edit?key=statuses").status, 404);
+    let body2 = form_body(&[("key", "statuses"), ("value", "x")]);
+    assert_eq!(post_form(&server, "/config", &body2).status, 404);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn browser_config_folder_move_from_view() {
+    let dir = test_root("browser-config-folder-move");
+    init_project(&dir);
+    fs::write(dir.join("backlog/extra.txt"), "x").unwrap();
+    let config_path = dir.join("papyrus.config.yml");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let body = form_body(&[("key", "backlog_directory"), ("value", "archive")]);
+    let resp = post_form(&server, "/config", &body);
+    assert_eq!(resp.status, 303);
+    assert_eq!(resp.header("Location"), Some("/config"));
+    drop(server);
+    assert!(dir.join("archive/extra.txt").exists());
+    let cfg = fs::read_to_string(&config_path).unwrap();
+    assert!(cfg.contains("backlog_directory: archive"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn browser_config_containment_refusal() {
+    let dir = test_root("browser-config-contain");
+    init_project(&dir);
+    std::os::unix::fs::symlink("../containment-escape", dir.join("escape-link")).unwrap();
+    fs::write(dir.join("backlog/extra.txt"), "x").unwrap();
+    let config_path = dir.join("papyrus.config.yml");
+    let before = fs::read_to_string(&config_path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let body = form_body(&[("key", "backlog_directory"), ("value", "escape-link")]);
+    let resp = post_form(&server, "/config", &body);
+    assert_eq!(resp.status, 422);
+    drop(server);
+    assert_eq!(fs::read_to_string(&config_path).unwrap(), before);
+    assert!(dir.join("backlog/extra.txt").exists());
+    assert!(!dir.join("escape-link/extra.txt").exists());
+    let _ = fs::remove_file(dir.join("escape-link"));
+    let _ = fs::remove_dir_all(&dir);
+}
