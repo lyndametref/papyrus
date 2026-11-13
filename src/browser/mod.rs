@@ -12,9 +12,10 @@ use crate::commands::load_effective_config;
 use crate::config::{Config, is_loopback_host, validate_browser_host};
 use crate::context::Context;
 use crate::error::AppError;
+use crate::record::edit::{self, FieldChange};
 use http::{HttpError, Method, Request, Response};
 use records::Category;
-use records::{FieldChange, Form, Record};
+use records::{Form, Record};
 use std::io::Write;
 use std::net::{IpAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
@@ -484,16 +485,16 @@ fn handle_request(request: Request, state: &ServerState) -> Response {
                     project: &project,
                     bind_note: &bind_note,
                 };
-                if records::matches_tech_spec_id(&cfg, id) {
+                if matches_doc_type_id(&cfg, "tech-spec", id) {
                     return Response::html(404, render::tech_spec_not_found_page(&cfg, chrome));
                 }
-                if records::matches_use_case_id(&cfg, id) {
+                if matches_doc_type_id(&cfg, "use-case", id) {
                     return Response::html(404, render::use_case_not_found_page(&cfg, chrome));
                 }
-                if records::matches_test_case_id(&cfg, id) {
+                if matches_doc_type_id(&cfg, "test-case", id) {
                     return Response::html(404, render::test_case_not_found_page(&cfg, chrome));
                 }
-                if records::matches_test_report_id(&cfg, id) {
+                if matches_doc_type_id(&cfg, "test-report", id) {
                     return Response::html(404, render::test_report_not_found_page(&cfg, chrome));
                 }
             }
@@ -956,6 +957,36 @@ fn resolve_record(id: &str, state: &ServerState) -> Result<(Record, Config), Htt
         Ok(None) => Err(HttpError::new(404)),
         Err(_) => Err(HttpError::new(500)),
     }
+}
+
+/// Whether an ID has the configured numeric shape of a document type.
+fn matches_doc_type_id(cfg: &Config, key: &str, id: &str) -> bool {
+    cfg.document_types
+        .get(key)
+        .is_some_and(|entry| crate::record::identity::matches_family_id(id, &entry.prefix, false))
+}
+
+/// Apply one browser patch list and write once through the shared store.
+fn save_ops(
+    ctx: &Context,
+    record: &Record,
+    ops: Vec<crate::record::patch::PatchOp>,
+) -> Result<(), HttpError> {
+    let content = edit::apply(&record.doc, &ops).map_err(|_| HttpError::new(500))?;
+    // Browser saves use LF with exactly one trailing newline (ADR-0013 D2).
+    let content = crate::record::line_endings::normalize(&content);
+    save_content(ctx, record, content)
+}
+
+/// Write already-rendered content only when it differs from the bytes stored on
+/// disk. A no-op save performs no write and does not refresh `updated_date`;
+/// the first save of a CRLF record still performs the one-time LF conversion.
+fn save_content(ctx: &Context, record: &Record, content: String) -> Result<(), HttpError> {
+    if content != record.stored_source {
+        crate::record::store::write_atomic(ctx, &record.path, &content)
+            .map_err(|_| HttpError::new(500))?;
+    }
+    Ok(())
 }
 
 fn resolved_group<'a>(record: &Record, index: &'a records::Index) -> Option<&'a Record> {
@@ -1536,7 +1567,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
     }
     let fields = parse_form(&request.body)?;
     let version = form_field(&fields, "version").unwrap_or("");
-    if !records::valid_version_token(version) {
+    if !crate::record::store::valid_version_token(version) {
         return Err(HttpError::new(400));
     }
     let (record, cfg) = resolve_record(id, state)?;
@@ -1688,30 +1719,14 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 ));
             }
             let title = title.unwrap_or_default();
-            let content = records::apply_edit(
+            let ops = edit::requirement_ops(
                 &record.doc,
-                &record.id,
                 &title,
                 story_change,
                 description_change,
                 record.kind.supports_story(),
             );
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Category::Task => {
@@ -1845,9 +1860,8 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             let labels = labels.unwrap_or_default();
             let deps = deps_result.unwrap_or_default();
             let acs = acs.unwrap_or_default();
-            let content = records::apply_task_edit(
+            let ops = edit::task_ops(
                 &record.doc,
-                &record.id,
                 &title,
                 description_change,
                 &status,
@@ -1857,22 +1871,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 deps,
                 acs,
             );
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Category::Milestone => {
@@ -1927,29 +1926,8 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 ));
             }
             let title = title.unwrap_or_default();
-            let content = records::apply_milestone_edit(
-                &record.doc,
-                &record.id,
-                &title,
-                description_change,
-                release_change,
-            );
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let ops = edit::milestone_ops(&record.doc, &title, description_change, release_change);
+            save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Category::Release => {
@@ -1988,24 +1966,8 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 ));
             }
             let title = title.unwrap_or_default();
-            let content =
-                records::apply_release_edit(&record.doc, &record.id, &title, description_change);
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let ops = edit::release_ops(&record.doc, &title, description_change);
+            save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Category::Decision => {
@@ -2142,31 +2104,15 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                     .unwrap_or_else(|| "proposed".to_string())
             };
 
-            let content = records::apply_decision_edit(
+            let ops = edit::decision_ops(
                 &record.doc,
-                &record.id,
                 &title,
                 &status_to_write,
                 decision_change,
                 context_change,
                 consequences_change,
             );
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Category::Glossary => {
@@ -2209,24 +2155,8 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             }
 
             let title = title.unwrap_or_default();
-            let content =
-                records::apply_glossary_edit(&record.doc, &record.id, &title, definition_change);
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let ops = edit::glossary_ops(&record.doc, &title, definition_change);
+            save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Category::UiSpec => {
@@ -2279,29 +2209,8 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 Some(v) => render::change(Some(v)),
                 None => FieldChange::Keep,
             };
-            let content = records::apply_ui_spec_edit(
-                &record.doc,
-                &record.id,
-                &title,
-                view_change,
-                description_change,
-            );
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let ops = edit::ui_spec_ops(&record.doc, &title, view_change, description_change);
+            save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Category::UiMockup => {
@@ -2355,24 +2264,8 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             let specs = specs.unwrap_or_default();
             let refs = refs.unwrap_or_default();
             let original = std::fs::read_to_string(&record.path).unwrap_or_default();
-            let content =
-                records::apply_ui_mockup_edit(&original, &record.id, &title, &specs, &refs);
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let content = records::edit_ui_mockup(&original, &record.id, &title, &specs, &refs);
+            save_content(&ctx, &record, content)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Category::BusinessRule => {
@@ -2436,31 +2329,15 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             }
             let title = title.unwrap_or_default();
             let requirements = requirements.unwrap_or_default();
-            let content = records::apply_business_rule_edit(
+            let ops = edit::business_rule_ops(
                 &record.doc,
-                &record.id,
                 &title,
                 description_change,
                 rationale_change,
                 applicability_change,
                 requirements,
             );
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Category::TechSpec => {
@@ -2501,24 +2378,8 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 ));
             }
             let title = title.unwrap_or_default();
-            let content =
-                records::apply_tech_spec_edit(&record.doc, &record.id, &title, description_change);
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let ops = edit::tech_spec_ops(&record.doc, &title, description_change);
+            save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Category::UseCase | Category::TestCase | Category::TestReport => {
@@ -2589,24 +2450,15 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             let title = title.unwrap_or_default();
             let labels = labels.unwrap_or_default();
             let references = references.unwrap_or_default();
-            let content = records::apply_use_case_edit(
+            let ops = edit::use_case_ops(
                 &record.doc,
-                &record.id,
                 &title,
                 description_change,
                 applicability_change,
                 labels,
                 references,
             );
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Category::AuditRecord => {
@@ -2664,29 +2516,8 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             } else {
                 audit_type_value
             };
-            let content = records::apply_audit_edit(
-                &record.doc,
-                &record.id,
-                &title,
-                &final_audit_type,
-                content_change,
-            );
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let ops = edit::audit_ops(&record.doc, &title, &final_audit_type, content_change);
+            save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
     }
@@ -3222,7 +3053,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
         .get("version")
         .and_then(|value| value.as_str())
         .ok_or_else(|| HttpError::new(400))?;
-    if !records::valid_version_token(version) {
+    if !crate::record::store::valid_version_token(version) {
         return Err(HttpError::new(400));
     }
     let (record, cfg) = resolve_record(id, state)?;
@@ -3267,30 +3098,14 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 }
                 Some(_) => return Err(HttpError::new(400)),
             }
-            let content = records::apply_edit(
+            let ops = edit::requirement_ops(
                 &record.doc,
-                &record.id,
                 &title,
                 story_change,
                 description_change,
                 record.kind.supports_story(),
             );
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            save_ops(&ctx, &record, ops)?;
             let (updated, updated_cfg) = resolve_record(id, state)?;
             let index = records::build_index(&ctx, &updated_cfg, updated.kind);
             let group = resolved_group(&updated, &index);
@@ -3478,9 +3293,8 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 }
             }
 
-            let content = records::apply_task_edit(
+            let ops = edit::task_ops(
                 &record.doc,
-                &record.id,
                 &title,
                 description_change,
                 &status,
@@ -3490,22 +3304,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 deps,
                 acs,
             );
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            save_ops(&ctx, &record, ops)?;
             let (updated, updated_cfg) = resolve_record(id, state)?;
             let related = updated.milestone_id.as_ref().and_then(|mid| {
                 records::resolve_id(&ctx, &updated_cfg, mid)
@@ -3560,29 +3359,8 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                     _ => return Err(HttpError::new(400)),
                 }
             }
-            let content = records::apply_milestone_edit(
-                &record.doc,
-                &record.id,
-                &title,
-                description_change,
-                release_change,
-            );
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let ops = edit::milestone_ops(&record.doc, &title, description_change, release_change);
+            save_ops(&ctx, &record, ops)?;
             let (updated, updated_cfg) = resolve_record(id, state)?;
             let related = updated.release_id.as_ref().and_then(|rid| {
                 records::resolve_id(&ctx, &updated_cfg, rid)
@@ -3617,24 +3395,8 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                     _ => return Err(HttpError::new(400)),
                 }
             }
-            let content =
-                records::apply_release_edit(&record.doc, &record.id, &title, description_change);
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let ops = edit::release_ops(&record.doc, &title, description_change);
+            save_ops(&ctx, &record, ops)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -3776,31 +3538,15 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                     .unwrap_or_else(|| "proposed".to_string())
             };
 
-            let content = records::apply_decision_edit(
+            let ops = edit::decision_ops(
                 &record.doc,
-                &record.id,
                 &title,
                 &status_to_write,
                 decision_change,
                 context_change,
                 consequences_change,
             );
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            save_ops(&ctx, &record, ops)?;
             let (updated, updated_cfg) = resolve_record(id, state)?;
             let superseded_title = updated.superseded_by.as_ref().and_then(|sid| {
                 records::resolve_id(&ctx, &updated_cfg, sid)
@@ -3835,24 +3581,8 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 }
             }
 
-            let content =
-                records::apply_glossary_edit(&record.doc, &record.id, &title, definition_change);
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let ops = edit::glossary_ops(&record.doc, &title, definition_change);
+            save_ops(&ctx, &record, ops)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -3889,29 +3619,8 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                     _ => return Err(HttpError::new(400)),
                 }
             }
-            let content = records::apply_ui_spec_edit(
-                &record.doc,
-                &record.id,
-                &title,
-                view_change,
-                description_change,
-            );
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let ops = edit::ui_spec_ops(&record.doc, &title, view_change, description_change);
+            save_ops(&ctx, &record, ops)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -3970,24 +3679,8 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             };
             // Read-only task/status/superseded_by and unknown members ignored.
             let original = std::fs::read_to_string(&record.path).unwrap_or_default();
-            let content =
-                records::apply_ui_mockup_edit(&original, &record.id, &title, &specs, &refs);
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let content = records::edit_ui_mockup(&original, &record.id, &title, &specs, &refs);
+            save_content(&ctx, &record, content)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -4057,53 +3750,15 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 }
                 Some(_) => return Err(HttpError::new(400)),
             };
-            // apply. Need convert FieldChange to values for apply_business_rule_edit which takes FieldChange for desc/rationale/applicability and Vec requirements.
-            // But apply_business_rule_edit expects description FieldChange; we have. requirements vec empty clears. Good.
-            // However if omitted, FieldChange::Keep leaves section unchanged; requirements set to record.requirements (unchanged) but apply writes bullets same. Fine.
-            // But requirements omitted should leave unchanged; passing record.requirements rewrites same. OK.
-            let content = if description_change == FieldChange::Keep
-                && rationale_change == FieldChange::Keep
-                && applicability_change == FieldChange::Keep
-                && requirements == record.requirements
-                && title == record.title
-            {
-                // no changes; still write? spec success returns reread; writing same content okay.
-                records::apply_business_rule_edit(
-                    &record.doc,
-                    &record.id,
-                    &title,
-                    description_change,
-                    rationale_change,
-                    applicability_change,
-                    requirements,
-                )
-            } else {
-                records::apply_business_rule_edit(
-                    &record.doc,
-                    &record.id,
-                    &title,
-                    description_change,
-                    rationale_change,
-                    applicability_change,
-                    requirements,
-                )
-            };
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let ops = edit::business_rule_ops(
+                &record.doc,
+                &title,
+                description_change,
+                rationale_change,
+                applicability_change,
+                requirements,
+            );
+            save_ops(&ctx, &record, ops)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -4131,24 +3786,8 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 }
                 Some(_) => return Err(HttpError::new(400)),
             }
-            let content =
-                records::apply_tech_spec_edit(&record.doc, &record.id, &title, description_change);
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let ops = edit::tech_spec_ops(&record.doc, &title, description_change);
+            save_ops(&ctx, &record, ops)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -4224,24 +3863,15 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 }
                 Some(_) => return Err(HttpError::new(400)),
             };
-            let content = records::apply_use_case_edit(
+            let ops = edit::use_case_ops(
                 &record.doc,
-                &record.id,
                 &title,
                 description_change,
                 applicability_change,
                 labels,
                 references,
             );
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            save_ops(&ctx, &record, ops)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -4304,29 +3934,8 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             } else {
                 audit_type_val
             };
-            let content = records::apply_audit_edit(
-                &record.doc,
-                &record.id,
-                &title,
-                &final_audit_type,
-                content_change,
-            );
-            // A no-op save performs no write and does not refresh
-            // updated_date (TASK-67); real changes go through the shared
-            // atomic writer on the patched content. Metadata-backed saves
-            // use the record store (patch + atomic write); legacy files
-            // without front matter keep the browser's non-migrating
-            // writer so a browser save never triggers lazy migration
-            // (migration is owned by TASK-68/TASK-69).
-            if content != record.doc.source {
-                if crate::record::frontmatter::has_front_matter(&content) {
-                    crate::record::store::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                } else {
-                    records::write_atomic(&ctx, &record.path, &content)
-                        .map_err(|_| HttpError::new(500))?;
-                }
-            }
+            let ops = edit::audit_ops(&record.doc, &title, &final_audit_type, content_change);
+            save_ops(&ctx, &record, ops)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -4451,15 +4060,8 @@ mod tests {
             refs: vec!["docs/a.md".to_string()],
             mockup_task: "TASK-1".to_string(),
             audit_type: None,
-            doc: records::Doc {
-                id: "MOCK-001".to_string(),
-                title: "Login".to_string(),
-                heading: "# MOCK-001 Login".to_string(),
-                preamble: Vec::new(),
-                sections: Vec::new(),
-                front_matter: None,
-                source: String::new(),
-            },
+            doc: crate::record::document::parse("# MOCK-001 Login\n").unwrap(),
+            stored_source: String::new(),
             path: std::path::PathBuf::from("docs/specifications/ui/mockups/MOCK-001.html"),
             rel_path: "docs/specifications/ui/mockups/MOCK-001.html".to_string(),
             version: "1.2.3".to_string(),
@@ -4529,15 +4131,8 @@ mod tests {
             refs: Vec::new(),
             mockup_task: String::new(),
             audit_type: None,
-            doc: records::Doc {
-                id: "TECH-001".to_string(),
-                title: "Offline architecture".to_string(),
-                heading: "# TECH-001 Offline architecture".to_string(),
-                preamble: Vec::new(),
-                sections: Vec::new(),
-                front_matter: None,
-                source: String::new(),
-            },
+            doc: crate::record::document::parse("# TECH-001 Offline architecture\n").unwrap(),
+            stored_source: String::new(),
             path: std::path::PathBuf::from("docs/technical/TECH-001.md"),
             rel_path: "docs/technical/TECH-001.md".to_string(),
             version: "1.2.3".to_string(),

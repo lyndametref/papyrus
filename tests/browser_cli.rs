@@ -5529,8 +5529,119 @@ fn t57e_field_preserving_write() {
     ]);
     assert_eq!(post_form(&server, "/doc/TECH-001", &body).status, 303);
     let after = fs::read_to_string(&path).unwrap();
-    let expected = "# TECH-001 Edited title\n\nPreamble kept.\n\n## Description\nNew body\nsecond line\n\n## Editor Notes\nKeep this line\n\n## Unknown\nAnd this\n";
-    assert_eq!(after, expected);
+    // A browser save adopts front matter (REQ-05.011) and leaves the body
+    // unchanged apart from the edited fields.
+    let (_, body) = papyrus::record::frontmatter::split(&after).unwrap();
+    let expected_body = "# TECH-001 Edited title\n\nPreamble kept.\n\n## Description\nNew body\nsecond line\n\n## Editor Notes\nKeep this line\n\n## Unknown\nAnd this\n";
+    assert_eq!(body, expected_body);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-97 AC #5: read/save adoption is idempotent.
+#[test]
+fn t57_read_adoption_is_idempotent() {
+    let dir = tech_spec_fixture("t57-adopt");
+    let path = tech_spec_path(&dir, "TECH-001");
+    let original = "# TECH-001 Legacy title\n\n## Description\nBody\n";
+    fs::write(&path, original).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let edit = get(&server, "/doc/TECH-001/edit").text();
+    let adopted = fs::read_to_string(&path).unwrap();
+    let (_, body) = papyrus::record::frontmatter::split(&adopted).unwrap();
+    assert_eq!(body, original, "adoption changes the body");
+    let _ = get(&server, "/doc/TECH-001/edit").text();
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        adopted,
+        "second read must not write again"
+    );
+    let version = extract_version(&edit);
+    let unchanged = form_body(&[
+        ("version", &version),
+        ("title", "Legacy title"),
+        ("description", "Body"),
+    ]);
+    assert_eq!(post_form(&server, "/doc/TECH-001", &unchanged).status, 303);
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        adopted,
+        "no-op save must not write or refresh updated_date"
+    );
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-97 AC #12 / D2: a CRLF record normalizes to LF on the first save and the
+// next identical save writes nothing.
+#[test]
+fn t57_crlf_save_normalizes_to_lf_once() {
+    let dir = tech_spec_fixture("t57-crlf");
+    let path = tech_spec_path(&dir, "TECH-001");
+    let lf = fs::read_to_string(&path).unwrap();
+    assert!(!lf.contains('\r'), "fixture starts with LF");
+    fs::write(&path, lf.replace('\n', "\r\n")).unwrap();
+
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let edit = get(&server, "/doc/TECH-001/edit").text();
+    assert!(
+        !edit.contains('\r'),
+        "read normalization strips carriage returns from headings and bodies"
+    );
+    let version = extract_version(&edit);
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Offline architecture"),
+        ("description", "Defines the local browser."),
+    ]);
+    assert_eq!(post_form(&server, "/doc/TECH-001", &body).status, 303);
+
+    let after_first = fs::read(&path).unwrap();
+    let text = String::from_utf8(after_first.clone()).unwrap();
+    assert!(!text.contains('\r'), "first save writes LF: {text:?}");
+    assert!(
+        text.ends_with('\n') && !text.ends_with("\n\n"),
+        "first save writes exactly one trailing newline: {text:?}"
+    );
+    assert_eq!(
+        text.matches("## Description").count(),
+        1,
+        "the section heading appears exactly once: {text:?}"
+    );
+    let updated_after_first = text
+        .lines()
+        .find(|line| line.starts_with("updated_date:"))
+        .map(str::to_string);
+    let mtime_after_first = fs::metadata(&path).unwrap().modified().unwrap();
+
+    // A second, immediately repeated identical save must perform no write.
+    let edit = get(&server, "/doc/TECH-001/edit").text();
+    let version = extract_version(&edit);
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Offline architecture"),
+        ("description", "Defines the local browser."),
+    ]);
+    assert_eq!(post_form(&server, "/doc/TECH-001", &body).status, 303);
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        after_first,
+        "the second identical save must leave the file byte-identical"
+    );
+    assert_eq!(
+        fs::metadata(&path).unwrap().modified().unwrap(),
+        mtime_after_first,
+        "the second identical save must not write and refresh updated_date"
+    );
+    assert_eq!(
+        fs::read_to_string(&path)
+            .unwrap()
+            .lines()
+            .find(|line| line.starts_with("updated_date:"))
+            .map(str::to_string),
+        updated_after_first
+    );
+
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -6766,8 +6877,11 @@ fn t81f_field_preserving_write() {
     ]);
     assert_eq!(post_form(&server, "/doc/UC-001", &body).status, 303);
     let after = fs::read_to_string(&path).unwrap();
-    let expected = "# UC-001 Edited title\n\nPreamble kept.\n\n## Description\nNew body\nsecond line\n\n## Editor Notes\nKeep this line\n\n## Unknown\nAnd this\n";
-    assert_eq!(after, expected);
+    // A browser save adopts front matter (REQ-05.011) and leaves the body
+    // unchanged apart from the edited fields.
+    let (_, body) = papyrus::record::frontmatter::split(&after).unwrap();
+    let expected_body = "# UC-001 Edited title\n\nPreamble kept.\n\n## Description\nNew body\nsecond line\n\n## Editor Notes\nKeep this line\n\n## Unknown\nAnd this\n";
+    assert_eq!(body, expected_body);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }

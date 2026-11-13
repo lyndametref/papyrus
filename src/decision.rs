@@ -218,13 +218,10 @@ fn type_entry(cfg: &Config, key: &str) -> Result<crate::config::TypeEntry, AppEr
 
 pub fn type_key_for_id(cfg: &Config, id: &str) -> Option<String> {
     for (key, entry) in &cfg.decision_types {
-        if !entry.enabled {
+        if !entry.enabled || entry.prefix.is_empty() {
             continue;
         }
-        if entry.prefix.is_empty() {
-            continue;
-        }
-        if id.starts_with(&format!("{}-", entry.prefix)) {
+        if crate::record::identity::parse_id_parts(id, &entry.prefix, false).is_some() {
             return Some(key.clone());
         }
     }
@@ -444,7 +441,7 @@ pub fn create(
     let file_name = if slug.is_empty() {
         format!("{}.md", id)
     } else {
-        format!("{}-{}.md", id, slug)
+        format!("{id}-{slug}.md")
     };
     let file_path = active.join(file_name);
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
@@ -474,7 +471,7 @@ pub fn list(
     let mut items: Vec<(String, String, String)> = Vec::new();
     for record in records {
         let included = if let Some((_, prefix)) = &type_filter {
-            record.id.starts_with(&format!("{}-", prefix))
+            crate::record::identity::parse_id_parts(&record.id, prefix, false).is_some()
         } else {
             type_key_for_id(&cfg, &record.id).is_some()
         };
@@ -760,7 +757,7 @@ pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
     if record.path == archived_safe || archived_safe.exists() {
         return Err(AppError::Validation(format!("already archived: {}", id)));
     }
-    fs::rename(&record.path, &archived_safe).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::move_record(ctx, &record.path, &archived_safe)?;
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))
     } else {

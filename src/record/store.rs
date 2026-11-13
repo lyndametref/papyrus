@@ -16,6 +16,41 @@ pub fn read(ctx: &Context, target: &Path) -> Result<(Document, String), AppError
 }
 
 pub fn read_document(ctx: &Context, target: &Path) -> Result<(Document, String), AppError> {
+    let (safe, content) = read_source(ctx, target)?;
+    let doc = document::parse(&content)?;
+    let meta = fs::metadata(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let token = version_token(&meta);
+    Ok((doc, token))
+}
+
+/// One read of a record for the browser edit surface (ADR-0013 D2).
+#[derive(Debug)]
+pub struct NormalizedRead {
+    /// Document parsed after CRLF and lone-CR normalization.
+    pub document: Document,
+    /// Optimistic-concurrency token read from the stored file.
+    pub version: String,
+    /// Content exactly as stored on disk, before normalization.
+    pub stored_source: String,
+}
+
+/// Read a record for the browser: the shared parser keeps its byte-preserving
+/// contract, while the browser requests LF-normalized content so headings never
+/// carry a trailing `\r` (ADR-0013 D2). `stored_source` keeps the on-disk bytes
+/// so a line-ending-only difference still produces exactly one write.
+pub fn read_document_normalized(ctx: &Context, target: &Path) -> Result<NormalizedRead, AppError> {
+    let (safe, stored_source) = read_source(ctx, target)?;
+    let normalized = crate::record::line_endings::normalize(&stored_source);
+    let document = document::parse(&normalized)?;
+    let meta = fs::metadata(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
+    Ok(NormalizedRead {
+        document,
+        version: version_token(&meta),
+        stored_source,
+    })
+}
+
+fn read_source(ctx: &Context, target: &Path) -> Result<(PathBuf, String), AppError> {
     let safe = resolve_path(ctx, target).map_err(|_| {
         AppError::Runtime(format!(
             "path resolves outside project directory: {}",
@@ -28,11 +63,8 @@ pub fn read_document(ctx: &Context, target: &Path) -> Result<(Document, String),
             target.display()
         )));
     }
-    let content = crate::record::migrate::ensure_front_matter(ctx, &safe)?;
-    let doc = document::parse(&content)?;
-    let meta = fs::metadata(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
-    let token = version_token(&meta);
-    Ok((doc, token))
+    let content = crate::record::migrate::ensure_front_matter_quiet(ctx, &safe)?;
+    Ok((safe, content))
 }
 
 pub fn version_token(meta: &fs::Metadata) -> String {
@@ -46,6 +78,41 @@ pub fn version_token(meta: &fs::Metadata) -> String {
         duration.subsec_nanos(),
         meta.len()
     )
+}
+
+pub fn valid_version_token(token: &str) -> bool {
+    let mut parts = token.split('.');
+    let (Some(seconds), Some(nanos), Some(length), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return false;
+    };
+    !seconds.is_empty()
+        && !nanos.is_empty()
+        && !length.is_empty()
+        && seconds.bytes().all(|b| b.is_ascii_digit())
+        && nanos.bytes().all(|b| b.is_ascii_digit())
+        && length.bytes().all(|b| b.is_ascii_digit())
+}
+
+/// Move one record file atomically to another project-relative location.
+///
+/// Relocation is a directory move, not a record write: the shared store is the
+/// only place that may rename a record path.
+pub fn move_record(ctx: &Context, source: &Path, destination: &Path) -> Result<(), AppError> {
+    let source = resolve_path(ctx, source).map_err(|_| {
+        AppError::Runtime(format!(
+            "path resolves outside project directory: {}",
+            source.display()
+        ))
+    })?;
+    let destination = resolve_path(ctx, destination).map_err(|_| {
+        AppError::Runtime(format!(
+            "path resolves outside project directory: {}",
+            destination.display()
+        ))
+    })?;
+    fs::rename(&source, &destination).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
 pub fn write_atomic(ctx: &Context, target: &Path, content: &str) -> Result<(), AppError> {
@@ -185,6 +252,47 @@ impl Store {
     pub fn read_document(ctx: &Context, target: &Path) -> Result<(Document, String), AppError> {
         read_document(ctx, target)
     }
+    pub fn read_document_normalized(
+        ctx: &Context,
+        target: &Path,
+    ) -> Result<NormalizedRead, AppError> {
+        read_document_normalized(ctx, target)
+    }
+    pub fn valid_version_token(token: &str) -> bool {
+        let mut parts = token.split('.');
+        let (Some(seconds), Some(nanos), Some(length), None) =
+            (parts.next(), parts.next(), parts.next(), parts.next())
+        else {
+            return false;
+        };
+        !seconds.is_empty()
+            && !nanos.is_empty()
+            && !length.is_empty()
+            && seconds.bytes().all(|b| b.is_ascii_digit())
+            && nanos.bytes().all(|b| b.is_ascii_digit())
+            && length.bytes().all(|b| b.is_ascii_digit())
+    }
+
+    /// Move one record file atomically to another project-relative location.
+    ///
+    /// Relocation is a directory move, not a record write: the shared store is the
+    /// only place that may rename a record path.
+    pub fn move_record(ctx: &Context, source: &Path, destination: &Path) -> Result<(), AppError> {
+        let source = resolve_path(ctx, source).map_err(|_| {
+            AppError::Runtime(format!(
+                "path resolves outside project directory: {}",
+                source.display()
+            ))
+        })?;
+        let destination = resolve_path(ctx, destination).map_err(|_| {
+            AppError::Runtime(format!(
+                "path resolves outside project directory: {}",
+                destination.display()
+            ))
+        })?;
+        fs::rename(&source, &destination).map_err(|e| AppError::Runtime(e.to_string()))
+    }
+
     pub fn write_atomic(ctx: &Context, target: &Path, content: &str) -> Result<(), AppError> {
         write_atomic(ctx, target, content)
     }

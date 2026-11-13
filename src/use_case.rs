@@ -583,7 +583,7 @@ fn deprecate(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
     if destination.exists() {
         return Err(AppError::Validation(format!("already deprecated: {}", id)));
     }
-    fs::rename(&record.path, &destination).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::move_record(ctx, &record.path, &destination)?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))
@@ -624,7 +624,7 @@ fn restore(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
     if destination.exists() {
         return Err(AppError::Validation(format!("not deprecated: {}", id)));
     }
-    fs::rename(&record.path, &destination).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::move_record(ctx, &record.path, &destination)?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))
