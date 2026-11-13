@@ -377,7 +377,13 @@ mod tests {
     fn make_ctx(project: &std::path::Path) -> Context {
         Context {
             project_dir: project.to_path_buf(),
-            config_path: project.join("papyrus.config.yml"),
+            config_path: {
+                let p = project.join("papyrus.config.yml");
+                if !p.exists() {
+                    let _ = std::fs::write(&p, "project_name: Test\n");
+                }
+                p
+            },
             json: false,
             no_color: false,
         }

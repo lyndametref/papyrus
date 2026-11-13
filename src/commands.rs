@@ -55,16 +55,19 @@ fn yaml_scalar_to_string(v: &yaml_serde::Value) -> String {
 }
 
 pub fn load_effective_value(config_path: &Path) -> Result<yaml_serde::Value, AppError> {
+    if !config_path.exists() {
+        return Err(AppError::Runtime(format!(
+            "configuration file not found: {}; run `papyrus init` to create it",
+            config_path.display()
+        )));
+    }
     let default_cfg = Config::default();
     let mut base =
         yaml_serde::to_value(&default_cfg).map_err(|e| AppError::Runtime(e.to_string()))?;
-    if config_path.exists() {
-        let raw =
-            std::fs::read_to_string(config_path).map_err(|e| AppError::Runtime(e.to_string()))?;
-        let overlay: yaml_serde::Value =
-            yaml_serde::from_str(&raw).map_err(|e| AppError::Validation(e.to_string()))?;
-        merge_yaml(&mut base, &overlay);
-    }
+    let raw = std::fs::read_to_string(config_path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let overlay: yaml_serde::Value =
+        yaml_serde::from_str(&raw).map_err(|e| AppError::Validation(e.to_string()))?;
+    merge_yaml(&mut base, &overlay);
     Ok(base)
 }
 

@@ -76,11 +76,32 @@ fn init_no_git_skips_git() {
 }
 
 #[test]
-fn init_nonempty_without_force_exits_four() {
+fn init_nonempty_succeeds() {
     let d = tmpdir("nonempty");
     fs::write(d.join("file.txt"), "x").unwrap();
     let out = bin()
-        .args(["--dir", d.to_str().unwrap(), "init", "Proj"])
+        .args(["--dir", d.to_str().unwrap(), "init", "Proj", "--no-git"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{:?}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(d.join("papyrus.config.yml").exists());
+    assert_eq!(fs::read_to_string(d.join("file.txt")).unwrap(), "x");
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn init_existing_config_without_force_exits_four() {
+    let d = tmpdir("conflict");
+    bin()
+        .args(["--dir", d.to_str().unwrap(), "init", "Proj", "--no-git"])
+        .output()
+        .unwrap();
+    let out = bin()
+        .args(["--dir", d.to_str().unwrap(), "init", "Proj2"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(4));
@@ -97,6 +118,20 @@ fn init_force_leaves_files() {
         .unwrap();
     assert!(out.status.success());
     assert_eq!(fs::read_to_string(d.join("file.txt")).unwrap(), "x");
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn missing_config_fails_with_runtime_error() {
+    let d = tmpdir("missingcfg");
+    let out = bin()
+        .args(["--dir", d.to_str().unwrap(), "config", "list"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("papyrus.config.yml"));
+    assert!(stderr.contains("papyrus init"));
     let _ = fs::remove_dir_all(&d);
 }
 
