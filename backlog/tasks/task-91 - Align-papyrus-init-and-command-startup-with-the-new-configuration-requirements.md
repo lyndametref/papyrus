@@ -1,10 +1,10 @@
 ---
 id: TASK-91
 title: Align papyrus init and command startup with the new configuration requirements
-status: Implemented
+status: Done
 assignee: []
 created_date: '2026-11-11T20:42:00Z'
-updated_date: '2026-11-13T05:53:00Z'
+updated_date: '2026-11-13T05:57:00Z'
 labels:
   - configuration
   - init
@@ -74,11 +74,11 @@ Assumptions:
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Implementation plan recorded in the ticket and followed.
-- [ ] #2 Unit and integration tests updated for the changed init and startup behavior.
-- [ ] #3 cargo test passes.
-- [ ] #4 README and manpage wording updated if user-visible behavior changed.
-- [ ] #5 No direct task/specification file edits were made outside the backlog CLI and documented spec locations.
+- [x] #1 Implementation plan recorded in the ticket and followed.
+- [x] #2 Unit and integration tests updated for the changed init and startup behavior.
+- [x] #3 cargo test passes.
+- [x] #4 README and manpage wording updated if user-visible behavior changed.
+- [x] #5 No direct task/specification file edits were made outside the backlog CLI and documented spec locations.
 <!-- DOD:END -->
 
 ## Implementation Plan
