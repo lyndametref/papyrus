@@ -6004,6 +6004,85 @@ fn t72b_lifecycle_custom_status_list() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+// TASK-95 AC #6 / spec §7.6: a disabled document type renders read-only
+// configuration with enabled: false and does not fail the page.
+#[test]
+fn t95a_lifecycle_disabled_document_type() {
+    let dir = test_root("lifecycle-disabled-type");
+    init_project(&dir);
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "config",
+        "set",
+        "document_types.tech-spec.enabled",
+        "false",
+    ]);
+
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let response = get(&server, "/lifecycle");
+    assert_eq!(response.status, 200);
+    let body = response.text();
+    assert_twelve_sections_in_order(&body);
+    assert!(body.contains("Curated description: technical specification records."));
+    assert!(
+        body.contains("enabled: false; ID prefix: TECH; storage folder: docs/technical."),
+        "disabled type must render enabled: false"
+    );
+    assert!(
+        body.contains("Changes via <a class=\"link\" href=\"/config\">Configuration</a>"),
+        "configuration values remain display-only and link to /config"
+    );
+    for control in ["<form", "<input"] {
+        assert!(
+            !body.contains(control),
+            "lifecycle page must offer no editing control: {}",
+            control
+        );
+    }
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-95 AC #6 / spec §7.7: a renamed prefix and storage folder appear in
+// the rendered read-only configuration line; curated description is unchanged.
+#[test]
+fn t95b_lifecycle_renamed_prefix_and_folder() {
+    let dir = test_root("lifecycle-renamed");
+    init_project(&dir);
+    for (key, value) in [
+        ("document_types.req.prefix", "BRQ"),
+        (
+            "document_types.req.directory",
+            "requirements/business-rules/",
+        ),
+        ("doc_directory", "documentation/"),
+    ] {
+        run_ok(&["--dir", dir.to_str().unwrap(), "config", "set", key, value]);
+    }
+
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let body = get(&server, "/lifecycle").text();
+    assert_twelve_sections_in_order(&body);
+    assert!(
+        body.contains("Curated description: business requirement groups and atomic requirements.")
+    );
+    assert!(
+        body.contains(
+            "<p>Read-only config — enabled: true; ID prefix: BRQ; storage folder: documentation/requirements/business-rules."
+        ),
+        "renamed prefix and storage folder must render"
+    );
+    // Other document sections join the renamed base directory too.
+    assert!(body.contains(
+        "<p>Read-only config — enabled: true; ID prefix: NFR; storage folder: documentation/requirements/non-functional."
+    ));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 // TASK-77 / spec §8: eight skill groups in order.
 fn assert_eight_skill_groups_in_order(body: &str) {
     const GROUPS: [&str; 8] = [
