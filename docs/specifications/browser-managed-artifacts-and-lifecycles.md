@@ -114,6 +114,9 @@ Each section's lifecycle paragraph uses the documented lifecycle for that type:
 2. The same test asserts `GET /?type=lifecycle` returns the same page (alias).
 3. The same test asserts `POST /lifecycle` returns `405` with an `Allow` header.
 4. A second test (or a parameterised case) initialises a project with a custom status list (for example `["Backlog", "Doing", "Done"]`) and asserts the task section renders that exact chain and does not render the default chain.
+5. A third test (TASK-95) initialises a project with a disabled document type (`document_types.<key>.enabled: false`) and asserts `GET /lifecycle` returns `200`, still renders twelve sections, and shows `enabled: false` in that section's read-only configuration line without an error.
+6. A fourth test (TASK-95) renames a document type's ID prefix and storage folder, plus the base document directory, and asserts the rendered read-only configuration line shows the new prefix and joined folder while the section's curated description text stays unchanged.
+7. The TASK-95 tests also assert the read-only configuration line is display-only: the section links to `/config` for changes and the page contains no form or input editing control.
 
 ## Assumptions
 
@@ -137,5 +140,6 @@ Each section's lifecycle paragraph uses the documented lifecycle for that type:
 - Task status source: `docs/business-rules/BR-001-papyrus-command-behavior.md`, `docs/business-rules/BR-006-papyrus-milestone-command-behavior.md`, `docs/business-rules/BR-007-papyrus-release-command-behavior.md`, `docs/business-rules/BR-008-papyrus-decision-command-behavior.md`
 - Milestone: `m-12`
 - Dependency: TASK-66 (Done), TASK-86
+- Implementation: TASK-95 (per-artifact descriptions and read-only configuration, section 4a)
 - ADR: ADR-0010, ADR-0012, ADR-0013
 path: /home/lyly/Documents/Dev/papyrus/docs/specifications/browser-managed-artifacts-and-lifecycles.md
