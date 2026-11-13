@@ -137,5 +137,6 @@ Each section's lifecycle paragraph uses the documented lifecycle for that type:
 - Task status source: `docs/business-rules/BR-001-papyrus-command-behavior.md`, `docs/business-rules/BR-006-papyrus-milestone-command-behavior.md`, `docs/business-rules/BR-007-papyrus-release-command-behavior.md`, `docs/business-rules/BR-008-papyrus-decision-command-behavior.md`
 - Milestone: `m-12`
 - Dependency: TASK-66 (Done), TASK-86
+- Implementation: TASK-95 (per-artifact descriptions and read-only configuration, section 4a)
 - ADR: ADR-0010, ADR-0012, ADR-0013
 path: /home/lyly/Documents/Dev/papyrus/docs/specifications/browser-managed-artifacts-and-lifecycles.md
