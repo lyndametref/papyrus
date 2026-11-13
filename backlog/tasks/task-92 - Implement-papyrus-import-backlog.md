@@ -1,10 +1,10 @@
 ---
 id: TASK-92
 title: Implement papyrus import backlog
-status: Implemented
+status: Done
 assignee: []
 created_date: '2026-11-11T20:43:00Z'
-updated_date: '2026-11-13T06:21:00Z'
+updated_date: '2026-11-13T06:24:00Z'
 labels:
   - import
   - native-layout
@@ -91,7 +91,7 @@ Verification: cargo build/test pass, including no_drift; dry-run writes nothing;
 - [x] #3 cargo test passes, including no_drift checks and import-specific tests.
 - [x] #4 Dry run performs phases 1-2 and writes nothing; source directory is byte-identical after a real import.
 - [x] #5 --report writes only inside the project directory; destination paths pass Context::ensure_within.
-- [ ] #6 Command help and README/papyrus(1) document the command, options, one-way/non-idempotent caveat, and excluded scope.
+- [x] #6 Command help and README/papyrus(1) document the command, options, one-way/non-idempotent caveat, and excluded scope.
 - [x] #7 Mechanical grep confirms no Backlog-specific parser/serializer and no source storage ID persisted in imported records.
 - [x] #8 All acceptance criteria verified by code review and tests.
 <!-- DOD:END -->
