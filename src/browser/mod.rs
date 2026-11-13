@@ -1190,6 +1190,7 @@ fn config_submit(request: Request, state: &ServerState) -> Result<Response, Http
             ))
         }
         Err(AppError::NotFound(_)) => Err(HttpError::new(404)),
+        Err(AppError::Interrupted) => Err(HttpError::new(500)),
         Err(AppError::Runtime(msg)) => {
             if msg.contains("outside project directory") {
                 let cfg = state.config().unwrap_or_default();
