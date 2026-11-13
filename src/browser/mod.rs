@@ -987,6 +987,17 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                     .map(|r| r.record)
             })
             .collect()
+    } else if !record.refs.is_empty() {
+        record
+            .refs
+            .iter()
+            .map(|rid| {
+                records::resolve_id(&ctx, &cfg, rid)
+                    .ok()
+                    .flatten()
+                    .map(|r| r.record)
+            })
+            .collect()
     } else {
         Vec::new()
     };

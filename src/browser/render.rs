@@ -519,15 +519,11 @@ fn record_view_extra_rows(record: &Record, skip: &[&str]) -> String {
             escape(value)
         ));
     }
-    rows
-}
-
-fn with_extra_rows(block: String, record: &Record, skip: &[&str]) -> String {
-    let extra = record_view_extra_rows(record, skip);
-    if extra.is_empty() {
-        return block;
+    if rows.is_empty() {
+        String::new()
+    } else {
+        format!("<div class=\"meta\"><dl class=\"dl\">{}</dl></div>", rows)
     }
-    block.replacen("</dl></div>", &format!("{}</dl></div>", extra), 1)
 }
 
 /// List-row metadata line rendered from the shared `RecordView` (TASK-67).
@@ -616,19 +612,43 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
     } else {
         owning_group_dd(record, resolved_group)
     };
-    let block = format!(
-        "<div class=\"meta\"><dl class=\"dl\">\
+    let view = record_view(record);
+    let created = view
+        .as_ref()
+        .map(|v| v.value_text("created_date"))
+        .unwrap_or_default();
+    let created = if created.is_empty() {
+        "(none)".to_string()
+    } else {
+        created
+    };
+    let updated = view
+        .as_ref()
+        .map(|v| v.value_text("updated_date"))
+        .unwrap_or_default();
+    let updated = if updated.is_empty() {
+        "(none)".to_string()
+    } else {
+        updated
+    };
+    let include_owning = matches!(record.form, Form::Requirement);
+    let owning_row = if include_owning {
+        format!("<div><dt>Owning group</dt>{}</div>", owning)
+    } else {
+        String::new()
+    };
+    format!(
+        "<div class=\"meta summary-card\"><dl class=\"dl\">\
 <div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div>\
-<div><dt>Record form</dt><dd>{}</dd></div>\
-<div><dt>Document type</dt><dd>{}</dd></div>\
-<div><dt>Owning group</dt>{}</div>\
+<div><dt>Created date</dt><dd>{}</dd></div>\
+<div><dt>Updated date</dt><dd>{}</dd></div>\
+{}\
 </dl></div>",
         escape(&record.id),
-        escape(record.form.label()),
-        escape(&record.type_label()),
-        owning
-    );
-    with_extra_rows(block, record, &[])
+        escape(&created),
+        escape(&updated),
+        owning_row
+    )
 }
 
 fn requirement_link(record: &Record) -> String {
@@ -718,13 +738,30 @@ fn list_section(kind: Category, index: &Index, other_has_records: bool) -> Strin
         } else {
             plural(members.len(), "requirement", "requirements")
         };
+        let title = if group.title.trim().is_empty() {
+            group.id.clone()
+        } else {
+            group.title.clone()
+        };
+        let group_head = if group.path.as_os_str().is_empty() {
+            format!(
+                "<span class=\"group-id\">{}</span> {}",
+                escape(&group.id),
+                escape(&title)
+            )
+        } else {
+            format!(
+                "<a href=\"/doc/{}\"><span class=\"group-id\">{}</span> {}</a>",
+                escape(&group.id),
+                escape(&group.id),
+                escape(&title)
+            )
+        };
         body.push_str(&format!(
             "<article class=\"group\">\
-<div class=\"group-head\"><h3 class=\"group-title\"><a href=\"/doc/{}\"><span class=\"group-id\">{}</span> {}</a></h3>\
+<div class=\"group-head\"><h3 class=\"group-title\">{}</h3>\
 <span class=\"group-count\">{}</span></div>",
-            escape(&group.id),
-            escape(&group.id),
-            escape(&group.title),
+            group_head,
             escape(&member_count)
         ));
         if members.is_empty() {
@@ -740,7 +777,7 @@ fn list_section(kind: Category, index: &Index, other_has_records: bool) -> Strin
         let _ = position;
     }
 
-    if !index.other.is_empty() {
+    if kind == Category::Req && !index.other.is_empty() {
         body.push_str(&format!(
             "<section class=\"other\" aria-label=\"Other {}\">\
 <h3 class=\"h3\">Other requirements</h3>\
@@ -927,11 +964,26 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
                 escape(&meta)
             ));
         }
-        let record_meta = record_view_backlog_row_meta(record);
-        if !record_meta.is_empty()
-            && let Some(li_end) = body.rfind("</li>")
-        {
-            body.insert_str(li_end, &record_meta);
+        if kind != Category::Glossary {
+            let record_meta = record_view_backlog_row_meta(record);
+            if !record_meta.is_empty()
+                && let Some(li_end) = body.rfind("</li>")
+            {
+                body.insert_str(li_end, &record_meta);
+            }
+        }
+        // Glossary landing: labels as tags.
+        if kind == Category::Glossary && !record.labels.is_empty() {
+            let tags: String = record
+                .labels
+                .iter()
+                .map(|l| format!("<span class=\"tag\">{}</span>", escape(l)))
+                .collect::<Vec<_>>()
+                .join("");
+            let tag_html = format!("<span class=\"taglist\">{}</span>", tags);
+            if let Some(li_end) = body.rfind("</li>") {
+                body.insert_str(li_end, &tag_html);
+            }
         }
     }
     body.push_str("</ul></section>");
@@ -1025,6 +1077,7 @@ pub fn view_page(
     chrome: Chrome<'_>,
 ) -> String {
     let mut content = String::new();
+    let mut details = String::new();
     match record.kind {
         Category::Req | Category::Nfr => {
             if record.kind.supports_story()
@@ -1088,27 +1141,26 @@ pub fn view_page(
                 content.push_str("</ul>");
             }
             content.push_str("</section>");
-            // Dependencies
-            content.push_str("<section class=\"record-section\"><h2>Dependencies</h2>");
-            if record.dependencies.is_empty() {
-                content.push_str("<p class=\"text empty-text\">No dependencies.</p>");
-            } else {
-                content.push_str("<ul class=\"req-list\">");
+            // Dependencies (rendered at the end as a disclosure section)
+            if !record.dependencies.is_empty() {
+                details.push_str(&format!(
+                    "<details><summary>Dependencies ({})</summary><ul class=\"req-list\">",
+                    record.dependencies.len()
+                ));
                 for (i, dep) in record.dependencies.iter().enumerate() {
                     let resolved = resolved_dependencies.get(i).and_then(|r| r.as_ref());
                     match resolved {
-                        Some(rel) => content.push_str(&format!(
+                        Some(rel) => details.push_str(&format!(
                             "<li><a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a></li>",
                             escape(&rel.id),
                             escape(dep),
                             escape(&rel.title)
                         )),
-                        None => content.push_str(&format!("<li>{}</li>", escape(dep))),
+                        None => details.push_str(&format!("<li>{}</li>", escape(dep))),
                     }
                 }
-                content.push_str("</ul>");
+                details.push_str("</ul></details>");
             }
-            content.push_str("</section>");
             // Acceptance criteria
             content.push_str("<section class=\"record-section\"><h2>Acceptance criteria</h2>");
             if record.acceptance_criteria.is_empty() {
@@ -1272,16 +1324,16 @@ pub fn view_page(
                 ));
             }
             content.push_str("</section>");
-            content.push_str("<section class=\"record-section\"><h2>References</h2>");
-            if refs.is_empty() {
-                content.push_str("<p class=\"text empty-text\">(none)</p>");
-            } else {
+            if !refs.is_empty() {
                 content.push_str(&format!(
-                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
+                    "<section class=\"record-section\"><h2>References</h2><p class=\"text\" style=\"white-space: pre-wrap\">{}</p></section>",
+                    escape(&refs)
+                ));
+                details.push_str(&format!(
+                    "<details><summary>References (1)</summary><p class=\"text\" style=\"white-space: pre-wrap\">{}</p></details>",
                     escape(&refs)
                 ));
             }
-            content.push_str("</section>");
         }
         Category::BusinessRule => {
             // Description
@@ -1314,28 +1366,31 @@ pub fn view_page(
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
             }
             content.push_str("</section>");
-            // Requirements
-            content.push_str("<section class=\"record-section\"><h2>Requirements</h2>");
-            if record.requirements.is_empty() {
-                content.push_str("<p class=\"text empty-text\">(none)</p>");
-            } else {
-                content.push_str("<ul class=\"req-list\">");
+            // Requirements (rendered at the end as a disclosure section)
+            if !record.requirements.is_empty() {
+                details.push_str(&format!(
+                    "<details><summary>Requirements ({})</summary><ul class=\"req-list\">",
+                    record.requirements.len()
+                ));
                 for (i, req) in record.requirements.iter().enumerate() {
                     let resolved = resolved_refs.get(i).and_then(|r| r.as_ref());
                     match resolved {
-                        Some(rel) => content.push_str(&format!(
+                        Some(rel) => details.push_str(&format!(
                             "<li><a href=\"/doc/{}\">{}</a></li>",
                             escape(&rel.id),
                             escape(req)
                         )),
-                        None => content.push_str(&format!("<li>{}</li>", escape(req))),
+                        None => details.push_str(&format!("<li>{}</li>", escape(req))),
                     }
                 }
-                content.push_str("</ul>");
+                details.push_str("</ul></details>");
             }
-            content.push_str("</section>");
         }
         Category::AuditRecord => {
+            content.push_str(&format!(
+                "<p class=\"text\">Audit type: {}</p>",
+                escape(record.audit_type.as_deref().unwrap_or("security"))
+            ));
             let content_text = record.description.as_deref().unwrap_or("");
             if content_text.trim().is_empty() {
                 content.push_str("<p class=\"text empty-text\">(none)</p>");
@@ -1377,22 +1432,72 @@ pub fn view_page(
         }
     }
 
+    if !resolved_refs.is_empty() && record.kind != Category::BusinessRule {
+        details.push_str(&format!(
+            "<details><summary>References ({})</summary><ul class=\"req-list\">",
+            resolved_refs.len()
+        ));
+        for (i, rref) in record.refs.iter().enumerate() {
+            let resolved = resolved_refs.get(i).and_then(|r| r.as_ref());
+            match resolved {
+                Some(rel) => details.push_str(&format!(
+                    "<li><a href=\"/doc/{}\">{}</a></li>",
+                    escape(&rel.id),
+                    escape(rref)
+                )),
+                None => details.push_str(&format!("<li>{}</li>", escape(rref))),
+            }
+        }
+        details.push_str("</ul></details>");
+    }
+    let form_line = format!(
+        "<p class=\"record-meta\">{}</p>",
+        escape(record.form.label())
+    );
+    content = format!("{}{}", form_line, content);
+    if record.kind == Category::Decision {
+        content = format!(
+            "<p class=\"record-meta\">Decision type: {}</p><p class=\"record-meta\">Status: {}</p>{}",
+            escape(record.decision_type.as_deref().unwrap_or("(none)")),
+            escape(record.status.as_deref().unwrap_or("(none)")),
+            content
+        );
+    }
+    let extra = record_view_extra_rows(record, &["created_date", "updated_date", "labels"]);
+    if !extra.is_empty() {
+        content.push_str(&extra);
+    }
+    if !details.is_empty() {
+        content.push_str(&details);
+    }
+    let taglist = if record.labels.is_empty() {
+        String::new()
+    } else {
+        let mut out = String::from("<div class=\"taglist\">Labels: ");
+        for l in &record.labels {
+            out.push_str(&format!("<span class=\"tag\">{}</span>", escape(l)));
+        }
+        out.push_str("</div>");
+        out
+    };
     let page_head = if record.kind == Category::AuditRecord {
         let audit_type = record.audit_type.as_deref().unwrap_or("security");
         format!(
-            "<div class=\"page-head\"><div><p class=\"id\">{} <span class=\"badge\">{}</span></p><h1 class=\"h1\">{}</h1></div>\
+            "<div class=\"page-head\"><div><p class=\"id\">{} <span class=\"badge\">{}</span></p><h1 class=\"h1\">{}</h1>{}</div>\
 <div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Edit</a></div></div>",
             escape(&record.id),
             escape(audit_type),
             escape(&record.title),
+            taglist,
             escape(&record.id)
         )
     } else {
         format!(
-            "<div class=\"page-head\"><div><p class=\"id\">{}</p><h1 class=\"h1\">{}</h1></div>\
+            "<div class=\"page-head\"><div><p class=\"id\">{}</p><h1 class=\"h1\">{}</h1>{}</div>\
 <div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Edit</a></div></div>",
             escape(&record.id),
             escape(&record.title),
+            taglist,
             escape(&record.id)
         )
     };
@@ -1422,159 +1527,10 @@ pub fn view_page(
 
 fn metadata_block_backlog(
     record: &Record,
-    related_milestone: Option<&Record>,
-    related_release: Option<&Record>,
+    _related_milestone: Option<&Record>,
+    _related_release: Option<&Record>,
 ) -> String {
-    let block = metadata_block_backlog_inner(record, related_milestone, related_release);
-    let skip: &[&str] = match record.kind {
-        Category::Task => &["status", "milestone", "assignee"],
-        Category::Milestone => &["release"],
-        Category::AuditRecord => &["type"],
-        _ => &[],
-    };
-    with_extra_rows(block, record, skip)
-}
-
-fn metadata_block_backlog_inner(
-    record: &Record,
-    related_milestone: Option<&Record>,
-    related_release: Option<&Record>,
-) -> String {
-    match record.kind {
-        Category::Task => {
-            let ms = match (&record.milestone_id, related_milestone) {
-                (Some(id), Some(rel)) => format!(
-                    "<a href=\"/doc/{}\">{} {}</a>",
-                    escape(&rel.id),
-                    escape(id),
-                    escape(&rel.title)
-                ),
-                (Some(id), None) => escape(id),
-                _ => "(none)".to_string(),
-            };
-            format!(
-                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Document type</dt><dd>{}</dd></div><div><dt>Status</dt><dd>{}</dd></div><div><dt>Milestone</dt><dd>{}</dd></div><div><dt>Assignee</dt><dd>{}</dd></div></dl></div>",
-                escape(&record.id),
-                escape(record.form.label()),
-                escape(&record.type_label()),
-                escape(record.status.as_deref().unwrap_or("(none)")),
-                ms,
-                escape(record.assignee.as_deref().unwrap_or("(none)")),
-            )
-        }
-        Category::Milestone => {
-            let rel = match (&record.release_id, related_release) {
-                (Some(id), Some(r)) => format!(
-                    "<a href=\"/doc/{}\">{} {}</a>",
-                    escape(&r.id),
-                    escape(id),
-                    escape(&r.title)
-                ),
-                (Some(id), None) => escape(id),
-                _ => "(none)".to_string(),
-            };
-            format!(
-                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Document type</dt><dd>{}</dd></div><div><dt>Release</dt><dd>{}</dd></div></dl></div>",
-                escape(&record.id),
-                escape(record.form.label()),
-                escape(&record.type_label()),
-                rel,
-            )
-        }
-        Category::Release => {
-            format!(
-                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Document type</dt><dd>{}</dd></div></dl></div>",
-                escape(&record.id),
-                escape(record.form.label()),
-                escape(&record.type_label()),
-            )
-        }
-        Category::Glossary => {
-            format!(
-                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div></dl></div>",
-                escape(&record.id),
-                escape(record.form.label()),
-                escape("Glossary"),
-            )
-        }
-        Category::UiSpec => {
-            format!(
-                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div></dl></div>",
-                escape(&record.id),
-                escape(record.form.label()),
-                escape("UI Specifications"),
-            )
-        }
-        Category::UiMockup => {
-            format!(
-                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div></dl></div>",
-                escape(&record.id),
-                escape(record.form.label()),
-                escape("UI Mockups"),
-            )
-        }
-        Category::BusinessRule => {
-            format!(
-                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div></dl></div>",
-                escape(&record.id),
-                escape(record.form.label()),
-                escape("Business Rules"),
-            )
-        }
-        Category::AuditRecord => {
-            let audit_type = record.audit_type.as_deref().unwrap_or("security");
-            format!(
-                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div><div><dt>Audit type</dt><dd>{}</dd></div></dl></div>",
-                escape(&record.id),
-                escape(record.form.label()),
-                escape("Audit Records"),
-                escape(audit_type),
-            )
-        }
-        Category::TechSpec => {
-            format!(
-                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div></dl></div>",
-                escape(&record.id),
-                escape(record.form.label()),
-                escape("Technical Specifications"),
-            )
-        }
-        Category::UseCase => {
-            format!(
-                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div></dl></div>",
-                escape(&record.id),
-                escape(record.form.label()),
-                escape("Use Cases"),
-            )
-        }
-        Category::TestCase => {
-            format!(
-                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div></dl></div>",
-                escape(&record.id),
-                escape(record.form.label()),
-                escape("Test Cases"),
-            )
-        }
-        Category::TestReport => {
-            format!(
-                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div></dl></div>",
-                escape(&record.id),
-                escape(record.form.label()),
-                escape("Test Reports"),
-            )
-        }
-        Category::Decision => {
-            format!(
-                "<div class=\"meta\"><dl class=\"dl\"><div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div><div><dt>Record form</dt><dd>{}</dd></div><div><dt>Category</dt><dd>{}</dd></div><div><dt>Decision type</dt><dd>{}</dd></div><div><dt>Status</dt><dd>{}</dd></div></dl></div>",
-                escape(&record.id),
-                escape(record.form.label()),
-                escape(&record.type_label()),
-                escape(record.decision_type.as_deref().unwrap_or("(none)")),
-                escape(record.status.as_deref().unwrap_or("(none)")),
-            )
-        }
-        _ => String::new(),
-    }
+    metadata_block(record, None, false)
 }
 
 /// Submitted values shown on the edit form (pristine or after a 422).
