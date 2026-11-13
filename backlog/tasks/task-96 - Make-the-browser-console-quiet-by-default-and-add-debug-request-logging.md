@@ -1,11 +1,11 @@
 ---
 id: TASK-96
 title: Make the browser console quiet by default and add debug request logging
-status: Implemented
+status: Done
 assignee:
   - '@rust-dev'
 created_date: '2026-11-11T20:44:00Z'
-updated_date: '2026-11-13T09:19:00Z'
+updated_date: '2026-11-13T09:23:00Z'
 labels:
   - browser
   - release-1.0
@@ -69,29 +69,29 @@ Out of scope:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 `papyrus browser --help` shows usage `papyrus browser [--host <host>] [--port <port>] [--no-open] [--debug]` and documents `--debug` as a browser-only flag that takes no value.
-- [ ] #2 Passing `--debug` to any command other than `browser` (for example `papyrus req list --debug`), or as a global option before the subcommand (`papyrus --debug browser`), exits 2 with a usage message and starts nothing.
-- [ ] #3 Without `--debug`, a parsed request returning 2xx, 3xx, 4xx, or 5xx writes no per-request line to stderr; stdout contains only the single startup line, or the single startup JSON object with `--json`.
-- [ ] #4 With `--debug`, each parsed request writes exactly one stderr line formatted `<method> <path> <status> <duration>ms`, where `<duration>` is a non-negative integer (for example `GET /doc/REQ-001.001 200 4ms`).
-- [ ] #5 The logged path excludes the query string, is percent-decoded, and is truncated to 200 characters; a request for `/?type=req` logs `/`, not `/?type=req`.
-- [ ] #6 Request headers and bodies never appear in console output: a request carrying a unique header value and a unique body phrase produces no stderr containing either value, with or without `--debug`.
-- [ ] #7 Without `--debug`, warnings and fatal messages still print (non-loopback bind warning, opener warning, bind failure), and pre-parse failures still print `- - <status>` (for example `- - 408`); the over-capacity rejection prints exactly `- - 503` with and without `--debug`.
-- [ ] #8 With `--debug` and `--json`, all request and error lines go to stderr and stdout contains exactly one JSON startup object.
-- [ ] #9 The `README.md` papyrus(1) browser section shows the usage line with `[--debug]` and documents that the flag logs one line per request without headers or bodies, consistent with `--help`.
-- [ ] #10 `tests/browser_cli.rs` covers the quiet default, the debug line shape and duration, query stripping and 200-character truncation, absence of header/body content, always-on warnings and `- - 503`, rejection of `--debug` on another command and as a global option, and the help text.
-- [ ] #11 `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`, and `cargo fmt --check` pass, and `Cargo.toml` gains no dependency.
+- [x] #1 `papyrus browser --help` shows usage `papyrus browser [--host <host>] [--port <port>] [--no-open] [--debug]` and documents `--debug` as a browser-only flag that takes no value.
+- [x] #2 Passing `--debug` to any command other than `browser` (for example `papyrus req list --debug`), or as a global option before the subcommand (`papyrus --debug browser`), exits 2 with a usage message and starts nothing.
+- [x] #3 Without `--debug`, a parsed request returning 2xx, 3xx, 4xx, or 5xx writes no per-request line to stderr; stdout contains only the single startup line, or the single startup JSON object with `--json`.
+- [x] #4 With `--debug`, each parsed request writes exactly one stderr line formatted `<method> <path> <status> <duration>ms`, where `<duration>` is a non-negative integer (for example `GET /doc/REQ-001.001 200 4ms`).
+- [x] #5 The logged path excludes the query string, is percent-decoded, and is truncated to 200 characters; a request for `/?type=req` logs `/`, not `/?type=req`.
+- [x] #6 Request headers and bodies never appear in console output: a request carrying a unique header value and a unique body phrase produces no stderr containing either value, with or without `--debug`.
+- [x] #7 Without `--debug`, warnings and fatal messages still print (non-loopback bind warning, opener warning, bind failure), and pre-parse failures still print `- - <status>` (for example `- - 408`); the over-capacity rejection prints exactly `- - 503` with and without `--debug`.
+- [x] #8 With `--debug` and `--json`, all request and error lines go to stderr and stdout contains exactly one JSON startup object.
+- [x] #9 The `README.md` papyrus(1) browser section shows the usage line with `[--debug]` and documents that the flag logs one line per request without headers or bodies, consistent with `--help`.
+- [x] #10 `tests/browser_cli.rs` covers the quiet default, the debug line shape and duration, query stripping and 200-character truncation, absence of header/body content, always-on warnings and `- - 503`, rejection of `--debug` on another command and as a global option, and the help text.
+- [x] #11 `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`, and `cargo fmt --check` pass, and `Cargo.toml` gains no dependency.
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 All 11 acceptance criteria are verified with concrete evidence (test names or command output) recorded in the ticket.
-- [ ] #2 New and updated tests in `tests/browser_cli.rs` pass, including the existing browser suite.
-- [ ] #3 `cargo test --all-targets` passes.
-- [ ] #4 `cargo clippy --all-targets -- -D warnings` passes.
-- [ ] #5 `cargo fmt --check` passes.
-- [ ] #6 The `README.md` papyrus(1) browser section documents `--debug` consistently with `papyrus browser --help`.
-- [ ] #7 `docs/specifications/browser-requirements.md` section 2.12 matches the implemented format and exception; `docs/requirements/` and `docs/business-rules/` are unchanged.
-- [ ] #8 No dependency, route, HTTP response, record, or configuration behavior changed; the final summary lists every changed file.
+- [x] #1 All 11 acceptance criteria are verified with concrete evidence (test names or command output) recorded in the ticket.
+- [x] #2 New and updated tests in `tests/browser_cli.rs` pass, including the existing browser suite.
+- [x] #3 `cargo test --all-targets` passes.
+- [x] #4 `cargo clippy --all-targets -- -D warnings` passes.
+- [x] #5 `cargo fmt --check` passes.
+- [x] #6 The `README.md` papyrus(1) browser section documents `--debug` consistently with `papyrus browser --help`.
+- [x] #7 `docs/specifications/browser-requirements.md` section 2.12 matches the implemented format and exception; `docs/requirements/` and `docs/business-rules/` are unchanged.
+- [x] #8 No dependency, route, HTTP response, record, or configuration behavior changed; the final summary lists every changed file.
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -121,3 +121,9 @@ Evidence:
 - cargo fmt --check: exit 0.
 - Cargo.toml unchanged (no dependency added).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented browser --debug request logging. Changed files: src/lib.rs (browser-only --debug flag), src/browser/mod.rs (gated one-line request logs with duration), tests/browser_cli.rs (9 new tests + updates), README.md (man page --debug), docs/specifications/browser-requirements.md (§2.12). Quiet by default; errors/over-capacity always printed; no headers or bodies logged; stdout startup-only. cargo test 620 passed, clippy/fmt clean.
+<!-- SECTION:FINAL_SUMMARY:END -->
