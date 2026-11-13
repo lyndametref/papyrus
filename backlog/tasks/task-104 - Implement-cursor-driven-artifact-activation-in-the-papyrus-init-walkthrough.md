@@ -1,11 +1,11 @@
 ---
 id: TASK-104
 title: Implement cursor-driven artifact activation in the papyrus init walkthrough
-status: Implemented
+status: Done
 assignee:
   - '@rust-dev'
 created_date: '2026-11-13T16:17:00Z'
-updated_date: '2026-11-13T16:46:00Z'
+updated_date: '2026-11-13T16:49:00Z'
 labels:
   - configuration
   - init
