@@ -6,6 +6,7 @@ pub mod context;
 pub mod decision;
 pub mod error;
 pub mod glossary;
+pub mod import;
 pub mod init;
 pub mod milestone;
 pub mod nfreq;
@@ -160,6 +161,11 @@ pub enum Commands {
     TestReport {
         #[command(subcommand)]
         action: test_report::TestReportCmd,
+    },
+    /// Import records from a Backlog.md store.
+    Import {
+        #[command(subcommand)]
+        action: import::ImportCmd,
     },
     /// Serve the local web interface.
     #[command(override_usage = "papyrus browser [--host <host>] [--port <port>] [--no-open]")]
@@ -385,6 +391,10 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
         Commands::TestReport { action } => {
             let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
             test_report::run(&ctx, action)
+        }
+        Commands::Import { action } => {
+            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
+            import::run(&ctx, action)
         }
         Commands::Browser {
             host,
