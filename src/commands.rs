@@ -250,6 +250,11 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
                 // sanitizer would reject characters such as `/` with a generic
                 // message that does not name the key.
                 yaml_serde::Value::String(s)
+            } else if Config::is_folder_key(key) {
+                let sanitized = crate::sanitize::sanitize_path_string(&s).ok_or_else(|| {
+                    AppError::Validation(format!("{}: value cannot be normalized", key))
+                })?;
+                yaml_serde::Value::String(sanitized)
             } else {
                 let sanitized = crate::sanitize::sanitize_path_component(&s).ok_or_else(|| {
                     AppError::Validation(format!("{}: value cannot be normalized", key))
@@ -272,7 +277,7 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
         file_val = yaml_serde::Value::Mapping(yaml_serde::Mapping::new());
     }
 
-    yaml_set(&mut file_val, key, parsed).map_err(AppError::Validation)?;
+    yaml_set(&mut file_val, key, parsed.clone()).map_err(AppError::Validation)?;
 
     // validate merged effective
     let default_cfg = Config::default();
@@ -283,20 +288,40 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
         .map_err(|e| AppError::Validation(format!("{}: {}", key, e)))?;
     cfg.validate().map_err(AppError::Validation)?;
 
+    // Folder relocation, if applicable, runs before persistence.
+    let mut relocation_cross_device = false;
+    if Config::is_folder_key(key) {
+        let old_cfg = load_effective_config(&ctx.config_path, &ctx.project_dir).unwrap_or_default();
+        let new_value = match &parsed {
+            yaml_serde::Value::String(s) => s.clone(),
+            _ => {
+                return Err(AppError::Validation(format!(
+                    "{}: value must be a string",
+                    key
+                )));
+            }
+        };
+        let (source, destination) = folder_paths(ctx, &old_cfg, key, &new_value)?;
+        let report = crate::record::relocate::relocate(ctx, &source, &destination)?;
+        relocation_cross_device = report.cross_device;
+    }
+
     // boundary check for config path? skip
     // write
     let out_str = yaml_serde::to_string(&file_val).map_err(|e| AppError::Runtime(e.to_string()))?;
     crate::config::write_config_file(&ctx.config_path, &out_str)?;
 
+    let text = if relocation_cross_device {
+        "relocation: a single rename was impossible; used copy-then-remove".to_string()
+    } else {
+        String::new()
+    };
     let json = if ctx.json {
         Some(serde_json::json!({"status":"ok"}))
     } else {
         None
     };
-    Ok(CommandOutput {
-        text: String::new(),
-        json,
-    })
+    Ok(CommandOutput { text, json })
 }
 
 pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
@@ -344,6 +369,51 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
         text: String::new(),
         json,
     })
+}
+
+fn folder_paths(
+    ctx: &Context,
+    cfg: &Config,
+    key: &str,
+    new_value: &str,
+) -> Result<(std::path::PathBuf, std::path::PathBuf), AppError> {
+    let (source_raw, destination_raw) = match key {
+        "backlog_directory" => (
+            ctx.project_dir.join(&cfg.backlog_directory),
+            ctx.project_dir.join(new_value),
+        ),
+        "decision_directory" => (
+            ctx.project_dir.join(&cfg.decision_directory),
+            ctx.project_dir.join(new_value),
+        ),
+        "doc_directory" => (
+            ctx.project_dir.join(&cfg.doc_directory),
+            ctx.project_dir.join(new_value),
+        ),
+        _ if key.starts_with("document_types.") && key.ends_with(".directory") => {
+            let type_key = key
+                .trim_start_matches("document_types.")
+                .trim_end_matches(".directory");
+            let old_entry = cfg.document_types.get(type_key).ok_or_else(|| {
+                AppError::Validation(format!("unknown document type: {}", type_key))
+            })?;
+            let doc_dir = &cfg.doc_directory;
+            (
+                ctx.project_dir.join(doc_dir).join(&old_entry.directory),
+                ctx.project_dir.join(doc_dir).join(new_value),
+            )
+        }
+        _ => {
+            return Err(AppError::Validation("not a folder key".to_string()));
+        }
+    };
+    let source = Context::ensure_within(&ctx.project_dir, &source_raw).map_err(|_| {
+        AppError::Runtime("source path resolves outside project directory".to_string())
+    })?;
+    let destination = Context::ensure_within(&ctx.project_dir, &destination_raw).map_err(|_| {
+        AppError::Runtime("destination path resolves outside project directory".to_string())
+    })?;
+    Ok((source, destination))
 }
 
 fn valid_sanitized_key(key: &str) -> bool {

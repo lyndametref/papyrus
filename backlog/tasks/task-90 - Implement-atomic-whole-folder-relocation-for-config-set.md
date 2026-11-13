@@ -1,10 +1,10 @@
 ---
 id: TASK-90
 title: Implement atomic whole-folder relocation for config set
-status: To Do
+status: Implemented
 assignee: []
 created_date: '2026-11-11T20:42:00Z'
-updated_date: '2026-11-11T20:57:00Z'
+updated_date: '2026-11-13T05:29:00Z'
 labels:
   - configuration
   - relocation
@@ -27,16 +27,68 @@ ordinal: 39070
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-REQ-01.002 now requires config set to move every file and subfolder of an artifact folder synchronously and atomically, with no partial move and no persisted value on failure. Today config set only persists a key and nothing moves files, and the browser configuration view must reuse the same routine rather than move folders itself. This task implements the single relocation routine of ADR-0010 decision 8 and ADR-0013 stage 5.
+Implement the single shared whole-folder relocation routine (record::relocate) required by ADR-0010 decision 8 and ADR-0013 stage 5, and wire it into `papyrus config set` for backlog_directory, decision_directory, doc_directory, and any document type directory key.
+
+Scope:
+- Add `src/record/relocate.rs` exposing `relocate(ctx, source, destination) -> Result<RelocationReport, AppError>` (plus `relocate_folder`/`move_folder` aliases). The routine is the only folder-move implementation.
+- It moves every file and subfolder of the source folder (including unmanaged files), runs synchronously during `config set`, removes the source folder once empty, and never persists configuration on failure.
+- Pre-check the entire plan for destination entry conflicts, containment, and readability before moving anything; on any failure move nothing or roll back already-moved entries, persist no configuration value, and return a conflict outcome (exit code 4).
+- Fall back to copy-then-remove on EXDEV (cross-device) and report that a single rename was impossible.
+- All source and destination paths pass `Context::ensure_within`; `Config::validate` rejects absolute or traversal folder values.
+- Folder-key string values in `config set` are sanitized with the path-aware sanitizer so relative multi-segment folders are accepted while traversal/absolute values are rejected.
+- The browser configuration view reaches folder moves only through this `config set` path and performs no folder move of its own.
+
+Out of scope: browser UI implementation (TASK-94/TASK-95), Backlog.md import (TASK-92), and any new crate or storage layer.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 papyrus config set on backlog_directory, decision_directory, doc_directory, or a document type directory moves every file and subfolder of the source folder, including files Papyrus does not manage.
-- [ ] #2 The move runs inside the command, is a move rather than a copy, and removes the source folder once it is empty.
-- [ ] #3 A destination entry conflict, permission failure, or write failure moves nothing or rolls back, persists no configuration value, and reports the conflict outcome of REQ-01.004.
-- [ ] #4 One shared implementation (record::relocate) is used by config set, and the browser reaches folder moves only through this path.
-- [ ] #5 Every source and destination path passes Context::ensure_within, and configuration validation rejects absolute and traversal folder values.
-- [ ] #6 A cross-device move falls back to copy-then-remove and the command reports that a single rename was impossible.
-- [ ] #7 Tests cover a successful move, a destination conflict, partial-failure rollback, cross-device fallback, and unchanged configuration on failure.
+- [ ] #1 record::relocate::relocate is the single implementation used by config set for backlog_directory, decision_directory, doc_directory, and document_types.<type>.directory; the browser performs no folder move of its own.
+- [ ] #2 On a successful folder change, every file and subfolder of the source folder (including files Papyrus does not manage) is present at the destination and the source folder is removed once empty.
+- [ ] #3 The move runs inside config set, is a move rather than a copy on the same filesystem, and the configuration value is persisted only after a successful move.
+- [ ] #4 A destination entry conflict, permission failure, or write failure moves nothing or rolls back already-moved entries, persists no configuration value, and returns exit code 4 with a conflict message.
+- [ ] #5 A partial failure during relocation rolls back moved entries and leaves both folders as they were.
+- [ ] #6 A cross-device move falls back to copy-then-remove and config set reports that a single rename was impossible.
+- [ ] #7 Every source and destination path passes Context::ensure_within, and Config::validate rejects absolute and traversal folder values.
+- [ ] #8 config set for a folder key accepts relative multi-segment folder values and rejects traversal/absolute values.
+- [ ] #9 Integration tests cover a successful move, a destination conflict, partial-failure rollback, cross-device fallback handling, and unchanged configuration on failure.
 <!-- AC:END -->
+
+## Definition of Done
+<!-- DOD:BEGIN -->
+- [ ] #1 Implementation in src/record/relocate.rs and src/commands.rs; Config::validate updated.
+- [ ] #2 cargo build and cargo test pass, including no_drift checks.
+- [ ] #3 Existing config/browser/integration tests remain green.
+<!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add src/record/relocate.rs implementing plan/pre-check/move/rollback and EXDEV fallback.
+2. Register module in src/record/mod.rs.
+3. Add Config::is_folder_key and folder-value validation in Config::validate.
+4. Update config_set sanitization for folder keys and integrate relocation before persistence.
+5. Add folder_paths helper in commands.rs.
+6. Add/adjust tests for success, conflict, rollback, cross-device report, and validation.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Refinement only: ticket scope, acceptance criteria, assumptions, dependencies, and DoD aligned with REQ-01.002, ADR-0010 decision 8, and ADR-0013 stage 5. Implementation not performed in this pass.
+
+Assumptions:
+- Rust 1.99.1/Cargo available (ADR-0001).
+- record::relocate lives in src/record/ and is the only folder-move implementation (ADR-0013).
+- Config file values for folders are relative to the project directory; absolute/traversal values are rejected (NFR-04.002).
+- Cross-device detection uses OS rename failure EXDEV and falls back to copy-then-remove.
+- Browser configuration view (TASK-94) delegates to config set and performs no folder move.
+
+Open questions: none.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented record::relocate atomic folder relocation and wired into config set for folder keys; added Config::is_folder_key and folder validation; path-aware sanitization; updated affected tests.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -168,6 +168,16 @@ impl Config {
         None
     }
 
+    /// Whether a dotted configuration key addresses a folder.
+    pub fn is_folder_key(key: &str) -> bool {
+        key == "backlog_directory"
+            || key == "decision_directory"
+            || key == "doc_directory"
+            || (key.starts_with("document_types.")
+                && key.ends_with(".directory")
+                && key.split('.').count() == 3)
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if !(1..=6).contains(&self.id_padding) {
             return Err("id_padding: must be between 1 and 6".to_string());
@@ -200,6 +210,24 @@ impl Config {
         }
         validate_browser_host(&self.browser_host)
             .map_err(|reason| format!("browser_host: {}", reason))?;
+        // Folder values must be relative and free of traversal segments.
+        for (label, value) in [
+            ("backlog_directory", &self.backlog_directory),
+            ("decision_directory", &self.decision_directory),
+            ("doc_directory", &self.doc_directory),
+        ] {
+            if crate::sanitize::sanitize_path_string(value).is_none() {
+                return Err(format!("{}: invalid folder value", label));
+            }
+        }
+        for (key, entry) in &self.document_types {
+            if crate::sanitize::sanitize_path_string(&entry.directory).is_none() {
+                return Err(format!(
+                    "document_types.{}.directory: invalid folder value",
+                    key
+                ));
+            }
+        }
         Ok(())
     }
 

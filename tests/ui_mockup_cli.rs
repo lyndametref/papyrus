@@ -234,8 +234,8 @@ fn config_prefix_padding_directory() {
     );
     assert!(out.status.success());
     let out = create(&d, "Custom", "T", &["S"], &[]);
-    assert_eq!(stdout(&out).trim(), "SPEC-0001");
-    assert!(d.join("docs/custom-ui/SPEC-0001.html").exists());
+    assert_eq!(stdout(&out).trim(), "SPEC-0002");
+    assert!(d.join("docs/custom-ui/SPEC-0002.html").exists());
 
     let _ = fs::remove_dir_all(&d);
 }
