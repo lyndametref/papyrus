@@ -3644,64 +3644,179 @@ pub fn lifecycle_page(cfg: &Config, chrome: Chrome<'_>) -> String {
         .map(|s| escape(s))
         .collect::<Vec<_>>()
         .join(" \u{2192} ");
+    fn storage_folder(base: &str, sub: &str) -> String {
+        let base = base.trim_end_matches('/');
+        let sub = sub.trim_matches('/');
+        if sub.is_empty() {
+            base.to_string()
+        } else if base.is_empty() {
+            sub.to_string()
+        } else {
+            format!("{}/{}", base, sub)
+        }
+    }
+
     let mut sections = String::new();
-    sections.push_str(&format!(
-        "<section><h2>Tasks</h2><p>States: {}. States and transitions are derived from the configured task statuses (REQ-01.002). Task lifecycle operations are CLI-only.</p></section>",
-        chain
-    ));
-    let others: [(&str, &str); 11] = [
-        (
-            "Milestones",
-            "Lifecycle: active \u{2192} archived. Archiving a milestone is separate from task workflow status.",
-        ),
-        (
-            "Releases",
-            "Lifecycle: active \u{2192} released. released is delivery completion, distinct from archiving; releases are not archived. The transition is performed explicitly via the documented release status command.",
-        ),
-        (
-            "Decisions",
-            "Lifecycle: proposed \u{2192} accepted | rejected; accepted \u{2192} deprecated | superseded.",
-        ),
-        (
-            "Business requirements",
-            "Lifecycle: active \u{2192} deprecated (restored via restore).",
-        ),
-        (
-            "Non-functional requirements",
-            "Lifecycle: active \u{2192} deprecated (restored via restore).",
-        ),
-        (
-            "Glossary terms",
-            "Lifecycle: active \u{2192} deprecated (restored via restore).",
-        ),
-        (
-            "UI specifications",
-            "Lifecycle: active \u{2192} deprecated (restored via restore).",
-        ),
-        (
-            "Technical specifications",
-            "Lifecycle: active \u{2192} deprecated (restored via restore).",
-        ),
-        (
-            "UI mockups",
-            "Lifecycle: pending \u{2192} approved \u{2192} deprecated (restored via restore; supersession via ui-mockup supersede).",
-        ),
-        (
-            "Business rules",
-            "Lifecycle: active \u{2192} deprecated (restored via restore).",
-        ),
-        (
-            "Audit records",
-            "Lifecycle: active \u{2192} deprecated (restored via restore).",
-        ),
-    ];
-    for (heading, sentence) in others {
+
+    // Tasks
+    {
+        let folder = storage_folder(&cfg.backlog_directory, "tasks");
         sections.push_str(&format!(
-            "<section><h2>{}</h2><p>{}</p></section>",
-            escape(heading),
-            escape(sentence)
+            "<section><h2>Tasks</h2><p>Curated description: tracked work items with a configurable status workflow.</p><p>States: {}. States and transitions are derived from the configured task statuses (REQ-01.002). Task lifecycle operations are CLI-only.</p><p>Read-only config \u{2014} enabled: true; ID prefix: {}; storage folder: {}. Statuses shown above. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
+            chain, escape(&cfg.task_prefix), escape(&folder)
         ));
     }
+
+    // Milestones
+    {
+        let folder = storage_folder(&cfg.backlog_directory, "milestones");
+        sections.push_str(&format!(
+            "<section><h2>Milestones</h2><p>Curated description: grouping of tasks toward a delivery goal.</p><p>Lifecycle: active \u{2192} archived. Archiving a milestone is separate from task workflow status.</p><p>Read-only config \u{2014} enabled: true; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
+            escape(&cfg.milestone_prefix), escape(&folder)
+        ));
+    }
+
+    // Releases
+    {
+        let folder = storage_folder(&cfg.backlog_directory, "releases");
+        sections.push_str(&format!(
+            "<section><h2>Releases</h2><p>Curated description: grouping of milestones toward a delivery.</p><p>Lifecycle: active \u{2192} released. released is delivery completion, distinct from archiving; releases are not archived. The transition is performed explicitly via the documented release status command.</p><p>Read-only config \u{2014} enabled: true; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
+            escape(&cfg.release_prefix), escape(&folder)
+        ));
+    }
+
+    // Decisions
+    {
+        let enabled = cfg.decision_types.values().any(|e| e.enabled);
+        let prefixes: Vec<String> = cfg
+            .decision_types
+            .values()
+            .filter(|e| e.enabled)
+            .map(|e| e.prefix.clone())
+            .collect();
+        let prefix = prefixes.join(", ");
+        let folder = storage_folder(&cfg.decision_directory, "");
+        sections.push_str(&format!(
+            "<section><h2>Decisions</h2><p>Curated description: recorded decisions with status and supersession.</p><p>Lifecycle: proposed \u{2192} accepted | rejected; accepted \u{2192} deprecated | superseded.</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
+            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
+        ));
+    }
+
+    let doc = |key: &str| cfg.document_types.get(key).cloned();
+
+    // Business requirements
+    {
+        let entry = doc("req");
+        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
+        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
+        let folder = entry
+            .as_ref()
+            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
+            .unwrap_or_default();
+        sections.push_str(&format!(
+            "<section><h2>Business requirements</h2><p>Curated description: business requirement groups and atomic requirements.</p><p>Lifecycle: active \u{2192} deprecated (restored via restore).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
+            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
+        ));
+    }
+    // Non-functional requirements
+    {
+        let entry = doc("nfr");
+        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
+        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
+        let folder = entry
+            .as_ref()
+            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
+            .unwrap_or_default();
+        sections.push_str(&format!(
+            "<section><h2>Non-functional requirements</h2><p>Curated description: non-functional requirement groups and atomic requirements.</p><p>Lifecycle: active \u{2192} deprecated (restored via restore).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
+            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
+        ));
+    }
+    // Glossary terms
+    {
+        let entry = doc("glossary");
+        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
+        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
+        let folder = entry
+            .as_ref()
+            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
+            .unwrap_or_default();
+        sections.push_str(&format!(
+            "<section><h2>Glossary terms</h2><p>Curated description: glossary terms and definitions.</p><p>Lifecycle: active \u{2192} deprecated (restored via restore).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
+            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
+        ));
+    }
+    // UI specifications
+    {
+        let entry = doc("ui-spec");
+        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
+        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
+        let folder = entry
+            .as_ref()
+            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
+            .unwrap_or_default();
+        sections.push_str(&format!(
+            "<section><h2>UI specifications</h2><p>Curated description: UI specification records.</p><p>Lifecycle: active \u{2192} deprecated (restored via restore).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
+            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
+        ));
+    }
+    // Technical specifications
+    {
+        let entry = doc("tech-spec");
+        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
+        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
+        let folder = entry
+            .as_ref()
+            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
+            .unwrap_or_default();
+        sections.push_str(&format!(
+            "<section><h2>Technical specifications</h2><p>Curated description: technical specification records.</p><p>Lifecycle: active \u{2192} deprecated (restored via restore).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
+            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
+        ));
+    }
+    // UI mockups
+    {
+        let entry = doc("ui-mockup");
+        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
+        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
+        let folder = entry
+            .as_ref()
+            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
+            .unwrap_or_default();
+        sections.push_str(&format!(
+            "<section><h2>UI mockups</h2><p>Curated description: UI mockup review packages.</p><p>Lifecycle: pending \u{2192} approved \u{2192} deprecated (restored via restore; supersession via ui-mockup supersede).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
+            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
+        ));
+    }
+    // Business rules
+    {
+        let entry = doc("rule");
+        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
+        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
+        let folder = entry
+            .as_ref()
+            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
+            .unwrap_or_default();
+        sections.push_str(&format!(
+            "<section><h2>Business rules</h2><p>Curated description: business rules and applicability.</p><p>Lifecycle: active \u{2192} deprecated (restored via restore).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
+            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
+        ));
+    }
+    // Audit records
+    {
+        let entry = doc("audit");
+        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
+        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
+        let folder = entry
+            .as_ref()
+            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
+            .unwrap_or_default();
+        sections.push_str(&format!(
+            "<section><h2>Audit records</h2><p>Curated description: audit records with type and content.</p><p>Lifecycle: active \u{2192} deprecated (restored via restore).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
+            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
+        ));
+    }
+
     let title = "Papyrus \u{2014} Managed artifacts and lifecycles".to_string();
     let subheading = "One section per managed record type. Backlog.md docs, drafts, and project configuration files are not covered.";
     render_template(
