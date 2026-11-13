@@ -97,7 +97,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
        Serve the local web UI over both the backlog and documentation stores.
        <code style="font-weight: bold;">
-       papyrus browser [--host &lt;host&gt;] [--port &lt;port&gt;] [--no-open]
+       papyrus browser [--host &lt;host&gt;] [--port &lt;port&gt;] [--no-open] [--debug]
        </code>
        <b style="color: light-dark(#1a7f37, #3fb950);">--host &lt;host&gt;</b>
        Bind address. Default: <b>127.0.0.1</b>. A non-loopback address is allowed but prints a warning.
@@ -107,6 +107,9 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
        <b style="color: light-dark(#1a7f37, #3fb950);">--no-open</b>
        Do not open the default browser automatically.
+
+       <b style="color: light-dark(#1a7f37, #3fb950);">--debug</b>
+       Browser-only debugging flag. Logs one line per received request to standard error with the method, path, response status, and duration. Request headers and bodies are never logged. Errors are printed whether or not the flag is set.
 
 <b style="color: light-dark(#0969da, #58a6ff);">import</b>
 

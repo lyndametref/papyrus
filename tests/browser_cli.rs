@@ -4,7 +4,7 @@ use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, ChildStdout, Command, Stdio};
 use std::time::{Duration, Instant};
 
 fn bin() -> Command {
@@ -166,6 +166,8 @@ struct Server {
     child: Child,
     port: u16,
     stderr_path: PathBuf,
+    startup: String,
+    stdout: BufReader<ChildStdout>,
 }
 
 impl Server {
@@ -194,11 +196,12 @@ impl Server {
                 let _ = child.wait();
                 continue;
             }
-            let _ = startup;
             return Server {
                 child,
                 port,
                 stderr_path,
+                startup: startup.trim().to_string(),
+                stdout: reader,
             };
         }
         panic!("server did not start after retries");
@@ -206,6 +209,16 @@ impl Server {
 
     fn stderr_text(&self) -> String {
         fs::read_to_string(&self.stderr_path).unwrap_or_default()
+    }
+
+    /// Stop the server and return whatever standard output was written after
+    /// the startup line.
+    fn finish_stdout(&mut self) -> String {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+        let mut rest = String::new();
+        let _ = self.stdout.read_to_string(&mut rest);
+        rest
     }
 
     fn wait_for_stderr(&self, needle: &str) {
@@ -448,7 +461,12 @@ fn t01_command_shape() {
     let out = bin().args(["browser", "--help"]).output().unwrap();
     assert!(out.status.success());
     let text = String::from_utf8_lossy(&out.stdout);
-    assert!(text.contains("papyrus browser [--host <host>] [--port <port>] [--no-open]"));
+    assert!(text.contains("papyrus browser [--host <host>] [--port <port>] [--no-open] [--debug]"));
+    assert!(text.contains("--debug"));
+    assert!(
+        text.contains("Log one line per received request"),
+        "help must document --debug: {text}"
+    );
 
     let out = bin().args(["browser", "extra"]).output().unwrap();
     assert_eq!(out.status.code(), Some(2));
@@ -1554,6 +1572,7 @@ fn t22_request_limits_and_status_codes() {
     let mut bytes = Vec::new();
     stream.read_to_end(&mut bytes).unwrap();
     assert_eq!(parse_response(&bytes).status, 408);
+    server.wait_for_stderr("- - 408");
 
     drop(server);
     let _ = fs::remove_dir_all(&dir);
@@ -1563,7 +1582,7 @@ fn t22_request_limits_and_status_codes() {
 #[test]
 fn unknown_path_is_404_for_every_method() {
     let dir = fixture("route-method");
-    let server = Server::start(&dir, &["--no-open"], &[]);
+    let server = Server::start(&dir, &["--no-open", "--debug"], &[]);
     for method in ["DELETE", "PUT", "OPTIONS"] {
         let response = request(server.port, method, "/nope", &[], None);
         assert_eq!(response.status, 404, "{} /nope", method);
@@ -7441,4 +7460,230 @@ fn browser_config_containment_refusal() {
     assert!(!dir.join("escape-link/extra.txt").exists());
     let _ = fs::remove_file(dir.join("escape-link"));
     let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-96 AC #2: `--debug` is a browser-only flag, not a global option.
+#[test]
+fn debug_flag_is_rejected_outside_browser() {
+    let dir = test_root("debug-reject");
+    init_project(&dir);
+
+    let out = bin()
+        .args(["--dir", dir.to_str().unwrap(), "req", "list", "--debug"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("--debug"), "stderr: {stderr}");
+    assert!(stderr.contains("Usage"), "stderr: {stderr}");
+
+    let out = bin()
+        .args(["--debug", "browser", "--no-open"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("--debug"), "stderr: {stderr}");
+    assert!(stderr.contains("Usage"), "stderr: {stderr}");
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-96 AC #3: quiet by default for 2xx, 3xx, 4xx, and 5xx responses.
+#[test]
+fn browser_console_is_quiet_by_default() {
+    let dir = fixture("quiet-default");
+    let mut server = Server::start(&dir, &["--no-open"], &[]);
+    assert!(
+        server.startup.starts_with("Serving http://127.0.0.1:"),
+        "startup: {:?}",
+        server.startup
+    );
+
+    assert_eq!(get(&server, "/").status, 200);
+    let body = form_body(&[("key", "browser_port"), ("value", "6421")]);
+    assert_eq!(post_form(&server, "/config", &body).status, 303);
+    assert_eq!(get(&server, "/nope").status, 404);
+
+    // Corrupting the configuration after startup makes a parsed request fail
+    // with 500, proving a 5xx response is a response and not a console error.
+    fs::write(dir.join("papyrus.config.yml"), "browser_port: 0\n").unwrap();
+    assert_eq!(get(&server, "/").status, 500);
+
+    std::thread::sleep(Duration::from_millis(150));
+    let stderr = server.stderr_text();
+    assert!(
+        stderr.is_empty(),
+        "default browser run must not write per-request lines: {stderr:?}"
+    );
+    let rest = server.finish_stdout();
+    assert!(rest.is_empty(), "unexpected stdout: {rest:?}");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-96 AC #4: one debug line per parsed request with a duration in ms.
+#[test]
+fn debug_logs_one_line_per_request_with_duration() {
+    let dir = fixture("debug-line");
+    let server = Server::start(&dir, &["--no-open", "--debug"], &[]);
+    assert_eq!(get(&server, "/").status, 200);
+    server.wait_for_stderr("GET / 200 ");
+    let stderr = server.stderr_text();
+    let lines: Vec<&str> = stderr.lines().collect();
+    assert_eq!(lines.len(), 1, "stderr: {stderr:?}");
+    let parts: Vec<&str> = lines[0].split(' ').collect();
+    assert_eq!(parts.len(), 4, "line: {:?}", lines[0]);
+    assert_eq!(parts[0], "GET");
+    assert_eq!(parts[1], "/");
+    assert_eq!(parts[2], "200");
+    let duration = parts[3]
+        .strip_suffix("ms")
+        .unwrap_or_else(|| panic!("duration suffix: {:?}", parts[3]));
+    assert!(
+        duration.chars().all(|c| c.is_ascii_digit()),
+        "duration: {:?}",
+        duration
+    );
+    assert!(duration.parse::<u64>().is_ok());
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-96 AC #5: query stripped, path percent-decoded, 200-character cap.
+#[test]
+fn debug_path_strips_query_decodes_and_truncates() {
+    let dir = fixture("debug-path");
+    let server = Server::start(&dir, &["--no-open", "--debug"], &[]);
+
+    assert_eq!(get(&server, "/?type=req").status, 200);
+    server.wait_for_stderr("GET / 200 ");
+    assert!(!server.stderr_text().contains("?type=req"));
+
+    assert_eq!(get(&server, "/n%6Fpe").status, 404);
+    server.wait_for_stderr("GET /nope 404 ");
+
+    let long_path = format!("/{}", "a".repeat(250));
+    assert_eq!(get(&server, &long_path).status, 404);
+    let truncated = format!("GET /{} 404 ", "a".repeat(199));
+    server.wait_for_stderr(&truncated);
+    assert!(!server.stderr_text().contains(&"a".repeat(201)));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-96 AC #6: headers and bodies never reach the console.
+#[test]
+fn console_never_contains_headers_or_body() {
+    for debug in [false, true] {
+        let name = if debug { "body-debug" } else { "body-quiet" };
+        let dir = fixture(name);
+        let extra: &[&str] = if debug {
+            &["--no-open", "--debug"]
+        } else {
+            &["--no-open"]
+        };
+        let server = Server::start(&dir, extra, &[]);
+        let response = request(
+            server.port,
+            "POST",
+            "/nope",
+            &[
+                ("Content-Type", "text/plain"),
+                ("X-Unique-Probe", "SECRET-HEADER-9f3a"),
+            ],
+            Some(b"UNIQUE-BODY-7c2b"),
+        );
+        assert_eq!(response.status, 404);
+        if debug {
+            server.wait_for_stderr("POST /nope 404 ");
+        } else {
+            std::thread::sleep(Duration::from_millis(150));
+        }
+        let stderr = server.stderr_text();
+        assert!(
+            !stderr.contains("SECRET-HEADER-9f3a"),
+            "header leaked: {stderr:?}"
+        );
+        assert!(
+            !stderr.contains("UNIQUE-BODY-7c2b"),
+            "body leaked: {stderr:?}"
+        );
+        drop(server);
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+// TASK-96 AC #7: the over-capacity line stays exactly `- - 503` with --debug.
+#[test]
+fn over_capacity_line_is_unconditional_with_debug() {
+    let dir = fixture("capacity-debug");
+    let server = Server::start(&dir, &["--no-open", "--debug"], &[]);
+    let mut held = Vec::new();
+    for _ in 0..16 {
+        let mut stream = TcpStream::connect(("127.0.0.1", server.port)).unwrap();
+        stream.write_all(b"GET / HT").unwrap();
+        held.push(stream);
+    }
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let mut probe = TcpStream::connect(("127.0.0.1", server.port)).unwrap();
+        probe
+            .set_read_timeout(Some(Duration::from_millis(200)))
+            .unwrap();
+        let mut bytes = Vec::new();
+        let rejected = probe.read_to_end(&mut bytes).is_ok()
+            && !bytes.is_empty()
+            && parse_response(&bytes).status == 503;
+        if rejected {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "server never reached the concurrency limit"
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    server.wait_for_stderr("- - 503");
+    let stderr = server.stderr_text();
+    let line = stderr
+        .lines()
+        .find(|line| line.contains("503"))
+        .unwrap_or_else(|| panic!("no 503 line: {stderr:?}"));
+    assert_eq!(line, "- - 503");
+    drop(held);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-96 AC #8: with --debug and --json, stdout stays one startup object.
+#[test]
+fn debug_with_json_keeps_stdout_to_the_startup_object() {
+    let dir = fixture("debug-json");
+    let mut server = Server::start(&dir, &["--no-open", "--debug", "--json"], &[]);
+    let startup: serde_json::Value = serde_json::from_str(&server.startup)
+        .unwrap_or_else(|_| panic!("startup is not JSON: {:?}", server.startup));
+    assert_eq!(startup["status"], "serving");
+    assert_eq!(startup["port"], server.port);
+
+    assert_eq!(get(&server, "/").status, 200);
+    server.wait_for_stderr("GET / 200 ");
+    assert_eq!(get(&server, "/nope").status, 404);
+    server.wait_for_stderr("GET /nope 404 ");
+
+    let rest = server.finish_stdout();
+    assert_eq!(rest, "", "stdout must hold only the startup object");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-96 AC #9: the man page documents the flag like `--help`.
+#[test]
+fn readme_documents_browser_debug() {
+    let readme = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("README.md"))
+        .expect("README.md");
+    assert!(readme.contains(
+        "papyrus browser [--host &lt;host&gt;] [--port &lt;port&gt;] [--no-open] [--debug]"
+    ));
+    assert!(readme.contains("--debug"));
+    assert!(readme.contains("Logs one line per received request"));
+    assert!(readme.contains("Request headers and bodies are never logged"));
 }

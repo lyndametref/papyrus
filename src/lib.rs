@@ -168,7 +168,9 @@ pub enum Commands {
         action: import::ImportCmd,
     },
     /// Serve the local web interface.
-    #[command(override_usage = "papyrus browser [--host <host>] [--port <port>] [--no-open]")]
+    #[command(
+        override_usage = "papyrus browser [--host <host>] [--port <port>] [--no-open] [--debug]"
+    )]
     Browser {
         /// Bind address. Default: 127.0.0.1.
         #[arg(long, value_name = "host")]
@@ -184,6 +186,10 @@ pub enum Commands {
         /// Do not open the default browser automatically.
         #[arg(long = "no-open")]
         no_open: bool,
+        /// Log one line per received request to stderr (method, path, status, duration).
+        /// Browser-only flag; takes no value.
+        #[arg(long)]
+        debug: bool,
     },
     /// Search records by free text.
     Search {
@@ -400,9 +406,10 @@ pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
             host,
             port,
             no_open,
+            debug,
         } => {
             let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            browser::run(&ctx, host.as_deref(), port, no_open)
+            browser::run(&ctx, host.as_deref(), port, no_open, debug)
         }
         Commands::Search {
             query,
