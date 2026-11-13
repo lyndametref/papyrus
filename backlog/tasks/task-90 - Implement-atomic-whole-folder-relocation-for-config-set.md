@@ -4,7 +4,7 @@ title: Implement atomic whole-folder relocation for config set
 status: Implemented
 assignee: []
 created_date: '2026-11-11T20:42:00Z'
-updated_date: '2026-11-13T05:29:00Z'
+updated_date: '2026-11-13T05:36:00Z'
 labels:
   - configuration
   - relocation
@@ -43,22 +43,22 @@ Out of scope: browser UI implementation (TASK-94/TASK-95), Backlog.md import (TA
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 record::relocate::relocate is the single implementation used by config set for backlog_directory, decision_directory, doc_directory, and document_types.<type>.directory; the browser performs no folder move of its own.
-- [ ] #2 On a successful folder change, every file and subfolder of the source folder (including files Papyrus does not manage) is present at the destination and the source folder is removed once empty.
-- [ ] #3 The move runs inside config set, is a move rather than a copy on the same filesystem, and the configuration value is persisted only after a successful move.
-- [ ] #4 A destination entry conflict, permission failure, or write failure moves nothing or rolls back already-moved entries, persists no configuration value, and returns exit code 4 with a conflict message.
-- [ ] #5 A partial failure during relocation rolls back moved entries and leaves both folders as they were.
-- [ ] #6 A cross-device move falls back to copy-then-remove and config set reports that a single rename was impossible.
-- [ ] #7 Every source and destination path passes Context::ensure_within, and Config::validate rejects absolute and traversal folder values.
-- [ ] #8 config set for a folder key accepts relative multi-segment folder values and rejects traversal/absolute values.
-- [ ] #9 Integration tests cover a successful move, a destination conflict, partial-failure rollback, cross-device fallback handling, and unchanged configuration on failure.
+- [x] #1 record::relocate::relocate is the single implementation used by config set for backlog_directory, decision_directory, doc_directory, and document_types.<type>.directory; the browser performs no folder move of its own.
+- [x] #2 On a successful folder change, every file and subfolder of the source folder (including files Papyrus does not manage) is present at the destination and the source folder is removed once empty.
+- [x] #3 The move runs inside config set, is a move rather than a copy on the same filesystem, and the configuration value is persisted only after a successful move.
+- [x] #4 A destination entry conflict, permission failure, or write failure moves nothing or rolls back already-moved entries, persists no configuration value, and returns exit code 4 with a conflict message.
+- [x] #5 A partial failure during relocation rolls back moved entries and leaves both folders as they were.
+- [x] #6 A cross-device move falls back to copy-then-remove and config set reports that a single rename was impossible.
+- [x] #7 Every source and destination path passes Context::ensure_within, and Config::validate rejects absolute and traversal folder values.
+- [x] #8 config set for a folder key accepts relative multi-segment folder values and rejects traversal/absolute values.
+- [x] #9 Integration tests cover a successful move, a destination conflict, partial-failure rollback, cross-device fallback handling, and unchanged configuration on failure.
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Implementation in src/record/relocate.rs and src/commands.rs; Config::validate updated.
-- [ ] #2 cargo build and cargo test pass, including no_drift checks.
-- [ ] #3 Existing config/browser/integration tests remain green.
+- [x] #1 Implementation in src/record/relocate.rs and src/commands.rs; Config::validate updated.
+- [x] #2 cargo build and cargo test pass, including no_drift checks.
+- [x] #3 Existing config/browser/integration tests remain green.
 <!-- DOD:END -->
 
 ## Implementation Plan
