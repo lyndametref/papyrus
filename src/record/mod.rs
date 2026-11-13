@@ -6,6 +6,7 @@ pub mod frontmatter;
 pub mod identity;
 pub mod migrate;
 pub mod patch;
+pub mod relocate;
 pub mod resolve;
 pub mod store;
 pub mod view;
@@ -19,3 +20,5 @@ pub use identity::*;
 pub use patch::{Patch, PatchOp, apply_patch};
 pub use store::{Store, read as read_record, read_document, resolve_path, write_atomic};
 pub use view::RecordView;
+
+pub use relocate::{RelocationReport, move_folder, relocate, relocate_folder};

@@ -267,12 +267,12 @@ fn ui_spec_respects_configured_prefix_padding_and_directory() {
         String::from_utf8_lossy(&out.stderr)
     );
     let out = create(&d, "Custom", "v", "d");
-    assert_eq!(stdout(&out).trim(), "SPEC-0001");
-    assert!(d.join("docs/custom-ui/SPEC-0001.md").exists());
+    assert_eq!(stdout(&out).trim(), "SPEC-0002");
+    assert!(d.join("docs/custom-ui/SPEC-0002.md").exists());
 
     let out = run(&d, &["ui-spec", "list"]);
-    assert!(stdout(&out).contains("SPEC-0001 Custom"));
-    assert!(!record(&d, "SPEC-0002").exists());
+    assert!(stdout(&out).contains("SPEC-0002 Custom"));
+    assert!(!record(&d, "SPEC-0003").exists());
 
     let _ = fs::remove_dir_all(&d);
 }
