@@ -146,7 +146,13 @@ pub fn has_front_matter(content: &str) -> bool {
 }
 
 pub fn ensure_front_matter(ctx: &Context, path: &Path) -> Result<String, AppError> {
-    ensure_front_matter_internal(ctx, path).map(|(content, _)| content)
+    ensure_front_matter_internal(ctx, path, true).map(|(content, _)| content)
+}
+
+/// Read adoption without writing a progress line. Used by request handlers
+/// whose stdout is a protocol stream.
+pub fn ensure_front_matter_quiet(ctx: &Context, path: &Path) -> Result<String, AppError> {
+    ensure_front_matter_internal(ctx, path, false).map(|(content, _)| content)
 }
 
 /// Like [`ensure_front_matter`], but returns the record path unchanged.
@@ -154,10 +160,14 @@ pub fn ensure_front_matter(ctx: &Context, path: &Path) -> Result<String, AppErro
 /// Lazy adoption never relocates or renames a record, so the returned path is
 /// always the path that was given.
 pub fn ensure_front_matter_canonical(ctx: &Context, path: &Path) -> Result<PathBuf, AppError> {
-    ensure_front_matter_internal(ctx, path).map(|(_, canonical)| canonical)
+    ensure_front_matter_internal(ctx, path, true).map(|(_, canonical)| canonical)
 }
 
-fn ensure_front_matter_internal(ctx: &Context, path: &Path) -> Result<(String, PathBuf), AppError> {
+fn ensure_front_matter_internal(
+    ctx: &Context,
+    path: &Path,
+    announce: bool,
+) -> Result<(String, PathBuf), AppError> {
     let safe = crate::record::store::resolve_path(ctx, path).map_err(|_| {
         AppError::Runtime(format!(
             "path resolves outside project directory: {}",
@@ -195,8 +205,10 @@ fn ensure_front_matter_internal(ctx: &Context, path: &Path) -> Result<(String, P
         return Ok((content, safe));
     }
     crate::record::store::write_atomic(ctx, &safe, &new_content)?;
-    let rel = rel_path(&ctx.project_dir, &safe);
-    println!("{}\t{}\t{}", rel, action, keys.join(","));
+    if announce {
+        let rel = rel_path(&ctx.project_dir, &safe);
+        println!("{}\t{}\t{}", rel, action, keys.join(","));
+    }
     Ok((new_content, safe))
 }
 
@@ -634,7 +646,7 @@ fn id_from_filename(path: &Path) -> String {
         // take first two segments
         let segs: Vec<&str> = stem.split('-').collect();
         if segs.len() >= 2 {
-            return format!("{}-{}", segs[0], segs[1]);
+            return crate::record::identity::join_id(segs[0], segs[1]);
         }
     }
     // if stem matches a managed id pattern exactly, use it

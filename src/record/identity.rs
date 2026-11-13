@@ -378,6 +378,35 @@ pub fn allocate_from_observed_ids(
     Ok(spec.format_id(allocate_next(&observed)))
 }
 
+/// Whether a value is safe to use as one path component for a record.
+///
+/// This is path safety, not ID formatting: it accepts dotted and dashed
+/// Papyrus identifiers and rejects separators, parent components, and
+/// leading dots or dashes.
+pub fn is_valid_id_component(id: &str) -> bool {
+    if id.is_empty() || id.len() > 128 {
+        return false;
+    }
+    if id.starts_with('.') || id.starts_with('-') {
+        return false;
+    }
+    if id.contains("..") || id == "." || id == ".." {
+        return false;
+    }
+    id.bytes()
+        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+}
+
+/// Whether `id` matches a family prefix and numeric shape.
+pub fn matches_family_id(id: &str, prefix: &str, dotted: bool) -> bool {
+    !prefix.is_empty() && parse_id_parts(id, prefix, dotted).is_some()
+}
+
+/// Join a prefix and an already formatted suffix without reimplementing the
+/// ID shape at a call site.
+pub fn join_id(prefix: &str, suffix: &str) -> String {
+    format!("{prefix}-{suffix}")
+}
 #[cfg(test)]
 mod tests {
     use super::*;

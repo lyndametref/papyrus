@@ -723,7 +723,7 @@ fn edit(
     let safe_dest = Context::ensure_within(&ctx.project_dir, &destination)?;
 
     if move_to_deprecated && path != safe_dest {
-        fs::rename(&path, &safe_dest).map_err(|e| AppError::Runtime(e.to_string()))?;
+        crate::record::store::move_record(ctx, &path, &safe_dest)?;
     }
 
     let new_content = render_record(&record);
@@ -774,7 +774,7 @@ fn deprecate(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
     let destination = deprecated.join(file_name);
     let safe_dest = Context::ensure_within(&ctx.project_dir, &destination)?;
 
-    fs::rename(&path, &safe_dest).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::move_record(ctx, &path, &safe_dest)?;
 
     let content = fs::read_to_string(&safe_dest).map_err(|e| AppError::Runtime(e.to_string()))?;
     let mut record = parse_record(&content, &id);
@@ -826,7 +826,7 @@ fn restore(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
     let destination = active.join(file_name);
     let safe_dest = Context::ensure_within(&ctx.project_dir, &destination)?;
 
-    fs::rename(&path, &safe_dest).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::move_record(ctx, &path, &safe_dest)?;
 
     let content = fs::read_to_string(&safe_dest).map_err(|e| AppError::Runtime(e.to_string()))?;
     let mut record = parse_record(&content, &id);

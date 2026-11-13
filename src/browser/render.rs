@@ -6,8 +6,9 @@
 //! built.
 
 use crate::browser::records::Category;
-use crate::browser::records::{FieldChange, Form, Index, Record};
+use crate::browser::records::{Form, Index, Record};
 use crate::config::Config;
+use crate::record::edit::FieldChange;
 
 pub const LIST_TEMPLATE: &str = include_str!("templates/list.html");
 pub const VIEW_TEMPLATE: &str = include_str!("templates/view.html");
@@ -3852,7 +3853,11 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     } else {
         3
     };
-    let example = format!("{:0width$}", 1, width = padding as usize);
+    let task_example = crate::record::identity::format_id(&cfg.task_prefix, 1, padding as usize);
+    let milestone_example =
+        crate::record::identity::format_id(&cfg.milestone_prefix, 1, padding as usize);
+    let release_example =
+        crate::record::identity::format_id(&cfg.release_prefix, 1, padding as usize);
     let id_padding_str = padding.to_string();
 
     let task_prefix = cfg.task_prefix.clone();
@@ -3923,7 +3928,9 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
         ("milestone_prefix", milestone_prefix.clone()),
         ("release_prefix", release_prefix.clone()),
         ("id_padding", id_padding_str.clone()),
-        ("example", example.clone()),
+        ("task_example", task_example.clone()),
+        ("milestone_example", milestone_example.clone()),
+        ("release_example", release_example.clone()),
         ("status_chain", status_chain_raw.clone()),
         ("default_status", default_status.clone()),
         ("enabled_doc_types", enabled_doc_types_display.clone()),
@@ -3952,10 +3959,7 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
         ("Task prefix", task_prefix.clone()),
         ("Milestone prefix", milestone_prefix.clone()),
         ("Release prefix", release_prefix.clone()),
-        (
-            "ID padding",
-            format!("{} (e.g. {}-{})", padding, task_prefix, example),
-        ),
+        ("ID padding", format!("{} (e.g. {})", padding, task_example)),
         ("Date format", date_format.clone()),
         ("Statuses", status_chain_raw.clone()),
         ("Enabled document types", enabled_doc_types_display.clone()),
@@ -3999,12 +4003,12 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
             vec![
                 (
                     "Task IDs and statuses",
-                    "New tasks use prefix {task_prefix} with padding {id_padding}: {task_prefix}-{example}. Statuses flow {status_chain}.",
+                    "New tasks use prefix {task_prefix} with padding {id_padding}: {task_example}. Statuses flow {status_chain}.",
                     "papyrus task create \"Title\" --status {default_status}",
                 ),
                 (
                     "Milestones and releases",
-                    "Milestone IDs use prefix {milestone_prefix} ({milestone_prefix}-{example}); release IDs use prefix {release_prefix} ({release_prefix}-{example}). Release lifecycle is separate from task workflow status.",
+                    "Milestone IDs use prefix {milestone_prefix} ({milestone_example}); release IDs use prefix {release_prefix} ({release_example}). Release lifecycle is separate from task workflow status.",
                     "papyrus milestone create \"Title\"\npapyrus release create \"Title\"",
                 ),
             ],
@@ -4045,7 +4049,7 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
             vec![(
                 "Releases and audits",
                 "Releases move active \u{2192} released; audit records are created for release audits. Decision types enabled: {enabled_decision_types}.",
-                "papyrus release status {release_prefix}-{example} released",
+                "papyrus release status {release_example} released",
             )],
         ),
         (

@@ -2,6 +2,7 @@
 
 pub mod descriptor;
 pub mod document;
+pub mod edit;
 pub mod frontmatter;
 pub mod identity;
 pub mod migrate;

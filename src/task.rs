@@ -382,28 +382,8 @@ fn milestone_release(ctx: &Context, cfg: &Config, milestone_id: &str) -> Option<
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty());
     }
-    let lines: Vec<&str> = content.lines().collect();
-    let mut i = 0usize;
-    while i < lines.len() {
-        if lines[i].trim() == "## Release" {
-            i += 1;
-            let mut buf = Vec::new();
-            while i < lines.len() && !lines[i].starts_with("## ") {
-                buf.push(lines[i]);
-                i += 1;
-            }
-            while buf.first().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                buf.remove(0);
-            }
-            while buf.last().map(|s| s.trim().is_empty()).unwrap_or(false) {
-                buf.pop();
-            }
-            let text = buf.join("\n").trim().to_string();
-            return (!text.is_empty()).then_some(text);
-        }
-        i += 1;
-    }
-    None
+    let doc = crate::record::document::parse(&content).ok()?;
+    crate::record::document::section_text(&doc, "Release")
 }
 
 #[derive(Clone, Debug, Default)]
@@ -1671,9 +1651,7 @@ fn move_record(
     source: &std::path::Path,
     destination: &std::path::Path,
 ) -> Result<(), AppError> {
-    let source_safe = Context::ensure_within(&ctx.project_dir, source)?;
-    let destination_safe = Context::ensure_within(&ctx.project_dir, destination)?;
-    fs::rename(&source_safe, &destination_safe).map_err(|e| AppError::Runtime(e.to_string()))
+    crate::record::store::move_record(ctx, source, destination)
 }
 
 /// Retire legacy metadata sections and refresh `updated_date` before a

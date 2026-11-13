@@ -763,7 +763,7 @@ pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
         return Err(AppError::Validation(format!("already archived: {}", id)));
     }
 
-    fs::rename(&path, &archived_safe).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::move_record(ctx, &path, &archived_safe)?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))
