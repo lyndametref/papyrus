@@ -3,10 +3,10 @@ id: TASK-93
 title: >-
   Apply the record view layout, reference links, NFR grouping, glossary landing,
   and title branding in the browser
-status: Implemented
+status: Done
 assignee: []
 created_date: '2026-11-11T20:43:00Z'
-updated_date: '2026-11-13T06:47:00Z'
+updated_date: '2026-11-13T06:49:00Z'
 labels:
   - browser
   - release-1.0
