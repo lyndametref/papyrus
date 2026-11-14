@@ -21,7 +21,7 @@ pub fn dispatch(
 
     // builtins
     if let Ok(cmd) = BuiltinCmd::from_arg_matches(matches) {
-        return dispatch_builtin(cmd, project_raw, config_path, json, no_color);
+        return dispatch_builtin(cmd, project_raw, config_path, json, no_color, registry);
     }
 
     // document slug?
@@ -78,6 +78,7 @@ fn dispatch_builtin(
     config_path: PathBuf,
     json: bool,
     no_color: bool,
+    registry: Option<&ArtifactRegistry>,
 ) -> Result<CommandOutput, AppError> {
     use crate::cli::builtin::ConfigCmd;
     match cmd {
@@ -151,7 +152,9 @@ fn dispatch_builtin(
             limit,
         } => {
             let ctx = build_context(project_raw, config_path, json, no_color)?;
-            crate::search::run(&ctx, &query, &types, limit)
+            let registry = registry
+                .ok_or_else(|| AppError::Runtime("artifact registry is unavailable".to_string()))?;
+            crate::search::run(&ctx, registry, &query, &types, limit)
         }
     }
 }

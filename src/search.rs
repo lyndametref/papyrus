@@ -1,28 +1,21 @@
 //! Read-only project-local free-text search (TASK-5 + TASK-10).
+//!
+//! The searched document set is the enabled `Document` descriptors of the
+//! startup artifact registry (ADR-0017, TASK-113). No module-local document
+//! slug list selects or shapes a document type.
 
 use crate::CommandOutput;
 use crate::SearchType;
 use crate::commands::load_effective_config;
-use crate::config::{Config, DocTypeEntry};
+use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
+use crate::registry::{ArtifactCategory, ArtifactRegistry, ContentModel, IdShape, TypeDescriptor};
+use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
 
 const DOC_TYPE: &str = "doc";
-const DOC_KEYS: [&str; 11] = [
-    "req",
-    "nfr",
-    "glossary",
-    "ui-spec",
-    "ui-mockup",
-    "rule",
-    "audit",
-    "tech-spec",
-    "use-case",
-    "test-case",
-    "test-report",
-];
 
 pub fn sanitize_query(raw: &str) -> Result<String, AppError> {
     let trimmed = raw.trim();
@@ -46,6 +39,7 @@ struct Hit {
 
 pub fn run(
     ctx: &Context,
+    registry: &ArtifactRegistry,
     query_raw: &str,
     types: &[SearchType],
     limit: Option<usize>,
@@ -56,8 +50,8 @@ pub fn run(
 
     let mut hits = Vec::new();
     if types.is_empty() || types.contains(&SearchType::Doc) {
-        for key in DOC_KEYS {
-            collect_type(ctx, &cfg, key, &needle, &mut hits)?;
+        for descriptor in document_type_descriptors(registry) {
+            collect_document_type(ctx, &cfg, descriptor, &needle, &mut hits)?;
         }
     }
     if types.is_empty() || types.contains(&SearchType::Task) {
@@ -108,79 +102,151 @@ pub fn run(
     Ok(CommandOutput { text, json })
 }
 
-fn collect_type(
+/// The collected document-type set: exactly the enabled `Document` descriptors,
+/// in registry order (Behavior 1.1).
+fn document_type_descriptors(registry: &ArtifactRegistry) -> Vec<&TypeDescriptor> {
+    registry.enabled(ArtifactCategory::Document).collect()
+}
+
+/// Index one descriptor's active directory with descriptor-driven extension,
+/// identity shape, and title projection (Behavior 2).
+fn collect_document_type(
     ctx: &Context,
     cfg: &Config,
-    key: &str,
+    descriptor: &TypeDescriptor,
     needle: &str,
     hits: &mut Vec<Hit>,
 ) -> Result<(), AppError> {
-    let Some(entry) = cfg.document_types.get(key) else {
+    let Some(active) = document_active_dir(ctx, cfg, descriptor)? else {
         return Ok(());
     };
-    if !entry.enabled {
-        return Ok(());
-    }
-    let Some(dir) = active_dir(ctx, cfg, entry)? else {
-        return Ok(());
-    };
-    let entries = fs::read_dir(&dir).map_err(|e| {
-        AppError::Runtime(format!("cannot read directory {}: {}", dir.display(), e))
+    let extension = document_extension(descriptor);
+    let entries = fs::read_dir(&active).map_err(|e| {
+        AppError::Runtime(format!("cannot read directory {}: {}", active.display(), e))
     })?;
     for dir_entry in entries {
         let dir_entry = dir_entry.map_err(|e| AppError::Runtime(e.to_string()))?;
         let path = dir_entry.path();
-        let allowed = match key {
-            "ui-mockup" => path.extension().and_then(|s| s.to_str()) == Some("html"),
-            _ => path.extension().and_then(|s| s.to_str()) == Some("md"),
-        };
-        if !allowed {
+        // Only files directly inside the active directory; subdirectories such
+        // as the archived folder are never scanned (Behavior 2.2).
+        if path.is_dir() {
             continue;
         }
-        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+        if path.extension().and_then(OsStr::to_str) != Some(extension) {
+            continue;
+        }
+        let Some(stem) = path.file_stem().and_then(OsStr::to_str) else {
             continue;
         };
-        // Only native stems are records; a document family keeps its dotted
-        // shape and may carry a legacy kebab slug, which is not part of the ID.
-        let dotted = matches!(key, "req" | "nfr");
-        let parsed =
-            crate::record::identity::parse_id_parts(stem, &entry.prefix, dotted).or_else(|| {
-                dotted
-                    .then(|| crate::record::identity::parse_id_parts(stem, &entry.prefix, false))
-                    .flatten()
-            });
-        let Some(id) = parsed.map(|parts| parts.display) else {
+        let Some(stem_id) = record_id(stem, descriptor) else {
             continue;
         };
-        let id = id.as_str();
+        // Boundary check before any eligibility decision or read, so symlink
+        // escapes always surface as exit 1.
         let safe = Context::ensure_within(&ctx.project_dir, &path)?;
+        // Read-path auto-relocation required by REQ-05.007. Failure is a
+        // validation outcome naming the source record (Behavior 4.2).
+        let safe = crate::record::store::relocate_if_archived(ctx, &safe)
+            .map_err(|error| AppError::Validation(error.to_string()))?;
+        // A relocated record left the active directory and is not returned.
+        if safe.parent() != Some(active.as_path()) {
+            continue;
+        }
         let Ok(content) = fs::read_to_string(&safe) else {
             continue;
         };
+        // An archived UI mockup is excluded by its HTML status without
+        // relocation (Assumption A2).
+        if matches!(descriptor.content_model, ContentModel::HtmlMockup(_))
+            && crate::ui_mockup::parse_record(&content, &stem_id).status == "archived"
+        {
+            continue;
+        }
         if !content.to_lowercase().contains(needle) {
             continue;
         }
-        let title = if key == "ui-mockup" {
-            crate::ui_mockup::extract_title(&content, id)
-        } else {
-            let heading = crate::record::document::parse(&content)
-                .ok()
-                .and_then(|d| d.heading)
-                .unwrap_or_default();
-            let rest = heading.trim_start_matches('#').trim();
-            let mut parts = rest.splitn(2, char::is_whitespace);
-            let _ = parts.next();
-            let t = parts.next().unwrap_or("").trim().to_string();
-            if t.is_empty() { id.to_string() } else { t }
-        };
+        let (id, title) = document_identity_and_title(descriptor, &content, &stem_id);
         hits.push(Hit {
-            id: id.to_string(),
+            id,
             kind: DOC_TYPE,
             title,
             path: safe,
         });
     }
     Ok(())
+}
+
+/// A document descriptor's active directory: `doc_directory` plus the
+/// descriptor's relative directory, contained by the project boundary.
+fn document_active_dir(
+    ctx: &Context,
+    cfg: &Config,
+    descriptor: &TypeDescriptor,
+) -> Result<Option<PathBuf>, AppError> {
+    let base = match descriptor.directory.config_key {
+        "doc_directory" => cfg.doc_directory.as_str(),
+        other => {
+            return Err(AppError::Validation(format!(
+                "unsupported document directory key: {}",
+                other
+            )));
+        }
+    };
+    let raw = ctx
+        .project_dir
+        .join(base)
+        .join(&descriptor.directory.relative);
+    if !raw.exists() {
+        return Ok(None);
+    }
+    Context::ensure_within(&ctx.project_dir, &raw).map(Some)
+}
+
+fn document_extension(descriptor: &TypeDescriptor) -> &'static str {
+    match descriptor.content_model {
+        ContentModel::HtmlMockup(_) => "html",
+        ContentModel::Generic | ContentModel::Typed(_) => "md",
+    }
+}
+
+/// Parse a record stem with the descriptor's prefix and ID shape (Behavior 2.4).
+fn record_id(stem: &str, descriptor: &TypeDescriptor) -> Option<String> {
+    let prefix = &descriptor.prefix;
+    let parsed = match descriptor.id_shape {
+        IdShape::Grouped => crate::record::identity::parse_id_parts(stem, prefix, true)
+            .or_else(|| crate::record::identity::parse_id_parts(stem, prefix, false)),
+        IdShape::Dotted => crate::record::identity::parse_id_parts(stem, prefix, true),
+        IdShape::Plain => crate::record::identity::parse_id_parts(stem, prefix, false),
+    };
+    parsed.map(|parts| parts.display)
+}
+
+/// Identity and title from the shared list/view projection (Behavior 2.6).
+fn document_identity_and_title(
+    descriptor: &TypeDescriptor,
+    content: &str,
+    stem_id: &str,
+) -> (String, String) {
+    if matches!(descriptor.content_model, ContentModel::HtmlMockup(_)) {
+        return (
+            stem_id.to_string(),
+            crate::ui_mockup::extract_title(content, stem_id),
+        );
+    }
+    let projected = crate::record::document::parse(content)
+        .ok()
+        .map(|doc| crate::record::document::heading_id_title_with_frontmatter(&doc));
+    let (id, title) = match projected {
+        Some((id, title)) => (id.trim().to_string(), title.trim().to_string()),
+        None => (String::new(), String::new()),
+    };
+    let id = if id.is_empty() {
+        stem_id.to_string()
+    } else {
+        id
+    };
+    let title = if title.is_empty() { id.clone() } else { title };
+    (id, title)
 }
 
 fn collect_backlog_store(
@@ -204,10 +270,10 @@ fn collect_backlog_store(
     for dir_entry in entries {
         let dir_entry = dir_entry.map_err(|e| AppError::Runtime(e.to_string()))?;
         let path = dir_entry.path();
-        if path.extension().and_then(|s| s.to_str()) != Some("md") {
+        if path.extension().and_then(OsStr::to_str) != Some("md") {
             continue;
         }
-        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+        let Some(stem) = path.file_stem().and_then(OsStr::to_str) else {
             continue;
         };
         let Some(id) = desc.configured_prefixes(cfg).iter().find_map(|prefix| {
@@ -263,10 +329,10 @@ fn collect_decision_store(
         if path.is_dir() {
             continue;
         }
-        if path.extension().and_then(|s| s.to_str()) != Some("md") {
+        if path.extension().and_then(OsStr::to_str) != Some("md") {
             continue;
         }
-        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+        let Some(stem) = path.file_stem().and_then(OsStr::to_str) else {
             continue;
         };
         // Boundary check before any eligibility/read, so symlink escapes
@@ -302,21 +368,6 @@ fn collect_decision_store(
     Ok(())
 }
 
-fn active_dir(
-    ctx: &Context,
-    cfg: &Config,
-    entry: &DocTypeEntry,
-) -> Result<Option<PathBuf>, AppError> {
-    let raw = ctx
-        .project_dir
-        .join(&cfg.doc_directory)
-        .join(&entry.directory);
-    if !raw.exists() {
-        return Ok(None);
-    }
-    Context::ensure_within(&ctx.project_dir, &raw).map(Some)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -345,5 +396,49 @@ mod tests {
     fn path_separators_are_literal_search_characters() {
         assert_eq!(sanitize_query("a/b").unwrap(), "a/b");
         assert_eq!(sanitize_query("a\\b").unwrap(), "a\\b");
+    }
+
+    fn note_entry(prefix: &str, directory: &str, enabled: bool) -> crate::config::DocTypeEntry {
+        crate::config::DocTypeEntry {
+            prefix: prefix.to_string(),
+            directory: directory.to_string(),
+            enabled,
+            statuses: None,
+            default_status: None,
+        }
+    }
+
+    // T-113-13: the collected type set equals the enabled Document descriptors.
+    #[test]
+    fn collected_document_types_equal_enabled_registry_descriptors() {
+        let mut cfg = Config::default();
+        cfg.document_types
+            .insert("note".to_string(), note_entry("NOTE", "notes/", true));
+        cfg.document_types
+            .insert("shelved".to_string(), note_entry("SHLV", "shelved/", false));
+        let registry = ArtifactRegistry::build(&cfg).expect("registry builds");
+
+        let collected: Vec<&str> = document_type_descriptors(&registry)
+            .iter()
+            .map(|descriptor| descriptor.slug.as_str())
+            .collect();
+        let expected: Vec<&str> = registry
+            .enabled(ArtifactCategory::Document)
+            .map(|descriptor| descriptor.slug.as_str())
+            .collect();
+
+        assert_eq!(collected, expected);
+        assert!(collected.contains(&"note"));
+        assert!(!collected.contains(&"shelved"));
+    }
+
+    // T-113-13: no static document key list or slug arm remains in this module.
+    #[test]
+    fn search_module_has_no_static_document_key_list_or_slug_arms() {
+        let source = include_str!("search.rs");
+        let forbidden_key_list = ["DOC", "_KEYS"].concat();
+        let forbidden_collector = ["collect", "_type"].concat();
+        assert!(!source.contains(&forbidden_key_list));
+        assert!(!source.contains(&forbidden_collector));
     }
 }
