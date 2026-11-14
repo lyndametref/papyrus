@@ -1,0 +1,88 @@
+project_name: Proj
+task_prefix: TASK
+milestone_prefix: MS
+release_prefix: REL
+id_padding: 3
+date_format: yyyy-mm-dd
+editor: null
+backlog_directory: backlog/
+decision_directory: decisions/
+doc_directory: docs/
+statuses: [ToDo, Initiated, Refined, Implemented, Validated, Done]
+default_status: ToDo
+decision_types:
+  adr:
+    prefix: ADR
+    enabled: true
+  bdr:
+    prefix: BDR
+    enabled: true
+document_types:
+  legacy:
+    prefix: LEG
+    directory: legacy/
+    enabled: false
+    statuses: [active, archived]
+  note:
+    prefix: NOTE
+    directory: notes/
+    enabled: true
+    statuses: [active, archived, review]
+    default_status: review
+  audit:
+    prefix: AUD
+    directory: audit-records/
+    enabled: true
+    statuses: [active, archived]
+  glossary:
+    prefix: GLO
+    directory: glossary/
+    enabled: true
+    statuses: [active, archived]
+  nfr:
+    prefix: NFR
+    directory: requirements/non-functional/
+    enabled: true
+    statuses: [active, archived]
+  req:
+    prefix: REQ
+    directory: requirements/business/
+    enabled: true
+    statuses: [active, archived]
+  rule:
+    prefix: RUL
+    directory: business-rules/
+    enabled: true
+    statuses: [active, archived]
+  tech-spec:
+    prefix: TECH
+    directory: technical/
+    enabled: true
+    statuses: [active, archived]
+  test-case:
+    prefix: TC
+    directory: test-cases/
+    enabled: true
+    statuses: [active, archived]
+  test-report:
+    prefix: TR
+    directory: test-reports/
+    enabled: true
+    statuses: [active, archived]
+  ui-mockup:
+    prefix: MOCK
+    directory: specifications/ui/mockups/
+    enabled: true
+  ui-spec:
+    prefix: UI
+    directory: specifications/ui/
+    enabled: true
+    statuses: [active, archived]
+  use-case:
+    prefix: UC
+    directory: use-cases/
+    enabled: true
+    statuses: [active, archived]
+browser_host: 127.0.0.1
+browser_port: 6420
+browser_open: true

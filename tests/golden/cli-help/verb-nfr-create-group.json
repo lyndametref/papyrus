@@ -1,0 +1,5 @@
+{
+  "exit": 0,
+  "stdout": "Create a business-requirement group\n\nUsage: papyrus nfr create-group [OPTIONS] --title <TITLE>\n\nOptions:\n      --json                       Emit stable, machine-readable JSON.\n      --title <TITLE>              Group title\n      --dir <path>                 Project directory. Default: the current working directory.\n      --story <STORY>              User story\n      --config <file>              Configuration file. Default: papyrus.config.yml in the project directory.\n  -d, --description <DESCRIPTION>  Description\n      --no-color                   Disable ANSI color output.\n  -h, --help                       Print help\n",
+  "stderr": ""
+}

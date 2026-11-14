@@ -1,10 +1,11 @@
-use crate::commands::load_effective_config;
-use crate::config::Config;
+use crate::CommandOutput;
 use crate::context::Context;
+use crate::document::{DocumentArgs, DocumentScope, DocumentVerb};
 use crate::error::AppError;
+use crate::registry::ArtifactRegistry;
 use crate::sanitize;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
@@ -25,6 +26,60 @@ impl Kind {
     }
 }
 
+pub fn handle(
+    ctx: &Context,
+    scope: &DocumentScope,
+    registry: &ArtifactRegistry,
+    kind: Kind,
+    verb: DocumentVerb,
+    args: &DocumentArgs,
+) -> Result<CommandOutput, AppError> {
+    match verb {
+        DocumentVerb::Create => {
+            let id = create(
+                ctx,
+                scope,
+                registry,
+                kind,
+                args.get("title"),
+                args.get("title_flag"),
+                args.get("story"),
+                args.get("description"),
+                args.require("group")?,
+                args.get_all("label"),
+                args.get_all("reference"),
+            )?;
+            Ok(crate::document::typed_created(ctx, id))
+        }
+        DocumentVerb::CreateGroup => {
+            let id = create_group(
+                ctx,
+                scope,
+                kind,
+                args.require("title")?,
+                args.get("story"),
+                args.get("description"),
+            )?;
+            Ok(crate::document::typed_created(ctx, id))
+        }
+        DocumentVerb::List => list(ctx, scope, kind),
+        DocumentVerb::View => view(ctx, scope, kind, args.require("id")?),
+        DocumentVerb::Edit => edit(
+            ctx,
+            scope,
+            kind,
+            args.require("id")?,
+            args.get("title"),
+            args.get("story"),
+            args.get("description"),
+            args.get_all("label"),
+            args.get_all("reference"),
+            args.flag("editor"),
+        ),
+        other => Err(crate::document::unsupported_verb(other)),
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ParsedDoc {
     pub id: String,
@@ -40,75 +95,38 @@ pub fn sanitize_text(input: &str) -> Result<String, AppError> {
         .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))
 }
 
-pub fn load_config(ctx: &Context) -> Result<Config, AppError> {
-    load_effective_config(&ctx.config_path, &ctx.project_dir)
-}
-
-pub fn type_entry(cfg: &Config, key: &str) -> Result<crate::config::DocTypeEntry, AppError> {
-    let entry = cfg
-        .document_types
-        .get(key)
-        .ok_or_else(|| AppError::NotFound(format!("document type not configured: {}", key)))?;
-    if !entry.enabled {
-        return Err(AppError::Validation(format!(
-            "document type disabled: {}",
-            key
-        )));
-    }
-    if entry.prefix.is_empty() {
-        return Err(AppError::Validation(format!(
-            "document type prefix empty: {}",
-            key
-        )));
-    }
-    Ok(entry.clone())
-}
-
-pub fn active_dir(ctx: &Context, cfg: &Config, key: &str) -> Result<PathBuf, AppError> {
-    let entry = type_entry(cfg, key)?;
-    let raw = ctx
-        .project_dir
-        .join(&cfg.doc_directory)
-        .join(&entry.directory);
-    Context::ensure_within(&ctx.project_dir, &raw)
-}
-
-pub fn archived_dir(ctx: &Context, cfg: &Config, key: &str) -> Result<PathBuf, AppError> {
-    let raw = active_dir(ctx, cfg, key)?.join("archived");
-    Context::ensure_within(&ctx.project_dir, &raw)
-}
-
-fn kind_id(cfg: &Config, kind: Kind) -> Result<(String, bool), AppError> {
-    let entry = type_entry(cfg, kind.key())?;
+fn kind_dotted(kind: Kind) -> Result<bool, AppError> {
     let descriptor = crate::record::descriptor::descriptor_for_doc_type(kind.key())
         .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
-    Ok((entry.prefix, descriptor.is_dotted_id()))
+    Ok(descriptor.is_dotted_id())
 }
 
 fn resolve_kind_record(
     ctx: &Context,
-    cfg: &Config,
+    scope: &DocumentScope,
     kind: Kind,
     id: &str,
 ) -> Result<crate::record::resolve::ResolvedRecord, AppError> {
-    let (prefix, dotted) = kind_id(cfg, kind)?;
-    let dirs = [
-        active_dir(ctx, cfg, kind.key())?,
-        archived_dir(ctx, cfg, kind.key())?,
-    ];
+    let dotted = kind_dotted(kind)?;
+    let dirs = [scope.active.clone(), scope.archived.clone()];
     if let Some(record) = crate::record::resolve::resolve_in_dirs(
         ctx,
         &dirs,
         id,
-        std::slice::from_ref(&prefix),
+        std::slice::from_ref(&scope.prefix),
         dotted,
     )? {
         return Ok(record);
     }
     // A group record carries the simple `<ID>` shape, not a dotted ID.
     if dotted
-        && let Some(record) =
-            crate::record::resolve::resolve_in_dirs(ctx, &dirs, id, &[prefix], false)?
+        && let Some(record) = crate::record::resolve::resolve_in_dirs(
+            ctx,
+            &dirs,
+            id,
+            std::slice::from_ref(&scope.prefix),
+            false,
+        )?
     {
         return Ok(record);
     }
@@ -121,13 +139,12 @@ fn ensure_dirs(dir: &Path) -> Result<(), AppError> {
 
 pub fn create_group(
     ctx: &Context,
+    scope: &DocumentScope,
     kind: Kind,
     title_raw: &str,
     story_raw: Option<&str>,
     desc_raw: Option<&str>,
 ) -> Result<String, AppError> {
-    let cfg = load_config(ctx)?;
-    let entry = type_entry(&cfg, kind.key())?;
     let title = sanitize_text(title_raw)?;
     let story = match story_raw {
         Some(s) => Some(sanitize_text(s)?),
@@ -138,13 +155,11 @@ pub fn create_group(
         None => None,
     };
 
-    let active = active_dir(ctx, &cfg, kind.key())?;
+    let active = scope.active.clone();
     ensure_dirs(&active)?;
 
-    let next =
-        crate::record::identity::next_number(&active, &active.join("archived"), &entry.prefix);
-    let id =
-        crate::record::identity::format_id(&entry.prefix, next as i64, cfg.id_padding as usize);
+    let next = crate::record::identity::next_number(&active, &scope.archived, &scope.prefix);
+    let id = crate::record::identity::format_id(&scope.prefix, next as i64, scope.id_padding);
 
     let body_doc = body_document_group(kind, &id, &title, story.as_deref(), desc.as_deref());
     let content = crate::record::document::render(&body_doc);
@@ -158,6 +173,8 @@ pub fn create_group(
 #[allow(clippy::too_many_arguments)]
 pub fn create(
     ctx: &Context,
+    scope: &DocumentScope,
+    registry: &ArtifactRegistry,
     kind: Kind,
     title_raw: Option<&str>,
     title_flag_raw: Option<&str>,
@@ -184,9 +201,6 @@ pub fn create(
             return Err(AppError::Validation("title is required".to_string()));
         }
     };
-
-    let cfg = load_config(ctx)?;
-    let entry = type_entry(&cfg, kind.key())?;
 
     let story = match story_raw {
         Some(s) if kind.supports_story() => Some(sanitize_text(s)?),
@@ -215,27 +229,24 @@ pub fn create(
     }
     let group_id = sanitize_text(group_raw)?;
 
-    if !crate::record::identity::is_group_id(&group_id, &entry.prefix) {
+    if !crate::record::identity::is_group_id(&group_id, &scope.prefix) {
         let other_kind = match kind {
             Kind::Req => Kind::Nfr,
             Kind::Nfr => Kind::Req,
         };
-        let mismatch = type_entry(&cfg, other_kind.key())
-            .ok()
-            .filter(|other_entry| {
-                crate::record::identity::is_group_id(&group_id, &other_entry.prefix)
-            })
-            .map(|_| {
-                let other_active = active_dir(ctx, &cfg, other_kind.key()).ok();
-                let other_deprecated = archived_dir(ctx, &cfg, other_kind.key()).ok();
-                other_active
-                    .as_ref()
-                    .map(|d| d.join(format!("{}.md", group_id)).exists())
+        let mismatch = registry
+            .descriptor(other_kind.key())
+            .filter(|other| crate::record::identity::is_group_id(&group_id, &other.prefix))
+            .map(|other| {
+                DocumentScope::resolve(ctx, other)
+                    .map(|other_scope| {
+                        other_scope.active.join(format!("{}.md", group_id)).exists()
+                            || other_scope
+                                .archived
+                                .join(format!("{}.md", group_id))
+                                .exists()
+                    })
                     .unwrap_or(false)
-                    || other_deprecated
-                        .as_ref()
-                        .map(|d| d.join(format!("{}.md", group_id)).exists())
-                        .unwrap_or(false)
             })
             .unwrap_or(false);
         if mismatch {
@@ -247,8 +258,8 @@ pub fn create(
         return Err(AppError::NotFound(format!("group not found: {}", group_id)));
     }
 
-    let active = active_dir(ctx, &cfg, kind.key())?;
-    let deprecated = archived_dir(ctx, &cfg, kind.key())?;
+    let active = scope.active.clone();
+    let deprecated = scope.archived.clone();
     ensure_dirs(&active)?;
     ensure_dirs(&deprecated)?;
 
@@ -280,10 +291,9 @@ pub fn create(
         )));
     }
 
-    let next_seq =
-        crate::record::identity::next_seq_number(&active, &active.join("archived"), &group_id);
+    let next_seq = crate::record::identity::next_seq_number(&active, &scope.archived, &group_id);
     let req_id =
-        crate::record::identity::format_seq_id(&group_id, next_seq as i64, cfg.id_padding as usize);
+        crate::record::identity::format_seq_id(&group_id, next_seq as i64, scope.id_padding);
 
     let body_doc = body_document_requirement(
         kind,
@@ -334,18 +344,30 @@ pub fn create(
     Ok(req_id)
 }
 
-pub fn list(ctx: &Context, kind: Kind) -> Result<crate::CommandOutput, AppError> {
-    let cfg = load_config(ctx)?;
-    let (prefix, dotted) = kind_id(&cfg, kind)?;
-    let active = active_dir(ctx, &cfg, kind.key())?;
+pub fn list(
+    ctx: &Context,
+    scope: &DocumentScope,
+    kind: Kind,
+) -> Result<crate::CommandOutput, AppError> {
+    let dotted = kind_dotted(kind)?;
+    let active = scope.active.clone();
     ensure_dirs(&active).ok();
 
-    let mut records =
-        crate::record::resolve::list_in_dir(ctx, &active, std::slice::from_ref(&prefix), dotted)?;
+    let mut records = crate::record::resolve::list_in_dir(
+        ctx,
+        &active,
+        std::slice::from_ref(&scope.prefix),
+        dotted,
+    )?;
     if dotted {
         // Groups keep the simple `<ID>` shape and are listed alongside the
         // dotted requirement records.
-        for group in crate::record::resolve::list_in_dir(ctx, &active, &[prefix], false)? {
+        for group in crate::record::resolve::list_in_dir(
+            ctx,
+            &active,
+            std::slice::from_ref(&scope.prefix),
+            false,
+        )? {
             if !group.id.contains('.') {
                 records.push(group);
             }
@@ -493,10 +515,14 @@ fn body_document_requirement(
     }
 }
 
-pub fn view(ctx: &Context, kind: Kind, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
+pub fn view(
+    ctx: &Context,
+    scope: &DocumentScope,
+    kind: Kind,
+    id_raw: &str,
+) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let record = resolve_kind_record(ctx, &cfg, kind, &requested)?;
+    let record = resolve_kind_record(ctx, scope, kind, &requested)?;
     let id = record.id.clone();
     let path = record.path;
 
@@ -534,6 +560,7 @@ fn frontmatter_list_req(content: &str, key: &str) -> Vec<String> {
 #[allow(clippy::too_many_arguments)]
 pub fn edit(
     ctx: &Context,
+    scope: &DocumentScope,
     kind: Kind,
     id_raw: &str,
     title_raw: Option<&str>,
@@ -544,8 +571,7 @@ pub fn edit(
     editor: bool,
 ) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let resolved = resolve_kind_record(ctx, &cfg, kind, &requested)?;
+    let resolved = resolve_kind_record(ctx, scope, kind, &requested)?;
     resolved.ensure_writable()?;
     let id = resolved.id.clone();
     let path = resolved.path.clone();
@@ -643,7 +669,7 @@ pub fn edit(
     let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
 
     if editor {
-        let editor_cmd = cfg.effective_editor();
+        let editor_cmd = scope.config.effective_editor();
         if let Some(cmd) = editor_cmd {
             let mut parts = cmd.split_whitespace();
             let prog = parts.next().unwrap_or("");
@@ -677,6 +703,7 @@ pub fn edit(
 #[cfg(test)]
 mod native_layout_tests {
     use super::*;
+    use std::path::PathBuf;
 
     fn tmpdir(name: &str) -> PathBuf {
         let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -702,10 +729,17 @@ mod native_layout_tests {
         }
     }
 
+    fn req_scope(c: &Context) -> DocumentScope {
+        let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir).unwrap();
+        let registry = crate::registry::ArtifactRegistry::build(&cfg).unwrap();
+        DocumentScope::resolve(c, registry.descriptor("req").unwrap()).unwrap()
+    }
+
     #[test]
     fn dotted_ids_stay_distinct_during_resolution_and_listing() {
         let dir = tmpdir("dotted");
         let c = ctx(&dir);
+        let scope = req_scope(&c);
         let active = dir.join("docs/requirements/business");
         fs::create_dir_all(&active).unwrap();
         fs::write(
@@ -719,12 +753,12 @@ mod native_layout_tests {
         )
         .unwrap();
 
-        let one = view(&c, Kind::Req, "REQ-01.001").unwrap();
+        let one = view(&c, &scope, Kind::Req, "REQ-01.001").unwrap();
         assert_eq!(one.json.unwrap()["id"], "REQ-01.001");
-        let two = view(&c, Kind::Req, "REQ-1.2").unwrap();
+        let two = view(&c, &scope, Kind::Req, "REQ-1.2").unwrap();
         assert_eq!(two.json.unwrap()["id"], "REQ-01.002");
 
-        let listed = list(&c, Kind::Req).unwrap();
+        let listed = list(&c, &scope, Kind::Req).unwrap();
         assert!(listed.text.contains("REQ-01.001"));
         assert!(listed.text.contains("REQ-01.002"));
     }

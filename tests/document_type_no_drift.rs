@@ -514,3 +514,136 @@ fn scanner_flags_planted_violations_and_accepts_allowlisted_lines() {
     let allowed = "```sh\npapyrus req archive REQ-003\n```\n";
     assert!(static_inventory_violation(allowed).is_none());
 }
+
+// TASK-119 guards ----------------------------------------------------------
+
+const TYPED_DOCUMENT_MODULES: [&str; 10] = [
+    "src/requirement.rs",
+    "src/glossary.rs",
+    "src/rule.rs",
+    "src/ui_spec.rs",
+    "src/audit.rs",
+    "src/tech_spec.rs",
+    "src/use_case.rs",
+    "src/test_case.rs",
+    "src/test_report.rs",
+    "src/ui_mockup.rs",
+];
+
+const REMOVED_DOCUMENT_ENUMS: [&str; 10] = [
+    "ReqCmd",
+    "GlossaryCmd",
+    "RuleCmd",
+    "UiSpecCmd",
+    "AuditCmd",
+    "TechSpecCmd",
+    "UseCaseCmd",
+    "TestCaseCmd",
+    "TestReportCmd",
+    "UiMockupCmd",
+];
+
+// D-08 ---------------------------------------------------------------------
+#[test]
+fn d08_no_per_type_document_clap_enum_returns() {
+    scan_src("D-08 per-type document clap enum in src/:", &[], |line| {
+        REMOVED_DOCUMENT_ENUMS
+            .iter()
+            .any(|name| line.contains(name))
+    })
+    .unwrap();
+}
+
+// D-09 ---------------------------------------------------------------------
+#[test]
+fn d09_no_document_dispatch_plumbing_in_cli() {
+    let mut violations = Vec::new();
+    for path in src_files() {
+        let rel = relative(&path);
+        if !rel.starts_with("src/cli/") {
+            continue;
+        }
+        let content = fs::read_to_string(&path).unwrap_or_default();
+        for (lineno, line) in production_lines_in(&content) {
+            let lowered = line.trim_start();
+            if lowered.contains("TypedHandler")
+                || lowered.contains("dispatch_typed_module")
+                || (lowered.contains("from_arg_matches")
+                    && !lowered.contains("BuiltinCmd::from_arg_matches"))
+                || (lowered.contains("augment_subcommands")
+                    && !lowered.contains("BuiltinCmd::augment_subcommands"))
+            {
+                violations.push(format!("{}:{}: {}", rel, lineno, line.trim()));
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "D-09 document dispatch plumbing in src/cli/:\n{}",
+        violations.join("\n")
+    );
+}
+
+// D-10 ---------------------------------------------------------------------
+#[test]
+fn d10_no_module_local_document_directory_helpers() {
+    let mut violations = Vec::new();
+    for rel in TYPED_DOCUMENT_MODULES {
+        let content = fs::read_to_string(rel).unwrap_or_default();
+        for (lineno, line) in production_lines_in(&content) {
+            let trimmed = line.trim();
+            if trimmed.contains("cfg.doc_directory")
+                || trimmed.contains("load_effective_config")
+                || trimmed.starts_with("fn load_config(")
+                || trimmed.starts_with("pub fn load_config(")
+                || trimmed.starts_with("fn type_entry(")
+                || trimmed.starts_with("pub fn type_entry(")
+                || trimmed.starts_with("fn active_dir(")
+                || trimmed.starts_with("pub fn active_dir(")
+                || trimmed.starts_with("fn archived_dir(")
+                || trimmed.starts_with("pub fn archived_dir(")
+            {
+                violations.push(format!("{}:{}: {}", rel, lineno, trimmed));
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "D-10 module-local document directory/config helpers:\n{}",
+        violations.join("\n")
+    );
+}
+
+// D-11 ---------------------------------------------------------------------
+#[test]
+fn d11_document_tree_is_descriptor_driven() {
+    let tree = fs::read_to_string("src/cli/tree.rs").unwrap_or_default();
+    let production: String = production_lines_in(&tree)
+        .into_iter()
+        .map(|(_, line)| line)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        production.contains("ordered_verb_specs"),
+        "document_command must build from descriptor verb metadata"
+    );
+    assert!(
+        !production.contains("ContentModel::"),
+        "document_command must not branch on the content model"
+    );
+
+    let document = fs::read_to_string("src/document.rs").unwrap_or_default();
+    let production: String = production_lines_in(&document)
+        .into_iter()
+        .map(|(_, line)| line)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        production.contains("fn dispatch_typed("),
+        "document::run must delegate typed content verbs through one handler"
+    );
+    assert!(
+        !production.contains("fn dispatch_typed_module"),
+        "the second dispatcher must not return"
+    );
+}
