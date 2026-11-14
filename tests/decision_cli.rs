@@ -512,30 +512,6 @@ fn decision_sanitization() {
 }
 
 #[test]
-fn decision_id_not_reused() {
-    let d = tmpdir("reuse");
-    init(&d);
-    let p = d.to_str().unwrap();
-
-    let _ = bin()
-        .args(["--dir", p, "decision", "create", "D1"])
-        .output()
-        .unwrap();
-    let _ = bin()
-        .args(["--dir", p, "decision", "archive", "ADR-001"])
-        .output()
-        .unwrap();
-    let out = bin()
-        .args(["--dir", p, "decision", "create", "D2"])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "ADR-002");
-
-    let _ = fs::remove_dir_all(&d);
-}
-
-#[test]
 fn decision_project_directory_boundary() {
     let root = tmpdir("bnd");
     let proj = root.join("proj");

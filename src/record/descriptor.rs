@@ -118,6 +118,31 @@ impl RecordDescriptor {
         }
     }
 
+    /// Canonical archived location of a family, if the family has one.
+    ///
+    /// Document descriptors resolve to `<active dir>/archived`. Task and
+    /// milestone descriptors resolve to their archive location so downstream
+    /// has one method for both active and archived paths. Decision and other
+    /// families have no archived location.
+    pub fn resolve_archived_directory(
+        &self,
+        cfg: &crate::config::Config,
+        project_dir: &std::path::Path,
+    ) -> Option<Result<std::path::PathBuf, AppError>> {
+        match self.record_type {
+            "task" | "milestone" => self.resolve_archive_directory(cfg, project_dir),
+            _ => {
+                if self.doc_type_key.is_some() {
+                    let active = self.resolve_directory(cfg, project_dir).ok()?;
+                    let raw = active.join("archived");
+                    Some(Context::ensure_within(project_dir, &raw))
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
     /// Legacy archive alias of a backlog family, read-only.
     pub fn resolve_legacy_archive_directory(
         &self,
@@ -136,20 +161,23 @@ impl RecordDescriptor {
         }
     }
 
-    /// Deprecated location of a document family, if the family has one.
-    pub fn resolve_deprecated_directory(
-        &self,
-        cfg: &Config,
-        project_dir: &std::path::Path,
-    ) -> Option<Result<std::path::PathBuf, AppError>> {
-        self.doc_type_key?;
-        let active = self.resolve_directory(cfg, project_dir).ok()?;
-        let raw = active.join("deprecated");
-        Some(Context::ensure_within(project_dir, &raw))
+    /// Declared status vocabulary for this record family (main + custom).
+    pub fn declared_statuses(&self, cfg: &crate::config::Config) -> Vec<String> {
+        match self.record_type {
+            "task" => cfg.statuses.clone(),
+            "milestone" => vec!["open".to_string(), "closed".to_string()],
+            "release" => vec!["planned".to_string(), "released".to_string()],
+            _ if self.doc_type_key.is_some() => self
+                .doc_type_key
+                .and_then(|k| cfg.document_types.get(k))
+                .and_then(|e| e.statuses.clone())
+                .unwrap_or_else(|| vec!["active".to_string(), "archived".to_string()]),
+            _ => Vec::new(),
+        }
     }
 
-    /// All locations a family may be read from: active, archive, legacy
-    /// alias, and deprecated.
+    /// All locations a family may be read from: active, archived, and the
+    /// task/milestone legacy alias. No deprecated path is included.
     pub fn resolve_read_directories(
         &self,
         cfg: &Config,
@@ -159,13 +187,14 @@ impl RecordDescriptor {
         if let Ok(dir) = self.resolve_directory(cfg, project_dir) {
             dirs.push(dir);
         }
-        if let Some(Ok(dir)) = self.resolve_archive_directory(cfg, project_dir) {
+        if let Some(Ok(dir)) = self.resolve_archived_directory(cfg, project_dir)
+            && !dirs.contains(&dir)
+        {
             dirs.push(dir);
         }
-        if let Some(Ok(dir)) = self.resolve_legacy_archive_directory(cfg, project_dir) {
-            dirs.push(dir);
-        }
-        if let Some(Ok(dir)) = self.resolve_deprecated_directory(cfg, project_dir) {
+        if let Some(Ok(dir)) = self.resolve_legacy_archive_directory(cfg, project_dir)
+            && !dirs.contains(&dir)
+        {
             dirs.push(dir);
         }
         dirs
@@ -236,7 +265,7 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         directory: "backlog",
         subpath: "milestones",
         doc_type_key: None,
-        frontmatter_keys: &["release"],
+        frontmatter_keys: &["status", "release"],
         sections: MILESTONE_SECTIONS,
     },
     RecordDescriptor {
@@ -248,7 +277,7 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         directory: "backlog",
         subpath: "releases",
         doc_type_key: None,
-        frontmatter_keys: &[],
+        frontmatter_keys: &["status"],
         sections: RELEASE_SECTIONS,
     },
     RecordDescriptor {
@@ -272,7 +301,7 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         directory: "doc",
         subpath: "",
         doc_type_key: Some("req"),
-        frontmatter_keys: &[],
+        frontmatter_keys: &["status"],
         sections: REQUIREMENT_SECTIONS,
     },
     RecordDescriptor {
@@ -284,7 +313,7 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         directory: "doc",
         subpath: "",
         doc_type_key: Some("nfr"),
-        frontmatter_keys: &[],
+        frontmatter_keys: &["status"],
         sections: REQUIREMENT_SECTIONS,
     },
     RecordDescriptor {
@@ -296,7 +325,7 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         directory: "doc",
         subpath: "",
         doc_type_key: Some("glossary"),
-        frontmatter_keys: &[],
+        frontmatter_keys: &["status"],
         sections: GLOSSARY_SECTIONS,
     },
     RecordDescriptor {
@@ -308,7 +337,7 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         directory: "doc",
         subpath: "",
         doc_type_key: Some("ui-spec"),
-        frontmatter_keys: &[],
+        frontmatter_keys: &["status"],
         sections: UI_SPEC_SECTIONS,
     },
     RecordDescriptor {
@@ -320,7 +349,7 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         directory: "doc",
         subpath: "",
         doc_type_key: Some("tech-spec"),
-        frontmatter_keys: &[],
+        frontmatter_keys: &["status"],
         sections: TECH_SPEC_SECTIONS,
     },
     RecordDescriptor {
@@ -332,7 +361,7 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         directory: "doc",
         subpath: "",
         doc_type_key: Some("rule"),
-        frontmatter_keys: &[],
+        frontmatter_keys: &["status"],
         sections: RULE_SECTIONS,
     },
     RecordDescriptor {
@@ -344,7 +373,7 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         directory: "doc",
         subpath: "",
         doc_type_key: Some("audit"),
-        frontmatter_keys: &["type"],
+        frontmatter_keys: &["status", "type"],
         sections: AUDIT_SECTIONS,
     },
     RecordDescriptor {
@@ -356,7 +385,7 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         directory: "doc",
         subpath: "",
         doc_type_key: Some("use-case"),
-        frontmatter_keys: &[],
+        frontmatter_keys: &["status"],
         sections: USE_CASE_SECTIONS,
     },
     RecordDescriptor {
@@ -368,7 +397,7 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         directory: "doc",
         subpath: "",
         doc_type_key: Some("test-case"),
-        frontmatter_keys: &[],
+        frontmatter_keys: &["status"],
         sections: TEST_CASE_SECTIONS,
     },
     RecordDescriptor {
@@ -380,7 +409,7 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         directory: "doc",
         subpath: "",
         doc_type_key: Some("test-report"),
-        frontmatter_keys: &[],
+        frontmatter_keys: &["status"],
         sections: TEST_REPORT_SECTIONS,
     },
 ];

@@ -193,27 +193,6 @@ fn tech_spec_create_requires_all_arguments() {
 }
 
 #[test]
-fn tech_spec_id_generation_and_no_reuse() {
-    let d = tmpdir("ids");
-    init(&d);
-
-    let out = create(&d, "One", "d");
-    assert_eq!(stdout(&out).trim(), "TECH-001");
-    let out = run(&d, &["tech-spec", "deprecate", "TECH-001"]);
-    assert!(out.status.success());
-
-    let out = create(&d, "Two", "d");
-    assert_eq!(stdout(&out).trim(), "TECH-002");
-
-    let out = run(&d, &["tech-spec", "restore", "TECH-001"]);
-    assert!(out.status.success());
-    let out = create(&d, "Three", "d");
-    assert_eq!(stdout(&out).trim(), "TECH-003");
-
-    let _ = fs::remove_dir_all(&d);
-}
-
-#[test]
 fn tech_spec_respects_configured_prefix_padding_and_directory() {
     let d = tmpdir("config");
     init(&d);

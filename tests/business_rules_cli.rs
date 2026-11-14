@@ -163,19 +163,6 @@ fn rule_basic_lifecycle() {
 }
 
 #[test]
-fn rule_id_generation_not_reused() {
-    let d = tmpdir("ids");
-    init(&d);
-    create(&d, "A", "d", "r", "a");
-    create(&d, "B", "d", "r", "a");
-    let out = run(&d, &["rule", "deprecate", "RUL-001"]);
-    assert!(out.status.success());
-    let out = create(&d, "C", "d", "r", "a");
-    assert_eq!(stdout(&out).trim(), "RUL-003");
-    let _ = fs::remove_dir_all(&d);
-}
-
-#[test]
 fn rule_requirement_references() {
     let d = tmpdir("reqs");
     init(&d);

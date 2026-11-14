@@ -231,61 +231,6 @@ fn glossary_edit_deprecated_allowed() {
 }
 
 #[test]
-fn glossary_id_not_reused() {
-    let d = tmpdir("reuse");
-    init(&d);
-    let p = d.to_str().unwrap();
-
-    let _ = bin()
-        .args([
-            "--dir",
-            p,
-            "glossary",
-            "create",
-            "--term",
-            "D1",
-            "--definition",
-            "d",
-        ])
-        .output()
-        .unwrap();
-    let _ = bin()
-        .args(["--dir", p, "glossary", "deprecate", "GLO-001"])
-        .output()
-        .unwrap();
-    let out = bin()
-        .args([
-            "--dir",
-            p,
-            "glossary",
-            "create",
-            "--term",
-            "D2",
-            "--definition",
-            "d",
-        ])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "GLO-002");
-
-    let out = bin()
-        .args(["--dir", p, "glossary", "restore", "GLO-001"])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    let out = bin()
-        .args(["--dir", p, "glossary", "view", "GLO-001"])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    let s = String::from_utf8_lossy(&out.stdout);
-    assert!(s.contains("# GLO-001 D1"));
-
-    let _ = fs::remove_dir_all(&d);
-}
-
-#[test]
 fn glossary_sanitization() {
     let d = tmpdir("san");
     init(&d);

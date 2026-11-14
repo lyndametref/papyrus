@@ -437,9 +437,6 @@ pub fn run_init_with_io<R: BufRead, W: Write>(
         if let Ok(dir) = desc.resolve_directory(&config, &project_dir) {
             let _ = fs::create_dir_all(&dir);
         }
-        if let Some(Ok(deprecated)) = desc.resolve_deprecated_directory(&config, &project_dir) {
-            let _ = fs::create_dir_all(deprecated);
-        }
     }
 
     // Write config file (full replace under --force or when absent).

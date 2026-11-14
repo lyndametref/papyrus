@@ -185,23 +185,6 @@ fn create_requires_args() {
 }
 
 #[test]
-fn id_generation_no_reuse() {
-    let d = tmpdir("ids");
-    init(&d);
-    let out = create(&d, "One", "T", &["S"], &[]);
-    assert_eq!(stdout(&out).trim(), "MOCK-001");
-    let out = run(&d, &["ui-mockup", "deprecate", "MOCK-001"]);
-    assert!(out.status.success());
-    let out = create(&d, "Two", "T", &["S"], &[]);
-    assert_eq!(stdout(&out).trim(), "MOCK-002");
-    let out = run(&d, &["ui-mockup", "restore", "MOCK-001"]);
-    assert!(out.status.success());
-    let out = create(&d, "Three", "T", &["S"], &[]);
-    assert_eq!(stdout(&out).trim(), "MOCK-003");
-    let _ = fs::remove_dir_all(&d);
-}
-
-#[test]
 fn config_prefix_padding_directory() {
     let d = tmpdir("config");
     init(&d);

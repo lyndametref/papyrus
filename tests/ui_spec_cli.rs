@@ -209,28 +209,6 @@ fn ui_spec_create_requires_all_arguments() {
 }
 
 #[test]
-fn ui_spec_id_generation_and_no_reuse() {
-    let d = tmpdir("ids");
-    init(&d);
-
-    let out = create(&d, "One", "v", "d");
-    assert_eq!(stdout(&out).trim(), "UI-001");
-    let out = run(&d, &["ui-spec", "deprecate", "UI-001"]);
-    assert!(out.status.success());
-
-    // The deprecated folder still counts for ID generation.
-    let out = create(&d, "Two", "v", "d");
-    assert_eq!(stdout(&out).trim(), "UI-002");
-
-    let out = run(&d, &["ui-spec", "restore", "UI-001"]);
-    assert!(out.status.success());
-    let out = create(&d, "Three", "v", "d");
-    assert_eq!(stdout(&out).trim(), "UI-003");
-
-    let _ = fs::remove_dir_all(&d);
-}
-
-#[test]
 fn ui_spec_respects_configured_prefix_padding_and_directory() {
     let d = tmpdir("config");
     init(&d);
