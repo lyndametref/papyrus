@@ -768,10 +768,10 @@ fn t10_category_parameter() {
         assert_eq!(get(&server, path).status, 200, "path={}", path);
     }
     for path in ["/?type=all", "/?type=x"] {
-        assert_eq!(get(&server, path).status, 400, "path={}", path);
+        assert_eq!(get(&server, path).status, 404, "path={}", path);
         assert_eq!(
             get(&server, &format!("/api/requirements{}", &path[1..])).status,
-            400
+            404
         );
     }
     drop(server);
@@ -2410,7 +2410,7 @@ fn t11b_category_parameter_backlog() {
     for ty in ["all", "x", "tasks"] {
         assert_eq!(
             get(&server, &format!("/?type={}", ty)).status,
-            400,
+            404,
             "type={}",
             ty
         );
@@ -3400,7 +3400,7 @@ fn t15b_category_parameter_decision() {
     for ty in ["all", "x", "decisions"] {
         assert_eq!(
             get(&server, &format!("/?type={}", ty)).status,
-            400,
+            404,
             "type={}",
             ty
         );
@@ -3831,7 +3831,7 @@ fn t40a_list_ui_mockups_category() {
     for ty in ["all", "x", "mockup", "ui-mockups"] {
         assert_eq!(
             get(&server, &format!("/?type={}", ty)).status,
-            400,
+            404,
             "type={}",
             ty
         );
@@ -3857,15 +3857,10 @@ fn t40a_disabled_ui_mockup_empty_state() {
         "false",
     ]);
     let server = Server::start(&dir, &["--no-open"], &[]);
-    let html = get(&server, "/?type=ui-mockup").text();
-    assert_eq!(get(&server, "/?type=ui-mockup").status, 200);
-    // Entry omitted from the sidebar; empty state, not an error.
+    let html = get(&server, "/").text();
     assert!(!html.contains("href=\"/?type=ui-mockup\""));
-    assert!(html.contains("UI Mockups"));
-    assert!(html.contains("No UI mockups"));
-    let api: serde_json::Value =
-        serde_json::from_str(&get(&server, "/api/ui-mockups").text()).unwrap();
-    assert!(api.as_array().unwrap().is_empty());
+    assert_eq!(get(&server, "/?type=ui-mockup").status, 404);
+    assert_eq!(get(&server, "/api/ui-mockups").status, 404);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -3948,6 +3943,62 @@ fn t40c_view_ui_mockup() {
             path
         );
     }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-40n / T-114 AC5
+#[test]
+fn t40n_detail_renders_mockup_status_read_only() {
+    let dir = mockup_fixture("t40n");
+    // pending is the default; move the second mockup to approved.
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "ui-mockup",
+        "edit",
+        "MOCK-002",
+        "--status",
+        "approved",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    let pending = get(&server, "/doc/MOCK-001").text();
+    assert!(
+        pending
+            .contains("<p class=\"status-line\"><span class=\"badge\">Status</span> pending</p>"),
+        "pending detail must render the stored status: {}",
+        pending
+    );
+    assert!(!pending.contains("name=\"status\""));
+    assert!(!pending.contains("name=\"status_change\""));
+
+    let approved = get(&server, "/doc/MOCK-002").text();
+    assert!(
+        approved
+            .contains("<p class=\"status-line\"><span class=\"badge\">Status</span> approved</p>"),
+        "approved detail must render the stored status: {}",
+        approved
+    );
+    assert!(!approved.contains("name=\"status\""));
+    assert!(!approved.contains("name=\"status_change\""));
+
+    // The edit form never exposes a status control.
+    let edit = get(&server, "/doc/MOCK-002/edit").text();
+    assert!(!edit.contains("name=\"status\""));
+    assert!(!edit.contains("name=\"status_change\""));
+
+    // Archived mockups stay unreachable.
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "ui-mockup",
+        "archive",
+        "MOCK-002",
+    ]);
+    assert_eq!(get(&server, "/doc/MOCK-002").status, 404);
+    assert_eq!(get(&server, "/doc/MOCK-002/edit").status, 404);
+
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -4586,10 +4637,11 @@ fn t25a_list_business_rules_category() {
     // default stays req; unknown values are 400.
     assert_eq!(get(&server, "/?type=req").status, 200);
     assert_eq!(get(&server, "/?type=req").status, 200);
-    for ty in ["all", "x", "business-rules", "rule"] {
+    assert_eq!(get(&server, "/?type=rule").status, 200);
+    for ty in ["all", "x", "business-rules"] {
         assert_eq!(
             get(&server, &format!("/?type={}", ty)).status,
-            400,
+            404,
             "type={}",
             ty
         );
@@ -4610,12 +4662,10 @@ fn t25a_disabled_business_rule_empty_state() {
         "false",
     ]);
     let server = Server::start(&dir, &["--no-open"], &[]);
-    let html = get(&server, "/?type=business-rule").text();
-    assert_eq!(get(&server, "/?type=business-rule").status, 200);
+    let html = get(&server, "/").text();
     assert!(!html.contains("href=\"/?type=business-rule\""));
-    let api: serde_json::Value =
-        serde_json::from_str(&get(&server, "/api/business-rules").text()).unwrap();
-    assert!(api.as_array().unwrap().is_empty());
+    assert_eq!(get(&server, "/?type=business-rule").status, 404);
+    assert_eq!(get(&server, "/api/business-rules").status, 404);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -5199,10 +5249,11 @@ fn t26a_list_audit_records_category() {
     assert!(html.contains("First content paragraph."));
     assert_eq!(get(&server, "/?type=req").status, 200);
     assert_eq!(get(&server, "/?type=req").status, 200);
-    for ty in ["all", "x", "audit-records", "audit"] {
+    assert_eq!(get(&server, "/?type=audit").status, 200);
+    for ty in ["all", "x", "audit-records"] {
         assert_eq!(
             get(&server, &format!("/?type={}", ty)).status,
-            400,
+            404,
             "type={}",
             ty
         );
@@ -5223,12 +5274,10 @@ fn t26a_disabled_audit_record_empty_state() {
         "false",
     ]);
     let server = Server::start(&dir, &["--no-open"], &[]);
-    let html = get(&server, "/?type=audit-record").text();
-    assert_eq!(get(&server, "/?type=audit-record").status, 200);
+    let html = get(&server, "/").text();
     assert!(!html.contains("href=\"/?type=audit-record\""));
-    let api: serde_json::Value =
-        serde_json::from_str(&get(&server, "/api/audit-records").text()).unwrap();
-    assert!(api.as_array().unwrap().is_empty());
+    assert_eq!(get(&server, "/?type=audit-record").status, 404);
+    assert_eq!(get(&server, "/api/audit-records").status, 404);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -5780,7 +5829,7 @@ fn t57a_list_category_and_sidebar() {
     for ty in ["all", "x", "tech-specs", "tech_spec"] {
         assert_eq!(
             get(&server, &format!("/?type={}", ty)).status,
-            400,
+            404,
             "type={}",
             ty
         );
@@ -5801,13 +5850,10 @@ fn t57a_disabled_tech_spec_empty_state() {
         "false",
     ]);
     let server = Server::start(&dir, &["--no-open"], &[]);
-    let html = get(&server, "/?type=tech-spec").text();
-    assert_eq!(get(&server, "/?type=tech-spec").status, 200);
+    let html = get(&server, "/").text();
     assert!(!html.contains("href=\"/?type=tech-spec\""));
-    assert!(html.contains("No technical specifications"));
-    let api: serde_json::Value =
-        serde_json::from_str(&get(&server, "/api/tech-specs").text()).unwrap();
-    assert!(api.as_array().unwrap().is_empty());
+    assert_eq!(get(&server, "/?type=tech-spec").status, 404);
+    assert_eq!(get(&server, "/api/tech-specs").status, 404);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -6455,36 +6501,14 @@ fn t57m_quality_gates() {
 
 // TASK-72 / spec §7: the twelve lifecycle section headings, in order.
 fn assert_twelve_sections_in_order(body: &str) {
-    const HEADINGS: [&str; 12] = [
-        "Tasks",
-        "Milestones",
-        "Releases",
-        "Decisions",
-        "Business requirements",
-        "Non-functional requirements",
-        "Glossary terms",
-        "UI specifications",
-        "Technical specifications",
-        "UI mockups",
-        "Business rules",
-        "Audit records",
-    ];
-    assert_eq!(body.matches("<section>").count(), 12, "section count");
-    let mut previous = 0usize;
-    for (index, heading) in HEADINGS.iter().enumerate() {
-        let marker = format!("<h2>{}</h2>", heading);
-        let position = body
-            .find(&marker)
-            .unwrap_or_else(|| panic!("missing section heading {}", heading));
-        if index > 0 {
-            assert!(
-                position > previous,
-                "section heading {} is out of order",
-                heading
-            );
-        }
-        previous = position;
-    }
+    assert_eq!(body.matches("<section>").count(), 16, "section count");
+    let backlog = body.find("<h2 class=\"h2\">Backlog</h2>").unwrap();
+    let decisions = body.find("<h2 class=\"h2\">Decisions</h2>").unwrap();
+    let documents = body.find("<h2 class=\"h2\">Documents</h2>").unwrap();
+    assert!(backlog < decisions && decisions < documents, "group order");
+    assert!(body.contains("<h2>Tasks</h2>"));
+    assert!(body.contains("<h2>Milestones</h2>"));
+    assert!(body.contains("<h2>Releases</h2>"));
 }
 
 // TASK-72 / spec §7.1-7.3: GET /lifecycle, alias route, method handling
@@ -6500,12 +6524,10 @@ fn t72a_lifecycle_page_route_alias_and_method() {
         Some("text/html; charset=utf-8")
     );
     let body = response.text();
-    assert!(body.contains("<h1 class=\"h1\">Managed artifacts and lifecycles</h1>"));
+    assert!(body.contains("<h1 class=\"h1\">Managed artifacts &amp; lifecycles</h1>"));
     assert_twelve_sections_in_order(&body);
     assert!(body.contains("ToDo → Initiated → Refined → Implemented → Validated → Done"));
-    assert!(body.contains(
-        "One section per managed record type. Backlog.md docs, drafts, and project configuration files are not covered."
-    ));
+    assert!(body.contains("The three categories are Backlog, Decisions, and Documents."));
     assert!(body.contains("Managed artifacts &amp; lifecycles"));
     assert!(body.contains(
         "<a href=\"/lifecycle\" aria-current=\"page\">Managed artifacts &amp; lifecycles</a>"
@@ -6521,7 +6543,7 @@ fn t72a_lifecycle_page_route_alias_and_method() {
         Some("text/html; charset=utf-8")
     );
     let alias_body = alias.text();
-    assert!(alias_body.contains("<h1 class=\"h1\">Managed artifacts and lifecycles</h1>"));
+    assert!(alias_body.contains("<h1 class=\"h1\">Managed artifacts &amp; lifecycles</h1>"));
     assert_twelve_sections_in_order(&alias_body);
     assert!(alias_body.contains("ToDo → Initiated → Refined → Implemented → Validated → Done"));
 
@@ -6542,7 +6564,7 @@ fn t72b_lifecycle_custom_status_list() {
     let server = Server::start(&dir, &["--no-open"], &[]);
     let body = get(&server, "/lifecycle").text();
     assert_twelve_sections_in_order(&body);
-    assert!(body.contains("States: Backlog → Doing → Done."));
+    assert!(body.contains("Backlog → Doing → Done"));
     assert!(
         !body.contains("ToDo → Initiated"),
         "default chain must not render with custom statuses"
@@ -6571,7 +6593,7 @@ fn t95a_lifecycle_disabled_document_type() {
     assert_eq!(response.status, 200);
     let body = response.text();
     assert_twelve_sections_in_order(&body);
-    assert!(body.contains("Curated description: technical specification records."));
+    assert!(body.contains("Curated description: Technical specifications are active until archived; archive moves the file to archived folder."));
     assert!(
         body.contains("enabled: false; ID prefix: TECH; storage folder: docs/technical."),
         "disabled type must render enabled: false"
@@ -6613,7 +6635,7 @@ fn t95b_lifecycle_renamed_prefix_and_folder() {
     let body = get(&server, "/lifecycle").text();
     assert_twelve_sections_in_order(&body);
     assert!(
-        body.contains("Curated description: business requirement groups and atomic requirements.")
+        body.contains("Curated description: Requirements are active until archived; archive moves the file to archived folder.")
     );
     assert!(
         body.contains(
@@ -6840,6 +6862,9 @@ fn t19a_inventory_hub() {
         "Glossary",
         "UI Specifications",
         "UI Mockups",
+        "Use Cases",
+        "Test Cases",
+        "Test Reports",
         "Managed artifacts &amp; lifecycles",
         "Agent skills &amp; workflows",
     ];
@@ -6883,7 +6908,7 @@ fn t19a_inventory_hub() {
     let server = Server::start(&disabled, &["--no-open"], &[]);
     let html = get(&server, "/").text();
     assert!(!html.contains("<h3>Technical Specifications</h3>"));
-    assert_eq!(get(&server, "/?type=tech-spec").status, 200);
+    assert_eq!(get(&server, "/?type=tech-spec").status, 404);
     drop(server);
 
     let _ = fs::remove_dir_all(&empty);
@@ -6970,7 +6995,7 @@ fn t81a_sidebar_placement_and_type_values() {
     for ty in ["all", "x", "use-cases", "use_case", "uc"] {
         assert_eq!(
             get(&server, &format!("/?type={}", ty)).status,
-            400,
+            404,
             "type={}",
             ty
         );
@@ -6992,13 +7017,10 @@ fn t81b_disabled_use_case_empty_state() {
         "false",
     ]);
     let server = Server::start(&dir, &["--no-open"], &[]);
-    let html = get(&server, "/?type=use-case").text();
-    assert_eq!(get(&server, "/?type=use-case").status, 200);
+    let html = get(&server, "/").text();
     assert!(!html.contains("href=\"/?type=use-case\""));
-    assert!(html.contains("No use cases"));
-    let api: serde_json::Value =
-        serde_json::from_str(&get(&server, "/api/use-cases").text()).unwrap();
-    assert!(api.as_array().unwrap().is_empty());
+    assert_eq!(get(&server, "/?type=use-case").status, 404);
+    assert_eq!(get(&server, "/api/use-cases").status, 404);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }

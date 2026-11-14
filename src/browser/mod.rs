@@ -6,6 +6,7 @@
 pub mod http;
 pub mod records;
 pub mod render;
+pub mod routes;
 
 use crate::CommandOutput;
 use crate::commands::load_effective_config;
@@ -13,9 +14,12 @@ use crate::config::{Config, is_loopback_host, validate_browser_host};
 use crate::context::Context;
 use crate::error::AppError;
 use crate::record::edit::{self, FieldChange};
+use crate::registry::{
+    ArtifactCategory as CategoryKind, ArtifactRegistry, ContentModel, TypeDescriptor, TypedHandler,
+};
 use http::{HttpError, Method, Request, Response};
-use records::Category;
-use records::{Form, Record};
+use records::Record;
+use routes::{BrowserRoutes, NotFoundPage};
 use std::io::Write;
 use std::net::{IpAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
@@ -128,6 +132,8 @@ struct ServerState {
     host: String,
     port: u16,
     debug: bool,
+    registry: ArtifactRegistry,
+    routes: BrowserRoutes,
 }
 
 impl ServerState {
@@ -152,12 +158,14 @@ impl ServerState {
 /// Run the browser command until the process is interrupted.
 pub fn run(
     ctx: &Context,
+    registry: &ArtifactRegistry,
     cli_host: Option<&str>,
     cli_port: Option<u16>,
     no_open: bool,
     debug: bool,
 ) -> Result<CommandOutput, AppError> {
     let cfg = load_effective_config(&ctx.config_path, &ctx.project_dir)?;
+    let browser_routes = BrowserRoutes::build(registry);
     let options = resolve_options(cli_host, cli_port, no_open, &read_env(), &cfg)?;
 
     if !is_loopback_host(&options.host) {
@@ -203,6 +211,8 @@ pub fn run(
         host: options.host.clone(),
         port: options.port,
         debug,
+        registry: registry.clone(),
+        routes: browser_routes,
     });
     serve(listener, state)?;
     Ok(CommandOutput {
@@ -392,6 +402,7 @@ fn error_response(status: u16, api: bool, state: &ServerState) -> Response {
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
+        routes: &state.routes,
     };
     if api {
         let body = serde_json::json!({
@@ -426,25 +437,99 @@ fn json_error(status: u16, message: &str) -> Response {
     )
 }
 
-fn category_from_query(request: &Request) -> Result<Category, HttpError> {
-    match http::query_param(&request.target.query, "type")? {
-        None => Ok(Category::Req),
-        Some(value) if value == "req" => Ok(Category::Req),
-        Some(value) if value == "nfr" => Ok(Category::Nfr),
-        Some(value) if value == "task" => Ok(Category::Task),
-        Some(value) if value == "milestone" => Ok(Category::Milestone),
-        Some(value) if value == "release" => Ok(Category::Release),
-        Some(value) if value == "decision" => Ok(Category::Decision),
-        Some(value) if value == "glossary" => Ok(Category::Glossary),
-        Some(value) if value == "ui-spec" => Ok(Category::UiSpec),
-        Some(value) if value == "ui-mockup" => Ok(Category::UiMockup),
-        Some(value) if value == "business-rule" => Ok(Category::BusinessRule),
-        Some(value) if value == "audit-record" => Ok(Category::AuditRecord),
-        Some(value) if value == "tech-spec" => Ok(Category::TechSpec),
-        Some(value) if value == "use-case" => Ok(Category::UseCase),
-        Some(value) if value == "test-case" => Ok(Category::TestCase),
-        Some(value) if value == "test-report" => Ok(Category::TestReport),
-        Some(_) => Err(HttpError::new(400)),
+/// Resolve the `?type=` value to an enabled descriptor slug. Unknown,
+/// empty, and disabled values are 404 (ADR-0020 decision 3).
+fn type_from_query(request: &Request, state: &ServerState) -> Result<String, HttpError> {
+    let value = http::query_param(&request.target.query, "type")?
+        .unwrap_or_else(|| state.routes.default_type.clone());
+    state
+        .routes
+        .slug_for_type(&value)
+        .map(str::to_string)
+        .ok_or_else(|| HttpError::new(404))
+}
+
+fn descriptor<'a>(state: &'a ServerState, slug: &str) -> Result<&'a TypeDescriptor, HttpError> {
+    state
+        .registry
+        .descriptor(slug)
+        .filter(|descriptor| descriptor.enabled)
+        .ok_or_else(|| HttpError::new(404))
+}
+
+fn enabled_index(ctx: &Context, cfg: &Config, state: &ServerState, slug: &str) -> records::Index {
+    if state.routes.is_decision_view(slug) {
+        let mut combined = records::Index::default();
+        for descriptor in state.registry.enabled(CategoryKind::Decision) {
+            combined
+                .records
+                .extend(records::build_index(ctx, cfg, &state.registry, descriptor, None).records);
+        }
+        combined.records.sort_by(|a, b| a.id.cmp(&b.id));
+        return combined;
+    }
+    state
+        .registry
+        .descriptor(slug)
+        .filter(|descriptor| descriptor.enabled)
+        .map(|descriptor| records::build_index(ctx, cfg, &state.registry, descriptor, None))
+        .unwrap_or_default()
+}
+
+/// Build one backlog descriptor's index selected by its typed handler rather
+/// than a slug literal.
+fn enabled_index_for_handler(
+    ctx: &Context,
+    cfg: &Config,
+    state: &ServerState,
+    handler: TypedHandler,
+) -> records::Index {
+    state
+        .registry
+        .enabled(CategoryKind::Backlog)
+        .find(|descriptor| handler_of(descriptor) == Some(handler))
+        .map(|descriptor| records::build_index(ctx, cfg, &state.registry, descriptor, None))
+        .unwrap_or_default()
+}
+
+/// The descriptor used to render a `?type=` view. The decision category is a
+/// single browser type covering every enabled decision descriptor.
+fn view_descriptor(state: &ServerState, slug: &str) -> Option<TypeDescriptor> {
+    if state.routes.is_decision_view(slug) {
+        let mut descriptor = state
+            .registry
+            .enabled(CategoryKind::Decision)
+            .next()?
+            .clone();
+        descriptor.slug = slug.to_string();
+        descriptor.label = "Decision".to_string();
+        return Some(descriptor);
+    }
+    state
+        .registry
+        .descriptor(slug)
+        .filter(|descriptor| descriptor.enabled)
+        .cloned()
+}
+
+/// Validate the optional list status filter: at most one `status` parameter
+/// whose value is offered by the descriptor. An explicit empty, unknown,
+/// archived, or duplicate value is 400 (NFR-02.002).
+fn status_filter(
+    request: &Request,
+    descriptor: &TypeDescriptor,
+) -> Result<Option<String>, HttpError> {
+    let values: Vec<String> = http::query_params(&request.target.query, "status")?;
+    match values.as_slice() {
+        [] => Ok(None),
+        [value] if !value.is_empty() => {
+            if records::filter_statuses(descriptor).contains(value) {
+                Ok(Some(value.clone()))
+            } else {
+                Err(HttpError::new(400))
+            }
+        }
+        _ => Err(HttpError::new(400)),
     }
 }
 
@@ -484,18 +569,28 @@ fn handle_request(request: Request, state: &ServerState) -> Response {
                 let chrome = render::Chrome {
                     project: &project,
                     bind_note: &bind_note,
+                    routes: &state.routes,
                 };
-                if matches_doc_type_id(&cfg, "tech-spec", id) {
-                    return Response::html(404, render::tech_spec_not_found_page(&cfg, chrome));
-                }
-                if matches_doc_type_id(&cfg, "use-case", id) {
-                    return Response::html(404, render::use_case_not_found_page(&cfg, chrome));
-                }
-                if matches_doc_type_id(&cfg, "test-case", id) {
-                    return Response::html(404, render::test_case_not_found_page(&cfg, chrome));
-                }
-                if matches_doc_type_id(&cfg, "test-report", id) {
-                    return Response::html(404, render::test_report_not_found_page(&cfg, chrome));
+                match state.routes.not_found_page(id) {
+                    Some(NotFoundPage::TechSpec) => {
+                        return Response::html(404, render::tech_spec_not_found_page(&cfg, chrome));
+                    }
+                    Some(NotFoundPage::UseCase) => {
+                        return Response::html(404, render::use_case_not_found_page(&cfg, chrome));
+                    }
+                    Some(NotFoundPage::TestCase) => {
+                        return Response::html(404, render::test_case_not_found_page(&cfg, chrome));
+                    }
+                    Some(NotFoundPage::TestReport) => {
+                        return Response::html(
+                            404,
+                            render::test_report_not_found_page(&cfg, chrome),
+                        );
+                    }
+                    Some(NotFoundPage::GenericDocument) => {
+                        return Response::html(404, render::document_not_found_page(&cfg, chrome));
+                    }
+                    None => {}
                 }
             }
             error_response(error.status, api, state)
@@ -531,85 +626,22 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
     if path == "/api/requirements" {
         return match method {
             Method::Get | Method::Head => api_requirements(&request, state),
-            _ => Err(HttpError::new(405)),
+            _ => {
+                let mut response = json_error(405, "Method Not Allowed");
+                response = response.with_header("Allow", "GET, HEAD");
+                Ok(response)
+            }
         };
     }
-    if path == "/api/tasks" {
+    if let Some(slug) = state.routes.slug_for_api(&path) {
+        let slug = slug.to_string();
         return match method {
-            Method::Get | Method::Head => api_tasks(state),
-            _ => Err(HttpError::new(405)),
-        };
-    }
-    if path == "/api/milestones" {
-        return match method {
-            Method::Get | Method::Head => api_milestones(state),
-            _ => Err(HttpError::new(405)),
-        };
-    }
-    if path == "/api/releases" {
-        return match method {
-            Method::Get | Method::Head => api_releases(state),
-            _ => Err(HttpError::new(405)),
-        };
-    }
-    if path == "/api/decisions" {
-        return match method {
-            Method::Get | Method::Head => api_decisions(state),
-            _ => Err(HttpError::new(405)),
-        };
-    }
-    if path == "/api/glossary" {
-        return match method {
-            Method::Get | Method::Head => api_glossary(state),
-            _ => Err(HttpError::new(405)),
-        };
-    }
-    if path == "/api/ui-specs" || path == "/api/ui-specifications" || path == "/api/ui-spec" {
-        return match method {
-            Method::Get | Method::Head => api_ui_specs(state),
-            _ => Err(HttpError::new(405)),
-        };
-    }
-    if path == "/api/ui-mockups" || path == "/api/ui-mockup" || path == "/api/mockups" {
-        return match method {
-            Method::Get | Method::Head => api_ui_mockups(state),
-            _ => Err(HttpError::new(405)),
-        };
-    }
-    if path == "/api/business-rules" || path == "/api/business-rule" {
-        return match method {
-            Method::Get | Method::Head => api_business_rules(state),
-            _ => Err(HttpError::new(405)),
-        };
-    }
-    if path == "/api/audit-records" || path == "/api/audit-record" {
-        return match method {
-            Method::Get | Method::Head => api_audit_records(state),
-            _ => Err(HttpError::new(405)),
-        };
-    }
-    if path == "/api/tech-specs" || path == "/api/tech-spec" {
-        return match method {
-            Method::Get | Method::Head => api_tech_specs(state),
-            _ => Err(HttpError::new(405)),
-        };
-    }
-    if path == "/api/use-cases" || path == "/api/use-case" {
-        return match method {
-            Method::Get | Method::Head => api_use_cases(state),
-            _ => Err(HttpError::new(405)),
-        };
-    }
-    if path == "/api/test-cases" || path == "/api/test-case" {
-        return match method {
-            Method::Get | Method::Head => api_test_cases(state),
-            _ => Err(HttpError::new(405)),
-        };
-    }
-    if path == "/api/test-reports" || path == "/api/test-report" {
-        return match method {
-            Method::Get | Method::Head => api_test_reports(state),
-            _ => Err(HttpError::new(405)),
+            Method::Get | Method::Head => api_doc_list(&slug, state),
+            _ => {
+                let mut response = json_error(405, "Method Not Allowed");
+                response = response.with_header("Allow", "GET, HEAD");
+                Ok(response)
+            }
         };
     }
     if let Some(id) = path.strip_prefix("/api/doc/") {
@@ -632,6 +664,7 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
                 let chrome = render::Chrome {
                     project: &project,
                     bind_note: &bind_note,
+                    routes: &state.routes,
                 };
                 let mut response = Response::html(405, render::error_page(405, &cfg, chrome, None));
                 response = response.with_header("Allow", "GET, HEAD");
@@ -649,6 +682,7 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
                 let chrome = render::Chrome {
                     project: &project,
                     bind_note: &bind_note,
+                    routes: &state.routes,
                 };
                 let mut response = Response::html(405, render::error_page(405, &cfg, chrome, None));
                 response = response.with_header("Allow", "GET, HEAD");
@@ -666,6 +700,7 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
                 let chrome = render::Chrome {
                     project: &project,
                     bind_note: &bind_note,
+                    routes: &state.routes,
                 };
                 let mut response = Response::html(405, render::error_page(405, &cfg, chrome, None));
                 response = response.with_header("Allow", "GET, HEAD, POST");
@@ -682,6 +717,7 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
                 let chrome = render::Chrome {
                     project: &project,
                     bind_note: &bind_note,
+                    routes: &state.routes,
                 };
                 let mut response = Response::html(405, render::error_page(405, &cfg, chrome, None));
                 response = response.with_header("Allow", "GET, HEAD");
@@ -706,6 +742,7 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
                     let chrome = render::Chrome {
                         project: &project,
                         bind_note: &bind_note,
+                        routes: &state.routes,
                     };
                     let mut response =
                         Response::html(405, render::error_page(405, &cfg, chrome, None));
@@ -729,6 +766,7 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
                     let chrome = render::Chrome {
                         project: &project,
                         bind_note: &bind_note,
+                        routes: &state.routes,
                     };
                     let mut response =
                         Response::html(405, render::error_page(405, &cfg, chrome, None));
@@ -753,6 +791,7 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
                     let chrome = render::Chrome {
                         project: &project,
                         bind_note: &bind_note,
+                        routes: &state.routes,
                     };
                     let mut response =
                         Response::html(405, render::error_page(405, &cfg, chrome, None));
@@ -805,111 +844,72 @@ fn inventory_page(state: &ServerState) -> Result<Response, HttpError> {
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
-    };
-
-    let count_for =
-        |kind: Category| -> usize { records::build_index(&ctx, &cfg, kind).records.len() };
-    let enabled = |key: &str| -> bool {
-        cfg.document_types
-            .get(key)
-            .map(|e| e.enabled)
-            .unwrap_or(false)
+        routes: &state.routes,
     };
 
     let mut cards: Vec<render::InventoryCard> = Vec::new();
+    let card_for = |slug: &str| -> Option<render::InventoryCard> {
+        let entry = state
+            .routes
+            .inventory
+            .iter()
+            .find(|entry| entry.slug == slug)?;
+        let count = enabled_index(&ctx, &cfg, state, slug).records.len();
+        Some(render::InventoryCard {
+            title: entry.title.clone(),
+            count: count.to_string(),
+            href: Some(format!("/?type={}", entry.url_key)),
+            note: entry.note.clone(),
+        })
+    };
 
-    // Business requirements (gated)
-    if enabled(Category::Req.key()) {
-        cards.push(render::InventoryCard {
-            title: "Business requirements".to_string(),
-            count: count_for(Category::Req).to_string(),
-            href: Some("/?type=req".to_string()),
-            note: "Business requirements in this project.".to_string(),
-        });
+    // Aggregate cards keep their historic position after the first five
+    // built-in cards. Card membership comes from the route table, so every
+    // enabled document type appears exactly once; presentation order only
+    // decides where the existing built-ins and any new types are placed.
+    let mut aggregates: Vec<render::InventoryCard> = Vec::new();
+    for group in [routes::NavGroup::Backlog, routes::NavGroup::Decisions] {
+        if let Some(item) = state.routes.nav.iter().find(|item| item.group == group) {
+            let count = enabled_index(&ctx, &cfg, state, &item.slug).records.len();
+            aggregates.push(render::InventoryCard {
+                title: item.label.clone(),
+                count: count.to_string(),
+                href: Some(format!("/?type={}", item.url_key)),
+                note: if group == routes::NavGroup::Backlog {
+                    "Backlog tasks in this project.".to_string()
+                } else {
+                    "Decisions in this project.".to_string()
+                },
+            });
+        }
     }
-    // Business rules (gated, config key "rule")
-    if enabled(Category::BusinessRule.config_key()) {
-        cards.push(render::InventoryCard {
-            title: "Business Rules".to_string(),
-            count: count_for(Category::BusinessRule).to_string(),
-            href: Some("/?type=business-rule".to_string()),
-            note: "Business rules in this project.".to_string(),
-        });
+
+    let mut ordered: Vec<String> = routes::inventory_order()
+        .iter()
+        .map(|slug| (*slug).to_string())
+        .collect();
+    for entry in &state.routes.inventory {
+        if !ordered.iter().any(|slug| slug == &entry.slug) {
+            ordered.push(entry.slug.clone());
+        }
     }
-    // Audit records (gated, config key "audit")
-    if enabled(Category::AuditRecord.config_key()) {
-        cards.push(render::InventoryCard {
-            title: "Audit Records".to_string(),
-            count: count_for(Category::AuditRecord).to_string(),
-            href: Some("/?type=audit-record".to_string()),
-            note: "Audit records in this project.".to_string(),
-        });
+    let aggregate_at = routes::INVENTORY_AGGREGATE_AFTER.min(ordered.len());
+    for (index, slug) in ordered.iter().enumerate() {
+        if index == aggregate_at {
+            cards.append(&mut aggregates);
+        }
+        if let Some(card) = card_for(slug) {
+            cards.push(card);
+        }
     }
-    // Technical specifications (gated, config key "tech-spec")
-    if enabled(Category::TechSpec.config_key()) {
-        cards.push(render::InventoryCard {
-            title: "Technical Specifications".to_string(),
-            count: count_for(Category::TechSpec).to_string(),
-            href: Some("/?type=tech-spec".to_string()),
-            note: "Technical specifications in this project.".to_string(),
-        });
-    }
-    // Non-functional requirements (gated)
-    if enabled(Category::Nfr.key()) {
-        cards.push(render::InventoryCard {
-            title: "Non-functional requirements".to_string(),
-            count: count_for(Category::Nfr).to_string(),
-            href: Some("/?type=nfr".to_string()),
-            note: "Non-functional requirements in this project.".to_string(),
-        });
-    }
-    // Backlog (always present) - tasks list
-    cards.push(render::InventoryCard {
-        title: "Backlog".to_string(),
-        count: count_for(Category::Task).to_string(),
-        href: Some("/?type=task".to_string()),
-        note: "Backlog tasks in this project.".to_string(),
-    });
-    // Decisions (always present)
-    cards.push(render::InventoryCard {
-        title: "Decisions".to_string(),
-        count: count_for(Category::Decision).to_string(),
-        href: Some("/?type=decision".to_string()),
-        note: "Decisions in this project.".to_string(),
-    });
-    // Glossary (always present)
-    cards.push(render::InventoryCard {
-        title: "Glossary".to_string(),
-        count: count_for(Category::Glossary).to_string(),
-        href: Some("/?type=glossary".to_string()),
-        note: "Glossary terms in this project.".to_string(),
-    });
-    // UI specifications (gated)
-    if enabled(Category::UiSpec.config_key()) {
-        cards.push(render::InventoryCard {
-            title: "UI Specifications".to_string(),
-            count: count_for(Category::UiSpec).to_string(),
-            href: Some("/?type=ui-spec".to_string()),
-            note: "UI specifications in this project.".to_string(),
-        });
-    }
-    // UI mockups (gated)
-    if enabled(Category::UiMockup.config_key()) {
-        cards.push(render::InventoryCard {
-            title: "UI Mockups".to_string(),
-            count: count_for(Category::UiMockup).to_string(),
-            href: Some("/?type=ui-mockup".to_string()),
-            note: "UI mockups in this project.".to_string(),
-        });
-    }
-    // Managed artifacts & lifecycles (virtual, always present)
+    cards.append(&mut aggregates);
+
     cards.push(render::InventoryCard {
         title: "Managed artifacts & lifecycles".to_string(),
-        count: "12 types".to_string(),
+        count: format!("{} types", state.registry.len()),
         href: Some("/lifecycle".to_string()),
         note: "Managed artifacts and lifecycles.".to_string(),
     });
-    // Agent skills & workflows (virtual, always present)
     cards.push(render::InventoryCard {
         title: "Agent skills & workflows".to_string(),
         count: "8 groups".to_string(),
@@ -932,36 +932,64 @@ fn render_board_page(
     alert: Option<render::BoardAlert<'_>>,
 ) -> String {
     let ctx = state.context();
-    let tasks = records::build_index(&ctx, cfg, Category::Task);
-    let milestones = records::build_index(&ctx, cfg, Category::Milestone);
-    let releases = records::build_index(&ctx, cfg, Category::Release);
+    let task_slug = state
+        .routes
+        .nav
+        .iter()
+        .find(|item| item.group == routes::NavGroup::Backlog)
+        .map(|item| item.slug.as_str())
+        .unwrap_or_default();
+    let tasks = enabled_index(&ctx, cfg, state, task_slug);
+    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone);
+    let releases = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Release);
     let (project, bind_note) = chrome_for(cfg, state);
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
+        routes: &state.routes,
     };
     render::board_page(cfg, &tasks, &milestones, &releases, expand, alert, chrome)
 }
 
 fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpError> {
-    let kind = category_from_query(request)?;
+    let slug = type_from_query(request, state)?;
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    if kind == Category::Task {
+    let descriptor = view_descriptor(state, &slug).ok_or_else(|| HttpError::new(404))?;
+    let descriptor = &descriptor;
+    if handler_of(descriptor) == Some(TypedHandler::Task) {
         let expand = http::query_param(&request.target.query, "expand")?;
         return Ok(Response::html(
             200,
             render_board_page(state, &cfg, expand.as_deref(), None),
         ));
     }
+    // The status filter and shared row-field order belong to document-type
+    // lists only; milestone, release, and decision lists keep their layout.
+    let status = if descriptor.category == CategoryKind::Document {
+        status_filter(request, descriptor)?
+    } else {
+        None
+    };
     let ctx = state.context();
-    let index = records::build_index(&ctx, &cfg, kind);
-    let other_has_records = if kind.is_requirement() {
-        let other_kind = match kind {
-            Category::Req => Category::Nfr,
-            Category::Nfr => Category::Req,
-            _ => kind,
+    let index = if state.routes.is_decision_view(&descriptor.slug) {
+        enabled_index(&ctx, &cfg, state, &descriptor.slug)
+    } else {
+        records::build_index(&ctx, &cfg, &state.registry, descriptor, status.as_deref())
+    };
+    let other_has_records = if descriptor.id_shape == crate::registry::IdShape::Grouped {
+        let other_handler = match handler_of(descriptor) {
+            Some(TypedHandler::Requirement(crate::registry::RequirementKind::Business)) => {
+                TypedHandler::Requirement(crate::registry::RequirementKind::NonFunctional)
+            }
+            _ => TypedHandler::Requirement(crate::registry::RequirementKind::Business),
         };
-        !records::build_index(&ctx, &cfg, other_kind).is_empty()
+        state
+            .registry
+            .enabled(CategoryKind::Document)
+            .find(|other| handler_of(other) == Some(other_handler))
+            .is_some_and(|other| {
+                !records::build_index(&ctx, &cfg, &state.registry, other, None).is_empty()
+            })
     } else {
         false
     };
@@ -969,28 +997,31 @@ fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpErr
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
+        routes: &state.routes,
     };
-    Ok(Response::html(
-        200,
-        render::list_page(kind, &index, other_has_records, &cfg, chrome),
-    ))
+    let html = if matches!(descriptor.content_model, ContentModel::Generic) {
+        render::document_list_page(descriptor, &index, status.as_deref(), &cfg, chrome)
+    } else {
+        render::list_page(
+            descriptor,
+            &index,
+            other_has_records,
+            status.as_deref(),
+            &cfg,
+            chrome,
+        )
+    };
+    Ok(Response::html(200, html))
 }
 
 fn resolve_record(id: &str, state: &ServerState) -> Result<(Record, Config), HttpError> {
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let ctx = state.context();
-    match records::resolve_id(&ctx, &cfg, id) {
+    match records::resolve_id(&ctx, &cfg, &state.registry, id) {
         Ok(Some(resolved)) => Ok((resolved.record, cfg)),
         Ok(None) => Err(HttpError::new(404)),
         Err(_) => Err(HttpError::new(500)),
     }
-}
-
-/// Whether an ID has the configured numeric shape of a document type.
-fn matches_doc_type_id(cfg: &Config, key: &str, id: &str) -> bool {
-    cfg.document_types
-        .get(key)
-        .is_some_and(|entry| crate::record::identity::matches_family_id(id, &entry.prefix, false))
 }
 
 /// Apply one browser patch list and write once through the shared store.
@@ -1017,7 +1048,7 @@ fn save_content(ctx: &Context, record: &Record, content: String) -> Result<(), H
 }
 
 fn resolved_group<'a>(record: &Record, index: &'a records::Index) -> Option<&'a Record> {
-    if record.form != Form::Requirement {
+    if !record.is_requirement() || record.is_group {
         return None;
     }
     let group_id = record.group_id.as_deref()?;
@@ -1087,6 +1118,9 @@ fn config_page(state: &ServerState) -> Result<Response, HttpError> {
         "<p>Changing a folder key relocates the folder through the single relocation routine (REQ-01.002); the browser never moves a folder itself. Every path passes the project-directory boundary check.</p>",
     );
     section.push_str(
+        "<p>Document-type changes take effect on the next browser start: the route and navigation table is a startup snapshot.</p>",
+    );
+    section.push_str(
         "<p><a class=\"link\" href=\"/lifecycle\">Per-artifact (read-only) configuration \u{2192} Managed artifacts &amp; lifecycles</a></p>",
     );
 
@@ -1094,8 +1128,9 @@ fn config_page(state: &ServerState) -> Result<Response, HttpError> {
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
+        routes: &state.routes,
     };
-    let sidebar_html = render::sidebar_with_config(None, &cfg, true);
+    let sidebar_html = render::sidebar_with_config(None, &cfg, true, &state.routes);
     Ok(Response::html(
         200,
         render::config_page(chrome, &section, &sidebar_html),
@@ -1124,8 +1159,9 @@ fn config_edit(request: Request, state: &ServerState) -> Result<Response, HttpEr
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
+        routes: &state.routes,
     };
-    let sidebar_html = render::sidebar_with_config(None, &cfg, true);
+    let sidebar_html = render::sidebar_with_config(None, &cfg, true, &state.routes);
     let form = build_config_form(&key, &current, None);
     Ok(Response::html(
         200,
@@ -1183,8 +1219,9 @@ fn config_submit(request: Request, state: &ServerState) -> Result<Response, Http
             let chrome = render::Chrome {
                 project: &project,
                 bind_note: &bind_note,
+                routes: &state.routes,
             };
-            let sidebar_html = render::sidebar_with_config(None, &cfg, true);
+            let sidebar_html = render::sidebar_with_config(None, &cfg, true, &state.routes);
             let form = build_config_form(&key, &value, Some(&msg));
             Ok(Response::html(
                 422,
@@ -1200,8 +1237,9 @@ fn config_submit(request: Request, state: &ServerState) -> Result<Response, Http
                 let chrome = render::Chrome {
                     project: &project,
                     bind_note: &bind_note,
+                    routes: &state.routes,
                 };
-                let sidebar_html = render::sidebar_with_config(None, &cfg, true);
+                let sidebar_html = render::sidebar_with_config(None, &cfg, true, &state.routes);
                 let form = build_config_form(&key, &value, Some(&msg));
                 Ok(Response::html(
                     422,
@@ -1220,8 +1258,12 @@ fn lifecycle_page(state: &ServerState) -> Result<Response, HttpError> {
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
+        routes: &state.routes,
     };
-    Ok(Response::html(200, render::lifecycle_page(&cfg, chrome)))
+    Ok(Response::html(
+        200,
+        render::lifecycle_page(&cfg, &state.registry, chrome),
+    ))
 }
 
 fn skills_page(state: &ServerState) -> Result<Response, HttpError> {
@@ -1230,6 +1272,7 @@ fn skills_page(state: &ServerState) -> Result<Response, HttpError> {
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
+        routes: &state.routes,
     };
     Ok(Response::html(200, render::skills_page(&cfg, chrome)))
 }
@@ -1237,9 +1280,9 @@ fn skills_page(state: &ServerState) -> Result<Response, HttpError> {
 fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
     let (record, cfg) = resolve_record(id, state)?;
     let ctx = state.context();
-    let index = records::build_index(&ctx, &cfg, record.kind);
+    let index = records::build_index(&ctx, &cfg, &state.registry, &record.descriptor, None);
     let group = resolved_group(&record, &index);
-    let members: Vec<records::Record> = if record.form == Form::Group {
+    let members: Vec<records::Record> = if record.is_group {
         index
             .members
             .get(&record.id)
@@ -1253,10 +1296,9 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
     } else {
         Vec::new()
     };
-    // Resolve related backlog records for links.
-    let related_milestone = if record.kind == Category::Task {
+    let related_milestone = if record.handler() == Some(TypedHandler::Task) {
         record.milestone_id.as_ref().and_then(|mid| {
-            records::resolve_id(&ctx, &cfg, mid)
+            records::resolve_id(&ctx, &cfg, &state.registry, mid)
                 .ok()
                 .flatten()
                 .map(|r| r.record)
@@ -1264,9 +1306,9 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
     } else {
         None
     };
-    let related_release = if record.kind == Category::Milestone {
+    let related_release = if record.handler() == Some(TypedHandler::Milestone) {
         record.release_id.as_ref().and_then(|rid| {
-            records::resolve_id(&ctx, &cfg, rid)
+            records::resolve_id(&ctx, &cfg, &state.registry, rid)
                 .ok()
                 .flatten()
                 .map(|r| r.record)
@@ -1274,53 +1316,57 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
     } else {
         None
     };
-    let resolved_deps: Vec<Option<records::Record>> = if record.kind == Category::Task {
-        record
-            .dependencies
-            .iter()
-            .map(|did| {
-                records::resolve_id(&ctx, &cfg, did)
-                    .ok()
-                    .flatten()
-                    .map(|r| r.record)
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
-    let resolved_refs: Vec<Option<records::Record>> = if record.kind == Category::BusinessRule {
-        record
-            .requirements
-            .iter()
-            .map(|rid| {
-                records::resolve_id(&ctx, &cfg, rid)
-                    .ok()
-                    .flatten()
-                    .filter(|r| matches!(r.kind, Category::Req | Category::Nfr))
-                    .map(|r| r.record)
-            })
-            .collect()
-    } else if !record.refs.is_empty() {
-        record
-            .refs
-            .iter()
-            .map(|rid| {
-                records::resolve_id(&ctx, &cfg, rid)
-                    .ok()
-                    .flatten()
-                    .map(|r| r.record)
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
+    let resolved_deps: Vec<Option<records::Record>> =
+        if record.handler() == Some(TypedHandler::Task) {
+            record
+                .dependencies
+                .iter()
+                .map(|did| {
+                    records::resolve_id(&ctx, &cfg, &state.registry, did)
+                        .ok()
+                        .flatten()
+                        .map(|r| r.record)
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+    let resolved_refs: Vec<Option<records::Record>> =
+        if record.handler() == Some(TypedHandler::Rule) {
+            record
+                .requirements
+                .iter()
+                .map(|rid| {
+                    records::resolve_id(&ctx, &cfg, &state.registry, rid)
+                        .ok()
+                        .flatten()
+                        .filter(|r| r.record.is_requirement())
+                        .map(|r| r.record)
+                })
+                .collect()
+        } else if !record.refs.is_empty() {
+            record
+                .refs
+                .iter()
+                .map(|rid| {
+                    records::resolve_id(&ctx, &cfg, &state.registry, rid)
+                        .ok()
+                        .flatten()
+                        .map(|r| r.record)
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
     let (project, bind_note) = chrome_for(&cfg, state);
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
+        routes: &state.routes,
     };
-    Ok(Response::html(
-        200,
+    let html = if record.is_generic() {
+        render::document_detail_page(&record, &cfg, chrome)
+    } else {
         render::view_page(
             &record,
             group,
@@ -1331,22 +1377,24 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
             &resolved_refs,
             &cfg,
             chrome,
-        ),
-    ))
+        )
+    };
+    Ok(Response::html(200, html))
 }
 
 fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
     let (record, cfg) = resolve_record(id, state)?;
     let ctx = state.context();
-    let index = records::build_index(&ctx, &cfg, record.kind);
+    let index = records::build_index(&ctx, &cfg, &state.registry, &record.descriptor, None);
     let group = resolved_group(&record, &index);
     let (project, bind_note) = chrome_for(&cfg, state);
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
+        routes: &state.routes,
     };
-    let html = match record.kind {
-        Category::Req | Category::Nfr => {
+    let html = match record.handler() {
+        Some(TypedHandler::Requirement(_)) => {
             let values = render::EditValues {
                 title: record.title.clone(),
                 story: record.story.clone().unwrap_or_default(),
@@ -1362,7 +1410,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
-        Category::Task => {
+        Some(TypedHandler::Task) => {
             let values = render::TaskEditValues {
                 title: record.title.clone(),
                 description: record.description.clone().unwrap_or_default(),
@@ -1382,7 +1430,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
-        Category::Milestone => {
+        Some(TypedHandler::Milestone) => {
             let values = render::MilestoneEditValues {
                 title: record.title.clone(),
                 description: record.description.clone().unwrap_or_default(),
@@ -1397,7 +1445,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
-        Category::Release => {
+        Some(TypedHandler::Release) => {
             let values = render::ReleaseEditValues {
                 title: record.title.clone(),
                 description: record.description.clone().unwrap_or_default(),
@@ -1411,7 +1459,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
-        Category::Decision => {
+        Some(TypedHandler::Decision) => {
             let values = render::DecisionEditValues {
                 title: record.title.clone(),
                 status: record.status.clone().unwrap_or_default(),
@@ -1429,7 +1477,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
-        Category::Glossary => {
+        Some(TypedHandler::Glossary) => {
             let values = render::GlossaryEditValues {
                 title: record.title.clone(),
                 definition: record.definition.clone().unwrap_or_default(),
@@ -1443,7 +1491,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
-        Category::UiSpec => {
+        Some(TypedHandler::UiSpec) => {
             let values = render::UiSpecEditValues {
                 title: record.title.clone(),
                 view: record.view.clone().unwrap_or_default(),
@@ -1458,7 +1506,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
-        Category::UiMockup => {
+        Some(TypedHandler::UiMockup) => {
             let values = render::UiMockupEditValues {
                 title: record.title.clone(),
                 specs: record.specs.clone(),
@@ -1473,7 +1521,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
-        Category::BusinessRule => {
+        Some(TypedHandler::Rule) => {
             let values = render::BusinessRuleEditValues {
                 title: record.title.clone(),
                 description: record.description.clone().unwrap_or_default(),
@@ -1490,7 +1538,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
-        Category::TechSpec => {
+        Some(TypedHandler::TechSpec) => {
             let values = render::TechSpecEditValues {
                 title: record.title.clone(),
                 description: record.description.clone().unwrap_or_default(),
@@ -1504,7 +1552,9 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
-        Category::UseCase | Category::TestCase | Category::TestReport => {
+        Some(TypedHandler::UseCase)
+        | Some(TypedHandler::TestCase)
+        | Some(TypedHandler::TestReport) => {
             let values = render::UseCaseEditValues {
                 title: record.title.clone(),
                 description: record.description.clone().unwrap_or_default(),
@@ -1521,7 +1571,20 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                 chrome,
             )
         }
-        Category::AuditRecord => {
+        None => render::document_edit_page(
+            &record,
+            &render::DocumentEditValues {
+                title: record.title.clone(),
+                description: record.description.clone().unwrap_or_default(),
+                labels: record.labels.clone(),
+                references: record.refs.clone(),
+            },
+            &render::DocumentFieldErrors::default(),
+            &record.version,
+            &cfg,
+            chrome,
+        ),
+        Some(TypedHandler::Audit) => {
             let values = render::AuditEditValues {
                 title: record.title.clone(),
                 audit_type: record
@@ -1628,7 +1691,7 @@ fn board_status_submit(
     state: &ServerState,
     fields: &[(String, String)],
 ) -> Result<Response, HttpError> {
-    if record.kind != Category::Task {
+    if record.handler() != Some(TypedHandler::Task) {
         return Err(HttpError::new(400));
     }
     let version = form_field(fields, "version").unwrap_or("");
@@ -1665,18 +1728,77 @@ fn board_status_submit(
     }
     // Save-then-reread: the redirect target reads the files again. The success
     // location restores the card's milestone only when it is still active.
-    let milestones = records::build_index(&ctx, cfg, Category::Milestone);
+    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone);
     let expand = record.milestone_id.as_deref().filter(|milestone_id| {
         milestones
             .records
             .iter()
             .any(|milestone| milestone.id == *milestone_id)
     });
+    let type_key = routes::legacy_url_key(record.slug());
     let location = match expand {
-        Some(milestone_id) => format!("/?type=task&expand={}", milestone_id),
-        None => "/?type=task".to_string(),
+        Some(milestone_id) => format!("/?type={}&expand={}", type_key, milestone_id),
+        None => format!("/?type={}", type_key),
     };
     Ok(Response::redirect(&location))
+}
+
+fn save_generic_document(
+    record: &Record,
+    cfg: &Config,
+    state: &ServerState,
+    fields: &[(String, String)],
+    chrome: render::Chrome<'_>,
+) -> Result<Response, HttpError> {
+    let submitted = render::DocumentEditValues {
+        title: form_field(fields, "title").unwrap_or("").to_string(),
+        description: form_field(fields, "description").unwrap_or("").to_string(),
+        labels: records::submitted_tag_values(&form_fields(fields, "labels")),
+        references: records::submitted_tag_values(&form_fields(fields, "references")),
+    };
+    let mut errors = render::DocumentFieldErrors::default();
+    let title = match records::validate_title(&submitted.title) {
+        Ok(value) => Some(value),
+        Err(message) => {
+            errors.title = Some(message);
+            None
+        }
+    };
+    let mut description_change = FieldChange::Keep;
+    match records::validate_multiline("Description", &submitted.description) {
+        Ok(value) => description_change = render::change(value),
+        Err(message) => errors.description = Some(message),
+    }
+    let labels = match records::validate_labels(&submitted.labels) {
+        Ok(value) => Some(value),
+        Err(message) => {
+            errors.labels = Some(message);
+            None
+        }
+    };
+    let references = match records::validate_refs(&submitted.references) {
+        Ok(value) => Some(value),
+        Err(message) => {
+            errors.references = Some(message);
+            None
+        }
+    };
+    if errors.any() {
+        return Ok(Response::html(
+            422,
+            render::document_edit_page(record, &submitted, &errors, &record.version, cfg, chrome),
+        ));
+    }
+    let ctx = state.context();
+    let ops = edit::generic_document_ops(
+        &record.doc,
+        &title.unwrap_or_default(),
+        description_change,
+        &labels.unwrap_or_default(),
+        &references.unwrap_or_default(),
+    );
+    save_ops(&ctx, record, ops)?;
+    Ok(Response::redirect(&format!("/doc/{}", record.id)))
 }
 
 fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response, HttpError> {
@@ -1694,14 +1816,39 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
+        routes: &state.routes,
     };
 
+    if record.is_generic()
+        && (form_field(&fields, "status").is_some()
+            || form_field(&fields, "status_change").is_some())
+    {
+        return Err(HttpError::new(422));
+    }
     if form_field(&fields, "status_change") == Some("1") {
         return board_status_submit(&record, &cfg, state, &fields);
     }
 
     if version != record.version {
-        if record.kind == Category::UiMockup {
+        if record.is_generic() {
+            let title = form_field(&fields, "title").unwrap_or("").to_string();
+            let description = form_field(&fields, "description").unwrap_or("").to_string();
+            let labels = records::submitted_tag_values(&form_fields(&fields, "labels"));
+            let references = records::submitted_tag_values(&form_fields(&fields, "references"));
+            return Ok(Response::html(
+                409,
+                render::document_conflict_page(
+                    &record,
+                    &title,
+                    &description,
+                    &labels,
+                    &references,
+                    &cfg,
+                    chrome,
+                ),
+            ));
+        }
+        if record.handler() == Some(TypedHandler::UiMockup) {
             let title = form_field(&fields, "title").unwrap_or("").to_string();
             let specs = records::submitted_tag_values(&form_fields(&fields, "specs"));
             let refs = records::submitted_tag_values(&form_fields(&fields, "refs"));
@@ -1710,7 +1857,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 render::conflict_page_ui_mockup(&record, &title, &specs, &refs, &cfg, chrome),
             ));
         }
-        if record.kind == Category::BusinessRule {
+        if record.handler() == Some(TypedHandler::Rule) {
             let title = form_field(&fields, "title").unwrap_or("").to_string();
             let description = form_field(&fields, "description").unwrap_or("").to_string();
             let rationale = form_field(&fields, "rationale").unwrap_or("").to_string();
@@ -1733,7 +1880,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             ));
         }
 
-        if record.kind == Category::AuditRecord {
+        if record.handler() == Some(TypedHandler::Audit) {
             let title = form_field(&fields, "title").unwrap_or("").to_string();
             let audit_type = form_field(&fields, "audit_type").unwrap_or("").to_string();
             let content = form_field(&fields, "content").unwrap_or("").to_string();
@@ -1749,7 +1896,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 ),
             ));
         }
-        if record.kind == Category::TechSpec {
+        if record.handler() == Some(TypedHandler::TechSpec) {
             let title = form_field(&fields, "title").unwrap_or("").to_string();
             let description = form_field(&fields, "description").unwrap_or("").to_string();
             return Ok(Response::html(
@@ -1758,8 +1905,10 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             ));
         }
         if matches!(
-            record.kind,
-            Category::UseCase | Category::TestCase | Category::TestReport
+            record.handler(),
+            Some(TypedHandler::UseCase)
+                | Some(TypedHandler::TestCase)
+                | Some(TypedHandler::TestReport)
         ) {
             let title = form_field(&fields, "title").unwrap_or("").to_string();
             let description = form_field(&fields, "description").unwrap_or("").to_string();
@@ -1794,8 +1943,8 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
         ));
     }
 
-    match record.kind {
-        Category::Req | Category::Nfr => {
+    match record.handler() {
+        Some(TypedHandler::Requirement(_)) => {
             let submitted = render::EditValues {
                 title: form_field(&fields, "title").unwrap_or("").to_string(),
                 story: form_field(&fields, "story").unwrap_or("").to_string(),
@@ -1810,7 +1959,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 }
             };
             let mut story_change = FieldChange::Keep;
-            if record.kind.supports_story()
+            if record.supports_story()
                 && let Some(raw) = form_field(&fields, "story")
             {
                 match records::validate_multiline("User story", raw) {
@@ -1826,7 +1975,8 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 }
             }
             if errors.any() {
-                let index = records::build_index(&ctx, &cfg, record.kind);
+                let index =
+                    records::build_index(&ctx, &cfg, &state.registry, &record.descriptor, None);
                 return Ok(Response::html(
                     422,
                     render::edit_page(
@@ -1846,12 +1996,12 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 &title,
                 story_change,
                 description_change,
-                record.kind.supports_story(),
+                record.supports_story(),
             );
             save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
-        Category::Task => {
+        Some(TypedHandler::Task) => {
             let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
             let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
             let raw_status = form_field(&fields, "status").unwrap_or("").to_string();
@@ -1884,8 +2034,8 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             let milestone_change = if milestone_trimmed.is_empty() {
                 FieldChange::Clear
             } else {
-                match records::resolve_id(&ctx, &cfg, milestone_trimmed) {
-                    Ok(Some(r)) if r.record.kind == Category::Milestone => {
+                match records::resolve_id(&ctx, &cfg, &state.registry, milestone_trimmed) {
+                    Ok(Some(r)) if r.record.handler() == Some(TypedHandler::Milestone) => {
                         FieldChange::Set(milestone_trimmed.to_string())
                     }
                     _ => {
@@ -1914,8 +2064,10 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                             dep_error = Some("A task cannot depend on itself.".to_string());
                             break;
                         }
-                        match records::resolve_id(&ctx, &cfg, &item) {
-                            Ok(Some(r)) if r.record.kind == Category::Task => parsed.push(item),
+                        match records::resolve_id(&ctx, &cfg, &state.registry, &item) {
+                            Ok(Some(r)) if r.record.handler() == Some(TypedHandler::Task) => {
+                                parsed.push(item)
+                            }
                             _ => {
                                 dep_error = Some("Dependency not found.".to_string());
                                 break;
@@ -1996,7 +2148,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
-        Category::Milestone => {
+        Some(TypedHandler::Milestone) => {
             let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
             let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
             let raw_release = form_field(&fields, "release").unwrap_or("").to_string();
@@ -2018,8 +2170,8 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             let release_change = if release_trimmed.is_empty() {
                 FieldChange::Clear
             } else {
-                match records::resolve_id(&ctx, &cfg, release_trimmed) {
-                    Ok(Some(r)) if r.record.kind == Category::Release => {
+                match records::resolve_id(&ctx, &cfg, &state.registry, release_trimmed) {
+                    Ok(Some(r)) if r.record.handler() == Some(TypedHandler::Release) => {
                         FieldChange::Set(release_trimmed.to_string())
                     }
                     _ => {
@@ -2052,7 +2204,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
-        Category::Release => {
+        Some(TypedHandler::Release) => {
             let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
             let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
 
@@ -2092,7 +2244,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
-        Category::Decision => {
+        Some(TypedHandler::Decision) => {
             let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
             let raw_status = form_field(&fields, "status").unwrap_or("").to_string();
             let raw_decision = form_field(&fields, "decision").unwrap_or("").to_string();
@@ -2177,7 +2329,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 let sup_id = superseded_trimmed;
                 if sup_id == record.id {
                     errors.superseded_by = Some("A decision cannot supersede itself.".to_string());
-                } else if !records::decision_exists(&ctx, &cfg, sup_id) {
+                } else if !records::decision_exists(&ctx, &cfg, &state.registry, sup_id) {
                     errors.superseded_by = Some("Decision not found.".to_string());
                 } else {
                     let current_type = record.decision_type.clone().unwrap_or_default();
@@ -2237,7 +2389,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
-        Category::Glossary => {
+        Some(TypedHandler::Glossary) => {
             let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
             let raw_definition = form_field(&fields, "definition").unwrap_or("").to_string();
 
@@ -2281,7 +2433,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
-        Category::UiSpec => {
+        Some(TypedHandler::UiSpec) => {
             let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
             let raw_view = form_field(&fields, "view").unwrap_or("").to_string();
             let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
@@ -2335,7 +2487,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
-        Category::UiMockup => {
+        Some(TypedHandler::UiMockup) => {
             let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
             // Tag fields submit one occurrence per value; all occurrences are
             // collected in order (section 6.7 overrides last-value-wins).
@@ -2390,7 +2542,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             save_content(&ctx, &record, content)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
-        Category::BusinessRule => {
+        Some(TypedHandler::Rule) => {
             let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
             let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
             let raw_rationale = form_field(&fields, "rationale").unwrap_or("").to_string();
@@ -2462,7 +2614,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
-        Category::TechSpec => {
+        Some(TypedHandler::TechSpec) => {
             let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
             let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
 
@@ -2504,7 +2656,9 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
-        Category::UseCase | Category::TestCase | Category::TestReport => {
+        Some(TypedHandler::UseCase)
+        | Some(TypedHandler::TestCase)
+        | Some(TypedHandler::TestReport) => {
             let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
             let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
             let raw_applicability = form_field(&fields, "applicability")
@@ -2583,7 +2737,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
-        Category::AuditRecord => {
+        Some(TypedHandler::Audit) => {
             let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
             let raw_audit_type = form_field(&fields, "audit_type").unwrap_or("").to_string();
             let raw_content = form_field(&fields, "content").unwrap_or("").to_string();
@@ -2642,7 +2796,18 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             save_ops(&ctx, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
+        None => save_generic_document(&record, &cfg, state, &fields, chrome),
     }
+}
+
+fn form_name(record: &Record) -> String {
+    if record.is_group {
+        return "group".to_string();
+    }
+    if record.is_requirement() {
+        return "requirement".to_string();
+    }
+    routes::legacy_url_key(record.slug()).to_string()
 }
 
 fn record_json(
@@ -2650,23 +2815,23 @@ fn record_json(
     group: Option<&Record>,
     related: Option<&Record>,
 ) -> serde_json::Value {
-    match record.kind {
-        Category::Req | Category::Nfr => {
-            let group_value = match (record.form, record.group_id.as_deref(), group) {
-                (Form::Requirement, Some(id), Some(group)) => {
+    match record.handler() {
+        Some(TypedHandler::Requirement(_)) => {
+            let group_value = match (record.is_group, record.group_id.as_deref(), group) {
+                (false, Some(id), Some(group)) => {
                     serde_json::json!({"id": id, "title": group.title})
                 }
                 _ => serde_json::Value::Null,
             };
-            let story = if record.kind.supports_story() {
+            let story = if record.supports_story() {
                 serde_json::json!(record.story)
             } else {
                 serde_json::Value::Null
             };
             serde_json::json!({
                 "id": record.id,
-                "kind": record.kind.key(),
-                "form": match record.form { Form::Group => "group", Form::Requirement => "requirement", Form::Task => "task", Form::Milestone => "milestone", Form::Release => "release", Form::Decision => "decision", Form::Glossary => "glossary", Form::UiSpec => "ui-spec", Form::UiMockup => "ui-mockup", Form::BusinessRule => "business-rule", Form::AuditRecord => "audit-record", Form::TechSpec => "tech-spec", Form::UseCase => "use-case", Form::TestCase => "test-case", Form::TestReport => "test-report" },
+                "kind": record.slug(),
+                "form": form_name(record),
                 "title": record.title,
                 "group": group_value,
                 "story": story,
@@ -2676,7 +2841,7 @@ fn record_json(
                 "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
             })
         }
-        Category::Task => {
+        Some(TypedHandler::Task) => {
             let milestone_value = match (&record.milestone_id, related) {
                 (Some(id), Some(rel)) => serde_json::json!({"id": id, "title": rel.title}),
                 (Some(id), None) => serde_json::json!({"id": id, "title": null}),
@@ -2705,7 +2870,7 @@ fn record_json(
                 "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
             })
         }
-        Category::Milestone => {
+        Some(TypedHandler::Milestone) => {
             let release_value = match (&record.release_id, related) {
                 (Some(id), Some(rel)) => serde_json::json!({"id": id, "title": rel.title}),
                 (Some(id), None) => serde_json::json!({"id": id, "title": null}),
@@ -2723,7 +2888,7 @@ fn record_json(
                 "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
             })
         }
-        Category::Release => {
+        Some(TypedHandler::Release) => {
             serde_json::json!({
                 "id": record.id,
                 "kind": "release",
@@ -2735,7 +2900,7 @@ fn record_json(
                 "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
             })
         }
-        Category::Decision => {
+        Some(TypedHandler::Decision) => {
             let superseded_value = match (&record.superseded_by, &record.superseded_title) {
                 (Some(id), Some(title)) => serde_json::json!({"id": id, "title": title}),
                 (Some(id), None) => serde_json::json!({"id": id, "title": null}),
@@ -2757,7 +2922,7 @@ fn record_json(
                 "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
             })
         }
-        Category::Glossary => {
+        Some(TypedHandler::Glossary) => {
             serde_json::json!({
                 "id": record.id,
                 "kind": "glossary",
@@ -2769,7 +2934,7 @@ fn record_json(
                 "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
             })
         }
-        Category::UiSpec => {
+        Some(TypedHandler::UiSpec) => {
             serde_json::json!({
                 "id": record.id,
                 "kind": "ui-spec",
@@ -2782,7 +2947,7 @@ fn record_json(
                 "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
             })
         }
-        Category::UiMockup => {
+        Some(TypedHandler::UiMockup) => {
             serde_json::json!({
                 "id": record.id,
                 "kind": "ui-mockup",
@@ -2798,7 +2963,7 @@ fn record_json(
                 "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
             })
         }
-        Category::BusinessRule => {
+        Some(TypedHandler::Rule) => {
             serde_json::json!({
                 "id": record.id,
                 "kind": "business-rule",
@@ -2813,7 +2978,7 @@ fn record_json(
                 "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
             })
         }
-        Category::TechSpec => {
+        Some(TypedHandler::TechSpec) => {
             serde_json::json!({
                 "id": record.id,
                 "kind": "tech-spec",
@@ -2825,9 +2990,11 @@ fn record_json(
                 "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
             })
         }
-        Category::UseCase | Category::TestCase | Category::TestReport => {
-            let kind = record.kind.key();
-            let form = record.kind.key();
+        Some(TypedHandler::UseCase)
+        | Some(TypedHandler::TestCase)
+        | Some(TypedHandler::TestReport) => {
+            let kind = record.slug();
+            let form = record.slug();
             serde_json::json!({
                 "id": record.id,
                 "kind": kind,
@@ -2842,7 +3009,7 @@ fn record_json(
                 "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
             })
         }
-        Category::AuditRecord => {
+        Some(TypedHandler::Audit) => {
             serde_json::json!({
                 "id": record.id,
                 "kind": "audit-record",
@@ -2855,6 +3022,19 @@ fn record_json(
                 "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
             })
         }
+        None => serde_json::json!({
+            "id": record.id,
+            "kind": record.slug(),
+            "form": "document",
+            "title": record.title,
+            "description": record.description,
+            "status": record.status,
+            "labels": record.labels,
+            "references": record.refs,
+            "version": record.version,
+            "path": record.rel_path,
+            "metadata": record_metadata_json(record),
+        }),
     }
 }
 
@@ -2867,24 +3047,105 @@ fn record_metadata_json(record: &Record) -> serde_json::Value {
 }
 
 fn api_requirements(request: &Request, state: &ServerState) -> Result<Response, HttpError> {
-    let kind = category_from_query(request)?;
+    let slug = type_from_query(request, state)?;
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let index = records::build_index(&state.context(), &cfg, kind);
+    let descriptor = descriptor(state, &slug)?;
+    if !matches!(handler_of(descriptor), Some(TypedHandler::Requirement(_))) {
+        return Err(HttpError::new(404));
+    }
+    let index = records::build_index(&state.context(), &cfg, &state.registry, descriptor, None);
+    Ok(Response::json(200, requirements_json(descriptor, &index)))
+}
+
+fn api_doc_list(slug: &str, state: &ServerState) -> Result<Response, HttpError> {
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let descriptor = view_descriptor(state, slug).ok_or_else(|| HttpError::new(404))?;
+    let descriptor = &descriptor;
+    let index = enabled_index(&state.context(), &cfg, state, slug);
+    if let Some(TypedHandler::Requirement(_)) = handler_of(descriptor) {
+        return Ok(Response::json(200, requirements_json(descriptor, &index)));
+    }
+    if matches!(descriptor.content_model, ContentModel::Generic) {
+        let items: Vec<serde_json::Value> = index
+            .records
+            .iter()
+            .map(|record| {
+                serde_json::json!({
+                    "id": record.id,
+                    "kind": record.slug(),
+                    "title": record.title,
+                    "status": record.status,
+                    "labels": record.labels,
+                    "references": record.refs,
+                    "version": record.version,
+                    "path": record.rel_path,
+                    "metadata": record_metadata_json(record),
+                })
+            })
+            .collect();
+        return Ok(Response::json(200, serde_json::json!(items)));
+    }
+    let items: Vec<serde_json::Value> = index
+        .records
+        .iter()
+        .map(|record| match record.handler() {
+            Some(TypedHandler::Task) => serde_json::json!({
+                "id": record.id,
+                "title": record.title,
+                "status": record.status,
+                "milestone": record.milestone_id,
+                "assignee": record.assignee,
+                "metadata": record_metadata_json(record),
+            }),
+            Some(TypedHandler::Milestone) => serde_json::json!({
+                "id": record.id,
+                "title": record.title,
+                "release": record.release_id,
+                "metadata": record_metadata_json(record),
+            }),
+            Some(TypedHandler::Decision) => serde_json::json!({
+                "id": record.id,
+                "title": record.title,
+                "status": record.status,
+                "type": record.decision_type,
+                "metadata": record_metadata_json(record),
+            }),
+            _ => serde_json::json!({
+                "id": record.id,
+                "title": record.title,
+                "metadata": record_metadata_json(record),
+            }),
+        })
+        .collect();
+    Ok(Response::json(200, serde_json::json!(items)))
+}
+
+fn handler_of(descriptor: &TypeDescriptor) -> Option<TypedHandler> {
+    match &descriptor.content_model {
+        ContentModel::Generic => None,
+        ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => Some(schema.handler),
+    }
+}
+
+fn requirements_json(descriptor: &TypeDescriptor, index: &records::Index) -> serde_json::Value {
+    let is_nfr = matches!(
+        handler_of(descriptor),
+        Some(TypedHandler::Requirement(
+            crate::registry::RequirementKind::NonFunctional
+        ))
+    );
     let groups: Vec<serde_json::Value> = index
         .groups
         .iter()
         .map(|group| {
-            // A missing (synthesised) NFR group carries a null title rather
-            // than echoing its ID prefix; a present group record keeps its
-            // title.
-            let title = if kind == Category::Nfr && group.title.trim().is_empty() {
+            let title = if is_nfr && group.title.trim().is_empty() {
                 serde_json::Value::Null
             } else {
                 serde_json::Value::String(group.title.clone())
             };
             serde_json::json!({
                 "id": group.id,
-                "kind": kind.key(),
+                "kind": descriptor.slug,
                 "form": "group",
                 "title": title,
                 "metadata": record_metadata_json(group),
@@ -2897,7 +3158,7 @@ fn api_requirements(request: &Request, state: &ServerState) -> Result<Response, 
         .map(|requirement| {
             serde_json::json!({
                 "id": requirement.id,
-                "kind": kind.key(),
+                "kind": descriptor.slug,
                 "form": "requirement",
                 "title": requirement.title,
                 "group": requirement.group_id,
@@ -2905,252 +3166,23 @@ fn api_requirements(request: &Request, state: &ServerState) -> Result<Response, 
             })
         })
         .collect();
-    Ok(Response::json(
-        200,
-        serde_json::json!({"groups": groups, "requirements": requirements}),
-    ))
-}
-
-fn api_tasks(state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let index = records::build_index(&state.context(), &cfg, Category::Task);
-    let items: Vec<serde_json::Value> = index
-        .records
-        .iter()
-        .map(|r| {
-            serde_json::json!({
-                "id": r.id,
-                "title": r.title,
-                "status": r.status,
-                "milestone": r.milestone_id,
-                "assignee": r.assignee,
-                "metadata": record_metadata_json(r),
-            })
-        })
-        .collect();
-    Ok(Response::json(200, serde_json::json!(items)))
-}
-
-fn api_milestones(state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let index = records::build_index(&state.context(), &cfg, Category::Milestone);
-    let items: Vec<serde_json::Value> = index
-        .records
-        .iter()
-        .map(|r| {
-            serde_json::json!({
-                "id": r.id,
-                "title": r.title,
-                "release": r.release_id,
-                "metadata": record_metadata_json(r),
-            })
-        })
-        .collect();
-    Ok(Response::json(200, serde_json::json!(items)))
-}
-
-fn api_releases(state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let index = records::build_index(&state.context(), &cfg, Category::Release);
-    let items: Vec<serde_json::Value> = index
-        .records
-        .iter()
-        .map(|r| {
-            serde_json::json!({
-                "id": r.id,
-                "title": r.title,
-                "metadata": record_metadata_json(r),
-            })
-        })
-        .collect();
-    Ok(Response::json(200, serde_json::json!(items)))
-}
-
-fn api_decisions(state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let index = records::build_index(&state.context(), &cfg, Category::Decision);
-    let items: Vec<serde_json::Value> = index
-        .records
-        .iter()
-        .map(|r| {
-            serde_json::json!({
-                "id": r.id,
-                "title": r.title,
-                "status": r.status,
-                "type": r.decision_type,
-                "metadata": record_metadata_json(r),
-            })
-        })
-        .collect();
-    Ok(Response::json(200, serde_json::json!(items)))
-}
-
-fn api_glossary(state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let index = records::build_index(&state.context(), &cfg, Category::Glossary);
-    let items: Vec<serde_json::Value> = index
-        .records
-        .iter()
-        .map(|r| {
-            serde_json::json!({
-                "id": r.id,
-                "title": r.title,
-                "metadata": record_metadata_json(r),
-            })
-        })
-        .collect();
-    Ok(Response::json(200, serde_json::json!(items)))
-}
-
-fn api_ui_mockups(state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let index = records::build_index(&state.context(), &cfg, Category::UiMockup);
-    let items: Vec<serde_json::Value> = index
-        .records
-        .iter()
-        .map(|r| {
-            serde_json::json!({
-                "id": r.id,
-                "title": r.title,
-                "metadata": record_metadata_json(r),
-            })
-        })
-        .collect();
-    Ok(Response::json(200, serde_json::json!(items)))
-}
-
-fn api_ui_specs(state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let index = records::build_index(&state.context(), &cfg, Category::UiSpec);
-    let items: Vec<serde_json::Value> = index
-        .records
-        .iter()
-        .map(|r| {
-            serde_json::json!({
-                "id": r.id,
-                "title": r.title,
-                "metadata": record_metadata_json(r),
-            })
-        })
-        .collect();
-    Ok(Response::json(200, serde_json::json!(items)))
-}
-
-fn api_business_rules(state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let index = records::build_index(&state.context(), &cfg, Category::BusinessRule);
-    let items: Vec<serde_json::Value> = index
-        .records
-        .iter()
-        .map(|r| {
-            serde_json::json!({
-                "id": r.id,
-                "title": r.title,
-                "metadata": record_metadata_json(r),
-            })
-        })
-        .collect();
-    Ok(Response::json(200, serde_json::json!(items)))
-}
-
-fn api_tech_specs(state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let index = records::build_index(&state.context(), &cfg, Category::TechSpec);
-    let items: Vec<serde_json::Value> = index
-        .records
-        .iter()
-        .map(|r| {
-            serde_json::json!({
-                "id": r.id,
-                "title": r.title,
-                "metadata": record_metadata_json(r),
-            })
-        })
-        .collect();
-    Ok(Response::json(200, serde_json::json!(items)))
-}
-fn api_use_cases(state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let index = records::build_index(&state.context(), &cfg, Category::UseCase);
-    let items: Vec<serde_json::Value> = index
-        .records
-        .iter()
-        .map(|r| {
-            serde_json::json!({
-                "id": r.id,
-                "title": r.title,
-                "metadata": record_metadata_json(r),
-            })
-        })
-        .collect();
-    Ok(Response::json(200, serde_json::json!(items)))
-}
-
-fn api_test_cases(state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let index = records::build_index(&state.context(), &cfg, Category::TestCase);
-    let items: Vec<serde_json::Value> = index
-        .records
-        .iter()
-        .map(|r| {
-            serde_json::json!({
-                "id": r.id,
-                "title": r.title,
-                "metadata": record_metadata_json(r),
-            })
-        })
-        .collect();
-    Ok(Response::json(200, serde_json::json!(items)))
-}
-
-fn api_test_reports(state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let index = records::build_index(&state.context(), &cfg, Category::TestReport);
-    let items: Vec<serde_json::Value> = index
-        .records
-        .iter()
-        .map(|r| {
-            serde_json::json!({
-                "id": r.id,
-                "title": r.title,
-                "metadata": record_metadata_json(r),
-            })
-        })
-        .collect();
-    Ok(Response::json(200, serde_json::json!(items)))
-}
-
-fn api_audit_records(state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let index = records::build_index(&state.context(), &cfg, Category::AuditRecord);
-    let items: Vec<serde_json::Value> = index
-        .records
-        .iter()
-        .map(|r| {
-            serde_json::json!({
-                "id": r.id,
-                "title": r.title,
-                "metadata": record_metadata_json(r),
-            })
-        })
-        .collect();
-    Ok(Response::json(200, serde_json::json!(items)))
+    serde_json::json!({"groups": groups, "requirements": requirements})
 }
 
 fn api_get(id: &str, state: &ServerState) -> Result<Response, HttpError> {
     let (record, cfg) = resolve_record(id, state)?;
     let ctx = state.context();
-    let index = records::build_index(&ctx, &cfg, record.kind);
+    let index = records::build_index(&ctx, &cfg, &state.registry, &record.descriptor, None);
     let group = resolved_group(&record, &index);
-    let related = match record.kind {
-        Category::Task => record.milestone_id.as_ref().and_then(|mid| {
-            records::resolve_id(&ctx, &cfg, mid)
+    let related = match record.handler() {
+        Some(TypedHandler::Task) => record.milestone_id.as_ref().and_then(|mid| {
+            records::resolve_id(&ctx, &cfg, &state.registry, mid)
                 .ok()
                 .flatten()
                 .map(|r| r.record)
         }),
-        Category::Milestone => record.release_id.as_ref().and_then(|rid| {
-            records::resolve_id(&ctx, &cfg, rid)
+        Some(TypedHandler::Milestone) => record.release_id.as_ref().and_then(|rid| {
+            records::resolve_id(&ctx, &cfg, &state.registry, rid)
                 .ok()
                 .flatten()
                 .map(|r| r.record)
@@ -3184,8 +3216,8 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
         return Ok(json_error(409, "record changed on disk; reload the form"));
     }
 
-    match record.kind {
-        Category::Req | Category::Nfr => {
+    match record.handler() {
+        Some(TypedHandler::Requirement(_)) => {
             let title = object
                 .get("title")
                 .and_then(|value| value.as_str())
@@ -3195,7 +3227,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 Err(message) => return Ok(json_error(422, &message)),
             };
             let mut story_change = FieldChange::Keep;
-            if record.kind.supports_story() {
+            if record.supports_story() {
                 match object.get("story") {
                     None => {}
                     Some(serde_json::Value::Null) => story_change = FieldChange::Clear,
@@ -3225,11 +3257,17 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 &title,
                 story_change,
                 description_change,
-                record.kind.supports_story(),
+                record.supports_story(),
             );
             save_ops(&ctx, &record, ops)?;
             let (updated, updated_cfg) = resolve_record(id, state)?;
-            let index = records::build_index(&ctx, &updated_cfg, updated.kind);
+            let index = records::build_index(
+                &ctx,
+                &updated_cfg,
+                &state.registry,
+                &updated.descriptor,
+                None,
+            );
             let group = resolved_group(&updated, &index);
             let related = None;
             Ok(Response::json(
@@ -3237,7 +3275,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 record_json(&updated, group, related.as_ref()),
             ))
         }
-        Category::Task => {
+        Some(TypedHandler::Task) => {
             // title (required if present? if omitted, keep original; spec says title required for POST?
             // Spec: POST accepts version, title (required). We'll require title in body for task too?
             // To allow partial updates, if omitted keep original. But spec says title required. We'll require if no title?
@@ -3276,8 +3314,10 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                         if m.is_empty() {
                             milestone_change = FieldChange::Clear;
                         } else {
-                            match records::resolve_id(&ctx, &cfg, m) {
-                                Ok(Some(r)) if r.record.kind == Category::Milestone => {
+                            match records::resolve_id(&ctx, &cfg, &state.registry, m) {
+                                Ok(Some(r))
+                                    if r.record.handler() == Some(TypedHandler::Milestone) =>
+                                {
                                     milestone_change = FieldChange::Set(m.to_string())
                                 }
                                 _ => return Ok(json_error(422, "Milestone not found.")),
@@ -3366,8 +3406,9 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                                 if t == record.id {
                                     return Ok(json_error(422, "A task cannot depend on itself."));
                                 }
-                                match records::resolve_id(&ctx, &cfg, t) {
-                                    Ok(Some(r)) if r.record.kind == Category::Task => {}
+                                match records::resolve_id(&ctx, &cfg, &state.registry, t) {
+                                    Ok(Some(r))
+                                        if r.record.handler() == Some(TypedHandler::Task) => {}
                                     _ => return Ok(json_error(422, "Dependency not found.")),
                                 }
                                 if !parsed.contains(&t.to_string()) {
@@ -3429,7 +3470,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             save_ops(&ctx, &record, ops)?;
             let (updated, updated_cfg) = resolve_record(id, state)?;
             let related = updated.milestone_id.as_ref().and_then(|mid| {
-                records::resolve_id(&ctx, &updated_cfg, mid)
+                records::resolve_id(&ctx, &updated_cfg, &state.registry, mid)
                     .ok()
                     .flatten()
                     .map(|r| r.record)
@@ -3439,7 +3480,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 record_json(&updated, None, related.as_ref()),
             ))
         }
-        Category::Milestone => {
+        Some(TypedHandler::Milestone) => {
             let title = match object.get("title") {
                 None => return Err(HttpError::new(400)),
                 Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
@@ -3470,8 +3511,10 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                         if r.is_empty() {
                             release_change = FieldChange::Clear;
                         } else {
-                            match records::resolve_id(&ctx, &cfg, r) {
-                                Ok(Some(res)) if res.record.kind == Category::Release => {
+                            match records::resolve_id(&ctx, &cfg, &state.registry, r) {
+                                Ok(Some(res))
+                                    if res.record.handler() == Some(TypedHandler::Release) =>
+                                {
                                     release_change = FieldChange::Set(r.to_string())
                                 }
                                 _ => return Ok(json_error(422, "Release not found.")),
@@ -3485,7 +3528,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             save_ops(&ctx, &record, ops)?;
             let (updated, updated_cfg) = resolve_record(id, state)?;
             let related = updated.release_id.as_ref().and_then(|rid| {
-                records::resolve_id(&ctx, &updated_cfg, rid)
+                records::resolve_id(&ctx, &updated_cfg, &state.registry, rid)
                     .ok()
                     .flatten()
                     .map(|r| r.record)
@@ -3495,7 +3538,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 record_json(&updated, None, related.as_ref()),
             ))
         }
-        Category::Release => {
+        Some(TypedHandler::Release) => {
             let title = match object.get("title") {
                 None => return Err(HttpError::new(400)),
                 Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
@@ -3522,7 +3565,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
-        Category::Decision => {
+        Some(TypedHandler::Decision) => {
             // title required
             let title = match object.get("title") {
                 None => return Err(HttpError::new(400)),
@@ -3627,7 +3670,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                             if sup_id == record.id {
                                 return Ok(json_error(422, "A decision cannot supersede itself."));
                             }
-                            if !records::decision_exists(&ctx, &cfg, sup_id) {
+                            if !records::decision_exists(&ctx, &cfg, &state.registry, sup_id) {
                                 return Ok(json_error(422, "Decision not found."));
                             }
                             let current_type = record.decision_type.clone().unwrap_or_default();
@@ -3671,7 +3714,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             save_ops(&ctx, &record, ops)?;
             let (updated, updated_cfg) = resolve_record(id, state)?;
             let superseded_title = updated.superseded_by.as_ref().and_then(|sid| {
-                records::resolve_id(&ctx, &updated_cfg, sid)
+                records::resolve_id(&ctx, &updated_cfg, &state.registry, sid)
                     .ok()
                     .flatten()
                     .map(|r| r.record.title)
@@ -3679,7 +3722,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             let _ = superseded_title;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
-        Category::Glossary => {
+        Some(TypedHandler::Glossary) => {
             let title = match object.get("title") {
                 None => return Err(HttpError::new(400)),
                 Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
@@ -3708,7 +3751,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
-        Category::UiSpec => {
+        Some(TypedHandler::UiSpec) => {
             let title = match object.get("title") {
                 None => return Err(HttpError::new(400)),
                 Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
@@ -3746,7 +3789,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
-        Category::UiMockup => {
+        Some(TypedHandler::UiMockup) => {
             // title: optional, required when present (section 10.3).
             let title = match object.get("title") {
                 None => record.title.clone(),
@@ -3806,7 +3849,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
-        Category::BusinessRule => {
+        Some(TypedHandler::Rule) => {
             // title: optional, required when present
             let title = match object.get("title") {
                 None => record.title.clone(),
@@ -3884,7 +3927,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
-        Category::TechSpec => {
+        Some(TypedHandler::TechSpec) => {
             let title = match object.get("title") {
                 None => record.title.clone(),
                 Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
@@ -3913,7 +3956,9 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
-        Category::UseCase | Category::TestCase | Category::TestReport => {
+        Some(TypedHandler::UseCase)
+        | Some(TypedHandler::TestCase)
+        | Some(TypedHandler::TestReport) => {
             let title = match object.get("title") {
                 None => record.title.clone(),
                 Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
@@ -3997,7 +4042,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
-        Category::AuditRecord => {
+        Some(TypedHandler::Audit) => {
             let title = match object.get("title") {
                 None => record.title.clone(),
                 Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
@@ -4061,6 +4106,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
+        None => Err(HttpError::new(405)),
     }
 }
 
@@ -4150,8 +4196,12 @@ mod tests {
     fn ui_mockup_record_json_shape() {
         let record = Record {
             id: "MOCK-001".to_string(),
-            kind: Category::UiMockup,
-            form: Form::UiMockup,
+            descriptor: crate::registry::ArtifactRegistry::build(&Config::default())
+                .expect("registry")
+                .descriptor("ui-mockup")
+                .expect("ui-mockup")
+                .clone(),
+            is_group: false,
             title: "Login".to_string(),
             story: None,
             group_id: None,
@@ -4221,8 +4271,12 @@ mod tests {
     fn tech_spec_record_json_shape() {
         let record = Record {
             id: "TECH-001".to_string(),
-            kind: Category::TechSpec,
-            form: Form::TechSpec,
+            descriptor: crate::registry::ArtifactRegistry::build(&Config::default())
+                .expect("registry")
+                .descriptor("tech-spec")
+                .expect("tech-spec")
+                .clone(),
+            is_group: false,
             title: "Offline architecture".to_string(),
             story: None,
             group_id: None,

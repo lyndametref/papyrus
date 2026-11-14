@@ -260,6 +260,28 @@ pub fn query_param(query: &Option<String>, name: &str) -> Result<Option<String>,
     Ok(found)
 }
 
+/// Every decoded occurrence of a query parameter, in order.
+pub fn query_params(query: &Option<String>, name: &str) -> Result<Vec<String>, HttpError> {
+    let Some(query) = query else {
+        return Ok(Vec::new());
+    };
+    let mut found = Vec::new();
+    for pair in query.split('&') {
+        if pair.is_empty() {
+            continue;
+        }
+        let (key, value) = match pair.split_once('=') {
+            Some((key, value)) => (key, value),
+            None => (pair, ""),
+        };
+        let key = decode_component(key)?;
+        if key == name {
+            found.push(decode_component(value)?);
+        }
+    }
+    Ok(found)
+}
+
 /// Decode header bytes as ISO-8859-1, as required by the specification.
 fn latin1(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| *byte as char).collect()

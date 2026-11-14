@@ -144,7 +144,9 @@ fn dispatch_builtin(
             debug,
         } => {
             let ctx = build_context(project_raw, config_path, json, no_color)?;
-            crate::browser::run(&ctx, host.as_deref(), port, no_open, debug)
+            let registry = registry
+                .ok_or_else(|| AppError::Runtime("artifact registry is unavailable".to_string()))?;
+            crate::browser::run(&ctx, registry, host.as_deref(), port, no_open, debug)
         }
         BuiltinCmd::Search {
             query,

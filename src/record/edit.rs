@@ -144,6 +144,69 @@ pub fn apply(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> {
     apply_patch(doc, &dated)
 }
 
+/// Generic config-defined document edit: title/heading, the Description
+/// section, and the `labels`/`references` front-matter lists. Unknown
+/// sections and keys are preserved; status is never touched.
+pub fn generic_document_ops(
+    doc: &Document,
+    title: &str,
+    description: FieldChange,
+    labels: &[String],
+    references: &[String],
+) -> Vec<PatchOp> {
+    let mut fm_ops = title_ops(doc, title);
+    if let Some(fm) = &doc.front_matter {
+        // An unchanged empty submission must not add a missing key: hand-written
+        // records without labels/references stay byte-identical on a no-op save.
+        // Existing keys are always patched so edits (including clearing) apply;
+        // the patch layer turns identical values into no-ops.
+        if !labels.is_empty() || crate::record::frontmatter::contains_key(&fm.raw, "labels") {
+            fm_ops.push(PatchOp::SetFrontMatter("labels".into(), labels.join("\n")));
+        }
+        if !references.is_empty() || crate::record::frontmatter::contains_key(&fm.raw, "references")
+        {
+            fm_ops.push(PatchOp::SetFrontMatter(
+                "references".into(),
+                references.join("\n"),
+            ));
+        }
+    }
+    let mut sections = doc.sections.clone();
+    match description {
+        FieldChange::Keep => {}
+        FieldChange::Clear => {
+            if let Some(index) = sections.iter().position(|s| s.heading == "## Description") {
+                sections.remove(index);
+            }
+        }
+        FieldChange::Set(value) => {
+            if let Some(index) = sections.iter().position(|s| s.heading == "## Description") {
+                let trailing = trailing_empty_lines(&sections[index].body);
+                let mut body: Vec<String> =
+                    value.split('\n').map(|line| line.to_string()).collect();
+                for _ in 0..trailing {
+                    body.push(String::new());
+                }
+                sections[index].body = body;
+            } else {
+                let mut body: Vec<String> =
+                    value.split('\n').map(|line| line.to_string()).collect();
+                if !sections.is_empty() {
+                    body.push(String::new());
+                }
+                sections.insert(
+                    0,
+                    Section {
+                        heading: "## Description".to_string(),
+                        body,
+                    },
+                );
+            }
+        }
+    }
+    finish(doc, fm_ops, &sections)
+}
+
 const REQ_KNOWN: &[&str] = &["## User Story", "## Group", "## Description"];
 const TASK_KNOWN: &[&str] = &[
     "## Description",

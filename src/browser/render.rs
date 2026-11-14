@@ -5,10 +5,13 @@
 //! placeholders are internal fragments whose values are escaped as they are
 //! built.
 
-use crate::browser::records::Category;
-use crate::browser::records::{Form, Index, Record};
+use crate::browser::records::{Index, Record, filter_statuses};
+use crate::browser::routes::{self, BrowserRoutes, NavGroup};
 use crate::config::Config;
 use crate::record::edit::FieldChange;
+use crate::registry::{
+    ArtifactCategory as CategoryKind, ContentModel, StatusModel, TypeDescriptor, TypedHandler,
+};
 
 pub const LIST_TEMPLATE: &str = include_str!("templates/list.html");
 pub const VIEW_TEMPLATE: &str = include_str!("templates/view.html");
@@ -63,46 +66,22 @@ fn render_template(template: &str, escaped: &[(&str, &str)], raw: &[(&str, &str)
 pub struct Chrome<'a> {
     pub project: &'a str,
     pub bind_note: &'a str,
+    pub routes: &'a BrowserRoutes,
 }
 
-fn category_name(kind: Category) -> &'static str {
-    match kind {
-        Category::Req => "Business requirements",
-        Category::Nfr => "Non-functional requirements",
-        Category::Task => "Tasks",
-        Category::Milestone => "Milestones",
-        Category::Release => "Releases",
-        Category::Decision => "Decisions",
-        Category::Glossary => "Glossary",
-        Category::UiSpec => "UI Specifications",
-        Category::UiMockup => "UI Mockups",
-        Category::BusinessRule => "Business Rules",
-        Category::AuditRecord => "Audit Records",
-        Category::TechSpec => "Technical Specifications",
-        Category::UseCase => "Use Cases",
-        Category::TestCase => "Test Cases",
-        Category::TestReport => "Test Reports",
+fn content_handler(descriptor: &TypeDescriptor) -> Option<TypedHandler> {
+    match &descriptor.content_model {
+        ContentModel::Generic => None,
+        ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => Some(schema.handler),
     }
 }
 
-fn category_short(kind: Category) -> &'static str {
-    match kind {
-        Category::Req => "business requirements",
-        Category::Nfr => "non-functional requirements",
-        Category::Task => "tasks",
-        Category::Milestone => "milestones",
-        Category::Release => "releases",
-        Category::Decision => "decisions",
-        Category::Glossary => "glossary terms",
-        Category::UiSpec => "UI specifications",
-        Category::UiMockup => "UI mockups",
-        Category::BusinessRule => "business rules",
-        Category::AuditRecord => "audit records",
-        Category::TechSpec => "technical specifications",
-        Category::UseCase => "use cases",
-        Category::TestCase => "test cases",
-        Category::TestReport => "test reports",
-    }
+fn category_name(slug: &str) -> String {
+    routes::heading(slug)
+}
+
+fn category_short(slug: &str) -> String {
+    routes::short(slug)
 }
 
 fn first_paragraph(text: &str) -> String {
@@ -127,257 +106,94 @@ fn plural(count: usize, singular: &str, plural: &str) -> String {
     }
 }
 
-/// Sidebar fragment. Only enabled document types are listed.
-pub fn sidebar(selected: Option<Category>, cfg: &Config) -> String {
-    build_sidebar(selected, cfg, false, false, false)
+/// Sidebar fragment generated from the startup route table.
+pub fn sidebar(selected: Option<&str>, _cfg: &Config, routes: &BrowserRoutes) -> String {
+    build_sidebar(selected, routes, false, false, false)
 }
 
 /// Sidebar fragment with optional lifecycle-page active state.
 pub fn sidebar_with_lifecycle(
-    selected: Option<Category>,
-    cfg: &Config,
+    selected: Option<&str>,
+    _cfg: &Config,
     lifecycle_active: bool,
+    routes: &BrowserRoutes,
 ) -> String {
-    build_sidebar(selected, cfg, false, lifecycle_active, false)
+    build_sidebar(selected, routes, false, lifecycle_active, false)
 }
 
 /// Sidebar fragment with optional skills-page active state.
 pub fn sidebar_with_skills(
-    selected: Option<Category>,
-    cfg: &Config,
+    selected: Option<&str>,
+    _cfg: &Config,
     skills_active: bool,
+    routes: &BrowserRoutes,
 ) -> String {
-    build_sidebar(selected, cfg, false, false, skills_active)
+    build_sidebar(selected, routes, false, false, skills_active)
 }
 
 /// Sidebar fragment with optional configuration-page active state.
 pub fn sidebar_with_config(
-    selected: Option<Category>,
-    cfg: &Config,
+    selected: Option<&str>,
+    _cfg: &Config,
     config_active: bool,
+    routes: &BrowserRoutes,
 ) -> String {
-    build_sidebar(selected, cfg, config_active, false, false)
+    build_sidebar(selected, routes, config_active, false, false)
 }
 
 fn build_sidebar(
-    selected: Option<Category>,
-    cfg: &Config,
+    selected: Option<&str>,
+    routes: &BrowserRoutes,
     config_active: bool,
     lifecycle_active: bool,
     skills_active: bool,
 ) -> String {
+    let effective_selected = selected.and_then(|value| routes.nav_slug_for(value));
     let mut items = String::new();
-    // Three sidebar entries: Business requirements, Non-functional requirements, Backlog.
-    // The Backlog entry covers task, milestone, and release records.
-    let backlog_selected = matches!(
-        selected,
-        Some(Category::Task | Category::Milestone | Category::Release)
-    );
-    // Business requirements
-    let req_enabled = cfg
-        .document_types
-        .get(Category::Req.key())
-        .map(|e| e.enabled)
-        .unwrap_or(false);
-    if req_enabled {
-        let current = if selected == Some(Category::Req) {
-            " aria-current=\"page\""
-        } else {
-            ""
-        };
+    for group in [NavGroup::Backlog, NavGroup::Decisions, NavGroup::Documents] {
+        let entries: Vec<&crate::browser::routes::NavItem> = routes
+            .nav
+            .iter()
+            .filter(|item| item.group == group)
+            .collect();
+        if entries.is_empty() {
+            continue;
+        }
         items.push_str(&format!(
-            "<li><a href=\"/?type=req\"{}>{}</a></li>",
-            current,
-            escape(category_name(Category::Req))
+            "<li class=\"sidebar-group\"><p class=\"sidebar-label\">{}</p><ul class=\"sidebar-group-list\">",
+            escape(group.heading())
         ));
-    }
-    // Business Rules (omitted when the document type is disabled)
-    let rule_enabled = cfg
-        .document_types
-        .get(Category::BusinessRule.config_key())
-        .map(|e| e.enabled)
-        .unwrap_or(false);
-    if rule_enabled {
-        let current = if selected == Some(Category::BusinessRule) {
-            " aria-current=\"page\""
-        } else {
-            ""
-        };
-        items.push_str(&format!(
-            "<li><a href=\"/?type=business-rule\"{}>Business Rules</a></li>",
-            current
-        ));
-    }
-
-    // Audit Records (omitted when the document type is disabled)
-    let audit_enabled = cfg
-        .document_types
-        .get(Category::AuditRecord.config_key())
-        .map(|e| e.enabled)
-        .unwrap_or(false);
-    if audit_enabled {
-        let current = if selected == Some(Category::AuditRecord) {
-            " aria-current=\"page\""
-        } else {
-            ""
-        };
-        items.push_str(&format!(
-            "<li><a href=\"/?type=audit-record\"{}>Audit Records</a></li>",
-            current
-        ));
-    }
-    // Technical Specifications (omitted when the document type is disabled)
-    let tech_spec_enabled = cfg
-        .document_types
-        .get(Category::TechSpec.config_key())
-        .map(|e| e.enabled)
-        .unwrap_or(false);
-    if tech_spec_enabled {
-        let current = if selected == Some(Category::TechSpec) {
-            " aria-current=\"page\""
-        } else {
-            ""
-        };
-        items.push_str(&format!(
-            "<li><a href=\"/?type=tech-spec\"{}>Technical Specifications</a></li>",
-            current
-        ));
-    }
-    // Use Cases, Test Cases, Test Reports (omitted when the document type is disabled)
-    for (key, label, cat) in [
-        ("use-case", "Use Cases", Category::UseCase),
-        ("test-case", "Test Cases", Category::TestCase),
-        ("test-report", "Test Reports", Category::TestReport),
-    ] {
-        let enabled = cfg
-            .document_types
-            .get(key)
-            .map(|e| e.enabled)
-            .unwrap_or(false);
-        if enabled {
-            let current = if selected == Some(cat) {
+        for item in entries {
+            let current = if effective_selected == Some(item.slug.as_str()) {
                 " aria-current=\"page\""
             } else {
                 ""
             };
             items.push_str(&format!(
                 "<li><a href=\"/?type={}\"{}>{}</a></li>",
-                key, current, label
+                escape(&item.url_key),
+                current,
+                escape(&item.label)
             ));
         }
+        items.push_str("</ul></li>");
     }
-    // Non-functional requirements
-    let nfr_enabled = cfg
-        .document_types
-        .get(Category::Nfr.key())
-        .map(|e| e.enabled)
-        .unwrap_or(false);
-    if nfr_enabled {
-        let current = if selected == Some(Category::Nfr) {
-            " aria-current=\"page\""
-        } else {
-            ""
-        };
+    let utility = [
+        ("/config", "Configuration", config_active),
+        (
+            "/lifecycle",
+            "Managed artifacts &amp; lifecycles",
+            lifecycle_active,
+        ),
+        ("/skills", "Agent skills &amp; workflows", skills_active),
+    ];
+    for (href, label, active) in utility {
+        let current = if active { " aria-current=\"page\"" } else { "" };
         items.push_str(&format!(
-            "<li><a href=\"/?type=nfr\"{}>{}</a></li>",
-            current,
-            escape(category_name(Category::Nfr))
+            "<li><a href=\"{}\"{}>{}</a></li>",
+            href, current, label
         ));
     }
-    // Backlog (always available)
-    let current = if backlog_selected {
-        " aria-current=\"page\""
-    } else {
-        ""
-    };
-    items.push_str(&format!(
-        "<li><a href=\"/?type=task\"{}>Backlog</a></li>",
-        current
-    ));
-    // Decisions (always available)
-    let current = if selected == Some(Category::Decision) {
-        " aria-current=\"page\""
-    } else {
-        ""
-    };
-    items.push_str(&format!(
-        "<li><a href=\"/?type=decision\"{}>Decisions</a></li>",
-        current
-    ));
-    // Glossary (always available)
-    let current = if selected == Some(Category::Glossary) {
-        " aria-current=\"page\""
-    } else {
-        ""
-    };
-    items.push_str(&format!(
-        "<li><a href=\"/?type=glossary\"{}>Glossary</a></li>",
-        current
-    ));
-    // UI Specifications (omitted when the document type is disabled)
-    let ui_spec_enabled = cfg
-        .document_types
-        .get(Category::UiSpec.config_key())
-        .map(|e| e.enabled)
-        .unwrap_or(false);
-    if ui_spec_enabled {
-        let current = if selected == Some(Category::UiSpec) {
-            " aria-current=\"page\""
-        } else {
-            ""
-        };
-        items.push_str(&format!(
-            "<li><a href=\"/?type=ui-spec\"{}>UI Specifications</a></li>",
-            current
-        ));
-    }
-    // UI Mockups (omitted when the document type is disabled)
-    let mockup_enabled = cfg
-        .document_types
-        .get(Category::UiMockup.key())
-        .map(|e| e.enabled)
-        .unwrap_or(false);
-    if mockup_enabled {
-        let current = if selected == Some(Category::UiMockup) {
-            " aria-current=\"page\""
-        } else {
-            ""
-        };
-        items.push_str(&format!(
-            "<li><a href=\"/?type=ui-mockup\"{}>UI Mockups</a></li>",
-            current
-        ));
-    }
-    // Configuration (always present, not gated by document_types)
-    let config_current = if config_active {
-        " aria-current=\"page\""
-    } else {
-        ""
-    };
-    items.push_str(&format!(
-        "<li><a href=\"/config\"{}>Configuration</a></li>",
-        config_current
-    ));
-    // Managed artifacts & lifecycles (always present, not gated by document_types)
-    let lifecycle_current = if lifecycle_active {
-        " aria-current=\"page\""
-    } else {
-        ""
-    };
-    items.push_str(&format!(
-        "<li><a href=\"/lifecycle\"{}>Managed artifacts &amp; lifecycles</a></li>",
-        lifecycle_current
-    ));
-    // Agent skills & workflows (always present, not gated by document_types)
-    let skills_current = if skills_active {
-        " aria-current=\"page\""
-    } else {
-        ""
-    };
-    items.push_str(&format!(
-        "<li><a href=\"/skills\"{}>Agent skills &amp; workflows</a></li>",
-        skills_current
-    ));
     format!(
         "<aside class=\"sidebar\">\
 <button class=\"sidebar-toggle\" type=\"button\" aria-expanded=\"true\" aria-controls=\"type-list\">\
@@ -391,32 +207,39 @@ fn build_sidebar(
     )
 }
 
+fn breadcrumb_label(record: &Record) -> String {
+    match record.handler() {
+        Some(TypedHandler::Requirement(_)) => "Requirements".to_string(),
+        Some(TypedHandler::Task) => "Tasks".to_string(),
+        Some(TypedHandler::Milestone) => "Milestones".to_string(),
+        Some(TypedHandler::Release) => "Releases".to_string(),
+        Some(TypedHandler::Decision) => "Decisions".to_string(),
+        Some(TypedHandler::Glossary) => "Glossary".to_string(),
+        Some(TypedHandler::UiSpec) => "UI Specifications".to_string(),
+        Some(TypedHandler::UiMockup) => "UI Mockups".to_string(),
+        Some(TypedHandler::Rule) => "Business Rules".to_string(),
+        Some(TypedHandler::Audit) => "Audit Records".to_string(),
+        Some(TypedHandler::TechSpec) => "Technical Specifications".to_string(),
+        Some(TypedHandler::UseCase) => "Use Cases".to_string(),
+        Some(TypedHandler::TestCase) => "Test Cases".to_string(),
+        Some(TypedHandler::TestReport) => "Test Reports".to_string(),
+        None => record.type_label(),
+    }
+}
+
 fn breadcrumb(
     record: &Record,
     _resolved_group: Option<&Record>,
     _related_milestone: Option<&Record>,
     _related_release: Option<&Record>,
 ) -> String {
-    let (label, type_key) = match record.kind {
-        Category::Req | Category::Nfr => ("Requirements", record.kind.key()),
-        Category::Task => ("Tasks", "task"),
-        Category::Milestone => ("Milestones", "milestone"),
-        Category::Release => ("Releases", "release"),
-        Category::Decision => ("Decisions", "decision"),
-        Category::Glossary => ("Glossary", "glossary"),
-        Category::UiSpec => ("UI Specifications", "ui-spec"),
-        Category::UiMockup => ("UI Mockups", "ui-mockup"),
-        Category::BusinessRule => ("Business Rules", "business-rule"),
-        Category::AuditRecord => ("Audit Records", "audit-record"),
-        Category::TechSpec => ("Technical Specifications", "tech-spec"),
-        Category::UseCase => ("Use Cases", "use-case"),
-        Category::TestCase => ("Test Cases", "test-case"),
-        Category::TestReport => ("Test Reports", "test-report"),
-    };
+    let label = breadcrumb_label(record);
+    let type_key = routes::legacy_url_key(record.slug());
     let mut items = String::new();
     items.push_str(&format!(
         "<li><a href=\"/?type={}\">{}</a></li>",
-        type_key, label
+        escape(type_key),
+        escape(&label)
     ));
     items.push_str(&format!(
         "<li><span aria-current=\"page\">{}</span></li>",
@@ -429,26 +252,13 @@ fn breadcrumb(
 }
 
 fn edit_breadcrumb(record: &Record, _resolved_group: Option<&Record>) -> String {
-    let (label, type_key) = match record.kind {
-        Category::Req | Category::Nfr => ("Requirements", record.kind.key()),
-        Category::Task => ("Tasks", "task"),
-        Category::Milestone => ("Milestones", "milestone"),
-        Category::Release => ("Releases", "release"),
-        Category::Decision => ("Decisions", "decision"),
-        Category::Glossary => ("Glossary", "glossary"),
-        Category::UiSpec => ("UI Specifications", "ui-spec"),
-        Category::UiMockup => ("UI Mockups", "ui-mockup"),
-        Category::BusinessRule => ("Business Rules", "business-rule"),
-        Category::AuditRecord => ("Audit Records", "audit-record"),
-        Category::TechSpec => ("Technical Specifications", "tech-spec"),
-        Category::UseCase => ("Use Cases", "use-case"),
-        Category::TestCase => ("Test Cases", "test-case"),
-        Category::TestReport => ("Test Reports", "test-report"),
-    };
+    let label = breadcrumb_label(record);
+    let type_key = routes::legacy_url_key(record.slug());
     let mut items = String::new();
     items.push_str(&format!(
         "<li><a href=\"/?type={}\">{}</a></li>",
-        type_key, label
+        escape(type_key),
+        escape(&label)
     ));
     items.push_str(&format!(
         "<li><a href=\"/doc/{}\">{}</a></li>",
@@ -463,40 +273,30 @@ fn edit_breadcrumb(record: &Record, _resolved_group: Option<&Record>) -> String 
 }
 
 fn owning_group_dd(record: &Record, resolved_group: Option<&Record>) -> String {
-    match record.form {
-        Form::Group => "<dd class=\"link-muted\">None (group record)</dd>".to_string(),
-        Form::Requirement => match (record.group_id.as_deref(), resolved_group) {
-            (Some(id), Some(group)) => format!(
-                "<dd><a href=\"/doc/{}\">{} {}</a></dd>",
-                escape(&group.id),
-                escape(id),
-                escape(&group.title)
-            ),
-            (Some(id), None) => {
-                let stored = match &record.group_title {
-                    Some(title) => format!("{} {}", id, title),
-                    None => id.to_string(),
-                };
-                format!(
-                    "<dd>{} <span class=\"unresolved\">(not an active group)</span></dd>",
-                    escape(&stored)
-                )
-            }
-            (None, _) => "<dd class=\"link-muted\">None</dd>".to_string(),
-        },
-        Form::Task
-        | Form::Milestone
-        | Form::Release
-        | Form::Decision
-        | Form::Glossary
-        | Form::UiSpec
-        | Form::UiMockup
-        | Form::BusinessRule
-        | Form::AuditRecord
-        | Form::TechSpec
-        | Form::UseCase
-        | Form::TestCase
-        | Form::TestReport => "<dd class=\"link-muted\">(none)</dd>".to_string(),
+    if record.is_group {
+        return "<dd class=\"link-muted\">None (group record)</dd>".to_string();
+    }
+    if !record.is_requirement() {
+        return "<dd class=\"link-muted\">(none)</dd>".to_string();
+    }
+    match (record.group_id.as_deref(), resolved_group) {
+        (Some(id), Some(group)) => format!(
+            "<dd><a href=\"/doc/{}\">{} {}</a></dd>",
+            escape(&group.id),
+            escape(id),
+            escape(&group.title)
+        ),
+        (Some(id), None) => {
+            let stored = match &record.group_title {
+                Some(title) => format!("{} {}", id, title),
+                None => id.to_string(),
+            };
+            format!(
+                "<dd>{} <span class=\"unresolved\">(not an active group)</span></dd>",
+                escape(&stored)
+            )
+        }
+        (None, _) => "<dd class=\"link-muted\">None</dd>".to_string(),
     }
 }
 
@@ -602,9 +402,10 @@ fn read_only_timestamps(record: &Record) -> String {
 
 fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_only: bool) -> String {
     let owning = if group_id_only {
-        match record.form {
-            Form::Group => "<dd class=\"link-muted\">None (group record)</dd>".to_string(),
-            Form::Requirement => match (record.group_id.as_deref(), resolved_group) {
+        if record.is_group {
+            "<dd class=\"link-muted\">None (group record)</dd>".to_string()
+        } else if record.is_requirement() {
+            match (record.group_id.as_deref(), resolved_group) {
                 (Some(id), Some(group)) => format!(
                     "<dd><a href=\"/doc/{}\">{}</a></dd>",
                     escape(&group.id),
@@ -615,20 +416,9 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
                     escape(id)
                 ),
                 (None, _) => "<dd class=\"link-muted\">None</dd>".to_string(),
-            },
-            Form::Task
-            | Form::Milestone
-            | Form::Release
-            | Form::Decision
-            | Form::Glossary
-            | Form::UiSpec
-            | Form::UiMockup
-            | Form::BusinessRule
-            | Form::AuditRecord
-            | Form::TechSpec
-            | Form::UseCase
-            | Form::TestCase
-            | Form::TestReport => "<dd class=\"link-muted\">(none)</dd>".to_string(),
+            }
+        } else {
+            "<dd class=\"link-muted\">(none)</dd>".to_string()
         }
     } else {
         owning_group_dd(record, resolved_group)
@@ -652,7 +442,7 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
     } else {
         updated
     };
-    let include_owning = matches!(record.form, Form::Requirement);
+    let include_owning = record.is_requirement() && !record.is_group;
     let owning_row = if include_owning {
         format!("<div><dt>Owning group</dt>{}</div>", owning)
     } else {
@@ -674,10 +464,12 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
 
 fn requirement_link(record: &Record) -> String {
     format!(
-        "<li><a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>{}</li>",
+        "<li>{}<a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>{} {}</li>",
+        row_status(record),
         escape(&record.id),
         escape(&record.id),
         escape(&record.title),
+        row_dates(record),
         record_view_list_meta(record, &[])
     )
 }
@@ -693,7 +485,14 @@ fn member_list(members: &[Record]) -> String {
     format!("<ul class=\"req-list\">{}</ul>", items)
 }
 
-fn list_section(kind: Category, index: &Index, other_has_records: bool) -> String {
+fn list_section(descriptor: &TypeDescriptor, index: &Index, other_has_records: bool) -> String {
+    let slug = descriptor.slug.as_str();
+    let is_business_requirement = matches!(
+        content_handler(descriptor),
+        Some(TypedHandler::Requirement(
+            crate::registry::RequirementKind::Business
+        ))
+    );
     let total = index.records.len();
     let count = if total == 0 {
         "No groups".to_string()
@@ -709,21 +508,21 @@ fn list_section(kind: Category, index: &Index, other_has_records: bool) -> Strin
     body.push_str(&format!(
         "<section class=\"section\" aria-label=\"{}\">\
 <div class=\"section-head\"><h2 class=\"h2\">{}</h2><p class=\"count\">{}</p></div>",
-        escape(category_name(kind)),
-        escape(category_name(kind)),
+        escape(&category_name(slug)),
+        escape(&category_name(slug)),
         escape(&count)
     ));
 
     if total == 0 {
         let message = if other_has_records {
-            format!("No {} in this project.", category_short(kind))
+            format!("No {} in this project.", category_short(slug))
         } else {
             "No requirement records were found in the configured document directories.".to_string()
         };
-        let other_name = match kind {
-            Category::Req => "Non-functional requirements",
-            Category::Nfr => "Business requirements",
-            _ => "Other records",
+        let other_name = if is_business_requirement {
+            "Non-functional requirements"
+        } else {
+            "Business requirements"
         };
         let help = if other_has_records {
             format!(
@@ -743,7 +542,7 @@ fn list_section(kind: Category, index: &Index, other_has_records: bool) -> Strin
         return body;
     }
 
-    for (position, group) in index.groups.iter().enumerate() {
+    for group in &index.groups {
         let members: Vec<Record> = index
             .members
             .get(&group.id)
@@ -795,16 +594,15 @@ fn list_section(kind: Category, index: &Index, other_has_records: bool) -> Strin
             body.push_str(&format!("<ul class=\"req-list\">{}</ul>", items));
         }
         body.push_str("</article>");
-        let _ = position;
     }
 
-    if kind == Category::Req && !index.other.is_empty() {
+    if is_business_requirement && !index.other.is_empty() {
         body.push_str(&format!(
             "<section class=\"other\" aria-label=\"Other {}\">\
 <h3 class=\"h3\">Other requirements</h3>\
 <p class=\"other-note\">Group reference does not match an active group</p>\
 <ul class=\"other-list\">",
-            escape(category_name(kind))
+            escape(&category_name(slug))
         ));
         for position in &index.other {
             if let Some(requirement) = index.requirements.get(*position) {
@@ -814,11 +612,13 @@ fn list_section(kind: Category, index: &Index, other_has_records: bool) -> Strin
                     .map(|id| format!("Group: {} (not found)", id))
                     .unwrap_or_else(|| "Group: (none)".to_string());
                 body.push_str(&format!(
-                    "<li><a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>\
+                    "<li>{}<a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>{}\
 <span class=\"other-ref\">{}</span></li>",
+                    row_status(requirement),
                     escape(&requirement.id),
                     escape(&requirement.id),
                     escape(&requirement.title),
+                    row_dates(requirement),
                     escape(&reference)
                 ));
             }
@@ -830,32 +630,137 @@ fn list_section(kind: Category, index: &Index, other_has_records: bool) -> Strin
     body
 }
 
-/// Render the category list page.
-fn backlog_list_section(kind: Category, index: &Index) -> String {
+fn form_label(record: &Record) -> String {
+    if record.is_group {
+        return "Group".to_string();
+    }
+    if record.is_requirement() {
+        return "Requirement".to_string();
+    }
+    match record.handler() {
+        Some(TypedHandler::Requirement(_)) => "Requirement".to_string(),
+        Some(TypedHandler::Task) => "Task".to_string(),
+        Some(TypedHandler::Milestone) => "Milestone".to_string(),
+        Some(TypedHandler::Release) => "Release".to_string(),
+        Some(TypedHandler::Decision) => "Decision".to_string(),
+        Some(TypedHandler::Glossary) => "Glossary term".to_string(),
+        Some(TypedHandler::UiSpec) => "UI specification".to_string(),
+        Some(TypedHandler::UiMockup) => "UI mockup".to_string(),
+        Some(TypedHandler::Rule) => "Business rule".to_string(),
+        Some(TypedHandler::Audit) => "Audit record".to_string(),
+        Some(TypedHandler::TechSpec) => "Technical specification".to_string(),
+        Some(TypedHandler::UseCase) => "Use case".to_string(),
+        Some(TypedHandler::TestCase) => "Test case".to_string(),
+        Some(TypedHandler::TestReport) => "Test report".to_string(),
+        None => "Document".to_string(),
+    }
+}
+
+/// Read-only status cell, immediately before the ID.
+fn row_status(record: &Record) -> String {
+    format!(
+        "<span class=\"row-status\">{}</span> ",
+        escape(&record.status_text())
+    )
+}
+
+/// Read-only Created and Updated cells, in that order.
+fn row_dates(record: &Record) -> String {
+    let view = record_view(record);
+    let created = view
+        .as_ref()
+        .map(|v| v.value_text("created_date"))
+        .unwrap_or_default();
+    let created = if created.is_empty() {
+        "(none)"
+    } else {
+        created.as_str()
+    };
+    let updated = view
+        .as_ref()
+        .map(|v| v.value_text("updated_date"))
+        .unwrap_or_default();
+    let updated = if updated.is_empty() {
+        "(none)"
+    } else {
+        updated.as_str()
+    };
+    format!(
+        " <span class=\"row-created\">{}</span> <span class=\"row-updated\">{}</span>",
+        escape(created),
+        escape(updated)
+    )
+}
+
+/// Read-only status filter form for a document list.
+fn status_filter_html(descriptor: &TypeDescriptor, selected: Option<&str>) -> String {
+    let mut options = String::new();
+    // A disabled, default-selected placeholder keeps an untouched form from
+    // submitting `status` while still showing a prompt (REQ-07.005, AC6/AC7).
+    // `Show all` is the explicit reset; there is no empty selectable option.
+    if selected.is_none() {
+        options.push_str("<option value=\"\" disabled selected>Status</option>");
+    } else {
+        options.push_str("<option value=\"\" disabled>Status</option>");
+    }
+    for value in filter_statuses(descriptor) {
+        let current = if selected == Some(value.as_str()) {
+            " selected"
+        } else {
+            ""
+        };
+        options.push_str(&format!(
+            "<option value=\"{}\"{}>{}</option>",
+            escape(&value),
+            current,
+            escape(&value)
+        ));
+    }
+    format!(
+        "<form class=\"filter\" method=\"get\" action=\"/\">\
+<input type=\"hidden\" name=\"type\" value=\"{}\">\
+<div class=\"field\"><label for=\"status\">Status</label>\
+<select class=\"input\" id=\"status\" name=\"status\">{}</select></div>\
+<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Apply filter</button>\
+<a class=\"link\" href=\"/?type={}\">Show all</a></div></form>",
+        escape(routes::legacy_url_key(&descriptor.slug)),
+        options,
+        escape(routes::legacy_url_key(&descriptor.slug))
+    )
+}
+
+/// The category list page for a typed built-in document type.
+fn backlog_list_section(
+    slug: &str,
+    handler: Option<TypedHandler>,
+    index: &Index,
+    document_fields: bool,
+) -> String {
     let total = index.records.len();
-    // MOCK-0009's empty list still shows a count ("0 technical specifications"),
-    // unlike the other categories' "No records" summary.
-    let count = if total == 0
-        && !matches!(
-            kind,
-            Category::TechSpec | Category::UseCase | Category::TestCase | Category::TestReport
-        ) {
+    let empty_special = matches!(
+        handler,
+        Some(TypedHandler::TechSpec)
+            | Some(TypedHandler::UseCase)
+            | Some(TypedHandler::TestCase)
+            | Some(TypedHandler::TestReport)
+    );
+    let count = if total == 0 && !empty_special {
         "No records".to_string()
     } else {
-        let singular = match kind {
-            Category::Task => "task",
-            Category::Milestone => "milestone",
-            Category::Release => "release",
-            Category::Decision => "decision",
-            Category::Glossary => "glossary term",
-            Category::UiSpec => "UI specification",
-            Category::UiMockup => "UI mockup",
-            Category::BusinessRule => "business rule",
-            Category::AuditRecord => "audit record",
-            Category::TechSpec => "technical specification",
-            Category::UseCase => "use case",
-            Category::TestCase => "test case",
-            Category::TestReport => "test report",
+        let singular = match handler {
+            Some(TypedHandler::Task) => "task",
+            Some(TypedHandler::Milestone) => "milestone",
+            Some(TypedHandler::Release) => "release",
+            Some(TypedHandler::Decision) => "decision",
+            Some(TypedHandler::Glossary) => "glossary term",
+            Some(TypedHandler::UiSpec) => "UI specification",
+            Some(TypedHandler::UiMockup) => "UI mockup",
+            Some(TypedHandler::Rule) => "business rule",
+            Some(TypedHandler::Audit) => "audit record",
+            Some(TypedHandler::TechSpec) => "technical specification",
+            Some(TypedHandler::UseCase) => "use case",
+            Some(TypedHandler::TestCase) => "test case",
+            Some(TypedHandler::TestReport) => "test report",
             _ => "record",
         };
         let plural_word = format!("{}s", singular);
@@ -864,24 +769,21 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
     let mut body = String::new();
     body.push_str(&format!(
         "<section class=\"section\" aria-label=\"{}\"><div class=\"section-head\"><h2 class=\"h2\">{}</h2><p class=\"count\">{}</p></div>",
-        escape(category_name(kind)),
-        escape(category_name(kind)),
+        escape(&category_name(slug)),
+        escape(&category_name(slug)),
         escape(&count)
     ));
     if total == 0 {
-        if matches!(
-            kind,
-            Category::TechSpec | Category::UseCase | Category::TestCase | Category::TestReport
-        ) {
+        if empty_special {
             body.push_str(&format!(
                 "<div class=\"empty\"><p>No {} were found in the configured directory.</p><p class=\"help\">{} are created from the command line; this browser does not create records. Deprecated {} are hidden.</p></div></section>",
-                category_short(kind),
-                category_name(kind),
-                category_short(kind)
+                category_short(slug),
+                category_name(slug),
+                category_short(slug)
             ));
             return body;
         }
-        let message = format!("No {} in this project.", category_short(kind));
+        let message = format!("No {} in this project.", category_short(slug));
         body.push_str(&format!(
             "<div class=\"empty\"><p>{}</p><p class=\"help\">Records are created from the command line; this browser does not create records.</p></div>",
             escape(&message)
@@ -891,8 +793,18 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
     }
     body.push_str("<ul class=\"req-list\">");
     for record in &index.records {
-        let meta = match kind {
-            Category::Task => {
+        let status_cell = if document_fields {
+            row_status(record)
+        } else {
+            String::new()
+        };
+        let dates = if document_fields {
+            row_dates(record)
+        } else {
+            String::new()
+        };
+        let meta = match record.handler() {
+            Some(TypedHandler::Task) => {
                 let mut parts = Vec::new();
                 if let Some(s) = &record.status {
                     parts.push(s.clone());
@@ -905,9 +817,8 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
                 }
                 parts.join(" \u{b7} ")
             }
-            Category::Milestone => record.release_id.clone().unwrap_or_default(),
-            Category::Release => String::new(),
-            Category::Decision => {
+            Some(TypedHandler::Milestone) => record.release_id.clone().unwrap_or_default(),
+            Some(TypedHandler::Decision) => {
                 let mut parts = Vec::new();
                 if let Some(s) = &record.status {
                     parts.push(s.clone());
@@ -917,75 +828,74 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
                 }
                 parts.join(" \u{b7} ")
             }
-            Category::Glossary => String::new(),
-            Category::UiSpec => String::new(),
-            Category::UiMockup => String::new(),
-            Category::BusinessRule => String::new(),
-            Category::AuditRecord => String::new(),
             _ => String::new(),
         };
-        if kind == Category::Glossary
-            || kind == Category::UiSpec
-            || kind == Category::BusinessRule
-            || kind == Category::AuditRecord
-            || kind == Category::TechSpec
-            || kind == Category::UseCase
-            || kind == Category::TestCase
-            || kind == Category::TestReport
-        {
-            let preview = if kind == Category::UiSpec
-                || kind == Category::BusinessRule
-                || kind == Category::AuditRecord
-                || kind == Category::TechSpec
-                || kind == Category::UseCase
-                || kind == Category::TestCase
-                || kind == Category::TestReport
-            {
+        let preview_handler = matches!(
+            record.handler(),
+            Some(TypedHandler::Glossary)
+                | Some(TypedHandler::UiSpec)
+                | Some(TypedHandler::Rule)
+                | Some(TypedHandler::Audit)
+                | Some(TypedHandler::TechSpec)
+                | Some(TypedHandler::UseCase)
+                | Some(TypedHandler::TestCase)
+                | Some(TypedHandler::TestReport)
+        );
+        if preview_handler {
+            let preview = if record.handler() == Some(TypedHandler::Glossary) {
                 record
-                    .description
+                    .definition
                     .as_deref()
                     .map(first_paragraph)
                     .unwrap_or_default()
             } else {
                 record
-                    .definition
+                    .description
                     .as_deref()
                     .map(first_paragraph)
                     .unwrap_or_default()
             };
             if preview.is_empty() {
                 body.push_str(&format!(
-                    "<li><a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a></li>",
-                    escape(&record.id),
-                    escape(&record.id),
-                    escape(&record.title)
-                ));
-            } else {
-                body.push_str(&format!(
-                    "<li><a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a><p class=\"text\">{}</p></li>",
+                    "<li>{}<a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>{}</li>",
+                    status_cell,
                     escape(&record.id),
                     escape(&record.id),
                     escape(&record.title),
+                    dates
+                ));
+            } else {
+                body.push_str(&format!(
+                    "<li>{}<a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>{}<p class=\"text\">{}</p></li>",
+                    status_cell,
+                    escape(&record.id),
+                    escape(&record.id),
+                    escape(&record.title),
+                    dates,
                     escape(&preview)
                 ));
             }
         } else if meta.is_empty() {
             body.push_str(&format!(
-                "<li><a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a></li>",
-                escape(&record.id),
-                escape(&record.id),
-                escape(&record.title)
-            ));
-        } else {
-            body.push_str(&format!(
-                "<li><a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a> <span class=\"row-meta\">{}</span></li>",
+                "<li>{}<a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>{}</li>",
+                status_cell,
                 escape(&record.id),
                 escape(&record.id),
                 escape(&record.title),
+                dates
+            ));
+        } else {
+            body.push_str(&format!(
+                "<li>{}<a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>{} <span class=\"row-meta\">{}</span></li>",
+                status_cell,
+                escape(&record.id),
+                escape(&record.id),
+                escape(&record.title),
+                dates,
                 escape(&meta)
             ));
         }
-        if kind != Category::Glossary {
+        if record.handler() != Some(TypedHandler::Glossary) {
             let record_meta = record_view_backlog_row_meta(record);
             if !record_meta.is_empty()
                 && let Some(li_end) = body.rfind("</li>")
@@ -993,8 +903,7 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
                 body.insert_str(li_end, &record_meta);
             }
         }
-        // Glossary landing: labels as tags.
-        if kind == Category::Glossary && !record.labels.is_empty() {
+        if record.handler() == Some(TypedHandler::Glossary) && !record.labels.is_empty() {
             let tags: String = record
                 .labels
                 .iter()
@@ -1013,10 +922,10 @@ fn backlog_list_section(kind: Category, index: &Index) -> String {
 
 /// Backlog list-row metadata line from the shared `RecordView` (TASK-67).
 fn record_view_backlog_row_meta(record: &Record) -> String {
-    let skip: &[&str] = match record.kind {
-        Category::Task => &["status", "milestone", "assignee"],
-        Category::Milestone => &["release"],
-        Category::Decision => &["status"],
+    let skip: &[&str] = match record.handler() {
+        Some(TypedHandler::Task) => &["status", "milestone", "assignee"],
+        Some(TypedHandler::Milestone) => &["release"],
+        Some(TypedHandler::Decision) => &["status"],
         _ => &[],
     };
     record_view_list_meta(record, skip)
@@ -1186,7 +1095,19 @@ pub fn board_page(
     }
 
     if tasks.is_empty() && milestones.is_empty() {
-        section.push_str(&backlog_list_section(Category::Task, tasks));
+        let task_slug = chrome
+            .routes
+            .nav
+            .iter()
+            .find(|item| item.group == NavGroup::Backlog)
+            .map(|item| item.slug.as_str())
+            .unwrap_or_default();
+        section.push_str(&backlog_list_section(
+            task_slug,
+            Some(TypedHandler::Task),
+            tasks,
+            false,
+        ));
     } else {
         // The no-release group comes first, then every active release in
         // ascending ID order. A dangling release reference belongs to the
@@ -1293,75 +1214,119 @@ pub fn board_page(
             ("subheading", subheading),
         ],
         &[
-            ("sidebar", &sidebar(Some(Category::Task), cfg)),
+            (
+                "sidebar",
+                &sidebar(
+                    chrome
+                        .routes
+                        .nav
+                        .iter()
+                        .find(|item| item.group == NavGroup::Backlog)
+                        .map(|item| item.slug.as_str()),
+                    cfg,
+                    chrome.routes,
+                ),
+            ),
             ("section", &section),
         ],
     )
 }
 
 pub fn list_page(
-    kind: Category,
+    descriptor: &TypeDescriptor,
     index: &Index,
     other_has_records: bool,
+    status: Option<&str>,
     cfg: &Config,
     chrome: Chrome<'_>,
 ) -> String {
-    let section = if kind.is_requirement() {
-        list_section(kind, index, other_has_records)
+    let slug = descriptor.slug.as_str();
+    let handler = match &descriptor.content_model {
+        ContentModel::Generic => None,
+        ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => Some(schema.handler),
+    };
+    let document_fields = descriptor.category == CategoryKind::Document;
+    let section_body = if descriptor.id_shape == crate::registry::IdShape::Grouped {
+        list_section(descriptor, index, other_has_records)
     } else {
-        backlog_list_section(kind, index)
+        backlog_list_section(slug, handler, index, document_fields)
     };
-    let heading = match kind {
-        Category::Req | Category::Nfr => "Requirements",
-        Category::Task => "Tasks",
-        Category::Milestone => "Milestones",
-        Category::Release => "Releases",
-        Category::Decision => "Decisions",
-        Category::Glossary => "Glossary",
-        Category::UiSpec => "UI Specifications",
-        Category::UiMockup => "UI Mockups",
-        Category::BusinessRule => "Business Rules",
-        Category::AuditRecord => "Audit Records",
-        Category::TechSpec => "Technical Specifications",
-        Category::UseCase => "Use Cases",
-        Category::TestCase => "Test Cases",
-        Category::TestReport => "Test Reports",
+    let section = if document_fields {
+        format!(
+            "<div class=\"filter-wrap\">{}</div>{}",
+            status_filter_html(descriptor, status),
+            section_body
+        )
+    } else {
+        section_body
     };
-    let subheading = match kind {
-        Category::Req => "Business requirement records in this project.",
-        Category::Nfr => "Non-functional requirement records in this project.",
-        Category::Task => "Task records in this project.",
-        Category::Milestone => "Milestone records in this project.",
-        Category::Release => "Release records in this project.",
-        Category::Decision => "Decision records in this project.",
-        Category::Glossary => "Glossary terms in this project.",
-        Category::UiSpec => "UI specifications in this project.",
-        Category::UiMockup => "UI mockups in this project.",
-        Category::BusinessRule => "Business rules in this project.",
-        Category::AuditRecord => "Audit records in this project.",
-        Category::TechSpec => "Technical specifications in this project.",
-        Category::UseCase => "Use cases in this project.",
-        Category::TestCase => "Test cases in this project.",
-        Category::TestReport => "Test reports in this project.",
+    let heading = match handler {
+        Some(TypedHandler::Requirement(_)) => "Requirements",
+        Some(TypedHandler::Task) => "Tasks",
+        Some(TypedHandler::Milestone) => "Milestones",
+        Some(TypedHandler::Release) => "Releases",
+        Some(TypedHandler::Decision) => "Decisions",
+        Some(TypedHandler::Glossary) => "Glossary",
+        Some(TypedHandler::UiSpec) => "UI Specifications",
+        Some(TypedHandler::UiMockup) => "UI Mockups",
+        Some(TypedHandler::Rule) => "Business Rules",
+        Some(TypedHandler::Audit) => "Audit Records",
+        Some(TypedHandler::TechSpec) => "Technical Specifications",
+        Some(TypedHandler::UseCase) => "Use Cases",
+        Some(TypedHandler::TestCase) => "Test Cases",
+        Some(TypedHandler::TestReport) => "Test Reports",
+        None => "",
     };
-    let title = format!("Papyrus \u{2014} {}", category_name(kind));
+    let subheading = match handler {
+        Some(TypedHandler::Requirement(kind)) => {
+            if kind == crate::registry::RequirementKind::Business {
+                "Business requirement records in this project."
+            } else {
+                "Non-functional requirement records in this project."
+            }
+        }
+        Some(TypedHandler::Task) => "Task records in this project.",
+        Some(TypedHandler::Milestone) => "Milestone records in this project.",
+        Some(TypedHandler::Release) => "Release records in this project.",
+        Some(TypedHandler::Decision) => "Decision records in this project.",
+        Some(TypedHandler::Glossary) => "Glossary terms in this project.",
+        Some(TypedHandler::UiSpec) => "UI specifications in this project.",
+        Some(TypedHandler::UiMockup) => "UI mockups in this project.",
+        Some(TypedHandler::Rule) => "Business rules in this project.",
+        Some(TypedHandler::Audit) => "Audit records in this project.",
+        Some(TypedHandler::TechSpec) => "Technical specifications in this project.",
+        Some(TypedHandler::UseCase) => "Use cases in this project.",
+        Some(TypedHandler::TestCase) => "Test cases in this project.",
+        Some(TypedHandler::TestReport) => "Test reports in this project.",
+        None => "",
+    };
+    let heading = if heading.is_empty() {
+        category_name(slug)
+    } else {
+        heading.to_string()
+    };
+    let subheading = if subheading.is_empty() {
+        routes::inventory_note(slug)
+    } else {
+        subheading.to_string()
+    };
+    let title = format!("Papyrus \u{2014} {}", category_name(slug));
     render_template(
         LIST_TEMPLATE,
         &[
             ("title", &title),
             ("project", chrome.project),
             ("bind_note", chrome.bind_note),
-            ("heading", heading),
-            ("subheading", subheading),
+            ("heading", &heading),
+            ("subheading", &subheading),
         ],
         &[
-            ("sidebar", &sidebar(Some(kind), cfg)),
+            ("sidebar", &sidebar(Some(slug), cfg, chrome.routes)),
             ("section", &section),
         ],
     )
 }
 
-/// Render a record view page.
 #[allow(clippy::too_many_arguments)]
 pub fn view_page(
     record: &Record,
@@ -1376,9 +1341,9 @@ pub fn view_page(
 ) -> String {
     let mut content = String::new();
     let mut details = String::new();
-    match record.kind {
-        Category::Req | Category::Nfr => {
-            if record.kind.supports_story()
+    match record.handler() {
+        Some(TypedHandler::Requirement(_)) => {
+            if record.supports_story()
                 && let Some(story) = &record.story
             {
                 content.push_str(&format!(
@@ -1394,14 +1359,14 @@ pub fn view_page(
                 None => content.push_str("<p class=\"text empty-text\">No description.</p>"),
             }
             content.push_str("</section>");
-            if record.form == Form::Group {
+            if record.is_group {
                 content.push_str(&format!(
                     "<section class=\"record-section\"><h2>Requirements in this group</h2>{}</section>",
                     member_list(members)
                 ));
             }
         }
-        Category::Task => {
+        Some(TypedHandler::Task) => {
             // Status
             content.push_str(&format!(
                 "<section class=\"record-section\"><h2>Status</h2><p class=\"text\">{}</p></section>",
@@ -1493,7 +1458,7 @@ pub fn view_page(
             }
             content.push_str("</section>");
         }
-        Category::Milestone => {
+        Some(TypedHandler::Milestone) => {
             let rel_html = match (&record.release_id, related_release) {
                 (Some(id), Some(rel)) => format!(
                     "<a href=\"/doc/{}\">{} {}</a>",
@@ -1517,7 +1482,7 @@ pub fn view_page(
             }
             content.push_str("</section>");
         }
-        Category::Release => {
+        Some(TypedHandler::Release) => {
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
                 Some(description) => {
@@ -1527,7 +1492,7 @@ pub fn view_page(
             }
             content.push_str("</section>");
         }
-        Category::Decision => {
+        Some(TypedHandler::Decision) => {
             // Decision text
             content.push_str("<section class=\"record-section\"><h2>Decision</h2>");
             match &record.decision {
@@ -1576,7 +1541,7 @@ pub fn view_page(
             }
             content.push_str("</section>");
         }
-        Category::Glossary => {
+        Some(TypedHandler::Glossary) => {
             content.push_str("<section class=\"record-section\"><h2>Definition</h2>");
             match &record.definition {
                 Some(t) if !t.trim().is_empty() => content.push_str(&format!(
@@ -1587,7 +1552,7 @@ pub fn view_page(
             }
             content.push_str("</section>");
         }
-        Category::UiSpec => {
+        Some(TypedHandler::UiSpec) => {
             content.push_str("<section class=\"record-section\"><h2>View</h2>");
             match &record.view {
                 Some(t) if !t.trim().is_empty() => content.push_str(&format!(
@@ -1607,7 +1572,7 @@ pub fn view_page(
             }
             content.push_str("</section>");
         }
-        Category::UiMockup => {
+        Some(TypedHandler::UiMockup) => {
             // Shared parser values loaded with the record (section 3);
             // the stored package itself is never rendered or embedded.
             let specs = record.specs.join(" ");
@@ -1633,7 +1598,7 @@ pub fn view_page(
                 ));
             }
         }
-        Category::BusinessRule => {
+        Some(TypedHandler::Rule) => {
             // Description
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
@@ -1684,7 +1649,7 @@ pub fn view_page(
                 details.push_str("</ul></details>");
             }
         }
-        Category::AuditRecord => {
+        Some(TypedHandler::Audit) => {
             content.push_str(&format!(
                 "<p class=\"text\">Audit type: {}</p>",
                 escape(record.audit_type.as_deref().unwrap_or("security"))
@@ -1699,7 +1664,7 @@ pub fn view_page(
                 ));
             }
         }
-        Category::TechSpec => {
+        Some(TypedHandler::TechSpec) => {
             // The description is body text: no "Description" heading. The
             // shared `.text` class already applies `white-space: pre-wrap`.
             let content_text = record.description.as_deref().unwrap_or("");
@@ -1709,7 +1674,9 @@ pub fn view_page(
                 content.push_str(&format!("<p class=\"text\">{}</p>", escape(content_text)));
             }
         }
-        Category::UseCase | Category::TestCase | Category::TestReport => {
+        Some(TypedHandler::UseCase)
+        | Some(TypedHandler::TestCase)
+        | Some(TypedHandler::TestReport) => {
             let content_text = record.description.as_deref().unwrap_or("");
             if content_text.trim().is_empty() {
                 content.push_str("<p class=\"text empty-text\">(none)</p>");
@@ -1728,9 +1695,19 @@ pub fn view_page(
                 ));
             }
         }
+        None => {
+            content.push_str("<section class=\"record-section\"><h2>Description</h2>");
+            match &record.description {
+                Some(description) => {
+                    content.push_str(&format!("<p class=\"text\">{}</p>", escape(description)))
+                }
+                None => content.push_str("<p class=\"text empty-text\">No description.</p>"),
+            }
+            content.push_str("</section>");
+        }
     }
 
-    if !resolved_refs.is_empty() && record.kind != Category::BusinessRule {
+    if !resolved_refs.is_empty() && record.handler() != Some(TypedHandler::Rule) {
         details.push_str(&format!(
             "<details><summary>References ({})</summary><ul class=\"req-list\">",
             resolved_refs.len()
@@ -1750,10 +1727,10 @@ pub fn view_page(
     }
     let form_line = format!(
         "<p class=\"record-meta\">{}</p>",
-        escape(record.form.label())
+        escape(&form_label(record))
     );
     content = format!("{}{}", form_line, content);
-    if record.kind == Category::Decision {
+    if record.handler() == Some(TypedHandler::Decision) {
         content = format!(
             "<p class=\"record-meta\">Decision type: {}</p><p class=\"record-meta\">Status: {}</p>{}",
             escape(record.decision_type.as_deref().unwrap_or("(none)")),
@@ -1778,7 +1755,18 @@ pub fn view_page(
         out.push_str("</div>");
         out
     };
-    let page_head = if record.kind == Category::AuditRecord {
+    // UI mockups store their status in HTML metadata rather than in a
+    // rendered section, so surface it with the same read-only status line as
+    // the generic document detail page (specification 4.1.3).
+    let status_line = if record.handler() == Some(TypedHandler::UiMockup) {
+        format!(
+            "<p class=\"status-line\"><span class=\"badge\">Status</span> {}</p>",
+            escape(&record.status_text())
+        )
+    } else {
+        String::new()
+    };
+    let page_head = if record.handler() == Some(TypedHandler::Audit) {
         let audit_type = record.audit_type.as_deref().unwrap_or("security");
         format!(
             "<div class=\"page-head\"><div><p class=\"id\">{} <span class=\"badge\">{}</span></p><h1 class=\"h1\">{}</h1>{}</div>\
@@ -1791,17 +1779,18 @@ pub fn view_page(
         )
     } else {
         format!(
-            "<div class=\"page-head\"><div><p class=\"id\">{}</p><h1 class=\"h1\">{}</h1>{}</div>\
+            "<div class=\"page-head\"><div><p class=\"id\">{}</p><h1 class=\"h1\">{}</h1>{}{}</div>\
 <div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Edit</a></div></div>",
             escape(&record.id),
             escape(&record.title),
             taglist,
+            status_line,
             escape(&record.id)
         )
     };
     let title = format!("Papyrus \u{2014} {} {}", record.id, record.title);
     let breadcrumb_html = breadcrumb(record, resolved_group, related_milestone, related_release);
-    let meta_html = if record.kind.is_requirement() {
+    let meta_html = if record.is_requirement() {
         metadata_block(record, resolved_group, false)
     } else {
         metadata_block_backlog(record, related_milestone, related_release)
@@ -1814,7 +1803,7 @@ pub fn view_page(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &breadcrumb_html),
             ("page_head", &page_head),
             ("meta", &meta_html),
@@ -2058,7 +2047,7 @@ pub fn edit_page(
         field_error("title", errors.title.as_deref())
     ));
 
-    if record.kind.supports_story() {
+    if record.supports_story() {
         form.push_str(&format!(
             "<div class=\"field\"><label for=\"story\">User story</label>\
 <textarea class=\"textarea\" id=\"story\" name=\"story\" rows=\"4\"{}>{}</textarea>\
@@ -2104,7 +2093,7 @@ pub fn edit_page(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, resolved_group)),
             ("page_head", &page_head),
             ("meta", &metadata_block(record, resolved_group, true)),
@@ -2217,7 +2206,7 @@ pub fn edit_page_task(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -2297,7 +2286,7 @@ pub fn edit_page_milestone(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -2370,7 +2359,7 @@ pub fn edit_page_release(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -2472,7 +2461,7 @@ pub fn edit_page_decision(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -2594,7 +2583,7 @@ pub fn edit_page_glossary(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -2675,7 +2664,7 @@ pub fn edit_page_ui_spec(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -2809,7 +2798,7 @@ pub fn edit_page_ui_mockup(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -2908,7 +2897,7 @@ pub fn edit_page_business_rule(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -3038,7 +3027,7 @@ pub fn edit_page_audit_record(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -3085,7 +3074,7 @@ pub fn conflict_page_audit_record(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &body),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -3209,7 +3198,7 @@ pub fn edit_page_tech_spec(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -3312,7 +3301,7 @@ pub fn edit_page_use_case(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -3392,7 +3381,7 @@ pub fn conflict_page_use_case(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &body),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -3480,7 +3469,7 @@ pub fn conflict_page_tech_spec(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &body),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -3589,7 +3578,10 @@ pub fn error_page(status: u16, cfg: &Config, chrome: Chrome<'_>, actions: Option
             ("message", message),
             ("hint", hint),
         ],
-        &[("sidebar", &sidebar(None, cfg)), ("actions", actions)],
+        &[
+            ("sidebar", &sidebar(None, cfg, chrome.routes)),
+            ("actions", actions),
+        ],
     )
 }
 
@@ -3616,7 +3608,14 @@ The same page is used for an unknown address.",
             ),
         ],
         &[
-            ("sidebar", &sidebar(Some(Category::TechSpec), cfg)),
+            (
+                "sidebar",
+                &sidebar(
+                    routes::not_found_slug(routes::NotFoundPage::TechSpec),
+                    cfg,
+                    chrome.routes,
+                ),
+            ),
             ("actions", actions),
         ],
     )
@@ -3640,7 +3639,14 @@ pub fn use_case_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
             ),
         ],
         &[
-            ("sidebar", &sidebar(Some(Category::UseCase), cfg)),
+            (
+                "sidebar",
+                &sidebar(
+                    routes::not_found_slug(routes::NotFoundPage::UseCase),
+                    cfg,
+                    chrome.routes,
+                ),
+            ),
             ("actions", actions),
         ],
     )
@@ -3664,7 +3670,14 @@ pub fn test_case_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
             ),
         ],
         &[
-            ("sidebar", &sidebar(Some(Category::TestCase), cfg)),
+            (
+                "sidebar",
+                &sidebar(
+                    routes::not_found_slug(routes::NotFoundPage::TestCase),
+                    cfg,
+                    chrome.routes,
+                ),
+            ),
             ("actions", actions),
         ],
     )
@@ -3688,7 +3701,14 @@ pub fn test_report_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
             ),
         ],
         &[
-            ("sidebar", &sidebar(Some(Category::TestReport), cfg)),
+            (
+                "sidebar",
+                &sidebar(
+                    routes::not_found_slug(routes::NotFoundPage::TestReport),
+                    cfg,
+                    chrome.routes,
+                ),
+            ),
             ("actions", actions),
         ],
     )
@@ -3718,13 +3738,13 @@ pub fn conflict_page(
 <a class=\"link\" href=\"/?type={}\">Back to requirements</a></div>",
         escape(&record.id),
         escape(&record.id),
-        record.kind.key()
+        record.slug()
     ));
     content.push_str(
         "<div class=\"readonly-block\"><h2>Your unsaved changes (read-only, not saved)</h2><dl>",
     );
     content.push_str(&format!("<dt>Title</dt><dd>{}</dd>", escape(&values.title)));
-    if record.kind.supports_story() {
+    if record.supports_story() {
         content.push_str(&format!(
             "<dt>User story</dt><dd class=\"text\">{}</dd>",
             escape(&values.story)
@@ -3747,7 +3767,7 @@ pub fn conflict_page(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &content),
             ("meta", ""),
@@ -3774,7 +3794,7 @@ pub fn conflict_page_ui_mockup(
         "<div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Reload the form</a><a class=\"link\" href=\"/doc/{}\">View current record</a><a class=\"link\" href=\"/?type={}\">Back to requirements</a></div>",
         escape(&record.id),
         escape(&record.id),
-        record.kind.key()
+        record.slug()
     ));
     content.push_str(
         "<div class=\"readonly-block\"><h2>Your unsaved changes (read-only, not saved)</h2><dl>",
@@ -3801,7 +3821,7 @@ pub fn conflict_page_ui_mockup(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &content),
             ("meta", ""),
@@ -3870,7 +3890,7 @@ pub fn conflict_page_business_rule(
             ("bind_note", chrome.bind_note),
         ],
         &[
-            ("sidebar", &sidebar(Some(record.kind), cfg)),
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &content),
             ("meta", &metadata_block_backlog(record, None, None)),
@@ -3910,18 +3930,12 @@ mod tests {
     }
 }
 
-/// Render the managed artifacts and lifecycles page.
-pub fn lifecycle_page(cfg: &Config, chrome: Chrome<'_>) -> String {
-    let statuses = if cfg.statuses.is_empty() || !cfg.statuses.contains(&cfg.default_status) {
-        Config::default().statuses
-    } else {
-        cfg.statuses.clone()
-    };
-    let chain = statuses
-        .iter()
-        .map(|s| escape(s))
-        .collect::<Vec<_>>()
-        .join(" \u{2192} ");
+/// Render the registry-derived managed artifacts and lifecycles page.
+pub fn lifecycle_page(
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    chrome: Chrome<'_>,
+) -> String {
     fn storage_folder(base: &str, sub: &str) -> String {
         let base = base.trim_end_matches('/');
         let sub = sub.trim_matches('/');
@@ -3934,187 +3948,84 @@ pub fn lifecycle_page(cfg: &Config, chrome: Chrome<'_>) -> String {
         }
     }
 
+    fn section(descriptor: &TypeDescriptor, cfg: &Config) -> String {
+        let heading = routes::heading(&descriptor.slug);
+        let description = routes::lifecycle_description(&descriptor.slug);
+        let lifecycle = match &descriptor.status_model {
+            StatusModel::TaskConfigurable { statuses, .. } => statuses.join(" \u{2192} "),
+            StatusModel::Fixed { states } => states.join(" \u{2192} "),
+            StatusModel::DocumentMain { custom, .. } => {
+                let mut values = vec!["active \u{2192} archived".to_string()];
+                if !custom.is_empty() {
+                    values.push(format!(
+                        "custom front-matter statuses: {} (do not move files)",
+                        custom.join(", ")
+                    ));
+                } else {
+                    values.push("custom front-matter statuses: (none)".to_string());
+                }
+                values.join("; ")
+            }
+            StatusModel::HtmlMetadata { states } => states.join(" \u{2192} "),
+        };
+        let folder = match descriptor.directory.config_key {
+            "backlog_directory" => {
+                storage_folder(&cfg.backlog_directory, &descriptor.directory.relative)
+            }
+            "decision_directory" => {
+                storage_folder(&cfg.decision_directory, &descriptor.directory.relative)
+            }
+            _ => storage_folder(&cfg.doc_directory, &descriptor.directory.relative),
+        };
+        format!(
+            "<section><h2>{}</h2><p>Curated description: {}</p><p>Lifecycle: {}.</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
+            escape(&heading),
+            escape(&description),
+            escape(&lifecycle),
+            if descriptor.enabled { "true" } else { "false" },
+            escape(&descriptor.prefix),
+            escape(&folder)
+        )
+    }
+
     let mut sections = String::new();
+    for (group, category) in [
+        (NavGroup::Backlog, CategoryKind::Backlog),
+        (NavGroup::Decisions, CategoryKind::Decision),
+        (NavGroup::Documents, CategoryKind::Document),
+    ] {
+        sections.push_str(&format!("<h2 class=\"h2\">{}</h2>", group.heading()));
+        for descriptor in registry.in_category(category) {
+            sections.push_str(&section(descriptor, cfg));
+        }
+    }
+    sections.push_str(
+        "<p>The three categories are Backlog, Decisions, and Documents. Backlog.md <code>docs</code>, <code>drafts</code>, and project configuration files are excluded from every category. Configuration is a startup snapshot: document-type changes take effect on the next browser start.</p>",
+    );
 
-    // Tasks
-    {
-        let folder = storage_folder(&cfg.backlog_directory, "tasks");
-        sections.push_str(&format!(
-            "<section><h2>Tasks</h2><p>Curated description: tracked work items with a configurable status workflow.</p><p>States: {}. States and transitions are derived from the configured task statuses (REQ-01.002). Task lifecycle operations are CLI-only.</p><p>Read-only config \u{2014} enabled: true; ID prefix: {}; storage folder: {}. Statuses shown above. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
-            chain, escape(&cfg.task_prefix), escape(&folder)
-        ));
-    }
-
-    // Milestones
-    {
-        let folder = storage_folder(&cfg.backlog_directory, "milestones");
-        sections.push_str(&format!(
-            "<section><h2>Milestones</h2><p>Curated description: grouping of tasks toward a delivery goal.</p><p>Lifecycle: active \u{2192} archived. Archiving a milestone is separate from task workflow status.</p><p>Read-only config \u{2014} enabled: true; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
-            escape(&cfg.milestone_prefix), escape(&folder)
-        ));
-    }
-
-    // Releases
-    {
-        let folder = storage_folder(&cfg.backlog_directory, "releases");
-        sections.push_str(&format!(
-            "<section><h2>Releases</h2><p>Curated description: grouping of milestones toward a delivery.</p><p>Lifecycle: active \u{2192} released. released is delivery completion, distinct from archiving; releases are not archived. The transition is performed explicitly via the documented release status command.</p><p>Read-only config \u{2014} enabled: true; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
-            escape(&cfg.release_prefix), escape(&folder)
-        ));
-    }
-
-    // Decisions
-    {
-        let enabled = cfg.decision_types.values().any(|e| e.enabled);
-        let prefixes: Vec<String> = cfg
-            .decision_types
-            .values()
-            .filter(|e| e.enabled)
-            .map(|e| e.prefix.clone())
-            .collect();
-        let prefix = prefixes.join(", ");
-        let folder = storage_folder(&cfg.decision_directory, "");
-        sections.push_str(&format!(
-            "<section><h2>Decisions</h2><p>Curated description: recorded decisions with status and supersession.</p><p>Lifecycle: proposed \u{2192} accepted | rejected; accepted \u{2192} deprecated | superseded.</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
-            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
-        ));
-    }
-
-    let doc = |key: &str| cfg.document_types.get(key).cloned();
-
-    // Business requirements
-    {
-        let entry = doc("req");
-        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
-        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
-        let folder = entry
-            .as_ref()
-            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
-            .unwrap_or_default();
-        sections.push_str(&format!(
-            "<section><h2>Business requirements</h2><p>Curated description: business requirement groups and atomic requirements.</p><p>Lifecycle: active \u{2192} deprecated (restored via restore).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
-            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
-        ));
-    }
-    // Non-functional requirements
-    {
-        let entry = doc("nfr");
-        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
-        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
-        let folder = entry
-            .as_ref()
-            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
-            .unwrap_or_default();
-        sections.push_str(&format!(
-            "<section><h2>Non-functional requirements</h2><p>Curated description: non-functional requirement groups and atomic requirements.</p><p>Lifecycle: active \u{2192} deprecated (restored via restore).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
-            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
-        ));
-    }
-    // Glossary terms
-    {
-        let entry = doc("glossary");
-        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
-        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
-        let folder = entry
-            .as_ref()
-            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
-            .unwrap_or_default();
-        sections.push_str(&format!(
-            "<section><h2>Glossary terms</h2><p>Curated description: glossary terms and definitions.</p><p>Lifecycle: active \u{2192} deprecated (restored via restore).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
-            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
-        ));
-    }
-    // UI specifications
-    {
-        let entry = doc("ui-spec");
-        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
-        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
-        let folder = entry
-            .as_ref()
-            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
-            .unwrap_or_default();
-        sections.push_str(&format!(
-            "<section><h2>UI specifications</h2><p>Curated description: UI specification records.</p><p>Lifecycle: active \u{2192} deprecated (restored via restore).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
-            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
-        ));
-    }
-    // Technical specifications
-    {
-        let entry = doc("tech-spec");
-        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
-        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
-        let folder = entry
-            .as_ref()
-            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
-            .unwrap_or_default();
-        sections.push_str(&format!(
-            "<section><h2>Technical specifications</h2><p>Curated description: technical specification records.</p><p>Lifecycle: active \u{2192} deprecated (restored via restore).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
-            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
-        ));
-    }
-    // UI mockups
-    {
-        let entry = doc("ui-mockup");
-        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
-        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
-        let folder = entry
-            .as_ref()
-            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
-            .unwrap_or_default();
-        sections.push_str(&format!(
-            "<section><h2>UI mockups</h2><p>Curated description: UI mockup review packages.</p><p>Lifecycle: pending \u{2192} approved \u{2192} deprecated (restored via restore; supersession via ui-mockup supersede).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
-            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
-        ));
-    }
-    // Business rules
-    {
-        let entry = doc("rule");
-        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
-        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
-        let folder = entry
-            .as_ref()
-            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
-            .unwrap_or_default();
-        sections.push_str(&format!(
-            "<section><h2>Business rules</h2><p>Curated description: business rules and applicability.</p><p>Lifecycle: active \u{2192} deprecated (restored via restore).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
-            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
-        ));
-    }
-    // Audit records
-    {
-        let entry = doc("audit");
-        let enabled = entry.as_ref().map(|e| e.enabled).unwrap_or(false);
-        let prefix = entry.as_ref().map(|e| e.prefix.clone()).unwrap_or_default();
-        let folder = entry
-            .as_ref()
-            .map(|e| storage_folder(&cfg.doc_directory, &e.directory))
-            .unwrap_or_default();
-        sections.push_str(&format!(
-            "<section><h2>Audit records</h2><p>Curated description: audit records with type and content.</p><p>Lifecycle: active \u{2192} deprecated (restored via restore).</p><p>Read-only config \u{2014} enabled: {}; ID prefix: {}; storage folder: {}. Changes via <a class=\"link\" href=\"/config\">Configuration</a>.</p></section>",
-            if enabled { "true" } else { "false" }, escape(&prefix), escape(&folder)
-        ));
-    }
-
-    let title = "Papyrus \u{2014} Managed artifacts and lifecycles".to_string();
-    let subheading = "One section per managed record type. Backlog.md docs, drafts, and project configuration files are not covered.";
     render_template(
-        LIST_TEMPLATE,
+        VIEW_TEMPLATE,
         &[
-            ("title", &title),
+            ("title", "Papyrus \u{2014} Managed artifacts & lifecycles"),
             ("project", chrome.project),
             ("bind_note", chrome.bind_note),
-            ("heading", "Managed artifacts and lifecycles"),
-            ("subheading", subheading),
         ],
         &[
-            ("sidebar", &sidebar_with_lifecycle(None, cfg, true)),
-            ("section", &sections),
+            (
+                "sidebar",
+                &sidebar_with_lifecycle(None, cfg, true, chrome.routes),
+            ),
+            ("breadcrumb", ""),
+            (
+                "page_head",
+                "<h1 class=\"h1\">Managed artifacts &amp; lifecycles</h1>",
+            ),
+            ("meta", ""),
+            ("content", &sections),
         ],
     )
 }
 
-/// Render the agent skills and workflows page.
-#[allow(clippy::type_complexity)]
 pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     // Status fallback mirrors the lifecycle page.
     let statuses = if cfg.statuses.is_empty() || !cfg.statuses.contains(&cfg.default_status) {
@@ -4146,7 +4057,8 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     let decision_directory = cfg.decision_directory.clone();
     let doc_directory = cfg.doc_directory.clone();
 
-    // Enabled document types in configured (canonical default) order.
+    // Display order for the skills summary; membership still comes from the
+    // configured document types.
     let known_doc_order = [
         "req",
         "nfr",
@@ -4162,18 +4074,17 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     ];
     let mut enabled_doc = Vec::new();
     for key in known_doc_order {
-        if let Some(e) = cfg.document_types.get(key)
-            && e.enabled
+        if let Some(entry) = cfg.document_types.get(key)
+            && entry.enabled
         {
             enabled_doc.push(key.to_string());
         }
     }
-    // Append any unknown enabled keys (sorted).
     let mut unknown: Vec<String> = cfg
         .document_types
         .iter()
-        .filter(|(k, e)| e.enabled && !known_doc_order.contains(&k.as_str()))
-        .map(|(k, _)| k.clone())
+        .filter(|(key, entry)| entry.enabled && !known_doc_order.contains(&key.as_str()))
+        .map(|(key, _)| key.clone())
         .collect();
     unknown.sort();
     enabled_doc.extend(unknown);
@@ -4258,6 +4169,7 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
 
     // Skill groups.
     // (group title, Vec of (title, desc_template, snippet_template))
+    #[allow(clippy::type_complexity)]
     let groups: Vec<(&str, Vec<(&str, &str, &str)>)> = vec![
         (
             "Project setup and init",
@@ -4375,7 +4287,10 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
             ("subheading", subheading),
         ],
         &[
-            ("sidebar", &sidebar_with_skills(None, cfg, true)),
+            (
+                "sidebar",
+                &sidebar_with_skills(None, cfg, true, chrome.routes),
+            ),
             ("section", &sections),
         ],
     )
@@ -4458,6 +4373,375 @@ pub fn inventory_page(cfg: &Config, chrome: Chrome<'_>, cards: &[InventoryCard])
             ("heading", "Browser inventory"),
             ("subheading", subheading),
         ],
-        &[("sidebar", &sidebar(None, cfg)), ("section", &section)],
+        &[
+            ("sidebar", &sidebar(None, cfg, chrome.routes)),
+            ("section", &section),
+        ],
+    )
+}
+
+pub const DOCUMENT_LIST_TEMPLATE: &str = include_str!("templates/document_list.html");
+pub const DOCUMENT_DETAIL_TEMPLATE: &str = include_str!("templates/document_detail.html");
+pub const DOCUMENT_EDIT_TEMPLATE: &str = include_str!("templates/document_edit.html");
+
+/// Generic document list with the shared Status, ID, Title, Created, Updated
+/// table columns (section 3.1).
+pub fn document_list_page(
+    descriptor: &TypeDescriptor,
+    index: &Index,
+    status: Option<&str>,
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    let slug = descriptor.slug.as_str();
+    let title = format!("Papyrus \u{2014} {}", category_name(slug));
+    let count = plural(index.records.len(), "record", "records");
+    let mut rows = String::new();
+    for record in &index.records {
+        let view = record_view(record);
+        let created = view
+            .as_ref()
+            .map(|v| v.value_text("created_date"))
+            .unwrap_or_default();
+        let created = if created.is_empty() {
+            "(none)".to_string()
+        } else {
+            created
+        };
+        let updated = view
+            .as_ref()
+            .map(|v| v.value_text("updated_date"))
+            .unwrap_or_default();
+        let updated = if updated.is_empty() {
+            "(none)".to_string()
+        } else {
+            updated
+        };
+        rows.push_str(&format!(
+            "<tr><td>{}</td><td class=\"mono\">{}</td><td><a href=\"/doc/{}\">{}</a></td><td>{}</td><td>{}</td></tr>",
+            escape(&record.status_text()),
+            escape(&record.id),
+            escape(&record.id),
+            escape(&record.title),
+            escape(&created),
+            escape(&updated)
+        ));
+    }
+    let section = if index.records.is_empty() {
+        format!(
+            "<div class=\"empty\"><p>No {} in this project.</p><p class=\"help\">Records are created from the command line; this browser does not create records.</p></div>",
+            escape(&category_short(slug))
+        )
+    } else {
+        format!(
+            "<p class=\"count\">{}</p><table class=\"table\"><thead><tr><th scope=\"col\">Status</th><th scope=\"col\">ID</th><th scope=\"col\">Title</th><th scope=\"col\">Created</th><th scope=\"col\">Updated</th></tr></thead><tbody>{}</tbody></table>",
+            escape(&count),
+            rows
+        )
+    };
+    render_template(
+        DOCUMENT_LIST_TEMPLATE,
+        &[
+            ("title", &title),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+            ("heading", &category_name(slug)),
+            ("subheading", &routes::inventory_note(slug)),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(slug), cfg, chrome.routes)),
+            ("filter", &status_filter_html(descriptor, status)),
+            ("section", &section),
+        ],
+    )
+}
+
+/// Generic document detail page (section 4.1).
+pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -> String {
+    let view = record_view(record);
+    let created = view
+        .as_ref()
+        .map(|v| v.value_text("created_date"))
+        .unwrap_or_default();
+    let created = if created.is_empty() {
+        "(none)".to_string()
+    } else {
+        created
+    };
+    let updated = view
+        .as_ref()
+        .map(|v| v.value_text("updated_date"))
+        .unwrap_or_default();
+    let updated = if updated.is_empty() {
+        "(none)".to_string()
+    } else {
+        updated
+    };
+
+    let mut tags = String::new();
+    for label in &record.labels {
+        tags.push_str(&format!("<span class=\"tag\">{}</span>", escape(label)));
+    }
+    let label_tags = if tags.is_empty() {
+        String::new()
+    } else {
+        format!("<p class=\"taglist\">{}</p>", tags)
+    };
+    let page_head = format!(
+        "<h1 class=\"h1\">{} {}</h1>{}<p class=\"status-line\"><span class=\"badge\">Status</span> {}</p>",
+        escape(&record.id),
+        escape(&record.title),
+        label_tags,
+        escape(&record.status_text())
+    );
+    let meta = format!(
+        "<div class=\"meta summary-card\"><dl class=\"dl\">\
+<div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div>\
+<div><dt>Created date</dt><dd>{}</dd></div>\
+<div><dt>Updated date</dt><dd>{}</dd></div>\
+</dl></div>",
+        escape(&record.id),
+        escape(&created),
+        escape(&updated)
+    );
+    let description = record
+        .description
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| format!("<p>{}</p>", escape(value)))
+        .unwrap_or_else(|| "<p>No description.</p>".to_string());
+    let skip = [
+        "id",
+        "title",
+        "created_date",
+        "updated_date",
+        "labels",
+        "references",
+    ];
+    let metadata = record_view_extra_rows(record, &skip);
+    let mut references = String::new();
+    if !record.refs.is_empty() {
+        let items: String = record
+            .refs
+            .iter()
+            .map(|value| format!("<li>{}</li>", escape(value)))
+            .collect();
+        references = format!(
+            "<details class=\"references\"><summary>References</summary><ul>{}</ul></details>",
+            items
+        );
+    }
+    let content = format!(
+        "<section class=\"section\"><h2 class=\"h2\">Description</h2>{}</section>{}{}<p><a class=\"btn\" href=\"/doc/{}/edit\">Edit</a></p>",
+        description,
+        metadata,
+        references,
+        escape(&record.id)
+    );
+    render_template(
+        DOCUMENT_DETAIL_TEMPLATE,
+        &[
+            (
+                "title",
+                &format!("Papyrus \u{2014} {} {}", record.id, record.title),
+            ),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
+            ("breadcrumb", &breadcrumb(record, None, None, None)),
+            ("page_head", &page_head),
+            ("meta", &meta),
+            ("content", &content),
+        ],
+    )
+}
+
+/// Submitted values for the generic document edit form.
+#[derive(Clone, Debug, Default)]
+pub struct DocumentEditValues {
+    pub title: String,
+    pub description: String,
+    pub labels: Vec<String>,
+    pub references: Vec<String>,
+}
+
+/// Field errors for the generic document edit form.
+#[derive(Clone, Debug, Default)]
+pub struct DocumentFieldErrors {
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub labels: Option<String>,
+    pub references: Option<String>,
+}
+
+impl DocumentFieldErrors {
+    pub fn any(&self) -> bool {
+        self.title.is_some()
+            || self.description.is_some()
+            || self.labels.is_some()
+            || self.references.is_some()
+    }
+}
+
+fn document_edit_form(
+    record: &Record,
+    values: &DocumentEditValues,
+    errors: &DocumentFieldErrors,
+    version: &str,
+) -> String {
+    let mut alert = String::new();
+    let mut messages = Vec::new();
+    for message in [
+        errors.title.as_deref(),
+        errors.description.as_deref(),
+        errors.labels.as_deref(),
+        errors.references.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        messages.push(format!("<li>{}</li>", escape(message)));
+    }
+    if !messages.is_empty() {
+        alert = format!(
+            "<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>{}</ul><p>Nothing was saved. Your typed values are kept below.</p></div>",
+            messages.join("")
+        );
+    }
+    let labels: String = values
+        .labels
+        .iter()
+        .map(|value| {
+            format!(
+                "<input class=\"input\" name=\"labels\" type=\"text\" value=\"{}\">",
+                escape(value)
+            )
+        })
+        .collect();
+    let references: String = values
+        .references
+        .iter()
+        .map(|value| {
+            format!(
+                "<input class=\"input\" name=\"references\" type=\"text\" value=\"{}\">",
+                escape(value)
+            )
+        })
+        .collect();
+    format!(
+        "{alert}<form class=\"form\" method=\"post\" action=\"/doc/{id}\">\
+<input type=\"hidden\" name=\"version\" value=\"{version}\">\
+<div class=\"field\"><label for=\"title\">Title</label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" value=\"{title}\" required maxlength=\"200\"></div>\
+<div class=\"field\"><label for=\"description\">Description</label><textarea class=\"input\" id=\"description\" name=\"description\" rows=\"8\">{description}</textarea></div>\
+<div class=\"field\"><label>Labels</label>{labels}<input class=\"input\" name=\"labels\" type=\"text\" value=\"\"></div>\
+<div class=\"field\"><label>References</label>{references}<input class=\"input\" name=\"references\" type=\"text\" value=\"\"></div>\
+{timestamps}\
+<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{id}\">Cancel</a></div></form>",
+        alert = alert,
+        id = escape(&record.id),
+        version = escape(version),
+        title = escape(&values.title),
+        description = escape(&values.description),
+        labels = labels,
+        references = references,
+        timestamps = read_only_timestamps(record),
+    )
+}
+
+/// Generic document edit form (section 4.2); never renders status.
+pub fn document_edit_page(
+    record: &Record,
+    values: &DocumentEditValues,
+    errors: &DocumentFieldErrors,
+    version: &str,
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    let page_head = format!(
+        "<h1 class=\"h1\">Edit {} {}</h1>",
+        escape(&record.id),
+        escape(&record.title)
+    );
+    render_template(
+        DOCUMENT_EDIT_TEMPLATE,
+        &[
+            ("title", &format!("Papyrus \u{2014} Edit {}", record.id)),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
+            ("breadcrumb", &edit_breadcrumb(record, None)),
+            ("page_head", &page_head),
+            ("meta", ""),
+            ("form", &document_edit_form(record, values, errors, version)),
+        ],
+    )
+}
+
+/// Stale-version conflict page that preserves the submitted values.
+#[allow(clippy::too_many_arguments)]
+pub fn document_conflict_page(
+    record: &Record,
+    title: &str,
+    description: &str,
+    labels: &[String],
+    references: &[String],
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> String {
+    let values = DocumentEditValues {
+        title: title.to_string(),
+        description: description.to_string(),
+        labels: labels.to_vec(),
+        references: references.to_vec(),
+    };
+    let errors = DocumentFieldErrors::default();
+    let mut form = document_edit_form(record, &values, &errors, &record.version);
+    form = format!(
+        "<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><p>record changed on disk; reload the form</p></div>{}",
+        form
+    );
+    let page_head = format!(
+        "<h1 class=\"h1\">Edit {} {}</h1>",
+        escape(&record.id),
+        escape(&record.title)
+    );
+    render_template(
+        DOCUMENT_EDIT_TEMPLATE,
+        &[
+            ("title", &format!("Papyrus \u{2014} Edit {}", record.id)),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
+            ("breadcrumb", &edit_breadcrumb(record, None)),
+            ("page_head", &page_head),
+            ("meta", ""),
+            ("form", &form),
+        ],
+    )
+}
+
+/// Generic document not-found page. It never echoes the requested ID.
+pub fn document_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
+    let content = "<p>The requested record was not found.</p><p><a class=\"link\" href=\"/\">Back to requirements</a></p>";
+    render_template(
+        VIEW_TEMPLATE,
+        &[
+            ("title", "Papyrus \u{2014} Not found"),
+            ("project", chrome.project),
+            ("bind_note", chrome.bind_note),
+        ],
+        &[
+            ("sidebar", &sidebar(None, cfg, chrome.routes)),
+            ("breadcrumb", ""),
+            ("page_head", "<h1 class=\"h1\">Not found</h1>"),
+            ("meta", ""),
+            ("content", content),
+        ],
     )
 }
