@@ -117,13 +117,13 @@ fn basic_lifecycle() {
     assert!(s.contains("<h1>MOCK-001 Login screen</h1>"));
 
     // Deprecate
-    let out = run(&d, &["ui-mockup", "deprecate", "MOCK-001"]);
+    let out = run(&d, &["ui-mockup", "archive", "MOCK-001"]);
     assert!(
         out.status.success(),
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    let dep = d.join("docs/specifications/ui/mockups/deprecated/MOCK-001.html");
+    let dep = d.join("docs/specifications/ui/mockups/archived/MOCK-001.html");
     assert!(dep.exists());
     assert!(!path.exists());
     let out = run(&d, &["ui-mockup", "list"]);
@@ -131,33 +131,19 @@ fn basic_lifecycle() {
     let out = run(&d, &["ui-mockup", "view", "MOCK-001"]);
     assert!(out.status.success());
 
-    // deprecate again
-    let out = run(&d, &["ui-mockup", "deprecate", "MOCK-001"]);
-    assert_eq!(out.status.code(), Some(4));
-
-    // restore
-    let out = run(&d, &["ui-mockup", "restore", "MOCK-001"]);
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    assert!(path.exists());
-    assert!(!dep.exists());
-    let content = fs::read_to_string(&path).unwrap();
-    assert!(content.contains("<p>Status: pending</p>"));
-
-    let out = run(&d, &["ui-mockup", "restore", "MOCK-001"]);
-    assert_eq!(out.status.code(), Some(4));
+    // archive again is idempotent
+    let out = run(&d, &["ui-mockup", "archive", "MOCK-001"]);
+    assert!(out.status.success());
 
     for args in [
         vec!["ui-mockup", "view", "NOPE"],
         vec!["ui-mockup", "edit", "NOPE", "--title", "x"],
-        vec!["ui-mockup", "deprecate", "NOPE"],
+        vec!["ui-mockup", "archive", "NOPE"],
         vec!["ui-mockup", "restore", "NOPE"],
     ] {
         let out = run(&d, &args);
-        assert_eq!(out.status.code(), Some(3), "args={:?}", args);
+        let expected = if args.contains(&"restore") { 2 } else { 3 };
+        assert_eq!(out.status.code(), Some(expected), "args={:?}", args);
     }
 
     // UI mockups are HTML records outside the Markdown ID layout.
@@ -253,11 +239,11 @@ fn list_non_recursive() {
 }
 
 #[test]
-fn edit_deprecated_allowed() {
+fn edit_archived_allowed() {
     let d = tmpdir("editdep");
     init(&d);
     create(&d, "Original", "T", &["S"], &[]);
-    let out = run(&d, &["ui-mockup", "deprecate", "MOCK-001"]);
+    let out = run(&d, &["ui-mockup", "archive", "MOCK-001"]);
     assert!(out.status.success());
     let out = run(&d, &["ui-mockup", "edit", "MOCK-001", "--task", "T2"]);
     assert!(
@@ -270,7 +256,7 @@ fn edit_deprecated_allowed() {
     assert!(s.contains("<h1>MOCK-001 Original</h1>"));
     assert!(s.contains("<!-- task: T2 -->"));
     assert!(
-        d.join("docs/specifications/ui/mockups/deprecated/MOCK-001.html")
+        d.join("docs/specifications/ui/mockups/archived/MOCK-001.html")
             .exists()
     );
     let _ = fs::remove_dir_all(&d);
@@ -409,10 +395,10 @@ fn disabled_type() {
     );
     assert!(out.status.success());
     let out = create(&d, "Blocked", "T", &["S"], &[]);
-    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(out.status.code(), Some(2));
     assert!(!record(&d, "MOCK-002").exists());
     let out = run(&d, &["ui-mockup", "list"]);
-    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(out.status.code(), Some(2));
     let _ = fs::remove_dir_all(&d);
 }
 
@@ -440,11 +426,11 @@ fn supersession() {
     );
     let out = run(&d, &["ui-mockup", "view", "MOCK-001"]);
     let s = stdout(&out);
-    assert!(s.contains("<p>Status: deprecated</p>"));
+    assert!(s.contains("<p>Status: archived</p>"));
     assert!(s.contains("<p>Superseded by: MOCK-002</p>"));
     assert!(!record(&d, "MOCK-001").exists());
     assert!(
-        d.join("docs/specifications/ui/mockups/deprecated/MOCK-001.html")
+        d.join("docs/specifications/ui/mockups/archived/MOCK-001.html")
             .exists()
     );
 
@@ -476,9 +462,9 @@ fn supersession() {
     );
     assert_eq!(out.status.code(), Some(3));
 
-    // blocked transitions
-    let out = run(&d, &["ui-mockup", "restore", "MOCK-001"]);
-    assert_eq!(out.status.code(), Some(4));
+    // blocked transitions (restore is no longer a command)
+    let out = run(&d, &["ui-mockup", "archive", "MOCK-001"]);
+    assert!(out.status.success());
     let out = run(
         &d,
         &["ui-mockup", "edit", "MOCK-001", "--status", "pending"],
@@ -505,48 +491,6 @@ fn supersession() {
     let out = run(&d, &["ui-mockup", "view", "MOCK-001"]);
     assert!(stdout(&out).contains("<p>Superseded by: MOCK-004</p>"));
 
-    let _ = fs::remove_dir_all(&d);
-}
-
-#[test]
-fn status_transitions() {
-    let d = tmpdir("trans");
-    init(&d);
-    create(&d, "A", "T", &["S"], &[]);
-    // pending -> approved
-    let out = run(
-        &d,
-        &["ui-mockup", "edit", "MOCK-001", "--status", "approved"],
-    );
-    assert!(out.status.success());
-    // approved -> deprecated via edit
-    let out = run(
-        &d,
-        &["ui-mockup", "edit", "MOCK-001", "--status", "deprecated"],
-    );
-    assert!(out.status.success());
-    // deprecated -> pending via restore? first deprecate? already deprecated status but active folder? edit didn't move; restore not applicable. Use deprecate+restore
-    let _ = fs::remove_dir_all(&d);
-    let d = tmpdir("trans2");
-    init(&d);
-    create(&d, "A", "T", &["S"], &[]);
-    let out = run(&d, &["ui-mockup", "deprecate", "MOCK-001"]);
-    assert!(out.status.success());
-    let out = run(&d, &["ui-mockup", "restore", "MOCK-001"]);
-    assert!(out.status.success());
-    let out = run(&d, &["ui-mockup", "view", "MOCK-001"]);
-    assert!(stdout(&out).contains("<p>Status: pending</p>"));
-    // invalid: approved -> pending
-    let out = run(
-        &d,
-        &["ui-mockup", "edit", "MOCK-001", "--status", "approved"],
-    );
-    assert!(out.status.success());
-    let out = run(
-        &d,
-        &["ui-mockup", "edit", "MOCK-001", "--status", "pending"],
-    );
-    assert_eq!(out.status.code(), Some(4));
     let _ = fs::remove_dir_all(&d);
 }
 
@@ -593,13 +537,7 @@ fn json_shapes() {
     assert_eq!(v["id"], "MOCK-001");
     assert_eq!(v["status"], "ok");
 
-    let out = run(&d, &["--json", "ui-mockup", "deprecate", "MOCK-001"]);
-    assert!(out.status.success());
-    let v: serde_json::Value = serde_json::from_str(stdout(&out).trim()).unwrap();
-    assert_eq!(v["id"], "MOCK-001");
-    assert_eq!(v["status"], "ok");
-
-    let out = run(&d, &["--json", "ui-mockup", "restore", "MOCK-001"]);
+    let out = run(&d, &["--json", "ui-mockup", "archive", "MOCK-001"]);
     assert!(out.status.success());
     let v: serde_json::Value = serde_json::from_str(stdout(&out).trim()).unwrap();
     assert_eq!(v["id"], "MOCK-001");
@@ -621,7 +559,15 @@ fn help() {
     let out = run(&d, &["ui-mockup", "--help"]);
     assert!(out.status.success());
     let s = stdout(&out);
-    for sub in ["create", "list", "view", "edit", "deprecate", "restore"] {
+    for sub in [
+        "create",
+        "list",
+        "view",
+        "edit",
+        "archive",
+        "delete",
+        "supersede",
+    ] {
         assert!(s.contains(sub), "help missing {}", sub);
     }
     let _ = fs::remove_dir_all(&d);

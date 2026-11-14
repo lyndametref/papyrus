@@ -121,8 +121,8 @@ fn rule_basic_lifecycle() {
     assert!(s.contains("## Description\ndesc2"));
     assert!(s.contains("## Rationale\nrationale text"));
 
-    // deprecate
-    let out = run(&d, &["rule", "deprecate", "RUL-001"]);
+    // archive
+    let out = run(&d, &["rule", "archive", "RUL-001"]);
     assert!(
         out.status.success(),
         "{}",
@@ -133,31 +133,20 @@ fn rule_basic_lifecycle() {
     let out = run(&d, &["rule", "view", "RUL-001"]);
     assert!(out.status.success());
 
-    // already deprecated
-    let out = run(&d, &["rule", "deprecate", "RUL-001"]);
-    assert_eq!(out.status.code(), Some(4));
+    // already archived (idempotent)
+    let out = run(&d, &["rule", "archive", "RUL-001"]);
+    assert!(out.status.success());
 
-    // restore
-    let out = run(&d, &["rule", "restore", "RUL-001"]);
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
     let out = run(&d, &["rule", "list"]);
-    assert!(stdout(&out).contains("RUL-001"));
-
-    // already active
-    let out = run(&d, &["rule", "restore", "RUL-001"]);
-    assert_eq!(out.status.code(), Some(4));
+    assert!(!stdout(&out).contains("RUL-001"));
 
     // unknown id
     let out = run(&d, &["rule", "view", "RUL-999"]);
     assert_eq!(out.status.code(), Some(3));
-    let out = run(&d, &["rule", "deprecate", "RUL-999"]);
+    let out = run(&d, &["rule", "archive", "RUL-999"]);
     assert_eq!(out.status.code(), Some(3));
     let out = run(&d, &["rule", "restore", "RUL-999"]);
-    assert_eq!(out.status.code(), Some(3));
+    assert_eq!(out.status.code(), Some(2));
 
     let _ = fs::remove_dir_all(&d);
 }
@@ -336,11 +325,11 @@ fn rule_disabled_type() {
     assert!(out.status.success());
 
     let out = create(&d, "Blocked", "d", "r", "a");
-    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(out.status.code(), Some(2));
     assert!(!record(&d, "RUL-002").exists());
 
     let out = run(&d, &["rule", "list"]);
-    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(out.status.code(), Some(2));
 
     let _ = fs::remove_dir_all(&d);
 }
@@ -381,7 +370,7 @@ fn rule_project_directory_boundary() {
     let out = run(&proj, &["rule", "view", "RUL-001"]);
     assert_eq!(out.status.code(), Some(1));
 
-    let out = run(&proj, &["rule", "deprecate", "RUL-001"]);
+    let out = run(&proj, &["rule", "archive", "RUL-001"]);
     assert_eq!(out.status.code(), Some(1));
 
     let _ = fs::remove_dir_all(&root);
@@ -437,13 +426,7 @@ fn rule_json_output_shapes() {
     assert_eq!(v["id"], "RUL-001");
     assert_eq!(v["status"], "ok");
 
-    let out = run(&d, &["--json", "rule", "deprecate", "RUL-001"]);
-    assert!(out.status.success());
-    let v: serde_json::Value = serde_json::from_str(stdout(&out).trim()).unwrap();
-    assert_eq!(v["id"], "RUL-001");
-    assert_eq!(v["status"], "ok");
-
-    let out = run(&d, &["--json", "rule", "restore", "RUL-001"]);
+    let out = run(&d, &["--json", "rule", "archive", "RUL-001"]);
     assert!(out.status.success());
     let v: serde_json::Value = serde_json::from_str(stdout(&out).trim()).unwrap();
     assert_eq!(v["id"], "RUL-001");
@@ -552,24 +535,26 @@ fn rule_help_is_available() {
     let out = run(&d, &["rule", "--help"]);
     assert!(out.status.success());
     let s = stdout(&out);
-    for sub in ["create", "list", "view", "edit", "deprecate", "restore"] {
+    for sub in [
+        "create", "list", "view", "edit", "archive", "delete", "status",
+    ] {
         assert!(s.contains(sub), "help missing {}", sub);
     }
     let _ = fs::remove_dir_all(&d);
 }
 
 #[test]
-fn rule_deprecated_edit_keeps_deprecated() {
+fn rule_archived_edit_keeps_archived() {
     let d = tmpdir("depedit");
     init(&d);
     create(&d, "Dep", "d", "r", "a");
-    let out = run(&d, &["rule", "deprecate", "RUL-001"]);
+    let out = run(&d, &["rule", "archive", "RUL-001"]);
     assert!(out.status.success());
     let out = run(&d, &["rule", "edit", "RUL-001", "--title", "Dep Updated"]);
     assert!(out.status.success());
-    // still in deprecated folder
+    // still in archived folder
     assert!(!record(&d, "RUL-001").exists());
-    assert!(d.join("docs/business-rules/deprecated/RUL-001.md").exists());
+    assert!(d.join("docs/business-rules/archived/RUL-001.md").exists());
     let out = run(&d, &["rule", "list"]);
     assert!(!stdout(&out).contains("RUL-001"));
     let _ = fs::remove_dir_all(&d);

@@ -108,41 +108,33 @@ fn audit_basic_lifecycle() {
     let s = stdout(&out);
     assert!(s.contains("## Audit Type\nlicence"));
 
-    let out = run(&d, &["audit", "deprecate", "AUD-001"]);
+    let out = run(&d, &["audit", "archive", "AUD-001"]);
     assert!(
         out.status.success(),
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert!(d.join("docs/audit-records/deprecated/AUD-001.md").exists());
+    assert!(d.join("docs/audit-records/archived/AUD-001.md").exists());
     let out = run(&d, &["audit", "list"]);
     assert!(!stdout(&out).contains("AUD-001"));
     let out = run(&d, &["audit", "view", "AUD-001"]);
     assert!(out.status.success());
 
-    let out = run(&d, &["audit", "deprecate", "AUD-001"]);
-    assert_eq!(out.status.code(), Some(4));
+    let out = run(&d, &["audit", "archive", "AUD-001"]);
+    assert!(out.status.success());
 
     let out = run(&d, &["audit", "restore", "AUD-001"]);
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    assert!(d.join("docs/audit-records/AUD-001.md").exists());
-    assert!(!d.join("docs/audit-records/deprecated/AUD-001.md").exists());
+    assert_eq!(out.status.code(), Some(2));
+
     let out = run(&d, &["audit", "list"]);
-    assert!(stdout(&out).contains("AUD-001"));
-
-    let out = run(&d, &["audit", "restore", "AUD-001"]);
-    assert_eq!(out.status.code(), Some(4));
+    assert!(!stdout(&out).contains("AUD-001"));
 
     let out = run(&d, &["audit", "view", "AUD-999"]);
     assert_eq!(out.status.code(), Some(3));
-    let out = run(&d, &["audit", "deprecate", "AUD-999"]);
+    let out = run(&d, &["audit", "archive", "AUD-999"]);
     assert_eq!(out.status.code(), Some(3));
     let out = run(&d, &["audit", "restore", "AUD-999"]);
-    assert_eq!(out.status.code(), Some(3));
+    assert_eq!(out.status.code(), Some(2));
 
     let _ = fs::remove_dir_all(&d);
 }
@@ -176,11 +168,11 @@ fn audit_types_and_custom() {
 }
 
 #[test]
-fn audit_edit_deprecated_allowed() {
+fn audit_edit_archived_allowed() {
     let d = tmpdir("editdep");
     init(&d);
     create(&d, "T", "d", None);
-    let _ = run(&d, &["audit", "deprecate", "AUD-001"]);
+    let _ = run(&d, &["audit", "archive", "AUD-001"]);
     let out = run(
         &d,
         &[
@@ -284,7 +276,7 @@ fn audit_project_directory_boundary() {
     assert_eq!(out.status.code(), Some(1));
 
     let out = bin()
-        .args(["--dir", p, "audit", "deprecate", "AUD-001"])
+        .args(["--dir", p, "audit", "archive", "AUD-001"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -346,17 +338,7 @@ fn audit_json_output() {
     );
 
     let out = bin()
-        .args(["--dir", p, "--json", "audit", "deprecate", "AUD-001"])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    assert_eq!(
-        String::from_utf8_lossy(&out.stdout).trim(),
-        r#"{"status":"ok","id":"AUD-001"}"#
-    );
-
-    let out = bin()
-        .args(["--dir", p, "--json", "audit", "restore", "AUD-001"])
+        .args(["--dir", p, "--json", "audit", "archive", "AUD-001"])
         .output()
         .unwrap();
     assert!(out.status.success());
@@ -393,9 +375,9 @@ fn audit_disabled_type_exit_4() {
         String::from_utf8_lossy(&out.stderr)
     );
     let out = run(&d, &["audit", "list"]);
-    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(out.status.code(), Some(2));
     let out = run(&d, &["audit", "create", "--title", "t", "--content", "c"]);
-    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(out.status.code(), Some(2));
     let _ = fs::remove_dir_all(&d);
 }
 
@@ -486,8 +468,8 @@ fn audit_restore_unknown_exit_3() {
     let d = tmpdir("restunk");
     init(&d);
     let out = run(&d, &["audit", "restore", "NOPE"]);
-    assert_eq!(out.status.code(), Some(3));
-    let out = run(&d, &["audit", "deprecate", "NOPE"]);
+    assert_eq!(out.status.code(), Some(2));
+    let out = run(&d, &["audit", "archive", "NOPE"]);
     assert_eq!(out.status.code(), Some(3));
     let _ = fs::remove_dir_all(&d);
 }

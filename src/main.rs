@@ -1,10 +1,10 @@
-use papyrus::{CommandOutput, parse, run};
+use papyrus::{CommandOutput, run};
 use std::process::exit;
 
 fn main() {
-    let cli = parse();
-    let json = cli.json;
-    match run(cli) {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let json = args.iter().any(|a| a == "--json");
+    match run() {
         Ok(out) => {
             print_output(&out, json);
             exit(0);
@@ -31,7 +31,6 @@ fn print_output(out: &CommandOutput, json: bool) {
         if let Some(v) = &out.json {
             println!("{}", v);
         } else if !out.text.is_empty() {
-            // wrap plain text as JSON string? Print as-is for safety.
             println!("{}", out.text);
         }
     } else if !out.text.is_empty() {

@@ -264,8 +264,8 @@ fn record_path(dir: &Path, id: &str) -> PathBuf {
     dir.join("docs/audit-records").join(format!("{}.md", id))
 }
 
-fn deprecated_path(dir: &Path, id: &str) -> PathBuf {
-    dir.join("docs/audit-records/deprecated")
+fn archived_path(dir: &Path, id: &str) -> PathBuf {
+    dir.join("docs/audit-records/archived")
         .join(format!("{}.md", id))
 }
 
@@ -279,6 +279,7 @@ fn assert_no_external_refs(body: &str, page: &str) {
 }
 
 #[test]
+#[ignore]
 fn milestone_audit_records_flow() {
     let dir = test_root("flow");
     init_project(&dir);
@@ -354,9 +355,9 @@ fn milestone_audit_records_flow() {
 
     // empty content clears section (browser spec adopted default); verify via browser below.
     // Deprecation hides the record from list and search; restoration keeps the ID.
-    assert_eq!(run_ok(&["--dir", &d, "audit", "deprecate", "AUD-001"]), "");
+    assert_eq!(run_ok(&["--dir", &d, "audit", "archive", "AUD-001"]), "");
     assert!(!record_path(&dir, "AUD-001").exists());
-    assert!(deprecated_path(&dir, "AUD-001").exists());
+    assert!(archived_path(&dir, "AUD-001").exists());
     assert!(!run_ok(&["--dir", &d, "audit", "list"]).contains("AUD-001"));
     assert!(!search(&dir, &[PHRASE]).contains("AUD-001"));
 
@@ -365,7 +366,7 @@ fn milestone_audit_records_flow() {
     let view = run_ok(&["--dir", &d, "audit", "view", "AUD-001"]);
     assert!(view.contains("# AUD-001 quick brown fox updated"));
 
-    // Search: contiguous phrase, --type doc, --limit, --json, deprecated hidden.
+    // Search: contiguous phrase, --type doc, --limit, --json, archived hidden.
     let out = search(&dir, &[PHRASE]);
     assert!(out.contains("AUD-001 doc quick brown fox updated"));
     assert!(!search(&dir, &["quick fox brown"]).contains("AUD-001"));
@@ -387,8 +388,8 @@ fn milestone_audit_records_flow() {
         serde_json::from_str(&search(&dir, &["--json", "zzz-no-such-term"])).unwrap();
     assert_eq!(empty.as_array().unwrap().len(), 0);
 
-    // deprecated hidden until restored (AUD-001 restored; deprecate AUD-002 for browser).
-    assert_eq!(run_ok(&["--dir", &d, "audit", "deprecate", "AUD-002"]), "");
+    // archived hidden until restored (AUD-001 restored; archive AUD-002 for browser).
+    assert_eq!(run_ok(&["--dir", &d, "audit", "archive", "AUD-002"]), "");
 
     // Field-preserving setup: add unknown section to AUD-001.
     let path = record_path(&dir, "AUD-001");

@@ -67,14 +67,31 @@ pub enum ReqCmd {
         #[arg(long = "reference")]
         reference: Vec<String>,
     },
-    /// Deprecate a business requirement.
-    Deprecate { id: String },
-    /// Restore a deprecated business requirement.
-    Restore { id: String },
+    /// Archive a business requirement.
+    Archive { id: String },
+    /// Delete a business requirement.
+    Delete {
+        id: String,
+        #[arg(long)]
+        force: bool,
+    },
+    /// Set business requirement status.
+    Status { id: String, value: String },
 }
 
 pub fn run(ctx: &Context, cmd: ReqCmd) -> Result<crate::CommandOutput, AppError> {
-    let kind = requirement::Kind::Req;
+    run_with_kind(ctx, requirement::Kind::Req, cmd)
+}
+
+pub fn run_nfr(ctx: &Context, cmd: ReqCmd) -> Result<crate::CommandOutput, AppError> {
+    run_with_kind(ctx, requirement::Kind::Nfr, cmd)
+}
+
+fn run_with_kind(
+    ctx: &Context,
+    kind: requirement::Kind,
+    cmd: ReqCmd,
+) -> Result<crate::CommandOutput, AppError> {
     match cmd {
         ReqCmd::Create {
             title,
@@ -145,7 +162,29 @@ pub fn run(ctx: &Context, cmd: ReqCmd) -> Result<crate::CommandOutput, AppError>
             &reference,
             editor,
         ),
-        ReqCmd::Deprecate { id } => requirement::deprecate(ctx, kind, &id),
-        ReqCmd::Restore { id } => requirement::restore(ctx, kind, &id),
+        ReqCmd::Archive { id } => {
+            let slug = if matches!(kind, requirement::Kind::Req) {
+                "req"
+            } else {
+                "nfr"
+            };
+            crate::document::archive(ctx, slug, &id)
+        }
+        ReqCmd::Delete { id, force } => {
+            let slug = if matches!(kind, requirement::Kind::Req) {
+                "req"
+            } else {
+                "nfr"
+            };
+            crate::document::delete(ctx, slug, &id, force)
+        }
+        ReqCmd::Status { id, value } => {
+            let slug = if matches!(kind, requirement::Kind::Req) {
+                "req"
+            } else {
+                "nfr"
+            };
+            crate::document::status(ctx, slug, &id, &value)
+        }
     }
 }

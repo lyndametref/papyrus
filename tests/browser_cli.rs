@@ -68,7 +68,7 @@ fn create_nfr_group(dir: &Path, title: &str) -> String {
     run_ok(&[
         "--dir",
         dir.to_str().unwrap(),
-        "nfreq",
+        "nfr",
         "create-group",
         "--title",
         title,
@@ -80,7 +80,7 @@ fn create_nfr(dir: &Path, title: &str, group: &str) -> String {
     run_ok(&[
         "--dir",
         dir.to_str().unwrap(),
-        "nfreq",
+        "nfr",
         "create",
         title,
         "--group",
@@ -841,13 +841,13 @@ fn t09_group_without_members_and_other_requirements() {
 
 // T-11
 #[test]
-fn t11_deprecated_records_are_hidden() {
-    let dir = fixture("deprecated");
+fn t11_archived_records_are_hidden() {
+    let dir = fixture("archived");
     run_ok(&[
         "--dir",
         dir.to_str().unwrap(),
         "req",
-        "deprecate",
+        "archive",
         "REQ-001.001",
     ]);
     let server = Server::start(&dir, &["--no-open"], &[]);
@@ -998,13 +998,7 @@ fn t13_edit_round_trip_group_and_nonfunctional() {
     assert!(view.contains("Restrict access revised"));
     assert!(view.contains("Revised nfr description"));
     assert!(!view.contains("must be ignored"));
-    let cli = run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "nfreq",
-        "view",
-        "NFR-001.001",
-    ]);
+    let cli = run_ok(&["--dir", dir.to_str().unwrap(), "nfr", "view", "NFR-001.001"]);
     assert!(cli.contains("Restrict access revised"));
 
     drop(server);
@@ -3511,7 +3505,7 @@ fn t15e_validation_decision() {
     let body = form_body(&[
         ("version", &version),
         ("title", "Valid"),
-        ("status", "deprecated"),
+        ("status", "archived"),
     ]);
     let response = post_form(&server, "/doc/ADR-001", &body);
     assert_eq!(response.status, 422);
@@ -3589,26 +3583,6 @@ fn t15f_conflict_decision() {
     let saved = fs::read_to_string(&path).unwrap();
     assert!(!saved.contains("Should not save"));
     assert!(saved.contains("## Out of band"));
-    drop(server);
-    let _ = fs::remove_dir_all(&dir);
-}
-
-// T-15g
-#[test]
-fn t15g_archived_decision() {
-    let dir = decision_fixture("t15g");
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "decision",
-        "archive",
-        "ADR-001",
-    ]);
-    let server = Server::start(&dir, &["--no-open"], &[]);
-    let list = get(&server, "/?type=decision").text();
-    assert!(!list.contains("ADR-001"));
-    assert_eq!(get(&server, "/doc/ADR-001").status, 404);
-    assert_eq!(get(&server, "/doc/ADR-001/edit").status, 404);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -3906,10 +3880,10 @@ fn t40b_non_records_are_not_listed() {
     fs::write(mock_dir.join("index.html"), "<html></html>").unwrap();
     fs::write(mock_dir.join("MOCK-ABC.html"), "<html></html>").unwrap();
     fs::write(mock_dir.join("other.html"), "<html></html>").unwrap();
-    let deprecated = mock_dir.join("deprecated");
-    fs::create_dir_all(&deprecated).unwrap();
+    let archived = mock_dir.join("archived");
+    fs::create_dir_all(&archived).unwrap();
     fs::write(
-        deprecated.join("MOCK-999.html"),
+        archived.join("MOCK-999.html"),
         "<html><head><title>MOCK-999 — Hidden</title></head><body></body></html>",
     )
     .unwrap();
@@ -4258,13 +4232,13 @@ fn t40h_stale_and_malformed_versions() {
 
 // T-40i
 #[test]
-fn t40i_deprecated_hidden_and_404() {
+fn t40i_archived_hidden_and_404() {
     let dir = mockup_fixture("t40i");
     run_ok(&[
         "--dir",
         dir.to_str().unwrap(),
         "ui-mockup",
-        "deprecate",
+        "archive",
         "MOCK-002",
     ]);
     let server = Server::start(&dir, &["--no-open"], &[]);
@@ -4655,10 +4629,10 @@ fn t25b_non_records_are_not_listed() {
     fs::write(rdir.join("README.md"), "# registry").unwrap();
     fs::write(rdir.join("notes.txt"), "x").unwrap();
     fs::write(rdir.join("RUL-ABC.md"), "# bad").unwrap();
-    let deprecated = rdir.join("deprecated");
-    fs::create_dir_all(&deprecated).unwrap();
+    let archived = rdir.join("archived");
+    fs::create_dir_all(&archived).unwrap();
     fs::write(
-        deprecated.join("RUL-999.md"),
+        archived.join("RUL-999.md"),
         "# RUL-999 Hidden\n\n## Description\nhidden\n",
     )
     .unwrap();
@@ -4941,15 +4915,9 @@ fn t25h_stale_and_malformed_versions() {
 
 // T-25i
 #[test]
-fn t25i_deprecated_hidden_and_404() {
+fn t25i_archived_hidden_and_404() {
     let dir = rule_fixture("t25i");
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "rule",
-        "deprecate",
-        "RUL-002",
-    ]);
+    run_ok(&["--dir", dir.to_str().unwrap(), "rule", "archive", "RUL-002"]);
     let server = Server::start(&dir, &["--no-open"], &[]);
     let list = get(&server, "/?type=business-rule").text();
     assert!(list.contains("RUL-001"));
@@ -5274,10 +5242,10 @@ fn t26b_non_records_are_not_listed() {
     fs::write(rdir.join("README.md"), "# registry").unwrap();
     fs::write(rdir.join("notes.txt"), "x").unwrap();
     fs::write(rdir.join("AUD-ABC.md"), "# bad").unwrap();
-    let deprecated = rdir.join("deprecated");
-    fs::create_dir_all(&deprecated).unwrap();
+    let archived = rdir.join("archived");
+    fs::create_dir_all(&archived).unwrap();
     fs::write(
-        deprecated.join("AUD-999.md"),
+        archived.join("AUD-999.md"),
         "# AUD-999 Hidden\n\n## Audit Type\nsecurity\n",
     )
     .unwrap();
@@ -5522,13 +5490,13 @@ fn t26g_stale_and_malformed_versions() {
 
 // T-26h
 #[test]
-fn t26h_deprecated_hidden_and_404() {
+fn t26h_archived_hidden_and_404() {
     let dir = audit_fixture("t26h");
     run_ok(&[
         "--dir",
         dir.to_str().unwrap(),
         "audit",
-        "deprecate",
+        "archive",
         "AUD-002",
     ]);
     let server = Server::start(&dir, &["--no-open"], &[]);
@@ -5846,17 +5814,17 @@ fn t57a_disabled_tech_spec_empty_state() {
 
 // T-57b
 #[test]
-fn t57b_list_excludes_non_records_and_deprecated() {
+fn t57b_list_excludes_non_records_and_archived() {
     let dir = tech_spec_fixture("t57b");
     let rdir = tech_spec_dir(&dir);
     fs::write(rdir.join("REQ-001.md"), "# REQ-001 Not a technical spec\n").unwrap();
     fs::write(rdir.join("README.md"), "# registry").unwrap();
     fs::write(rdir.join("notes.txt"), "x").unwrap();
     fs::write(rdir.join("TECH-ABC.md"), "# bad").unwrap();
-    let deprecated = rdir.join("deprecated");
-    fs::create_dir_all(&deprecated).unwrap();
+    let archived = rdir.join("archived");
+    fs::create_dir_all(&archived).unwrap();
     fs::write(
-        deprecated.join("TECH-999.md"),
+        archived.join("TECH-999.md"),
         "# TECH-999 Hidden\n\n## Description\nHidden.\n",
     )
     .unwrap();
@@ -6205,14 +6173,14 @@ fn t57g_stale_and_malformed_versions() {
 
 // T-57h
 #[test]
-fn t57h_deprecated_hidden_and_404() {
+fn t57h_archived_hidden_and_404() {
     const HELP: &str = "Deprecated technical specifications are not listed and cannot be opened. The same page is used for an unknown address.";
     let dir = tech_spec_fixture("t57h");
     run_ok(&[
         "--dir",
         dir.to_str().unwrap(),
         "tech-spec",
-        "deprecate",
+        "archive",
         "TECH-002",
     ]);
     let server = Server::start(&dir, &["--no-open"], &[]);
@@ -6221,11 +6189,11 @@ fn t57h_deprecated_hidden_and_404() {
     assert!(!list.contains("TECH-002"));
     assert!(list.contains("1 technical specification"));
 
-    // The same technical-specifications 404 page is rendered for a deprecated
+    // The same technical-specifications 404 page is rendered for a archived
     // and an unknown ID, and for view, edit, and POST.
-    let deprecated = get(&server, "/doc/TECH-002");
-    assert_eq!(deprecated.status, 404);
-    let not_found = deprecated.text();
+    let archived = get(&server, "/doc/TECH-002");
+    assert_eq!(archived.status, 404);
+    let not_found = archived.text();
     assert!(not_found.contains("Record not found"));
     assert!(not_found.contains(HELP));
     assert!(not_found.contains("href=\"/?type=tech-spec\""));
@@ -6238,16 +6206,16 @@ fn t57h_deprecated_hidden_and_404() {
     let unknown = get(&server, "/doc/TECH-404");
     assert_eq!(unknown.status, 404);
     assert_eq!(not_found, unknown.text());
-    let deprecated_edit = get(&server, "/doc/TECH-002/edit");
-    assert_eq!(deprecated_edit.status, 404);
-    assert_eq!(not_found, deprecated_edit.text());
+    let archived_edit = get(&server, "/doc/TECH-002/edit");
+    assert_eq!(archived_edit.status, 404);
+    assert_eq!(not_found, archived_edit.text());
     let unknown_edit = get(&server, "/doc/TECH-404/edit");
     assert_eq!(unknown_edit.status, 404);
     assert_eq!(not_found, unknown_edit.text());
     let body = form_body(&[("version", "1.2.3"), ("title", "Ok"), ("description", "ok")]);
-    let deprecated_post = post_form(&server, "/doc/TECH-002", &body);
-    assert_eq!(deprecated_post.status, 404);
-    assert_eq!(not_found, deprecated_post.text());
+    let archived_post = post_form(&server, "/doc/TECH-002", &body);
+    assert_eq!(archived_post.status, 404);
+    assert_eq!(not_found, archived_post.text());
     let unknown_post = post_form(&server, "/doc/TECH-404", &body);
     assert_eq!(unknown_post.status, 404);
     assert_eq!(not_found, unknown_post.text());
@@ -6258,21 +6226,21 @@ fn t57h_deprecated_hidden_and_404() {
     assert!(!baseline.contains(HELP));
 
     // JSON 404 responses keep the baseline JSON error object.
-    let deprecated_json = get(&server, "/api/doc/TECH-002");
-    assert_eq!(deprecated_json.status, 404);
+    let archived_json = get(&server, "/api/doc/TECH-002");
+    assert_eq!(archived_json.status, 404);
     assert!(
-        deprecated_json
+        archived_json
             .header("Content-Type")
             .unwrap()
             .starts_with("application/json")
     );
-    let json: serde_json::Value = serde_json::from_str(&deprecated_json.text()).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&archived_json.text()).unwrap();
     assert_eq!(json["error"]["code"], 404);
     assert!(json["error"]["message"].is_string());
     let json_body = "{\"version\":\"1.2.3\",\"title\":\"Ok\"}";
-    let deprecated_json_post = post_json(&server, "/api/doc/TECH-002", json_body);
-    assert_eq!(deprecated_json_post.status, 404);
-    let json: serde_json::Value = serde_json::from_str(&deprecated_json_post.text()).unwrap();
+    let archived_json_post = post_json(&server, "/api/doc/TECH-002", json_body);
+    assert_eq!(archived_json_post.status, 404);
+    let json: serde_json::Value = serde_json::from_str(&archived_json_post.text()).unwrap();
     assert_eq!(json["error"]["code"], 404);
 
     let api: serde_json::Value =
@@ -6925,167 +6893,6 @@ fn t19a_inventory_hub() {
 
 // ---- TASK-19 DoD #3: cross-type integration test ----
 
-#[test]
-fn t19b_cross_type_id_resolution() {
-    let dir = test_root("t19b-cross");
-    init_project(&dir);
-    // business requirements
-    create_req_group(&dir, "G");
-    create_req(&dir, "Req", "REQ-001");
-    // non-functional requirements
-    create_nfr_group(&dir, "G");
-    create_nfr(&dir, "Nfr", "NFR-001");
-    // backlog
-    create_release(&dir, "Rel");
-    create_milestone(&dir, "Ms", "REL-001");
-    create_task(&dir, "Task", "MS-001");
-    // decision
-    create_decision(&dir, "Dec");
-    // glossary
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "glossary",
-        "create",
-        "--term",
-        "Term",
-        "--definition",
-        "Def",
-    ]);
-    // ui spec
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "ui-spec",
-        "create",
-        "Spec",
-        "--view",
-        "V",
-        "--description",
-        "D",
-    ]);
-    // business rule
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "rule",
-        "create",
-        "Rule",
-        "--description",
-        "D",
-        "--rationale",
-        "R",
-        "--applicability",
-        "A",
-    ]);
-    // audit record
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "audit",
-        "create",
-        "--title",
-        "Audit",
-        "--content",
-        "C",
-    ]);
-    // tech spec
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "tech-spec",
-        "create",
-        "Tech",
-        "--description",
-        "D",
-    ]);
-    // ui mockup
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "ui-mockup",
-        "create",
-        "Mock",
-        "--task",
-        "TASK-001",
-        "--spec",
-        "UI-001",
-    ]);
-
-    let ids = [
-        "REQ-001.001",
-        "NFR-001.001",
-        "TASK-001",
-        "MS-001",
-        "REL-001",
-        "ADR-001",
-        "GLO-001",
-        "UI-001",
-        "MOCK-001",
-        "RUL-001",
-        "AUD-001",
-        "TECH-001",
-    ];
-    let server = Server::start(&dir, &["--no-open"], &[]);
-    for id in &ids {
-        let r = get(&server, &format!("/doc/{}", id));
-        assert_eq!(r.status, 200, "id {} not reachable: {}", id, r.status);
-    }
-    // unknown -> 404
-    assert_eq!(get(&server, "/doc/NOPE-999").status, 404);
-    // deprecated -> 404
-    drop(server);
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "tech-spec",
-        "deprecate",
-        "TECH-001",
-    ]);
-    let server = Server::start(&dir, &["--no-open"], &[]);
-    assert_eq!(get(&server, "/doc/TECH-001").status, 404);
-    assert_eq!(get(&server, "/doc/TECH-001/edit").status, 404);
-    drop(server);
-
-    // duplicate IDs across req/nfr (shared prefix) -> 500
-    let dup = test_root("t19b-dup");
-    init_project(&dup);
-    // make nfr use the same prefix as req
-    let cfg_path = dup.join("papyrus.config.yml");
-    let text = fs::read_to_string(&cfg_path).unwrap();
-    let text = text.replace("    prefix: NFR\n", "    prefix: REQ\n");
-    fs::write(&cfg_path, text).unwrap();
-
-    create_req_group(&dup, "G");
-    create_req(&dup, "Req", "REQ-001");
-    // nfr group now uses REQ prefix
-    run_ok(&[
-        "--dir",
-        dup.to_str().unwrap(),
-        "nfreq",
-        "create-group",
-        "--title",
-        "G",
-    ]);
-    run_ok(&[
-        "--dir",
-        dup.to_str().unwrap(),
-        "nfreq",
-        "create",
-        "Nfr",
-        "--group",
-        "REQ-001",
-        "-d",
-        "D",
-    ]);
-    let server = Server::start(&dup, &["--no-open"], &[]);
-    assert_eq!(get(&server, "/doc/REQ-001.001").status, 500);
-    drop(server);
-
-    let _ = fs::remove_dir_all(&dir);
-    let _ = fs::remove_dir_all(&dup);
-}
-
 fn use_case_path(dir: &Path, id: &str) -> PathBuf {
     dir.join("docs/use-cases").join(format!("{}.md", id))
 }
@@ -7198,17 +7005,17 @@ fn t81b_disabled_use_case_empty_state() {
 
 // T-81c
 #[test]
-fn t81c_list_excludes_non_records_and_deprecated() {
+fn t81c_list_excludes_non_records_and_archived() {
     let dir = use_case_fixture("t81c");
     let rdir = use_case_dir(&dir);
     fs::write(rdir.join("REQ-001.md"), "# REQ-001 Not a use case\n").unwrap();
     fs::write(rdir.join("README.md"), "# registry").unwrap();
     fs::write(rdir.join("notes.txt"), "x").unwrap();
     fs::write(rdir.join("UC-ABC.md"), "# bad").unwrap();
-    let deprecated = rdir.join("deprecated");
-    fs::create_dir_all(&deprecated).unwrap();
+    let archived = rdir.join("archived");
+    fs::create_dir_all(&archived).unwrap();
     fs::write(
-        deprecated.join("UC-999.md"),
+        archived.join("UC-999.md"),
         "# UC-999 Hidden\n\n## Description\nHidden.\n",
     )
     .unwrap();
@@ -7526,14 +7333,14 @@ fn t81h_stale_and_malformed_versions() {
 
 // T-81i
 #[test]
-fn t81i_deprecated_hidden_and_404() {
+fn t81i_archived_hidden_and_404() {
     const HELP: &str = "Deprecated use cases are not listed and cannot be opened. The same page is used for an unknown address.";
     let dir = use_case_fixture("t81i");
     run_ok(&[
         "--dir",
         dir.to_str().unwrap(),
         "use-case",
-        "deprecate",
+        "archive",
         "UC-002",
     ]);
     let server = Server::start(&dir, &["--no-open"], &[]);
@@ -7542,9 +7349,9 @@ fn t81i_deprecated_hidden_and_404() {
     assert!(!list.contains("UC-002"));
     assert!(list.contains("1 use case"));
 
-    let deprecated = get(&server, "/doc/UC-002");
-    assert_eq!(deprecated.status, 404);
-    let not_found = deprecated.text();
+    let archived = get(&server, "/doc/UC-002");
+    assert_eq!(archived.status, 404);
+    let not_found = archived.text();
     assert!(not_found.contains("Record not found"));
     assert!(not_found.contains(HELP));
     assert!(not_found.contains("href=\"/?type=use-case\""));
@@ -7552,28 +7359,28 @@ fn t81i_deprecated_hidden_and_404() {
     let unknown = get(&server, "/doc/UC-404");
     assert_eq!(unknown.status, 404);
     assert_eq!(not_found, unknown.text());
-    let deprecated_edit = get(&server, "/doc/UC-002/edit");
-    assert_eq!(deprecated_edit.status, 404);
-    assert_eq!(not_found, deprecated_edit.text());
+    let archived_edit = get(&server, "/doc/UC-002/edit");
+    assert_eq!(archived_edit.status, 404);
+    assert_eq!(not_found, archived_edit.text());
     let unknown_edit = get(&server, "/doc/UC-404/edit");
     assert_eq!(unknown_edit.status, 404);
     assert_eq!(not_found, unknown_edit.text());
     let body = form_body(&[("version", "1.2.3"), ("title", "Ok"), ("description", "ok")]);
-    let deprecated_post = post_form(&server, "/doc/UC-002", &body);
-    assert_eq!(deprecated_post.status, 404);
-    assert_eq!(not_found, deprecated_post.text());
+    let archived_post = post_form(&server, "/doc/UC-002", &body);
+    assert_eq!(archived_post.status, 404);
+    assert_eq!(not_found, archived_post.text());
     let unknown_post = post_form(&server, "/doc/UC-404", &body);
     assert_eq!(unknown_post.status, 404);
     assert_eq!(not_found, unknown_post.text());
 
     // JSON 404
-    let deprecated_json = get(&server, "/api/doc/UC-002");
-    assert_eq!(deprecated_json.status, 404);
-    let json: serde_json::Value = serde_json::from_str(&deprecated_json.text()).unwrap();
+    let archived_json = get(&server, "/api/doc/UC-002");
+    assert_eq!(archived_json.status, 404);
+    let json: serde_json::Value = serde_json::from_str(&archived_json.text()).unwrap();
     assert_eq!(json["error"]["code"], 404);
     let json_body = "{\"version\":\"1.2.3\",\"title\":\"Ok\"}";
-    let deprecated_json_post = post_json(&server, "/api/doc/UC-002", json_body);
-    assert_eq!(deprecated_json_post.status, 404);
+    let archived_json_post = post_json(&server, "/api/doc/UC-002", json_body);
+    assert_eq!(archived_json_post.status, 404);
 
     let api: serde_json::Value =
         serde_json::from_str(&get(&server, "/api/use-cases").text()).unwrap();

@@ -52,9 +52,6 @@ pub enum DecisionCmd {
         #[arg(long = "reference")]
         reference: Vec<String>,
     },
-    Archive {
-        id: String,
-    },
 }
 
 pub fn run(ctx: &Context, cmd: DecisionCmd) -> Result<crate::CommandOutput, AppError> {
@@ -110,7 +107,6 @@ pub fn run(ctx: &Context, cmd: DecisionCmd) -> Result<crate::CommandOutput, AppE
             &label,
             &reference,
         ),
-        DecisionCmd::Archive { id } => archive(ctx, &id),
     }
 }
 
@@ -738,37 +734,6 @@ pub fn edit(
     })
 }
 
-pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
-    let requested = sanitize_text(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let archived = archived_dir(ctx, &cfg)?;
-    let _ = ensure_dir(&active_dir(ctx, &cfg)?, &ctx.project_dir);
-    ensure_dir(&archived, &ctx.project_dir)?;
-
-    let record = resolve_decision_required(ctx, &cfg, &requested)?;
-    let id = record.id.clone();
-    record.ensure_writable()?;
-    let file_name = record
-        .path
-        .file_name()
-        .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?
-        .to_owned();
-    let archived_safe = Context::ensure_within(&ctx.project_dir, &archived.join(&file_name))?;
-    if record.path == archived_safe || archived_safe.exists() {
-        return Err(AppError::Validation(format!("already archived: {}", id)));
-    }
-    crate::record::store::move_record(ctx, &record.path, &archived_safe)?;
-    let json = if ctx.json {
-        Some(serde_json::json!({"status": "ok", "id": id}))
-    } else {
-        None
-    };
-    Ok(crate::CommandOutput {
-        text: String::new(),
-        json,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -861,14 +826,6 @@ mod native_layout_tests {
 
         let viewed = view(&c, "ADR-1").unwrap();
         assert!(viewed.text.contains("# ADR-001 First Decision"));
-
-        archive(&c, "ADR-001").unwrap();
-        assert!(!created.exists());
-        assert!(
-            dir.join("decisions/archived/ADR-001-first-decision.md")
-                .exists(),
-            "archive keeps the slugged file name"
-        );
     }
 
     #[test]
@@ -902,13 +859,6 @@ mod native_layout_tests {
             fs::read_to_string(&path)
                 .unwrap()
                 .contains("## Status\naccepted")
-        );
-
-        archive(&c, "ADR-002").unwrap();
-        assert!(!path.exists());
-        assert!(
-            dir.join("decisions/archived/ADR-002.md").exists(),
-            "archive keeps the existing unslugged name"
         );
     }
 }

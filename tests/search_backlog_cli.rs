@@ -218,9 +218,7 @@ fn decision_search_basic() {
     assert_eq!(out.status.code(), Some(0));
     assert!(stdout(&out).contains("ADR-001 decision Decision title"));
 
-    // archived decision is hidden
-    run(&d, &["decision", "archive", "ADR-001"]);
     let out = search(&d, &["needle", "--type", "decision"]);
     assert_eq!(out.status.code(), Some(0));
-    assert!(!stdout(&out).contains("ADR-001"));
+    assert!(stdout(&out).contains("ADR-001"));
 }

@@ -1,5 +1,6 @@
 pub mod audit;
 pub mod browser;
+pub mod cli;
 pub mod commands;
 pub mod config;
 pub mod context;
@@ -10,7 +11,6 @@ pub mod glossary;
 pub mod import;
 pub mod init;
 pub mod milestone;
-pub mod nfreq;
 pub mod record;
 pub mod registry;
 pub mod release;
@@ -27,37 +27,6 @@ pub mod ui_mockup;
 pub mod ui_spec;
 pub mod use_case;
 
-use clap::{Parser, Subcommand};
-use std::path::PathBuf;
-
-#[derive(Parser, Debug)]
-#[command(
-    name = "papyrus",
-    version,
-    about = "Project-level backlog and documentation manager.",
-    arg_required_else_help = true
-)]
-pub struct Cli {
-    /// Emit stable, machine-readable JSON.
-    #[arg(long, action = clap::ArgAction::SetTrue, global = true)]
-    pub json: bool,
-
-    /// Project directory. Default: the current working directory.
-    #[arg(long, value_name = "path", global = true)]
-    pub dir: Option<PathBuf>,
-
-    /// Configuration file. Default: papyrus.config.yml in the project directory.
-    #[arg(long, value_name = "file", global = true)]
-    pub config: Option<PathBuf>,
-
-    /// Disable ANSI color output.
-    #[arg(long, action = clap::ArgAction::SetTrue, global = true)]
-    pub no_color: bool,
-
-    #[command(subcommand)]
-    pub command: Commands,
-}
-
 /// Documented record types accepted by `papyrus search --type`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
 pub enum SearchType {
@@ -66,161 +35,6 @@ pub enum SearchType {
     Release,
     Decision,
     Doc,
-}
-
-#[derive(Subcommand, Debug)]
-pub enum Commands {
-    /// Initialize a project.
-    Init {
-        /// Project name.
-        name: String,
-        /// Do not initialize a Git repository.
-        #[arg(long)]
-        no_git: bool,
-        /// Allow initialization in a non-empty directory.
-        #[arg(long)]
-        force: bool,
-    },
-    /// Read and edit configuration.
-    Config {
-        #[command(subcommand)]
-        action: ConfigCmd,
-    },
-    /// Manage business requirements.
-    Req {
-        #[command(subcommand)]
-        action: req::ReqCmd,
-    },
-    /// Manage non-functional requirements.
-    Nfreq {
-        #[command(subcommand)]
-        action: nfreq::NfreqCmd,
-    },
-    /// Manage milestones.
-    Milestone {
-        #[command(subcommand)]
-        action: milestone::MilestoneCmd,
-    },
-    /// Manage releases.
-    Release {
-        #[command(subcommand)]
-        action: release::ReleaseCmd,
-    },
-    /// Manage tasks.
-    Task {
-        #[command(subcommand)]
-        action: Option<task::TaskCmd>,
-        /// Task ID (shorthand for view).
-        #[arg(value_name = "id")]
-        id: Option<String>,
-    },
-    /// Manage decision records.
-    Decision {
-        #[command(subcommand)]
-        action: decision::DecisionCmd,
-    },
-    /// Manage glossary terms.
-    Glossary {
-        #[command(subcommand)]
-        action: glossary::GlossaryCmd,
-    },
-    /// Manage UI specifications.
-    UiSpec {
-        #[command(subcommand)]
-        action: ui_spec::UiSpecCmd,
-    },
-    /// Manage technical specifications.
-    TechSpec {
-        #[command(subcommand)]
-        action: tech_spec::TechSpecCmd,
-    },
-    /// Manage business rules.
-    Rule {
-        #[command(subcommand)]
-        action: rule::RuleCmd,
-    },
-    /// Manage UI mockups.
-    UiMockup {
-        #[command(subcommand)]
-        action: ui_mockup::UiMockupCmd,
-    },
-    /// Manage audit records.
-    Audit {
-        #[command(subcommand)]
-        action: audit::AuditCmd,
-    },
-    /// Manage use cases.
-    UseCase {
-        #[command(subcommand)]
-        action: use_case::UseCaseCmd,
-    },
-    /// Manage test cases.
-    TestCase {
-        #[command(subcommand)]
-        action: test_case::TestCaseCmd,
-    },
-    /// Manage test reports.
-    TestReport {
-        #[command(subcommand)]
-        action: test_report::TestReportCmd,
-    },
-    /// Import records from a Backlog.md store.
-    Import {
-        #[command(subcommand)]
-        action: import::ImportCmd,
-    },
-    /// Serve the local web interface.
-    #[command(
-        override_usage = "papyrus browser [--host <host>] [--port <port>] [--no-open] [--debug]"
-    )]
-    Browser {
-        /// Bind address. Default: 127.0.0.1.
-        #[arg(long, value_name = "host")]
-        host: Option<String>,
-        /// TCP port. Default: 6420.
-        #[arg(
-            long,
-            value_name = "port",
-            value_parser = parse_browser_port,
-            allow_hyphen_values = true
-        )]
-        port: Option<u16>,
-        /// Do not open the default browser automatically.
-        #[arg(long = "no-open")]
-        no_open: bool,
-        /// Log one line per received request to stderr (method, path, status, duration).
-        /// Browser-only flag; takes no value.
-        #[arg(long)]
-        debug: bool,
-    },
-    /// Search records by free text.
-    Search {
-        /// Free-text search term or phrase. Quote phrases that contain spaces.
-        #[arg(value_name = "query")]
-        query: String,
-        /// Restrict to record types. Repeatable. Default: all types.
-        #[arg(long = "type", value_name = "type", value_enum)]
-        types: Vec<SearchType>,
-        /// Maximum number of results. Must be a positive integer.
-        #[arg(long, value_name = "n", value_parser = parse_limit, allow_hyphen_values = true)]
-        limit: Option<usize>,
-    },
-}
-
-#[derive(Subcommand, Debug)]
-pub enum ConfigCmd {
-    /// Print all effective keys.
-    List,
-    /// Print one effective value.
-    Get { key: String },
-    /// Persist one value.
-    Set {
-        key: String,
-        #[arg(allow_hyphen_values = true)]
-        value: String,
-    },
-    /// Remove one key.
-    Unset { key: String },
 }
 
 pub struct CommandOutput {
@@ -252,174 +66,83 @@ pub(crate) fn parse_limit(raw: &str) -> Result<usize, String> {
     usize::try_from(value).map_err(|_| "limit must be a positive integer".to_string())
 }
 
-pub fn parse() -> Cli {
-    Cli::parse()
-}
+pub fn run() -> Result<CommandOutput, error::AppError> {
+    use crate::cli;
+    use crate::registry::ArtifactRegistry;
 
-/// Build a command context for non-init commands, enforcing the
-/// project-directory boundary for the configuration path.
-fn build_context(
-    project_raw: PathBuf,
-    config_path: PathBuf,
-    json: bool,
-    no_color: bool,
-) -> Result<context::Context, error::AppError> {
-    let project_dir = context::Context::canonical_project_dir(&project_raw)?;
-    let config_path =
-        context::Context::ensure_within(&project_dir, &config_path).map_err(|_| {
-            error::AppError::Runtime(format!(
-                "configuration path resolves outside project directory: {}",
-                config_path.display()
-            ))
-        })?;
-    if !config_path.exists() {
-        return Err(error::AppError::Runtime(format!(
-            "configuration file not found: {}; run `papyrus init` to create it",
-            config_path.display()
-        )));
-    }
-    Ok(context::Context {
-        project_dir,
-        config_path,
-        json,
-        no_color,
-    })
-}
+    let full_args: Vec<String> = std::env::args().collect();
+    let args: Vec<String> = full_args.iter().skip(1).cloned().collect();
+    let prescan = cli::scan(&args);
 
-pub fn run(cli: Cli) -> Result<CommandOutput, error::AppError> {
-    let project_raw = context::Context::select_project_dir(cli.dir.clone())?;
-    let config_path_raw = context::Context::select_config_path(cli.config.clone(), &project_raw);
-    // Sanitize the selected config path components (exit 4 if unnormalizable).
+    let project_raw = context::Context::select_project_dir(prescan.dir.clone())?;
+    let config_path_raw =
+        context::Context::select_config_path(prescan.config.clone(), &project_raw);
     let config_path = crate::sanitize::sanitize_path(&config_path_raw).ok_or_else(|| {
         crate::error::AppError::Validation("configuration path cannot be normalized".to_string())
     })?;
 
-    // no_color / NO_COLOR
-    let no_color = cli.no_color
+    let json = args.iter().any(|a| a == "--json");
+    let no_color = args.iter().any(|a| a == "--no-color")
         || std::env::var("NO_COLOR")
             .map(|v| !v.is_empty())
             .unwrap_or(false);
 
-    match cli.command {
-        Commands::Init {
-            name,
-            no_git,
-            force,
-        } => {
-            init::run_init(
-                project_raw,
-                init::InitOptions {
-                    name,
-                    no_git,
-                    force,
-                },
-            )?;
-            Ok(CommandOutput {
-                text: String::new(),
-                json: if cli.json {
-                    Some(serde_json::json!({"status":"ok"}))
-                } else {
-                    None
-                },
-            })
-        }
-        Commands::Config { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            match action {
-                ConfigCmd::List => commands::config_list(&ctx),
-                ConfigCmd::Get { key } => commands::config_get(&ctx, &key),
-                ConfigCmd::Set { key, value } => commands::config_set(&ctx, &key, &value),
-                ConfigCmd::Unset { key } => commands::config_unset(&ctx, &key),
-            }
-        }
-        Commands::Req { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            req::run(&ctx, action)
-        }
-        Commands::Nfreq { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            nfreq::run(&ctx, action)
-        }
-        Commands::Milestone { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            milestone::run(&ctx, action)
-        }
-        Commands::Release { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            release::run(&ctx, action)
-        }
-        Commands::Task { action, id } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            if let Some(a) = action {
-                task::run(&ctx, a)
-            } else if let Some(i) = id {
-                task::view(&ctx, &i)
+    let first = prescan.first_positional.clone();
+    let is_init = first.as_deref() == Some("init");
+    let is_config = first.as_deref() == Some("config");
+    let is_help = prescan.help || first.as_deref() == Some("help");
+    let is_version = prescan.version;
+
+    // Phase 2: config
+    let (_cfg_opt, registry_opt): (Option<crate::config::Config>, Option<ArtifactRegistry>) =
+        if is_init {
+            (None, None)
+        } else if is_config {
+            let cfg = if config_path.exists() {
+                crate::commands::load_effective_config(&config_path, &project_raw).ok()
             } else {
-                Err(error::AppError::Validation(
-                    "missing task subcommand or id".to_string(),
-                ))
+                None
+            };
+            let reg = cfg.as_ref().and_then(|c| ArtifactRegistry::build(c).ok());
+            (cfg, reg)
+        } else if (is_help || is_version) && !config_path.exists() {
+            let cfg = crate::config::Config::default();
+            let reg = ArtifactRegistry::build(&cfg).ok();
+            (Some(cfg), reg)
+        } else {
+            // load + validate
+            let cfg = crate::commands::load_effective_config(&config_path, &project_raw)?;
+            let reg = ArtifactRegistry::build(&cfg).map_err(crate::error::AppError::from)?;
+            (Some(cfg), Some(reg))
+        };
+
+    let tree = cli::tree(registry_opt.as_ref())?;
+
+    // Phase 3: parse once
+    let matches = match tree.try_get_matches_from(&full_args) {
+        Ok(m) => m,
+        Err(e) => {
+            use clap::error::ErrorKind;
+            match e.kind() {
+                ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => {
+                    e.print().ok();
+                    std::process::exit(0);
+                }
+                _ => {
+                    e.print().ok();
+                    std::process::exit(2);
+                }
             }
         }
-        Commands::Decision { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            decision::run(&ctx, action)
-        }
-        Commands::Glossary { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            glossary::run(&ctx, action)
-        }
-        Commands::UiSpec { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            ui_spec::run(&ctx, action)
-        }
-        Commands::TechSpec { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            tech_spec::run(&ctx, action)
-        }
-        Commands::Rule { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            rule::run(&ctx, action)
-        }
-        Commands::UiMockup { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            ui_mockup::run(&ctx, action)
-        }
-        Commands::Audit { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            audit::run(&ctx, action)
-        }
-        Commands::UseCase { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            use_case::run(&ctx, action)
-        }
-        Commands::TestCase { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            test_case::run(&ctx, action)
-        }
-        Commands::TestReport { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            test_report::run(&ctx, action)
-        }
-        Commands::Import { action } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            import::run(&ctx, action)
-        }
-        Commands::Browser {
-            host,
-            port,
-            no_open,
-            debug,
-        } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            browser::run(&ctx, host.as_deref(), port, no_open, debug)
-        }
-        Commands::Search {
-            query,
-            types,
-            limit,
-        } => {
-            let ctx = build_context(project_raw, config_path, cli.json, no_color)?;
-            search::run(&ctx, &query, &types, limit)
-        }
-    }
+    };
+
+    // Phase 4: dispatch
+    cli::dispatch(
+        &matches,
+        project_raw,
+        config_path,
+        json,
+        no_color,
+        registry_opt.as_ref(),
+    )
 }
