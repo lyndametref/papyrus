@@ -2,117 +2,52 @@
 
 ## Description
 
-The papyrus configuration file papyrus.config.yml defines keys and precedence as stated in papyrus-config(5); behavior not stated there is unspecified.
+`papyrus.config.yml` is the single source of project paths, ID formats, workflow statuses, document types, and browser settings, and its effective value is resolved in the fixed precedence order command-line options, environment variables, the project configuration file, then built-in defaults.
 
 ## Rationale
 
-Based on REQ-01.002 — Read and Edit Project Configuration and REQ-01.003 — Select Project and Configuration Context, this rule exists because configuration keys and precedence are defined by the manpage; README.md is the sole behavior source.
+Based on REQ-01.002 — Read and Edit Project Configuration, REQ-01.003 — Select Project and Configuration Context, REQ-07.001 — Organize Artifacts into Three Categories, and REQ-07.002 — Configure Document Types and Slugs, this rule exists because configuration is the only place document types, their slugs, prefixes, directories, and status vocabularies are declared; the loader must therefore validate the whole map fail-closed and still leave a repair path, or one bad entry would make every command unusable and the project could not be fixed through Papyrus itself.
 
 ## Applicability
 
-Applies to papyrus configuration files (papyrus.config.yml) and the project data they govern. The excerpt below reproduces relevant manpage behavior verbatim; heading identifies README section and exact source line range.
+Applies to every `papyrus.config.yml` file and to the project data it governs.
 
-### papyrus-config(5): DESCRIPTION, PRECEDENCE, and KEYS — `README.md` lines 902–999
+### Precedence
 
-```text
-DESCRIPTION
+1. Command-line options.
+2. Environment variables (`PAPYRUS_DIR`, `PAPYRUS_CONFIG`).
+3. `papyrus.config.yml` in the project directory.
+4. Built-in defaults.
 
-       papyrus.config.yml is a YAML file that controls project paths, ID formats, workflow statuses, document types, and the local web UI.
+This order is unchanged by the document-type model.
 
-       The file is read from the project directory (--dir) unless --config or PAPYRUS_CONFIG names another file.
+### General, path, and workflow keys
 
-PRECEDENCE
+- `project_name`, `task_prefix`, `milestone_prefix`, `release_prefix`, `id_padding` (1–6, default 3), `date_format`, and `editor`.
+- `backlog_directory`, `decision_directory`, and `doc_directory`; each document type's `directory` is relative to `doc_directory`.
+- `statuses` and `default_status` configure task statuses only. The milestone (`open -> closed`), release (`planned -> released`), and decision lifecycles stay fixed, and the document main statuses `active` and `archived` are not configurable.
 
-       From highest to lowest:
+### document_types
 
-       1. Command-line options.
-       2. Environment variables (PAPYRUS_DIR, PAPYRUS_CONFIG).
-       3. papyrus.config.yml in the project directory.
-       4. Built-in defaults.
+- The map is keyed by document slug; the key is the command name (`papyrus <slug>`) and the identifier used elsewhere. There is no separate document-slug attribute.
+- Each entry declares `prefix`, `directory` (relative to `doc_directory`), and `enabled`, and may declare `statuses` and `default_status`. Archived records are stored in an `archived/` subfolder of the entry's directory.
+- `papyrus init` seeds eleven entries: `req` (REQ, `requirements/business/`), `nfr` (NFR, `requirements/non-functional/`), `glossary` (GLO, `glossary/`), `rule` (RUL, `business-rules/`), `ui-spec` (UI, `specifications/ui/`), `ui-mockup` (MOCK, `specifications/ui/mockups/`), `audit` (AUD, `audit-records/`), `tech-spec` (TECH, `technical/`), `use-case` (UC, `use-cases/`), `test-case` (TC, `test-cases/`), and `test-report` (TR, `test-reports/`). `deploy` is not seeded and can be added as an ordinary user-defined entry.
+- Default entries are fully ordinary: any entry can be renamed, removed, disabled, or given another prefix or directory.
+- The map is whole: when the key is present, exactly its entries exist and no seeded entry is re-added. Removing an entry stops managing its records and deletes no file; `enabled: false` removes the command and browser view while keeping the entry, its prefix reservation, and its files.
+- `statuses`, when present, is a non-empty duplicate-free list that contains `active` and `archived` exactly once; `active` and `archived` are fixed and every other value is a custom status. Every declared value follows the slug character rule. `default_status`, when present, must be a declared status and must never be `archived`. An entry without `statuses` has only the two main statuses and starts `active` unless `default_status` is set. `statuses` and `default_status` are rejected on `ui-mockup`, which keeps its state in HTML metadata.
+- `statuses` is list-valued: `papyrus config set document_types.<slug>.statuses active,archived,review` writes the value as a YAML flow sequence; commas are separators with no escape form, and an empty value is rejected.
 
-KEYS
+### Validation
 
-General
+- Fail-closed: every command except the repair surfaces (`config get|set|unset|list`) and `init --force` refuses to run while the effective configuration is invalid, and no partially valid document-type set is used.
+- A violation is a validation outcome (exit code 4) that names `document_types.<slug>` and the offending field.
+- Slug: non-empty, ASCII letters, digits, `-`, and `_`, not starting with `-`, with no whitespace, control character, or path separator; values are rejected, never trimmed or normalized.
+- Reserved names: a slug equal to `init`, `config`, `task`, `milestone`, `release`, `decision`, `search`, `browser`, `import`, `help`, or `version` is rejected. The comparison is case-insensitive, so `Config` and `SEARCH` are rejected too.
+- `prefix` is non-empty and unique across all entries, including disabled ones.
+- `directory` is relative, stays inside the project directory, and is unique among enabled entries.
+- A repeated `document_types` slug key is invalid configuration; neither occurrence is preferred.
 
-       project_name
-       Project name. Default: the directory name.
+### Repair surfaces
 
-       task_prefix
-       Task ID prefix. Default: TASK.
-
-       milestone_prefix
-       Milestone ID prefix. Default: MS.
-
-       release_prefix
-       Release ID prefix. Default: REL.
-
-        id_padding
-        ID zero-padding width from 1 to 6. Default: 3 (for example TASK-001). IDs wider than the padding are not truncated.
-
-       date_format
-       Date format. Default: yyyy-mm-dd.
-
-       editor
-       Editor command. Default: $VISUAL, then $EDITOR.
-
-Paths
-
-       backlog_directory
-       Backlog store. Default: backlog/.
-
-       decision_directory
-       Decision records. Default: decisions/, outside the backlog store.
-
-       doc_directory
-       Active documentation store. Default: docs/.
-
-       Each document type has its own configured directory relative to this path.
-       Deprecated documents are stored in a deprecated/ subfolder within
-       their type directory.
-
-Workflow
-
-       statuses
-       Ordered task statuses. Default: ["ToDo", "Initiated", "Refined", "Implemented", "Validated", "Done"].
-       Use unique values; default_status must match one of them.
-
-       default_status
-       Status assigned to new tasks. Default: ToDo.
-
-Decisions
-
-       decision_types
-       Decision types and their ID prefixes. Default:
-
-         
-         decision_types:
-           adr: { prefix: ADR, enabled: true }
-           bdr: { prefix: BDR, enabled: true }
-         
-
-         Additional types may be added. A disabled type is rejected by papyrus decision create and hidden from lists and search.
-
-Documents
-
-       document_types
-       Document type keys, ID prefixes, directories relative to doc_directory,
-       and enabled flags. Deprecated documents are stored in a deprecated/
-       subfolder of each type directory. Default:
-
-       
-       document_types:
-         req:      { prefix: REQ, directory: requirements/business/,       enabled: true }
-         nfr:      { prefix: NFR, directory: requirements/non-functional/, enabled: true }
-         glossary: { prefix: GLO, directory: glossary/,                    enabled: true }
-         rule:     { prefix: RUL, directory: business-rules/,              enabled: true }
-         ui-spec:    { prefix: UI,  directory: specifications/ui/,           enabled: true }
-         ui-mockup:  { prefix: MOCK, directory: specifications/ui/mockups/,   enabled: true }
-         audit:      { prefix: AUD, directory: audit-records/,                enabled: true }
-         deploy:     { prefix: DEP, directory: architecture/deployment/,     enabled: true }
-         tech-spec:  { prefix: TECH, directory: technical/,                  enabled: true }
-       
-
-       The nfreq command uses the nfr type key. Additional types may
-       be added. Disabled types cannot be created and are hidden from lists and search.
-
-```
+- `papyrus config get|set|unset|list` load tolerantly, validate the configuration that would result, and refuse an invalid write.
+- `papyrus init --force` replaces the file with the generated default set.

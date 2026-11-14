@@ -2,78 +2,24 @@
 
 ## Description
 
-The papyrus decision command performs the behavior stated in its Papyrus manpage entry (README.md, papyrus(1) → COMMANDS → decision); behavior not stated there is unspecified.
+The `papyrus decision` command creates, lists, views, and edits decision records (ADR/BDR) and expresses their lifecycle only through the Nygard statuses `proposed`, `accepted`, `rejected`, `deprecated`, and `superseded`; there is no decision archive command and a decision carries no archive state.
 
 ## Rationale
 
-Based on REQ-04.001 — Create and Inspect Decisions and REQ-04.002 — Update, Supersede, and Archive Decisions, this rule exists because the documented decision behavior is the contract for papyrus decision; README.md is the sole behavior source.
+Based on REQ-04.001 — Create and Inspect Decisions and REQ-04.002 — Update and Supersede Decisions, this rule exists because decisions belong to the decision category, whose lifecycle is the five Nygard statuses; an inactive or replaced decision is marked `superseded` or `deprecated`, so documenting an archive operation would invent a state the category does not have and contradict the command set.
 
 ## Applicability
 
-Applies to all invocations of `papyrus decision` and the project data they manage. The excerpt below reproduces relevant manpage behavior verbatim; heading identifies README section and exact source line range.
+Applies to every invocation of `papyrus decision` and to every decision record.
 
-### papyrus(1): decision — `README.md` lines 306–367
+### Command surface
 
-```text
-decision
+- `create` (`-t/--decision-type`, `-d/--decision`, `--context`, `--consequences`), `list`, `view`, and `edit` (`--title`, `-d`, `--status`, `--context`, `--consequences`, `--superseded-by`).
+- `--superseded-by` cannot be combined with `--status`.
+- No archive command exists, and a decision is never moved to a document `archived/` folder.
 
-       Manage decisions (ADR-001, BDR-001, ...). Decisions may reference zero or more business requirements and zero or more non-functional requirements, and may be superseded by zero or one decision of the same type.
-       
-        papyrus decision create <title> [-t, --decision-type <type>] [-d <decision>] [--context <text>] [--consequences <text>]
-        papyrus decision list [-t, --decision-type <type>]
-       papyrus decision view <id>
-       papyrus decision edit <id> [--title <title>] [-d <decision>]
-                                     [--status <status>] [--context <text>] [--consequences <text>]
-                                     [--superseded-by <id>]
-       papyrus decision archive <id>
-       
-       create
-       Create a decision.
+### Status model
 
-           -t, --decision-type <type>
-          Decision type. Built-in types: adr (default) and bdr. Additional types are configured in papyrus-config(5).
-
-          -d, --decision <text>
-          The decision which was taken.
-
-          --context <text>
-          Context of the decision.
-
-          --consequences <text>
-          Consequences of the decision.
-
-       list
-       List decisions.
-
-           -t, --decision-type <type>
-           Filter by decision type.
-
-       view <id>
-       View a decision.
-
-       edit <id>
-       Edit a decision.
-
-          --title <title>
-          Update the title.
-
-          -d, --decision <text>
-          The decision which was taken.
-
-          --status <status>
-          Set the status.
-
-          --context <text>
-          Context of the decision.
-
-          --consequences <text>
-          Consequences of the decision.
-
-          --superseded-by <id>
-           Mark this decision as superseded by at most one other decision of the same type. Cannot be combined with --status.
-
-       archive <id>
-       Archive a decision.
-
-       Decision records follow the Nygard ADR template: Title, Status, Decision, Context, and Consequences. Statuses are proposed, accepted, rejected, deprecated, and superseded.
-```
+- Exactly `proposed`, `accepted`, `rejected`, `deprecated`, and `superseded`.
+- Decision statuses are distinct from document statuses: a decision is never `active` or `archived`, and a document is never `deprecated`.
+- Decision status changes are performed through `edit --status` or supersession, not through a document status command.

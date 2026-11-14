@@ -2,62 +2,32 @@
 
 ## Description
 
-The papyrus glossary command performs the behavior stated in its Papyrus manpage entry (README.md, papyrus(1) → COMMANDS → glossary); behavior not stated there is unspecified.
+`papyrus glossary` manages glossary terms as the ordinary `document_types.glossary` entry using only the baseline document verbs and the document status model, with each term carrying a required term and definition.
 
 ## Rationale
 
-Based on REQ-05.003 — Manage Glossary Terms, this rule exists because the documented glossary behavior is the contract for papyrus glossary; README.md is the sole behavior source.
+Based on REQ-05.003 — Manage Glossary Terms, REQ-07.002 — Configure Document Types and Slugs, REQ-07.003 — Dispatch Config-Defined Document Commands, and REQ-05.007 — Manage Document Archive State and Deletion, this rule exists because a glossary term is a standard document record: it needs a stable identity, the common create/list/view/edit/archive/delete family, and the common status model, and it adds no verb or lifecycle of its own.
 
 ## Applicability
 
-Applies to all invocations of `papyrus glossary` and the project data they manage. The excerpt below reproduces relevant manpage behavior verbatim; heading identifies README section and exact source line range.
+Applies to every invocation of `papyrus glossary` and to every glossary record, in projects where the `glossary` entry is enabled.
 
-### papyrus(1): glossary — `README.md` lines 492–537
+### Type entry
 
-```text
-glossary
+- Ordinary `document_types` entry (default prefix `GLO`, directory `glossary/`); renameable, removable, disableable, and assignable another prefix or `doc_directory`-relative directory.
+- IDs use the entry prefix and `id_padding` and are preserved on archive.
 
-       Manage glossary terms (GLO-...).
+### Verbs
 
-       
-       papyrus glossary create --term <term> --definition <text>
-       papyrus glossary list
-       papyrus glossary view <id>
-       papyrus glossary edit <id> [--term <term>] [--definition <text>] [--editor]
-       papyrus glossary deprecate <id>
-       papyrus glossary restore <id>
-       
+- Baseline only: `create`, `list`, `view`, `edit`, `archive`, `delete`, plus `status <id> <value>`.
+- No extension verb is declared.
+- Content is retained: `--term` and `--definition` on create and edit, and `--editor` for the body.
 
-       create
-       Create a glossary term.
+### Status and archive
 
-          --term <term>
-          Glossary term.
-
-          --definition <text>
-          Definition of the term.
-
-       list
-       List glossary terms.
-
-       view <id>
-       View a glossary term.
-
-       edit <id>
-       Edit a glossary term.
-
-          --term <term>
-          Update the glossary term.
-
-          --definition <text>
-          Update the definition.
-
-          --editor
-          Open the document body in $VISUAL or $EDITOR.
-
-       deprecate <id>
-       Move a glossary term to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-       restore <id>
-       Return a deprecated glossary term to its original folder. The ID is preserved.
-```
+- Main statuses `active` and `archived` plus optional configured custom statuses; custom statuses are front-matter values only and move no file.
+- A new record starts at the configured `default_status`, or `active` when none is configured.
+- `archive` sets `archived`, moves the file into the entry's `archived/` subfolder, and keeps the ID.
+- Archiving does not retain a previous custom status value, and there is no inverse command.
+- `status` never archives: `status <id> archived` is rejected, naming `archive` as the only way.
+- Decision statuses are a separate lifecycle and never apply to documents; the milestone `open -> closed` and release `planned -> released` lifecycles are fixed and unaffected by `statuses` or `default_status`.

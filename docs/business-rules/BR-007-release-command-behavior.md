@@ -2,53 +2,25 @@
 
 ## Description
 
-The papyrus release command performs the behavior stated in its Papyrus manpage entry (README.md, papyrus(1) → COMMANDS → release); behavior not stated there is unspecified.
+The `papyrus release` command manages releases with the verbs `create`, `list`, `view`, `edit`, and `close`, where `papyrus release close <id>` is the only transition of the fixed `planned -> released` lifecycle; releases are not documents and have no archive, restore, or delete command.
 
 ## Rationale
 
-Based on REQ-03.002 — Manage Releases, this rule exists because the documented release behavior is the contract for papyrus release; README.md is the sole behavior source.
+Based on REQ-03.002 — Manage Releases and REQ-07.001 — Organize Artifacts into Three Categories, this rule exists because a release is a backlog artifact whose lifecycle is fixed by the category model rather than configurable: the state is stored in the front-matter `status` field, `close` is the single command that moves a release from `planned` to `released`, and document archive semantics never apply to a release.
 
 ## Applicability
 
-Applies to all invocations of `papyrus release` and the project data they manage. The excerpts below reproduce relevant manpage behavior verbatim; each heading identifies the README section and exact source line range. No `archive`, `restore`, or `delete` subcommand is documented for `papyrus release`; its lifecycle is `active -> released`.
+Applies to every invocation of `papyrus release` and to every release record.
 
-### papyrus(1): release — `README.md` lines 279–305
+### Command surface
 
-```text
-release
+- `create`, `list`, `view`, and `edit` (`--title`, `-d/--description`).
+- `close <id>` is the only transition command and moves the release from `planned` to `released`.
+- No `--status` option performs the transition, and no archive, restore, delete, or other document verb is declared.
 
-       Manage releases (REL-001, ...). A release may contain multiple milestones; each milestone may be assigned to zero or one release.
-       
-       papyrus release create <title>
-       papyrus release list
-       papyrus release view <id>
-       papyrus release edit <id> [--title <title>] [-d <description>]
-       
-       create
-       Create a release.
+### Lifecycle
 
-       list
-       List releases.
-
-       view <id>
-       View a release.
-
-       edit <id>
-       Edit a release.
-
-          --title <title>
-          Update the title.
-
-          -d, --description <text>
-          Update the description.
-```
-
-### papyrus(1): STATUSES → Releases — `README.md` lines 737–741
-
-```text
-Releases
-
-        active -> released
-
-        Releases group milestones.
-```
+- Fixed `planned -> released`, reached only through `papyrus release close <id>`; `statuses` or `default_status` configuration cannot change it.
+- `released` represents delivery completion and is distinct from archiving; releases are not archived.
+- Release status is stored in the front-matter `status` field and is neither a document main status nor configurable, and a release is never moved to a document `archived/` folder.
+- A release groups milestones; each milestone may be assigned to at most one release.
