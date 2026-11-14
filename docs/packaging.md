@@ -1403,3 +1403,242 @@ Observed results:
   **Resolved in the quality-gate wording fix:** AC#9 and specification §8.1/§8.2
   scope search to the CLI with the browser limited to the record view and JSON API;
   no implementation change was needed.
+
+## TASK-117 — Config-defined document types release verification and packaging
+
+**Supported platform statement.** Debian **Forky amd64** is the supported and verified
+release target for this package (ADR-0003, NFR-03.002). Debian Trixie and every other
+release, and every other architecture, remain **not claimed or verified**.
+
+This section records the m-17 release gate for config-defined document types. It is a
+verification and packaging record only: no product source, requirement, business rule,
+ADR, README, or upgrade-notes file was changed.
+
+### Environment
+
+| Item | Value |
+|---|---|
+| Host | Debian GNU/Linux forky/sid, amd64 |
+| Date and timezone | 2026-11-14 20:53 CET (UTC+01:00) |
+| glibc | 2.43-7 |
+| rustc / cargo | 1.99.1 (pinned by `rust-toolchain.toml`) |
+| clippy / rustfmt | 0.1.99 / 1.10.0-stable |
+| dpkg / dpkg-deb | 1.23.11 |
+| Tooling | `fakeroot`, `unshare`, `ip`, `curl` available |
+| Package toolchain | `./scripts/build-deb.sh` unchanged |
+
+### Isolation method
+
+- Every CLI, upgrade, browser, and installed-binary fixture lived under
+  `./.tmp/task117/`; the two new test files use a `Scratch` guard that removes its
+  directory on success and on panic.
+- The repository's `backlog/` store was never used as a fixture and was not written.
+  `git status --porcelain` before and after the run lists only the TASK-117 artifacts.
+- The package was installed in an isolated dpkg root with
+  `fakeroot dpkg --instdir=./.tmp/task117/inst --admindir=./.tmp/task117/adm
+  --force-depends -i`; the host `dpkg -l papyrus` output was identical before and
+  after (the host already carried the packaged `0.1.0` from prior work).
+- All `./.tmp/task117/` scratch, including the isolated roots, was removed after the
+  verification; the built `.deb` remains.
+
+### Automated verification
+
+`cargo test`: **789 passed, 0 failed, 22 ignored** across 42 test binaries
+(299 library unit tests plus integration binaries). The ignored tests are the
+pre-existing milestone-flow smoke tests that require an external editor/flow; they
+are unrelated to this feature.
+
+Named document-type suites in the same run:
+
+| Suite | Passed | Failed |
+|---|---|---|
+| `src/lib.rs` unit tests (registry, config, document, search, browser) | 299 | 0 |
+| `tests/cli_dispatch.rs` | 9 | 0 |
+| `tests/browser_config_types_cli.rs` | 19 | 0 |
+| `tests/search_config_types_cli.rs` | 13 | 0 |
+| `tests/config_list_keys_cli.rs` | 9 | 0 |
+| `tests/cli.rs` | 24 | 0 |
+| `tests/no_drift.rs` | 10 | 0 |
+| `tests/release_document_types_smoke.rs` (new) | 8 | 0 |
+| `tests/document_type_no_drift.rs` (new) | 8 | 0 |
+
+New test names:
+
+- `tests/release_document_types_smoke.rs`: `t117_01_generated_help_and_dispatch_matrix`,
+  `t117_02_cli_lifecycle_persistence_and_validation`,
+  `t117_03_json_is_accepted_on_every_document_verb`,
+  `t117_04_search_front_matter_and_hidden_states`,
+  `t117_05_invalid_configuration_fails_closed_and_repairs`,
+  `t117_06_upgrade_from_pre_change_configuration`,
+  `t117_07_deploy_command_from_configuration_alone`,
+  `t117_08_browser_matrix_over_http`.
+- `tests/document_type_no_drift.rs`: `d01_no_deprecated_folder_literal_in_src`,
+  `d02_no_nfreq_command_in_src`, `d03_no_document_deprecate_or_restore_variants`,
+  `d04_no_static_per_type_command_in_cli`,
+  `d05_no_slug_literal_dispatch_outside_type_modules`,
+  `d06_no_stale_nfreq_or_static_command_block_in_user_docs`,
+  `d07_no_static_inventory_in_config_type_specifications`,
+  `scanner_flags_planted_violations_and_accepts_allowlisted_lines`.
+
+### CLI matrix (C-01 .. C-26)
+
+Executed against `target/release/papyrus` on a fixture declaring
+`note` (`NOTE`, `notes/`, `statuses: [active, archived, review, approved]`,
+`default_status: active`).
+
+| Row | Observed |
+|---|---|
+| C-01 `--help` | exit 0; the eleven default slugs plus `note`; no `deploy`, no `nfreq` |
+| C-02 `note --help` | exit 0; create/list/view/edit/archive/delete/status |
+| C-03 `req`/`nfr --help` | exit 0; `create-group`; `create --help` shows required `--group` |
+| C-04 `ui-mockup --help` | exit 0; `supersede`; no `status` |
+| C-05 `nfreq --help` | exit 2 |
+| C-06 unknown slug | exit 2 |
+| C-07 disabled note | exit 2 for every verb; absent from `--help` |
+| C-08 undeclared `deploy` | exit 2 |
+| C-09 create | exit 0; prints `NOTE-001`; writes `docs/notes/NOTE-001.md` |
+| C-10 list/view | exit 0; ID order; metadata and body match the file |
+| C-11 edit | exit 0; only the supplied title changed |
+| C-12 status review | exit 0; `status: review`; file stays in place |
+| C-13 status archived | exit 4; stderr names `archive`; file hash unchanged |
+| C-14 archive | exit 0; moves to `docs/notes/archived/NOTE-001.md`; hidden from list; review discarded |
+| C-15 delete without `--force` | prompt; `n` leaves the file, `y` removes it |
+| C-16 delete `--force` | exit 0; no prompt; file gone |
+| C-17 unknown ID | exit 3 |
+| C-18 invalid title | empty, newline/CR, and path separator exit 4 with no write (see F-117-1) |
+| C-19 unwritable directory | exit 1, `Permission denied (os error 13)` |
+| C-20 `--json` | create/list/view/edit/status/archive/delete each emit one JSON value; errors emit `{"error":{"code","message"}}` on stderr |
+| C-21 search | title, `--type doc`, and `--json` find `NOTE-*` as `doc`; archived/disabled hidden |
+| C-22 `docs/notes/deprecated/NOTE-900.md` | not listed, viewed, searched, or browsed; inert |
+| C-23 manual recovery | move to `docs/notes/` and set `status: active`; list/view work; no `restore` command (exit 2) |
+| C-24 invalid config | validating commands exit 4 naming `document_types.note.statuses`; `config get`/`list` still read |
+| C-25 repair | valid `config set` writes; invalid merge exits 4 and leaves the file byte-identical (same SHA-256) |
+| C-26 `init --force` | rewrites the eleven defaults; `req list` exit 0; undeclared `note` exit 2 |
+
+### Browser matrix (B-01 .. B-19)
+
+HTTP only against `browser --no-open --port <free>` on a `note` fixture with
+`active`, `review`, and `approved` records. Rows B-01 .. B-18 are asserted by
+`t117_08_browser_matrix_over_http`; B-19 was executed manually.
+
+| Row | Observed |
+|---|---|
+| B-01 startup | exactly `Serving http://127.0.0.1:<port>/` |
+| B-02 list | 200; `Notes` under `Documents`; Status/ID/Title/Created/Updated order; rows match CLI |
+| B-03 detail | 200; status read-only; no status control |
+| B-04 edit form | 200; no `name="status"`/`name="status_change"`; labels/references present |
+| B-05 edit POST | 303 to `/doc/NOTE-003`; persisted via CLI; unknown key/section preserved |
+| B-06 no-op save | 303; file byte-identical (SHA-256 unchanged) |
+| B-07 stale version | 409; file unchanged |
+| B-08 `status=archived` | 422; file unchanged |
+| B-09 filter values | exactly `active`, `review`, `approved`; no `archived` |
+| B-10 review/approved filter | only matching records |
+| B-11 invalid filters | `archived`, `bogus`, `Review`, empty, duplicate each 400 with the error page and no list |
+| B-12 no status | all active-directory records, including custom statuses |
+| B-13 archived | omitted; detail/edit/POST/API 404; 404 page identical to an unknown ID; deprecated file also 404 |
+| B-14 disabled type | after restart: list/detail/edit/API 404; no sidebar entry; `/lifecycle` still lists `Notes` with `enabled: false` |
+| B-15 lifecycle | Backlog, Decisions, Documents; 17 `enabled:` sections with `note`; custom statuses/prefix/folder shown |
+| B-16 `/api/docs/note` | 200; rows carry id, kind, title, status, labels, references, version, path, metadata |
+| B-17 assets | app.css/app.js 200, non-empty, correct type, `Cache-Control: no-store` |
+| B-18 CSP/external refs | `default-src 'none'; …` present; no `http://`/`https://` reference in served HTML |
+| B-19 offline | `unshare -rn` with loopback up: outbound TCP to 1.1.1.1:80 fails (exit 1); list/detail/edit/API/assets all 200 over loopback |
+
+### Upgrade scenario
+
+A pre-change configuration containing only `document_types.req` and
+`document_types.deploy`, an active `REQ-001`, a `docs/deployments/DEP-001.md`, and
+`docs/requirements/business/deprecated/REQ-900.md` was exercised:
+
+1. `--help` lists `req` and `deploy`, not `nfreq`.
+2. `nfreq --help`, `req deprecate`, and `req restore` exit 2.
+3. `req list` omits `REQ-900`; search for its body marker is empty; `deploy list` shows `DEP-001`.
+4. Moving `REQ-900.md` into `docs/requirements/business/` and setting `status: active`
+   makes `req list`/`req view REQ-900` work with the same ID.
+5. Breaking a `statuses` list exits 4 naming `document_types.req.statuses`;
+   `config get`/`list` still read; `config set` repairs it.
+6. Removing the `deploy` entry makes `deploy --help` exit 2; re-declaring it by
+   editing `papyrus.config.yml` only restores the command. The fresh-project check
+   prints `DEP-001` for the first `deploy create "Release 1"` with no rebuild and no
+   installed file beyond `/usr/bin/papyrus`.
+
+The fixture outside the intentional edits stayed byte-identical. The exact
+front-matter-only search query was `fm-only-label` (a label absent from the body);
+it returned `NOTE-001 doc Wallet note` and did not change the project hash.
+
+### Package artifact
+
+- File: `papyrus_0.1.0_amd64.deb`
+- Size: 1,284,160 bytes
+- SHA-256: `6028cc9e79f112d03a0c2e2b1a3d423997920ec6232f723a48ac45516494486d`
+- `dpkg-deb -I`: `Package: papyrus`, `Version: 0.1.0`, `Architecture: amd64`,
+  `Depends: libc6 (>= 2.34)`, `Section: utils`, `Priority: optional`,
+  `Maintainer: Papyrus Maintainers <maintainers@papyrus.example>`.
+- `dpkg-deb -c`: only `/usr/bin/papyrus` (0755) and
+  `/usr/share/doc/papyrus/copyright` (0644, 865 bytes) plus directories; the
+  copyright declares `GPL-3.0-or-later`.
+
+### Installed-binary smoke on Debian Forky amd64
+
+| Check | Result |
+|---|---|
+| Isolated `fakeroot dpkg --instdir/--admindir` install | PASS (exit 0) |
+| Installed file owner/mode (fakeroot view) | PASS — `root:root` 0755 binary, 0644 copyright |
+| Installed binary version | PASS — `papyrus 0.1.0` |
+| Installed `--help` | PASS — lists the enabled configuration slugs |
+| Declare `note` by editing config only | PASS — `--help` lists `note` with no rebuild |
+| Installed `note create/list/view/status/archive/delete/search` | PASS — `NOTE-001`, status `review`, archived path, forced delete, search hit |
+| Offline `unshare -rn` (loopback up) | PASS — outbound TCP failed; `--help`, `note --help`, `note list` succeeded; browser list/detail/edit/API/assets returned 200 |
+| Man page for `note` | Not expected and not asserted (NFR-03.003 gap; ADR-0021 stays Proposed) |
+| `dpkg -r papyrus` | PASS — binary and copyright removed from the isolated root |
+| `dpkg --purge papyrus` | PASS — no papyrus file and no papyrus admin entry remain |
+| Host package database and filesystem | PASS — `dpkg -l papyrus` identical before/after |
+
+### No-drift result
+
+`tests/document_type_no_drift.rs` passed all D-01 .. D-07 checks in the full suite,
+including the scanner self-test that plants a violation and an allowlisted migration
+line. Historical ADRs, historical specifications, `docs/packaging.md` evidence, and
+`backlog/` records are excluded as specified. The live documentation allowlist covers
+only removal/migration wording, the inert-folder recovery section, and the legacy
+folder note.
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| `cargo build --release` (Rust 1.99.1) | PASS — `target/release/papyrus` |
+| `target/release/papyrus --help` lists the enabled slugs before packaging | PASS |
+| `cargo test` | PASS — 789 passed, 0 failed, 22 ignored |
+| `cargo clippy --all-targets -- -D warnings` | PASS — 0 warnings |
+| `cargo fmt --check` | PASS |
+
+### Findings and dispositions
+
+| ID | Finding | Severity | Owner | Disposition |
+|---|---|---|---|---|
+| G-1 | `config set document_types.<new>.prefix` cannot bootstrap a type; it exits 4 naming the missing `document_types.<new>.directory`, leaves the file byte-identical, and refuses a mapping value. The documented direct edit works. | Low | TASK-111 owner | Accepted documented limitation; not release-blocking. |
+| G-2 | `docs/release-1.0-upgrade-notes.md` line 148 says task IDs allocate from active, archived, and deprecated locations; the shipped allocator reads only active and archived. A planted `backlog/deprecated/tasks/TASK-999.md` did not change the next `TASK-005` allocation. | Low | Upgrade-notes owner | Documentation finding; not release-blocking. |
+| G-3 | `README.md` says milestones move `active -> archived`; `src/registry.rs` `MILESTONE_STATES` is `["open","closed"]`, and shipped milestone files carry no status while `archive` moves the file. | Low | README owner | Stale wording recorded; not release-blocking for this gate. |
+| G-4 | `config list` omits `document_types.<slug>.default_status`; `config get` returns it, `config set`/`unset` validate it, and an invalid value is inspectable and repairable. | Medium | TASK-111 owner | Follow-up; not release-blocking because the repair path works. |
+| G-5 | BR-007 documents `papyrus release close <id>` as the only `planned -> released` transition, but `src/release.rs` has no `Close` variant and `papyrus release close REL-001` exits 2; the browser lifecycle text also names a non-existent `papyrus release status <id> released`. The `planned -> released` transition is unreachable. | High | Release owner / BR-007 owner | **Release-blocking** for the m-17 gate unless a follow-up code task is opened or the owner accepts amending BR-007. |
+| F-117-1 | `sanitize_name` rejects NUL, CR, LF, empty values, and path separators, but accepts other C0 controls (TAB 0x09, 0x01) in a document title; C-18 exercises the rejected forms. | Low | REQ-01.004 / TASK-110 owner | Follow-up input-validation hardening; not release-blocking. |
+
+### Recorded limitations (G-6)
+
+- No real-GUI browser run (NFR-05.001 limitation); verification is HTTP, markup, and
+  asset level.
+- Debian Forky amd64 only (ADR-0003, NFR-03.002); no other release or architecture is
+  claimed.
+- Config-defined slugs have no man page; ADR-0021 remains Proposed and NFR-03.003 is
+  not claimed. This is a recorded release risk, not a new claim.
+- `scripts/build-deb.sh` does not force a rebuild; the mitigation was
+  `cargo build --release` first and asserting `--help` before packaging.
+- `dpkg -r` removes both packaged files, so the subsequent `--purge` reports the
+  package as already removed and removes the remaining admin entry; the end state is
+  the intended one.
+
+### Release gate statement
+
+`release-ready: no` — G-5 is open and release-blocking. G-1, G-2, G-3, G-4, and
+F-117-1 are recorded follow-ups or accepted limitations. The quality gates, CLI,
+browser, upgrade, package, offline, and no-drift checks pass.
