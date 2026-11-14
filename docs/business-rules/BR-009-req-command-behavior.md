@@ -2,84 +2,34 @@
 
 ## Description
 
-The papyrus req command performs the behavior stated in its Papyrus manpage entry (README.md, papyrus(1) → COMMANDS → req); behavior not stated there is unspecified.
+`papyrus req` manages business requirements as the ordinary `document_types.req` entry, using the baseline document verbs plus `create-group` and a required `--group` on `create`; records use the document status model and become inactive only through `archive`.
 
 ## Rationale
 
-Based on REQ-05.001 — Manage Business Requirements, this rule exists because the documented req behavior is the contract for papyrus req; README.md is the sole behavior source.
+Based on REQ-05.001 — Manage Business Requirements, REQ-07.002 — Configure Document Types and Slugs, REQ-07.003 — Dispatch Config-Defined Document Commands, and REQ-05.007 — Manage Document Archive State and Deletion, this rule exists because business requirements are the document type that adds a group concept on top of the shared document family: requirement-to-group cardinality is 1..1 and groups contain business requirements only, while storage, status, and archive behavior must stay identical to every other document type.
 
 ## Applicability
 
-Applies to all invocations of `papyrus req` and the project data they manage. The excerpt below reproduces relevant manpage behavior verbatim; heading identifies README section and exact source line range.
+Applies to every invocation of `papyrus req` and to every business-requirement record and group, in projects where the `req` entry is enabled.
 
-### papyrus(1): req — `README.md` lines 368–435
+### Type entry
 
-```text
-req
+- `req` is an ordinary `document_types` entry (default prefix `REQ`, directory `requirements/business/`); it can be renamed, removed, disabled, or given another prefix or `doc_directory`-relative directory.
+- Renaming the key renames the command; the change does not move existing files.
+- IDs use the entry prefix and `id_padding` and are preserved on archive.
 
-         Manage business requirements (REQ-...). Requirement-to-group cardinality is 1..1; each group contains business requirements only.
+### Verbs
 
-       
-        papyrus req create <title> [--title <title>] [--story <text>] [-d <description>] --group <id>
-       papyrus req create-group --title <title> [--story <text>] [-d <description>]
-       papyrus req list
-       papyrus req view <id>
-       papyrus req edit <id> [--title <title>] [--story <text>] [-d <description>] [--editor]
-       papyrus req deprecate <id>
-       papyrus req restore <id>
-       
+- Baseline: `create`, `list`, `view`, `edit`, `archive`, `delete`, plus `status <id> <value>`.
+- Extensions: `create-group` and a required `--group` on `create`.
+- Content is retained: create and edit carry title, user story, and description; a group carries a title, optional user story, and optional description; `--editor` opens the body.
+- No other extension verb is declared for `req`.
 
-       create
-       Create a business requirement.
+### Status and archive
 
-          --title <title>
-          Requirement title.
-
-          --story <text>
-          User story.
-
-          -d, --description <text>
-          Description.
-
-          --group <id>
-           Add the requirement to its required business-requirement group.
-
-       create-group
-        Create a business-requirement group. It can contain business requirements only.
-
-          --title <title>
-          Requirement group title.
-
-          --story <text>
-          User story.
-
-          -d, --description <text>
-          Description.
-
-       list
-       List business requirements.
-
-       view <id>
-       View a business requirement.
-
-       edit <id>
-       Edit a business requirement.
-
-          --title <title>
-          Update the title.
-
-          --story <text>
-          Update the user story.
-
-          -d, --description <text>
-          Update the description.
-
-          --editor
-          Open the document body in $VISUAL or $EDITOR.
-
-       deprecate <id>
-       Move a business requirement to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-       restore <id>
-       Return a deprecated business requirement to its original folder. The ID is preserved.
-```
+- Main statuses `active` and `archived` plus optional configured custom statuses; custom statuses are front-matter values only and move no file.
+- A new record starts at the configured `default_status`, or `active` when none is configured.
+- `archive` sets `archived`, moves the file into the entry's `archived/` subfolder, and keeps the ID.
+- Archiving does not retain a previous custom status value, and there is no inverse command.
+- `status` never archives: `status <id> archived` is rejected, naming `archive` as the only way.
+- Decision statuses are a separate lifecycle and never apply to documents; the milestone `open -> closed` and release `planned -> released` lifecycles are fixed and unaffected by `statuses` or `default_status`.

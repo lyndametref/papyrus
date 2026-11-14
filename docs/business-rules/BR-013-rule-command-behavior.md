@@ -2,74 +2,32 @@
 
 ## Description
 
-The papyrus rule command performs the behavior stated in its Papyrus manpage entry (README.md, papyrus(1) → COMMANDS → rule); behavior not stated there is unspecified.
+`papyrus rule` manages business rules as the ordinary `document_types.rule` entry using only the baseline document verbs and the document status model, with each rule carrying a description, rationale, applicability, and optional requirement references.
 
 ## Rationale
 
-Based on REQ-05.005 — Manage Business Rules, this rule exists because the documented rule behavior is the contract for papyrus rule; README.md is the sole behavior source.
+Based on REQ-05.005 — Manage Business Rules, REQ-07.002 — Configure Document Types and Slugs, REQ-07.003 — Dispatch Config-Defined Document Commands, and REQ-05.007 — Manage Document Archive State and Deletion, this rule exists because a business rule is a front-matter document record whose content is defined by its three prose sections and its requirement references; it therefore keeps those content fields while using the common document command family and status model.
 
 ## Applicability
 
-Applies to all invocations of `papyrus rule` and the project data they manage. The excerpt below reproduces relevant manpage behavior verbatim; heading identifies README section and exact source line range.
+Applies to every invocation of `papyrus rule` and to every business-rule record, in projects where the `rule` entry is enabled.
 
-### papyrus(1): rule — `README.md` lines 584–641
+### Type entry
 
-```text
-rule
+- Ordinary `document_types` entry (default prefix `RUL`, directory `business-rules/`); renameable, removable, disableable, and assignable another prefix or `doc_directory`-relative directory.
+- IDs use the entry prefix and `id_padding` and are preserved on archive.
 
-       Manage business rules (RUL-...).
+### Verbs
 
-       
-        papyrus rule create <title> --description <text> --rationale <text> --applicability <text> [--requirement <id>...]
-       papyrus rule list
-       papyrus rule view <id>
-        papyrus rule edit <id> [--title <title>] [-d <description>] [--requirement <id>...] [--no-requirement [<id>]] [--editor]
-       papyrus rule deprecate <id>
-       papyrus rule restore <id>
-        
+- Baseline only: `create`, `list`, `view`, `edit`, `archive`, `delete`, plus `status <id> <value>`.
+- No extension verb is declared.
+- Content is retained: `--description`, `--rationale`, and `--applicability` on create; `--title`, `-d/--description`, `--requirement <id>` (repeatable), `--no-requirement`, and `--editor` on edit.
 
-        create
-        Create a business rule.
+### Status and archive
 
-          --description <text>
-          State the business rule precisely.
-
-          --rationale <text>
-          Explain why the rule exists, referencing its requirement(s).
-
-          --applicability <text>
-          Describe when and where the rule applies.
-
-          --requirement <id>
-           Reference a business requirement. Repeatable; zero or more may be specified.
-
-       list
-        List business rules.
-
-       view <id>
-        View a business rule.
-
-       edit <id>
-        Edit a business rule.
-
-          --title <title>
-          Update the title.
-
-          -d, --description <text>
-          Update the description.
-
-          --requirement <id>
-           Add a business requirement to the existing list. Repeatable.
-
-          --no-requirement [<id>]
-           Remove the specified business requirement; if no ID is given, remove all business-requirement references.
-
-          --editor
-          Open the document body in $VISUAL or $EDITOR.
-
-       deprecate <id>
-        Move a business rule to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-       restore <id>
-       Return a deprecated business rule to its original folder. The ID is preserved.
-```
+- Main statuses `active` and `archived` plus optional configured custom statuses; custom statuses are front-matter values only and move no file.
+- A new record starts at the configured `default_status`, or `active` when none is configured.
+- `archive` sets `archived`, moves the file into the entry's `archived/` subfolder, and keeps the ID.
+- Archiving does not retain a previous custom status value, and there is no inverse command.
+- `status` never archives: `status <id> archived` is rejected, naming `archive` as the only way.
+- Decision statuses are a separate lifecycle and never apply to documents; the milestone `open -> closed` and release `planned -> released` lifecycles are fixed and unaffected by `statuses` or `default_status`.

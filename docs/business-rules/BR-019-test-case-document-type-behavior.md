@@ -2,43 +2,33 @@
 
 ## Description
 
-A test case is a managed document type whose records capture test scenarios, expected outcomes, and verification steps in a required title and description plus an optional applicability, and can be created, listed, viewed, edited, deprecated, and restored with the ID preserved; records follow the Documents lifecycle `active -> deprecated`, and deprecation hides them from lists, search, and the web UI.
+A test case is the ordinary `document_types.test-case` entry managed by `papyrus test-case`; its records carry a required title and description plus an optional applicability, use only the baseline document verbs and the document status model, and become inactive only through `archive`.
 
 ## Rationale
 
-Based on REQ-05.013 — Manage Test Cases, with REQ-05.007 — Manage Documentation Record Lifecycle (lifecycle and deprecation visibility), REQ-05.010 — Record Metadata in YAML Front Matter (front matter and body shape), and REQ-05.005 — Manage Business Rules (business rules may reference test cases), this rule exists because test scenarios are only traceable when they are first-class stored records with a stable ID and the same create, list, view, edit, deprecate, and restore contract as the other documentation types; without that contract test cases cannot be found, hidden, or restored consistently across the CLI, search, and the web UI. README.md is the sole behavior source; the `test-case` manpage entry is present, and behavior beyond it is unspecified.
+Based on REQ-05.013 — Manage Test Cases, with REQ-05.007 — Manage Document Archive State and Deletion, REQ-05.010 — Record Metadata in YAML Front Matter, REQ-07.002 — Configure Document Types and Slugs, and REQ-07.003 — Dispatch Config-Defined Document Commands, this rule exists because test scenarios are only traceable when they are first-class document records with a stable ID and the common command family and status model; the type adds an applicability field but no verb or lifecycle of its own.
 
 ## Applicability
 
-Applies to every test-case record and to the command invocations that create, list, view, edit, deprecate, or restore one, in projects where the test-case document type is enabled.
+Applies to every test-case record and to the command invocations that create, list, view, edit, archive, or delete one, in projects where the `test-case` entry is enabled.
 
-### Behavior (source: REQ-05.013 acceptance criteria)
+### Type entry
 
-- Create requires a title and a description; applicability is optional.
-- List and view list and display test cases.
-- Edit updates title and description.
-- Deprecate moves the record to the type's `deprecated/` folder and hides it from lists, search, and the web UI.
-- Restore returns a deprecated record to its original folder with the same ID.
-- Lifecycle is `active -> deprecated` (REQ-05.007).
+- Ordinary `document_types` entry (default prefix `TC`, directory `test-cases/`); renameable, removable, disableable, and assignable another prefix or `doc_directory`-relative directory.
+- IDs use the entry prefix and `id_padding` and are preserved on archive.
+- Records carry the general front-matter keys `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, and `status`, plus a `# <ID> <title>` body heading; `description` and `applicability` are body fields.
 
-### IDs, directories, and configuration (decided)
+### Verbs and content
 
-- The document-type key is `test-case`; `document_types.test-case: { prefix: TC, directory: test-cases/, enabled: true }` (decided).
-- Records are stored under `<doc_directory>/<document_types.test-case.directory>/`, deprecated records under that type directory's `deprecated/` subfolder. IDs are padded to the configured `id_padding` and remain stable across deprecate/restore cycles (REQ-01.005, BR-016).
-- Records carry YAML front matter with the general fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references` and a `# <ID> <title>` body heading generated from front-matter `id` and `title` (REQ-05.010). `description` and `applicability` are body fields, not front-matter keys (REQ-05.010, expose spec TASK-65).
+- Baseline only: `create`, `list`, `view`, `edit`, `archive`, `delete`, plus `status <id> <value>`.
+- No extension verb is declared.
+- Create requires a title and description; applicability is optional. Edit updates title and description.
 
-### Managing command (resolved)
+### Status and archive
 
-- REQ-05.013 states that test cases "are managed with the `req` command"; this wording is superseded by the decided resolution for implementation. BR-009 defines `req` as business requirements only (REQ-05.001: `--group`, `--story`, requirement-to-group cardinality 1..1, groups contain business requirements only), so routing test cases through `req` conflicts with that contract and would place two record kinds in one document type and ID namespace.
-- Resolution (decided): manage test cases with a dedicated `test-case` command, following the per-type command pattern of `tech-spec` (BR-017). The `req` command remains business-requirements only (BR-009). Any REQ-05.013 wording correction is left to the requirements owner.
-
-### Decided defaults
-
-- Managing command: dedicated `test-case` command (resolved; see "Managing command (resolved)").
-- ID prefix: `TC` (decided). The REQ-05.013 open-question mention of "prefix MOCK" is carried over from the UI-mockup open question and does not apply to test cases.
-- Directory: `test-cases/` (decided).
-- `enabled` default: `true`, matching every current `document_types` default (BR-016) (decided).
-- Visibility: active test cases appear in lists, search, and the web UI; deprecated ones are hidden (REQ-05.007) (decided).
-- Association to tickets or milestones: none; reference targets accepted by tasks are fixed by REQ-02.001 and adding one requires a requirement change.
-- Relationship to test reports: whether a test case is referenced by test-report records is not stated here; see BR-020.
-```
+- Main statuses `active` and `archived` plus optional configured custom statuses; custom statuses are front-matter values only and move no file.
+- A new record starts at the configured `default_status`, or `active` when none is configured.
+- `archive` sets `archived`, moves the file into the entry's `archived/` subfolder, and keeps the ID.
+- Archiving does not retain a previous custom status value, and there is no inverse command.
+- `status` never archives: `status <id> archived` is rejected, naming `archive` as the only way.
+- Decision statuses are a separate lifecycle and never apply to documents; the milestone `open -> closed` and release `planned -> released` lifecycles are fixed and unaffected by `statuses` or `default_status`.

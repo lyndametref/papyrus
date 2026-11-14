@@ -2,70 +2,33 @@
 
 ## Description
 
-The papyrus tech-spec command performs the behavior stated in its Papyrus manpage entry (README.md, papyrus(1) → COMMANDS → tech-spec); behavior not stated there is unspecified.
+`papyrus tech-spec` manages technical specifications as the ordinary `document_types.tech-spec` entry using only the baseline document verbs and the document status model, with each record carrying a required title and optional description.
 
 ## Rationale
 
-Based on REQ-05.009 — Manage Technical Specifications and REQ-05.007 — Manage Documentation Record Lifecycle (and REQ-01.002 — Read and Edit Project Configuration for the document_types.tech-spec key), this rule exists because the documented tech-spec behavior is the contract for papyrus tech-spec; README.md is the sole behavior source (tech-spec entry to be added).
+Based on REQ-05.009 — Manage Technical Specifications, REQ-07.002 — Configure Document Types and Slugs, REQ-07.003 — Dispatch Config-Defined Document Commands, and REQ-05.007 — Manage Document Archive State and Deletion, this rule exists because technical specifications are the model the generic document content follows: a title, an optional description, and the general front-matter keys, with the common command family, status model, and archive location.
 
 ## Applicability
 
-Applies to all invocations of `papyrus tech-spec` and the project data they manage. The excerpt below reproduces the relevant command behavior; heading identifies the source location.
+Applies to every invocation of `papyrus tech-spec` and to every technical-specification record, in projects where the `tech-spec` entry is enabled.
 
-### papyrus(1): tech-spec — `README.md` lines (to be added)
+### Type entry
 
-```text
-tech-spec
+- Ordinary `document_types` entry (default prefix `TECH`, directory `technical/`); renameable, removable, disableable, and assignable another prefix or `doc_directory`-relative directory.
+- IDs use the entry prefix and `id_padding` and are preserved on archive.
 
-        Manage technical specifications (TECH-...).
+### Verbs
 
-        papyrus tech-spec create <title> --description <text>
-        papyrus tech-spec list
-        papyrus tech-spec view <id>
-        papyrus tech-spec edit <id> [--title <title>] [--description <text>] [--editor]
-        papyrus tech-spec deprecate <id>
-        papyrus tech-spec restore <id>
+- Baseline only: `create`, `list`, `view`, `edit`, `archive`, `delete`, plus `status <id> <value>`.
+- No extension verb is declared.
+- Content is retained: a required title and description on create; `--title`, `--description`, and `--editor` on edit.
+- Records follow the same input sanitization and project-directory boundary as every other document type.
 
-        create
-        Create a technical specification.
+### Status and archive
 
-           <title>
-           Technical specification title (required).
-
-           --description <text>
-           Description of the technical specification (required).
-
-        list
-        List technical specifications.
-
-        view <id>
-        View a technical specification.
-
-        edit <id>
-        Edit a technical specification.
-
-           --title <title>
-           Update the title.
-
-           --description <text>
-           Update the description.
-
-           --editor
-           Open the document body in $VISUAL or $EDITOR.
-
-        deprecate <id>
-        Move a technical specification to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-        restore <id>
-        Return a deprecated technical specification to its original folder. The ID is preserved.
-```
-
-### IDs, directories, and configuration
-
-- Technical specification IDs use the `TECH` prefix (for example `TECH-001`), padded to the configured `id_padding`, and remain stable across deprecate/restore cycles.
-- Technical specifications are stored under `<doc_directory>/technical/` (`document_types.tech-spec.directory`); deprecated technical specifications are stored under `<doc_directory>/technical/deprecated/`.
-- Configuration key: `document_types.tech-spec: { prefix: TECH, directory: technical/, enabled: true }`. A disabled type cannot be created and is hidden from lists and search.
-
-### Sanitization and project-directory boundary
-
-- Technical specifications follow the same input sanitization and project-directory path boundary as other document types.
+- Main statuses `active` and `archived` plus optional configured custom statuses; custom statuses are front-matter values only and move no file.
+- A new record starts at the configured `default_status`, or `active` when none is configured.
+- `archive` sets `archived`, moves the file into the entry's `archived/` subfolder, and keeps the ID.
+- Archiving does not retain a previous custom status value, and there is no inverse command.
+- `status` never archives: `status <id> archived` is rejected, naming `archive` as the only way.
+- Decision statuses are a separate lifecycle and never apply to documents; the milestone `open -> closed` and release `planned -> released` lifecycles are fixed and unaffected by `statuses` or `default_status`.

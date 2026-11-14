@@ -2,62 +2,32 @@
 
 ## Description
 
-The papyrus ui-spec command performs the behavior stated in its Papyrus manpage entry (README.md, papyrus(1) → COMMANDS → ui-spec); behavior not stated there is unspecified.
+`papyrus ui-spec` manages UI specifications as the ordinary `document_types.ui-spec` entry using only the baseline document verbs and the document status model, with each specification carrying a view association and a description.
 
 ## Rationale
 
-Based on REQ-05.004 — Manage UI Specifications, this rule exists because the documented ui-spec behavior is the contract for papyrus ui-spec; README.md is the sole behavior source.
+Based on REQ-05.004 — Manage UI Specifications, REQ-07.002 — Configure Document Types and Slugs, REQ-07.003 — Dispatch Config-Defined Document Commands, and REQ-05.007 — Manage Document Archive State and Deletion, this rule exists because a UI specification is a standard front-matter document record that adds a view association to the shared document family; its storage, status, and archive behavior must remain the common document behavior.
 
 ## Applicability
 
-Applies to all invocations of `papyrus ui-spec` and the project data they manage. The excerpt below reproduces relevant manpage behavior verbatim; heading identifies README section and exact source line range.
+Applies to every invocation of `papyrus ui-spec` and to every UI-specification record, in projects where the `ui-spec` entry is enabled. UI mockups are a separate entry (`ui-mockup`) with HTML metadata and an additional `supersede` verb.
 
-### papyrus(1): ui-spec — `README.md` lines 538–583
+### Type entry
 
-```text
-ui-spec
+- Ordinary `document_types` entry (default prefix `UI`, directory `specifications/ui/`); renameable, removable, disableable, and assignable another prefix or `doc_directory`-relative directory.
+- IDs use the entry prefix and `id_padding` and are preserved on archive.
 
-        Manage UI specifications (UI-...).
+### Verbs
 
-       
-       papyrus ui-spec create <title> --view <view> --description <text>
-       papyrus ui-spec list
-       papyrus ui-spec view <id>
-       papyrus ui-spec edit <id> [--view <view>] [--description <text>] [--editor]
-       papyrus ui-spec deprecate <id>
-       papyrus ui-spec restore <id>
-       
+- Baseline only: `create`, `list`, `view`, `edit`, `archive`, `delete`, plus `status <id> <value>`.
+- No extension verb is declared.
+- Content is retained: `--view` and `--description` on create and edit, and `--editor` for the body.
 
-       create
-       Create a UI specification.
+### Status and archive
 
-          --view <view>
-          Associate the specification with a view.
-
-          --description <text>
-          Description of the UI specification.
-
-       list
-       List UI specifications.
-
-       view <id>
-       View a UI specification.
-
-       edit <id>
-       Edit a UI specification.
-
-          --view <view>
-          Update the associated view.
-
-          --description <text>
-          Update the description.
-
-          --editor
-          Open the document body in $VISUAL or $EDITOR.
-
-       deprecate <id>
-        Move a UI specification to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-       restore <id>
-        Return a deprecated UI specification to its original folder. The ID is preserved.
-```
+- Main statuses `active` and `archived` plus optional configured custom statuses; custom statuses are front-matter values only and move no file.
+- A new record starts at the configured `default_status`, or `active` when none is configured.
+- `archive` sets `archived`, moves the file into the entry's `archived/` subfolder, and keeps the ID.
+- Archiving does not retain a previous custom status value, and there is no inverse command.
+- `status` never archives: `status <id> archived` is rejected, naming `archive` as the only way.
+- Decision statuses are a separate lifecycle and never apply to documents; the milestone `open -> closed` and release `planned -> released` lifecycles are fixed and unaffected by `statuses` or `default_status`.
