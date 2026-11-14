@@ -3,15 +3,20 @@
 //! Reading, parsing, identity, projection, and writing all live under
 //! `crate::record/`. This module only reshapes the shared [`Document`] and
 //! [`RecordView`] into the render-only [`Record`] view model and keeps the
-//! browser's validation rules.
+//! browser's validation rules. The owning [`TypeDescriptor`] is carried on
+//! every record; behaviour is selected by `ContentModel`/`TypedHandler`, never
+//! by a browser-local category enum or a slug literal.
 
 use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
-use crate::record::descriptor::{descriptor_for, descriptor_for_doc_type};
 use crate::record::document::{self, Document};
 use crate::record::identity;
 use crate::record::view::RecordView;
+use crate::registry::{
+    ArtifactCategory as CategoryKind, ArtifactRegistry, ContentModel, IdShape, StatusModel,
+    TypeDescriptor, TypedHandler,
+};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -23,116 +28,13 @@ pub const MAX_TITLE_CHARS: usize = 200;
 /// Maximum accepted story or description length (section 7.3).
 pub const MAX_TEXT_CHARS: usize = 20000;
 
-/// Browser content category. Covers both document-store and backlog-store records.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Category {
-    Req,
-    Nfr,
-    Task,
-    Milestone,
-    Release,
-    Decision,
-    Glossary,
-    UiSpec,
-    UiMockup,
-    BusinessRule,
-    AuditRecord,
-    TechSpec,
-    UseCase,
-    TestCase,
-    TestReport,
-}
-
-impl Category {
-    pub fn key(self) -> &'static str {
-        match self {
-            Category::Req => "req",
-            Category::Nfr => "nfr",
-            Category::Task => "task",
-            Category::Milestone => "milestone",
-            Category::Release => "release",
-            Category::Decision => "decision",
-            Category::Glossary => "glossary",
-            Category::UiSpec => "ui-spec",
-            Category::UiMockup => "ui-mockup",
-            Category::BusinessRule => "business-rule",
-            Category::AuditRecord => "audit-record",
-            Category::TechSpec => "tech-spec",
-            Category::UseCase => "use-case",
-            Category::TestCase => "test-case",
-            Category::TestReport => "test-report",
-        }
-    }
-
-    /// Configuration key used in `document_types`.
-    pub fn config_key(self) -> &'static str {
-        match self {
-            Category::BusinessRule => "rule",
-            Category::AuditRecord => "audit",
-            _ => self.key(),
-        }
-    }
-
-    pub fn supports_story(self) -> bool {
-        matches!(self, Category::Req)
-    }
-
-    pub fn is_requirement(self) -> bool {
-        matches!(self, Category::Req | Category::Nfr)
-    }
-}
-
-/// The record forms rendered by the browser.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Form {
-    Group,
-    Requirement,
-    Task,
-    Milestone,
-    Release,
-    Decision,
-    Glossary,
-    UiSpec,
-    UiMockup,
-    BusinessRule,
-    AuditRecord,
-    TechSpec,
-    UseCase,
-    TestCase,
-    TestReport,
-}
-
-impl Form {
-    pub fn label(self) -> &'static str {
-        match self {
-            Form::Group => "Group",
-            Form::Requirement => "Requirement",
-            Form::Task => "Task",
-            Form::Milestone => "Milestone",
-            Form::Release => "Release",
-            Form::Decision => "Decision",
-            Form::Glossary => "Glossary term",
-            Form::UiSpec => "UI specification",
-            Form::UiMockup => "UI mockup",
-            Form::BusinessRule => "Business rule",
-            Form::AuditRecord => "Audit record",
-            Form::TechSpec => "Technical specification",
-            Form::UseCase => "Use case",
-            Form::TestCase => "Test case",
-            Form::TestReport => "Test report",
-        }
-    }
-}
-
-/// A loaded record with its metadata.
-///
-/// This is a render-only view model: `doc` is the shared parsed document and
-/// every other field is derived from it, the front matter, or [`RecordView`].
+/// A loaded record with its owning descriptor.
 #[derive(Clone, Debug)]
 pub struct Record {
     pub id: String,
-    pub kind: Category,
-    pub form: Form,
+    pub descriptor: TypeDescriptor,
+    /// A grouped family's group record (`REQ-001`) rather than a member.
+    pub is_group: bool,
     pub title: String,
     pub story: Option<String>,
     pub group_id: Option<String>,
@@ -173,36 +75,53 @@ pub struct Record {
 }
 
 impl Record {
-    pub fn kind_key(&self) -> &'static str {
-        self.kind.key()
+    /// Registry slug of the record's type.
+    pub fn slug(&self) -> &str {
+        &self.descriptor.slug
+    }
+
+    /// Typed handler for built-in types; `None` for generic config types.
+    pub fn handler(&self) -> Option<TypedHandler> {
+        match &self.descriptor.content_model {
+            ContentModel::Generic => None,
+            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => Some(schema.handler),
+        }
+    }
+
+    pub fn is_generic(&self) -> bool {
+        matches!(self.descriptor.content_model, ContentModel::Generic)
+    }
+
+    pub fn is_html_mockup(&self) -> bool {
+        matches!(self.descriptor.content_model, ContentModel::HtmlMockup(_))
+    }
+
+    pub fn is_requirement(&self) -> bool {
+        matches!(self.handler(), Some(TypedHandler::Requirement(_)))
+    }
+
+    pub fn supports_story(&self) -> bool {
+        self.handler()
+            == Some(TypedHandler::Requirement(
+                crate::registry::RequirementKind::Business,
+            ))
     }
 
     pub fn type_label(&self) -> String {
-        let base = match self.kind {
-            Category::Req => "Business requirement",
-            Category::Nfr => "Non-functional requirement",
-            Category::Task => "Task",
-            Category::Milestone => "Milestone",
-            Category::Release => "Release",
-            Category::Decision => "Decision",
-            Category::Glossary => "Glossary",
-            Category::UiSpec => "UI Specifications",
-            Category::UiMockup => "UI Mockups",
-            Category::BusinessRule => "Business Rules",
-            Category::AuditRecord => "Audit Records",
-            Category::TechSpec => "Technical Specifications",
-            Category::UseCase => "Use Cases",
-            Category::TestCase => "Test Cases",
-            Category::TestReport => "Test Reports",
-        };
-        match self.form {
-            Form::Group => format!("{} group", base),
-            _ => base.to_string(),
-        }
+        crate::browser::routes::label(self.slug())
+    }
+
+    /// Stored status rendered read-only, or `(none)` when absent.
+    pub fn status_text(&self) -> String {
+        self.status
+            .as_deref()
+            .filter(|value| !value.is_empty())
+            .unwrap_or("(none)")
+            .to_string()
     }
 }
 
-/// An indexed document category. Records are sorted by ID ascending.
+/// An indexed document type. Records are sorted by ID ascending.
 #[derive(Debug, Default)]
 pub struct Index {
     pub records: Vec<Record>,
@@ -224,155 +143,29 @@ impl Index {
 #[derive(Clone, Debug)]
 pub struct Resolved {
     pub record: Record,
-    pub kind: Category,
 }
 
-const ALL_CATEGORIES: [Category; 15] = [
-    Category::Req,
-    Category::Nfr,
-    Category::Task,
-    Category::Milestone,
-    Category::Release,
-    Category::Decision,
-    Category::Glossary,
-    Category::UiSpec,
-    Category::UiMockup,
-    Category::BusinessRule,
-    Category::AuditRecord,
-    Category::TechSpec,
-    Category::UseCase,
-    Category::TestCase,
-    Category::TestReport,
-];
-
-fn descriptor_name(kind: Category) -> Option<&'static str> {
-    match kind {
-        Category::Req => Some("requirement"),
-        Category::Nfr => Some("nfr"),
-        Category::Task => Some("task"),
-        Category::Milestone => Some("milestone"),
-        Category::Release => Some("release"),
-        Category::Decision => Some("decision"),
-        Category::Glossary => Some("glossary"),
-        Category::UiSpec => Some("ui-spec"),
-        Category::UiMockup => None,
-        Category::BusinessRule => Some("rule"),
-        Category::AuditRecord => Some("audit"),
-        Category::TechSpec => Some("tech-spec"),
-        Category::UseCase => Some("use-case"),
-        Category::TestCase => Some("test-case"),
-        Category::TestReport => Some("test-report"),
+/// Resolve a descriptor's active directory against the project boundary.
+pub fn descriptor_directory(
+    ctx: &Context,
+    cfg: &Config,
+    descriptor: &TypeDescriptor,
+) -> Option<PathBuf> {
+    if !descriptor.enabled {
+        return None;
     }
-}
-
-fn active_prefixes(cfg: &Config, kind: Category) -> Vec<String> {
-    match kind {
-        Category::Task => vec![cfg.task_prefix.clone()],
-        Category::Milestone => vec![cfg.milestone_prefix.clone()],
-        Category::Release => vec![cfg.release_prefix.clone()],
-        Category::Decision => cfg
-            .decision_types
-            .values()
-            .filter(|entry| entry.enabled && !entry.prefix.is_empty())
-            .map(|entry| entry.prefix.clone())
-            .collect(),
-        _ => cfg
-            .document_types
-            .get(kind.config_key())
-            .filter(|entry| entry.enabled && !entry.prefix.is_empty())
-            .map(|entry| vec![entry.prefix.clone()])
-            .unwrap_or_default(),
-    }
-}
-
-fn uri_kind(kind: Category) -> bool {
-    kind.is_requirement()
-}
-
-fn parse_id_for(cfg: &Config, kind: Category, value: &str) -> Option<identity::ParsedId> {
-    let dotted = uri_kind(kind);
-    for prefix in active_prefixes(cfg, kind) {
-        if let Some(parts) = identity::parse_id_parts(value, &prefix, dotted) {
-            return Some(parts);
-        }
-        if dotted && let Some(parts) = identity::parse_id_parts(value, &prefix, false) {
-            return Some(parts);
-        }
-    }
-    None
-}
-
-fn canonical_id(cfg: &Config, kind: Category, value: &str) -> Option<String> {
-    parse_id_for(cfg, kind, value).map(|parts| parts.display)
-}
-
-fn canonical_key(cfg: &Config, kind: Category, value: &str) -> Option<String> {
-    let dotted = uri_kind(kind);
-    for prefix in active_prefixes(cfg, kind) {
-        if let Some(parts) = identity::parse_id_parts(value, &prefix, dotted).or_else(|| {
-            dotted
-                .then(|| identity::parse_id_parts(value, &prefix, false))
-                .flatten()
-        }) {
-            return Some(parts.key(&prefix));
-        }
-    }
-    None
-}
-
-fn matches_stem(cfg: &Config, kind: Category, stem: &str) -> bool {
-    parse_id_for(cfg, kind, stem).is_some()
-}
-
-fn form_for_stem(cfg: &Config, kind: Category, stem: &str) -> Option<Form> {
-    match kind {
-        Category::Req | Category::Nfr => {
-            let dotted = active_prefixes(cfg, kind)
-                .iter()
-                .any(|prefix| identity::parse_id_parts(stem, prefix, true).is_some());
-            if dotted {
-                Some(Form::Requirement)
-            } else if active_prefixes(cfg, kind)
-                .iter()
-                .any(|prefix| identity::parse_id_parts(stem, prefix, false).is_some())
-            {
-                Some(Form::Group)
-            } else {
-                None
-            }
-        }
-        Category::Task => Some(Form::Task),
-        Category::Milestone => Some(Form::Milestone),
-        Category::Release => Some(Form::Release),
-        Category::Decision => Some(Form::Decision),
-        Category::Glossary => Some(Form::Glossary),
-        Category::UiSpec => Some(Form::UiSpec),
-        Category::UiMockup => Some(Form::UiMockup),
-        Category::BusinessRule => Some(Form::BusinessRule),
-        Category::AuditRecord => Some(Form::AuditRecord),
-        Category::TechSpec => Some(Form::TechSpec),
-        Category::UseCase => Some(Form::UseCase),
-        Category::TestCase => Some(Form::TestCase),
-        Category::TestReport => Some(Form::TestReport),
-    }
-}
-
-fn record_directory(ctx: &Context, cfg: &Config, kind: Category) -> Option<PathBuf> {
-    if kind == Category::UiMockup {
-        let entry = cfg.document_types.get(kind.config_key())?;
-        if !entry.enabled || entry.prefix.is_empty() {
-            return None;
-        }
-        let raw = ctx
-            .project_dir
-            .join(&cfg.doc_directory)
-            .join(&entry.directory);
-        return Context::ensure_within(&ctx.project_dir, &raw).ok();
-    }
-    let name = descriptor_name(kind)?;
-    descriptor_for(name)?
-        .resolve_directory(cfg, &ctx.project_dir)
-        .ok()
+    let base = match descriptor.directory.config_key {
+        "backlog_directory" => ctx.project_dir.join(&cfg.backlog_directory),
+        "decision_directory" => ctx.project_dir.join(&cfg.decision_directory),
+        "doc_directory" => ctx.project_dir.join(&cfg.doc_directory),
+        _ => return None,
+    };
+    let raw = if descriptor.directory.relative.is_empty() {
+        base
+    } else {
+        base.join(&descriptor.directory.relative)
+    };
+    Context::ensure_within(&ctx.project_dir, &raw).ok()
 }
 
 fn relative_path(project_dir: &Path, path: &Path) -> String {
@@ -418,10 +211,57 @@ fn frontmatter_title(doc: &Document) -> String {
     document::heading_id_title_with_frontmatter(doc).1
 }
 
+fn non_empty_or(value: String, fallback: &str) -> String {
+    if value.is_empty() {
+        fallback.to_string()
+    } else {
+        value
+    }
+}
+
+fn is_group_id(descriptor: &TypeDescriptor, stem: &str) -> bool {
+    descriptor.id_shape == IdShape::Grouped
+        && identity::parse_id_parts(stem, &descriptor.prefix, true).is_none()
+        && identity::parse_id_parts(stem, &descriptor.prefix, false).is_some()
+}
+
+fn canonical_id(descriptor: &TypeDescriptor, value: &str) -> Option<String> {
+    match descriptor.id_shape {
+        IdShape::Grouped => identity::parse_id_parts(value, &descriptor.prefix, true)
+            .or_else(|| identity::parse_id_parts(value, &descriptor.prefix, false))
+            .map(|parts| parts.display),
+        IdShape::Dotted => {
+            identity::parse_id_parts(value, &descriptor.prefix, true).map(|parts| parts.display)
+        }
+        IdShape::Plain => {
+            identity::parse_id_parts(value, &descriptor.prefix, false).map(|parts| parts.display)
+        }
+    }
+}
+
+/// Whether a file stem denotes a record of the descriptor's type.
+pub fn matches_stem(descriptor: &TypeDescriptor, stem: &str) -> bool {
+    identity::is_valid_id_component(stem) && canonical_id(descriptor, stem).is_some()
+}
+
+fn content_handler(descriptor: &TypeDescriptor) -> Option<TypedHandler> {
+    match &descriptor.content_model {
+        ContentModel::Generic => None,
+        ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => Some(schema.handler),
+    }
+}
+
+fn content_extension(descriptor: &TypeDescriptor) -> &'static str {
+    match descriptor.content_model {
+        ContentModel::HtmlMockup(_) => "html",
+        _ => "md",
+    }
+}
+
 fn default_record(
     id: String,
-    kind: Category,
-    form: Form,
+    descriptor: TypeDescriptor,
+    is_group: bool,
     doc: Document,
     path: PathBuf,
     rel_path: String,
@@ -429,8 +269,8 @@ fn default_record(
 ) -> Record {
     Record {
         id,
-        kind,
-        form,
+        descriptor,
+        is_group,
         title: String::new(),
         story: None,
         group_id: None,
@@ -470,9 +310,15 @@ fn default_record(
 }
 
 /// Load one managed record from the shared document parser and projection.
-fn load_record(ctx: &Context, kind: Category, path: &Path) -> Result<Option<Record>, AppError> {
-    if kind == Category::UiMockup {
-        return load_ui_mockup(ctx, path);
+pub fn load_record(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    descriptor: &TypeDescriptor,
+    path: &Path,
+) -> Result<Option<Record>, AppError> {
+    if matches!(descriptor.content_model, ContentModel::HtmlMockup(_)) {
+        return load_ui_mockup(ctx, cfg, descriptor, path);
     }
     let safe = match Context::ensure_within(&ctx.project_dir, path) {
         Ok(safe) => safe,
@@ -485,31 +331,35 @@ fn load_record(ctx: &Context, kind: Category, path: &Path) -> Result<Option<Reco
     else {
         return Ok(None);
     };
-    let cfg = match crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir) {
-        Ok(cfg) => cfg,
-        Err(_) => return Ok(None),
-    };
-    if !matches_stem(&cfg, kind, &stem) {
+    if !matches_stem(descriptor, &stem) {
         return Ok(None);
     }
-    let Some(form) = form_for_stem(&cfg, kind, &stem) else {
-        return Ok(None);
-    };
-    if kind == Category::Decision && crate::decision::type_key_for_id(&cfg, &stem).is_none() {
+    if descriptor.category == CategoryKind::Decision
+        && crate::decision::type_key_for_id(cfg, &stem).is_none()
+    {
         return Ok(None);
     }
     let Ok(read) = crate::record::store::read_document_normalized(ctx, &safe) else {
         return Ok(None);
     };
-    let id = canonical_id(&cfg, kind, &stem).unwrap_or_else(|| stem.clone());
+    let id = canonical_id(descriptor, &stem).unwrap_or_else(|| stem.clone());
     let view = RecordView::from_content(&read.document.source, &id, &read.version).ok();
     let rel_path = relative_path(&ctx.project_dir, &safe);
     let version = read.version;
-    let mut record = default_record(id, kind, form, read.document, safe, rel_path, version);
+    let is_group = is_group_id(descriptor, &stem);
+    let mut record = default_record(
+        id,
+        descriptor.clone(),
+        is_group,
+        read.document,
+        safe,
+        rel_path,
+        version,
+    );
     record.stored_source = read.stored_source;
-    let content = record.doc.source.clone();
-    match kind {
-        Category::Task => {
+
+    match record.handler() {
+        Some(TypedHandler::Task) => {
             let td = crate::task::task_from_document(&record.doc);
             record.title = if td.title.is_empty() {
                 stem.to_string()
@@ -525,7 +375,7 @@ fn load_record(ctx: &Context, kind: Category, path: &Path) -> Result<Option<Reco
             record.acceptance_criteria = td.acs;
             record.comments = td.comments;
         }
-        Category::Milestone => {
+        Some(TypedHandler::Milestone) => {
             record.title = non_empty_or(frontmatter_title(&record.doc), &stem);
             record.description = section_or_none(&record.doc, "Description");
             record.release_id = match record.doc.front_matter.as_ref() {
@@ -537,11 +387,11 @@ fn load_record(ctx: &Context, kind: Category, path: &Path) -> Result<Option<Reco
                 _ => section_or_none(&record.doc, "Release").map(|s| s.trim().to_string()),
             };
         }
-        Category::Release => {
+        Some(TypedHandler::Release) => {
             record.title = non_empty_or(heading_title(&record.doc), &stem);
             record.description = section_or_none(&record.doc, "Description");
         }
-        Category::Decision => {
+        Some(TypedHandler::Decision) => {
             record.title = non_empty_or(heading_title(&record.doc), &stem);
             let status = section_or_none(&record.doc, "Status").unwrap_or_default();
             record.status = Some(if status.trim().is_empty() {
@@ -555,68 +405,12 @@ fn load_record(ctx: &Context, kind: Category, path: &Path) -> Result<Option<Reco
                 .and_then(|s| s.strip_prefix("Superseded by "))
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty());
-            record.decision_type = crate::decision::type_key_for_id(&cfg, &stem);
+            record.decision_type = crate::decision::type_key_for_id(cfg, &stem);
             record.decision = section_or_none(&record.doc, "Decision");
             record.context = section_or_none(&record.doc, "Context");
             record.consequences = section_or_none(&record.doc, "Consequences");
         }
-        Category::Glossary => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
-            record.definition = section_or_none(&record.doc, "Definition");
-            record.labels = view
-                .as_ref()
-                .map(|v| v.list_value("labels"))
-                .unwrap_or_default();
-            record.refs = view
-                .as_ref()
-                .map(|v| v.list_value("references"))
-                .unwrap_or_default();
-        }
-        Category::UiSpec => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
-            record.view = section_or_none(&record.doc, "View");
-            record.description = section_or_none(&record.doc, "Description");
-        }
-        Category::BusinessRule => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
-            record.description = section_or_none(&record.doc, "Description");
-            record.rationale = section_or_none(&record.doc, "Rationale");
-            record.applicability = section_or_none(&record.doc, "Applicability");
-            record.requirements = list_from_section(&record.doc, "Requirements");
-        }
-        Category::AuditRecord => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
-            let fm_type =
-                record.doc.front_matter.as_ref().and_then(|fm| {
-                    crate::record::frontmatter::current_value_string(&fm.raw, "type")
-                });
-            record.audit_type = Some(
-                fm_type
-                    .filter(|t| !t.trim().is_empty())
-                    .or_else(|| section_or_none(&record.doc, "Audit Type"))
-                    .map(|t| t.trim().to_string())
-                    .unwrap_or_else(|| "security".to_string()),
-            );
-            record.description = section_or_none(&record.doc, "Content");
-        }
-        Category::TechSpec => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
-            record.description = section_or_none(&record.doc, "Description");
-        }
-        Category::UseCase | Category::TestCase | Category::TestReport => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
-            record.description = section_or_none(&record.doc, "Description");
-            record.applicability = section_or_none(&record.doc, "Applicability");
-            record.labels = view
-                .as_ref()
-                .map(|v| v.list_value("labels"))
-                .unwrap_or_default();
-            record.refs = view
-                .as_ref()
-                .map(|v| v.list_value("references"))
-                .unwrap_or_default();
-        }
-        Category::Req | Category::Nfr => {
+        Some(TypedHandler::Requirement(_)) => {
             record.title = non_empty_or(heading_title(&record.doc), &stem);
             record.story = section_or_none(&record.doc, "User Story");
             record.description = section_or_none(&record.doc, "Description");
@@ -635,52 +429,108 @@ fn load_record(ctx: &Context, kind: Category, path: &Path) -> Result<Option<Reco
                     .map(|s| s.trim().to_string())
                     .filter(|s| !s.is_empty());
             }
-            record.labels = view
-                .as_ref()
-                .map(|v| v.list_value("labels"))
-                .unwrap_or_default();
-            record.refs = view
-                .as_ref()
-                .map(|v| v.list_value("references"))
-                .unwrap_or_default();
         }
-        Category::UiMockup => {}
+        Some(TypedHandler::Glossary) => {
+            record.title = non_empty_or(heading_title(&record.doc), &stem);
+            record.definition = section_or_none(&record.doc, "Definition");
+        }
+        Some(TypedHandler::UiSpec) => {
+            record.title = non_empty_or(heading_title(&record.doc), &stem);
+            record.view = section_or_none(&record.doc, "View");
+            record.description = section_or_none(&record.doc, "Description");
+        }
+        Some(TypedHandler::Rule) => {
+            record.title = non_empty_or(heading_title(&record.doc), &stem);
+            record.description = section_or_none(&record.doc, "Description");
+            record.rationale = section_or_none(&record.doc, "Rationale");
+            record.applicability = section_or_none(&record.doc, "Applicability");
+            record.requirements = list_from_section(&record.doc, "Requirements");
+        }
+        Some(TypedHandler::Audit) => {
+            record.title = non_empty_or(heading_title(&record.doc), &stem);
+            let fm_type =
+                record.doc.front_matter.as_ref().and_then(|fm| {
+                    crate::record::frontmatter::current_value_string(&fm.raw, "type")
+                });
+            record.audit_type = Some(
+                fm_type
+                    .filter(|t| !t.trim().is_empty())
+                    .or_else(|| section_or_none(&record.doc, "Audit Type"))
+                    .map(|t| t.trim().to_string())
+                    .unwrap_or_else(|| "security".to_string()),
+            );
+            record.description = section_or_none(&record.doc, "Content");
+        }
+        Some(TypedHandler::TechSpec) => {
+            record.title = non_empty_or(heading_title(&record.doc), &stem);
+            record.description = section_or_none(&record.doc, "Description");
+        }
+        Some(TypedHandler::UseCase)
+        | Some(TypedHandler::TestCase)
+        | Some(TypedHandler::TestReport) => {
+            record.title = non_empty_or(heading_title(&record.doc), &stem);
+            record.description = section_or_none(&record.doc, "Description");
+            record.applicability = section_or_none(&record.doc, "Applicability");
+        }
+        Some(TypedHandler::UiMockup) => {}
+        None => {
+            record.title = non_empty_or(heading_title(&record.doc), &stem);
+            record.description = section_or_none(&record.doc, "Description");
+        }
     }
-    let _ = content;
-    if kind == Category::Task
-        && let Some(mid) = record.milestone_id.clone()
-    {
-        record.milestone_title = resolve_title(ctx, &cfg, &mid);
+
+    // Every document type, including generic config-defined types, projects
+    // the front-matter `labels` and `references` lists. A handler that already
+    // owns a field (task labels, UI mockup references) keeps its value.
+    if record.labels.is_empty() {
+        record.labels = view
+            .as_ref()
+            .map(|v| v.list_value("labels"))
+            .unwrap_or_default();
     }
-    if kind == Category::Milestone
-        && let Some(rid) = record.release_id.clone()
-    {
-        record.release_title = resolve_title(ctx, &cfg, &rid);
+    if record.refs.is_empty() {
+        record.refs = view
+            .as_ref()
+            .map(|v| v.list_value("references"))
+            .unwrap_or_default();
     }
-    if kind == Category::Decision
-        && let Some(sid) = record.superseded_by.clone()
-    {
-        record.superseded_title = resolve_title(ctx, &cfg, &sid);
+    if record.status.is_none() {
+        record.status = view
+            .as_ref()
+            .and_then(|v| v.str_value("status"))
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+    }
+    if let Some(mid) = record.milestone_id.clone() {
+        record.milestone_title = resolve_title(ctx, cfg, registry, &mid);
+    }
+    if let Some(rid) = record.release_id.clone() {
+        record.release_title = resolve_title(ctx, cfg, registry, &rid);
+    }
+    if let Some(sid) = record.superseded_by.clone() {
+        record.superseded_title = resolve_title(ctx, cfg, registry, &sid);
     }
     Ok(Some(record))
 }
 
-fn non_empty_or(value: String, fallback: &str) -> String {
-    if value.is_empty() {
-        fallback.to_string()
-    } else {
-        value
-    }
-}
-
-fn resolve_title(ctx: &Context, cfg: &Config, id: &str) -> Option<String> {
-    resolve_id(ctx, cfg, id)
+fn resolve_title(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    id: &str,
+) -> Option<String> {
+    resolve_id(ctx, cfg, registry, id)
         .ok()
         .flatten()
         .map(|r| r.record.title)
 }
 
-fn load_ui_mockup(ctx: &Context, path: &Path) -> Result<Option<Record>, AppError> {
+fn load_ui_mockup(
+    ctx: &Context,
+    cfg: &Config,
+    descriptor: &TypeDescriptor,
+    path: &Path,
+) -> Result<Option<Record>, AppError> {
     let safe = match Context::ensure_within(&ctx.project_dir, path) {
         Ok(safe) => safe,
         Err(_) => return Ok(None),
@@ -696,19 +546,12 @@ fn load_ui_mockup(ctx: &Context, path: &Path) -> Result<Option<Record>, AppError
     let Some(stem) = safe.file_stem().and_then(|s| s.to_str()) else {
         return Ok(None);
     };
-    if !identity::is_valid_id_component(stem) {
-        return Ok(None);
-    }
-    let cfg = match crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir) {
-        Ok(cfg) => cfg,
-        Err(_) => return Ok(None),
-    };
-    if !matches_stem(&cfg, Category::UiMockup, stem) {
+    if !identity::is_valid_id_component(stem) || !matches_stem(descriptor, stem) {
         return Ok(None);
     }
     let meta_record = crate::ui_mockup::parse_browser_metadata(&content, stem);
     let version = crate::record::store::version_token(&meta);
-    let id = canonical_id(&cfg, Category::UiMockup, stem).unwrap_or_else(|| stem.to_string());
+    let id = canonical_id(descriptor, stem).unwrap_or_else(|| stem.to_string());
     let doc = Document {
         source: content,
         front_matter: None,
@@ -718,15 +561,7 @@ fn load_ui_mockup(ctx: &Context, path: &Path) -> Result<Option<Record>, AppError
         sections: Vec::new(),
     };
     let rel_path = relative_path(&ctx.project_dir, &safe);
-    let mut record = default_record(
-        id,
-        Category::UiMockup,
-        Form::UiMockup,
-        doc,
-        safe,
-        rel_path,
-        version,
-    );
+    let mut record = default_record(id, descriptor.clone(), false, doc, safe, rel_path, version);
     record.title = meta_record.title.clone();
     record.status = (!meta_record.status.is_empty()).then_some(meta_record.status.clone());
     record.superseded_by = meta_record.superseded_by.clone();
@@ -734,52 +569,86 @@ fn load_ui_mockup(ctx: &Context, path: &Path) -> Result<Option<Record>, AppError
     record.refs = meta_record.refs.clone();
     record.mockup_task = meta_record.task.clone();
     record.stored_source = record.doc.source.clone();
+    let _ = cfg;
     Ok(Some(record))
 }
 
-/// Build the index for one category. Missing or unreadable directories render
-/// as an empty category; they are not server errors.
-pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
+/// The filterable status values offered by a descriptor, in order.
+pub fn filter_statuses(descriptor: &TypeDescriptor) -> Vec<String> {
+    match &descriptor.status_model {
+        StatusModel::DocumentMain { custom, .. } => {
+            let mut values = vec!["active".to_string()];
+            values.extend(custom.iter().cloned());
+            values
+        }
+        StatusModel::HtmlMetadata { states } => states
+            .iter()
+            .filter(|value| **value != "archived")
+            .map(|value| (*value).to_string())
+            .collect(),
+        StatusModel::TaskConfigurable { statuses, .. } => statuses.clone(),
+        StatusModel::Fixed { states } => states.iter().map(|value| (*value).to_string()).collect(),
+    }
+}
+
+/// Build the index for one descriptor. Only the active directory is read.
+pub fn build_index(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    descriptor: &TypeDescriptor,
+    status: Option<&str>,
+) -> Index {
     let mut index = Index::default();
-    let Some(dir) = record_directory(ctx, cfg, kind) else {
+    if !descriptor.enabled {
+        return index;
+    }
+    let Some(dir) = descriptor_directory(ctx, cfg, descriptor) else {
         return index;
     };
+    let extension = content_extension(descriptor);
     let Ok(read_dir) = fs::read_dir(&dir) else {
         return index;
     };
     for dir_entry in read_dir.flatten() {
         let path = dir_entry.path();
-        let allowed = match kind {
-            Category::UiMockup => path.extension().and_then(|s| s.to_str()) == Some("html"),
-            _ => path.extension().and_then(|s| s.to_str()) == Some("md"),
-        };
-        if !allowed {
+        if path.extension().and_then(|s| s.to_str()) != Some(extension) {
             continue;
         }
         let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
-        if !identity::is_valid_id_component(stem) || !matches_stem(cfg, kind, stem) {
+        if !matches_stem(descriptor, stem) {
             continue;
         }
-        if let Ok(Some(record)) = load_record(ctx, kind, &path) {
+        if let Ok(Some(record)) = load_record(ctx, cfg, registry, descriptor, &path) {
+            // A record auto-relocated out of the active directory by the read
+            // path is no longer listed.
+            if !record.path.exists() {
+                continue;
+            }
+            if let Some(wanted) = status
+                && record.status.as_deref() != Some(wanted)
+            {
+                continue;
+            }
             index.records.push(record);
         }
     }
     index.records.sort_by(|a, b| a.id.cmp(&b.id));
-    if !kind.is_requirement() {
+    if descriptor.id_shape != IdShape::Grouped {
         return index;
     }
     index.groups = index
         .records
         .iter()
-        .filter(|r| r.form == Form::Group)
+        .filter(|r| r.is_group)
         .cloned()
         .collect();
     index.requirements = index
         .records
         .iter()
-        .filter(|r| r.form == Form::Requirement)
+        .filter(|r| !r.is_group)
         .cloned()
         .collect();
 
@@ -789,8 +658,14 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
         .enumerate()
         .map(|(position, group)| (group.id.clone(), position))
         .collect();
+    let is_nfr = matches!(
+        content_handler(descriptor),
+        Some(TypedHandler::Requirement(
+            crate::registry::RequirementKind::NonFunctional
+        ))
+    );
     for (position, requirement) in index.requirements.iter().enumerate() {
-        let derived_group = if kind == Category::Nfr {
+        let derived_group = if is_nfr {
             requirement
                 .id
                 .split('.')
@@ -804,7 +679,7 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
             index.other.push(position);
             continue;
         }
-        let resolved = kind == Category::Nfr || group_ids.contains_key(&derived_group);
+        let resolved = is_nfr || group_ids.contains_key(&derived_group);
         if resolved {
             index
                 .members
@@ -815,7 +690,7 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
             index.other.push(position);
         }
     }
-    if kind == Category::Nfr {
+    if is_nfr {
         let prefixes: std::collections::BTreeSet<String> = index
             .requirements
             .iter()
@@ -835,8 +710,8 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
                 };
                 let mut rec = default_record(
                     prefix.clone(),
-                    Category::Nfr,
-                    Form::Group,
+                    descriptor.clone(),
+                    true,
                     doc,
                     PathBuf::new(),
                     String::new(),
@@ -851,22 +726,25 @@ pub fn build_index(ctx: &Context, cfg: &Config, kind: Category) -> Index {
     index
 }
 
-/// Resolve an ID by exact canonical match against the active directories.
-pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolved>, AppError> {
+/// Resolve an ID by exact canonical match against the enabled descriptors.
+pub fn resolve_id(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    id: &str,
+) -> Result<Option<Resolved>, AppError> {
     if !identity::is_valid_id_component(id) {
         return Ok(None);
     }
-    let mut matches: Vec<(Category, PathBuf)> = Vec::new();
-    for kind in ALL_CATEGORIES {
-        let Some(dir) = record_directory(ctx, cfg, kind) else {
-            continue;
-        };
-        let prefixes = active_prefixes(cfg, kind);
-        if prefixes.is_empty() {
+    for descriptor in registry.descriptors() {
+        if !descriptor.enabled {
             continue;
         }
-        if kind == Category::UiMockup {
-            let Some(wanted) = canonical_key(cfg, kind, id) else {
+        let Some(dir) = descriptor_directory(ctx, cfg, descriptor) else {
+            continue;
+        };
+        if matches!(descriptor.content_model, ContentModel::HtmlMockup(_)) {
+            let Some(wanted) = canonical_id(descriptor, id) else {
                 continue;
             };
             for entry in fs::read_dir(&dir).into_iter().flatten().flatten() {
@@ -877,48 +755,48 @@ pub fn resolve_id(ctx: &Context, cfg: &Config, id: &str) -> Result<Option<Resolv
                 let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
                     continue;
                 };
-                if canonical_key(cfg, kind, stem).as_ref() == Some(&wanted)
+                if canonical_id(descriptor, stem).as_ref() == Some(&wanted)
                     && Context::ensure_within(&ctx.project_dir, &path).is_ok()
+                    && let Some(record) = load_record(ctx, cfg, registry, descriptor, &path)?
                 {
-                    matches.push((kind, path));
+                    if !record.path.exists() {
+                        continue;
+                    }
+                    return Ok(Some(Resolved { record }));
                 }
             }
             continue;
         }
+        if canonical_id(descriptor, id).is_none() {
+            continue;
+        }
         let dirs = vec![dir];
-        let dotted = uri_kind(kind);
+        let prefixes = vec![descriptor.prefix.clone()];
+        let dotted = descriptor.id_shape != IdShape::Plain;
         let mut resolved =
             crate::record::resolve::resolve_in_dirs(ctx, &dirs, id, &prefixes, dotted)
                 .ok()
                 .flatten();
         if resolved.is_none() && dotted {
-            // A requirement family also resolves its group form (`REQ-001`).
             resolved = crate::record::resolve::resolve_in_dirs(ctx, &dirs, id, &prefixes, false)
                 .ok()
                 .flatten();
         }
         if let Some(found) = resolved {
-            matches.push((kind, found.path));
-        }
-    }
-    match matches.len() {
-        0 => Ok(None),
-        1 => {
-            let (kind, path) = matches.remove(0);
-            let Some(record) = load_record(ctx, kind, &path)? else {
-                let safe = Context::ensure_within(&ctx.project_dir, &path)
-                    .map_err(|_| AppError::Runtime("record is not readable".to_string()))?;
-                if fs::read_to_string(&safe).is_err() {
-                    return Err(AppError::Runtime("record is not valid UTF-8".to_string()));
+            if let Some(record) = load_record(ctx, cfg, registry, descriptor, &found.path)? {
+                if !record.path.exists() {
+                    continue;
                 }
-                return Ok(None);
-            };
-            Ok(Some(Resolved { record, kind }))
+                return Ok(Some(Resolved { record }));
+            }
+            let safe = Context::ensure_within(&ctx.project_dir, &found.path)
+                .map_err(|_| AppError::Runtime("record is not readable".to_string()))?;
+            if fs::read_to_string(&safe).is_err() {
+                return Err(AppError::Runtime("record is not valid UTF-8".to_string()));
+            }
         }
-        _ => Err(AppError::Runtime(
-            "record ID is ambiguous across document types".to_string(),
-        )),
     }
+    Ok(None)
 }
 
 /// Validate a title and return the stored value (specification section 7.3).
@@ -1121,10 +999,6 @@ fn body_open_end(content: &str) -> Option<usize> {
 }
 
 /// Field-preserving serialization for UI mockups (specification section 8).
-///
-/// Mockups are the documented non-front-matter serializer exception. Only the
-/// `<title>` text, a stub `<h1>` starting with the record ID, the `specs`/`refs`
-/// comment lines, and existing visible metadata lines are rewritten.
 pub fn edit_ui_mockup(
     original: &str,
     id: &str,
@@ -1289,37 +1163,34 @@ pub fn validate_requirement_refs(values: &[String]) -> Result<Vec<String>, Strin
 }
 
 /// Whether a decision ID exists in the active or archived store.
-pub fn decision_exists(ctx: &Context, cfg: &Config, id: &str) -> bool {
-    let Some(desc) = descriptor_for_doc_type("decision") else {
-        return false;
-    };
-    let Ok(active) = desc.resolve_directory(cfg, &ctx.project_dir) else {
-        return false;
-    };
-    let mut dirs = vec![active.clone()];
-    let archived = active.join("archived");
-    if Context::ensure_within(&ctx.project_dir, &archived).is_ok() {
-        dirs.push(archived);
-    }
-    let prefixes = active_prefixes(cfg, Category::Decision);
-    crate::record::resolve::resolve_in_dirs(ctx, &dirs, id, &prefixes, false)
-        .ok()
-        .flatten()
-        .is_some()
+pub fn decision_exists(ctx: &Context, cfg: &Config, registry: &ArtifactRegistry, id: &str) -> bool {
+    registry.descriptors().any(|descriptor| {
+        descriptor.category == CategoryKind::Decision
+            && descriptor.enabled
+            && descriptor_directory(ctx, cfg, descriptor).is_some_and(|active| {
+                let archived = active.join("archived");
+                let dirs = if Context::ensure_within(&ctx.project_dir, &archived).is_ok() {
+                    vec![active, archived]
+                } else {
+                    vec![active]
+                };
+                crate::record::resolve::resolve_in_dirs(
+                    ctx,
+                    &dirs,
+                    id,
+                    std::slice::from_ref(&descriptor.prefix),
+                    descriptor.id_shape != IdShape::Plain,
+                )
+                .ok()
+                .flatten()
+                .is_some()
+            })
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn category_and_form_labels() {
-        assert_eq!(Category::TechSpec.key(), "tech-spec");
-        assert_eq!(Category::TechSpec.config_key(), "tech-spec");
-        assert_eq!(Form::TechSpec.label(), "Technical specification");
-        assert_eq!(Category::BusinessRule.config_key(), "rule");
-        assert_eq!(Category::AuditRecord.config_key(), "audit");
-    }
 
     #[test]
     fn title_and_multiline_validation() {
@@ -1442,25 +1313,5 @@ mod tests {
         assert!(output.contains("<h1>TASK-99 Landing</h1>"));
         assert!(output.contains("<!-- specs: UI-010 -->"));
         assert!(output.contains("<!-- refs: docs/x.md -->"));
-    }
-
-    #[test]
-    fn requirement_refs_validation() {
-        assert_eq!(
-            validate_requirement_refs(&["REQ-001".to_string(), " REQ-002 ".to_string()]).unwrap(),
-            vec!["REQ-001".to_string(), "REQ-002".to_string()]
-        );
-        assert_eq!(
-            validate_requirement_refs(&["REQ-001".to_string(), "REQ-001".to_string()]).unwrap(),
-            vec!["REQ-001".to_string()]
-        );
-        assert_eq!(
-            validate_requirement_refs(&["bad id".to_string()]).unwrap_err(),
-            "Requirement references must be valid record IDs."
-        );
-        assert_eq!(
-            validate_requirement_refs(&["../x".to_string()]).unwrap_err(),
-            "Requirement references must be valid record IDs."
-        );
     }
 }

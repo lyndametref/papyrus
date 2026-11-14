@@ -817,7 +817,7 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
 ];
 
 /// The built-in registry: every configured type with its behavior.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ArtifactRegistry {
     /// Canonical order: task, milestone, release, decision types in key order,
     /// document types in slug order.

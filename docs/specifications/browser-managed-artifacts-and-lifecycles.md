@@ -5,6 +5,8 @@
 **Status:** Refined (execution-ready; UI mockup approved)
 **UI mockups:** [`MOCK-0010`](ui/mockups/MOCK-0010-browser-front-matter-and-lifecycle-review.html) (approved 2026-11-09, TASK-66) — UI description [`ui/browser-front-matter-and-lifecycle-ui.md`](ui/browser-front-matter-and-lifecycle-ui.md); reuses the approved baseline shell [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html). No new mockup is required for this ticket.
 
+> **Superseded in part (TASK-114):** the fixed twelve-section set and the "covered set does not change with `document_types`" rule are replaced by the registry-derived three-category page in [`browser-config-defined-document-types.md`](browser-config-defined-document-types.md) (REQ-06.003 revision of 2026-11-13). The page route, shell, and read-only configuration rules in this document remain in force.
+
 ## Purpose
 
 Add a read-only page to the offline, project-local web interface that describes every managed artifact/document type and its lifecycle, per REQ-06.003. The page is a single static view with one section per fixed record type; task states are derived from the configured task statuses (REQ-01.002); every other type uses the lifecycle documented for that type. It advances NFR-01.002 (display all Papyrus content) by giving contributors a single place to learn what each record type is and how it moves through its states.
