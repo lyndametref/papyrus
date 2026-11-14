@@ -3,7 +3,7 @@ id: doc-1
 title: Papyrus Feature Roadmap
 type: specification
 created_date: '2026-11-04T19:22:00Z'
-updated_date: '2026-11-13T21:29:00Z'
+updated_date: '2026-11-14T20:33:00Z'
 ---
 # Papyrus Feature Roadmap
 
@@ -27,6 +27,8 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 - m-14: Release 1.0 — two tasks, both Low priority: the release-level upgrade notes TASK-99 (ordinal 39160) and the release gate TASK-73 (labelled release, ordinal 40000, last). m-14 holds no implementation or specification work and stays open and isolated so more requirements can be added before 1.0 without redefining the gate. Closing it requires the feature milestone m-16 to be fully Done plus TASK-20 (m-12) and TASK-82 (m-15), with build/tests passing and the security audit complete; TASK-104 (m-16) is part of the feature milestone and must be accepted by the gate before it closes.
 - m-16: Release 1.0 - Native Layout, Import, and Browser Refinements — the extension feature milestone, 20 tasks, all High priority: specifications TASK-83 to TASK-86, design review TASK-87, native layout TASK-88, task and milestone adoption TASK-89, relocation TASK-90, init/config TASK-91, cursor-driven init walkthrough conformance TASK-104 (ordinal 39085, directly after TASK-91), import TASK-92, browser surfaces TASK-93 to TASK-96, serializer removal TASK-97, backlog kanban board specification TASK-101, mockup revision TASK-102 and implementation TASK-103, verification and packaging TASK-98. Placed before the release milestone; TASK-73 depends on its final tasks.
 - m-17: Config-Defined Document Types and Artifact Categories — REQ-07.001/002/003/004 plus REQ-06.014 and the REQ-01.002 list-valued keys; one feature milestone after Release 1.0, thirteen tasks TASK-105 to TASK-117, all High priority, ordinals 41000-41110. Delivers the runtime artifact registry and descriptors, the dynamic `papyrus <slug>` family with `status`, fail-closed `document_types` validation and repair, the generic content model, registry-derived search and browser views, init defaults without `deploy`, and the upgrade documentation. Man-page work is excluded: ADR-0021 is Proposed and NFR-03.003 remains a recorded release risk. No release gate is created; whether this ships as Release 1.1 or folds into an open release is an owner decision.
+
+- m-18: Registry Consolidation and Release Close - follow-ups from the m-17 architecture checkpoint and TASK-117 verification; seven tasks TASK-118 to TASK-124, ordinals 41200-41260. Closes the release-blocking `papyrus release close` gap G-5, refactors the two ADR-0016/0017 deviations in code (descriptor-driven typed dispatch through `document::run`, registry-based record descriptor resolution) and removes the process-global descriptor cache and slug leaks, then clears G-4 and F-117-1 and adds init/registry and archive-terminology drift guards. Every dependency is inside m-18; no release milestone or release ticket is created.
 
 ## Removed
 
@@ -56,6 +58,8 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 - m-16 all 20 tasks depend only on tasks inside m-16; the entry tasks TASK-83 to TASK-86 and TASK-101 follow. TASK-101 -> TASK-86; TASK-102 -> TASK-101; TASK-103 -> TASK-97, TASK-101, TASK-102; TASK-98 -> TASK-97, TASK-103; TASK-104 -> TASK-91. No m-16 task depends on m-12, m-15, or m-14 work, and none depends on a later milestone.
 - m-14 TASK-99 -> TASK-83 (m-16) and TASK-92 (m-16); TASK-73 -> TASK-99 (m-14), TASK-98 (m-16), TASK-91 (m-16), TASK-20 (m-12), TASK-82 (m-15). The release milestone depends on the feature milestone; no m-16 task depends on m-14 or on a later milestone.
 - New m-12 internal order: TASK-63 -> TASK-64 -> TASK-65 -> TASK-67; TASK-63/TASK-65 -> TASK-68 -> TASK-69; TASK-67/TASK-69 -> TASK-70 -> TASK-71; TASK-66 -> TASK-67, TASK-72, TASK-60, TASK-76; TASK-74 -> TASK-75; TASK-76 -> TASK-77; TASK-60/TASK-67/TASK-72/TASK-77 -> TASK-19; TASK-20 last.
+
+- m-18 all seven tasks depend only on tasks inside m-18; TASK-118, TASK-119, TASK-122, and TASK-123 have no dependency, TASK-120 follows TASK-119, TASK-121 and TASK-124 follow TASK-120. No m-18 task depends on m-14, m-16, m-17, or a later milestone.
 
 ## Requirement coverage
 
@@ -248,3 +252,53 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 - ADR-0021: man-page generation and the NFR-03.003 interpretation remain undecided. No man-page task is created; TASK-116 and TASK-117 only record the risk.
 - Specification pages that describe static per-type commands and per-category browser pages will be stale after TASK-108 and TASK-114. No specification task was in the requested scope; decide whether to add one before implementation or accept the ADRs and business rules as the contract.
 - REQ-06.014 leaves navigation grouping and display names open; TASK-114 follows ADR-0020's grouped default and slug-derived labels.
+
+## Requirement change update (2026-11-14) - m-17 follow-ups and registry consolidation
+
+- Inputs: the m-17 architecture checkpoint and the TASK-117 verification dispositions. Owner decisions: open a follow-up for G-5; refactor the code rather than amend ADR-0016/ADR-0017 for typed-module dispatch and the descriptor cache; plan the follow-ups and continue. No requirement, business rule, or ADR changed, so this is a planning update, not a requirement change.
+- Roadmap entry: **Registry consolidation and release close**, one feature increment after m-17. Source requirement and rule IDs: BR-007, REQ-03.002, REQ-07.001 (release close); ADR-0016, ADR-0017 (dispatch and registry); REQ-01.002 and BR-016 (configuration surface); NFR-02.002 (input validation); ADR-0022 (archive terminology).
+- Milestone decision: new **m-18 Registry Consolidation and Release Close**, not an extension of the completed m-17. m-17 is Done and its 13 tasks are not reopened; the work ranges over release, CLI dispatch, the record layer, configuration, and sanitizers, and splitting it would separate the release blocker from the refactor that makes the same surfaces consistent.
+- Release coupling: no release milestone and no release ticket are created. There is no gate to add G-5 to, and the m-17 release vehicle (Release 1.1 or an open release) is still an owner decision. Until that decision, `release-ready` stays no for the m-17 increment and m-18 is the work that clears it.
+
+### Task order
+
+| Ordinal | Task | Priority | Depends on | Assignee |
+|---|---|---|---|---|
+| 41200 | TASK-118 Implement `papyrus release close` for the planned to released transition | High | - | rust-dev |
+| 41210 | TASK-119 Route typed document commands through `document::run` with descriptor-driven dispatch | High | - | rust-dev |
+| 41220 | TASK-120 Resolve record descriptors from the artifact registry as the single source | High | TASK-119 | rust-dev |
+| 41230 | TASK-121 Remove the process-global descriptor cache and slug leaks | Medium | TASK-120 | rust-dev |
+| 41240 | TASK-122 Include document type `default_status` in `config list` (G-4) | Medium | - | rust-dev |
+| 41250 | TASK-123 Reject C0 control characters in titles (F-117-1) | Low | - | rust-dev |
+| 41260 | TASK-124 Guard init defaults and registry drift and finish archive terminology | Low | TASK-120 | rust-dev |
+
+### Ordering rationale
+
+- Dependencies first. TASK-118, TASK-119, TASK-122, and TASK-123 have no dependency and are the first eligible set. TASK-120 follows TASK-119 because both rework the same command path and the record lookup is defined against the descriptor-driven dispatch. TASK-121 removes the leaked constructor that TASK-120 leaves behind. TASK-124 follows TASK-120 because the rename touches the same seven typed modules.
+- User priority and release risk. G-5 is the only release-blocking item, so it holds ordinal 41200. The refactor pair follows because the owner directed a code change rather than an ADR amendment, and the remaining findings are ordered Medium then Low.
+- Reviewable split. The refactor is split at a real boundary - CLI dispatch before record descriptor resolution - so each change set stays reviewable and behavior-preserving. TASK-119 explicitly leaves `descriptor_for_doc_type` and the cache in place; TASK-120 then removes the second lookup; TASK-121 removes the leak.
+- No unusable increment. Nothing in m-18 depends on a later-milestone capability; every task is runnable against the delivered m-17 code.
+
+### Parallel work
+
+- TASK-118, TASK-119, TASK-122, and TASK-123 touch disjoint surfaces (release command and registry verb list; CLI tree, dispatch, document, typed modules; config flattening; sanitizers and shared validation tests) and can run concurrently.
+- TASK-120 starts after TASK-119; TASK-121 after TASK-120; TASK-124 after TASK-120. TASK-121 and TASK-124 can then run in parallel.
+
+### Coverage
+
+- BR-007, REQ-03.002, REQ-07.001 - TASK-118 (the `close` verb, the fixed `planned -> released` transition, browser text).
+- ADR-0016 - TASK-119 (every document dispatch through `document::run`, descriptor-built commands). ADR-0017 - TASK-119 (descriptor-driven commands), TASK-120 (single registry source for record descriptors), TASK-121 (registry-owned descriptors, no leaked identity).
+- REQ-01.002, BR-016 - TASK-122 (`document_types.<slug>.default_status` inspectable through `config list`, validation and repair unchanged).
+- NFR-02.002 - TASK-123 (C0 and DEL rejected in single-line input).
+- ADR-0022 and the document lifecycle - TASK-124 (archive terminology, no behavior change) plus the init/registry default-set guard.
+
+### Accepted and deferred items
+
+- G-1 - `config set` cannot bootstrap a document type. Accepted as documented behavior; the direct-edit workaround and the error naming the missing field stand. No task.
+- G-2, G-3 - upgrade-note and README wording findings already recorded by TASK-117. No task; they are documentation corrections outside this increment.
+- NFR-03.003 man-page gap - remains owned by the deferred ADR-0021 decision. No man-page task is created, and no m-18 task may claim compliance for config-defined slugs.
+
+### Open questions
+
+- Release vehicle: whether m-17 plus m-18 ship as Release 1.1 or fold into an open release, and therefore whether a release gate must depend on TASK-118. No release ticket exists to record that dependency.
+- Priority assumption: the owner gave a directive but no priority for the refactor and cache tasks. TASK-119 and TASK-120 are recorded as High to match the owner-directed ADR-0016/0017 conformance; TASK-121 is Medium because it has no user-visible effect; TASK-124 is Low as a drift guard. Adjust on request.

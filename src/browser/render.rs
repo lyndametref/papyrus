@@ -4236,8 +4236,8 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
             "Release and audit workflows",
             vec![(
                 "Releases and audits",
-                "Releases move active \u{2192} released; audit records are created for release audits. Decision types enabled: {enabled_decision_types}.",
-                "papyrus release status {release_example} released",
+                "Releases move planned \u{2192} released; audit records are created for release audits. Decision types enabled: {enabled_decision_types}.",
+                "papyrus release close {release_example}",
             )],
         ),
         (

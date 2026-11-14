@@ -28,6 +28,11 @@ pub enum ReleaseCmd {
     List,
     /// View a release.
     View { id: String },
+    /// Close a release (`planned -> released`).
+    Close {
+        /// Release ID.
+        id: String,
+    },
     /// Edit a release.
     Edit {
         id: String,
@@ -65,6 +70,7 @@ pub fn run(ctx: &Context, cmd: ReleaseCmd) -> Result<crate::CommandOutput, AppEr
         }
         ReleaseCmd::List => list(ctx),
         ReleaseCmd::View { id } => view(ctx, &id),
+        ReleaseCmd::Close { id } => close(ctx, &id),
         ReleaseCmd::Edit {
             id,
             title,
@@ -230,12 +236,61 @@ pub fn create(
         ),
         crate::record::patch::PatchOp::SetFrontMatterValue("labels".to_string(), labels_value),
         crate::record::patch::PatchOp::SetFrontMatterValue("references".to_string(), refs_value),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "status".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String("planned".to_string()),
+        ),
     ];
     let file_content = crate::record::patch::apply_patch(&parsed, &ops)?;
     let file_path = dir.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
     crate::record::store::write_atomic(ctx, &safe_path, &file_content)?;
     Ok(id)
+}
+
+/// Close a release: the only `planned -> released` transition.
+///
+/// A missing or empty stored `status` is treated as `planned` so imported and
+/// legacy records remain closable. Any other status is rejected with a
+/// validation outcome (exit 4) before any write, leaving the file untouched.
+pub fn close(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
+    let requested = sanitize_text(id_raw)?;
+    let cfg = load_config(ctx)?;
+    let record = resolve_release(ctx, &cfg, &requested)?
+        .ok_or_else(|| AppError::NotFound(format!("not found: {}", requested)))?;
+    record.ensure_writable()?;
+    let id = record.id.clone();
+    let path = record.path.clone();
+
+    let (doc, _token) = crate::record::store::read_document(ctx, &path)?;
+    let current = doc
+        .front_matter
+        .as_ref()
+        .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, "status"))
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "planned".to_string());
+    if current != "planned" {
+        return Err(AppError::Validation(format!(
+            "release {} is already {}; only planned releases can be closed",
+            id, current
+        )));
+    }
+
+    let now = crate::record::frontmatter::utc_now();
+    let new_content = crate::record::patch::apply_patch(
+        &doc,
+        &[
+            crate::record::patch::PatchOp::SetFrontMatter("status".into(), "released".into()),
+            crate::record::patch::PatchOp::SetFrontMatter("updated_date".into(), now),
+        ],
+    )?;
+    let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
+    crate::record::store::write_atomic(ctx, &safe_write, &new_content)?;
+
+    let json = ctx
+        .json
+        .then(|| serde_json::json!({"id": id, "status": "released"}));
+    Ok(crate::CommandOutput { text: id, json })
 }
 
 pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {

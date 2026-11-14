@@ -84,6 +84,7 @@ pub enum Verb {
     Restore,
     Delete,
     Status,
+    Close,
     CreateGroup,
     Supersede,
 }
@@ -99,6 +100,7 @@ impl Verb {
             Verb::Restore => "restore",
             Verb::Delete => "delete",
             Verb::Status => "status",
+            Verb::Close => "close",
             Verb::CreateGroup => "create-group",
             Verb::Supersede => "supersede",
         }
@@ -552,7 +554,13 @@ const MILESTONE_VERBS: &[Verb] = &[
     Verb::Archive,
     Verb::Delete,
 ];
-const RELEASE_VERBS: &[Verb] = &[Verb::Create, Verb::List, Verb::View, Verb::Edit];
+const RELEASE_VERBS: &[Verb] = &[
+    Verb::Create,
+    Verb::List,
+    Verb::View,
+    Verb::Edit,
+    Verb::Close,
+];
 const DECISION_VERBS: &[Verb] = &[Verb::Create, Verb::List, Verb::View, Verb::Edit];
 
 const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
@@ -1406,7 +1414,14 @@ mod tests {
 
         let release = registry.descriptor("release").expect("release");
         assert_eq!(release.verbs, RELEASE_VERBS.to_vec());
-        assert!(!release.has_verb(Verb::Archive));
+        assert!(release.has_verb(Verb::Close));
+        for absent in [Verb::Archive, Verb::Restore, Verb::Delete, Verb::Status] {
+            assert!(
+                !release.has_verb(absent),
+                "release must not expose {}",
+                absent.as_str()
+            );
+        }
     }
 
     // 2
