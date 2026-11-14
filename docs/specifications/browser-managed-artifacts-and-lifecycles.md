@@ -65,7 +65,7 @@ Each section's lifecycle paragraph uses the documented lifecycle for that type:
 | Section | Lifecycle paragraph |
 | --- | --- |
 | Milestones | `Lifecycle: active → archived. Archiving a milestone is separate from task workflow status.` |
-| Releases | `Lifecycle: active → released. released is delivery completion, distinct from archiving; releases are not archived. The transition is performed explicitly via the documented release status command.` |
+| Releases | `Lifecycle: planned → released. released is delivery completion, distinct from archiving; releases are not archived. The transition is performed explicitly via papyrus release close <id>.` |
 | Decisions | `Lifecycle: proposed → accepted \| rejected; accepted → deprecated \| superseded.` |
 | Business requirements | `Lifecycle: active → deprecated (restored via restore).` |
 | Non-functional requirements | `Lifecycle: active → deprecated (restored via restore).` |

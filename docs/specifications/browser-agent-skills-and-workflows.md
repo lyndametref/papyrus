@@ -93,7 +93,7 @@ Each group contains the skill articles listed below. Each article is an element 
 | Requirements and documentation management | Business rules, glossary, specifications | Rules, glossary terms, UI specs, technical specs, and mockups follow the same record lifecycle: active → deprecated (restored via restore). | `papyrus rule create "Title"` newline `papyrus glossary create "Term"` |
 | Search | Search across records | Search spans enabled document and decision types; disabled types are excluded. | `papyrus search "query"` |
 | Browser usage | Serve the local browser | Offline, loopback by default. No internet connection required. | `papyrus browser --port 6420` |
-| Release and audit workflows | Releases and audits | Releases move active → released; audit records are created for release audits. Decision types enabled: `{enabled_decision_types}`. | `papyrus release status {release_prefix}-{example} released` |
+| Release and audit workflows | Releases and audits | Releases move planned → released; audit records are created for release audits. Decision types enabled: `{enabled_decision_types}`. | `papyrus release close {release_prefix}-{example}` |
 | Configuration management | Set and unset keys | Prefixes, padding, statuses, enabled types, and directories are configuration keys (BR-016). | `papyrus config set task_prefix {task_prefix}` newline `papyrus config unset statuses` |
 | Decisions | Decision records | Enabled decision types: `{enabled_decision_types}`. Lifecycle: proposed → accepted \| rejected; accepted → deprecated \| superseded. | `papyrus decision create --type adr "Title"` |
 

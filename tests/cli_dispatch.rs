@@ -114,7 +114,7 @@ fn table_driven_builtin_help() {
         (
             "release",
             &["release", "--help"],
-            &["create", "list", "view", "edit"],
+            &["create", "list", "view", "edit", "close"],
         ),
         (
             "decision",

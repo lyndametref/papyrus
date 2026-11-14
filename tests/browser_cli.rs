@@ -6764,6 +6764,18 @@ fn t77a_skills_page_route_alias_and_method() {
     assert!(body.contains("<dt>Backlog directory</dt><dd>backlog/</dd>"));
     assert!(body.contains("<dt>Decision directory</dt><dd>decisions/</dd>"));
     assert!(body.contains("<dt>Doc directory</dt><dd>docs/</dd>"));
+    assert!(
+        body.contains("papyrus release close REL-001"),
+        "skills page must name the implemented close command"
+    );
+    assert!(
+        body.contains("planned → released"),
+        "skills page must state the planned -> released lifecycle"
+    );
+    assert!(
+        !body.contains("papyrus release status"),
+        "skills page must not advertise a non-existent release status command"
+    );
     assert!(body.contains("Agent skills &amp; workflows"));
     assert!(
         body.contains("<a href=\"/skills\" aria-current=\"page\">Agent skills &amp; workflows</a>")

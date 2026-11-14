@@ -328,6 +328,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        papyrus release list
        papyrus release view &lt;id&gt;
        papyrus release edit &lt;id&gt; [--title &lt;title&gt;] [-d &lt;description&gt;]
+       papyrus release close &lt;id&gt;
        </code>
        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
        Create a release.
@@ -346,6 +347,10 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
           <b style="color: light-dark(#1a7f37, #3fb950);">-d, --description &lt;text&gt;</b>
           Update the description.
+
+       <b style="color: light-dark(#8250df, #d2a8ff);">close &lt;id&gt;</b>
+       Close a release. This is the only <b>planned</b> -&gt; <b>released</b>
+       transition; releases in any other state are rejected.
 
 <b style="color: light-dark(#0969da, #58a6ff);">decision</b>
 
@@ -527,9 +532,10 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
 <b style="color: light-dark(#0969da, #58a6ff);">Releases</b>
 
-        <b>active</b> -&gt; <b>released</b>
+        <b>planned</b> -&gt; <b>released</b>
 
-        Releases group milestones.
+        Releases group milestones. <b>papyrus release close &lt;id&gt;</b> is the
+        only <b>planned</b> -&gt; <b>released</b> transition.
 
 <b style="color: light-dark(#0969da, #58a6ff);">Decisions</b>
 
