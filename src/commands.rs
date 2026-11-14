@@ -111,13 +111,25 @@ pub fn load_effective_config(config_path: &Path, project_dir: &Path) -> Result<C
     validate_browser_yaml(&val).map_err(AppError::Validation)?;
     let cfg: Config =
         yaml_serde::from_value(val).map_err(|e| AppError::Validation(e.to_string()))?;
-    cfg.validate().map_err(AppError::Validation)?;
+    cfg.validate(Some(project_dir))
+        .map_err(AppError::Validation)?;
+    Ok(cfg)
+}
+
+pub fn load_effective_config_tolerant(
+    config_path: &Path,
+    project_dir: &Path,
+) -> Result<Config, AppError> {
+    let val = load_effective_value(config_path)?;
+    validate_browser_yaml(&val).map_err(AppError::Validation)?;
+    let cfg: Config =
+        yaml_serde::from_value(val).map_err(|e| AppError::Validation(e.to_string()))?;
     let _ = project_dir;
     Ok(cfg)
 }
 
 pub fn config_list(ctx: &Context) -> Result<CommandOutput, AppError> {
-    let cfg = load_effective_config(&ctx.config_path, &ctx.project_dir)?;
+    let cfg = load_effective_config_tolerant(&ctx.config_path, &ctx.project_dir)?;
     // resolve project_name into a cloned config for json
     let mut cfg_json = cfg.clone();
     if cfg_json.project_name.is_none() {
@@ -280,6 +292,18 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
         file_val = yaml_serde::Value::Mapping(yaml_serde::Mapping::new());
     }
 
+    // Materialize the full default document_types map when absent, so editing
+    // document_types.<slug>.<field> never drops the default set.
+    if key.starts_with("document_types.") && yaml_get(&file_val, "document_types").is_none() {
+        let default_cfg = Config::default();
+        let default_val =
+            yaml_serde::to_value(&default_cfg).map_err(|e| AppError::Runtime(e.to_string()))?;
+        let default_dt = yaml_get(&default_val, "document_types")
+            .cloned()
+            .ok_or_else(|| AppError::Runtime("default document_types missing".to_string()))?;
+        yaml_set(&mut file_val, "document_types", default_dt).map_err(AppError::Validation)?;
+    }
+
     yaml_set(&mut file_val, key, parsed.clone()).map_err(AppError::Validation)?;
 
     // validate merged effective
@@ -289,7 +313,8 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
     validate_browser_yaml(&base).map_err(AppError::Validation)?;
     let cfg: Config = yaml_serde::from_value(base)
         .map_err(|e| AppError::Validation(format!("{}: {}", key, e)))?;
-    cfg.validate().map_err(AppError::Validation)?;
+    cfg.validate(Some(&ctx.project_dir))
+        .map_err(AppError::Validation)?;
 
     // Folder relocation, if applicable, runs before persistence.
     let mut relocation_cross_device = false;
@@ -352,7 +377,8 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
     validate_browser_yaml(&base).map_err(AppError::Validation)?;
     let cfg: Config =
         yaml_serde::from_value(base).map_err(|e| AppError::Validation(e.to_string()))?;
-    cfg.validate().map_err(AppError::Validation)?;
+    cfg.validate(Some(&ctx.project_dir))
+        .map_err(AppError::Validation)?;
 
     // write or remove
     let is_empty_map = matches!(&file_val, yaml_serde::Value::Mapping(m) if m.is_empty());

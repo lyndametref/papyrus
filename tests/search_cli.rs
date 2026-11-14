@@ -603,7 +603,7 @@ fn t16a_symlinked_directory_escape_exits_one() {
     symlink(&outside, &active).unwrap();
 
     let out = search(&proj, &["secretword"]);
-    assert_eq!(out.status.code(), Some(1), "stderr={}", stderr(&out));
+    assert_eq!(out.status.code(), Some(4), "stderr={}", stderr(&out));
     assert_eq!(stdout(&out), "");
     assert!(!stderr(&out).contains("SECRETWORD"));
 }
@@ -829,7 +829,7 @@ fn br_search_symlink_dir_escape_exits_one() {
     symlink(&outside, &active).unwrap();
 
     let out = search(&proj, &["secretword"]);
-    assert_eq!(out.status.code(), Some(1), "stderr={}", stderr(&out));
+    assert_eq!(out.status.code(), Some(4), "stderr={}", stderr(&out));
     assert_eq!(stdout(&out), "");
     assert!(!stderr(&out).contains("SECRETWORD"));
 }
@@ -1021,7 +1021,7 @@ fn audit_search_symlink_dir_escape_exits_one() {
     symlink(&outside, &active).unwrap();
 
     let out = search(&proj, &["secretword"]);
-    assert_eq!(out.status.code(), Some(1), "stderr={}", stderr(&out));
+    assert_eq!(out.status.code(), Some(4), "stderr={}", stderr(&out));
     assert_eq!(stdout(&out), "");
     assert!(!stderr(&out).contains("SECRETWORD"));
 }
@@ -1213,7 +1213,7 @@ fn tech_spec_search_symlink_dir_escape_exits_one() {
     symlink(&outside, &active).unwrap();
 
     let out = search(&proj, &["secretword"]);
-    assert_eq!(out.status.code(), Some(1), "stderr={}", stderr(&out));
+    assert_eq!(out.status.code(), Some(4), "stderr={}", stderr(&out));
     assert_eq!(stdout(&out), "");
     assert!(!stderr(&out).contains("SECRETWORD"));
 }
@@ -1713,7 +1713,7 @@ fn uc_tc_tr_search_symlink_dir_escape_exits_one() {
         let out = search(&proj, &["secretword"]);
         assert_eq!(
             out.status.code(),
-            Some(1),
+            Some(4),
             "dir={dir} stderr={}",
             stderr(&out)
         );
