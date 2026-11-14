@@ -148,19 +148,6 @@ fn audit_basic_lifecycle() {
 }
 
 #[test]
-fn audit_id_not_reused() {
-    let d = tmpdir("reuse");
-    init(&d);
-    create(&d, "A", "d", None);
-    create(&d, "B", "d", None);
-    let out = run(&d, &["audit", "deprecate", "AUD-001"]);
-    assert!(out.status.success());
-    let out = create(&d, "C", "d", None);
-    assert_eq!(stdout(&out).trim(), "AUD-003");
-    let _ = fs::remove_dir_all(&d);
-}
-
-#[test]
 fn audit_types_and_custom() {
     let d = tmpdir("types");
     init(&d);

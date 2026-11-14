@@ -271,8 +271,8 @@ pub fn next_number_in_dirs(dirs: &[&Path], prefix: &str) -> u32 {
     allocate_next(&observed_numbers_in_dirs(dirs, prefix)) as u32
 }
 
-pub fn next_number(active: &Path, deprecated: &Path, prefix: &str) -> u32 {
-    next_number_in_dirs(&[active, deprecated], prefix)
+pub fn next_number(active: &Path, archived: &Path, prefix: &str) -> u32 {
+    next_number_in_dirs(&[active, archived], prefix)
 }
 
 pub fn scan_max_ordinal_in_dirs(dirs: &[&Path]) -> i64 {
@@ -330,10 +330,10 @@ pub fn observed_numbers_in_dirs_ext(dirs: &[&Path], prefix: &str, extension: &st
     observed
 }
 
-pub fn next_seq_number(active: &Path, deprecated: &Path, group_id: &str) -> u32 {
+pub fn next_seq_number(active: &Path, archived: &Path, group_id: &str) -> u32 {
     let prefix = format!("{group_id}.");
     let mut observed: Vec<i64> = Vec::new();
-    for dir in [active, deprecated] {
+    for dir in [active, archived] {
         if let Ok(rd) = std::fs::read_dir(dir) {
             for e in rd.flatten() {
                 let path = e.path();
@@ -354,8 +354,8 @@ pub fn next_seq_number(active: &Path, deprecated: &Path, group_id: &str) -> u32 
     allocate_next(&observed) as u32
 }
 
-pub fn next_html_number(active: &Path, deprecated: &Path, prefix: &str) -> u32 {
-    let observed = observed_numbers_in_dirs_ext(&[active, deprecated], prefix, "html");
+pub fn next_html_number(active: &Path, archived: &Path, prefix: &str) -> u32 {
+    let observed = observed_numbers_in_dirs_ext(&[active, archived], prefix, "html");
     allocate_next(&observed) as u32
 }
 

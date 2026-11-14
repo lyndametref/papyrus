@@ -193,27 +193,6 @@ fn test_report_create_requires_all_arguments() {
 }
 
 #[test]
-fn test_report_id_generation_and_no_reuse() {
-    let d = tmpdir("ids");
-    init(&d);
-
-    let out = create(&d, "One", "d");
-    assert_eq!(stdout(&out).trim(), "TR-001");
-    let out = run(&d, &["test-report", "deprecate", "TR-001"]);
-    assert!(out.status.success());
-
-    let out = create(&d, "Two", "d");
-    assert_eq!(stdout(&out).trim(), "TR-002");
-
-    let out = run(&d, &["test-report", "restore", "TR-001"]);
-    assert!(out.status.success());
-    let out = create(&d, "Three", "d");
-    assert_eq!(stdout(&out).trim(), "TR-003");
-
-    let _ = fs::remove_dir_all(&d);
-}
-
-#[test]
 fn test_report_respects_configured_prefix_padding_and_directory() {
     let d = tmpdir("config");
     init(&d);

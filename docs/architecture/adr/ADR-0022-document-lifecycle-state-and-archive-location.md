@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13.
+Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-14 by owner decision (decision 3 revision note and decision 12) without status change.
 
 ## Date
 
@@ -41,7 +41,9 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
 
    If step 2 fails the source is untouched and the command fails. If step 3 fails, both copies exist; the command reports a runtime error naming both paths, and the existing duplicate detection makes the record unreadable-for-write until a human removes one. No path in this sequence truncates or rewrites the source in place, so an interruption never loses content.
 
-3. **`archive` is idempotent in effect, accepts an active record whatever its status value, and discards the custom value.** Archiving an already-archived record is a no-op success (no write, no `updated_date` change). Archiving a record stored in the active folder while its `status` reads `archived` is a validation error naming the value and the file location, because location and main status disagree (a hand-edited file). Archiving a record that carries a custom status is the ordinary case: the patch sets `status` to `archived`, the custom value is not copied anywhere, and no separate field records it (REQ-05.007, REQ-07.001).
+3. **`archive` is idempotent in effect, accepts an active record whatever its status value, and discards the custom value.** Archiving an already-archived record is a no-op success (no write, no `updated_date` change). Archiving a record that carries a custom status is the ordinary case: the patch sets `status` to `archived`, the custom value is not copied anywhere, and no separate field records it (REQ-05.007, REQ-07.001). A record stored in the active folder while its `status` reads `archived` is not an archive-time error: it is auto-relocated to `archived/` on read per decision 12; `archive` on such a record is a no-op success once relocation has occurred.
+
+   *Revision (2026-11-14, owner decision): the archived-in-active-folder case was previously a validation error refusing writes and reporting; it is now auto-relocated on read (decision 12). The original wording is superseded by this revision; the ADR remains Accepted.*
 
 4. **`status <id> <value>` changes the front-matter value only, and never archives.** `document::status`:
    - accepts `active` or a custom status declared for that type, and rejects any other value, including `archived`, with a validation error (exit 4) that names `archive` as the only way to archive;
@@ -53,9 +55,9 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
 
 5. **There is no restore for documents.** `record::store` loses its document restore operation, every document descriptor loses the `restore` verb, and no CLI, browser, or API path can move an archived document back. Only tasks and milestones keep archive/restore, because REQ-01.005 still requires their IDs to survive an archive/restore cycle.
 
-6. **`archived/` is the only recognized inactive location.** Directory resolution gains `resolve_archived_directory`; `resolve_deprecated_directory` and every read alias for `deprecated/` are deleted. A `deprecated/` folder is therefore invisible to listing, view, search, and the browser, exactly as REQ-05.007 states, and is never migrated, moved, or rewritten. Its files remain on disk until a human moves them.
+6. **`archived/` is the only recognized inactive location.** Directory resolution gains `resolve_archived_directory`; `resolve_deprecated_directory` and every read alias for `deprecated/` are deleted. A `deprecated/` folder is therefore invisible to listing, view, search, and the browser, exactly as REQ-05.007 states, and is never migrated, moved, or rewritten. Its files remain on disk until a human moves them. Orphaned `deprecated/` folders stay inert: no inventory, listing, or migration command is provided (decision 12).
 
-7. **Delete is archive-then-unlink.** `delete` on an active document performs decision 2's archive, then removes the archived file; on an already-archived document it removes the file directly. Confirmation and `--force` are CLI concerns (REQ-05.007), not store concerns. A deleted number is not reused: allocation takes `max(number present) + 1` over active and archived locations and never recomputes, so a gap is left where a file was removed (REQ-05.007's "ID is not reused" is satisfied by never lowering the maximum already observed in the same run; the residual case of deleting the highest record is recorded as an open question).
+7. **Delete is archive-then-unlink.** `delete` on an active document performs decision 2's archive, then removes the archived file; on an already-archived document it removes the file directly. Confirmation and `--force` are CLI concerns (REQ-05.007), not store concerns. Allocation stays `max(number present) + 1` over active and archived locations and never recomputes, so a gap is left where a file was removed. Reuse of the highest deleted number when the highest-numbered record is deleted is accepted behavior and is documented; no persisted high-water mark is introduced (decision 12; ADR-0010 decision 5 unchanged).
 
 8. **Supersession is a lifecycle transition expressed the same way.** `ui-mockup supersede <old> <new>` sets the old mockup's HTML status to `archived`, records the back-reference, and moves it to `archived/`, using decision 2's sequence. It does not introduce a second archive mechanism.
 
@@ -68,6 +70,11 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
     - ADR-0012's field-map rows for milestone, release, and front-matter document types, which gain `status`.
 
     ADR-0010's layout, identity, allocation and configuration-driven path decisions, and ADR-0012's metadata, patch, adoption and serialization decisions, remain in force. Because both ADRs are `Accepted` and their bodies are frozen, a consolidation ADR that restates the layout and field-map contract without the deprecated clauses is **outstanding** and is flagged in the ADR corpus audit; until it exists, this ADR is the authoritative delta and the old clauses must not be implemented.
+
+12. **Read-path auto-relocate and settled defaults.** Owner decisions of 2026-11-14, recorded here so the ADR stays Accepted:
+    - **Auto-relocate on read.** When a read path (list, view, search, browser resolution, or any ID lookup) encounters a file in the active directory whose `status` reads `archived`, Papyrus auto-relocates that file to `archived/` using decision 2's sequence: write the destination via the ADR-0006 atomic write, then unlink the source. On success the read returns the archived record. On failure (destination write or source unlink fails) the source remains intact and the read returns a read-only record together with a validation outcome describing the failure; no source write occurs and no partial state is left. This is the only permitted write during a read path. It replaces the prior "refuse writes and report" behavior for the archived-in-active-folder case.
+    - **Deleted IDs.** Allocation stays `max(number present) + 1` over active and archived locations with no recomputation; reuse of the highest deleted number when the highest-numbered record is deleted is accepted behavior and is documented. No persisted high-water mark is introduced (ADR-0010 decision 5 unchanged).
+    - **Orphaned `deprecated/` folders.** They stay inert: not read, migrated, inventoried, or reported. No inventory command is provided; a human moves the files. Consistent with decision 6.
 
 ## Consequences
 
@@ -85,6 +92,7 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
 - Removing restore is a user-visible capability loss; it is a deliberate product decision, not an implementation gap.
 - Archive now performs a content change, so a record's bytes and `updated_date` change on archive; any test or user expectation of "move only" must change.
 - Two operations (write + unlink) are not atomic together; the residual duplicate state is handled by reporting, not by a transaction.
+- Reading a record whose `status` is `archived` but whose file is still in the active folder now writes during the read (auto-relocate); callers must tolerate a validation outcome instead of a hard error on failure.
 - A custom status is lost on archive and cannot be restored; a record that was `in-review` before archiving reads `archived` afterwards with no history. This is the owner's decision (no retained field), not an omission.
 - `status` writes are refused on a record whose stored value is no longer declared, so a configuration change can leave records needing a manual fix.
 
@@ -95,7 +103,8 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
 - *Legacy `deprecated/` visibility regression*: the requirement accepts it; the upgrade note names the folder and the manual recovery steps.
 - *Status/key drift*: the key registry is the only place `status` is declared; one test asserts the three state models and that decisions and mockups are excluded.
 - *`archive` mistaken for a custom-status transition*: `status` rejects `archived` and names `archive`, `archive` discards the custom value; two tests cover both directions.
-- *Location/status disagreement*: a file whose `status` is `archived` but which sits in the active folder is reported and its writes refused; a test covers the hand-edited case.
+- *Location/status disagreement*: a file whose `status` is `archived` but which sits in the active folder is auto-relocated on read (decision 12); a read-path write occurs and must be tested for failure handling (source intact, read-only record plus validation outcome on failure).
+- *Read-path write*: auto-relocate performs a write during a read; tests kill the process between destination write and source unlink and assert the source survives and the read returns the validation outcome.
 - *Status vocabulary shrink*: removing a value from `statuses` leaves records that read but cannot be written; the validator cannot detect it (it only sees configuration), so the diagnostics and the release note carry it.
 
 ## Alternatives Considered
@@ -114,9 +123,7 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
 
 ## Open Questions
 
-- Should a record whose `status` is `archived` but whose file is still in the active folder be auto-relocated on read (current decision: refuse writes and report), or repaired by a command?
 - Should a configuration change that removes a declared custom status be detected and reported as an inventory of affected records (read-only check), or left to the first failed write?
-- REQ-05.007 says a deleted ID is "not reused" but also that allocation is `max + 1`; deleting the highest record makes its number available again under the current allocator. A persisted high-water mark would change ADR-0010 decision 5 and needs a product decision.
 - Should `archived/` be excluded from `git` via `.gitignore` or kept under version control? Current behaviour: kept, like every other record.
 
 ## Downstream constraints
@@ -128,6 +135,8 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
 5. ADR-0010 and ADR-0012 must not be implemented where they contradict decisions 1, 2, 6, and 8 until the consolidation ADR lands.
 6. Only `archive` writes `archived`, only `supersede` writes it for mockups, and `status` rejects it; no other command may produce the value.
 7. `status` performs no move, creates no folder, and is refused on an archived record.
+8. Auto-relocate on read uses decision 2's sequence and is the only permitted write during a read path; on failure the source stays intact and the read returns a read-only record with a validation outcome.
+9. No command inventories or migrates orphaned `deprecated/` folders.
 
 ## References
 

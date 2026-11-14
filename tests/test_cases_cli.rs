@@ -190,27 +190,6 @@ fn test_case_create_requires_all_arguments() {
 }
 
 #[test]
-fn test_case_id_generation_and_no_reuse() {
-    let d = tmpdir("ids");
-    init(&d);
-
-    let out = create(&d, "One", "d");
-    assert_eq!(stdout(&out).trim(), "TC-001");
-    let out = run(&d, &["test-case", "deprecate", "TC-001"]);
-    assert!(out.status.success());
-
-    let out = create(&d, "Two", "d");
-    assert_eq!(stdout(&out).trim(), "TC-002");
-
-    let out = run(&d, &["test-case", "restore", "TC-001"]);
-    assert!(out.status.success());
-    let out = create(&d, "Three", "d");
-    assert_eq!(stdout(&out).trim(), "TC-003");
-
-    let _ = fs::remove_dir_all(&d);
-}
-
-#[test]
 fn test_case_respects_configured_prefix_padding_and_directory() {
     let d = tmpdir("config");
     init(&d);

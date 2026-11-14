@@ -211,37 +211,6 @@ fn nfreq_basic() {
 }
 
 #[test]
-fn id_not_reused() {
-    let d = tmpdir("reuse");
-    init(&d);
-    let p = d.to_str().unwrap();
-    let _ = bin()
-        .args(["--dir", p, "req", "create-group", "--title", "G"])
-        .output()
-        .unwrap();
-    let _ = bin()
-        .args(["--dir", p, "req", "create", "R", "--group", "REQ-001"])
-        .output()
-        .unwrap();
-    let _ = bin()
-        .args(["--dir", p, "req", "deprecate", "REQ-001.001"])
-        .output()
-        .unwrap();
-    // restore then create new should get .002 not .001
-    let _ = bin()
-        .args(["--dir", p, "req", "restore", "REQ-001.001"])
-        .output()
-        .unwrap();
-    let out = bin()
-        .args(["--dir", p, "req", "create", "R2", "--group", "REQ-001"])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "REQ-001.002");
-    let _ = fs::remove_dir_all(&d);
-}
-
-#[test]
 fn sanitization_rejects_bad() {
     let d = tmpdir("san");
     init(&d);

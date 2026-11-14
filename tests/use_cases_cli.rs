@@ -190,27 +190,6 @@ fn use_case_create_requires_all_arguments() {
 }
 
 #[test]
-fn use_case_id_generation_and_no_reuse() {
-    let d = tmpdir("ids");
-    init(&d);
-
-    let out = create(&d, "One", "d");
-    assert_eq!(stdout(&out).trim(), "UC-001");
-    let out = run(&d, &["use-case", "deprecate", "UC-001"]);
-    assert!(out.status.success());
-
-    let out = create(&d, "Two", "d");
-    assert_eq!(stdout(&out).trim(), "UC-002");
-
-    let out = run(&d, &["use-case", "restore", "UC-001"]);
-    assert!(out.status.success());
-    let out = create(&d, "Three", "d");
-    assert_eq!(stdout(&out).trim(), "UC-003");
-
-    let _ = fs::remove_dir_all(&d);
-}
-
-#[test]
 fn use_case_respects_configured_prefix_padding_and_directory() {
     let d = tmpdir("config");
     init(&d);

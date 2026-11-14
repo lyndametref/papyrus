@@ -75,7 +75,7 @@ pub fn is_managed_path(project_dir: &Path, path: &Path) -> bool {
 /// Resolve the descriptor of a managed record.
 ///
 /// A path is managed when it sits directly in one of the descriptor's
-/// configured read locations (active, archive, legacy alias, or deprecated)
+/// configured read locations (active, archive, or legacy alias)
 /// and its stem is a native Papyrus stem for that family. Backlog-shaped
 /// stems resolve to no descriptor and are therefore invisible.
 pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<&'static RecordDescriptor> {
@@ -252,10 +252,7 @@ pub fn migrate_content(
             new_content,
             true,
             "added-front-matter".to_string(),
-            required_keys(desc)
-                .iter()
-                .map(|k| (*k).to_string())
-                .collect(),
+            required_keys(desc),
         ));
     }
 
@@ -278,7 +275,26 @@ pub fn migrate_content(
     let mut action = "added-front-matter".to_string();
     let had_audit_type = doc.sections.iter().any(|s| s.heading == "## Audit Type");
 
+    // Seed status for release records.
+    if desc.name == "release" {
+        keys.push("status".to_string());
+        ops.push(PatchOp::SetFrontMatter("status".into(), "planned".into()));
+    }
+
+    if desc.doc_type_key.is_some() && desc.name != "audit record" && desc.name != "release" {
+        let cfg = load_cfg(ctx);
+        let status = desc
+            .doc_type_key
+            .and_then(|k| cfg.document_types.get(k))
+            .and_then(|e| e.default_status.clone())
+            .unwrap_or_else(|| "active".to_string());
+        keys.push("status".to_string());
+        ops.push(PatchOp::SetFrontMatter("status".into(), status));
+    }
+
     if desc.name == "audit record" {
+        keys.push("status".to_string());
+        ops.push(PatchOp::SetFrontMatter("status".into(), "active".into()));
         keys.push("type".to_string());
         let audit_type = doc
             .sections
@@ -473,6 +489,10 @@ fn adoption_ops(
         ));
     } else {
         let release = null_or_string(scalar_value(section_scalar(doc, "Release")));
+        ops.push(PatchOp::SetFrontMatterValue(
+            "status".into(),
+            FrontMatterValue::String("open".to_string()),
+        ));
         ops.push(PatchOp::SetFrontMatterValue("release".into(), release));
     }
 
@@ -1067,10 +1087,7 @@ fn process_file(
             });
         } else {
             let keys = match desc {
-                Some(desc) => required_keys(desc)
-                    .iter()
-                    .map(|k| (*k).to_string())
-                    .collect(),
+                Some(desc) => required_keys(desc),
                 None => Vec::new(),
             };
             entries.push(MigrationEntry {
@@ -1150,50 +1167,42 @@ fn load_cfg_for(project_dir: &Path) -> crate::config::Config {
     crate::commands::load_effective_config(&config_path, project_dir).unwrap_or_default()
 }
 
-fn required_keys(desc: &RecordDescriptor) -> &'static [&'static str] {
-    match desc.name {
-        "task" => &[
-            "id",
-            "title",
-            "created_date",
-            "updated_date",
-            "labels",
-            "references",
-            "status",
-            "assignee",
-            "milestone",
-            "dependencies",
-            "ordinal",
-            "documentation",
-            "type",
-        ],
-        "milestone" => &[
-            "id",
-            "title",
-            "created_date",
-            "updated_date",
-            "labels",
-            "references",
-            "release",
-        ],
-        "audit record" => &[
-            "id",
-            "title",
-            "created_date",
-            "updated_date",
-            "labels",
-            "references",
-            "type",
-        ],
-        _ => &[
-            "id",
-            "title",
-            "created_date",
-            "updated_date",
-            "labels",
-            "references",
-        ],
+fn required_keys(desc: &RecordDescriptor) -> Vec<String> {
+    let mut keys: Vec<String> = GENERAL_KEYS.iter().map(|s| s.to_string()).collect();
+    if desc.name == "task" {
+        keys.extend(
+            [
+                "status",
+                "assignee",
+                "milestone",
+                "dependencies",
+                "ordinal",
+                "documentation",
+                "type",
+            ]
+            .iter()
+            .map(|s| s.to_string()),
+        );
+        return keys;
     }
+    if desc.name == "milestone" {
+        keys.push("status".to_string());
+        keys.push("release".to_string());
+        return keys;
+    }
+    if desc.name == "release" {
+        keys.push("status".to_string());
+        return keys;
+    }
+    if desc.name == "audit record" {
+        keys.push("status".to_string());
+        keys.push("type".to_string());
+        return keys;
+    }
+    if desc.doc_type_key.is_some() {
+        keys.push("status".to_string());
+    }
+    keys
 }
 
 #[cfg(test)]

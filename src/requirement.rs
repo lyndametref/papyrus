@@ -139,11 +139,10 @@ pub fn create_group(
     };
 
     let active = active_dir(ctx, &cfg, kind.key())?;
-    let deprecated = deprecated_dir(ctx, &cfg, kind.key())?;
     ensure_dirs(&active)?;
-    ensure_dirs(&deprecated)?;
 
-    let next = crate::record::identity::next_number(&active, &deprecated, &entry.prefix);
+    let next =
+        crate::record::identity::next_number(&active, &active.join("archived"), &entry.prefix);
     let id =
         crate::record::identity::format_id(&entry.prefix, next as i64, cfg.id_padding as usize);
 
@@ -281,7 +280,8 @@ pub fn create(
         )));
     }
 
-    let next_seq = crate::record::identity::next_seq_number(&active, &deprecated, &group_id);
+    let next_seq =
+        crate::record::identity::next_seq_number(&active, &active.join("archived"), &group_id);
     let req_id =
         crate::record::identity::format_seq_id(&group_id, next_seq as i64, cfg.id_padding as usize);
 

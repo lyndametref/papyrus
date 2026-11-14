@@ -228,11 +228,10 @@ pub fn create(
     }
 
     let active = active_dir(ctx, &cfg)?;
-    let deprecated = deprecated_dir(ctx, &cfg)?;
     ensure_dirs(&active)?;
-    ensure_dirs(&deprecated)?;
 
-    let next = crate::record::identity::next_number(&active, &deprecated, &entry.prefix);
+    let next =
+        crate::record::identity::next_number(&active, &active.join("archived"), &entry.prefix);
     let id =
         crate::record::identity::format_id(&entry.prefix, next as i64, cfg.id_padding as usize);
 
