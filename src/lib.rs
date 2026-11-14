@@ -11,6 +11,7 @@ pub mod init;
 pub mod milestone;
 pub mod nfreq;
 pub mod record;
+pub mod registry;
 pub mod release;
 pub mod req;
 pub mod requirement;

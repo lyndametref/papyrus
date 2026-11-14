@@ -26,6 +26,15 @@ pub struct DocTypeEntry {
     pub prefix: String,
     pub directory: String,
     pub enabled: bool,
+    /// Custom document statuses, in declared order (REQ-07.001).
+    ///
+    /// `None` means the entry declares no status list; `Some(vec![])` is an
+    /// explicit empty declaration and stays distinguishable from an absent one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub statuses: Option<Vec<String>>,
+    /// Initial status of a new record; falls back to `active` (REQ-07.001).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_status: Option<String>,
 }
 
 impl Default for DocTypeEntry {
@@ -34,6 +43,8 @@ impl Default for DocTypeEntry {
             prefix: String::new(),
             directory: String::new(),
             enabled: true,
+            statuses: None,
+            default_status: None,
         }
     }
 }
@@ -100,6 +111,8 @@ impl Default for Config {
                     prefix: p.to_string(),
                     directory: d.to_string(),
                     enabled: true,
+                    statuses: None,
+                    default_status: None,
                 },
             );
         }
@@ -651,5 +664,100 @@ mod tests {
         merge_yaml(&mut base, &root);
         let cfg: Config = yaml_serde::from_value(base).unwrap();
         assert_eq!(cfg.task_prefix, "PAP");
+    }
+
+    #[test]
+    fn doc_type_entry_without_status_fields_deserializes() {
+        let entry: DocTypeEntry = yaml_serde::from_str(
+            "prefix: DEP\ndirectory: architecture/deployment/\nenabled: true\n",
+        )
+        .unwrap();
+        assert_eq!(entry.prefix, "DEP");
+        assert_eq!(entry.directory, "architecture/deployment/");
+        assert!(entry.enabled);
+        assert_eq!(entry.statuses, None);
+        assert_eq!(entry.default_status, None);
+    }
+
+    #[test]
+    fn doc_type_entry_deserializes_statuses_and_default_status() {
+        let entry: DocTypeEntry = yaml_serde::from_str(
+            "prefix: REQ\ndirectory: requirements/business/\nenabled: true\nstatuses:\n  - active\n  - archived\n  - review\ndefault_status: review\n",
+        )
+        .unwrap();
+        assert_eq!(
+            entry.statuses,
+            Some(vec![
+                "active".to_string(),
+                "archived".to_string(),
+                "review".to_string()
+            ])
+        );
+        assert_eq!(entry.default_status, Some("review".to_string()));
+    }
+
+    #[test]
+    fn status_declaration_order_is_preserved() {
+        let entry: DocTypeEntry =
+            yaml_serde::from_str("statuses:\n  - active\n  - review\n  - archived\n  - draft\n")
+                .unwrap();
+        assert_eq!(
+            entry.statuses,
+            Some(vec![
+                "active".to_string(),
+                "review".to_string(),
+                "archived".to_string(),
+                "draft".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn empty_status_list_deserializes_as_some_empty() {
+        let entry: DocTypeEntry = yaml_serde::from_str("statuses: []\n").unwrap();
+        assert_eq!(entry.statuses, Some(Vec::new()));
+    }
+
+    #[test]
+    fn absent_status_fields_are_omitted_on_serialization() {
+        let entry = DocTypeEntry {
+            prefix: "DEP".to_string(),
+            directory: "architecture/deployment/".to_string(),
+            enabled: true,
+            statuses: None,
+            default_status: None,
+        };
+        let value = serde_json::to_value(&entry).unwrap();
+        let object = value.as_object().unwrap();
+        assert!(!object.contains_key("statuses"));
+        assert!(!object.contains_key("default_status"));
+
+        let yaml = yaml_serde::to_value(&entry).unwrap();
+        let yaml_serde::Value::Mapping(mapping) = yaml else {
+            panic!("expected a mapping");
+        };
+        assert!(!mapping.contains_key(yaml_serde::Value::String("statuses".to_string())));
+        assert!(!mapping.contains_key(yaml_serde::Value::String("default_status".to_string())));
+    }
+
+    #[test]
+    fn existing_configuration_files_still_load() {
+        let cfg: Config = yaml_serde::from_str(
+            "document_types:\n  deploy:\n    prefix: DEP\n    directory: architecture/deployment/\n    enabled: false\n",
+        )
+        .unwrap();
+        let deploy = cfg.document_types.get("deploy").expect("deploy entry");
+        assert_eq!(deploy.prefix, "DEP");
+        assert_eq!(deploy.directory, "architecture/deployment/");
+        assert!(!deploy.enabled);
+        assert_eq!(deploy.statuses, None);
+        assert_eq!(deploy.default_status, None);
+
+        // The top-level task `statuses` keys are unaffected; only the document
+        // entry must stay free of the new status keys.
+        let value = serde_json::to_value(&cfg).unwrap();
+        let deploy = value["document_types"]["deploy"].as_object().unwrap();
+        assert!(!deploy.contains_key("statuses"));
+        assert!(!deploy.contains_key("default_status"));
     }
 }

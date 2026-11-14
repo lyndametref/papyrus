@@ -1,11 +1,11 @@
 ---
 id: TASK-108
-title: Replace static document commands with registry-derived dispatch
+title: Replace static document and decision commands with registry-derived dispatch
 status: To Do
 assignee:
   - rust-dev
 created_date: '2026-11-13T21:25:00Z'
-updated_date: '2026-11-13T21:25:00Z'
+updated_date: '2026-11-13T22:00:00Z'
 labels:
   - rust
 milestone: m-17
@@ -15,6 +15,10 @@ dependencies:
 documentation:
   - docs/architecture/adr/ADR-0016-runtime-config-derived-command-dispatch.md
   - docs/requirements/business/REQ-07.003.md
+  - >-
+    docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md
+  - docs/requirements/business/REQ-04.002.md
+  - docs/architecture/adr/ADR-0023-consolidated-record-layout-and-field-map.md
 priority: high
 ordinal: 41030
 ---
@@ -23,6 +27,8 @@ ordinal: 41030
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
 `src/lib.rs` compiles twenty subcommands, including eleven document-type variants and the `nfreq` alias, and each type owns a clap enum and match arm. REQ-07.003 requires the command tree to come from the effective configuration at startup: a new `document_types` entry must expose `papyrus <slug>` and a help line with no rebuild, an unknown or disabled slug must exit 2, and built-in names must never be shadowed. ADR-0016 also requires the parser to use the project exit codes and JSON errors instead of clap's exiting parser. This task performs the single cutover of the command surface, so the static commands and `nfreq` cannot coexist with the dynamic ones.
+
+The cutover also removes the one static verb that contradicts a validated requirement: `papyrus decision archive` (REQ-04.002) and its `DecisionCmd::Archive` variant, dispatch arm, and now-unreachable handler. Decisions have no archive command or archive state and no archive policy (ADR-0017, ADR-0023 decision 3), so leaving the command would keep the registry and the CLI in disagreement. The document and decision command surface, dispatch, handler removal, and CLI tests belong to this task; the BR-008 and README wording corrections belong to TASK-115 and TASK-116.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -35,4 +41,5 @@ ordinal: 41030
 - [ ] #6 The eleven static document variants, their per-type clap enums and dispatch arms, and the nfreq alias are deleted; req and nfr keep working only because they are default document_types entries.
 - [ ] #7 A configuration whose slug equals a built-in name is rejected before the tree is built; cli::tree never inserts a colliding command.
 - [ ] #8 Table-driven characterization tests cover every built-in command's documented options, the generated help for a fixed config, the exit-2 paths, and the document invocation parsing.
+- [ ] #9 DecisionCmd::Archive, its dispatch arm, and the now-unreachable decision archive handler are deleted; papyrus decision archive <id> exits 2 as an unknown subcommand for adr and bdr, and the table-driven tests assert the command is absent while decision create, list, view, and edit still work.
 <!-- AC:END -->

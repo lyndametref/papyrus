@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - business-analyst
 created_date: '2026-11-13T21:26:00Z'
-updated_date: '2026-11-13T21:29:00Z'
+updated_date: '2026-11-13T21:59:00Z'
 labels:
   - docs
   - requirements
@@ -21,6 +21,7 @@ dependencies:
 documentation:
   - docs/requirements/business/REQ-07.001.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
+  - docs/requirements/business/REQ-04.002.md
 priority: high
 ordinal: 41090
 ---
@@ -39,4 +40,17 @@ The business-rule pages still describe a fixed per-type command set, the `nfreq`
 - [ ] #4 BR-016 documents document_types keyed by slug, prefix/directory/enabled/statuses/default_status, whole-map semantics, list-valued statuses, case-insensitive built-in collision rejection, prefix and directory uniqueness, fail-closed validation, and the two repair surfaces.
 - [ ] #5 Every updated rule distinguishes the document main statuses active/archived from custom front-matter statuses, states that archive is the only way to archive and there is no restore, keeps decision statuses separate, and keeps milestone/release lifecycles fixed.
 - [ ] #6 No rule retains deprecate, restore-for-documents, deploy as a default, or a static per-type command table; rule indexes and cross-references resolve.
+- [ ] #7 BR-008 states that decisions have no archive command and no archive state; the archive command line and description are removed, matching REQ-04.002.
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-13T21:59:00Z
+
+---
+
+Scope addition from TASK-105 refinement Q2: TASK-108 removes the `papyrus decision archive` CLI surface; this task removes the matching BR-008 documentation so the rule and the command set agree with REQ-04.002.
+
+---
+<!-- COMMENTS:END -->
