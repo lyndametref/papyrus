@@ -142,28 +142,34 @@ impl Default for Config {
         );
 
         let mut document_types = BTreeMap::new();
+        // `has_status` marks the front-matter-backed types that declare the
+        // seeded status vocabulary. `ui-mockup` has no front-matter status, so
+        // a `statuses` key on it is invalid configuration (REQ-05.008).
         let docs = [
-            ("req", "REQ", "requirements/business/"),
-            ("nfr", "NFR", "requirements/non-functional/"),
-            ("glossary", "GLO", "glossary/"),
-            ("rule", "RUL", "business-rules/"),
-            ("ui-spec", "UI", "specifications/ui/"),
-            ("ui-mockup", "MOCK", "specifications/ui/mockups/"),
-            ("audit", "AUD", "audit-records/"),
-            ("deploy", "DEP", "architecture/deployment/"),
-            ("tech-spec", "TECH", "technical/"),
-            ("use-case", "UC", "use-cases/"),
-            ("test-case", "TC", "test-cases/"),
-            ("test-report", "TR", "test-reports/"),
+            ("req", "REQ", "requirements/business/", true),
+            ("nfr", "NFR", "requirements/non-functional/", true),
+            ("glossary", "GLO", "glossary/", true),
+            ("rule", "RUL", "business-rules/", true),
+            ("ui-spec", "UI", "specifications/ui/", true),
+            ("ui-mockup", "MOCK", "specifications/ui/mockups/", false),
+            ("audit", "AUD", "audit-records/", true),
+            ("tech-spec", "TECH", "technical/", true),
+            ("use-case", "UC", "use-cases/", true),
+            ("test-case", "TC", "test-cases/", true),
+            ("test-report", "TR", "test-reports/", true),
         ];
-        for (k, p, d) in docs {
+        for (k, p, d, has_status) in docs {
             document_types.insert(
                 k.to_string(),
                 DocTypeEntry {
                     prefix: p.to_string(),
                     directory: d.to_string(),
                     enabled: true,
-                    statuses: None,
+                    statuses: if has_status {
+                        Some(vec!["active".to_string(), "archived".to_string()])
+                    } else {
+                        None
+                    },
                     default_status: None,
                 },
             );
@@ -1504,6 +1510,18 @@ mod tests {
     }
 
     #[test]
+    fn absent_document_types_key_yields_the_same_default_set() {
+        let project = TempProject::new("default-map");
+        project.write_config("project_name: Test\n");
+        let cfg = load_effective_config(&project.config_path(), project.path()).unwrap();
+        assert_eq!(cfg.document_types, Config::default().document_types);
+        assert_eq!(
+            cfg.document_types["req"].statuses,
+            Some(vec!["active".to_string(), "archived".to_string()])
+        );
+    }
+
+    #[test]
     fn strict_load_validates_while_tolerant_load_does_not() {
         let project = TempProject::new("strict-tolerant");
         project.write_config(
@@ -1523,7 +1541,7 @@ mod tests {
         let project = TempProject::new("config-set");
         let ctx = project.context();
 
-        config_set(&ctx, "document_types.deploy.enabled", "false").unwrap();
+        config_set(&ctx, "document_types.glossary.enabled", "false").unwrap();
         let value: yaml_serde::Value =
             yaml_serde::from_str(&project.read_config()).expect("parse written config");
         let document_types = yaml_get(&value, "document_types").unwrap();
@@ -1532,13 +1550,14 @@ mod tests {
         };
         assert_eq!(mapping.len(), Config::default().document_types.len());
         assert!(yaml_get(&value, "document_types.req").is_some());
+        assert!(yaml_get(&value, "document_types.deploy").is_none());
         assert!(matches!(
-            yaml_get(&value, "document_types.deploy.enabled"),
+            yaml_get(&value, "document_types.glossary.enabled"),
             Some(yaml_serde::Value::Bool(false))
         ));
 
         let before = project.read_config();
-        let err = config_set(&ctx, "document_types.deploy.prefix", "REQ")
+        let err = config_set(&ctx, "document_types.glossary.prefix", "REQ")
             .err()
             .expect("config set must refuse an invalid result");
         assert!(matches!(err, AppError::Validation(_)), "{:?}", err);
@@ -1591,8 +1610,24 @@ mod tests {
 
         let config = load_effective_config(&project.config_path(), project.path()).unwrap();
         assert_eq!(config.project_name.as_deref(), Some("repair"));
-        assert!(config.document_types.contains_key("deploy"));
+        assert!(!config.document_types.contains_key("deploy"));
         assert!(!config.document_types.contains_key("bad slug"));
+        for slug in [
+            "req",
+            "nfr",
+            "glossary",
+            "rule",
+            "ui-spec",
+            "ui-mockup",
+            "audit",
+            "tech-spec",
+            "use-case",
+            "test-case",
+            "test-report",
+        ] {
+            assert!(config.document_types.contains_key(slug), "missing {}", slug);
+        }
+        assert!(config.validate(Some(project.path())).is_ok());
     }
 
     #[test]
@@ -1738,9 +1773,7 @@ mod tests {
 
     #[test]
     fn flattened_renders_document_status_lists_in_flow_form() {
-        let mut config = Config::default();
-        config.document_types.get_mut("audit").unwrap().statuses =
-            Some(vec!["active".to_string(), "archived".to_string()]);
+        let config = Config::default();
         let flattened: BTreeMap<String, String> = config
             .flattened(Path::new("/project"))
             .into_iter()
@@ -1751,9 +1784,15 @@ mod tests {
                 .map(String::as_str),
             Some("[active, archived]")
         );
+        assert_eq!(
+            flattened
+                .get("document_types.req.statuses")
+                .map(String::as_str),
+            Some("[active, archived]")
+        );
         assert!(
-            !flattened.contains_key("document_types.req.statuses"),
-            "entries without a declaration must not gain a statuses line"
+            !flattened.contains_key("document_types.ui-mockup.statuses"),
+            "ui-mockup declares no status list"
         );
         assert_eq!(
             flattened.get("statuses").map(String::as_str),

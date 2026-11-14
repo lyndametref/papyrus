@@ -659,8 +659,32 @@ mod tests {
         }
     }
 
+    fn test_config() -> Config {
+        // The generic-handler suite exercises `deploy`, which is no longer a
+        // default document type; declare it explicitly as a user-defined type.
+        let mut cfg = Config {
+            project_name: Some("Test".to_string()),
+            ..Config::default()
+        };
+        cfg.document_types.insert(
+            "deploy".to_string(),
+            crate::config::DocTypeEntry {
+                prefix: "DEP".to_string(),
+                directory: "architecture/deployment/".to_string(),
+                enabled: true,
+                statuses: Some(vec!["active".to_string(), "archived".to_string()]),
+                default_status: None,
+            },
+        );
+        cfg
+    }
+
     fn default_config(dir: &std::path::Path) {
-        fs::write(dir.join("papyrus.config.yml"), "project_name: Test\n").unwrap();
+        fs::write(
+            dir.join("papyrus.config.yml"),
+            yaml_serde::to_string(&test_config()).unwrap(),
+        )
+        .unwrap();
     }
 
     fn custom_config(dir: &std::path::Path) {
@@ -738,6 +762,21 @@ mod tests {
         }
         assert!(content.contains("## Description"));
         assert!(content.contains("desc"));
+    }
+
+    #[test]
+    fn explicitly_declared_deploy_is_valid_and_dispatched() {
+        let dir = tmpdir("declareddeploy");
+        default_config(&dir);
+        let c = ctx(&dir);
+        let cfg = load_config(&c).unwrap();
+        assert!(cfg.validate(Some(&dir)).is_ok());
+        let reg = registry(&c);
+        let deploy = reg
+            .descriptor("deploy")
+            .expect("declared deploy descriptor");
+        assert_eq!(deploy.prefix, "DEP");
+        assert_eq!(deploy.directory.relative, "architecture/deployment/");
     }
 
     #[test]
@@ -1635,10 +1674,13 @@ mod tests {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
-        let mut cfg = "project_name: Test\neditor: ".to_string();
-        cfg.push_str(script.to_str().unwrap());
-        cfg.push('\n');
-        std::fs::write(dir.join("papyrus.config.yml"), cfg).unwrap();
+        let mut cfg = test_config();
+        cfg.editor = Some(script.to_str().unwrap().to_string());
+        std::fs::write(
+            dir.join("papyrus.config.yml"),
+            yaml_serde::to_string(&cfg).unwrap(),
+        )
+        .unwrap();
         let c = ctx(&dir);
         let reg = registry(&c);
         run(

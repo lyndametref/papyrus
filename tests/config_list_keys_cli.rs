@@ -195,9 +195,15 @@ fn set_document_statuses_preserves_entry_fields() {
         "{}",
         list
     );
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.req.statuses"])
+            .trim(),
+        "[active, archived]"
+    );
     assert!(
-        !list.contains("document_types.req.statuses"),
-        "entries without a declaration must not gain a statuses line: {}",
+        !list.contains("document_types.ui-mockup.statuses"),
+        "ui-mockup declares no status list: {}",
         list
     );
 

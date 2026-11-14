@@ -64,6 +64,118 @@ fn init_creates_config() {
 }
 
 #[test]
+fn init_writes_the_eleven_document_types_with_seeded_flow_statuses() {
+    let d = tmpdir("init-defaults");
+    let out = bin()
+        .args(["--dir", d.to_str().unwrap(), "init", "Proj", "--no-git"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let cfg = fs::read_to_string(d.join("papyrus.config.yml")).unwrap();
+    for slug in [
+        "req",
+        "nfr",
+        "glossary",
+        "rule",
+        "ui-spec",
+        "ui-mockup",
+        "audit",
+        "tech-spec",
+        "use-case",
+        "test-case",
+        "test-report",
+    ] {
+        assert!(cfg.contains(&format!("\n  {}:\n", slug)), "{}", cfg);
+    }
+    assert!(!cfg.contains("\n  deploy:\n"), "{}", cfg);
+    assert_eq!(
+        cfg.matches("statuses: [active, archived]").count(),
+        10,
+        "{}",
+        cfg
+    );
+    assert!(!cfg.contains("    default_status"), "{}", cfg);
+
+    let get = bin()
+        .args([
+            "--dir",
+            d.to_str().unwrap(),
+            "config",
+            "get",
+            "document_types.req.statuses",
+        ])
+        .output()
+        .unwrap();
+    assert!(get.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&get.stdout).trim(),
+        "[active, archived]"
+    );
+
+    let list = bin()
+        .args(["--dir", d.to_str().unwrap(), "config", "list"])
+        .output()
+        .unwrap();
+    assert!(list.status.success());
+    let listed = String::from_utf8_lossy(&list.stdout);
+    assert!(
+        listed.contains("document_types.ui-mockup.prefix:"),
+        "{}",
+        listed
+    );
+    assert!(
+        !listed.contains("document_types.ui-mockup.statuses:"),
+        "{}",
+        listed
+    );
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn init_force_repairs_an_invalid_configuration() {
+    let d = tmpdir("init-force-repair");
+    fs::write(
+        d.join("papyrus.config.yml"),
+        "document_types:\n  \"bad slug\":\n    prefix: BAD\n    directory: bad/\n",
+    )
+    .unwrap();
+    let out = bin()
+        .args([
+            "--dir",
+            d.to_str().unwrap(),
+            "init",
+            "Repair",
+            "--no-git",
+            "--force",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let cfg = fs::read_to_string(d.join("papyrus.config.yml")).unwrap();
+    assert!(!cfg.contains("bad slug"), "{}", cfg);
+    assert!(cfg.contains("\n  req:\n"), "{}", cfg);
+
+    let list = bin()
+        .args(["--dir", d.to_str().unwrap(), "config", "list"])
+        .output()
+        .unwrap();
+    assert!(
+        list.status.success(),
+        "{}",
+        String::from_utf8_lossy(&list.stderr)
+    );
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
 fn init_no_git_skips_git() {
     let d = tmpdir("nogit");
     let out = bin()
@@ -100,11 +212,16 @@ fn init_existing_config_without_force_exits_four() {
         .args(["--dir", d.to_str().unwrap(), "init", "Proj", "--no-git"])
         .output()
         .unwrap();
+    let before = fs::read_to_string(d.join("papyrus.config.yml")).unwrap();
     let out = bin()
         .args(["--dir", d.to_str().unwrap(), "init", "Proj2"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(4));
+    assert_eq!(
+        fs::read_to_string(d.join("papyrus.config.yml")).unwrap(),
+        before
+    );
     let _ = fs::remove_dir_all(&d);
 }
 

@@ -4155,7 +4155,6 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
         "ui-spec",
         "ui-mockup",
         "audit",
-        "deploy",
         "tech-spec",
         "use-case",
         "test-case",

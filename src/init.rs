@@ -18,7 +18,7 @@ const CORE_ARTIFACTS: [&str; 3] = ["task", "milestone", "release"];
 /// Decision types in configuration key order.
 const DECISION_ARTIFACTS: [&str; 2] = ["adr", "bdr"];
 /// Document types in schema (configuration declaration) order.
-const DOCUMENT_ARTIFACTS: [&str; 12] = [
+const DOCUMENT_ARTIFACTS: [&str; 11] = [
     "req",
     "nfr",
     "glossary",
@@ -26,7 +26,6 @@ const DOCUMENT_ARTIFACTS: [&str; 12] = [
     "ui-spec",
     "ui-mockup",
     "audit",
-    "deploy",
     "tech-spec",
     "use-case",
     "test-case",
@@ -441,8 +440,10 @@ pub fn run_init_with_io<R: BufRead, W: Write>(
         }
     }
 
-    // Write config file (full replace under --force or when absent).
-    let yaml = yaml_serde::to_string(&config).map_err(|e| AppError::Runtime(e.to_string()))?;
+    // Write config file (full replace under --force or when absent). Lists are
+    // rendered as flow sequences by the shared config renderer (ADR-0024).
+    let value = yaml_serde::to_value(&config).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let yaml = crate::config::to_config_yaml(&value).map_err(AppError::Runtime)?;
     fs::write(&config_path, yaml.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     // Git init unless suppressed.
@@ -797,7 +798,6 @@ mod tests {
             "ui-spec",
             "ui-mockup",
             "audit",
-            "deploy",
             "tech-spec",
             "use-case",
             "test-case",
@@ -813,6 +813,96 @@ mod tests {
             assert!(position >= offset);
             offset = position + needle.len();
         }
+    }
+
+    #[test]
+    fn selectable_document_types_are_the_eleven_defaults_without_deploy() {
+        assert_eq!(DOCUMENT_ARTIFACTS.len(), 11);
+        assert_eq!(SELECTABLE_ARTIFACT_COUNT, 13);
+        assert!(!DOCUMENT_ARTIFACTS.contains(&"deploy"));
+        let mut output = Vec::new();
+        list().render(&mut output).unwrap();
+        let output = String::from_utf8(output).unwrap();
+        assert!(!output.contains("deploy"), "{}", output);
+    }
+
+    fn tmpdir(name: &str) -> PathBuf {
+        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join(format!("init-{}", name));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        base
+    }
+
+    #[test]
+    fn non_interactive_init_writes_the_eleven_types_and_flow_statuses() {
+        let dir = tmpdir("generated");
+        let opts = InitOptions {
+            name: "Proj".to_string(),
+            no_git: true,
+            force: false,
+        };
+        let mut reader = Cursor::new(Vec::new());
+        let mut writer = Vec::new();
+        run_init_with_io(dir.clone(), opts, false, &mut reader, &mut writer).unwrap();
+
+        let raw = fs::read_to_string(dir.join("papyrus.config.yml")).unwrap();
+        for slug in [
+            "req",
+            "nfr",
+            "glossary",
+            "rule",
+            "ui-spec",
+            "ui-mockup",
+            "audit",
+            "tech-spec",
+            "use-case",
+            "test-case",
+            "test-report",
+        ] {
+            assert!(raw.contains(&format!("\n  {}:\n", slug)), "{}", raw);
+        }
+        assert!(!raw.contains("\n  deploy:\n"), "{}", raw);
+        assert_eq!(
+            raw.matches("statuses: [active, archived]").count(),
+            10,
+            "{}",
+            raw
+        );
+        assert!(!raw.contains("    default_status"), "{}", raw);
+
+        let config: Config = yaml_serde::from_str(&raw).unwrap();
+        assert_eq!(config.document_types["ui-mockup"].statuses, None);
+        config.validate(Some(&dir)).unwrap();
+    }
+
+    #[test]
+    fn walkthrough_disabling_a_document_type_keeps_its_seeded_shape() {
+        // Cursor: adr -> bdr -> req.
+        let (_, (decisions, documents)) =
+            run_scripted(vec![Key::Down, Key::Down, Key::Toggle, Key::Enter]);
+        let mut reader = Cursor::new(vec![b'\n'; 40]);
+        let mut writer = Vec::new();
+        let config = build_config_with_activation(
+            "Proj".into(),
+            &mut reader,
+            &mut writer,
+            decisions,
+            documents,
+        )
+        .unwrap();
+
+        let req = &config.document_types["req"];
+        assert!(!req.enabled);
+        assert_eq!(req.prefix, "REQ");
+        assert_eq!(req.directory, "requirements/business/");
+        assert_eq!(
+            req.statuses,
+            Some(vec!["active".to_string(), "archived".to_string()])
+        );
+        assert_eq!(req.default_status, None);
+        assert!(config.validate(None).is_ok());
     }
 
     #[test]

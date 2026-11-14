@@ -1,6 +1,6 @@
 # Feature Specification — Interactive Init Walkthrough for Artifact Activation
 
-**Ticket:** TASK-75 / TASK-85 (spec revision) / TASK-104 (cursor-driven list revision)
+**Ticket:** TASK-75 / TASK-85 (spec revision) / TASK-104 (cursor-driven list revision) / TASK-112 (default-set and status-seeding revision)
 **Milestone:** m-12 (Final Cross-Type Integration)
 **Status:** Refined (execution-ready)
 **UI mockups:** none
@@ -11,6 +11,8 @@ Deliver the interactive walkthrough at `papyrus init <project_name>` required by
 
 This specification was revised (TASK-85) so that the walkthrough matches REQ-01.006: a single artifact list with task, milestone, and release always active; per-activated-artifact prefix/folder prompts; shared roots prompted once; defaults in brackets; validation hints naming the default equivalent; inactive types written with `enabled: false`; and TTY-only execution with no new flag or environment variable. It was revised again (TASK-104) to fix the presentation contract: the list is cursor-driven (one highlighted selectable row, Up/Down and `k`/`j` navigation, Space toggle, Enter confirm, redraw on every keypress, clamped navigation, core rows never highlighted, typed token input rejected, end of input confirming and continuing) and the offered document-type set includes `use-case`, `test-case`, and `test-report`.
 
+It was revised again (TASK-112) so that the offered document-type set is exactly the eleven-entry default set of REQ-07.002 — `req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`, with `deploy` removed — and so that the generated configuration seeds the document status model: `statuses: [active, archived]` for every front-matter-backed document type, no `statuses` for `ui-mockup`, and no `default_status` on any entry.
+
 ## Scope
 
 ### In scope
@@ -19,7 +21,7 @@ This specification was revised (TASK-85) so that the walkthrough matches REQ-01.
 - Presentation of all available artifacts as a single cursor-driven list:
   - Core artifacts (always active, shown as such, never highlighted or toggled): task, milestone, release.
   - Selectable decision types: `adr`, `bdr`.
-  - Selectable document types: `req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `deploy`, `tech-spec`, `use-case`, `test-case`, `test-report`.
+  - Selectable document types: `req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`.
 - Keyboard navigation of the list (Up/Down, `k`/`j`), Space toggle of the highlighted row, Enter confirm, redraw on every keypress, clamped navigation, and end-of-input confirmation.
 - Per-activated-artifact ID prefix prompting with defaults and validation.
 - Storage folder prompting for shared roots and per-document-type directories, for activated artifacts only.
@@ -59,7 +61,7 @@ This specification was revised (TASK-85) so that the walkthrough matches REQ-01.
 7. The whole list is redrawn after every keypress so the cursor position and every row's `[x]`/`[ ]` state are always visible; no keypress is acknowledged by silent re-prompting.
 8. End of input on the list (for example closed `stdin` or Ctrl-D) confirms the current state and continues with the remaining prompts, so the walkthrough never waits on closed input.
 9. The list accepts no typed artifact tokens: there is no prompt that reads artifact names from a text line, and characters other than Space, `k`, `j`, and Enter have no effect on activation (they may be ignored, or cause a redraw only).
-10. The offered artifact set is task, milestone, release, the decision types (`adr`, `bdr`), and the document types defined in the configuration schema (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `deploy`, `tech-spec`, `use-case`, `test-case`, `test-report`).
+10. The offered artifact set is task, milestone, release, the decision types (`adr`, `bdr`), and the eleven default document types of REQ-07.002 (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`). `deploy` is not offered; it remains available only as a user-added document type declared in configuration after init.
 11. The schema defaults are the default selections (all artifacts active).
 12. Rows are listed in the configuration key order (core rows first, then decision types, then document types in schema order).
 
@@ -87,6 +89,8 @@ This specification was revised (TASK-85) so that the walkthrough matches REQ-01.
 1. The walkthrough builds a `Config` with `project_name` set to the sanitized name and `id_padding` 3 (default), then applies the collected prefixes, folders, and `enabled` flags.
 2. Before writing, `Config::validate()` is called; a validation failure aborts `init` with exit code 4 and writes no configuration file.
 3. The YAML is serialized and written to `papyrus.config.yml`: if the file already exists and `--force` is absent, `init` fails with a conflict (exit code 4) and writes nothing; under `--force` the existing file is replaced in full, with no value from the previous file kept. `--force` never overwrites any other pre-existing file (REQ-01.001).
+4. Every default document type backed by front matter is written with `statuses: [active, archived]` in declared order; `ui-mockup` is written with no `statuses` key (its state lives in HTML metadata, REQ-05.008); no entry is written with `default_status`, so a new record starts at the effective default `active`.
+5. Deactivating a document type in the list writes `enabled: false` and keeps the entry's prefix, directory, and seeded status list; it removes the type from management without touching existing files.
 
 ### 6. Directory creation
 
@@ -133,6 +137,8 @@ This specification was revised (TASK-85) so that the walkthrough matches REQ-01.
 - Assumption: Interactive detection uses `stdin` TTY status (`std::io::IsTerminal`); no new flags or environment variables are introduced.
 - Assumption: Defaults activate every artifact with built-in prefixes/folders and `id_padding` 3.
 - Assumption: Prompt text and row ordering are implementation-defined beyond the artifact set and key order, but the artifact set and defaults follow `Config::default()`.
+- Assumption: `Config::default()` is the single source of the default set, so it seeds the same eleven document types and the same status lists that `init` writes; when `document_types` is absent from a configuration file, the loader's whole-map default (ADR-0019 decision 8) supplies these seeded statuses too.
+- Assumption: Only `ui-mockup` omits `statuses`; every other default document type is front-matter-backed and seeds `[active, archived]`.
 - Assumption: No UI mockups are required (CLI-only ticket).
 - Assumption: README/manpage init section and BR-002 are updated to describe the walkthrough; BR-016 and the enabled-flag model are unchanged.
 - Assumption: The cursor-driven list replaces the earlier per-artifact `Activate? [Y/n]` prompts and the interim typed-token toggle line (REQ-01.006); only the prefix/folder prompts remain line-based.
