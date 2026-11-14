@@ -442,6 +442,39 @@ pub fn descriptor_for_doc_type(key: &str) -> Option<&'static RecordDescriptor> {
         .find(|descriptor| descriptor.doc_type_key == Some(key))
 }
 
+use std::collections::BTreeMap;
+use std::sync::{Mutex, OnceLock};
+
+static GENERIC_DESC_CACHE: OnceLock<Mutex<BTreeMap<String, &'static RecordDescriptor>>> =
+    OnceLock::new();
+
+/// Build (and cache) a runtime [`RecordDescriptor`] for a config-defined
+/// (generic) document type. The slug is leaked to satisfy the `'static`
+/// lifetime required by the record layer; the real directory, prefix, and
+/// status vocabulary are resolved through `doc_type_key`.
+pub fn generic_document_descriptor(slug: &str) -> &'static RecordDescriptor {
+    let cache = GENERIC_DESC_CACHE.get_or_init(|| Mutex::new(BTreeMap::new()));
+    let mut map = cache.lock().expect("generic descriptor cache poisoned");
+    if let Some(existing) = map.get(slug) {
+        return existing;
+    }
+    let slug_static: &'static str = Box::leak(slug.to_string().into_boxed_str());
+    let descriptor = Box::leak(Box::new(RecordDescriptor {
+        name: slug_static,
+        record_type: "document",
+        type_name: "document",
+        label: slug_static,
+        display_id_pattern: "GEN-###",
+        directory: "doc",
+        subpath: "",
+        doc_type_key: Some(slug_static),
+        frontmatter_keys: &["status"],
+        sections: &["## Description"],
+    }));
+    map.insert(slug.to_string(), descriptor);
+    descriptor
+}
+
 pub fn is_managed_record(name: &str) -> bool {
     descriptor_for(name).is_some()
 }
