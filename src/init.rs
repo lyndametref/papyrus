@@ -404,7 +404,9 @@ pub fn run_init_with_io<R: BufRead, W: Write>(
     };
 
     // Validate before writing.
-    config.validate().map_err(AppError::Validation)?;
+    config
+        .validate(Some(&project_dir))
+        .map_err(AppError::Validation)?;
 
     // Create directories through the shared record descriptors so the layout
     // has one source of truth. Directory creation follows activation.

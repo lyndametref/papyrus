@@ -2026,7 +2026,7 @@ fn id_padding_config_file_load_is_rejected() {
         let out = bin()
             .arg("--dir")
             .arg(&dir)
-            .args(["config", "list"])
+            .args(["task", "list"])
             .output()
             .unwrap();
         assert_eq!(out.status.code(), Some(4), "id_padding={}", value);

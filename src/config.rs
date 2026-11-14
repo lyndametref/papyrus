@@ -191,57 +191,144 @@ impl Config {
                 && key.split('.').count() == 3)
     }
 
-    pub fn validate(&self) -> Result<(), String> {
-        if !(1..=6).contains(&self.id_padding) {
-            return Err("id_padding: must be between 1 and 6".to_string());
-        }
-        // uniqueness of statuses
-        let mut seen = std::collections::HashSet::new();
-        for s in &self.statuses {
-            if !seen.insert(s.clone()) {
-                return Err(format!("duplicate status: {}", s));
-            }
-        }
-        if !self.statuses.contains(&self.default_status) {
-            return Err(format!(
-                "default_status '{}' is not one of the configured statuses",
-                self.default_status
-            ));
-        }
-        if self.statuses.is_empty() {
-            return Err("statuses must not be empty".to_string());
-        }
-        // non-empty prefixes
+    pub fn validate(&self, project_dir: Option<&Path>) -> Result<(), String> {
+        let mut errors: Vec<String> = Vec::new();
+
+        // Top-level fields in struct order.
         if self.task_prefix.is_empty()
             || self.milestone_prefix.is_empty()
             || self.release_prefix.is_empty()
         {
-            return Err("ID prefixes must not be empty".to_string());
+            errors.push("ID prefixes must not be empty".to_string());
         }
-        if self.browser_port == 0 {
-            return Err("browser_port: must be between 1 and 65535".to_string());
+        if !(1..=6).contains(&self.id_padding) {
+            errors.push("id_padding: must be between 1 and 6".to_string());
         }
-        validate_browser_host(&self.browser_host)
-            .map_err(|reason| format!("browser_host: {}", reason))?;
-        // Folder values must be relative and free of traversal segments.
         for (label, value) in [
             ("backlog_directory", &self.backlog_directory),
             ("decision_directory", &self.decision_directory),
             ("doc_directory", &self.doc_directory),
         ] {
             if crate::sanitize::sanitize_path_string(value).is_none() {
-                return Err(format!("{}: invalid folder value", label));
+                errors.push(format!("{}: invalid folder value", label));
             }
         }
-        for (key, entry) in &self.document_types {
-            if crate::sanitize::sanitize_path_string(&entry.directory).is_none() {
-                return Err(format!(
-                    "document_types.{}.directory: invalid folder value",
-                    key
+
+        // statuses
+        if self.statuses.is_empty() {
+            errors.push("statuses must not be empty".to_string());
+        }
+        let mut seen_statuses: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut dup_statuses: Vec<String> = Vec::new();
+        for s in &self.statuses {
+            if !seen_statuses.insert(s.clone()) && !dup_statuses.contains(s) {
+                dup_statuses.push(s.clone());
+            }
+        }
+        for s in &dup_statuses {
+            errors.push(format!("duplicate status: {}", s));
+        }
+        if !self.statuses.contains(&self.default_status) {
+            errors.push(format!(
+                "default_status '{}' is not one of the configured statuses",
+                self.default_status
+            ));
+        }
+
+        if let Err(reason) = validate_browser_host(&self.browser_host) {
+            errors.push(format!("browser_host: {}", reason));
+        }
+        if self.browser_port == 0 {
+            errors.push("browser_port: must be between 1 and 65535".to_string());
+        }
+
+        // document_types entries in BTreeMap order.
+        let mut seen_prefixes: Vec<(String, String)> = Vec::new();
+        let mut seen_dirs_enabled: Vec<(String, String)> = Vec::new();
+        for (slug, entry) in &self.document_types {
+            // slug
+            if !is_valid_slug(slug) {
+                errors.push(format!("document_types.{}: invalid slug", slug));
+            }
+            // reserved names (case-insensitive)
+            for builtin in crate::cli::BUILTIN_COMMANDS {
+                if slug.eq_ignore_ascii_case(builtin.name) {
+                    errors.push(format!(
+                        "document_types.{}: slug conflicts with built-in type {}",
+                        slug, builtin.name
+                    ));
+                    break;
+                }
+            }
+
+            // prefix
+            if entry.prefix.is_empty() {
+                errors.push(format!("document_types.{}.prefix: must not be empty", slug));
+            } else if !prefix_valid(&entry.prefix) {
+                errors.push(format!(
+                    "document_types.{}.prefix: must not contain whitespace, control characters, path separators, or '..'",
+                    slug
                 ));
             }
+            // prefix uniqueness (case-insensitive) across all entries
+            if !entry.prefix.is_empty() {
+                let lower = entry.prefix.to_lowercase();
+                if let Some((_, other)) = seen_prefixes.iter().find(|(p, _)| *p == lower) {
+                    errors.push(format!(
+                        "document_types.{}.prefix: {} is already used by {}",
+                        slug, entry.prefix, other
+                    ));
+                } else {
+                    seen_prefixes.push((lower, slug.clone()));
+                }
+            }
+
+            // directory
+            if entry.directory.is_empty() {
+                errors.push(format!(
+                    "document_types.{}.directory: must not be empty",
+                    slug
+                ));
+            } else if !dir_string_valid(&entry.directory) {
+                errors.push(format!(
+                    "document_types.{}.directory: value must be relative and stay inside the project directory: {}",
+                    slug, entry.directory
+                ));
+            } else {
+                if let Some(project_dir) = project_dir {
+                    let full = project_dir.join(&self.doc_directory).join(&entry.directory);
+                    if crate::context::Context::ensure_within(project_dir, &full).is_err() {
+                        errors.push(format!(
+                            "document_types.{}.directory: value must be relative and stay inside the project directory: {}",
+                            slug, entry.directory
+                        ));
+                    }
+                }
+                // duplicate among enabled entries
+                if entry.enabled {
+                    if let Some((_, other)) = seen_dirs_enabled
+                        .iter()
+                        .find(|(d, _)| *d == entry.directory)
+                    {
+                        errors.push(format!(
+                            "document_types.{}.directory: directory is already used by {}",
+                            slug, other
+                        ));
+                    } else {
+                        seen_dirs_enabled.push((entry.directory.clone(), slug.clone()));
+                    }
+                }
+            }
+
+            // statuses
+            validate_doc_entry_statuses(slug, entry, &mut errors);
         }
-        Ok(())
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors.join("\n"))
+        }
     }
 
     /// Flatten effective config into dotted keys in stable order.
@@ -300,6 +387,137 @@ impl Config {
         out.push(("browser_port".to_string(), self.browser_port.to_string()));
         out.push(("browser_open".to_string(), self.browser_open.to_string()));
         out
+    }
+}
+
+fn is_valid_slug(s: &str) -> bool {
+    if s.is_empty() || s.starts_with('-') {
+        return false;
+    }
+    s.chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
+
+fn prefix_valid(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    if s.chars()
+        .any(|c| c.is_whitespace() || c.is_control() || c == '/' || c == '\\')
+    {
+        return false;
+    }
+    !s.contains("..")
+}
+
+fn dir_string_valid(s: &str) -> bool {
+    if s.is_empty() || s.contains('\\') || s.contains('\0') || s.chars().any(|c| c.is_control()) {
+        return false;
+    }
+    let path = std::path::Path::new(s);
+    if path.is_absolute() {
+        return false;
+    }
+    for comp in path.components() {
+        match comp {
+            std::path::Component::ParentDir
+            | std::path::Component::Prefix(_)
+            | std::path::Component::RootDir => return false,
+            std::path::Component::Normal(name) => {
+                let name = match name.to_str() {
+                    Some(n) => n,
+                    None => return false,
+                };
+                if name.is_empty() || name.contains('\0') {
+                    return false;
+                }
+            }
+            std::path::Component::CurDir => {}
+        }
+    }
+    true
+}
+
+fn validate_doc_entry_statuses(slug: &str, entry: &DocTypeEntry, errors: &mut Vec<String>) {
+    let ui_mockup = slug == "ui-mockup";
+    if let Some(statuses) = &entry.statuses {
+        if ui_mockup {
+            errors.push(format!(
+                "document_types.{}.statuses: not allowed for a type without a front-matter status",
+                slug
+            ));
+        } else if statuses.is_empty() {
+            errors.push(format!(
+                "document_types.{}.statuses: must not be empty",
+                slug
+            ));
+        } else {
+            let active_count = statuses.iter().filter(|v| v.as_str() == "active").count();
+            if active_count != 1 {
+                errors.push(format!(
+                    "document_types.{}.statuses: \"active\" must be declared exactly once",
+                    slug
+                ));
+            }
+            let archived_count = statuses.iter().filter(|v| v.as_str() == "archived").count();
+            if archived_count != 1 {
+                errors.push(format!(
+                    "document_types.{}.statuses: \"archived\" must be declared exactly once",
+                    slug
+                ));
+            }
+            let mut seen: Vec<&str> = Vec::new();
+            let mut dup_values: Vec<String> = Vec::new();
+            for v in statuses {
+                if seen.contains(&v.as_str()) && !dup_values.contains(v) {
+                    dup_values.push(v.clone());
+                }
+                seen.push(v.as_str());
+            }
+            for v in &dup_values {
+                errors.push(format!(
+                    "document_types.{}.statuses: duplicate value {}",
+                    slug, v
+                ));
+            }
+            let mut invalid_values: Vec<String> = Vec::new();
+            for v in statuses {
+                if !is_valid_slug(v) && !invalid_values.contains(v) {
+                    invalid_values.push(v.clone());
+                }
+            }
+            for v in &invalid_values {
+                errors.push(format!(
+                    "document_types.{}.statuses: invalid status value {}",
+                    slug, v
+                ));
+            }
+        }
+    }
+    if let Some(default_status) = &entry.default_status {
+        if ui_mockup {
+            errors.push(format!(
+                "document_types.{}.default_status: not allowed for a type without a front-matter status",
+                slug
+            ));
+        } else {
+            let declared: Vec<String> = entry
+                .statuses
+                .clone()
+                .unwrap_or_else(|| vec!["active".to_string(), "archived".to_string()]);
+            if !declared.contains(default_status) {
+                errors.push(format!(
+                    "document_types.{}.default_status: {} is not a declared status",
+                    slug, default_status
+                ));
+            }
+            if default_status == "archived" {
+                errors.push(format!(
+                    "document_types.{}.default_status: must not be \"archived\"",
+                    slug
+                ));
+            }
+        }
     }
 }
 
@@ -365,7 +583,14 @@ pub fn merge_yaml(base: &mut yaml_serde::Value, overlay: &yaml_serde::Value) {
     match (base, overlay) {
         (yaml_serde::Value::Mapping(b), yaml_serde::Value::Mapping(o)) => {
             for (k, v) in o {
-                if let Some(existing) = b.get_mut(k) {
+                let is_document_types = match k {
+                    yaml_serde::Value::String(s) => s == "document_types",
+                    _ => false,
+                };
+                if is_document_types {
+                    // Replace wholesale when present.
+                    b.insert(k.clone(), v.clone());
+                } else if let Some(existing) = b.get_mut(k) {
                     merge_yaml(existing, v);
                 } else {
                     b.insert(k.clone(), v.clone());
@@ -476,7 +701,7 @@ mod tests {
     #[test]
     fn defaults_valid() {
         let c = Config::default();
-        assert!(c.validate().is_ok());
+        assert!(c.validate(None).is_ok());
         assert_eq!(
             c.statuses,
             vec![
@@ -498,7 +723,7 @@ mod tests {
             statuses: vec!["A".into(), "A".into()],
             ..Config::default()
         };
-        assert!(c.validate().is_err());
+        assert!(c.validate(None).is_err());
     }
 
     #[test]
@@ -507,7 +732,7 @@ mod tests {
             default_status: "Nope".into(),
             ..Config::default()
         };
-        assert!(c.validate().is_err());
+        assert!(c.validate(None).is_err());
     }
 
     #[test]
@@ -516,7 +741,7 @@ mod tests {
             id_padding: 0,
             ..Config::default()
         };
-        let err = c.validate().unwrap_err();
+        let err = c.validate(None).unwrap_err();
         assert_eq!(err, "id_padding: must be between 1 and 6");
     }
 
@@ -526,7 +751,7 @@ mod tests {
             id_padding: 7,
             ..Config::default()
         };
-        let err = c.validate().unwrap_err();
+        let err = c.validate(None).unwrap_err();
         assert_eq!(err, "id_padding: must be between 1 and 6");
     }
 
@@ -536,7 +761,7 @@ mod tests {
             id_padding: 1,
             ..Config::default()
         };
-        assert!(c.validate().is_ok());
+        assert!(c.validate(None).is_ok());
     }
 
     #[test]
@@ -545,7 +770,7 @@ mod tests {
             id_padding: 6,
             ..Config::default()
         };
-        assert!(c.validate().is_ok());
+        assert!(c.validate(None).is_ok());
     }
 
     #[test]
@@ -554,7 +779,7 @@ mod tests {
         assert_eq!(c.browser_host, "127.0.0.1");
         assert_eq!(c.browser_port, 6420);
         assert!(c.browser_open);
-        assert!(c.validate().is_ok());
+        assert!(c.validate(None).is_ok());
     }
 
     #[test]
@@ -563,7 +788,7 @@ mod tests {
             browser_port: 0,
             ..Config::default()
         };
-        assert!(c.validate().is_err());
+        assert!(c.validate(None).is_err());
     }
 
     #[test]
@@ -612,14 +837,14 @@ mod tests {
             browser_port: 0,
             ..Config::default()
         };
-        let error = c.validate().unwrap_err();
+        let error = c.validate(None).unwrap_err();
         assert!(error.starts_with("browser_port:"), "{}", error);
 
         let c = Config {
             browser_host: "bad/host".to_string(),
             ..Config::default()
         };
-        let error = c.validate().unwrap_err();
+        let error = c.validate(None).unwrap_err();
         assert!(error.starts_with("browser_host:"), "{}", error);
     }
 
@@ -759,5 +984,471 @@ mod tests {
         let deploy = value["document_types"]["deploy"].as_object().unwrap();
         assert!(!deploy.contains_key("statuses"));
         assert!(!deploy.contains_key("default_status"));
+    }
+
+    use crate::commands::{
+        config_set, config_unset, load_effective_config, load_effective_config_tolerant,
+        load_effective_value,
+    };
+    use crate::context::Context;
+    use crate::error::AppError;
+    use crate::init::{InitOptions, run_init_with_io};
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static TEMP_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    /// Temporary project directory that removes itself when the test ends.
+    struct TempProject {
+        path: PathBuf,
+    }
+
+    impl TempProject {
+        fn new(tag: &str) -> Self {
+            let base = PathBuf::from(".tmp").join("config-unit-tests");
+            std::fs::create_dir_all(&base).expect("create temp base");
+            let unique = format!(
+                "{}-{}-{}",
+                tag,
+                std::process::id(),
+                TEMP_DIR_COUNTER.fetch_add(1, Ordering::SeqCst)
+            );
+            let path = base.join(unique);
+            std::fs::create_dir_all(&path).expect("create temp project");
+            Self { path }
+        }
+
+        fn path(&self) -> &Path {
+            &self.path
+        }
+
+        fn config_path(&self) -> PathBuf {
+            self.path.join("papyrus.config.yml")
+        }
+
+        fn write_config(&self, content: &str) {
+            std::fs::write(self.config_path(), content).expect("write config file");
+        }
+
+        fn read_config(&self) -> String {
+            std::fs::read_to_string(self.config_path()).expect("read config file")
+        }
+
+        fn context(&self) -> Context {
+            Context {
+                project_dir: self.path.clone(),
+                config_path: self.config_path(),
+                json: false,
+                no_color: true,
+            }
+        }
+    }
+
+    impl Drop for TempProject {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.path);
+            // Succeeds only when the last test using the base directory is done.
+            let _ = std::fs::remove_dir(PathBuf::from(".tmp").join("config-unit-tests"));
+        }
+    }
+
+    fn entry(prefix: &str, directory: &str) -> DocTypeEntry {
+        DocTypeEntry {
+            prefix: prefix.to_string(),
+            directory: directory.to_string(),
+            enabled: true,
+            statuses: None,
+            default_status: None,
+        }
+    }
+
+    fn config_with_single_type(slug: &str, entry: DocTypeEntry) -> Config {
+        let mut config = Config {
+            document_types: BTreeMap::new(),
+            ..Config::default()
+        };
+        config.document_types.insert(slug.to_string(), entry);
+        config
+    }
+
+    fn validate_single(slug: &str, entry: DocTypeEntry) -> Result<(), String> {
+        config_with_single_type(slug, entry).validate(None)
+    }
+
+    #[test]
+    fn slug_grammar_rejects_invalid_document_type_keys() {
+        for slug in [
+            "",
+            "bad slug",
+            "Bad.Slug",
+            "-leading-dash",
+            "bad/slug",
+            "bad\\slug",
+            "bad..slug",
+            "bad\tslug",
+            "bad\u{1}slug",
+        ] {
+            let err = validate_single(slug, entry("NOTE", "notes/")).unwrap_err();
+            assert!(err.contains("invalid slug"), "slug {:?} => {}", slug, err);
+        }
+        assert!(validate_single("my-type_1", entry("NOTE", "notes/")).is_ok());
+    }
+
+    #[test]
+    fn reserved_slug_conflicts_are_case_insensitive() {
+        for (slug, builtin) in [("Config", "config"), ("SEARCH", "search"), ("task", "task")] {
+            let err = validate_single(slug, entry("NOTE", "notes/")).unwrap_err();
+            assert!(
+                err.contains(&format!("slug conflicts with built-in type {}", builtin)),
+                "slug {:?} => {}",
+                slug,
+                err
+            );
+        }
+    }
+
+    #[test]
+    fn prefix_grammar_rejects_invalid_values() {
+        for prefix in [
+            "",
+            "bad prefix",
+            "bad\tprefix",
+            "bad\u{1}prefix",
+            "bad/prefix",
+            "bad\\prefix",
+            "bad..prefix",
+        ] {
+            let err = validate_single("note", entry(prefix, "notes/")).unwrap_err();
+            assert!(
+                err.contains("document_types.note.prefix"),
+                "prefix {:?} => {}",
+                prefix,
+                err
+            );
+        }
+    }
+
+    #[test]
+    fn prefix_uniqueness_is_case_insensitive_and_includes_disabled_entries() {
+        let mut config = Config {
+            document_types: BTreeMap::new(),
+            ..Config::default()
+        };
+        config
+            .document_types
+            .insert("aaa".to_string(), entry("REQ", "a/"));
+        config.document_types.insert(
+            "bbb".to_string(),
+            DocTypeEntry {
+                enabled: false,
+                ..entry("req", "b/")
+            },
+        );
+
+        let err = config.validate(None).unwrap_err();
+        assert!(
+            err.contains("document_types.bbb.prefix: req is already used by aaa"),
+            "{}",
+            err
+        );
+    }
+
+    #[test]
+    fn directory_grammar_rejects_invalid_values() {
+        for directory in [
+            "",
+            "/absolute/path",
+            "../escape",
+            "a/../b",
+            "bad\\path",
+            "bad\u{1}path",
+        ] {
+            let err = validate_single("note", entry("NOTE", directory)).unwrap_err();
+            assert!(
+                err.contains("document_types.note.directory"),
+                "directory {:?} => {}",
+                directory,
+                err
+            );
+        }
+    }
+
+    #[test]
+    fn duplicate_directories_rejected_only_among_enabled_entries() {
+        let mut config = Config {
+            document_types: BTreeMap::new(),
+            ..Config::default()
+        };
+        config
+            .document_types
+            .insert("aaa".to_string(), entry("AAA", "shared/"));
+        config.document_types.insert(
+            "bbb".to_string(),
+            DocTypeEntry {
+                enabled: false,
+                ..entry("BBB", "shared/")
+            },
+        );
+        assert!(config.validate(None).is_ok());
+
+        config.document_types.get_mut("bbb").unwrap().enabled = true;
+        let err = config.validate(None).unwrap_err();
+        assert!(
+            err.contains("document_types.bbb.directory: directory is already used by aaa"),
+            "{}",
+            err
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_directory_escape_is_rejected_with_project_dir() {
+        let project = TempProject::new("symlink");
+        let outside = TempProject::new("symlink-outside");
+        std::fs::create_dir_all(project.path().join("docs")).expect("create docs directory");
+        let outside_target = std::fs::canonicalize(outside.path()).expect("canonicalize outside");
+        std::os::unix::fs::symlink(outside_target, project.path().join("docs").join("escape"))
+            .expect("create symlink");
+
+        let config = config_with_single_type("note", entry("NOTE", "escape/"));
+        assert!(config.validate(None).is_ok());
+
+        let err = config.validate(Some(project.path())).unwrap_err();
+        assert!(
+            err.contains(
+                "document_types.note.directory: value must be relative and stay inside the project directory"
+            ),
+            "{}",
+            err
+        );
+    }
+
+    #[test]
+    fn status_lists_reject_empty_duplicate_missing_and_invalid_values() {
+        let cases: &[(&str, &[&str], &str)] = &[
+            ("empty", &[], "statuses: must not be empty"),
+            (
+                "duplicate",
+                &["active", "archived", "active"],
+                "duplicate value active",
+            ),
+            (
+                "missing-active",
+                &["draft", "archived"],
+                "\"active\" must be declared exactly once",
+            ),
+            (
+                "missing-archived",
+                &["active", "draft"],
+                "\"archived\" must be declared exactly once",
+            ),
+            (
+                "invalid-value",
+                &["active", "archived", "bad status"],
+                "invalid status value bad status",
+            ),
+        ];
+        for (label, statuses, expected) in cases {
+            let mut doc = entry("NOTE", "notes/");
+            doc.statuses = Some(statuses.iter().map(|value| value.to_string()).collect());
+            let err = validate_single("note", doc).unwrap_err();
+            assert!(err.contains(expected), "{}: {}", label, err);
+        }
+    }
+
+    #[test]
+    fn ui_mockup_rejects_status_declarations() {
+        let mut config = Config::default();
+        let mockup = config.document_types.get_mut("ui-mockup").unwrap();
+        mockup.statuses = Some(vec!["active".to_string(), "archived".to_string()]);
+        let err = config.validate(None).unwrap_err();
+        assert!(
+            err.contains(
+                "document_types.ui-mockup.statuses: not allowed for a type without a front-matter status"
+            ),
+            "{}",
+            err
+        );
+
+        let mut config = Config::default();
+        config
+            .document_types
+            .get_mut("ui-mockup")
+            .unwrap()
+            .default_status = Some("active".to_string());
+        let err = config.validate(None).unwrap_err();
+        assert!(
+            err.contains(
+                "document_types.ui-mockup.default_status: not allowed for a type without a front-matter status"
+            ),
+            "{}",
+            err
+        );
+    }
+
+    #[test]
+    fn default_status_must_be_declared_and_not_archived() {
+        let mut doc = entry("NOTE", "notes/");
+        doc.statuses = Some(vec!["active".to_string(), "archived".to_string()]);
+        doc.default_status = Some("draft".to_string());
+        let err = validate_single("note", doc).unwrap_err();
+        assert!(
+            err.contains("document_types.note.default_status: draft is not a declared status"),
+            "{}",
+            err
+        );
+
+        let doc = DocTypeEntry {
+            default_status: Some("archived".to_string()),
+            ..entry("NOTE", "notes/")
+        };
+        let err = validate_single("note", doc).unwrap_err();
+        assert!(
+            err.contains("document_types.note.default_status: must not be \"archived\""),
+            "{}",
+            err
+        );
+    }
+
+    #[test]
+    fn browser_diagnostics_follow_struct_field_order() {
+        let config = Config {
+            browser_host: "bad/host".to_string(),
+            browser_port: 0,
+            ..Config::default()
+        };
+        let err = config.validate(None).unwrap_err();
+        assert_eq!(
+            err.lines().collect::<Vec<_>>(),
+            vec![
+                "browser_host: contains a forbidden character",
+                "browser_port: must be between 1 and 65535",
+            ]
+        );
+    }
+
+    #[test]
+    fn duplicate_yaml_keys_are_rejected_by_load_effective_value() {
+        let project = TempProject::new("duplicate-key");
+        project.write_config("task_prefix: A\ntask_prefix: B\n");
+
+        let err = load_effective_value(&project.config_path()).unwrap_err();
+        assert!(matches!(err, AppError::Validation(_)), "{:?}", err);
+        assert_eq!(err.code(), 4);
+        assert!(err.message().contains("duplicate entry"), "{}", err);
+    }
+
+    #[test]
+    fn document_types_overlay_replaces_defaults_wholesale() {
+        let project = TempProject::new("wholesale");
+        project.write_config("document_types:\n  note:\n    prefix: NOTE\n    directory: notes/\n");
+
+        let value = load_effective_value(&project.config_path()).unwrap();
+        let document_types = yaml_get(&value, "document_types").unwrap();
+        let yaml_serde::Value::Mapping(mapping) = document_types else {
+            panic!("document_types must be a mapping");
+        };
+        let keys: Vec<String> = mapping
+            .keys()
+            .filter_map(|key| match key {
+                yaml_serde::Value::String(value) => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(keys, vec!["note".to_string()]);
+        assert!(yaml_get(&value, "document_types.deploy").is_none());
+    }
+
+    #[test]
+    fn strict_load_validates_while_tolerant_load_does_not() {
+        let project = TempProject::new("strict-tolerant");
+        project.write_config(
+            "document_types:\n  \"bad slug\":\n    prefix: BAD\n    directory: bad/\n",
+        );
+
+        let tolerant = load_effective_config_tolerant(&project.config_path(), project.path());
+        assert!(tolerant.is_ok(), "{:?}", tolerant.err());
+
+        let err = load_effective_config(&project.config_path(), project.path()).unwrap_err();
+        assert!(matches!(err, AppError::Validation(_)), "{:?}", err);
+        assert!(err.message().contains("invalid slug"), "{}", err);
+    }
+
+    #[test]
+    fn config_set_materializes_defaults_and_refuses_an_invalid_result() {
+        let project = TempProject::new("config-set");
+        let ctx = project.context();
+
+        config_set(&ctx, "document_types.deploy.enabled", "false").unwrap();
+        let value: yaml_serde::Value =
+            yaml_serde::from_str(&project.read_config()).expect("parse written config");
+        let document_types = yaml_get(&value, "document_types").unwrap();
+        let yaml_serde::Value::Mapping(mapping) = document_types else {
+            panic!("document_types must be a mapping");
+        };
+        assert_eq!(mapping.len(), Config::default().document_types.len());
+        assert!(yaml_get(&value, "document_types.req").is_some());
+        assert!(matches!(
+            yaml_get(&value, "document_types.deploy.enabled"),
+            Some(yaml_serde::Value::Bool(false))
+        ));
+
+        let before = project.read_config();
+        let err = config_set(&ctx, "document_types.deploy.prefix", "REQ")
+            .err()
+            .expect("config set must refuse an invalid result");
+        assert!(matches!(err, AppError::Validation(_)), "{:?}", err);
+        assert!(err.message().contains("already used"), "{}", err);
+        assert_eq!(project.read_config(), before);
+    }
+
+    #[test]
+    fn config_unset_refuses_an_invalid_result() {
+        let project = TempProject::new("config-unset");
+        project.write_config("document_types:\n  note:\n    prefix: NOTE\n    directory: notes/\n");
+        let ctx = project.context();
+        let before = project.read_config();
+
+        let err = config_unset(&ctx, "document_types.note.directory")
+            .err()
+            .expect("config unset must refuse an invalid result");
+        assert!(matches!(err, AppError::Validation(_)), "{:?}", err);
+        assert!(
+            err.message()
+                .contains("document_types.note.directory: must not be empty"),
+            "{}",
+            err
+        );
+        assert_eq!(project.read_config(), before);
+    }
+
+    #[test]
+    fn init_force_repairs_an_invalid_configuration() {
+        let project = TempProject::new("init-force");
+        project.write_config(
+            "document_types:\n  \"bad slug\":\n    prefix: BAD\n    directory: bad/\n",
+        );
+
+        let opts = InitOptions {
+            name: "repair".to_string(),
+            no_git: true,
+            force: true,
+        };
+        let mut reader = std::io::empty();
+        let mut writer = std::io::sink();
+        run_init_with_io(
+            project.path().to_path_buf(),
+            opts,
+            false,
+            &mut reader,
+            &mut writer,
+        )
+        .unwrap();
+
+        let config = load_effective_config(&project.config_path(), project.path()).unwrap();
+        assert_eq!(config.project_name.as_deref(), Some("repair"));
+        assert!(config.document_types.contains_key("deploy"));
+        assert!(!config.document_types.contains_key("bad slug"));
     }
 }
