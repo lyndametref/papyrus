@@ -83,9 +83,9 @@ fn req_group_and_requirement_lifecycle() {
     assert!(s.contains("# REQ-001.001 R2"));
     assert!(s.contains("## Group\nREQ-001 G"));
 
-    // deprecate hides
+    // archive hides
     let out = bin()
-        .args(["--dir", p, "req", "deprecate", "REQ-001.001"])
+        .args(["--dir", p, "req", "archive", "REQ-001.001"])
         .output()
         .unwrap();
     assert!(out.status.success());
@@ -93,22 +93,12 @@ fn req_group_and_requirement_lifecycle() {
     let s = String::from_utf8_lossy(&out.stdout);
     assert!(!s.contains("REQ-001.001"));
 
-    // view deprecated allowed
+    // view archived allowed
     let out = bin()
         .args(["--dir", p, "req", "view", "REQ-001.001"])
         .output()
         .unwrap();
     assert!(out.status.success());
-
-    // restore
-    let out = bin()
-        .args(["--dir", p, "req", "restore", "REQ-001.001"])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    let out = bin().args(["--dir", p, "req", "list"]).output().unwrap();
-    let s = String::from_utf8_lossy(&out.stdout);
-    assert!(s.contains("REQ-001.001 R2"));
 
     let _ = fs::remove_dir_all(&d);
 }
@@ -156,28 +146,28 @@ fn req_errors() {
         .output()
         .unwrap();
     let out = bin()
-        .args(["--dir", p, "req", "deprecate", "REQ-001.001"])
+        .args(["--dir", p, "req", "archive", "REQ-001.001"])
         .output()
         .unwrap();
     assert!(out.status.success());
     let out = bin()
-        .args(["--dir", p, "req", "deprecate", "REQ-001.001"])
+        .args(["--dir", p, "req", "archive", "REQ-001.001"])
         .output()
         .unwrap();
-    assert_eq!(out.status.code(), Some(4));
+    assert!(out.status.success());
     let _ = fs::remove_dir_all(&d);
 }
 
 #[test]
-fn nfreq_basic() {
-    let d = tmpdir("nfreq");
+fn nfr_basic() {
+    let d = tmpdir("nfr");
     init(&d);
     let p = d.to_str().unwrap();
     let out = bin()
         .args([
             "--dir",
             p,
-            "nfreq",
+            "nfr",
             "create-group",
             "--title",
             "NG",
@@ -190,18 +180,18 @@ fn nfreq_basic() {
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "NFR-001");
     let out = bin()
         .args([
-            "--dir", p, "nfreq", "create", "NR", "-d", "nd", "--group", "NFR-001",
+            "--dir", p, "nfr", "create", "NR", "-d", "nd", "--group", "NFR-001",
         ])
         .output()
         .unwrap();
     assert!(out.status.success());
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "NFR-001.001");
-    let out = bin().args(["--dir", p, "nfreq", "list"]).output().unwrap();
+    let out = bin().args(["--dir", p, "nfr", "list"]).output().unwrap();
     let s = String::from_utf8_lossy(&out.stdout);
     assert!(s.contains("NFR-001 NG"));
     assert!(s.contains("NFR-001.001 NR"));
     let out = bin()
-        .args(["--dir", p, "--json", "nfreq", "view", "NFR-001.001"])
+        .args(["--dir", p, "--json", "nfr", "view", "NFR-001.001"])
         .output()
         .unwrap();
     assert!(out.status.success());
@@ -283,9 +273,9 @@ fn req_symlink_escape_exits_one() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
-    // deprecate should reject
+    // archive should reject
     let out = bin()
-        .args(["--dir", p, "req", "deprecate", "REQ-001.001"])
+        .args(["--dir", p, "req", "archive", "REQ-001.001"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -394,7 +384,7 @@ fn req_type_mismatch_exits_four() {
     init(&d);
     let p = d.to_str().unwrap();
     let out = bin()
-        .args(["--dir", p, "nfreq", "create-group", "--title", "NG"])
+        .args(["--dir", p, "nfr", "create-group", "--title", "NG"])
         .output()
         .unwrap();
     assert!(out.status.success());
@@ -408,8 +398,8 @@ fn req_type_mismatch_exits_four() {
 }
 
 #[test]
-fn nfreq_type_mismatch_exits_four() {
-    let d = tmpdir("nfreqtm");
+fn nfr_type_mismatch_exits_four() {
+    let d = tmpdir("nfrtm");
     init(&d);
     let p = d.to_str().unwrap();
     let out = bin()
@@ -419,7 +409,7 @@ fn nfreq_type_mismatch_exits_four() {
     assert!(out.status.success());
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "REQ-001");
     let out = bin()
-        .args(["--dir", p, "nfreq", "create", "NR", "--group", "REQ-001"])
+        .args(["--dir", p, "nfr", "create", "NR", "--group", "REQ-001"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(4));

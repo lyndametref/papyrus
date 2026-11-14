@@ -114,7 +114,7 @@ fn glossary_basic_lifecycle() {
     assert!(s.contains("## Definition\ndef2"));
 
     let out = bin()
-        .args(["--dir", p, "glossary", "deprecate", "GLO-001"])
+        .args(["--dir", p, "glossary", "archive", "GLO-001"])
         .output()
         .unwrap();
     assert!(
@@ -122,7 +122,7 @@ fn glossary_basic_lifecycle() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert!(d.join("docs/glossary/deprecated/GLO-001.md").exists());
+    assert!(d.join("docs/glossary/archived/GLO-001.md").exists());
 
     let out = bin()
         .args(["--dir", p, "glossary", "list"])
@@ -138,35 +138,10 @@ fn glossary_basic_lifecycle() {
     assert!(out.status.success());
 
     let out = bin()
-        .args(["--dir", p, "glossary", "deprecate", "GLO-001"])
+        .args(["--dir", p, "glossary", "archive", "GLO-001"])
         .output()
         .unwrap();
-    assert_eq!(out.status.code(), Some(4));
-
-    let out = bin()
-        .args(["--dir", p, "glossary", "restore", "GLO-001"])
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    assert!(d.join("docs/glossary/GLO-001.md").exists());
-    assert!(!d.join("docs/glossary/deprecated/GLO-001.md").exists());
-
-    let out = bin()
-        .args(["--dir", p, "glossary", "list"])
-        .output()
-        .unwrap();
-    let s = String::from_utf8_lossy(&out.stdout);
-    assert!(s.contains("GLO-001"));
-
-    let out = bin()
-        .args(["--dir", p, "glossary", "restore", "GLO-001"])
-        .output()
-        .unwrap();
-    assert_eq!(out.status.code(), Some(4));
+    assert!(out.status.success());
 
     let out = bin()
         .args(["--dir", p, "glossary", "view", "NOPE"])
@@ -178,7 +153,7 @@ fn glossary_basic_lifecycle() {
 }
 
 #[test]
-fn glossary_edit_deprecated_allowed() {
+fn glossary_edit_archived_allowed() {
     let d = tmpdir("editdep");
     init(&d);
     let p = d.to_str().unwrap();
@@ -196,7 +171,7 @@ fn glossary_edit_deprecated_allowed() {
         .output()
         .unwrap();
     let _ = bin()
-        .args(["--dir", p, "glossary", "deprecate", "GLO-001"])
+        .args(["--dir", p, "glossary", "archive", "GLO-001"])
         .output()
         .unwrap();
     let out = bin()
@@ -367,7 +342,7 @@ fn glossary_project_directory_boundary() {
     assert_eq!(out.status.code(), Some(1));
 
     let out = bin()
-        .args(["--dir", p, "glossary", "deprecate", "GLO-001"])
+        .args(["--dir", p, "glossary", "archive", "GLO-001"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -446,9 +421,9 @@ fn glossary_restore_unknown_exit_3() {
         .args(["--dir", p, "glossary", "restore", "NOPE"])
         .output()
         .unwrap();
-    assert_eq!(out.status.code(), Some(3));
+    assert_eq!(out.status.code(), Some(2));
     let out = bin()
-        .args(["--dir", p, "glossary", "deprecate", "NOPE"])
+        .args(["--dir", p, "glossary", "archive", "NOPE"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(3));

@@ -41,11 +41,17 @@ pub enum UiMockupCmd {
         #[arg(long = "editor")]
         editor: bool,
     },
-    Deprecate {
+    Archive {
         id: String,
     },
-    Restore {
+    Delete {
         id: String,
+        #[arg(long)]
+        force: bool,
+    },
+    Supersede {
+        old: String,
+        new: String,
     },
 }
 
@@ -87,8 +93,9 @@ pub fn run(ctx: &Context, cmd: UiMockupCmd) -> Result<CommandOutput, AppError> {
             superseded_by.as_deref(),
             editor,
         ),
-        UiMockupCmd::Deprecate { id } => deprecate(ctx, &id),
-        UiMockupCmd::Restore { id } => restore(ctx, &id),
+        UiMockupCmd::Archive { id } => archive(ctx, &id),
+        UiMockupCmd::Delete { id, force } => delete(ctx, &id, force),
+        UiMockupCmd::Supersede { old, new } => supersede(ctx, &old, &new),
     }
 }
 
@@ -138,8 +145,8 @@ fn active_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
     Context::ensure_within(&ctx.project_dir, &raw)
 }
 
-fn deprecated_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    Ok(active_dir(ctx, cfg)?.join("deprecated"))
+fn archived_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
+    Ok(active_dir(ctx, cfg)?.join("archived"))
 }
 
 fn ensure_dirs(dir: &Path) -> Result<(), AppError> {
@@ -472,15 +479,15 @@ pub(crate) fn render_record(record: &Mockup) -> String {
     )
 }
 
-const ALLOWED_STATUSES: &[&str] = &["pending", "approved", "deprecated"];
+const ALLOWED_STATUSES: &[&str] = &["pending", "approved", "archived"];
 
 pub fn valid_transition(current: &str, next: &str) -> bool {
     if current == next {
         return true;
     }
     match current {
-        "pending" => matches!(next, "approved" | "deprecated"),
-        "approved" => matches!(next, "deprecated"),
+        "pending" => matches!(next, "approved" | "archived"),
+        "approved" => matches!(next, "archived"),
         _ => false,
     }
 }
@@ -604,7 +611,7 @@ fn view(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
     let id = sanitize_field(id_raw)?;
     let cfg = load_config(ctx)?;
     let active = active_dir(ctx, &cfg)?;
-    let deprecated = deprecated_dir(ctx, &cfg)?;
+    let deprecated = archived_dir(ctx, &cfg)?;
     let path = resolve_record(ctx, &active, &deprecated, &id)?;
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
@@ -643,7 +650,7 @@ fn edit(
 
     let cfg = load_config(ctx)?;
     let active = active_dir(ctx, &cfg)?;
-    let deprecated = deprecated_dir(ctx, &cfg)?;
+    let deprecated = archived_dir(ctx, &cfg)?;
     let path = resolve_record(ctx, &active, &deprecated, &id)?;
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
@@ -708,7 +715,7 @@ fn edit(
             )));
         }
         let _ = resolve_record(ctx, &active, &deprecated, &sup)?;
-        record.status = "deprecated".to_string();
+        record.status = "archived".to_string();
         record.superseded_by = Some(sup);
         move_to_deprecated = true;
     }
@@ -744,15 +751,23 @@ fn edit(
     })
 }
 
-fn deprecate(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
+fn archive(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
     let id = sanitize_field(id_raw)?;
     let cfg = load_config(ctx)?;
     let active = active_dir(ctx, &cfg)?;
-    let deprecated = deprecated_dir(ctx, &cfg)?;
+    let deprecated = archived_dir(ctx, &cfg)?;
 
     let Some(path) = find_record(ctx, &active, &id)? else {
         if find_record(ctx, &deprecated, &id)?.is_some() {
-            return Err(AppError::Validation(format!("already deprecated: {}", id)));
+            let json = if ctx.json {
+                Some(serde_json::json!({"status":"ok","id":id}))
+            } else {
+                None
+            };
+            return Ok(CommandOutput {
+                text: String::new(),
+                json,
+            });
         }
         return Err(AppError::NotFound(format!("not found: {}", id)));
     };
@@ -780,7 +795,7 @@ fn deprecate(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
     if record.id.is_empty() {
         record.id = id.clone();
     }
-    record.status = "deprecated".to_string();
+    record.status = "archived".to_string();
     let new_content = render_record(&record);
     crate::record::store::write_atomic(ctx, &safe_dest, &new_content)
         .map_err(|e| AppError::Runtime(e.to_string()))?;
@@ -795,50 +810,101 @@ fn deprecate(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
         json,
     })
 }
-
-fn restore(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
+pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<CommandOutput, AppError> {
     let id = sanitize_field(id_raw)?;
     let cfg = load_config(ctx)?;
     let active = active_dir(ctx, &cfg)?;
-    let deprecated = deprecated_dir(ctx, &cfg)?;
+    let archived = archived_dir(ctx, &cfg)?;
 
-    let Some(path) = find_record(ctx, &deprecated, &id)? else {
-        if find_record(ctx, &active, &id)?.is_some() {
-            return Err(AppError::Validation(format!("not deprecated: {}", id)));
-        }
+    // if active, archive first
+    if find_record(ctx, &active, &id)?.is_some() {
+        archive(ctx, &id)?;
+    } else if find_record(ctx, &archived, &id)?.is_none() {
         return Err(AppError::NotFound(format!("not found: {}", id)));
-    };
+    }
 
-    let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
-    let record = parse_record(&content, &id);
-    if record.superseded_by.is_some() {
+    if !force {
+        use std::io::{self, Write};
+        print!("Delete {}? [y/N] ", id);
+        let _ = io::stdout().flush();
+        let mut input = String::new();
+        io::stdin()
+            .read_line(&mut input)
+            .map_err(|e| AppError::Runtime(e.to_string()))?;
+        let ans = input.trim().to_lowercase();
+        if ans != "y" && ans != "yes" {
+            let json = if ctx.json {
+                Some(serde_json::json!({"status":"aborted","id":id}))
+            } else {
+                None
+            };
+            return Ok(CommandOutput {
+                text: String::new(),
+                json,
+            });
+        }
+    }
+
+    // remove file from whichever folder
+    let path = if find_record(ctx, &active, &id)?.is_some() {
+        active.join(format!("{}.html", id))
+    } else {
+        archived.join(format!("{}.html", id))
+    };
+    let safe = Context::ensure_within(&ctx.project_dir, &path)?;
+    if safe.exists() {
+        fs::remove_file(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
+    }
+    let json = if ctx.json {
+        Some(serde_json::json!({"status":"ok","id":id}))
+    } else {
+        None
+    };
+    Ok(CommandOutput {
+        text: String::new(),
+        json,
+    })
+}
+
+pub fn supersede(ctx: &Context, old_raw: &str, new_raw: &str) -> Result<CommandOutput, AppError> {
+    let old = sanitize_field(old_raw)?;
+    let new = sanitize_field(new_raw)?;
+    if old == new {
         return Err(AppError::Validation(format!(
-            "status transitions blocked for superseded mockup: {}",
-            id
+            "mockup cannot supersede itself: {}",
+            old
         )));
     }
-
-    ensure_dirs(&active)?;
-    let file_name = path
-        .file_name()
-        .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?;
-    let destination = active.join(file_name);
-    let safe_dest = Context::ensure_within(&ctx.project_dir, &destination)?;
-
-    crate::record::store::move_record(ctx, &path, &safe_dest)?;
-
-    let content = fs::read_to_string(&safe_dest).map_err(|e| AppError::Runtime(e.to_string()))?;
-    let mut record = parse_record(&content, &id);
+    let cfg = load_config(ctx)?;
+    let active = active_dir(ctx, &cfg)?;
+    let archived = archived_dir(ctx, &cfg)?;
+    let _ = resolve_record(ctx, &active, &archived, &new)?;
+    // archive old with superseded_by set
+    let old_path = resolve_record(ctx, &active, &archived, &old)?;
+    let content = fs::read_to_string(&old_path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let mut record = parse_record(&content, &old);
     if record.id.is_empty() {
-        record.id = id.clone();
+        record.id = old.clone();
     }
-    record.status = "pending".to_string();
+    if record.title.is_empty() {
+        record.title = old.clone();
+    }
+    if record.status.is_empty() {
+        record.status = "pending".to_string();
+    }
+    record.status = "archived".to_string();
+    record.superseded_by = Some(new.clone());
+    ensure_dirs(&archived)?;
+    let dest = archived.join(format!("{}.html", old));
+    let safe_dest = Context::ensure_within(&ctx.project_dir, &dest)?;
+    if old_path != safe_dest {
+        crate::record::store::move_record(ctx, &old_path, &safe_dest)?;
+    }
     let new_content = render_record(&record);
     crate::record::store::write_atomic(ctx, &safe_dest, &new_content)
         .map_err(|e| AppError::Runtime(e.to_string()))?;
-
     let json = if ctx.json {
-        Some(serde_json::json!({"status": "ok", "id": id}))
+        Some(serde_json::json!({"status":"ok","id":old}))
     } else {
         None
     };
@@ -855,13 +921,13 @@ mod tests {
     fn valid_transition_table() {
         assert!(valid_transition("pending", "pending"));
         assert!(valid_transition("pending", "approved"));
-        assert!(valid_transition("pending", "deprecated"));
+        assert!(valid_transition("pending", "archived"));
         assert!(valid_transition("approved", "approved"));
-        assert!(valid_transition("approved", "deprecated"));
-        assert!(valid_transition("deprecated", "deprecated"));
+        assert!(valid_transition("approved", "archived"));
+        assert!(valid_transition("archived", "archived"));
         assert!(!valid_transition("approved", "pending"));
-        assert!(!valid_transition("deprecated", "pending"));
-        assert!(!valid_transition("deprecated", "approved"));
+        assert!(!valid_transition("archived", "pending"));
+        assert!(!valid_transition("archived", "approved"));
     }
 
     #[test]

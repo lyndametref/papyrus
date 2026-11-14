@@ -113,13 +113,13 @@ fn ui_spec_basic_lifecycle() {
     assert!(s.contains("## Description\nReset form"));
 
     // Deprecate: file moves, list hides it, view still works.
-    let out = run(&d, &["ui-spec", "deprecate", "UI-001"]);
+    let out = run(&d, &["ui-spec", "archive", "UI-001"]);
     assert!(
         out.status.success(),
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    let dep = d.join("docs/specifications/ui/deprecated/UI-001.md");
+    let dep = d.join("docs/specifications/ui/archived/UI-001.md");
     assert!(dep.exists());
     assert!(!path.exists());
 
@@ -131,37 +131,19 @@ fn ui_spec_basic_lifecycle() {
     assert!(out.status.success());
     assert!(stdout(&out).contains("Reset form"));
 
-    // Deprecating again is a validation error.
-    let out = run(&d, &["ui-spec", "deprecate", "UI-001"]);
-    assert_eq!(out.status.code(), Some(4));
-
-    // Restore preserves ID and content.
-    let before = fs::read_to_string(&dep).unwrap();
-    let out = run(&d, &["ui-spec", "restore", "UI-001"]);
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    assert!(path.exists());
-    assert!(!dep.exists());
-    assert_eq!(fs::read_to_string(&path).unwrap(), before);
-
-    let out = run(&d, &["ui-spec", "list"]);
-    assert!(stdout(&out).contains("UI-001 Login screen"));
-
-    // Restoring an active spec is a validation error.
-    let out = run(&d, &["ui-spec", "restore", "UI-001"]);
-    assert_eq!(out.status.code(), Some(4));
+    // Archiving again is idempotent.
+    let out = run(&d, &["ui-spec", "archive", "UI-001"]);
+    assert!(out.status.success());
 
     for args in [
         vec!["ui-spec", "view", "NOPE"],
         vec!["ui-spec", "edit", "NOPE", "--view", "v"],
-        vec!["ui-spec", "deprecate", "NOPE"],
+        vec!["ui-spec", "archive", "NOPE"],
         vec!["ui-spec", "restore", "NOPE"],
     ] {
         let out = run(&d, &args);
-        assert_eq!(out.status.code(), Some(3), "args={:?}", args);
+        let expected = if args.contains(&"restore") { 2 } else { 3 };
+        assert_eq!(out.status.code(), Some(expected), "args={:?}", args);
     }
 
     // IDs resolve case-insensitively and report the canonical ID.
@@ -303,11 +285,11 @@ fn ui_spec_list_is_non_recursive_and_filters_non_records() {
 }
 
 #[test]
-fn ui_spec_edit_deprecated_allowed_and_title_preserved() {
+fn ui_spec_edit_archived_allowed_and_title_preserved() {
     let d = tmpdir("editdep");
     init(&d);
     create(&d, "Original title", "v1", "d1");
-    let out = run(&d, &["ui-spec", "deprecate", "UI-001"]);
+    let out = run(&d, &["ui-spec", "archive", "UI-001"]);
     assert!(out.status.success());
 
     let out = run(
@@ -334,10 +316,7 @@ fn ui_spec_edit_deprecated_allowed_and_title_preserved() {
     assert!(s.contains("## View\nv2"));
     assert!(s.contains("## Description\nd2"));
 
-    assert!(
-        d.join("docs/specifications/ui/deprecated/UI-001.md")
-            .exists()
-    );
+    assert!(d.join("docs/specifications/ui/archived/UI-001.md").exists());
     assert!(!d.join("docs/specifications/ui/UI-001.md").exists());
 
     let out = run(&d, &["ui-spec", "list"]);
@@ -482,7 +461,7 @@ fn ui_spec_project_directory_boundary() {
     let out = run(&proj, &["ui-spec", "view", "UI-001"]);
     assert_eq!(out.status.code(), Some(1));
 
-    let out = run(&proj, &["ui-spec", "deprecate", "UI-001"]);
+    let out = run(&proj, &["ui-spec", "archive", "UI-001"]);
     assert_eq!(out.status.code(), Some(1));
 
     let _ = fs::remove_dir_all(&root);
@@ -505,11 +484,11 @@ fn ui_spec_disabled_type_blocks_create_and_list() {
     );
 
     let out = create(&d, "Blocked", "v", "d");
-    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(out.status.code(), Some(2));
     assert!(!record(&d, "UI-002").exists());
 
     let out = run(&d, &["ui-spec", "list"]);
-    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(out.status.code(), Some(2));
     assert!(!stdout(&out).contains("UI-001"));
 
     let _ = fs::remove_dir_all(&d);
@@ -562,13 +541,7 @@ fn ui_spec_json_output_shapes() {
     assert_eq!(v["id"], "UI-001");
     assert_eq!(v["status"], "ok");
 
-    let out = run(&d, &["--json", "ui-spec", "deprecate", "UI-001"]);
-    assert!(out.status.success());
-    let v: serde_json::Value = serde_json::from_str(stdout(&out).trim()).unwrap();
-    assert_eq!(v["id"], "UI-001");
-    assert_eq!(v["status"], "ok");
-
-    let out = run(&d, &["--json", "ui-spec", "restore", "UI-001"]);
+    let out = run(&d, &["--json", "ui-spec", "archive", "UI-001"]);
     assert!(out.status.success());
     let v: serde_json::Value = serde_json::from_str(stdout(&out).trim()).unwrap();
     assert_eq!(v["id"], "UI-001");
@@ -591,7 +564,9 @@ fn ui_spec_help_is_available() {
     let out = run(&d, &["ui-spec", "--help"]);
     assert!(out.status.success());
     let s = stdout(&out);
-    for sub in ["create", "list", "view", "edit", "deprecate", "restore"] {
+    for sub in [
+        "create", "list", "view", "edit", "archive", "delete", "status",
+    ] {
         assert!(s.contains(sub), "help missing {}", sub);
     }
     let _ = fs::remove_dir_all(&d);

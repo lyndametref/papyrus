@@ -102,13 +102,13 @@ fn use_case_basic_lifecycle() {
     assert!(s.contains("## Description\nNew desc"));
 
     // Deprecate: file moves, list hides it, view still works.
-    let out = run(&d, &["use-case", "deprecate", "UC-001"]);
+    let out = run(&d, &["use-case", "archive", "UC-001"]);
     assert!(
         out.status.success(),
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    let dep = d.join("docs/use-cases/deprecated/UC-001.md");
+    let dep = d.join("docs/use-cases/archived/UC-001.md");
     assert!(dep.exists());
     assert!(!path.exists());
 
@@ -120,37 +120,19 @@ fn use_case_basic_lifecycle() {
     assert!(out.status.success());
     assert!(stdout(&out).contains("New desc"));
 
-    // Deprecating again is a validation error.
-    let out = run(&d, &["use-case", "deprecate", "UC-001"]);
-    assert_eq!(out.status.code(), Some(4));
-
-    // Restore preserves ID and content.
-    let before = fs::read_to_string(&dep).unwrap();
-    let out = run(&d, &["use-case", "restore", "UC-001"]);
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    assert!(path.exists());
-    assert!(!dep.exists());
-    assert_eq!(fs::read_to_string(&path).unwrap(), before);
-
-    let out = run(&d, &["use-case", "list"]);
-    assert!(stdout(&out).contains("UC-001 New title"));
-
-    // Restoring an active spec is a validation error.
-    let out = run(&d, &["use-case", "restore", "UC-001"]);
-    assert_eq!(out.status.code(), Some(4));
+    // Archiving again is idempotent.
+    let out = run(&d, &["use-case", "archive", "UC-001"]);
+    assert!(out.status.success());
 
     for args in [
         vec!["use-case", "view", "NOPE"],
         vec!["use-case", "edit", "NOPE", "--title", "t"],
-        vec!["use-case", "deprecate", "NOPE"],
+        vec!["use-case", "archive", "NOPE"],
         vec!["use-case", "restore", "NOPE"],
     ] {
         let out = run(&d, &args);
-        assert_eq!(out.status.code(), Some(3), "args={:?}", args);
+        let expected = if args.contains(&"restore") { 2 } else { 3 };
+        assert_eq!(out.status.code(), Some(expected), "args={:?}", args);
     }
 
     // IDs resolve case-insensitively and report the canonical ID.
@@ -225,7 +207,7 @@ fn use_case_respects_configured_prefix_padding_and_directory() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    // Need new id due to existing? scan includes old dir? Actually active dir changed, scan old? new active empty, but deprecated? deprecated under new active. IDs may reset? Let's just create and check path.
+    // Need new id due to existing? scan includes old dir? Actually active dir changed, scan old? new active empty, but archived? archived under new active. IDs may reset? Let's just create and check path.
     let out = create(&d, "InCustom", "d");
     assert!(out.status.success());
     assert!(
@@ -300,11 +282,7 @@ fn use_case_json_outputs() {
     assert_eq!(v["status"], "ok");
     assert_eq!(v["id"], "UC-001");
 
-    let out = run(&d, &["--json", "use-case", "deprecate", "UC-001"]);
-    let v: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
-    assert_eq!(v["status"], "ok");
-
-    let out = run(&d, &["--json", "use-case", "restore", "UC-001"]);
+    let out = run(&d, &["--json", "use-case", "archive", "UC-001"]);
     let v: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
     assert_eq!(v["status"], "ok");
 
@@ -323,11 +301,11 @@ fn use_case_disabled_type() {
     assert!(out.status.success());
 
     let out = create(&d, "T", "d");
-    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(out.status.code(), Some(2));
     assert!(!d.join("docs/use-cases/UC-001.md").exists());
 
     let out = run(&d, &["use-case", "list"]);
-    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(out.status.code(), Some(2));
 
     let _ = fs::remove_dir_all(&d);
 }
@@ -454,7 +432,7 @@ fn use_case_applicability_and_front_matter() {
     assert!(!content.contains("## Applicability"));
 
     // deprecation visibility
-    let out = run(&d, &["use-case", "deprecate", &id]);
+    let out = run(&d, &["use-case", "archive", &id]);
     assert!(out.status.success());
     let out = run(&d, &["use-case", "list"]);
     assert!(!stdout(&out).contains(&id));

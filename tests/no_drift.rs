@@ -305,7 +305,7 @@ fn no_hardcoded_record_directories() {
         "tasks/archived",
         "milestones/archived",
         "decisions/archived",
-        "deprecated/",
+        "archived/",
     ];
     check(
         "hardcoded record-directory literals:",

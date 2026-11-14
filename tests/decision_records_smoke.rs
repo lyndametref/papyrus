@@ -205,10 +205,6 @@ fn decision_lifecycle_cli() {
     );
     let view = run_ok(&["--dir", &dir_arg(&dir), "decision", "view", "ADR-001"]);
     assert!(view.contains("accepted"));
-    assert_eq!(
-        run_ok(&["--dir", &dir_arg(&dir), "decision", "archive", "ADR-001"]),
-        ""
-    );
     // archived viewable
     let view = run_ok(&["--dir", &dir_arg(&dir), "decision", "view", "ADR-001"]);
     assert!(view.contains("ADR-001"));

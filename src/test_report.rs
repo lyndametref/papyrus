@@ -53,10 +53,16 @@ pub enum TestReportCmd {
         #[arg(long = "reference")]
         reference: Vec<String>,
     },
-    /// Move a test report to the deprecated folder.
-    Deprecate { id: String },
-    /// Return a deprecated test report to the active folder.
-    Restore { id: String },
+    /// Archive.
+    Archive { id: String },
+    /// Delete.
+    Delete {
+        id: String,
+        #[arg(long)]
+        force: bool,
+    },
+    /// Status.
+    Status { id: String, value: String },
 }
 
 pub fn run(ctx: &Context, cmd: TestReportCmd) -> Result<CommandOutput, AppError> {
@@ -103,8 +109,13 @@ pub fn run(ctx: &Context, cmd: TestReportCmd) -> Result<CommandOutput, AppError>
             &reference,
             editor,
         ),
-        TestReportCmd::Deprecate { id } => deprecate(ctx, &id),
-        TestReportCmd::Restore { id } => restore(ctx, &id),
+        TestReportCmd::Archive { id } => crate::document::archive(ctx, "test-report", &id),
+        TestReportCmd::Delete { id, force } => {
+            crate::document::delete(ctx, "test-report", &id, force)
+        }
+        TestReportCmd::Status { id, value } => {
+            crate::document::status(ctx, "test-report", &id, &value)
+        }
     }
 }
 
@@ -149,8 +160,8 @@ fn active_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
     Context::ensure_within(&ctx.project_dir, &raw)
 }
 
-fn deprecated_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let raw = active_dir(ctx, cfg)?.join("deprecated");
+fn archived_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
+    let raw = active_dir(ctx, cfg)?.join("archived");
     Context::ensure_within(&ctx.project_dir, &raw)
 }
 
@@ -373,7 +384,7 @@ fn view(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
         .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
     let dotted = descriptor.is_dotted_id();
     let active = active_dir(ctx, &cfg)?;
-    let deprecated = deprecated_dir(ctx, &cfg)?;
+    let deprecated = archived_dir(ctx, &cfg)?;
     let _ = ensure_dirs(&active);
     let _ = ensure_dirs(&deprecated);
     let record =
@@ -429,7 +440,7 @@ fn edit(
         .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
     let dotted = descriptor.is_dotted_id();
     let active = active_dir(ctx, &cfg)?;
-    let deprecated = deprecated_dir(ctx, &cfg)?;
+    let deprecated = archived_dir(ctx, &cfg)?;
     let _ = ensure_dirs(&active);
     let _ = ensure_dirs(&deprecated);
     let resolved =
@@ -541,88 +552,6 @@ fn edit(
     if let Some(command) = editor_cmd {
         run_editor(&command, &safe_path)?;
     }
-
-    let json = if ctx.json {
-        Some(serde_json::json!({"status": "ok", "id": id}))
-    } else {
-        None
-    };
-    Ok(CommandOutput {
-        text: String::new(),
-        json,
-    })
-}
-
-fn deprecate(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
-    let requested = sanitize_field(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let entry = type_entry(&cfg)?;
-    let descriptor = crate::record::descriptor::descriptor_for_doc_type("test-report")
-        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
-    let dotted = descriptor.is_dotted_id();
-    let active = active_dir(ctx, &cfg)?;
-    let deprecated = deprecated_dir(ctx, &cfg)?;
-    let _ = ensure_dirs(&active);
-    ensure_dirs(&deprecated)?;
-
-    let record =
-        active_or_deprecated(ctx, &active, &deprecated, &requested, &entry.prefix, dotted)?;
-    record.ensure_writable()?;
-    let id = record.id.clone();
-    if record.path.parent() != Some(active.as_path()) {
-        return Err(AppError::Validation(format!("already deprecated: {}", id)));
-    }
-    let file_name = record
-        .path
-        .file_name()
-        .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?
-        .to_owned();
-    let destination = Context::ensure_within(&ctx.project_dir, &deprecated.join(file_name))?;
-    if destination.exists() {
-        return Err(AppError::Validation(format!("already deprecated: {}", id)));
-    }
-    crate::record::store::move_record(ctx, &record.path, &destination)?;
-
-    let json = if ctx.json {
-        Some(serde_json::json!({"status": "ok", "id": id}))
-    } else {
-        None
-    };
-    Ok(CommandOutput {
-        text: String::new(),
-        json,
-    })
-}
-
-fn restore(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
-    let requested = sanitize_field(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let entry = type_entry(&cfg)?;
-    let descriptor = crate::record::descriptor::descriptor_for_doc_type("test-report")
-        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
-    let dotted = descriptor.is_dotted_id();
-    let active = active_dir(ctx, &cfg)?;
-    let deprecated = deprecated_dir(ctx, &cfg)?;
-    let _ = ensure_dirs(&active);
-    let _ = ensure_dirs(&deprecated);
-
-    let record =
-        active_or_deprecated(ctx, &active, &deprecated, &requested, &entry.prefix, dotted)?;
-    record.ensure_writable()?;
-    let id = record.id.clone();
-    if record.path.parent() != Some(deprecated.as_path()) {
-        return Err(AppError::Validation(format!("not deprecated: {}", id)));
-    }
-    let file_name = record
-        .path
-        .file_name()
-        .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?
-        .to_owned();
-    let destination = Context::ensure_within(&ctx.project_dir, &active.join(file_name))?;
-    if destination.exists() {
-        return Err(AppError::Validation(format!("not deprecated: {}", id)));
-    }
-    crate::record::store::move_record(ctx, &record.path, &destination)?;
 
     let json = if ctx.json {
         Some(serde_json::json!({"status": "ok", "id": id}))

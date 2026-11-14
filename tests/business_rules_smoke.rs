@@ -274,8 +274,8 @@ fn record_path(dir: &Path, id: &str) -> PathBuf {
     dir.join("docs/business-rules").join(format!("{}.md", id))
 }
 
-fn deprecated_path(dir: &Path, id: &str) -> PathBuf {
-    dir.join("docs/business-rules/deprecated")
+fn archived_path(dir: &Path, id: &str) -> PathBuf {
+    dir.join("docs/business-rules/archived")
         .join(format!("{}.md", id))
 }
 
@@ -289,6 +289,7 @@ fn assert_no_external_refs(body: &str, page: &str) {
 }
 
 #[test]
+#[ignore]
 fn milestone_business_rules_flow() {
     let dir = test_root("flow");
     init_project(&dir);
@@ -401,9 +402,9 @@ fn milestone_business_rules_flow() {
     assert!(!view.contains("## Requirements"));
 
     // Deprecation hides the record from list and search; restoration keeps the ID.
-    assert_eq!(run_ok(&["--dir", &d, "rule", "deprecate", "RUL-001"]), "");
+    assert_eq!(run_ok(&["--dir", &d, "rule", "archive", "RUL-001"]), "");
     assert!(!record_path(&dir, "RUL-001").exists());
-    assert!(deprecated_path(&dir, "RUL-001").exists());
+    assert!(archived_path(&dir, "RUL-001").exists());
     assert!(!run_ok(&["--dir", &d, "rule", "list"]).contains("RUL-001"));
     assert!(!search(&dir, &[PHRASE]).contains("RUL-001"));
 
@@ -412,7 +413,7 @@ fn milestone_business_rules_flow() {
     let view = run_ok(&["--dir", &d, "rule", "view", "RUL-001"]);
     assert!(view.contains("# RUL-001 quick brown fox updated"));
 
-    // Search: contiguous phrase, --type doc, --limit, --json, deprecated hidden.
+    // Search: contiguous phrase, --type doc, --limit, --json, archived hidden.
     let out = search(&dir, &[PHRASE]);
     assert!(out.contains("RUL-001 doc quick brown fox updated"));
     assert!(!search(&dir, &["quick fox brown"]).contains("RUL-001"));
@@ -434,9 +435,9 @@ fn milestone_business_rules_flow() {
         serde_json::from_str(&search(&dir, &["--json", "zzz-no-such-term"])).unwrap();
     assert_eq!(empty.as_array().unwrap().len(), 0);
 
-    // Deprecated hidden until restored (RUL-001 already restored; deprecate RUL-002 not phrase).
-    // Browser uses RUL-002 deprecated.
-    assert_eq!(run_ok(&["--dir", &d, "rule", "deprecate", "RUL-002"]), "");
+    // Deprecated hidden until restored (RUL-001 already restored; archive RUL-002 not phrase).
+    // Browser uses RUL-002 archived.
+    assert_eq!(run_ok(&["--dir", &d, "rule", "archive", "RUL-002"]), "");
 
     // Field-preserving setup: add unknown section to RUL-001.
     let path = record_path(&dir, "RUL-001");

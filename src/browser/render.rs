@@ -4296,7 +4296,7 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
                 (
                     "Document types and directories",
                     "Enabled types ({enabled_doc_types}) are stored under {doc_directory} in their configured directories. Disabled types are hidden.",
-                    "papyrus req create \"Title\"\npapyrus nfreq create \"Title\"",
+                    "papyrus req create \"Title\"\npapyrus nfr create \"Title\"",
                 ),
                 (
                     "Business rules, glossary, specifications",

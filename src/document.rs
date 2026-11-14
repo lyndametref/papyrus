@@ -50,6 +50,7 @@ pub struct DocumentInvocation {
     pub references: Vec<String>,
     pub editor: bool,
     pub status_value: Option<String>,
+    pub force: bool,
 }
 
 pub fn run(
@@ -101,15 +102,9 @@ pub fn run(
                 slug
             ))),
         },
-        DocumentVerb::Archive => archive_record(ctx, descriptor, &slug, invocation.id),
-        DocumentVerb::Delete => delete_record(ctx, descriptor, &slug, invocation.id),
-        DocumentVerb::Status => status_record(
-            ctx,
-            descriptor,
-            &slug,
-            invocation.id,
-            invocation.status_value,
-        ),
+        DocumentVerb::Archive => archive_record(ctx, &slug, invocation.id),
+        DocumentVerb::Delete => delete_record(ctx, &slug, invocation.id, invocation.force),
+        DocumentVerb::Status => status_record(ctx, &slug, invocation.id, invocation.status_value),
     }
 }
 
@@ -500,9 +495,8 @@ fn edit_generic(
     })
 }
 
-fn archive_record(
+pub fn archive_record(
     ctx: &Context,
-    _descriptor: &TypeDescriptor,
     slug: &str,
     id: Option<String>,
 ) -> Result<crate::CommandOutput, AppError> {
@@ -521,15 +515,36 @@ fn archive_record(
     })
 }
 
-fn delete_record(
+pub fn delete_record(
     ctx: &Context,
-    _descriptor: &TypeDescriptor,
     slug: &str,
     id: Option<String>,
+    force: bool,
 ) -> Result<crate::CommandOutput, AppError> {
     let id_raw = id.ok_or_else(|| AppError::Validation("id is required".to_string()))?;
     let requested = sanitize_field(&id_raw)?;
     let rd = record_descriptor_for(slug)?;
+    if !force {
+        use std::io::{self, Write};
+        print!("Delete {}? [y/N] ", requested);
+        let _ = io::stdout().flush();
+        let mut input = String::new();
+        io::stdin()
+            .read_line(&mut input)
+            .map_err(|e| AppError::Runtime(e.to_string()))?;
+        let ans = input.trim().to_lowercase();
+        if ans != "y" && ans != "yes" {
+            let json = if ctx.json {
+                Some(serde_json::json!({"status": "aborted", "id": requested}))
+            } else {
+                None
+            };
+            return Ok(crate::CommandOutput {
+                text: String::new(),
+                json,
+            });
+        }
+    }
     record::store::delete(ctx, &rd, &requested)?;
     let json = if ctx.json {
         Some(json!({"status": "ok", "id": requested}))
@@ -542,9 +557,8 @@ fn delete_record(
     })
 }
 
-fn status_record(
+pub fn status_record(
     ctx: &Context,
-    _descriptor: &TypeDescriptor,
     slug: &str,
     id: Option<String>,
     value: Option<String>,
@@ -595,6 +609,28 @@ fn run_editor(command: &str, path: &std::path::Path) -> Result<(), AppError> {
         return Err(AppError::Runtime(format!("editor exited with {}", status)));
     }
     Ok(())
+}
+
+pub fn archive(ctx: &Context, slug: &str, id: &str) -> Result<crate::CommandOutput, AppError> {
+    archive_record(ctx, slug, Some(id.to_string()))
+}
+
+pub fn delete(
+    ctx: &Context,
+    slug: &str,
+    id: &str,
+    force: bool,
+) -> Result<crate::CommandOutput, AppError> {
+    delete_record(ctx, slug, Some(id.to_string()), force)
+}
+
+pub fn status(
+    ctx: &Context,
+    slug: &str,
+    id: &str,
+    value: &str,
+) -> Result<crate::CommandOutput, AppError> {
+    status_record(ctx, slug, Some(id.to_string()), Some(value.to_string()))
 }
 
 #[cfg(test)]
@@ -661,6 +697,7 @@ mod tests {
             references,
             editor: false,
             status_value,
+            force: true,
         }
     }
 
@@ -1636,6 +1673,7 @@ mod tests {
             references: vec![],
             editor: true,
             status_value: None,
+            force: true,
         };
         run(&c, &reg, inv).unwrap();
         let after = std::fs::read_to_string(&path).unwrap();

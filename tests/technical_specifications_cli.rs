@@ -105,13 +105,13 @@ fn tech_spec_basic_lifecycle() {
     assert!(s.contains("## Description\nNew desc"));
 
     // Deprecate: file moves, list hides it, view still works.
-    let out = run(&d, &["tech-spec", "deprecate", "TECH-001"]);
+    let out = run(&d, &["tech-spec", "archive", "TECH-001"]);
     assert!(
         out.status.success(),
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    let dep = d.join("docs/technical/deprecated/TECH-001.md");
+    let dep = d.join("docs/technical/archived/TECH-001.md");
     assert!(dep.exists());
     assert!(!path.exists());
 
@@ -123,37 +123,19 @@ fn tech_spec_basic_lifecycle() {
     assert!(out.status.success());
     assert!(stdout(&out).contains("New desc"));
 
-    // Deprecating again is a validation error.
-    let out = run(&d, &["tech-spec", "deprecate", "TECH-001"]);
-    assert_eq!(out.status.code(), Some(4));
-
-    // Restore preserves ID and content.
-    let before = fs::read_to_string(&dep).unwrap();
-    let out = run(&d, &["tech-spec", "restore", "TECH-001"]);
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    assert!(path.exists());
-    assert!(!dep.exists());
-    assert_eq!(fs::read_to_string(&path).unwrap(), before);
-
-    let out = run(&d, &["tech-spec", "list"]);
-    assert!(stdout(&out).contains("TECH-001 New title"));
-
-    // Restoring an active spec is a validation error.
-    let out = run(&d, &["tech-spec", "restore", "TECH-001"]);
-    assert_eq!(out.status.code(), Some(4));
+    // Archiving again is idempotent.
+    let out = run(&d, &["tech-spec", "archive", "TECH-001"]);
+    assert!(out.status.success());
 
     for args in [
         vec!["tech-spec", "view", "NOPE"],
         vec!["tech-spec", "edit", "NOPE", "--title", "t"],
-        vec!["tech-spec", "deprecate", "NOPE"],
+        vec!["tech-spec", "archive", "NOPE"],
         vec!["tech-spec", "restore", "NOPE"],
     ] {
         let out = run(&d, &args);
-        assert_eq!(out.status.code(), Some(3), "args={:?}", args);
+        let expected = if args.contains(&"restore") { 2 } else { 3 };
+        assert_eq!(out.status.code(), Some(expected), "args={:?}", args);
     }
 
     // IDs resolve case-insensitively and report the canonical ID.
@@ -228,7 +210,7 @@ fn tech_spec_respects_configured_prefix_padding_and_directory() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    // Need new id due to existing? scan includes old dir? Actually active dir changed, scan old? new active empty, but deprecated? deprecated under new active. IDs may reset? Let's just create and check path.
+    // Need new id due to existing? scan includes old dir? Actually active dir changed, scan old? new active empty, but archived? archived under new active. IDs may reset? Let's just create and check path.
     let out = create(&d, "InCustom", "d");
     assert!(out.status.success());
     assert!(
@@ -303,11 +285,7 @@ fn tech_spec_json_outputs() {
     assert_eq!(v["status"], "ok");
     assert_eq!(v["id"], "TECH-001");
 
-    let out = run(&d, &["--json", "tech-spec", "deprecate", "TECH-001"]);
-    let v: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
-    assert_eq!(v["status"], "ok");
-
-    let out = run(&d, &["--json", "tech-spec", "restore", "TECH-001"]);
+    let out = run(&d, &["--json", "tech-spec", "archive", "TECH-001"]);
     let v: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
     assert_eq!(v["status"], "ok");
 
@@ -326,11 +304,11 @@ fn tech_spec_disabled_type() {
     assert!(out.status.success());
 
     let out = create(&d, "T", "d");
-    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(out.status.code(), Some(2));
     assert!(!d.join("docs/technical/TECH-001.md").exists());
 
     let out = run(&d, &["tech-spec", "list"]);
-    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(out.status.code(), Some(2));
 
     let _ = fs::remove_dir_all(&d);
 }
