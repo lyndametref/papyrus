@@ -8,6 +8,8 @@ permission:
   edit:
     "*": deny
     "docs/specifications/**": allow
+    "README.md": allow
+    "docs/release-1.0-upgrade-notes.md": allow
   bash:
     "backlog *": allow
     "*": deny
