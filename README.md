@@ -14,9 +14,13 @@ Release 1.0 stops reading the Backlog.md on-disk layout. If your project's backl
 
 Run it explicitly: `papyrus import backlog --from <source-project-dir> --dry-run`. Review the printed plan, keep the source store until the import is verified, then run the same command without `--dry-run`. Imported records receive fresh Papyrus IDs and milestone numbers; `papyrus import backlog` is the only bridge from a Backlog.md store. Full instructions, options, caveats, and the rest of the Release 1.0 change summary: [Release 1.0 upgrade notes](docs/release-1.0-upgrade-notes.md).
 
+Release 1.0 also makes document types configuration-defined. Static per-type document commands and the `nfreq` alias are gone, `deploy` is no longer seeded, and document `deprecate`/`restore` no longer exist. If you used any of them, or kept documents under `deprecated/`, follow [Document types are now configuration-defined](docs/release-1.0-upgrade-notes.md#document-types-are-now-configuration-defined).
+
 ---
 
 ## Man Page (`papyrus(1)`)
+
+Scope: this section is the in-repo command reference. It documents the built-in commands and the document command family generically; the command name for each document type is an enabled `document_types` slug. Config-defined slugs have no man page: ADR-0021 is Proposed and the scope decision is deferred, and NFR-03.003 is not claimed for them.
 
 <pre>
 PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
@@ -38,7 +42,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        - **Backlog management** - tasks, milestones, releases, and decisions.
         - **Documentation management** - business and non-functional requirements, glossary terms, UI and technical specifications, audit records, business rules, use cases, test cases, and test reports.
 
-       All project data lives in the project directory selected with <b>--dir</b> (default: the current working directory). IDs are generated automatically and remain stable across archive/restore and deprecate/restore cycles.
+       All project data lives in the project directory selected with <b>--dir</b> (default: the current working directory). IDs are generated automatically and remain stable across status changes and archive. Archived tasks can be restored; document records cannot.
 
 <b style="color: light-dark(#0969da, #58a6ff);">GLOBAL OPTIONS</b>
 
@@ -88,7 +92,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        papyrus config unset &lt;key&gt;
        </code>
        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
-       Print all effective keys, including defaults.
+       Print the effective keys as dotted <b>key: value</b> lines.
 
        <b style="color: light-dark(#8250df, #d2a8ff);">get &lt;key&gt;</b>
        Print one effective value.
@@ -405,693 +409,76 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
        Decision records follow the Nygard ADR template: Title, Status, Decision, Context, and Consequences. Statuses are <b>proposed</b>, <b>accepted</b>, <b>rejected</b>, <b>deprecated</b>, and <b>superseded</b>.
 
-<b style="color: light-dark(#0969da, #58a6ff);">req</b>
+<b style="color: light-dark(#0969da, #58a6ff);">&lt;document-slug&gt;</b>
 
-         Manage business requirements (REQ-...). Requirement-to-group cardinality is <b>1..1</b>; each group contains business requirements only.
+        Manage documents of a configured type. The command name is the enabled
+        <b>document_types</b> key. <b>papyrus --help</b> lists the enabled slugs
+        and <b>papyrus &lt;document-slug&gt; --help</b> lists that type's verbs.
+        <b>req</b> and <b>nfr</b> exist only because they are default entries.
 
        <code style="font-weight: bold;">
-        papyrus req create &lt;title&gt; [--title &lt;title&gt;] [--story &lt;text&gt;] [-d &lt;description&gt;] --group &lt;id&gt;
-       papyrus req create-group --title &lt;title&gt; [--story &lt;text&gt;] [-d &lt;description&gt;]
-       papyrus req list
-       papyrus req view &lt;id&gt;
-       papyrus req edit &lt;id&gt; [--title &lt;title&gt;] [--story &lt;text&gt;] [-d &lt;description&gt;] [--editor]
-       papyrus req deprecate &lt;id&gt;
-       papyrus req restore &lt;id&gt;
+       papyrus &lt;document-slug&gt; create &lt;title&gt; [options]
+       papyrus &lt;document-slug&gt; list
+       papyrus &lt;document-slug&gt; view &lt;id&gt;
+       papyrus &lt;document-slug&gt; edit &lt;id&gt; [options]
+       papyrus &lt;document-slug&gt; archive &lt;id&gt;
+       papyrus &lt;document-slug&gt; status &lt;id&gt; &lt;value&gt;
+       papyrus &lt;document-slug&gt; delete &lt;id&gt; [--force]
        </code>
 
-       <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
-       Create a business requirement.
+        A type with no built-in schema (a user-defined slug) uses the generic
+        baseline: <b>create &lt;title&gt; [-d, --description &lt;text&gt;]
+        [--label &lt;label&gt;...] [--reference &lt;value&gt;...]</b> and
+        <b>edit &lt;id&gt; [--title &lt;title&gt;] [-d, --description &lt;text&gt;]
+        [--label &lt;label&gt;...] [--reference &lt;value&gt;...] [--editor]</b>.
+        Built-in types keep their typed fields; <b>papyrus &lt;document-slug&gt; --help</b>
+        is authoritative for the selected type.
 
-          <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
-          Requirement title.
+       <b style="color: light-dark(#8250df, #d2a8ff);">status &lt;id&gt; &lt;value&gt;</b>
+        Set <b>active</b> or a declared custom status in place. Front-matter-backed
+        types have this verb; <b>ui-mockup</b> does not. <b>archived</b> is rejected;
+        use <b>archive</b>.
 
-          <b style="color: light-dark(#1a7f37, #3fb950);">--story &lt;text&gt;</b>
-          User story.
+       <b style="color: light-dark(#8250df, #d2a8ff);">archive &lt;id&gt;</b>
+        Move a document to the <b>archived/</b> subfolder of its type directory.
+        The ID is preserved and the previous custom status is replaced by
+        <b>archived</b>. Documents have no <b>restore</b>.
 
-          <b style="color: light-dark(#1a7f37, #3fb950);">-d, --description &lt;text&gt;</b>
-          Description.
+       <b style="color: light-dark(#8250df, #d2a8ff);">delete &lt;id&gt; [--force]</b>
+        Delete a document. An active document is archived first.
 
-          <b style="color: light-dark(#1a7f37, #3fb950);">--group &lt;id&gt;</b>
-           Add the requirement to its required business-requirement group.
+          <b style="color: light-dark(#1a7f37, #3fb950);">--force</b>
+          Skip confirmation prompt.
 
-       <b style="color: light-dark(#8250df, #d2a8ff);">create-group</b>
-        Create a business-requirement group. It can contain business requirements only.
+        Type-specific additions:
 
-          <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
-          Requirement group title.
+          <b style="color: light-dark(#1a7f37, #3fb950);">req</b> and <b>nfr</b>
+          add <b>create-group --title &lt;title&gt; [--story &lt;text&gt;] [-d &lt;description&gt;]</b>;
+          <b>create</b> requires <b>--group &lt;id&gt;</b>.
 
-          <b style="color: light-dark(#1a7f37, #3fb950);">--story &lt;text&gt;</b>
-          User story.
+          <b style="color: light-dark(#1a7f37, #3fb950);">ui-mockup</b>
+          adds <b>supersede</b> and has no <b>status</b>; its HTML metadata
+          states <b>pending</b>, <b>approved</b>, or <b>archived</b>.
 
-          <b style="color: light-dark(#1a7f37, #3fb950);">-d, --description &lt;text&gt;</b>
-          Description.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
-       List business requirements.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
-       View a business requirement.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
-       Edit a business requirement.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
-          Update the title.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--story &lt;text&gt;</b>
-          Update the user story.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">-d, --description &lt;text&gt;</b>
-          Update the description.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
-          Open the document body in $VISUAL or $EDITOR.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
-       Move a business requirement to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
-       Return a deprecated business requirement to its original folder. The ID is preserved.
-
-<b style="color: light-dark(#0969da, #58a6ff);">nfreq</b>
-
-          Manage non-functional requirements (NFR-...). Requirement-to-group cardinality is <b>1..1</b>; each group contains non-functional requirements only. Non-functional requirements may be referenced by tasks, decisions, and technical specifications.
+        The eleven defaults below are configuration written by <b>papyrus init</b>,
+        not a fixed command list. <b>deploy</b> is not seeded; declare it in
+        <b>document_types</b> to use <b>papyrus deploy</b>. A hand-written
+        <b>document_types</b> map replaces the defaults wholesale, so keep every
+        entry you still use.
 
        <code style="font-weight: bold;">
-        papyrus nfreq create &lt;title&gt; [-d &lt;description&gt;] --group &lt;id&gt;
-       papyrus nfreq create-group --title &lt;title&gt; [-d &lt;description&gt;]
-       papyrus nfreq list
-       papyrus nfreq view &lt;id&gt;
-       papyrus nfreq edit &lt;id&gt; [--title &lt;title&gt;] [-d &lt;description&gt;] [--editor]
-       papyrus nfreq deprecate &lt;id&gt;
-       papyrus nfreq restore &lt;id&gt;
+       req          REQ   requirements/business/
+       nfr          NFR   requirements/non-functional/
+       glossary     GLO   glossary/
+       rule         RUL   business-rules/
+       ui-spec      UI    specifications/ui/
+       ui-mockup    MOCK  specifications/ui/mockups/
+       audit        AUD   audit-records/
+       tech-spec    TECH  technical/
+       use-case     UC    use-cases/
+       test-case    TC    test-cases/
+       test-report  TR    test-reports/
        </code>
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
-       Create a non-functional requirement.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">-d, --description &lt;text&gt;</b>
-          Requirement description.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--group &lt;id&gt;</b>
-           Add the requirement to its required non-functional-requirement group.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">create-group</b>
-        Create a non-functional-requirement group. It can contain non-functional requirements only.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
-          Requirement group title.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">-d, --description &lt;text&gt;</b>
-          Description.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
-       List non-functional requirements.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
-       View a non-functional requirement.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
-       Edit a non-functional requirement.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
-          Update the title.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">-d, --description &lt;text&gt;</b>
-          Update the description.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
-          Open the document body in $VISUAL or $EDITOR.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
-       Move a non-functional requirement to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
-       Return a deprecated non-functional requirement to its original folder. The ID is preserved.
-
-<b style="color: light-dark(#0969da, #58a6ff);">glossary</b>
-
-       Manage glossary terms (GLO-...).
-
-       <code style="font-weight: bold;">
-       papyrus glossary create --term &lt;term&gt; --definition &lt;text&gt;
-       papyrus glossary list
-       papyrus glossary view &lt;id&gt;
-       papyrus glossary edit &lt;id&gt; [--term &lt;term&gt;] [--definition &lt;text&gt;] [--editor]
-       papyrus glossary deprecate &lt;id&gt;
-       papyrus glossary restore &lt;id&gt;
-       </code>
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
-       Create a glossary term.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--term &lt;term&gt;</b>
-          Glossary term.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--definition &lt;text&gt;</b>
-          Definition of the term.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
-       List glossary terms.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
-       View a glossary term.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
-       Edit a glossary term.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--term &lt;term&gt;</b>
-          Update the glossary term.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--definition &lt;text&gt;</b>
-          Update the definition.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
-          Open the document body in $VISUAL or $EDITOR.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
-       Move a glossary term to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
-       Return a deprecated glossary term to its original folder. The ID is preserved.
-
-<b style="color: light-dark(#0969da, #58a6ff);">ui-spec</b>
-
-        Manage UI specifications (UI-...).
-
-       <code style="font-weight: bold;">
-       papyrus ui-spec create &lt;title&gt; --view &lt;view&gt; --description &lt;text&gt;
-       papyrus ui-spec list
-       papyrus ui-spec view &lt;id&gt;
-       papyrus ui-spec edit &lt;id&gt; [--view &lt;view&gt;] [--description &lt;text&gt;] [--editor]
-       papyrus ui-spec deprecate &lt;id&gt;
-       papyrus ui-spec restore &lt;id&gt;
-       </code>
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
-       Create a UI specification.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--view &lt;view&gt;</b>
-          Associate the specification with a view.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
-          Description of the UI specification.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
-       List UI specifications.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
-       View a UI specification.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
-       Edit a UI specification.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--view &lt;view&gt;</b>
-          Update the associated view.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
-          Update the description.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
-          Open the document body in $VISUAL or $EDITOR.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
-        Move a UI specification to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
-        Return a deprecated UI specification to its original folder. The ID is preserved.
-
-<b style="color: light-dark(#0969da, #58a6ff);">tech-spec</b>
-
-        Manage technical specifications (TECH-...).
-
-        <code style="font-weight: bold;">
-        papyrus tech-spec create &lt;title&gt; --description &lt;text&gt;
-        papyrus tech-spec list
-        papyrus tech-spec view &lt;id&gt;
-        papyrus tech-spec edit &lt;id&gt; [--title &lt;title&gt;] [--description &lt;text&gt;] [--editor]
-        papyrus tech-spec deprecate &lt;id&gt;
-        papyrus tech-spec restore &lt;id&gt;
-        </code>
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
-        Create a technical specification.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">&lt;title&gt;</b>
-           Technical specification title (required).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
-           Description of the technical specification (required).
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
-        List technical specifications.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
-        View a technical specification.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
-        Edit a technical specification.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
-           Update the title.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
-           Update the description.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
-           Open the document body in $VISUAL or $EDITOR.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
-         Move a technical specification to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
-         Return a deprecated technical specification to its original folder. The ID is preserved.
-
-<b style="color: light-dark(#0969da, #58a6ff);">use-case</b>
-
-        Manage use cases (UC-...).
-
-        <code style="font-weight: bold;">
-        papyrus use-case create &lt;title&gt; --description &lt;text&gt; [--applicability &lt;text&gt;] [--label &lt;label&gt;...] [--reference &lt;value&gt;...]
-        papyrus use-case list
-        papyrus use-case view &lt;id&gt;
-        papyrus use-case edit &lt;id&gt; [--title &lt;title&gt;] [--description &lt;text&gt;] [--applicability &lt;text&gt;] [--label &lt;label&gt;...] [--reference &lt;value&gt;...] [--editor]
-        papyrus use-case deprecate &lt;id&gt;
-        papyrus use-case restore &lt;id&gt;
-        </code>
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
-        Create a use case.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">&lt;title&gt;</b>
-           Use case title (required).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
-           Description of the use case (required).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability &lt;text&gt;</b>
-           Optional applicability.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
-        List use cases.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
-        View a use case.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
-        Edit a use case.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
-           Update the title.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
-           Update the description.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability &lt;text&gt;</b>
-           Update the applicability (empty clears it).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
-           Open the document body in $VISUAL or $EDITOR.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
-         Move a use case to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
-         Return a deprecated use case to its original folder. The ID is preserved.
-
-<b style="color: light-dark(#0969da, #58a6ff);">test-case</b>
-
-        Manage test cases (TC-...).
-
-        <code style="font-weight: bold;">
-        papyrus test-case create &lt;title&gt; --description &lt;text&gt; [--applicability &lt;text&gt;] [--label &lt;label&gt;...] [--reference &lt;value&gt;...]
-        papyrus test-case list
-        papyrus test-case view &lt;id&gt;
-        papyrus test-case edit &lt;id&gt; [--title &lt;title&gt;] [--description &lt;text&gt;] [--applicability &lt;text&gt;] [--label &lt;label&gt;...] [--reference &lt;value&gt;...] [--editor]
-        papyrus test-case deprecate &lt;id&gt;
-        papyrus test-case restore &lt;id&gt;
-        </code>
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
-        Create a test case.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">&lt;title&gt;</b>
-           Test case title (required).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
-           Description of the test case (required).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability &lt;text&gt;</b>
-           Optional applicability.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
-        List test cases.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
-        View a test case.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
-        Edit a test case.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
-           Update the title.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
-           Update the description.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability &lt;text&gt;</b>
-           Update the applicability (empty clears it).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
-           Open the document body in $VISUAL or $EDITOR.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
-         Move a test case to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
-         Return a deprecated test case to its original folder. The ID is preserved.
-
-<b style="color: light-dark(#0969da, #58a6ff);">test-report</b>
-
-        Manage test reports (TR-...).
-
-        <code style="font-weight: bold;">
-        papyrus test-report create &lt;title&gt; --description &lt;text&gt; [--applicability &lt;text&gt;] [--label &lt;label&gt;...] [--reference &lt;value&gt;...]
-        papyrus test-report list
-        papyrus test-report view &lt;id&gt;
-        papyrus test-report edit &lt;id&gt; [--title &lt;title&gt;] [--description &lt;text&gt;] [--applicability &lt;text&gt;] [--label &lt;label&gt;...] [--reference &lt;value&gt;...] [--editor]
-        papyrus test-report deprecate &lt;id&gt;
-        papyrus test-report restore &lt;id&gt;
-        </code>
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
-        Create a test report.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">&lt;title&gt;</b>
-           Test report title (required).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
-           Description of the test report (required).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability &lt;text&gt;</b>
-           Optional applicability.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
-        List test reports.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
-        View a test report.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
-        Edit a test report.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
-           Update the title.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
-           Update the description.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability &lt;text&gt;</b>
-           Update the applicability (empty clears it).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
-           Open the document body in $VISUAL or $EDITOR.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
-         Move a test report to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
-         Return a deprecated test report to its original folder. The ID is preserved.
-
-<b style="color: light-dark(#0969da, #58a6ff);">rule</b>
-
-       Manage business rules (RUL-...).
-
-       <code style="font-weight: bold;">
-        papyrus rule create &lt;title&gt; --description &lt;text&gt; --rationale &lt;text&gt; --applicability &lt;text&gt; [--requirement &lt;id&gt;...]
-       papyrus rule list
-       papyrus rule view &lt;id&gt;
-        papyrus rule edit &lt;id&gt; [--title &lt;title&gt;] [-d &lt;description&gt;] [--requirement &lt;id&gt;...] [--no-requirement [&lt;id&gt;]] [--editor]
-       papyrus rule deprecate &lt;id&gt;
-       papyrus rule restore &lt;id&gt;
-        </code>
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
-        Create a business rule.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--description &lt;text&gt;</b>
-          State the business rule precisely.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--rationale &lt;text&gt;</b>
-          Explain why the rule exists, referencing its requirement(s).
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--applicability &lt;text&gt;</b>
-          Describe when and where the rule applies.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--requirement &lt;id&gt;</b>
-           Reference a business requirement. Repeatable; zero or more may be specified.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
-        List business rules.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
-        View a business rule.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
-        Edit a business rule.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
-          Update the title.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">-d, --description &lt;text&gt;</b>
-          Update the description.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--requirement &lt;id&gt;</b>
-           Add a business requirement to the existing list. Repeatable.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--no-requirement [&lt;id&gt;]</b>
-           Remove the specified business requirement; if no ID is given, remove all business-requirement references.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
-          Open the document body in $VISUAL or $EDITOR.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
-        Move a business rule to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
-       Return a deprecated business rule to its original folder. The ID is preserved.
-
-<b style="color: light-dark(#0969da, #58a6ff);">audit</b>
-
-        Manage audit records (<b>AUD-001</b>, ...).
-       <code style="font-weight: bold;">
-       papyrus audit create --title &lt;title&gt; --content &lt;text&gt; [--audit-type &lt;type&gt;]
-       papyrus audit list
-       papyrus audit view &lt;id&gt;
-       papyrus audit edit &lt;id&gt; [--title &lt;title&gt;] [--content &lt;text&gt;] [--audit-type &lt;type&gt;] [--editor]
-       papyrus audit deprecate &lt;id&gt;
-       papyrus audit restore &lt;id&gt;
-       </code>
-       <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
-       Create an audit record.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
-          Audit record title.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--content &lt;text&gt;</b>
-          Audit record content.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--audit-type &lt;type&gt;</b>
-          Audit record type. Built-in types: <b>security</b> (default), <b>licence</b>, and <b>architecture</b>; additional types are configurable.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
-       List audit records.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">view &lt;id&gt;</b>
-       View an audit record.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt;</b>
-       Edit an audit record.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--title &lt;title&gt;</b>
-          Update the title.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--content &lt;text&gt;</b>
-          Update the content.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--audit-type &lt;type&gt;</b>
-          Set the audit record type.
-
-          <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
-          Open the audit record content in $VISUAL or $EDITOR.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">deprecate &lt;id&gt;</b>
-       Deprecate an audit record.
-
-       <b style="color: light-dark(#8250df, #d2a8ff);">restore &lt;id&gt;</b>
-       Restore a deprecated audit record.
-
-<b style="color: light-dark(#0969da, #58a6ff);">use-case</b>
-
-        Manage use cases (UC-...).
-
-        <code style="font-weight: bold;">
-        papyrus use-case create <title> --description <text> [--applicability <text>]
-        papyrus use-case list
-        papyrus use-case view <id>
-        papyrus use-case edit <id> [--title <title>] [--description <text>] [--applicability <text>] [--editor]
-        papyrus use-case deprecate <id>
-        papyrus use-case restore <id>
-        </code>
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
-        Create a use case.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);"><title></b>
-           Use case title (required).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--description <text></b>
-           Description of the use case (required).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability <text></b>
-           Applicability of the use case (optional).
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
-        List use cases.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">view <id></b>
-        View a use case.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">edit <id></b>
-        Edit a use case.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--title <title></b>
-           Update the title.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--description <text></b>
-           Update the description.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability <text></b>
-           Update the applicability.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
-           Open the document body in $VISUAL or $EDITOR.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">deprecate <id></b>
-        Move a use case to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">restore <id></b>
-        Return a deprecated use case to its original folder. The ID is preserved.
-
-        Note: REQ-05.012 states use cases are managed with the `req` command; this is superseded by the decided dedicated `use-case` command (BR-018). Decided defaults: prefix `UC`, directory `use-cases/`, `enabled: true`; lifecycle `active -> deprecated`; visibility active=visible/deprecated=hidden; no ticket or milestone association. Records carry YAML front matter with the general fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references` (REQ-05.010); `description` and `applicability` are body fields, not front-matter keys.
-
-<b style="color: light-dark(#0969da, #58a6ff);">test-case</b>
-
-        Manage test cases (TC-...).
-
-        <code style="font-weight: bold;">
-        papyrus test-case create <title> --description <text> [--applicability <text>]
-        papyrus test-case list
-        papyrus test-case view <id>
-        papyrus test-case edit <id> [--title <title>] [--description <text>] [--applicability <text>] [--editor]
-        papyrus test-case deprecate <id>
-        papyrus test-case restore <id>
-        </code>
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
-        Create a test case.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);"><title></b>
-           Test case title (required).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--description <text></b>
-           Description of the test case (required).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability <text></b>
-           Applicability of the test case (optional).
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
-        List test cases.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">view <id></b>
-        View a test case.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">edit <id></b>
-        Edit a test case.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--title <title></b>
-           Update the title.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--description <text></b>
-           Update the description.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability <text></b>
-           Update the applicability.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
-           Open the document body in $VISUAL or $EDITOR.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">deprecate <id></b>
-        Move a test case to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">restore <id></b>
-        Return a deprecated test case to its original folder. The ID is preserved.
-
-        Note: REQ-05.013 states test cases are managed with the `req` command; this is superseded by the decided dedicated `test-case` command (BR-019). Decided defaults: prefix `TC`, directory `test-cases/`, `enabled: true`; lifecycle `active -> deprecated`; visibility active=visible/deprecated=hidden; no ticket or milestone association. Records carry YAML front matter with the general fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references` (REQ-05.010); `description` and `applicability` are body fields, not front-matter keys. Relationship to test reports is not stated (see BR-020).
-
-<b style="color: light-dark(#0969da, #58a6ff);">test-report</b>
-
-        Manage test reports (TR-...).
-
-        <code style="font-weight: bold;">
-        papyrus test-report create <title> --description <text> [--applicability <text>]
-        papyrus test-report list
-        papyrus test-report view <id>
-        papyrus test-report edit <id> [--title <title>] [--description <text>] [--applicability <text>] [--editor]
-        papyrus test-report deprecate <id>
-        papyrus test-report restore <id>
-        </code>
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
-        Create a test report.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);"><title></b>
-           Test report title (required).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--description <text></b>
-           Description of the test report (required).
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability <text></b>
-           Applicability of the test report (optional).
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
-        List test reports.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">view <id></b>
-        View a test report.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">edit <id></b>
-        Edit a test report.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--title <title></b>
-           Update the title.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--description <text></b>
-           Update the description.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--applicability <text></b>
-           Update the applicability.
-
-           <b style="color: light-dark(#1a7f37, #3fb950);">--editor</b>
-           Open the document body in $VISUAL or $EDITOR.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">deprecate <id></b>
-        Move a test report to the deprecated folder. Deprecated documents are hidden from lists, search, and the web UI.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">restore <id></b>
-        Return a deprecated test report to its original folder. The ID is preserved.
-
-        Note: REQ-05.014 states test reports are managed with the `req` command; this is superseded by the decided dedicated `test-report` command (BR-020). Decided defaults: prefix `TR`, directory `test-reports/`, `enabled: true`; lifecycle `active -> deprecated`; visibility active=visible/deprecated=hidden; no ticket or milestone association. Records carry YAML front matter with the general fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references` (REQ-05.010); `description` and `applicability` are body fields, not front-matter keys. Test-case coverage should be recorded in the general `references` field rather than a type-specific field. Pass/fail outcome storage is undecided.
 
 <b style="color: light-dark(#0969da, #58a6ff);">search</b>
 
@@ -1153,11 +540,21 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
 <b style="color: light-dark(#0969da, #58a6ff);">Documents</b>
 
-        Business requirements, non-functional requirements, glossary terms,
-        UI specifications, business rules, use cases, test cases, and test
-        reports share this lifecycle:
+        Front-matter-backed document types start at <b>active</b> and move to
+        <b>archived</b> only through <b>archive</b>:
 
-        <b>active</b> -&gt; <b>deprecated</b>
+        <b>active</b> -&gt; <b>archived</b>
+
+        A type may declare additional custom statuses in
+        <b>document_types.&lt;slug&gt;.statuses</b>. Custom statuses are ordinary
+        front-matter values: <b>status &lt;id&gt; &lt;value&gt;</b> sets one, and
+        <b>archive</b> replaces it with <b>archived</b>. <b>status</b> rejects
+        <b>archived</b> (exit 4), and documents have no <b>restore</b> and no
+        <b>deprecate</b>.
+
+        UI mockups are HTML records whose state lives in file metadata:
+        <b>pending</b>, <b>approved</b>, or <b>archived</b>. They have no
+        <b>status</b> command.
 
 <b style="color: light-dark(#0969da, #58a6ff);">FILES</b>
 
@@ -1177,82 +574,16 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
         <b style="color: light-dark(#8250df, #d2a8ff);">decisions/</b>
         Decision records. The <b>decision_directory</b> setting controls this path.
 
-        <b style="color: light-dark(#8250df, #d2a8ff);">docs/requirements/business/</b>
-        Business requirements. Path is <b>doc_directory</b> plus
-        <b>document_types.req.directory</b>.
+        <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.&lt;slug&gt;.directory&gt;/</b>
+        Active records of the document type whose <b>document_types</b> key is
+        <b>&lt;slug&gt;</b>. The key is also the command name.
 
-        <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.req.directory&gt;/deprecated/</b>
-        Deprecated business requirements, under the configured requirement folder.
+        <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.&lt;slug&gt;.directory&gt;/archived/</b>
+        Archived records of that type. <b>archive</b> is the only command that
+        moves a record into this folder.
 
-        <b style="color: light-dark(#8250df, #d2a8ff);">docs/requirements/non-functional/</b>
-        Non-functional requirements. Path is <b>doc_directory</b> plus
-        <b>document_types.nfr.directory</b>.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.nfr.directory&gt;/deprecated/</b>
-        Deprecated non-functional requirements, under the configured requirement folder.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">docs/glossary/</b>
-        Glossary terms. Path is <b>doc_directory</b> plus
-        <b>document_types.glossary.directory</b>.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.glossary.directory&gt;/deprecated/</b>
-        Deprecated glossary terms, under the configured glossary folder.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">docs/specifications/ui/</b>
-        UI specifications. Path is controlled by <b>doc_directory</b> and
-        <b>document_types.ui-spec.directory</b>.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.ui-spec.directory&gt;/deprecated/</b>
-        Deprecated UI specifications, under the configured UI specifications folder.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">docs/specifications/ui/mockups/</b>
-        UI mockups. Path is <b>doc_directory</b> plus
-        <b>document_types.ui-mockup.directory</b>.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.ui-mockup.directory&gt;/deprecated/</b>
-        Deprecated UI mockups, under the configured UI mockups folder.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">docs/business-rules/</b>
-        Business rules. Path is <b>doc_directory</b> plus
-        <b>document_types.rule.directory</b>.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.rule.directory&gt;/deprecated/</b>
-        Deprecated business rules, under the configured business rules folder.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">docs/audit-records/</b>
-        Audit records. Path is <b>doc_directory</b> plus
-        <b>document_types.audit.directory</b>.
-
-        <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.audit.directory&gt;/deprecated/</b>
-        Deprecated audit records, under the configured audit records folder.
-
-         <b style="color: light-dark(#8250df, #d2a8ff);">docs/technical/</b>
-         Technical specifications. Path is <b>doc_directory</b> plus
-         <b>document_types.tech-spec.directory</b>.
-
-         <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.tech-spec.directory&gt;/deprecated/</b>
-         Deprecated technical specifications, under the configured technical specifications folder.
-
-         <b style="color: light-dark(#8250df, #d2a8ff);">docs/use-cases/</b>
-         Use cases. Path is <b>doc_directory</b> plus
-         <b>document_types.use-case.directory</b>.
-
-         <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.use-case.directory&gt;/deprecated/</b>
-         Deprecated use cases, under the configured use cases folder.
-
-         <b style="color: light-dark(#8250df, #d2a8ff);">docs/test-cases/</b>
-         Test cases. Path is <b>doc_directory</b> plus
-         <b>document_types.test-case.directory</b>.
-
-         <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.test-case.directory&gt;/deprecated/</b>
-         Deprecated test cases, under the configured test cases folder.
-
-         <b style="color: light-dark(#8250df, #d2a8ff);">docs/test-reports/</b>
-         Test reports. Path is <b>doc_directory</b> plus
-         <b>document_types.test-report.directory</b>.
-
-         <b style="color: light-dark(#8250df, #d2a8ff);">&lt;doc_directory&gt;/&lt;document_types.test-report.directory&gt;/deprecated/</b>
-         Deprecated test reports, under the configured test reports folder.
+        A legacy <b>deprecated/</b> folder is inert: it is not read, migrated, or
+        inventoried. Move records out by hand; see the Release 1.0 upgrade notes.
 
 <b style="color: light-dark(#0969da, #58a6ff);">ENVIRONMENT</b>
 
@@ -1310,10 +641,22 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
         papyrus decision create "Use a single binary" --decision-type adr -d "One CLI, flat commands"
        </code>
 
-       Deprecate a document:
+       Archive a document and set a declared custom status:
        <code style="font-weight: bold;">
-       papyrus req deprecate REQ-003
-       papyrus req restore REQ-003
+       papyrus req archive REQ-003
+       papyrus req status REQ-004 review
+       </code>
+
+       Add a document type by editing papyrus.config.yml, then use its command.
+       A hand-written document_types map replaces the defaults wholesale, so keep
+       every entry you still use:
+       <code style="font-weight: bold;">
+       document_types:
+         # ... your existing entries ...
+         deploy: { prefix: DEP, directory: architecture/deployment/, enabled: true }
+       </code>
+       <code style="font-weight: bold;">
+       papyrus deploy list
        </code>
 
        Search everything:
@@ -1388,11 +731,12 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
        Decision records. Default: <b>decisions/</b>, outside the backlog store.
 
        <b style="color: light-dark(#8250df, #d2a8ff);">doc_directory</b>
-       Active documentation store. Default: <b>docs/</b>.
+       Root of the active documentation store. Default: <b>docs/</b>.
 
-       Each document type has its own configured directory relative to this path.
-       Deprecated documents are stored in a <b>deprecated/</b> subfolder within
-       their type directory.
+       Each document type stores its records under this path plus its
+       <b>document_types.&lt;slug&gt;.directory</b>. Archived records are stored in
+       an <b>archived/</b> subfolder of that type directory. A legacy
+       <b>deprecated/</b> folder is inert.
 
 <b style="color: light-dark(#0969da, #58a6ff);">Workflow</b>
 
@@ -1423,40 +767,79 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
 <b style="color: light-dark(#0969da, #58a6ff);">Documents</b>
 
        <b style="color: light-dark(#8250df, #d2a8ff);">document_types</b>
-       Document type keys, ID prefixes, directories relative to <b>doc_directory</b>,
-       and enabled flags. Deprecated documents are stored in a <b>deprecated/</b>
-       subfolder of each type directory. Default:
+       Document types keyed by slug. The slug is the command name:
+       <b>papyrus &lt;slug&gt;</b>. When this key is present in
+       <b>papyrus.config.yml</b>, exactly its entries exist: the default map is
+       replaced wholesale and no default entry is re-added. Removing an entry
+       stops managing its files without deleting them. <b>enabled: false</b>
+       keeps the entry, its prefix reservation, and its files, but removes the
+       command and the browser view.
+
+       Each entry has these fields:
+
+         <b>prefix</b>        ID prefix. Required. Unique across all entries,
+                     including disabled entries (case-insensitive); no
+                     whitespace, control characters, path separators, or "..".
+         <b>directory</b>     Directory relative to <b>doc_directory</b>. Required.
+                     Must stay inside the project and be unique among enabled
+                     entries.
+         <b>enabled</b>       Whether the type is active. Default: <b>true</b>.
+         <b>statuses</b>      Optional ordered status list. Must contain
+                     <b>active</b> and <b>archived</b> exactly once, with no
+                     duplicates. Values use the slug character set. Not allowed
+                     on <b>ui-mockup</b>.
+         <b>default_status</b>
+                     Status of a new record. Optional; defaults to <b>active</b>.
+                     Must be a declared status and must not be <b>archived</b>.
+                     Not allowed on <b>ui-mockup</b>.
+
+       The slug must use ASCII letters, digits, <b>_</b>, and <b>-</b>, must not
+       start with <b>-</b>, and must not match a built-in command name
+       (case-insensitive). A repeated YAML key is rejected.
+
+       The eleven defaults written by <b>papyrus init</b> (<b>deploy</b> is not
+       one of them):
 
        <code style="font-weight: bold;">
        document_types:
-         req:      { prefix: REQ, directory: requirements/business/,       enabled: true }
-         nfr:      { prefix: NFR, directory: requirements/non-functional/, enabled: true }
-         glossary: { prefix: GLO, directory: glossary/,                    enabled: true }
-         rule:     { prefix: RUL, directory: business-rules/,              enabled: true }
-         ui-spec:  { prefix: UI,  directory: specifications/ui/,           enabled: true }
+         req:      { prefix: REQ, directory: requirements/business/,       enabled: true, statuses: [active, archived] }
+         nfr:      { prefix: NFR, directory: requirements/non-functional/, enabled: true, statuses: [active, archived] }
+         glossary: { prefix: GLO, directory: glossary/,                    enabled: true, statuses: [active, archived] }
+         rule:     { prefix: RUL, directory: business-rules/,              enabled: true, statuses: [active, archived] }
+         ui-spec:  { prefix: UI,  directory: specifications/ui/,           enabled: true, statuses: [active, archived] }
          ui-mockup: { prefix: MOCK, directory: specifications/ui/mockups/, enabled: true }
-         tech-spec: { prefix: TECH, directory: technical/, enabled: true }
-         audit:    { prefix: AUD, directory: audit-records/,                enabled: true }
-         deploy:   { prefix: DEP, directory: architecture/deployment/,     enabled: true }
-         use-case: { prefix: UC,  directory: use-cases/,                  enabled: true }
-         test-case: { prefix: TC, directory: test-cases/,                enabled: true }
-         test-report: { prefix: TR, directory: test-reports/,            enabled: true }
+         audit:    { prefix: AUD, directory: audit-records/,               enabled: true, statuses: [active, archived] }
+         tech-spec: { prefix: TECH, directory: technical/,                 enabled: true, statuses: [active, archived] }
+         use-case: { prefix: UC,  directory: use-cases/,                   enabled: true, statuses: [active, archived] }
+         test-case: { prefix: TC, directory: test-cases/,                 enabled: true, statuses: [active, archived] }
+         test-report: { prefix: TR, directory: test-reports/,             enabled: true, statuses: [active, archived] }
        </code>
 
-       Each entry may declare <b>statuses</b>, an ordered custom status list that must contain
-       <b>active</b> and <b>archived</b>, and <b>default_status</b>. <b>document_types.&lt;slug&gt;.statuses</b>
-       is a list-valued key: write it with
-       <b>papyrus config set document_types.audit.statuses "active, archived, open"</b>. It is stored as a YAML flow
-       sequence (<b>[active, archived, open]</b>), and an empty value, an empty element, or an invalid status is rejected
-       without writing. Commas, quotes, and backslashes are not escaped. A status list may be omitted, in which case the
-       type uses <b>active</b> and <b>archived</b>; removing the declaration with <b>config unset</b> returns to that
-       default and is refused when <b>default_status</b> would no longer be declared.
+       Validation is fail-closed: an invalid configuration makes every command
+       that validates it exit <b>4</b> with a message naming
+       <b>document_types.&lt;slug&gt;.&lt;field&gt;</b>. Repair it with
+       <b>papyrus config get|set|unset|list</b>; <b>set</b> and <b>unset</b>
+       validate the merged configuration and write nothing when it is invalid.
+       A malformed or new entry must be defined by editing
+       <b>papyrus.config.yml</b>: a single <b>config set</b> cannot create a new
+       type because the entry would still lack its <b>prefix</b> or
+       <b>directory</b>. <b>papyrus init --force</b> replaces the configuration
+       file in full (the eleven defaults when non-interactive).
 
-       The <b>nfreq</b> command uses the <b>nfr</b> type key. Additional types may
-       be added. Disabled types cannot be created and are hidden from lists and search.
-       Use cases, test cases, and test reports use the <b>use-case</b>, <b>test-case</b>,
-       and <b>test-report</b> commands respectively (decided; <b>req</b> remains
-       business-requirements only; see BR-018, BR-019, and BR-020).
+       <b>statuses</b> and <b>document_types.&lt;slug&gt;.statuses</b> are
+       list-valued keys. Write them with a comma-separated value, for example
+       <b>papyrus config set document_types.audit.statuses "active, archived, review"</b>.
+       Each element is trimmed and stored as a YAML flow sequence
+       (<b>[active, archived, review]</b>); <b>config get</b> and
+       <b>config list</b> print that form. An empty value, an empty element, or a
+       control character is rejected and nothing is written. Commas, quotes, and
+       backslashes are not escaped: every comma separates elements, so a status
+       that must contain a comma can only be written by editing
+       <b>papyrus.config.yml</b> directly.
+
+       <b>req</b> and <b>nfr</b> are the default entries <b>req</b> and
+       <b>nfr</b>, not special commands; there is no <b>nfreq</b>. Disabled types
+       cannot be created and are hidden from lists and search.
 
 <b style="color: light-dark(#0969da, #58a6ff);">Web UI</b>
 
@@ -1489,19 +872,21 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
          bdr: { prefix: BDR, enabled: true }
 
        document_types:
-         req:      { prefix: REQ, directory: requirements/business/,       enabled: true }
-         nfr:      { prefix: NFR, directory: requirements/non-functional/, enabled: true }
-         glossary: { prefix: GLO, directory: glossary/,                    enabled: true }
-         rule:     { prefix: RUL, directory: business-rules/,              enabled: true }
-         ui-spec:  { prefix: UI,  directory: specifications/ui/,           enabled: true }
+         req:      { prefix: REQ, directory: requirements/business/,       enabled: true, statuses: [active, archived] }
+         nfr:      { prefix: NFR, directory: requirements/non-functional/, enabled: true, statuses: [active, archived] }
+         glossary: { prefix: GLO, directory: glossary/,                    enabled: true, statuses: [active, archived] }
+         rule:     { prefix: RUL, directory: business-rules/,              enabled: true, statuses: [active, archived] }
+         ui-spec:  { prefix: UI,  directory: specifications/ui/,           enabled: true, statuses: [active, archived] }
          ui-mockup: { prefix: MOCK, directory: specifications/ui/mockups/, enabled: true }
-         tech-spec: { prefix: TECH, directory: technical/, enabled: true }
-         audit:    { prefix: AUD, directory: audit-records/,                enabled: true }
-         deploy:   { prefix: DEP, directory: architecture/deployment/,     enabled: true }
-         use-case: { prefix: UC,  directory: use-cases/,                  enabled: true }
-         test-case: { prefix: TC, directory: test-cases/,                enabled: true }
-         test-report: { prefix: TR, directory: test-reports/,            enabled: true }
-       # Deprecated documents live under each type directory's deprecated/ subfolder.
+         audit:    { prefix: AUD, directory: audit-records/,               enabled: true, statuses: [active, archived, review], default_status: review }
+         tech-spec: { prefix: TECH, directory: technical/,                 enabled: true, statuses: [active, archived] }
+         use-case: { prefix: UC,  directory: use-cases/,                   enabled: true, statuses: [active, archived] }
+         test-case: { prefix: TC, directory: test-cases/,                 enabled: true, statuses: [active, archived] }
+         test-report: { prefix: TR, directory: test-reports/,             enabled: true, statuses: [active, archived] }
+       # Optional user-defined type. A hand-written map replaces the defaults,
+       # so keep the entries above when adding this one.
+       # deploy: { prefix: DEP, directory: architecture/deployment/, enabled: true }
+       # Archived records live under each type directory's archived/ subfolder.
 
        browser_host: 127.0.0.1
        browser_port: 6420
