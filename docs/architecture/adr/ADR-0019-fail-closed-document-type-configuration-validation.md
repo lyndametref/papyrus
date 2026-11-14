@@ -37,13 +37,13 @@ A typo in a slug therefore has two conflicting demands: the tool must refuse to 
 
    No trimming, lowercasing, or normalization is performed: `" Req"`, `"req "`, and `"REQ"` are rejected or accepted on their own merits, never repaired. This is NFR-02.002's "rejected rather than silently cleaned" applied to configuration.
 
-3. **Reserved names come from one constant.** `cli::BUILTIN_COMMANDS` (ADR-0016) is the only list of built-in command names; validation compares each slug against it and rejects a match. The comparison is **case-insensitive** (`Req` is rejected as well as `req`), because a case-variant slug would make help text, documentation, and diagnostics ambiguous even though clap's matching is case-sensitive. This is deliberately stricter than REQ-07.002's literal wording and is flagged in the intake report for requirement confirmation.
+3. **Reserved names come from one constant.** `cli::BUILTIN_COMMANDS` (ADR-0016) is the only list of built-in command names; validation compares each slug against it and rejects a match. The comparison is **case-insensitive** (`Req` is rejected as well as `req`), because a case-variant slug would make help text, documentation, and diagnostics ambiguous even though clap's matching is case-sensitive. REQ-07.002 requires this case-insensitive comparison, so a slug such as `Config` or `SEARCH` is rejected.
 
 4. **Duplicate keys are a parse error, not a merge.** The configuration file is read with a loader that detects a repeated mapping key, and a repeated `document_types.<slug>` (or any repeated key) is rejected with a validation outcome naming the key. Neither the first nor the last occurrence is silently kept, because either choice makes the effective type set depend on file order. The check happens on the raw file before defaults are merged, so a duplicate cannot be hidden by the merge.
 
-5. **Prefix constraints.** `prefix` must be non-empty after no normalization at all; it must contain no whitespace, control character, path separator, or `..`; and it must be unique among all configured document types, **including disabled ones**. Prefix uniqueness is what makes the record claim rule (`<PREFIX>-<digits>`) and ID allocation unambiguous (ADR-0018 decision 7); uniqueness across disabled entries prevents a later re-enable from creating a duplicate. This uniqueness rule is also stricter than the requirement text and is listed for confirmation.
+5. **Prefix constraints.** `prefix` must be non-empty after no normalization at all; it must contain no whitespace, control character, path separator, or `..`; and it must be unique among all configured document types, **including disabled ones**. Prefix uniqueness is what makes the record claim rule (`<PREFIX>-<digits>`) and ID allocation unambiguous (ADR-0018 decision 7); uniqueness across disabled entries prevents a later re-enable from creating a duplicate. REQ-07.002 requires this uniqueness across all configured document types, including disabled entries.
 
-6. **Directory constraints.** `directory` must be non-empty, relative, free of traversal segments and backslashes, and its resolved path must pass `Context::ensure_within` against the canonical project directory (NFR-04.002) — including after symlink resolution. Duplicate directories among **enabled** entries are rejected, because two enabled types sharing a folder make listing, archive location, and ID resolution ambiguous. The check is performed at load and again on every resolution through `record::store`; load-time validation is not treated as a substitute for the runtime boundary check.
+6. **Directory constraints.** `directory` must be non-empty, relative, free of traversal segments and backslashes, and its resolved path must pass `Context::ensure_within` against the canonical project directory (NFR-04.002) — including after symlink resolution. Duplicate directories among **enabled** entries are rejected, as required by REQ-07.002, because two enabled types sharing a folder make listing, archive location, and ID resolution ambiguous. The check is performed at load and again on every resolution through `record::store`; load-time validation is not treated as a substitute for the runtime boundary check.
 
 7. **Status lists are validated as a closed vocabulary.** For each entry:
    - `statuses`, when present, must be a non-empty list with no duplicates and must contain `active` and `archived` exactly once. Those two values are fixed: configuration cannot remove, rename, or replace them, and a custom status may not reuse either value.
@@ -86,7 +86,7 @@ A typo in a slug therefore has two conflicting demands: the tool must refuse to 
 **Negative:**
 
 - The whole-map semantics is a behaviour change for existing projects: a file that lists three document types now really has three, not eleven. Projects that relied on the merge gain types back only by re-adding entries or running `init --force`, and a project that relied on the seeded `deploy` entry must now declare it.
-- Case-insensitive reserved-name matching and prefix/directory uniqueness are stricter than the requirement text; a configuration that REQ-07.002 literally permits may be rejected. They remain flagged for confirmation.
+- Case-insensitive reserved-name matching, prefix uniqueness across all entries including disabled ones, and duplicate-directory rejection among enabled entries are required by REQ-07.002; a configuration violating any of them is rejected at load.
 - `config set` now rewrites the whole `document_types` map, producing a larger diff than a single-key edit and discarding comments in that section (the current writer already re-serializes YAML).
 - The repair mode of decision 10 is a deliberate, narrowly scoped hole in "fail closed": the tolerant load and the validated write are two different code paths and must stay visibly distinct.
 
@@ -94,7 +94,7 @@ A typo in a slug therefore has two conflicting demands: the tool must refuse to 
 
 - *Upgrade breakage*: a project whose configuration was only valid because defaults were merged now fails at load, and a project that used the seeded `deploy` entry loses that command. Mitigation: the release note documents both, the error names each missing entry, and `init --force` regenerates the default set.
 - *Validator/loader divergence*: `config get/set/unset` currently validate independently; they must call the same function, and a test asserts the same message from both surfaces. A second test asserts that repair mode rejects an invalid resulting configuration and writes nothing.
-- *Stricter rules reject valid projects*: flagged as a requirement question; if the user prefers the literal reading, decisions 3 and 5/6 lose the case-insensitive and uniqueness extensions without affecting anything else.
+- *Stricter rules reject valid projects*: no longer an open question; REQ-07.002 now requires case-insensitive reserved-name matching, prefix uniqueness across all entries, and duplicate-directory rejection among enabled entries.
 - *Status list read from the wrong source*: repair mode must validate the resulting list, not the file's existing list, or a `status` command could later accept a stale value; the test matrix covers add, remove, and redefine attempts.
 - *Path check bypass via a symlinked subdirectory*: `ensure_within` is applied at load and at every resolution, and a test covers a symlink inside `doc_directory` pointing outside the project.
 
@@ -111,8 +111,7 @@ A typo in a slug therefore has two conflicting demands: the tool must refuse to 
 
 ## Open Questions
 
-- Should a slug that matches a built-in name with different case (`Req`) be rejected (current decision) or accepted?
-- Should duplicate prefixes and duplicate enabled directories be rejected (current decision) or only the literal REQ checks performed?
+None. The questions raised by decisions 3, 5, and 6 are settled by REQ-07.002, which requires case-insensitive reserved-name matching, prefix uniqueness across all configured document types including disabled entries, and rejection of duplicate directories among enabled entries.
 
 ## Downstream constraints
 
