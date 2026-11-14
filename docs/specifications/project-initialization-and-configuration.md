@@ -1,6 +1,6 @@
 # Feature Specification — Project Initialization and Configuration Commands
 
-**Ticket:** TASK-2 / TASK-85 (spec revision)
+**Ticket:** TASK-2 / TASK-85 (spec revision); TASK-111 (list-valued configuration keys revision)
 **Milestone:** m-0 (Rust CLI Foundation and Requirements)
 **Status:** Refined (execution-ready)
 **UI mockups:** none
@@ -11,12 +11,15 @@ Deliver the `init` and `config` commands, plus project/configuration context sel
 
 This specification was revised (TASK-85) so that initialization, missing-configuration failure, and folder relocation match REQ-01.001, REQ-01.002, REQ-01.003 and ADR-0010 decision 8 (whole-folder relocation), including the browser configuration view as a consumer of the same `config set` path.
 
+It was revised again (TASK-111) so that the list-valued keys `statuses` and `document_types.<slug>.statuses` can be written through `config set` using a comma-separated value stored as a YAML flow sequence, and read back by `config get` and `config list` (REQ-01.002, REQ-07.002, ADR-0024).
+
 ## Scope
 
 ### In scope
 
 - `papyrus init <name> [--no-git] [--force]` (BR-002, REQ-01.001, REQ-01.006).
 - `papyrus config list|get|set|unset` with dotted keys and YAML-scalar values (BR-003, REQ-01.002).
+- List-valued keys `statuses` and `document_types.<slug>.statuses`: comma-separated values on `config set`, YAML flow-sequence storage, flow-form output from `config get`/`config list`, empty-value rejection, and validation of the resulting configuration before persistence (REQ-01.002, REQ-07.002, ADR-0024).
 - Project directory selection: `--dir`, `PAPYRUS_DIR`, then current working directory, in that precedence order (REQ-01.003).
 - Configuration file selection: `--config`, then `PAPYRUS_CONFIG`, then `<project_dir>/papyrus.config.yml` (REQ-01.003). No built-in-defaults fallback and no directory walk-up/discovery when none is found.
 - Common CLI controls and outcomes: `--json` (including errors), `--no-color` / `NO_COLOR`, `--version`, `-h`/`--help`, command help, and exit statuses 0/1/2/3/4 (REQ-01.004).
@@ -32,6 +35,8 @@ This specification was revised (TASK-85) so that initialization, missing-configu
 - Actual record ID assignment and archive/restore preservation logic — consumed by record commands in later tickets; this ticket delivers their configuration keys only.
 - Git workflows beyond invoking repository initialization when `--no-git` is absent.
 - UI mockups or web UI — none for this ticket.
+- List editing in the browser configuration view: the view's editable-key whitelist is unchanged, and a list key remains non-editable there (CLI `config set` only).
+- A quoting/escaping form for commas, `--append`/`--remove` flags, or a `config get --json` list mode beyond the existing JSON array (ADR-0024).
 - Non-amd64 or non-Debian distribution concerns — ADR-0002.
 
 ## Behavior
@@ -64,7 +69,7 @@ This specification was revised (TASK-85) so that initialization, missing-configu
 
 1. `papyrus config list` prints all effective keys, including defaults, in a stable order.
 2. `papyrus config get <key>` prints one effective value.
-3. `papyrus config set <key> <value>` persists one value; `<value>` is parsed as a YAML scalar.
+3. `papyrus config set <key> <value>` persists one value. For a scalar key, `<value>` is parsed as a YAML scalar, unchanged from the current behavior. For a list-valued key, `<value>` is a comma-separated list (see items 13–16).
 4. `papyrus config unset <key>` removes the configured key so its default applies.
 5. Nested keys use dotted notation (for example `document_types.req.enabled`).
 6. Keys and defaults match BR-016 (project name, prefixes, padding, date format, editor, paths, statuses, default status, decision/document types).
@@ -80,6 +85,14 @@ This specification was revised (TASK-85) so that initialization, missing-configu
     - On success the source folder no longer holds the moved content and is removed once empty.
     - Cross-device moves fall back to the atomic copy-then-remove sequence and are reported as non-atomic in the command output if a single rename is impossible.
 12. The browser configuration view (REQ-06.008) is a consumer of this same `config set` path: it invokes the relocation routine through `config set` and may not move folders itself. It performs no folder move of its own.
+13. **List-key classification.** A single declared classification names the list-valued keys: the top-level task `statuses` and each `document_types.<slug>.statuses`. Every other key is scalar, including `default_status`, `document_types.<slug>.default_status`, `prefix`, `directory`, `enabled`, `id_padding`, and `browser_*`. Classification depends only on the key; it never inspects the shape of the supplied value.
+14. **Comma-separated form.** For a list-valued key, `config set` splits the raw value on `,`, trims surrounding whitespace from each element, preserves element order, case, internal whitespace, and duplicates, and does not interpret YAML in the value (`true`, `1`, and `[a]` remain strings). An empty or whitespace-only value is rejected with exit 4 and a message naming the key. An element that is empty after trimming is rejected the same way; it is not dropped. A value containing a newline or other control character is rejected with exit 4.
+15. **No escaping or quoting.** Commas are separators only. Backslashes, single quotes, and double quotes have no escape meaning; `active\,archived` splits at the comma and is then rejected by status validation where the resulting elements are invalid. A value that must contain a comma can only be written by editing `papyrus.config.yml` directly. `config set --help` states this limitation.
+16. **Flow-sequence persistence.** A list value is written to `papyrus.config.yml` as a YAML flow sequence, for example `statuses: [ToDo, Initiated, Done]`. `config get` prints the same `[a, b]` form in the same order, for both file-sourced block lists and written flow lists. `config list` prints the top-level `statuses` key and every declared `document_types.<slug>.statuses` key in that form; it does not print the key for an entry that declares no `statuses`. JSON output keeps list values as JSON arrays.
+17. **Validate before write.** `config set` builds the configuration that would result, runs the ADR-0019 validator, and writes only if it is valid. A list that violates the status rules (empty, duplicate, missing `active`/`archived`, invalid status character, declared on `ui-mockup`, or a top-level `default_status` not in the new task list) is refused with exit 4 and the key named, and the existing file is byte-identical. When the existing file is otherwise invalid, the tolerant repair load applies: the change is applied and validated, and an invalid result is still refused.
+18. **Scalar keys unchanged.** For a non-list key a comma remains an ordinary character of the scalar value; no existing `config set` invocation changes meaning.
+19. **Unset unchanged.** `config unset` removes a list key; there is no clear-list operation and no empty list is written. The top-level key then falls back to the default task list. An absent `document_types.<slug>.statuses` declaration is reported by `config get` as a missing key (exit 3) and the effective document status model falls back to `active`/`archived`. Removing a declaration whose entry keeps a `default_status` that the fallback list would not contain is refused by the validator (exit 4) and the file is unchanged.
+20. **Documentation.** `papyrus(1)` (`config set`) and `papyrus-config(5)` (`statuses`, `document_types`) state the comma-separated form, flow-sequence storage, empty-value rejection, and no-escape limitation. No new flag is introduced.
 
 ### 4. Common CLI controls and outcomes
 
@@ -101,8 +114,8 @@ This specification was revised (TASK-85) so that initialization, missing-configu
 
 - `init`: input project name and optional flags; output is the created/updated project structure and `papyrus.config.yml`. On success prints nothing or a short success message; errors to stderr.
 - `config list`: output effective keys and values.
-- `config get <key>`: output one value.
-- `config set <key> <value>`: persists value; success output minimal. When the key is a folder key, performs the relocation described above before persisting.
+- `config get <key>`: output one value. For a list key, output is the flow form `[a, b]`; with `--json`, a JSON array of strings.
+- `config set <key> <value>`: persists value; success output minimal. A list key takes a comma-separated value and is stored as a flow sequence. When the key is a folder key, performs the relocation described above before persisting.
 - `config unset <key>`: removes key; success output minimal.
 - JSON mode wraps the above outputs as stable JSON, including errors.
 
@@ -112,7 +125,7 @@ This specification was revised (TASK-85) so that initialization, missing-configu
 - Filesystem/IO failure or project-directory boundary violation → exit code 1.
 - Missing configuration file (any non-`init` command) → exit code 1 (runtime error), message names the searched path and the `papyrus init` remedy.
 - Unknown record/key or missing target → exit code 3 where applicable (for example `config get` of an unknown key).
-- Validation/conflict (existing `papyrus.config.yml` without `--force`, duplicate statuses, invalid `default_status`, invalid padding, unnormalizable input, failed folder relocation) → exit code 4.
+- Validation/conflict (existing `papyrus.config.yml` without `--force`, duplicate statuses, invalid `default_status`, invalid padding, unnormalizable input, failed folder relocation, empty list value, empty list element, invalid document status list) → exit code 4.
 - `--json` error output includes the exit-relevant error information.
 
 ## Assumptions
@@ -122,9 +135,12 @@ This specification was revised (TASK-85) so that initialization, missing-configu
 - Assumption: single-crate layout (`src/main.rs` + `src/lib.rs`) is retained; module boundaries beyond this are allowed within the crate but no new crate/workspace without an ADR.
 - Assumption: `init` creates configured directories based on effective (default) configuration; it does not overwrite existing files other than `papyrus.config.yml` under `--force`.
 - Assumption: configuration is read/written as YAML using a Rust YAML crate added as a runtime dependency; that crate's license must be audited for GPL-3.0-or-later compatibility before release (NFR-06.001/002).
-- Assumption: input sanitization uses normalization/escaping (per user decision), not wholesale rejection, except where normalization cannot yield a valid value.
+- Assumption: input sanitization uses normalization/escaping (per user decision), not wholesale rejection, except where normalization cannot yield a valid value; list-valued status elements follow ADR-0024's reject-only behavior.
 - Assumption: symlink resolution uses canonical paths for the project-directory boundary.
 - Assumption: folder relocation uses the shared `record::relocate` routine (ADR-0013 stage 5) invoked by `config set`; the browser configuration view calls the same path.
+- Assumption: an empty element after trimming (for example `a,,b`) is rejected rather than dropped, because silently persisting an empty task status would be invalid data; ADR-0024 rejects an empty list and leaves no drop rule.
+- Assumption: flow rendering uses `[a, b]` (brackets, comma, single space), matching the existing top-level `statuses` rendering in `config list`.
+- Assumption: a list element containing a newline or other control character is rejected (exit 4), because a single-line flow sequence cannot represent it unambiguously (NFR-02.002).
 
 ## Open questions
 
@@ -134,10 +150,10 @@ This specification was revised (TASK-85) so that initialization, missing-configu
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-01, REQ-01.001, REQ-01.002, REQ-01.003, REQ-01.004, REQ-01.005, REQ-01.006, REQ-01.007 |
+| Requirement | REQ-01, REQ-01.001, REQ-01.002, REQ-01.003, REQ-01.004, REQ-01.005, REQ-01.006, REQ-01.007, REQ-07.002 |
 | Non-functional | NFR-02.001, NFR-02.002, NFR-04.001, NFR-04.002 |
 | Business rule | BR-002 (init), BR-003 (config), BR-016 (keys/precedence), BR-001 (command behavior) |
-| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002), ADR-0010 decision 8 (whole-folder relocation), ADR-0013 stage 5 (relocation implementation) |
-| Ticket | TASK-2, TASK-85 |
+| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002), ADR-0010 decision 8 (whole-folder relocation), ADR-0013 stage 5 (relocation implementation), ADR-0019 (fail-closed validation and repair), ADR-0024 (list-valued keys) |
+| Ticket | TASK-2, TASK-85, TASK-111 |
 | UI mockups | none |
 path: docs/specifications/project-initialization-and-configuration.md

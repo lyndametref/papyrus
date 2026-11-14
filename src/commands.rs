@@ -1,6 +1,7 @@
 use crate::CommandOutput;
 use crate::config::{
-    Config, merge_yaml, validate_browser_host, validate_key_path, yaml_get, yaml_set, yaml_unset,
+    Config, is_list_valued_key, merge_yaml, parse_list_value, render_yaml_flow, to_config_yaml,
+    validate_browser_host, validate_key_path, yaml_get, yaml_set, yaml_unset,
 };
 use crate::context::Context;
 use crate::error::AppError;
@@ -202,7 +203,13 @@ pub fn config_get(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
 
     let found =
         yaml_get(&val, key).ok_or_else(|| AppError::NotFound(format!("key not found: {}", key)))?;
-    let text = yaml_scalar_to_string(found);
+    // A list-valued key is printed in flow form, including a block-style list
+    // read from a hand-edited file (specification items 13-16).
+    let text = if is_list_valued_key(key) && matches!(found, yaml_serde::Value::Sequence(_)) {
+        render_yaml_flow(found)
+    } else {
+        yaml_scalar_to_string(found)
+    };
     let json = if ctx.json {
         Some(yaml_to_json(found))
     } else {
@@ -215,69 +222,15 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
     if !valid_sanitized_key(key) {
         return Err(AppError::Validation("invalid key".to_string()));
     }
-    // parse value as YAML
-    let parsed_raw: yaml_serde::Value =
-        yaml_serde::from_str(value).map_err(|e| AppError::Validation(e.to_string()))?;
-    // require scalar
-    match parsed_raw {
-        yaml_serde::Value::Mapping(_) | yaml_serde::Value::Sequence(_) => {
-            return Err(AppError::Validation(
-                "value must be a YAML scalar".to_string(),
-            ));
-        }
-        yaml_serde::Value::Null => {
-            return Err(AppError::Validation(
-                "value cannot be normalized".to_string(),
-            ));
-        }
-        _ => {}
-    }
-    // Browser keys are validated here so the message names the offending key
-    // (specification section 8.2). `browser_port` is a `u16`, so an
-    // out-of-range value would otherwise fail deserialization with a message
-    // that does not name the key.
-    if key == "browser_port" {
-        let in_range = match &parsed_raw {
-            yaml_serde::Value::Number(number) => number
-                .as_u64()
-                .map(|port| (1..=65535).contains(&port))
-                .unwrap_or(false),
-            _ => false,
-        };
-        if !in_range {
-            return Err(AppError::Validation(
-                "browser_port: must be between 1 and 65535".to_string(),
-            ));
-        }
-    }
-    if key == "browser_host"
-        && let yaml_serde::Value::String(host) = &parsed_raw
-        && let Err(reason) = validate_browser_host(host)
-    {
-        return Err(AppError::Validation(format!("browser_host: {}", reason)));
-    }
-
-    // Sanitize string values.
-    let parsed = match parsed_raw {
-        yaml_serde::Value::String(s) => {
-            if key == "browser_host" {
-                // Host validation above is authoritative; the path-component
-                // sanitizer would reject characters such as `/` with a generic
-                // message that does not name the key.
-                yaml_serde::Value::String(s)
-            } else if Config::is_folder_key(key) {
-                let sanitized = crate::sanitize::sanitize_path_string(&s).ok_or_else(|| {
-                    AppError::Validation(format!("{}: value cannot be normalized", key))
-                })?;
-                yaml_serde::Value::String(sanitized)
-            } else {
-                let sanitized = crate::sanitize::sanitize_path_component(&s).ok_or_else(|| {
-                    AppError::Validation(format!("{}: value cannot be normalized", key))
-                })?;
-                yaml_serde::Value::String(sanitized)
-            }
-        }
-        other => other,
+    // The key is classified before the value is parsed (ADR-0024 decision 1).
+    // A list-valued key takes the comma-separated form and never enters the
+    // YAML scalar path, so a comma stays separators here and ordinary data for
+    // every other key (decision 4).
+    let parsed = if is_list_valued_key(key) {
+        let values = parse_list_value(key, value).map_err(AppError::Validation)?;
+        yaml_serde::Value::Sequence(values.into_iter().map(yaml_serde::Value::String).collect())
+    } else {
+        parse_scalar_value(key, value)?
     };
 
     // load file value (or empty mapping)
@@ -336,7 +289,7 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
 
     // boundary check for config path? skip
     // write
-    let out_str = yaml_serde::to_string(&file_val).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let out_str = to_config_yaml(&file_val).map_err(AppError::Runtime)?;
     crate::config::write_config_file(&ctx.config_path, &out_str)?;
 
     let text = if relocation_cross_device {
@@ -385,8 +338,7 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
     if is_empty_map {
         let _ = std::fs::remove_file(&ctx.config_path);
     } else {
-        let out_str =
-            yaml_serde::to_string(&file_val).map_err(|e| AppError::Runtime(e.to_string()))?;
+        let out_str = to_config_yaml(&file_val).map_err(AppError::Runtime)?;
         crate::config::write_config_file(&ctx.config_path, &out_str)?;
     }
 
@@ -398,6 +350,77 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
     Ok(CommandOutput {
         text: String::new(),
         json,
+    })
+}
+
+/// Parse and sanitize a scalar `config set` value (specification section 8.2).
+///
+/// Kept separate from the list path so the two value forms never share
+/// semantics: a sequence or mapping written as a scalar value is still refused,
+/// and commas stay ordinary characters here.
+fn parse_scalar_value(key: &str, value: &str) -> Result<yaml_serde::Value, AppError> {
+    let parsed_raw: yaml_serde::Value =
+        yaml_serde::from_str(value).map_err(|e| AppError::Validation(e.to_string()))?;
+    // require scalar
+    match parsed_raw {
+        yaml_serde::Value::Mapping(_) | yaml_serde::Value::Sequence(_) => {
+            return Err(AppError::Validation(
+                "value must be a YAML scalar".to_string(),
+            ));
+        }
+        yaml_serde::Value::Null => {
+            return Err(AppError::Validation(
+                "value cannot be normalized".to_string(),
+            ));
+        }
+        _ => {}
+    }
+    // Browser keys are validated here so the message names the offending key
+    // (specification section 8.2). `browser_port` is a `u16`, so an
+    // out-of-range value would otherwise fail deserialization with a message
+    // that does not name the key.
+    if key == "browser_port" {
+        let in_range = match &parsed_raw {
+            yaml_serde::Value::Number(number) => number
+                .as_u64()
+                .map(|port| (1..=65535).contains(&port))
+                .unwrap_or(false),
+            _ => false,
+        };
+        if !in_range {
+            return Err(AppError::Validation(
+                "browser_port: must be between 1 and 65535".to_string(),
+            ));
+        }
+    }
+    if key == "browser_host"
+        && let yaml_serde::Value::String(host) = &parsed_raw
+        && let Err(reason) = validate_browser_host(host)
+    {
+        return Err(AppError::Validation(format!("browser_host: {}", reason)));
+    }
+
+    // Sanitize string values.
+    Ok(match parsed_raw {
+        yaml_serde::Value::String(s) => {
+            if key == "browser_host" {
+                // Host validation above is authoritative; the path-component
+                // sanitizer would reject characters such as `/` with a generic
+                // message that does not name the key.
+                yaml_serde::Value::String(s)
+            } else if Config::is_folder_key(key) {
+                let sanitized = crate::sanitize::sanitize_path_string(&s).ok_or_else(|| {
+                    AppError::Validation(format!("{}: value cannot be normalized", key))
+                })?;
+                yaml_serde::Value::String(sanitized)
+            } else {
+                let sanitized = crate::sanitize::sanitize_path_component(&s).ok_or_else(|| {
+                    AppError::Validation(format!("{}: value cannot be normalized", key))
+                })?;
+                yaml_serde::Value::String(sanitized)
+            }
+        }
+        other => other,
     })
 }
 
