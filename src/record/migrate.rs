@@ -95,6 +95,24 @@ pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<&'static Re
             }
         }
     }
+    // Config-defined (generic) document types.
+    for (slug, entry) in &cfg.document_types {
+        if crate::record::descriptor::descriptor_for_doc_type(slug).is_some() {
+            continue;
+        }
+        if !entry.enabled {
+            continue;
+        }
+        let desc = crate::record::descriptor::generic_document_descriptor(slug);
+        if !desc.matches_stem(&cfg, stem) {
+            continue;
+        }
+        for dir in desc.resolve_read_directories(&cfg, project_dir) {
+            if dir == parent {
+                return Some(desc);
+            }
+        }
+    }
     None
 }
 

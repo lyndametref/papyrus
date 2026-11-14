@@ -489,17 +489,68 @@ pub fn relocate_if_archived(ctx: &Context, path: &Path) -> Result<PathBuf, Reloc
     if status.as_deref() != Some("archived") {
         return Ok(safe);
     }
-    let id = crate::record::frontmatter::parse(&content)
-        .ok()
-        .flatten()
-        .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, "id"))
-        .unwrap_or_else(|| {
-            safe.file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or_default()
-                .to_string()
+
+    // Direct relocation without resolving by id (avoids recursion through
+    // `resolve_in_dirs` / `archive_inner`).
+    let archived_dir = match desc.resolve_archived_directory(&cfg, &ctx.project_dir) {
+        Some(Ok(dir)) => dir,
+        Some(Err(e)) => return Err(RelocateError::Other(e)),
+        None => {
+            return Err(RelocateError::Other(AppError::Validation(format!(
+                "record type {} has no archived location",
+                desc.name
+            ))));
+        }
+    };
+    fs::create_dir_all(&archived_dir)
+        .map_err(|e| RelocateError::Other(AppError::Runtime(e.to_string())))?;
+    let file_name = safe
+        .file_name()
+        .ok_or_else(|| {
+            RelocateError::Other(AppError::Runtime("record name is unavailable".to_string()))
+        })?
+        .to_string_lossy()
+        .to_string();
+    let dest = Context::ensure_within(&ctx.project_dir, &archived_dir.join(&file_name))
+        .map_err(RelocateError::Other)?;
+
+    let doc = crate::record::document::parse(&content).map_err(RelocateError::Other)?;
+    let new_content = crate::record::patch::apply_patch(
+        &doc,
+        &[crate::record::patch::PatchOp::SetFrontMatter(
+            "status".into(),
+            "archived".into(),
+        )],
+    )
+    .map_err(RelocateError::Other)?;
+
+    crate::record::store::write_atomic(ctx, &dest, &new_content).map_err(|_| {
+        eprintln!(
+            "failed to relocate archived record; source intact: {}",
+            safe.display()
+        );
+        RelocateError::WriteFailed {
+            source: safe.clone(),
+        }
+    })?;
+
+    if fs::remove_file(&safe).is_err() {
+        eprintln!(
+            "archive wrote {} but failed to remove {}",
+            dest.display(),
+            safe.display()
+        );
+        return Err(RelocateError::UnlinkFailed {
+            source: safe.clone(),
+            destination: dest.clone(),
         });
-    archive_inner(ctx, desc, &id)
+    }
+    eprintln!(
+        "relocated archived record: {} -> {}",
+        safe.display(),
+        dest.display()
+    );
+    Ok(dest)
 }
 
 /// Delete a document record: archive an active record first, then remove the
