@@ -1,102 +1,41 @@
-use crate::commands::load_effective_config;
-use crate::config::Config;
+use crate::CommandOutput;
 use crate::context::Context;
+use crate::document::{DocumentArgs, DocumentScope, DocumentVerb};
 use crate::error::AppError;
 use crate::sanitize;
-use clap::Subcommand;
 use std::fs;
-use std::path::PathBuf;
 
-#[derive(Subcommand, Debug)]
-pub enum GlossaryCmd {
-    /// Create a glossary term.
-    Create {
-        /// Glossary term.
-        #[arg(long = "term")]
-        term: String,
-        /// Definition of the term.
-        #[arg(long = "definition")]
-        definition: String,
-        /// Label.
-        #[arg(long = "label")]
-        label: Vec<String>,
-        /// Reference.
-        #[arg(long = "reference")]
-        reference: Vec<String>,
-    },
-    /// List glossary terms.
-    List,
-    /// View a glossary term.
-    View { id: String },
-    /// Edit a glossary term.
-    Edit {
-        id: String,
-        /// Update the glossary term.
-        #[arg(long = "term")]
-        term: Option<String>,
-        /// Update the definition.
-        #[arg(long = "definition")]
-        definition: Option<String>,
-        /// Open the document body in $VISUAL or $EDITOR.
-        #[arg(long = "editor")]
-        editor: bool,
-        /// Label.
-        #[arg(long = "label")]
-        label: Vec<String>,
-        /// Reference.
-        #[arg(long = "reference")]
-        reference: Vec<String>,
-    },
-    /// Archive a glossary term.
-    Archive { id: String },
-    /// Delete a glossary term.
-    Delete {
-        id: String,
-        #[arg(long)]
-        force: bool,
-    },
-    /// Set glossary term status.
-    Status { id: String, value: String },
-}
-
-pub fn run(ctx: &Context, cmd: GlossaryCmd) -> Result<crate::CommandOutput, AppError> {
-    match cmd {
-        GlossaryCmd::Create {
-            term,
-            definition,
-            label,
-            reference,
-        } => {
-            let id = create(ctx, &term, &definition, &label, &reference)?;
-            let text = id.clone();
-            let json = if ctx.json {
-                Some(serde_json::json!({"id": id}))
-            } else {
-                None
-            };
-            Ok(crate::CommandOutput { text, json })
+pub fn handle(
+    ctx: &Context,
+    scope: &DocumentScope,
+    verb: DocumentVerb,
+    args: &DocumentArgs,
+) -> Result<CommandOutput, AppError> {
+    match verb {
+        DocumentVerb::Create => {
+            let id = create(
+                ctx,
+                scope,
+                args.require("term")?,
+                args.require("definition")?,
+                args.get_all("label"),
+                args.get_all("reference"),
+            )?;
+            Ok(crate::document::typed_created(ctx, id))
         }
-        GlossaryCmd::List => list(ctx),
-        GlossaryCmd::View { id } => view(ctx, &id),
-        GlossaryCmd::Edit {
-            id,
-            term,
-            definition,
-            editor,
-            label,
-            reference,
-        } => edit(
+        DocumentVerb::List => list(ctx, scope),
+        DocumentVerb::View => view(ctx, scope, args.require("id")?),
+        DocumentVerb::Edit => edit(
             ctx,
-            &id,
-            term.as_deref(),
-            definition.as_deref(),
-            &label,
-            &reference,
-            editor,
+            scope,
+            args.require("id")?,
+            args.get("term"),
+            args.get("definition"),
+            args.get_all("label"),
+            args.get_all("reference"),
+            args.flag("editor"),
         ),
-        GlossaryCmd::Archive { id } => crate::document::archive(ctx, "glossary", &id),
-        GlossaryCmd::Delete { id, force } => crate::document::delete(ctx, "glossary", &id, force),
-        GlossaryCmd::Status { id, value } => crate::document::status(ctx, "glossary", &id, &value),
+        other => Err(crate::document::unsupported_verb(other)),
     }
 }
 
@@ -111,60 +50,23 @@ fn sanitize_text(input: &str) -> Result<String, AppError> {
     Ok(value)
 }
 
-fn load_config(ctx: &Context) -> Result<Config, AppError> {
-    load_effective_config(&ctx.config_path, &ctx.project_dir)
-}
-
-fn type_entry(cfg: &Config) -> Result<crate::config::DocTypeEntry, AppError> {
-    let entry = cfg
-        .document_types
-        .get("glossary")
-        .ok_or_else(|| AppError::NotFound("document type not configured: glossary".to_string()))?;
-    if !entry.enabled {
-        return Err(AppError::Validation(
-            "document type disabled: glossary".to_string(),
-        ));
-    }
-    if entry.prefix.is_empty() {
-        return Err(AppError::Validation(
-            "document type prefix empty: glossary".to_string(),
-        ));
-    }
-    Ok(entry.clone())
-}
-
-fn active_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let entry = type_entry(cfg)?;
-    let raw = ctx
-        .project_dir
-        .join(&cfg.doc_directory)
-        .join(&entry.directory);
-    Context::ensure_within(&ctx.project_dir, &raw)
-}
-
-fn archived_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let raw = active_dir(ctx, cfg)?.join("archived");
-    Context::ensure_within(&ctx.project_dir, &raw)
-}
-
-fn glossary_ids(cfg: &Config) -> Result<(String, bool), AppError> {
-    let entry = type_entry(cfg)?;
+fn glossary_dotted() -> Result<bool, AppError> {
     let descriptor = crate::record::descriptor::descriptor_for_doc_type("glossary")
         .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
-    Ok((entry.prefix, descriptor.is_dotted_id()))
+    Ok(descriptor.is_dotted_id())
 }
 
 fn resolve_glossary(
     ctx: &Context,
-    cfg: &Config,
+    scope: &DocumentScope,
     id: &str,
 ) -> Result<crate::record::resolve::ResolvedRecord, AppError> {
-    let (prefix, dotted) = glossary_ids(cfg)?;
+    let dotted = glossary_dotted()?;
     crate::record::resolve::resolve_in_dirs(
         ctx,
-        &[active_dir(ctx, cfg)?, archived_dir(ctx, cfg)?],
+        &[scope.active.clone(), scope.archived.clone()],
         id,
-        &[prefix],
+        std::slice::from_ref(&scope.prefix),
         dotted,
     )?
     .ok_or_else(|| AppError::NotFound(format!("not found: {}", id)))
@@ -207,15 +109,14 @@ fn body_document(id: &str, term: &str, definition: &str) -> crate::record::docum
 
 pub fn create(
     ctx: &Context,
+    scope: &DocumentScope,
     term_raw: &str,
     definition_raw: &str,
     labels_raw: &[String],
     references_raw: &[String],
 ) -> Result<String, AppError> {
-    let cfg = load_config(ctx)?;
     let term = sanitize_text(term_raw)?;
     let definition = sanitize_text(definition_raw)?;
-    let entry = type_entry(&cfg)?;
 
     let mut labels: Vec<String> = Vec::new();
     for l in labels_raw {
@@ -234,13 +135,12 @@ pub fn create(
         }
     }
 
-    let active = active_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
+    let archived = scope.archived.clone();
     ensure_dirs(&active)?;
 
-    let next =
-        crate::record::identity::next_number(&active, &active.join("archived"), &entry.prefix);
-    let id =
-        crate::record::identity::format_id(&entry.prefix, next as i64, cfg.id_padding as usize);
+    let next = crate::record::identity::next_number(&active, &archived, &scope.prefix);
+    let id = crate::record::identity::format_id(&scope.prefix, next as i64, scope.id_padding);
 
     let body_doc = body_document(&id, &term, &definition);
     let body = crate::record::document::render(&body_doc);
@@ -283,13 +183,17 @@ pub fn create(
     Ok(id)
 }
 
-pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
-    let cfg = load_config(ctx)?;
-    let (prefix, dotted) = glossary_ids(&cfg)?;
-    let active = active_dir(ctx, &cfg)?;
+pub fn list(ctx: &Context, scope: &DocumentScope) -> Result<crate::CommandOutput, AppError> {
+    let dotted = glossary_dotted()?;
+    let active = scope.active.clone();
     let _ = ensure_dirs(&active);
 
-    let records = crate::record::resolve::list_in_dir(ctx, &active, &[prefix], dotted)?;
+    let records = crate::record::resolve::list_in_dir(
+        ctx,
+        &active,
+        std::slice::from_ref(&scope.prefix),
+        dotted,
+    )?;
     let mut items: Vec<(String, String, String)> = Vec::new();
     for record in records {
         let content =
@@ -334,10 +238,13 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
     Ok(crate::CommandOutput { text, json })
 }
 
-pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
+pub fn view(
+    ctx: &Context,
+    scope: &DocumentScope,
+    id_raw: &str,
+) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let record = resolve_glossary(ctx, &cfg, &requested)?;
+    let record = resolve_glossary(ctx, scope, &requested)?;
     let id = record.id.clone();
     let path = record.path;
 
@@ -371,8 +278,10 @@ fn frontmatter_list_glo(content: &str, key: &str) -> Vec<String> {
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn edit(
     ctx: &Context,
+    scope: &DocumentScope,
     id_raw: &str,
     term_raw: Option<&str>,
     definition_raw: Option<&str>,
@@ -381,8 +290,7 @@ pub fn edit(
     editor: bool,
 ) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let resolved = resolve_glossary(ctx, &cfg, &requested)?;
+    let resolved = resolve_glossary(ctx, scope, &requested)?;
     resolved.ensure_writable()?;
     let id = resolved.id.clone();
     let path = resolved.path.clone();
@@ -406,7 +314,9 @@ pub fn edit(
 
     let editor_cmd = if editor {
         Some(
-            cfg.effective_editor()
+            scope
+                .config
+                .effective_editor()
                 .ok_or_else(|| AppError::Runtime("no editor configured".to_string()))?,
         )
     } else {

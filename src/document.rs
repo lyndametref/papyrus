@@ -8,35 +8,148 @@ use crate::record;
 use crate::record::document::{self, Document, Section};
 use crate::record::patch::{self, PatchOp};
 use crate::registry::{
-    ArtifactCategory, ArtifactRegistry, ContentModel, StatusModel, TypeDescriptor,
+    ArtifactCategory, ArtifactRegistry, ContentModel, StatusModel, TypeDescriptor, TypedHandler,
 };
 use crate::sanitize;
 
 use serde_json::json;
+use std::collections::BTreeMap;
 use std::fs;
+use std::path::PathBuf;
 
+/// The document verbs a descriptor may expose (REQ-07.003).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DocumentVerb {
     Create,
+    CreateGroup,
     List,
     View,
     Edit,
     Archive,
     Delete,
+    Supersede,
     Status,
+}
+
+impl DocumentVerb {
+    /// Map a command name to its verb. This is the fixed verb vocabulary, not
+    /// a per-type mapping.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "create" => DocumentVerb::Create,
+            "create-group" => DocumentVerb::CreateGroup,
+            "list" => DocumentVerb::List,
+            "view" => DocumentVerb::View,
+            "edit" => DocumentVerb::Edit,
+            "archive" => DocumentVerb::Archive,
+            "delete" => DocumentVerb::Delete,
+            "supersede" => DocumentVerb::Supersede,
+            "status" => DocumentVerb::Status,
+            _ => return None,
+        })
+    }
 }
 
 impl From<DocumentVerb> for crate::registry::Verb {
     fn from(v: DocumentVerb) -> Self {
         match v {
             DocumentVerb::Create => crate::registry::Verb::Create,
+            DocumentVerb::CreateGroup => crate::registry::Verb::CreateGroup,
             DocumentVerb::List => crate::registry::Verb::List,
             DocumentVerb::View => crate::registry::Verb::View,
             DocumentVerb::Edit => crate::registry::Verb::Edit,
             DocumentVerb::Archive => crate::registry::Verb::Archive,
             DocumentVerb::Delete => crate::registry::Verb::Delete,
+            DocumentVerb::Supersede => crate::registry::Verb::Supersede,
             DocumentVerb::Status => crate::registry::Verb::Status,
         }
+    }
+}
+
+/// Every non-global argument explicitly present on a document verb.
+///
+/// A missing key means "absent"; an empty value list means "present with no
+/// value" (a switch or an optional-value flag used without a value).
+#[derive(Clone, Debug, Default)]
+pub struct DocumentArgs {
+    values: BTreeMap<String, Vec<String>>,
+}
+
+impl DocumentArgs {
+    pub fn insert(&mut self, id: impl Into<String>, values: Vec<String>) {
+        self.values.insert(id.into(), values);
+    }
+
+    pub fn get(&self, id: &str) -> Option<&str> {
+        self.values
+            .get(id)
+            .and_then(|values| values.first())
+            .map(String::as_str)
+    }
+
+    pub fn get_all(&self, id: &str) -> &[String] {
+        self.values.get(id).map(Vec::as_slice).unwrap_or_default()
+    }
+
+    pub fn flag(&self, id: &str) -> bool {
+        self.values.contains_key(id)
+    }
+
+    /// `None` when absent, `Some(None)` when present without a value.
+    pub fn optional(&self, id: &str) -> Option<Option<&str>> {
+        self.values
+            .get(id)
+            .map(|values| values.first().map(String::as_str))
+    }
+
+    pub fn require(&self, id: &str) -> Result<&str, AppError> {
+        self.get(id)
+            .ok_or_else(|| AppError::Validation(format!("missing required argument: {}", id)))
+    }
+
+    pub fn ids(&self) -> impl Iterator<Item = &str> {
+        self.values.keys().map(String::as_str)
+    }
+}
+
+/// One resolved document scope, derived from the descriptor.
+///
+/// The registry stays I/O-free; directory containment and configuration
+/// loading happen here.
+#[derive(Clone, Debug)]
+pub struct DocumentScope {
+    pub config: Config,
+    pub active: PathBuf,
+    pub archived: PathBuf,
+    pub prefix: String,
+    pub id_padding: usize,
+}
+
+impl DocumentScope {
+    pub fn resolve(ctx: &Context, descriptor: &TypeDescriptor) -> Result<Self, AppError> {
+        let config = load_config(ctx)?;
+        let base = match descriptor.directory.config_key {
+            "doc_directory" => config.doc_directory.clone(),
+            other => {
+                return Err(AppError::Runtime(format!(
+                    "unsupported document directory key: {}",
+                    other
+                )));
+            }
+        };
+        let raw = ctx
+            .project_dir
+            .join(base)
+            .join(&descriptor.directory.relative);
+        let active = Context::ensure_within(&ctx.project_dir, &raw)?;
+        let archived = Context::ensure_within(&ctx.project_dir, &active.join("archived"))?;
+        Ok(DocumentScope {
+            id_padding: config.id_padding as usize,
+            config,
+            active,
+            archived,
+            prefix: descriptor.prefix.clone(),
+        })
     }
 }
 
@@ -51,6 +164,26 @@ pub struct DocumentInvocation {
     pub editor: bool,
     pub status_value: Option<String>,
     pub force: bool,
+    /// Every explicitly present non-global argument, for the typed handlers.
+    pub args: DocumentArgs,
+}
+
+impl DocumentInvocation {
+    pub fn new(slug: impl Into<String>, verb: DocumentVerb) -> Self {
+        DocumentInvocation {
+            slug: slug.into(),
+            verb,
+            id: None,
+            title: None,
+            description: None,
+            labels: Vec::new(),
+            references: Vec::new(),
+            editor: false,
+            status_value: None,
+            force: false,
+            args: DocumentArgs::default(),
+        }
+    }
 }
 
 pub fn run(
@@ -84,27 +217,115 @@ pub fn run(
         )));
     }
 
+    let scope = DocumentScope::resolve(ctx, descriptor)?;
     let slug = invocation.slug.clone();
     match invocation.verb {
-        DocumentVerb::Create => match descriptor.content_model {
-            ContentModel::Generic => create_generic(ctx, descriptor, invocation, &slug),
-            _ => Err(AppError::Validation(format!(
-                "document_types.{}: baseline create is handled by the owning type module",
-                slug
-            ))),
+        DocumentVerb::Create
+        | DocumentVerb::CreateGroup
+        | DocumentVerb::List
+        | DocumentVerb::View
+        | DocumentVerb::Edit
+        | DocumentVerb::Supersede => match descriptor.content_model {
+            ContentModel::Generic => match invocation.verb {
+                DocumentVerb::Create => create_generic(ctx, descriptor, invocation, &slug),
+                DocumentVerb::List => list_records(ctx, descriptor, &slug),
+                DocumentVerb::View => view_record(ctx, descriptor, &slug, invocation.id),
+                DocumentVerb::Edit => edit_generic(ctx, descriptor, invocation, &slug),
+                other => Err(AppError::Validation(format!(
+                    "document_types.{}: verb {} is not supported by the generic model",
+                    slug,
+                    crate::registry::Verb::from(other).as_str()
+                ))),
+            },
+            ContentModel::Typed(_) | ContentModel::HtmlMockup(_) => dispatch_typed(
+                ctx,
+                descriptor,
+                registry,
+                &scope,
+                invocation.verb,
+                &invocation.args,
+            ),
         },
-        DocumentVerb::List => list_records(ctx, descriptor, &slug),
-        DocumentVerb::View => view_record(ctx, descriptor, &slug, invocation.id),
-        DocumentVerb::Edit => match descriptor.content_model {
-            ContentModel::Generic => edit_generic(ctx, descriptor, invocation, &slug),
-            _ => Err(AppError::Validation(format!(
-                "document_types.{}: baseline edit is handled by the owning type module",
-                slug
-            ))),
-        },
-        DocumentVerb::Archive => archive_record(ctx, &slug, invocation.id),
-        DocumentVerb::Delete => delete_record(ctx, &slug, invocation.id, invocation.force),
-        DocumentVerb::Status => status_record(ctx, &slug, invocation.id, invocation.status_value),
+        DocumentVerb::Archive | DocumentVerb::Delete | DocumentVerb::Status => {
+            match descriptor.content_model {
+                // UI mockups keep their HTML metadata semantics.
+                ContentModel::HtmlMockup(_) => dispatch_typed(
+                    ctx,
+                    descriptor,
+                    registry,
+                    &scope,
+                    invocation.verb,
+                    &invocation.args,
+                ),
+                _ => match invocation.verb {
+                    DocumentVerb::Archive => archive_record(ctx, descriptor, invocation.id),
+                    DocumentVerb::Delete => {
+                        delete_record(ctx, descriptor, invocation.id, invocation.force)
+                    }
+                    DocumentVerb::Status => {
+                        status_record(ctx, descriptor, invocation.id, invocation.status_value)
+                    }
+                    _ => unreachable!("outer match limits record verbs"),
+                },
+            }
+        }
+    }
+}
+
+/// The create response shared by every typed module.
+pub(crate) fn typed_created(ctx: &Context, id: String) -> crate::CommandOutput {
+    let json = if ctx.json {
+        Some(json!({"id": id}))
+    } else {
+        None
+    };
+    crate::CommandOutput { text: id, json }
+}
+
+/// The error a module returns for a verb it does not own.
+pub(crate) fn unsupported_verb(verb: DocumentVerb) -> AppError {
+    AppError::Validation(format!(
+        "unsupported document verb: {}",
+        crate::registry::Verb::from(verb).as_str()
+    ))
+}
+
+/// Delegate a typed content verb to its owning module (never by slug).
+fn dispatch_typed(
+    ctx: &Context,
+    descriptor: &TypeDescriptor,
+    registry: &ArtifactRegistry,
+    scope: &DocumentScope,
+    verb: DocumentVerb,
+    args: &DocumentArgs,
+) -> Result<crate::CommandOutput, AppError> {
+    let handler = descriptor.content_model.handler().ok_or_else(|| {
+        AppError::Validation(format!(
+            "document_types.{}: content model is not typed",
+            descriptor.slug
+        ))
+    })?;
+    match handler {
+        TypedHandler::Requirement(kind) => {
+            let kind = match kind {
+                crate::registry::RequirementKind::Business => crate::requirement::Kind::Req,
+                crate::registry::RequirementKind::NonFunctional => crate::requirement::Kind::Nfr,
+            };
+            crate::requirement::handle(ctx, scope, registry, kind, verb, args)
+        }
+        TypedHandler::Glossary => crate::glossary::handle(ctx, scope, verb, args),
+        TypedHandler::Rule => crate::rule::handle(ctx, scope, verb, args),
+        TypedHandler::UiSpec => crate::ui_spec::handle(ctx, scope, verb, args),
+        TypedHandler::Audit => crate::audit::handle(ctx, scope, verb, args),
+        TypedHandler::TechSpec => crate::tech_spec::handle(ctx, scope, verb, args),
+        TypedHandler::UseCase => crate::use_case::handle(ctx, scope, verb, args),
+        TypedHandler::TestCase => crate::test_case::handle(ctx, scope, verb, args),
+        TypedHandler::TestReport => crate::test_report::handle(ctx, scope, verb, args),
+        TypedHandler::UiMockup => crate::ui_mockup::handle(ctx, scope, verb, args),
+        other => Err(AppError::Validation(format!(
+            "document_types.{}: unsupported typed handler {:?}",
+            descriptor.slug, other
+        ))),
     }
 }
 
@@ -497,12 +718,12 @@ fn edit_generic(
 
 pub fn archive_record(
     ctx: &Context,
-    slug: &str,
+    descriptor: &TypeDescriptor,
     id: Option<String>,
 ) -> Result<crate::CommandOutput, AppError> {
     let id_raw = id.ok_or_else(|| AppError::Validation("id is required".to_string()))?;
     let requested = sanitize_field(&id_raw)?;
-    let rd = record_descriptor_for(slug)?;
+    let rd = record_descriptor_for(&descriptor.slug)?;
     let _ = record::store::archive(ctx, &rd, &requested)?;
     let json = if ctx.json {
         Some(json!({"status": "ok", "id": requested}))
@@ -517,13 +738,13 @@ pub fn archive_record(
 
 pub fn delete_record(
     ctx: &Context,
-    slug: &str,
+    descriptor: &TypeDescriptor,
     id: Option<String>,
     force: bool,
 ) -> Result<crate::CommandOutput, AppError> {
     let id_raw = id.ok_or_else(|| AppError::Validation("id is required".to_string()))?;
     let requested = sanitize_field(&id_raw)?;
-    let rd = record_descriptor_for(slug)?;
+    let rd = record_descriptor_for(&descriptor.slug)?;
     if !force {
         use std::io::{self, Write};
         print!("Delete {}? [y/N] ", requested);
@@ -559,7 +780,7 @@ pub fn delete_record(
 
 pub fn status_record(
     ctx: &Context,
-    slug: &str,
+    descriptor: &TypeDescriptor,
     id: Option<String>,
     value: Option<String>,
 ) -> Result<crate::CommandOutput, AppError> {
@@ -571,7 +792,7 @@ pub fn status_record(
     let requested = sanitize_field(&id_raw)?;
     let value =
         value.ok_or_else(|| AppError::Validation("status value is required".to_string()))?;
-    let rd = record_descriptor_for(slug)?;
+    let rd = record_descriptor_for(&descriptor.slug)?;
     // Auto-relocate archived-in-active records and surface undeclared statuses.
     let cfg = load_config(ctx)?;
     let read_dirs = rd.resolve_read_directories(&cfg, &ctx.project_dir);
@@ -609,28 +830,6 @@ fn run_editor(command: &str, path: &std::path::Path) -> Result<(), AppError> {
         return Err(AppError::Runtime(format!("editor exited with {}", status)));
     }
     Ok(())
-}
-
-pub fn archive(ctx: &Context, slug: &str, id: &str) -> Result<crate::CommandOutput, AppError> {
-    archive_record(ctx, slug, Some(id.to_string()))
-}
-
-pub fn delete(
-    ctx: &Context,
-    slug: &str,
-    id: &str,
-    force: bool,
-) -> Result<crate::CommandOutput, AppError> {
-    delete_record(ctx, slug, Some(id.to_string()), force)
-}
-
-pub fn status(
-    ctx: &Context,
-    slug: &str,
-    id: &str,
-    value: &str,
-) -> Result<crate::CommandOutput, AppError> {
-    status_record(ctx, slug, Some(id.to_string()), Some(value.to_string()))
 }
 
 #[cfg(test)]
@@ -700,6 +899,24 @@ mod tests {
         ArtifactRegistry::build(&cfg).unwrap()
     }
 
+    fn scope_for(ctx: &Context, slug: &str) -> DocumentScope {
+        let cfg = load_config(ctx).unwrap();
+        let reg = ArtifactRegistry::build(&cfg).unwrap();
+        let descriptor = reg.descriptor(slug).unwrap_or_else(|| panic!("{slug}"));
+        DocumentScope::resolve(ctx, descriptor).unwrap()
+    }
+
+    fn typed_args(pairs: &[(&str, &[&str])]) -> DocumentArgs {
+        let mut args = DocumentArgs::default();
+        for (id, values) in pairs {
+            args.insert(
+                *id,
+                values.iter().map(|value| (*value).to_string()).collect(),
+            );
+        }
+        args
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn generic_invocation(
         slug: &str,
@@ -711,6 +928,26 @@ mod tests {
         references: Vec<String>,
         status_value: Option<String>,
     ) -> DocumentInvocation {
+        let mut args = DocumentArgs::default();
+        if let Some(value) = &id {
+            args.insert("id", vec![value.clone()]);
+        }
+        if let Some(value) = &title {
+            args.insert("title", vec![value.clone()]);
+        }
+        if let Some(value) = &description {
+            args.insert("description", vec![value.clone()]);
+        }
+        if !labels.is_empty() {
+            args.insert("label", labels.clone());
+        }
+        if !references.is_empty() {
+            args.insert("reference", references.clone());
+        }
+        if let Some(value) = &status_value {
+            args.insert("value", vec![value.clone()]);
+        }
+        args.insert("force", Vec::new());
         DocumentInvocation {
             slug: slug.to_string(),
             verb,
@@ -722,6 +959,7 @@ mod tests {
             editor: false,
             status_value,
             force: true,
+            args,
         }
     }
 
@@ -1497,11 +1735,22 @@ mod tests {
         let dir = tmpdir("typed");
         default_config(&dir);
         let c = ctx(&dir);
-        let _ =
-            crate::requirement::create_group(&c, crate::requirement::Kind::Req, "G", None, None)
-                .unwrap();
+        let reg = registry(&c);
+        let req_scope = scope_for(&c, "req");
+        let nfr_scope = scope_for(&c, "nfr");
+        let _ = crate::requirement::create_group(
+            &c,
+            &req_scope,
+            crate::requirement::Kind::Req,
+            "G",
+            None,
+            None,
+        )
+        .unwrap();
         let rid = crate::requirement::create(
             &c,
+            &req_scope,
+            &reg,
             crate::requirement::Kind::Req,
             Some("R"),
             None,
@@ -1512,11 +1761,19 @@ mod tests {
             &[],
         )
         .unwrap();
-        let _ =
-            crate::requirement::create_group(&c, crate::requirement::Kind::Nfr, "NG", None, None)
-                .unwrap();
+        let _ = crate::requirement::create_group(
+            &c,
+            &nfr_scope,
+            crate::requirement::Kind::Nfr,
+            "NG",
+            None,
+            None,
+        )
+        .unwrap();
         let nid = crate::requirement::create(
             &c,
+            &nfr_scope,
+            &reg,
             crate::requirement::Kind::Nfr,
             Some("NR"),
             None,
@@ -1528,7 +1785,6 @@ mod tests {
         )
         .unwrap();
 
-        let reg = registry(&c);
         let out = run(
             &c,
             &reg,
@@ -1646,21 +1902,26 @@ mod tests {
         let dir = tmpdir("uimockup");
         default_config(&dir);
         let c = ctx(&dir);
-        let id = crate::ui_mockup::run(
+        let scope = scope_for(&c, "ui-mockup");
+        let id = crate::ui_mockup::handle(
             &c,
-            crate::ui_mockup::UiMockupCmd::Create {
-                title: "M".to_string(),
-                task: "T".to_string(),
-                spec: vec!["S".to_string()],
-                r#ref: vec![],
-            },
+            &scope,
+            DocumentVerb::Create,
+            &typed_args(&[("title", &["M"]), ("task", &["T"]), ("spec", &["S"])]),
         )
         .unwrap()
         .text;
-        let out = crate::ui_mockup::run(&c, crate::ui_mockup::UiMockupCmd::List).unwrap();
+        let out =
+            crate::ui_mockup::handle(&c, &scope, DocumentVerb::List, &DocumentArgs::default())
+                .unwrap();
         assert!(out.text.contains(&id));
-        let out = crate::ui_mockup::run(&c, crate::ui_mockup::UiMockupCmd::View { id: id.clone() })
-            .unwrap();
+        let out = crate::ui_mockup::handle(
+            &c,
+            &scope,
+            DocumentVerb::View,
+            &typed_args(&[("id", &[id.as_str()])]),
+        )
+        .unwrap();
         assert!(out.text.contains(&id));
     }
 
@@ -1716,6 +1977,7 @@ mod tests {
             editor: true,
             status_value: None,
             force: true,
+            args: DocumentArgs::default(),
         };
         run(&c, &reg, inv).unwrap();
         let after = std::fs::read_to_string(&path).unwrap();
@@ -2168,11 +2430,20 @@ mod tests {
         .unwrap();
         assert!(out.text.contains("# DEP-001 G"));
         // typed req
-        let _ =
-            crate::requirement::create_group(&c, crate::requirement::Kind::Req, "G", None, None)
-                .unwrap();
+        let req_scope = scope_for(&c, "req");
+        let _ = crate::requirement::create_group(
+            &c,
+            &req_scope,
+            crate::requirement::Kind::Req,
+            "G",
+            None,
+            None,
+        )
+        .unwrap();
         let rid = crate::requirement::create(
             &c,
+            &req_scope,
+            &reg,
             crate::requirement::Kind::Req,
             Some("R"),
             None,
@@ -2183,7 +2454,6 @@ mod tests {
             &[],
         )
         .unwrap();
-        let reg = registry(&c);
         let out = run(
             &c,
             &reg,
@@ -2223,48 +2493,48 @@ mod tests {
         let dir = tmpdir("typedext");
         default_config(&dir);
         let c = ctx(&dir);
-        let gid =
-            crate::requirement::create_group(&c, crate::requirement::Kind::Req, "G", None, None)
-                .unwrap();
-        assert!(!gid.is_empty());
-        let id = crate::ui_mockup::run(
+        let req_scope = scope_for(&c, "req");
+        let gid = crate::requirement::create_group(
             &c,
-            crate::ui_mockup::UiMockupCmd::Create {
-                title: "M1".to_string(),
-                task: "T".to_string(),
-                spec: vec!["S".to_string()],
-                r#ref: vec![],
-            },
-        )
-        .unwrap()
-        .text;
-        let id2 = crate::ui_mockup::run(
-            &c,
-            crate::ui_mockup::UiMockupCmd::Create {
-                title: "M2".to_string(),
-                task: "T".to_string(),
-                spec: vec!["S".to_string()],
-                r#ref: vec![],
-            },
-        )
-        .unwrap()
-        .text;
-        crate::ui_mockup::run(
-            &c,
-            crate::ui_mockup::UiMockupCmd::Edit {
-                id: id.clone(),
-                title: None,
-                task: None,
-                spec: None,
-                r#ref: None,
-                status: None,
-                superseded_by: Some(id2.clone()),
-                editor: false,
-            },
+            &req_scope,
+            crate::requirement::Kind::Req,
+            "G",
+            None,
+            None,
         )
         .unwrap();
-        let out = crate::ui_mockup::run(&c, crate::ui_mockup::UiMockupCmd::View { id: id.clone() })
-            .unwrap();
+        assert!(!gid.is_empty());
+        let mock_scope = scope_for(&c, "ui-mockup");
+        let id = crate::ui_mockup::handle(
+            &c,
+            &mock_scope,
+            DocumentVerb::Create,
+            &typed_args(&[("title", &["M1"]), ("task", &["T"]), ("spec", &["S"])]),
+        )
+        .unwrap()
+        .text;
+        let id2 = crate::ui_mockup::handle(
+            &c,
+            &mock_scope,
+            DocumentVerb::Create,
+            &typed_args(&[("title", &["M2"]), ("task", &["T"]), ("spec", &["S"])]),
+        )
+        .unwrap()
+        .text;
+        crate::ui_mockup::handle(
+            &c,
+            &mock_scope,
+            DocumentVerb::Edit,
+            &typed_args(&[("id", &[id.as_str()]), ("superseded_by", &[id2.as_str()])]),
+        )
+        .unwrap();
+        let out = crate::ui_mockup::handle(
+            &c,
+            &mock_scope,
+            DocumentVerb::View,
+            &typed_args(&[("id", &[id.as_str()])]),
+        )
+        .unwrap();
         assert!(out.text.contains(&id2));
     }
 }

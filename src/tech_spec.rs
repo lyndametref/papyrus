@@ -1,101 +1,42 @@
 use crate::CommandOutput;
-use crate::commands::load_effective_config;
-use crate::config::{Config, DocTypeEntry};
 use crate::context::Context;
+use crate::document::{DocumentArgs, DocumentScope, DocumentVerb};
 use crate::error::AppError;
 use crate::sanitize;
-use clap::Subcommand;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-#[derive(Subcommand, Debug)]
-pub enum TechSpecCmd {
-    /// Create a technical specification.
-    Create {
-        /// Technical specification title.
-        title: String,
-        /// Description of the technical specification.
-        #[arg(long = "description")]
-        description: String,
-        /// Label.
-        #[arg(long = "label")]
-        label: Vec<String>,
-        /// Reference.
-        #[arg(long = "reference")]
-        reference: Vec<String>,
-    },
-    /// List technical specifications.
-    List,
-    /// View a technical specification.
-    View { id: String },
-    /// Edit a technical specification.
-    Edit {
-        id: String,
-        /// Update the title.
-        #[arg(long = "title")]
-        title: Option<String>,
-        /// Update the description.
-        #[arg(long = "description")]
-        description: Option<String>,
-        /// Open the document body in $VISUAL or $EDITOR.
-        #[arg(long = "editor")]
-        editor: bool,
-        /// Label.
-        #[arg(long = "label")]
-        label: Vec<String>,
-        /// Reference.
-        #[arg(long = "reference")]
-        reference: Vec<String>,
-    },
-    /// Archive.
-    Archive { id: String },
-    /// Delete.
-    Delete {
-        id: String,
-        #[arg(long)]
-        force: bool,
-    },
-    /// Status.
-    Status { id: String, value: String },
-}
-
-pub fn run(ctx: &Context, cmd: TechSpecCmd) -> Result<CommandOutput, AppError> {
-    match cmd {
-        TechSpecCmd::Create {
-            title,
-            description,
-            label,
-            reference,
-        } => {
-            let id = create(ctx, &title, &description, &label, &reference)?;
-            let json = if ctx.json {
-                Some(serde_json::json!({"id": id}))
-            } else {
-                None
-            };
-            Ok(CommandOutput { text: id, json })
+pub fn handle(
+    ctx: &Context,
+    scope: &DocumentScope,
+    verb: DocumentVerb,
+    args: &DocumentArgs,
+) -> Result<CommandOutput, AppError> {
+    match verb {
+        DocumentVerb::Create => {
+            let id = create(
+                ctx,
+                scope,
+                args.require("title")?,
+                args.require("description")?,
+                args.get_all("label"),
+                args.get_all("reference"),
+            )?;
+            Ok(crate::document::typed_created(ctx, id))
         }
-        TechSpecCmd::List => list(ctx),
-        TechSpecCmd::View { id } => view(ctx, &id),
-        TechSpecCmd::Edit {
-            id,
-            title,
-            description,
-            editor,
-            label,
-            reference,
-        } => edit(
+        DocumentVerb::List => list(ctx, scope),
+        DocumentVerb::View => view(ctx, scope, args.require("id")?),
+        DocumentVerb::Edit => edit(
             ctx,
-            &id,
-            title.as_deref(),
-            description.as_deref(),
-            &label,
-            &reference,
-            editor,
+            scope,
+            args.require("id")?,
+            args.get("title"),
+            args.get("description"),
+            args.get_all("label"),
+            args.get_all("reference"),
+            args.flag("editor"),
         ),
-        TechSpecCmd::Archive { id } => crate::document::archive(ctx, "tech-spec", &id),
-        TechSpecCmd::Delete { id, force } => crate::document::delete(ctx, "tech-spec", &id, force),
-        TechSpecCmd::Status { id, value } => crate::document::status(ctx, "tech-spec", &id, &value),
+        other => Err(crate::document::unsupported_verb(other)),
     }
 }
 
@@ -110,42 +51,6 @@ fn sanitize_field(raw: &str) -> Result<String, AppError> {
         ));
     }
     Ok(value)
-}
-
-fn load_config(ctx: &Context) -> Result<Config, AppError> {
-    load_effective_config(&ctx.config_path, &ctx.project_dir)
-}
-
-fn type_entry(cfg: &Config) -> Result<DocTypeEntry, AppError> {
-    let entry = cfg
-        .document_types
-        .get("tech-spec")
-        .ok_or_else(|| AppError::NotFound("document type not configured: tech-spec".to_string()))?;
-    if !entry.enabled {
-        return Err(AppError::Validation(
-            "document type disabled: tech-spec".to_string(),
-        ));
-    }
-    if entry.prefix.is_empty() {
-        return Err(AppError::Validation(
-            "document type prefix empty: tech-spec".to_string(),
-        ));
-    }
-    Ok(entry.clone())
-}
-
-fn active_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let entry = type_entry(cfg)?;
-    let raw = ctx
-        .project_dir
-        .join(&cfg.doc_directory)
-        .join(&entry.directory);
-    Context::ensure_within(&ctx.project_dir, &raw)
-}
-
-fn archived_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let raw = active_dir(ctx, cfg)?.join("archived");
-    Context::ensure_within(&ctx.project_dir, &raw)
 }
 
 fn ensure_dirs(dir: &Path) -> Result<(), AppError> {
@@ -228,6 +133,7 @@ fn run_editor(command: &str, path: &Path) -> Result<(), AppError> {
 
 fn create(
     ctx: &Context,
+    scope: &DocumentScope,
     title_raw: &str,
     description_raw: &str,
     labels_raw: &[String],
@@ -249,15 +155,12 @@ fn create(
         }
     }
 
-    let cfg = load_config(ctx)?;
-    let entry = type_entry(&cfg)?;
-    let active = active_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
+    let archived = scope.archived.clone();
     ensure_dirs(&active)?;
 
-    let next =
-        crate::record::identity::next_number(&active, &active.join("archived"), &entry.prefix);
-    let id =
-        crate::record::identity::format_id(&entry.prefix, next as i64, cfg.id_padding as usize);
+    let next = crate::record::identity::next_number(&active, &archived, &scope.prefix);
+    let id = crate::record::identity::format_id(&scope.prefix, next as i64, scope.id_padding);
 
     let body_doc = body_document(&id, &title, &description);
     let body = crate::record::document::render(&body_doc);
@@ -300,19 +203,17 @@ fn create(
     Ok(id)
 }
 
-fn list(ctx: &Context) -> Result<CommandOutput, AppError> {
-    let cfg = load_config(ctx)?;
-    let entry = type_entry(&cfg)?;
+fn list(ctx: &Context, scope: &DocumentScope) -> Result<CommandOutput, AppError> {
     let descriptor = crate::record::descriptor::descriptor_for_doc_type("tech-spec")
         .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
     let dotted = descriptor.is_dotted_id();
-    let active = active_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
     let _ = ensure_dirs(&active);
 
     let records = crate::record::resolve::list_in_dir(
         ctx,
         &active,
-        std::slice::from_ref(&entry.prefix),
+        std::slice::from_ref(&scope.prefix),
         dotted,
     )?;
     let mut items: Vec<(String, String, String)> = Vec::new();
@@ -357,19 +258,17 @@ fn list(ctx: &Context) -> Result<CommandOutput, AppError> {
     Ok(CommandOutput { text, json })
 }
 
-fn view(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
+fn view(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<CommandOutput, AppError> {
     let requested = sanitize_field(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let entry = type_entry(&cfg)?;
     let descriptor = crate::record::descriptor::descriptor_for_doc_type("tech-spec")
         .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
     let dotted = descriptor.is_dotted_id();
-    let active = active_dir(ctx, &cfg)?;
-    let deprecated = archived_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
+    let deprecated = scope.archived.clone();
     let _ = ensure_dirs(&active);
     let _ = ensure_dirs(&deprecated);
     let record =
-        active_or_deprecated(ctx, &active, &deprecated, &requested, &entry.prefix, dotted)?;
+        active_or_deprecated(ctx, &active, &deprecated, &requested, &scope.prefix, dotted)?;
     let id = record.id.clone();
     let path = record.path;
 
@@ -403,8 +302,10 @@ fn frontmatter_list_tech(content: &str, key: &str) -> Vec<String> {
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 fn edit(
     ctx: &Context,
+    scope: &DocumentScope,
     id_raw: &str,
     title_raw: Option<&str>,
     description_raw: Option<&str>,
@@ -413,17 +314,15 @@ fn edit(
     editor: bool,
 ) -> Result<CommandOutput, AppError> {
     let requested = sanitize_field(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let entry = type_entry(&cfg)?;
     let descriptor = crate::record::descriptor::descriptor_for_doc_type("tech-spec")
         .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
     let dotted = descriptor.is_dotted_id();
-    let active = active_dir(ctx, &cfg)?;
-    let deprecated = archived_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
+    let deprecated = scope.archived.clone();
     let _ = ensure_dirs(&active);
     let _ = ensure_dirs(&deprecated);
     let resolved =
-        active_or_deprecated(ctx, &active, &deprecated, &requested, &entry.prefix, dotted)?;
+        active_or_deprecated(ctx, &active, &deprecated, &requested, &scope.prefix, dotted)?;
     resolved.ensure_writable()?;
     let id = resolved.id.clone();
     let path = resolved.path.clone();
@@ -441,7 +340,9 @@ fn edit(
 
     let editor_cmd = if editor {
         Some(
-            cfg.effective_editor()
+            scope
+                .config
+                .effective_editor()
                 .ok_or_else(|| AppError::Runtime("no editor configured".to_string()))?,
         )
     } else {

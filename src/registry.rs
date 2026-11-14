@@ -156,7 +156,63 @@ pub struct TypedSchema {
     pub sections: &'static [&'static str],
     /// Extension verbs this family owns; must equal the descriptor's extensions.
     pub extensions: &'static [Verb],
+    /// Ordered per-verb command metadata (ADR-0016 decision 4).
+    pub verbs: &'static [VerbSpec],
 }
+
+/// How a command argument consumes values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ArgAction {
+    /// One value.
+    Set,
+    /// Repeatable value.
+    Append,
+    /// Boolean switch.
+    SetTrue,
+    /// Optional value: present with zero or one value.
+    OptionalValue,
+}
+
+/// One command argument, transcribed from the former `clap` derive field.
+///
+/// Argument declarations keep the derive order because `clap` derives help
+/// display order from insertion order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ArgSpec {
+    pub id: &'static str,
+    pub long: Option<&'static str>,
+    pub short: Option<char>,
+    /// Explicit value name; `""` for switches.
+    pub value_name: &'static str,
+    pub help: &'static str,
+    pub positional: bool,
+    pub required: bool,
+    pub required_unless_present: Option<&'static str>,
+    pub action: ArgAction,
+    pub conflicts_with: Option<&'static str>,
+}
+
+/// One verb of a document command family.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VerbSpec {
+    pub verb: Verb,
+    /// Verb help about-line; empty for `audit` and `ui-mockup`.
+    pub about: &'static str,
+    pub args: &'static [ArgSpec],
+}
+
+/// The canonical presentation order of document verbs (ADR-0016 decision 4).
+pub const CANONICAL_DOCUMENT_VERB_ORDER: &[Verb] = &[
+    Verb::Create,
+    Verb::CreateGroup,
+    Verb::List,
+    Verb::View,
+    Verb::Edit,
+    Verb::Archive,
+    Verb::Delete,
+    Verb::Supersede,
+    Verb::Status,
+];
 
 /// The body model of a document type (REQ-07.004, REQ-05.008).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -165,6 +221,43 @@ pub enum ContentModel {
     Generic,
     Typed(&'static TypedSchema),
     HtmlMockup(&'static TypedSchema),
+}
+
+impl ContentModel {
+    /// The ordered verb metadata used to build this content model's command.
+    pub fn verbs(self) -> &'static [VerbSpec] {
+        match self {
+            ContentModel::Generic => GENERIC_DOCUMENT_VERBS,
+            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => schema.verbs,
+        }
+    }
+
+    /// The module that owns typed validation and patch building, if any.
+    pub fn handler(self) -> Option<TypedHandler> {
+        match self {
+            ContentModel::Generic => None,
+            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => Some(schema.handler),
+        }
+    }
+}
+
+impl TypeDescriptor {
+    /// The verb spec for `verb`, when the content model declares one.
+    pub fn verb_spec(&self, verb: Verb) -> Option<&'static VerbSpec> {
+        self.content_model
+            .verbs()
+            .iter()
+            .find(|spec| spec.verb == verb)
+    }
+
+    /// Every declared spec verb, in canonical presentation order.
+    pub fn ordered_verb_specs(&self) -> Vec<&'static VerbSpec> {
+        CANONICAL_DOCUMENT_VERB_ORDER
+            .iter()
+            .filter(|verb| self.has_verb(**verb))
+            .filter_map(|verb| self.verb_spec(*verb))
+            .collect()
+    }
 }
 
 /// A descriptor's directory: which configuration key to read and its value.
@@ -257,6 +350,8 @@ pub enum RegistryError {
     ExtensionVerbMismatch { slug: String, verb: &'static str },
     /// I16: a document declares the `restore` verb.
     RestoreVerbOnDocument { slug: String },
+    /// I17: a document verb and its command metadata disagree.
+    VerbSpecMismatch { slug: String, verb: &'static str },
 }
 
 impl fmt::Display for RegistryError {
@@ -331,6 +426,11 @@ impl fmt::Display for RegistryError {
             RegistryError::RestoreVerbOnDocument { slug } => {
                 write!(f, "document_types.{}: documents have no restore verb", slug)
             }
+            RegistryError::VerbSpecMismatch { slug, verb } => write!(
+                f,
+                "document_types.{}: verb {} has no matching command metadata",
+                slug, verb
+            ),
         }
     }
 }
@@ -386,80 +486,1479 @@ const USE_CASE_SECTIONS: &[&str] = &["## Description", "## Applicability"];
 const TEST_CASE_SECTIONS: &[&str] = &["## Description", "## Applicability"];
 const TEST_REPORT_SECTIONS: &[&str] = &["## Description", "## Applicability"];
 
+/// Build one argument spec with the common defaults.
+#[allow(clippy::too_many_arguments)]
+const fn arg(
+    id: &'static str,
+    long: Option<&'static str>,
+    short: Option<char>,
+    value_name: &'static str,
+    help: &'static str,
+    positional: bool,
+    required: bool,
+    action: ArgAction,
+) -> ArgSpec {
+    ArgSpec {
+        id,
+        long,
+        short,
+        value_name,
+        help,
+        positional,
+        required,
+        required_unless_present: None,
+        action,
+        conflicts_with: None,
+    }
+}
+
+const ARG_ID: ArgSpec = arg("id", None, None, "ID", "", true, true, ArgAction::Set);
+const ARG_VALUE: ArgSpec = arg("value", None, None, "VALUE", "", true, true, ArgAction::Set);
+const ARG_FORCE: ArgSpec = arg(
+    "force",
+    Some("force"),
+    None,
+    "",
+    "",
+    false,
+    false,
+    ArgAction::SetTrue,
+);
+const ARG_EDITOR: ArgSpec = arg(
+    "editor",
+    Some("editor"),
+    None,
+    "",
+    "Open the document body in $VISUAL or $EDITOR",
+    false,
+    false,
+    ArgAction::SetTrue,
+);
+const ARG_LABEL: ArgSpec = arg(
+    "label",
+    Some("label"),
+    None,
+    "LABEL",
+    "Label",
+    false,
+    false,
+    ArgAction::Append,
+);
+const ARG_REFERENCE: ArgSpec = arg(
+    "reference",
+    Some("reference"),
+    None,
+    "REFERENCE",
+    "Reference",
+    false,
+    false,
+    ArgAction::Append,
+);
+
+const GENERIC_DOCUMENT_VERBS: &[VerbSpec] = &[
+    VerbSpec {
+        verb: Verb::Create,
+        about: "Create a document.",
+        args: &[
+            arg(
+                "title",
+                None,
+                None,
+                "title",
+                "",
+                true,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "title_flag",
+                Some("title"),
+                None,
+                "title",
+                "",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                Some('d'),
+                "description",
+                "",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "label",
+                Some("label"),
+                None,
+                "label",
+                "",
+                false,
+                false,
+                ArgAction::Append,
+            ),
+            arg(
+                "reference",
+                Some("reference"),
+                None,
+                "reference",
+                "",
+                false,
+                false,
+                ArgAction::Append,
+            ),
+        ],
+    },
+    VerbSpec {
+        verb: Verb::List,
+        about: "List documents.",
+        args: &[],
+    },
+    VerbSpec {
+        verb: Verb::View,
+        about: "View a document.",
+        args: &[arg("id", None, None, "id", "", true, true, ArgAction::Set)],
+    },
+    VerbSpec {
+        verb: Verb::Edit,
+        about: "Edit a document.",
+        args: &[
+            arg("id", None, None, "id", "", true, true, ArgAction::Set),
+            arg(
+                "title",
+                Some("title"),
+                None,
+                "title",
+                "",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                Some('d'),
+                "description",
+                "",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "editor",
+                Some("editor"),
+                None,
+                "",
+                "",
+                false,
+                false,
+                ArgAction::SetTrue,
+            ),
+            arg(
+                "label",
+                Some("label"),
+                None,
+                "label",
+                "",
+                false,
+                false,
+                ArgAction::Append,
+            ),
+            arg(
+                "reference",
+                Some("reference"),
+                None,
+                "reference",
+                "",
+                false,
+                false,
+                ArgAction::Append,
+            ),
+        ],
+    },
+    VerbSpec {
+        verb: Verb::Archive,
+        about: "Archive a document.",
+        args: &[arg("id", None, None, "id", "", true, true, ArgAction::Set)],
+    },
+    VerbSpec {
+        verb: Verb::Delete,
+        about: "Delete a document.",
+        args: &[
+            arg("id", None, None, "id", "", true, true, ArgAction::Set),
+            arg(
+                "force",
+                Some("force"),
+                None,
+                "",
+                "",
+                false,
+                false,
+                ArgAction::SetTrue,
+            ),
+        ],
+    },
+    VerbSpec {
+        verb: Verb::Status,
+        about: "Set document status.",
+        args: &[
+            arg("id", None, None, "id", "", true, true, ArgAction::Set),
+            arg("value", None, None, "value", "", true, true, ArgAction::Set),
+        ],
+    },
+];
+
+const REQUIREMENT_VERBS: &[VerbSpec] = &[
+    VerbSpec {
+        verb: Verb::Create,
+        about: "Create a business requirement",
+        args: &[
+            ArgSpec {
+                required_unless_present: Some("title_flag"),
+                ..arg(
+                    "title",
+                    None,
+                    None,
+                    "title",
+                    "Requirement title (positional)",
+                    true,
+                    false,
+                    ArgAction::Set,
+                )
+            },
+            ArgSpec {
+                required_unless_present: Some("title"),
+                ..arg(
+                    "title_flag",
+                    Some("title"),
+                    None,
+                    "TITLE_FLAG",
+                    "Requirement title (flag)",
+                    false,
+                    false,
+                    ArgAction::Set,
+                )
+            },
+            arg(
+                "story",
+                Some("story"),
+                None,
+                "STORY",
+                "User story",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                Some('d'),
+                "DESCRIPTION",
+                "Description",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "group",
+                Some("group"),
+                None,
+                "GROUP",
+                "Owning business-requirement group",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::CreateGroup,
+        about: "Create a business-requirement group",
+        args: &[
+            arg(
+                "title",
+                Some("title"),
+                None,
+                "TITLE",
+                "Group title",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "story",
+                Some("story"),
+                None,
+                "STORY",
+                "User story",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                Some('d'),
+                "DESCRIPTION",
+                "Description",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+        ],
+    },
+    VerbSpec {
+        verb: Verb::List,
+        about: "List business requirements",
+        args: &[],
+    },
+    VerbSpec {
+        verb: Verb::View,
+        about: "View a business requirement",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Edit,
+        about: "Edit a business requirement",
+        args: &[
+            ARG_ID,
+            arg(
+                "title",
+                Some("title"),
+                None,
+                "TITLE",
+                "Update the title",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "story",
+                Some("story"),
+                None,
+                "STORY",
+                "Update the user story",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                Some('d'),
+                "DESCRIPTION",
+                "Update the description",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            ARG_EDITOR,
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::Archive,
+        about: "Archive a business requirement",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Delete,
+        about: "Delete a business requirement",
+        args: &[ARG_ID, ARG_FORCE],
+    },
+    VerbSpec {
+        verb: Verb::Status,
+        about: "Set business requirement status",
+        args: &[ARG_ID, ARG_VALUE],
+    },
+];
+
+const GLOSSARY_VERBS: &[VerbSpec] = &[
+    VerbSpec {
+        verb: Verb::Create,
+        about: "Create a glossary term",
+        args: &[
+            arg(
+                "term",
+                Some("term"),
+                None,
+                "TERM",
+                "Glossary term",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "definition",
+                Some("definition"),
+                None,
+                "DEFINITION",
+                "Definition of the term",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::List,
+        about: "List glossary terms",
+        args: &[],
+    },
+    VerbSpec {
+        verb: Verb::View,
+        about: "View a glossary term",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Edit,
+        about: "Edit a glossary term",
+        args: &[
+            ARG_ID,
+            arg(
+                "term",
+                Some("term"),
+                None,
+                "TERM",
+                "Update the glossary term",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "definition",
+                Some("definition"),
+                None,
+                "DEFINITION",
+                "Update the definition",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            ARG_EDITOR,
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::Archive,
+        about: "Archive a glossary term",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Delete,
+        about: "Delete a glossary term",
+        args: &[ARG_ID, ARG_FORCE],
+    },
+    VerbSpec {
+        verb: Verb::Status,
+        about: "Set glossary term status",
+        args: &[ARG_ID, ARG_VALUE],
+    },
+];
+
+const RULE_VERBS: &[VerbSpec] = &[
+    VerbSpec {
+        verb: Verb::Create,
+        about: "Create a business rule",
+        args: &[
+            arg(
+                "title",
+                None,
+                None,
+                "TITLE",
+                "Business rule title",
+                true,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                None,
+                "DESCRIPTION",
+                "State the business rule precisely",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "rationale",
+                Some("rationale"),
+                None,
+                "RATIONALE",
+                "Explain why the rule exists",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "applicability",
+                Some("applicability"),
+                None,
+                "APPLICABILITY",
+                "Describe when and where the rule applies",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "requirement",
+                Some("requirement"),
+                None,
+                "REQUIREMENT",
+                "Reference a business requirement. Repeatable",
+                false,
+                false,
+                ArgAction::Append,
+            ),
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::List,
+        about: "List business rules",
+        args: &[],
+    },
+    VerbSpec {
+        verb: Verb::View,
+        about: "View a business rule",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Edit,
+        about: "Edit a business rule",
+        args: &[
+            ARG_ID,
+            arg(
+                "title",
+                Some("title"),
+                None,
+                "TITLE",
+                "Update the title",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                Some('d'),
+                "DESCRIPTION",
+                "Update the description",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "requirement",
+                Some("requirement"),
+                None,
+                "REQUIREMENT",
+                "Add a business requirement. Repeatable",
+                false,
+                false,
+                ArgAction::Append,
+            ),
+            arg(
+                "no_requirement",
+                Some("no-requirement"),
+                None,
+                "NO_REQUIREMENT",
+                "Remove a business requirement; without an ID removes all",
+                false,
+                false,
+                ArgAction::OptionalValue,
+            ),
+            ARG_EDITOR,
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::Archive,
+        about: "Archive a business rule",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Delete,
+        about: "Delete a business rule",
+        args: &[ARG_ID, ARG_FORCE],
+    },
+    VerbSpec {
+        verb: Verb::Status,
+        about: "Set business rule status",
+        args: &[ARG_ID, ARG_VALUE],
+    },
+];
+
+const UI_SPEC_VERBS: &[VerbSpec] = &[
+    VerbSpec {
+        verb: Verb::Create,
+        about: "Create a UI specification",
+        args: &[
+            arg(
+                "title",
+                None,
+                None,
+                "TITLE",
+                "UI specification title",
+                true,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "view",
+                Some("view"),
+                None,
+                "VIEW",
+                "Associate the specification with a view",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                None,
+                "DESCRIPTION",
+                "Description of the UI specification",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::List,
+        about: "List UI specifications",
+        args: &[],
+    },
+    VerbSpec {
+        verb: Verb::View,
+        about: "View a UI specification",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Edit,
+        about: "Edit a UI specification",
+        args: &[
+            ARG_ID,
+            arg(
+                "view",
+                Some("view"),
+                None,
+                "VIEW",
+                "Update the associated view",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                None,
+                "DESCRIPTION",
+                "Update the description",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            ARG_EDITOR,
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::Archive,
+        about: "Archive",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Delete,
+        about: "Delete",
+        args: &[ARG_ID, ARG_FORCE],
+    },
+    VerbSpec {
+        verb: Verb::Status,
+        about: "Status",
+        args: &[ARG_ID, ARG_VALUE],
+    },
+];
+
+const AUDIT_VERBS: &[VerbSpec] = &[
+    VerbSpec {
+        verb: Verb::Create,
+        about: "",
+        args: &[
+            arg(
+                "title",
+                Some("title"),
+                None,
+                "TITLE",
+                "",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "content",
+                Some("content"),
+                None,
+                "CONTENT",
+                "",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "audit_type",
+                Some("audit-type"),
+                None,
+                "AUDIT_TYPE",
+                "",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            ArgSpec {
+                help: "",
+                ..ARG_LABEL
+            },
+            ArgSpec {
+                help: "",
+                ..ARG_REFERENCE
+            },
+        ],
+    },
+    VerbSpec {
+        verb: Verb::List,
+        about: "",
+        args: &[],
+    },
+    VerbSpec {
+        verb: Verb::View,
+        about: "",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Edit,
+        about: "",
+        args: &[
+            ARG_ID,
+            arg(
+                "title",
+                Some("title"),
+                None,
+                "TITLE",
+                "",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "content",
+                Some("content"),
+                None,
+                "CONTENT",
+                "",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "audit_type",
+                Some("audit-type"),
+                None,
+                "AUDIT_TYPE",
+                "",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            ArgSpec {
+                help: "",
+                ..ARG_EDITOR
+            },
+            ArgSpec {
+                help: "",
+                ..ARG_LABEL
+            },
+            ArgSpec {
+                help: "",
+                ..ARG_REFERENCE
+            },
+        ],
+    },
+    VerbSpec {
+        verb: Verb::Archive,
+        about: "",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Delete,
+        about: "",
+        args: &[ARG_ID, ARG_FORCE],
+    },
+    VerbSpec {
+        verb: Verb::Status,
+        about: "",
+        args: &[ARG_ID, ARG_VALUE],
+    },
+];
+
+const TECH_SPEC_VERBS: &[VerbSpec] = &[
+    VerbSpec {
+        verb: Verb::Create,
+        about: "Create a technical specification",
+        args: &[
+            arg(
+                "title",
+                None,
+                None,
+                "TITLE",
+                "Technical specification title",
+                true,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                None,
+                "DESCRIPTION",
+                "Description of the technical specification",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::List,
+        about: "List technical specifications",
+        args: &[],
+    },
+    VerbSpec {
+        verb: Verb::View,
+        about: "View a technical specification",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Edit,
+        about: "Edit a technical specification",
+        args: &[
+            ARG_ID,
+            arg(
+                "title",
+                Some("title"),
+                None,
+                "TITLE",
+                "Update the title",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                None,
+                "DESCRIPTION",
+                "Update the description",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            ARG_EDITOR,
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::Archive,
+        about: "Archive",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Delete,
+        about: "Delete",
+        args: &[ARG_ID, ARG_FORCE],
+    },
+    VerbSpec {
+        verb: Verb::Status,
+        about: "Status",
+        args: &[ARG_ID, ARG_VALUE],
+    },
+];
+
+const USE_CASE_VERBS: &[VerbSpec] = &[
+    VerbSpec {
+        verb: Verb::Create,
+        about: "Create a use case",
+        args: &[
+            arg(
+                "title",
+                None,
+                None,
+                "TITLE",
+                "Use case title",
+                true,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                None,
+                "DESCRIPTION",
+                "Description of the use case",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "applicability",
+                Some("applicability"),
+                None,
+                "APPLICABILITY",
+                "Optional applicability",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::List,
+        about: "List use cases",
+        args: &[],
+    },
+    VerbSpec {
+        verb: Verb::View,
+        about: "View a use case",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Edit,
+        about: "Edit a use case",
+        args: &[
+            ARG_ID,
+            arg(
+                "title",
+                Some("title"),
+                None,
+                "TITLE",
+                "Update the title",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                None,
+                "DESCRIPTION",
+                "Update the description",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "applicability",
+                Some("applicability"),
+                None,
+                "APPLICABILITY",
+                "Update the applicability (empty clears it)",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            ARG_EDITOR,
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::Archive,
+        about: "Archive",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Delete,
+        about: "Delete",
+        args: &[ARG_ID, ARG_FORCE],
+    },
+    VerbSpec {
+        verb: Verb::Status,
+        about: "Status",
+        args: &[ARG_ID, ARG_VALUE],
+    },
+];
+
+const TEST_CASE_VERBS: &[VerbSpec] = &[
+    VerbSpec {
+        verb: Verb::Create,
+        about: "Create a test case",
+        args: &[
+            arg(
+                "title",
+                None,
+                None,
+                "TITLE",
+                "Test case title",
+                true,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                None,
+                "DESCRIPTION",
+                "Description of the test case",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "applicability",
+                Some("applicability"),
+                None,
+                "APPLICABILITY",
+                "Optional applicability",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::List,
+        about: "List test cases",
+        args: &[],
+    },
+    VerbSpec {
+        verb: Verb::View,
+        about: "View a test case",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Edit,
+        about: "Edit a test case",
+        args: &[
+            ARG_ID,
+            arg(
+                "title",
+                Some("title"),
+                None,
+                "TITLE",
+                "Update the title",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                None,
+                "DESCRIPTION",
+                "Update the description",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "applicability",
+                Some("applicability"),
+                None,
+                "APPLICABILITY",
+                "Update the applicability (empty clears it)",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            ARG_EDITOR,
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::Archive,
+        about: "Archive",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Delete,
+        about: "Delete",
+        args: &[ARG_ID, ARG_FORCE],
+    },
+    VerbSpec {
+        verb: Verb::Status,
+        about: "Status",
+        args: &[ARG_ID, ARG_VALUE],
+    },
+];
+
+const TEST_REPORT_VERBS: &[VerbSpec] = &[
+    VerbSpec {
+        verb: Verb::Create,
+        about: "Create a test report",
+        args: &[
+            arg(
+                "title",
+                None,
+                None,
+                "TITLE",
+                "Test report title",
+                true,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                None,
+                "DESCRIPTION",
+                "Description of the test report",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            arg(
+                "applicability",
+                Some("applicability"),
+                None,
+                "APPLICABILITY",
+                "Optional applicability",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::List,
+        about: "List test reports",
+        args: &[],
+    },
+    VerbSpec {
+        verb: Verb::View,
+        about: "View a test report",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Edit,
+        about: "Edit a test report",
+        args: &[
+            ARG_ID,
+            arg(
+                "title",
+                Some("title"),
+                None,
+                "TITLE",
+                "Update the title",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "description",
+                Some("description"),
+                None,
+                "DESCRIPTION",
+                "Update the description",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "applicability",
+                Some("applicability"),
+                None,
+                "APPLICABILITY",
+                "Update the applicability (empty clears it)",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            ARG_EDITOR,
+            ARG_LABEL,
+            ARG_REFERENCE,
+        ],
+    },
+    VerbSpec {
+        verb: Verb::Archive,
+        about: "Archive",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Delete,
+        about: "Delete",
+        args: &[ARG_ID, ARG_FORCE],
+    },
+    VerbSpec {
+        verb: Verb::Status,
+        about: "Status",
+        args: &[ARG_ID, ARG_VALUE],
+    },
+];
+
+const UI_MOCKUP_VERBS: &[VerbSpec] = &[
+    VerbSpec {
+        verb: Verb::Create,
+        about: "",
+        args: &[
+            arg("title", None, None, "TITLE", "", true, true, ArgAction::Set),
+            arg(
+                "task",
+                Some("task"),
+                None,
+                "TASK",
+                "",
+                false,
+                true,
+                ArgAction::Set,
+            ),
+            ArgSpec {
+                required: true,
+                ..arg(
+                    "spec",
+                    Some("spec"),
+                    None,
+                    "SPEC",
+                    "",
+                    false,
+                    false,
+                    ArgAction::Append,
+                )
+            },
+            arg(
+                "ref",
+                Some("ref"),
+                None,
+                "REF",
+                "",
+                false,
+                false,
+                ArgAction::Append,
+            ),
+        ],
+    },
+    VerbSpec {
+        verb: Verb::List,
+        about: "",
+        args: &[],
+    },
+    VerbSpec {
+        verb: Verb::View,
+        about: "",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Edit,
+        about: "",
+        args: &[
+            ARG_ID,
+            arg(
+                "title",
+                Some("title"),
+                None,
+                "TITLE",
+                "",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "task",
+                Some("task"),
+                None,
+                "TASK",
+                "",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "spec",
+                Some("spec"),
+                None,
+                "SPEC",
+                "",
+                false,
+                false,
+                ArgAction::Append,
+            ),
+            arg(
+                "ref",
+                Some("ref"),
+                None,
+                "REF",
+                "",
+                false,
+                false,
+                ArgAction::Append,
+            ),
+            ArgSpec {
+                conflicts_with: Some("superseded_by"),
+                ..arg(
+                    "status",
+                    Some("status"),
+                    None,
+                    "STATUS",
+                    "",
+                    false,
+                    false,
+                    ArgAction::Set,
+                )
+            },
+            ArgSpec {
+                conflicts_with: Some("status"),
+                ..arg(
+                    "superseded_by",
+                    Some("superseded-by"),
+                    None,
+                    "SUPERSEDED_BY",
+                    "",
+                    false,
+                    false,
+                    ArgAction::Set,
+                )
+            },
+            ArgSpec {
+                help: "",
+                ..ARG_EDITOR
+            },
+        ],
+    },
+    VerbSpec {
+        verb: Verb::Archive,
+        about: "",
+        args: &[ARG_ID],
+    },
+    VerbSpec {
+        verb: Verb::Delete,
+        about: "",
+        args: &[ARG_ID, ARG_FORCE],
+    },
+    VerbSpec {
+        verb: Verb::Supersede,
+        about: "",
+        args: &[
+            arg("old", None, None, "OLD", "", true, true, ArgAction::Set),
+            arg("new", None, None, "NEW", "", true, true, ArgAction::Set),
+        ],
+    },
+];
+
 const TASK_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::Task,
     sections: TASK_SECTIONS,
     extensions: &[],
+    verbs: &[],
 };
 const MILESTONE_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::Milestone,
     sections: MILESTONE_SECTIONS,
     extensions: &[],
+    verbs: &[],
 };
 const RELEASE_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::Release,
     sections: RELEASE_SECTIONS,
     extensions: &[],
+    verbs: &[],
 };
 const DECISION_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::Decision,
     sections: DECISION_SECTIONS,
     extensions: &[],
+    verbs: &[],
 };
 const REQUIREMENT_BUSINESS_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::Requirement(RequirementKind::Business),
     sections: REQUIREMENT_SECTIONS,
     extensions: &[Verb::CreateGroup],
+    verbs: REQUIREMENT_VERBS,
 };
 const REQUIREMENT_NON_FUNCTIONAL_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::Requirement(RequirementKind::NonFunctional),
     sections: REQUIREMENT_SECTIONS,
     extensions: &[Verb::CreateGroup],
+    verbs: REQUIREMENT_VERBS,
 };
 const GLOSSARY_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::Glossary,
     sections: GLOSSARY_SECTIONS,
     extensions: &[],
+    verbs: GLOSSARY_VERBS,
 };
 const RULE_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::Rule,
     sections: RULE_SECTIONS,
     extensions: &[],
+    verbs: RULE_VERBS,
 };
 const UI_SPEC_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::UiSpec,
     sections: UI_SPEC_SECTIONS,
     extensions: &[],
+    verbs: UI_SPEC_VERBS,
 };
 const UI_MOCKUP_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::UiMockup,
     sections: &[],
     extensions: &[Verb::Supersede],
+    verbs: UI_MOCKUP_VERBS,
 };
 const AUDIT_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::Audit,
     sections: AUDIT_SECTIONS,
     extensions: &[],
+    verbs: AUDIT_VERBS,
 };
 const TECH_SPEC_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::TechSpec,
     sections: TECH_SPEC_SECTIONS,
     extensions: &[],
+    verbs: TECH_SPEC_VERBS,
 };
 const USE_CASE_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::UseCase,
     sections: USE_CASE_SECTIONS,
     extensions: &[],
+    verbs: USE_CASE_VERBS,
 };
 const TEST_CASE_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::TestCase,
     sections: TEST_CASE_SECTIONS,
     extensions: &[],
+    verbs: TEST_CASE_VERBS,
 };
 const TEST_REPORT_SCHEMA: TypedSchema = TypedSchema {
     handler: TypedHandler::TestReport,
     sections: TEST_REPORT_SECTIONS,
     extensions: &[],
+    verbs: TEST_REPORT_VERBS,
 };
 
 const DECISION_STATES: &[&str] = &[
@@ -1274,6 +2773,30 @@ fn check_invariants(descriptors: &[TypeDescriptor]) -> Result<(), RegistryError>
             return Err(RegistryError::ExtensionVerbMismatch {
                 slug: descriptor.slug.clone(),
                 verb: verb.as_str(),
+            });
+        }
+    }
+
+    // I17: every document verb has a spec and every spec verb is declared.
+    for descriptor in documents() {
+        let specs = descriptor.content_model.verbs();
+        if let Some(verb) = descriptor
+            .verbs
+            .iter()
+            .find(|verb| !specs.iter().any(|spec| spec.verb == **verb))
+        {
+            return Err(RegistryError::VerbSpecMismatch {
+                slug: descriptor.slug.clone(),
+                verb: verb.as_str(),
+            });
+        }
+        if let Some(spec) = specs
+            .iter()
+            .find(|spec| !descriptor.verbs.contains(&spec.verb))
+        {
+            return Err(RegistryError::VerbSpecMismatch {
+                slug: descriptor.slug.clone(),
+                verb: spec.verb.as_str(),
             });
         }
     }
@@ -2270,5 +3793,129 @@ mod tests {
             "document_types.req.prefix: must not be empty"
         );
         assert!(matches!(app_error, AppError::Validation(_)));
+    }
+    // 41
+    #[test]
+    fn every_document_verb_has_a_spec_and_every_spec_verb_is_declared() {
+        let registry = default_registry();
+        for descriptor in registry.in_category(ArtifactCategory::Document) {
+            let specs = descriptor.content_model.verbs();
+            for verb in &descriptor.verbs {
+                assert!(
+                    specs.iter().any(|spec| spec.verb == *verb),
+                    "{}: verb {} has no spec",
+                    descriptor.slug,
+                    verb.as_str()
+                );
+            }
+            for spec in specs {
+                assert!(
+                    descriptor.verbs.contains(&spec.verb),
+                    "{}: spec verb {} is not declared",
+                    descriptor.slug,
+                    spec.verb.as_str()
+                );
+            }
+        }
+        // A declared verb without a spec is a startup defect.
+        static NO_SPEC_SCHEMA: TypedSchema = TypedSchema {
+            handler: TypedHandler::Glossary,
+            sections: &[],
+            extensions: &[],
+            verbs: &[],
+        };
+        let cfg = Config::default();
+        let mut descriptors = assembled(&cfg);
+        let glossary = find_mut(&mut descriptors, "glossary");
+        glossary.content_model = ContentModel::Typed(&NO_SPEC_SCHEMA);
+        let error = invariant_error(&descriptors);
+        assert!(matches!(
+            error,
+            RegistryError::VerbSpecMismatch { ref slug, verb: "create" } if slug == "glossary"
+        ));
+    }
+
+    // 42
+    #[test]
+    fn canonical_verb_order_and_typed_value_names_are_preserved() {
+        let registry = default_registry();
+
+        let glossary = registry.descriptor("glossary").unwrap();
+        let order: Vec<&str> = glossary
+            .ordered_verb_specs()
+            .iter()
+            .map(|spec| spec.verb.as_str())
+            .collect();
+        assert_eq!(
+            order,
+            vec![
+                "create", "list", "view", "edit", "archive", "delete", "status"
+            ]
+        );
+
+        let req = registry.descriptor("req").unwrap();
+        let order: Vec<&str> = req
+            .ordered_verb_specs()
+            .iter()
+            .map(|spec| spec.verb.as_str())
+            .collect();
+        assert_eq!(
+            order,
+            vec![
+                "create",
+                "create-group",
+                "list",
+                "view",
+                "edit",
+                "archive",
+                "delete",
+                "status"
+            ]
+        );
+        let create = req.verb_spec(Verb::Create).unwrap();
+        let title_flag = create
+            .args
+            .iter()
+            .find(|arg| arg.id == "title_flag")
+            .unwrap();
+        assert_eq!(title_flag.value_name, "TITLE_FLAG");
+        assert_eq!(title_flag.long, Some("title"));
+        let title = create.args.iter().find(|arg| arg.id == "title").unwrap();
+        assert_eq!(title.value_name, "title");
+        assert_eq!(title.required_unless_present, Some("title_flag"));
+
+        let mockup = registry.descriptor("ui-mockup").unwrap();
+        let edit = mockup.verb_spec(Verb::Edit).unwrap();
+        assert_eq!(
+            edit.args
+                .iter()
+                .find(|arg| arg.id == "status")
+                .unwrap()
+                .conflicts_with,
+            Some("superseded_by")
+        );
+        let create = mockup.verb_spec(Verb::Create).unwrap();
+        assert!(
+            create
+                .args
+                .iter()
+                .find(|arg| arg.id == "spec")
+                .unwrap()
+                .required
+        );
+
+        let built = ArtifactRegistry::build(&config_with("deploy", entry("DEP", "deploy/")))
+            .expect("generic registry");
+        let generic = built.descriptor("deploy").unwrap();
+        let create = generic.verb_spec(Verb::Create).unwrap();
+        assert_eq!(
+            create
+                .args
+                .iter()
+                .find(|arg| arg.id == "title_flag")
+                .unwrap()
+                .value_name,
+            "title"
+        );
     }
 }

@@ -1,7 +1,7 @@
-use crate::document::DocumentInvocation;
-use crate::document::DocumentVerb;
-use crate::registry::{ArtifactCategory, ContentModel, TypeDescriptor, Verb};
-use clap::{Arg, ArgAction, ArgMatches, Command, Subcommand};
+use crate::document::{DocumentArgs, DocumentInvocation, DocumentVerb};
+use crate::error::AppError;
+use crate::registry::{ArgAction, ArgSpec, ArtifactCategory, TypeDescriptor, VerbSpec};
+use clap::{Arg, ArgMatches, Command, Subcommand};
 
 pub fn tree(
     registry: Option<&crate::registry::ArtifactRegistry>,
@@ -15,7 +15,7 @@ pub fn tree(
     cmd = cmd.arg(
         Arg::new("json")
             .long("json")
-            .action(ArgAction::SetTrue)
+            .action(clap::ArgAction::SetTrue)
             .global(true)
             .help("Emit stable, machine-readable JSON."),
     );
@@ -36,7 +36,7 @@ pub fn tree(
     cmd = cmd.arg(
         Arg::new("no_color")
             .long("no-color")
-            .action(ArgAction::SetTrue)
+            .action(clap::ArgAction::SetTrue)
             .global(true)
             .help("Disable ANSI color output."),
     );
@@ -76,181 +76,110 @@ pub fn document_command(descriptor: &TypeDescriptor) -> Command {
     let slug_static: &'static str = Box::leak(slug.clone().into_boxed_str());
     let mut cmd = Command::new(slug_static).about(format!("Manage {} documents.", slug));
 
-    match &descriptor.content_model {
-        ContentModel::Generic => {
-            // baseline
-            cmd = cmd.subcommand(create_generic_cmd());
-            cmd = cmd.subcommand(Command::new("list").about("List documents."));
-            cmd = cmd.subcommand(
-                Command::new("view")
-                    .about("View a document.")
-                    .arg(Arg::new("id").required(true)),
-            );
-            cmd = cmd.subcommand(edit_generic_cmd());
-            cmd = cmd.subcommand(
-                Command::new("archive")
-                    .about("Archive a document.")
-                    .arg(Arg::new("id").required(true)),
-            );
-            cmd = cmd.subcommand(
-                Command::new("delete")
-                    .about("Delete a document.")
-                    .arg(Arg::new("id").required(true))
-                    .arg(Arg::new("force").long("force").action(ArgAction::SetTrue)),
-            );
-            if descriptor.has_verb(Verb::Status) {
-                cmd = cmd.subcommand(
-                    Command::new("status")
-                        .about("Set document status.")
-                        .arg(Arg::new("id").required(true))
-                        .arg(Arg::new("value").required(true)),
-                );
-            }
-        }
-        ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => {
-            // augment with module enum
-            match schema.handler {
-                crate::registry::TypedHandler::Requirement(
-                    crate::registry::RequirementKind::Business,
-                ) => {
-                    cmd = crate::req::ReqCmd::augment_subcommands(cmd);
-                }
-                crate::registry::TypedHandler::Requirement(
-                    crate::registry::RequirementKind::NonFunctional,
-                ) => {
-                    cmd = crate::req::ReqCmd::augment_subcommands(cmd);
-                }
-                crate::registry::TypedHandler::Glossary => {
-                    cmd = crate::glossary::GlossaryCmd::augment_subcommands(cmd);
-                }
-                crate::registry::TypedHandler::Rule => {
-                    cmd = crate::rule::RuleCmd::augment_subcommands(cmd);
-                }
-                crate::registry::TypedHandler::UiSpec => {
-                    cmd = crate::ui_spec::UiSpecCmd::augment_subcommands(cmd);
-                }
-                crate::registry::TypedHandler::Audit => {
-                    cmd = crate::audit::AuditCmd::augment_subcommands(cmd);
-                }
-                crate::registry::TypedHandler::TechSpec => {
-                    cmd = crate::tech_spec::TechSpecCmd::augment_subcommands(cmd);
-                }
-                crate::registry::TypedHandler::UseCase => {
-                    cmd = crate::use_case::UseCaseCmd::augment_subcommands(cmd);
-                }
-                crate::registry::TypedHandler::TestCase => {
-                    cmd = crate::test_case::TestCaseCmd::augment_subcommands(cmd);
-                }
-                crate::registry::TypedHandler::TestReport => {
-                    cmd = crate::test_report::TestReportCmd::augment_subcommands(cmd);
-                }
-                crate::registry::TypedHandler::UiMockup => {
-                    cmd = crate::ui_mockup::UiMockupCmd::augment_subcommands(cmd);
-                }
-                _ => {}
-            }
-            // Typed modules declare their own status subcommand when applicable.
-        }
+    for spec in descriptor.ordered_verb_specs() {
+        cmd = cmd.subcommand(verb_command(spec));
     }
-
     cmd
 }
 
-fn create_generic_cmd() -> Command {
-    Command::new("create")
-        .about("Create a document.")
-        .arg(Arg::new("title").value_name("title").required(false))
-        .arg(Arg::new("title_flag").long("title").value_name("title"))
-        .arg(Arg::new("description").short('d').long("description"))
-        .arg(Arg::new("label").long("label").action(ArgAction::Append))
-        .arg(
-            Arg::new("reference")
-                .long("reference")
-                .action(ArgAction::Append),
-        )
-}
-
-fn edit_generic_cmd() -> Command {
-    Command::new("edit")
-        .about("Edit a document.")
-        .arg(Arg::new("id").required(true))
-        .arg(Arg::new("title").long("title"))
-        .arg(Arg::new("description").short('d').long("description"))
-        .arg(Arg::new("editor").long("editor").action(ArgAction::SetTrue))
-        .arg(Arg::new("label").long("label").action(ArgAction::Append))
-        .arg(
-            Arg::new("reference")
-                .long("reference")
-                .action(ArgAction::Append),
-        )
-}
-
-pub fn parse_document_invocation(matches: &ArgMatches, slug: &str) -> DocumentInvocation {
-    // matches is the slug-level ArgMatches
-    let (verb_name, sub) = matches.subcommand().unwrap_or(("list", matches));
-    let verb = match verb_name {
-        "create" => DocumentVerb::Create,
-        "list" => DocumentVerb::List,
-        "view" => DocumentVerb::View,
-        "edit" => DocumentVerb::Edit,
-        "archive" => DocumentVerb::Archive,
-        "delete" => DocumentVerb::Delete,
-        "status" => DocumentVerb::Status,
-        _ => DocumentVerb::List,
-    };
-    let id = sub.try_get_one::<String>("id").ok().flatten().cloned();
-    // title: positional or flag
-    let title = sub
-        .try_get_one::<String>("title")
-        .ok()
-        .flatten()
-        .cloned()
-        .or_else(|| {
-            sub.try_get_one::<String>("title_flag")
-                .ok()
-                .flatten()
-                .cloned()
-        });
-    let description = sub
-        .try_get_one::<String>("description")
-        .ok()
-        .flatten()
-        .cloned();
-    let labels: Vec<String> = sub
-        .try_get_many::<String>("label")
-        .ok()
-        .flatten()
-        .map(|v| v.cloned().collect())
-        .unwrap_or_default();
-    let references: Vec<String> = sub
-        .try_get_many::<String>("reference")
-        .ok()
-        .flatten()
-        .map(|v| v.cloned().collect())
-        .unwrap_or_default();
-    let editor = sub
-        .try_get_one::<bool>("editor")
-        .ok()
-        .flatten()
-        .copied()
-        .unwrap_or(false);
-    let status_value = sub.try_get_one::<String>("value").ok().flatten().cloned();
-    let force = sub
-        .try_get_one::<bool>("force")
-        .ok()
-        .flatten()
-        .copied()
-        .unwrap_or(false);
-    DocumentInvocation {
-        slug: slug.to_string(),
-        verb,
-        id,
-        title,
-        description,
-        labels,
-        references,
-        editor,
-        status_value,
-        force,
+fn verb_command(spec: &VerbSpec) -> Command {
+    let mut cmd = Command::new(spec.verb.as_str());
+    if !spec.about.is_empty() {
+        cmd = cmd.about(spec.about);
     }
+    for arg in spec.args {
+        cmd = cmd.arg(build_arg(*arg));
+    }
+    cmd
+}
+
+fn build_arg(spec: ArgSpec) -> Arg {
+    let mut arg = Arg::new(spec.id);
+    if let Some(long) = spec.long {
+        arg = arg.long(long);
+    }
+    if let Some(short) = spec.short {
+        arg = arg.short(short);
+    }
+    if !spec.value_name.is_empty() {
+        arg = arg.value_name(spec.value_name);
+    }
+    if !spec.help.is_empty() {
+        arg = arg.help(spec.help);
+    }
+    arg = match spec.action {
+        ArgAction::Set => arg,
+        ArgAction::Append => arg.action(clap::ArgAction::Append),
+        ArgAction::SetTrue => arg.action(clap::ArgAction::SetTrue),
+        ArgAction::OptionalValue => arg.num_args(0..=1),
+    };
+    if spec.required {
+        arg = arg.required(true);
+    }
+    if let Some(other) = spec.required_unless_present {
+        arg = arg.required_unless_present(other);
+    }
+    if let Some(other) = spec.conflicts_with {
+        arg = arg.conflicts_with(other);
+    }
+    arg
+}
+
+/// Parse one document invocation from the slug-level matches.
+///
+/// `generic` selects the historical no-verb behaviour: a config-defined type
+/// lists, while a built-in typed type requires a verb. An unknown verb is
+/// always a validation error, never a silent `list`.
+pub fn parse_document_invocation(
+    matches: &ArgMatches,
+    slug: &str,
+    generic: bool,
+) -> Result<DocumentInvocation, AppError> {
+    let (verb, sub) = match matches.subcommand() {
+        Some((name, sub)) => {
+            let verb = DocumentVerb::from_name(name)
+                .ok_or_else(|| AppError::Validation(format!("unknown verb: {}", name)))?;
+            (verb, sub)
+        }
+        None if generic => (DocumentVerb::List, matches),
+        None => return Err(AppError::Validation("missing verb".to_string())),
+    };
+
+    let args = collect_args(sub);
+    let title = args.get("title").or_else(|| args.get("title_flag"));
+    let mut invocation = DocumentInvocation::new(slug, verb);
+    invocation.id = args.get("id").map(str::to_string);
+    invocation.title = title.map(str::to_string);
+    invocation.description = args.get("description").map(str::to_string);
+    invocation.labels = args.get_all("label").to_vec();
+    invocation.references = args.get_all("reference").to_vec();
+    invocation.editor = args.flag("editor");
+    invocation.status_value = args.get("value").map(str::to_string);
+    invocation.force = args.flag("force");
+    invocation.args = args;
+    Ok(invocation)
+}
+
+fn collect_args(matches: &ArgMatches) -> DocumentArgs {
+    let mut args = DocumentArgs::default();
+    for id in matches.ids() {
+        let id = id.as_str();
+        if matches!(id, "json" | "dir" | "config" | "no_color") {
+            continue;
+        }
+        // Only explicitly supplied arguments belong to the invocation map;
+        // defaults must not look like present switches.
+        if matches.value_source(id) != Some(clap::parser::ValueSource::CommandLine) {
+            continue;
+        }
+        let mut values: Vec<String> = Vec::new();
+        if let Ok(Some(flags)) = matches.try_get_many::<bool>(id) {
+            // Presence is the value; keep the key with an empty list.
+            let _ = flags.count();
+        } else if let Ok(Some(items)) = matches.try_get_many::<String>(id) {
+            values.extend(items.cloned());
+        }
+        args.insert(id, values);
+    }
+    args
 }

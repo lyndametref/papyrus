@@ -1,0 +1,5 @@
+{
+  "exit": 3,
+  "stdout": "",
+  "stderr": "{\"error\":{\"code\":3,\"message\":\"record not found: NOTE-999\"}}\n"
+}

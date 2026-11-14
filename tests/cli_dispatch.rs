@@ -556,7 +556,8 @@ fn document_invocation_parsing_table() {
             .unwrap_or_else(|e| panic!("parse failed for {}: {}", name, e));
         let (slug, sub) = matches.subcommand().expect("missing slug subcommand");
         assert_eq!(slug, "note", "unexpected slug for {}", name);
-        let inv = parse_document_invocation(sub, slug);
+        let inv = parse_document_invocation(sub, slug, true)
+            .unwrap_or_else(|e| panic!("parse failed for {}: {}", name, e));
         assert_eq!(inv.verb, expected.verb, "verb mismatch for {}", name);
         assert_eq!(inv.id.as_deref(), expected.id, "id mismatch for {}", name);
         assert_eq!(
@@ -585,6 +586,25 @@ fn document_invocation_parsing_table() {
             name
         );
         assert_eq!(inv.force, expected.force, "force mismatch for {}", name);
+        assert_eq!(inv.args.get("id"), expected.id, "args id for {}", name);
+        assert_eq!(
+            inv.args.get_all("label"),
+            expected.labels,
+            "args labels for {}",
+            name
+        );
+        assert_eq!(
+            inv.args.get_all("reference"),
+            expected.references,
+            "args references for {}",
+            name
+        );
+        assert_eq!(
+            inv.args.flag("editor"),
+            expected.editor,
+            "args editor for {}",
+            name
+        );
         assert_eq!(inv.slug, "note");
     }
 }

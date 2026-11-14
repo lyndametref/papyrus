@@ -1,107 +1,44 @@
 use crate::CommandOutput;
-use crate::commands::load_effective_config;
-use crate::config::{Config, DocTypeEntry};
 use crate::context::Context;
+use crate::document::{DocumentArgs, DocumentScope, DocumentVerb};
 use crate::error::AppError;
 use crate::sanitize;
-use clap::Subcommand;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-#[derive(Subcommand, Debug)]
-pub enum AuditCmd {
-    Create {
-        #[arg(long = "title")]
-        title: String,
-        #[arg(long = "content")]
-        content: String,
-        #[arg(long = "audit-type")]
-        audit_type: Option<String>,
-        #[arg(long = "label")]
-        label: Vec<String>,
-        #[arg(long = "reference")]
-        reference: Vec<String>,
-    },
-    List,
-    View {
-        id: String,
-    },
-    Edit {
-        id: String,
-        #[arg(long = "title")]
-        title: Option<String>,
-        #[arg(long = "content")]
-        content: Option<String>,
-        #[arg(long = "audit-type")]
-        audit_type: Option<String>,
-        #[arg(long = "editor")]
-        editor: bool,
-        #[arg(long = "label")]
-        label: Vec<String>,
-        #[arg(long = "reference")]
-        reference: Vec<String>,
-    },
-    Archive {
-        id: String,
-    },
-    Delete {
-        id: String,
-        #[arg(long)]
-        force: bool,
-    },
-    Status {
-        id: String,
-        value: String,
-    },
-}
-
-pub fn run(ctx: &Context, cmd: AuditCmd) -> Result<CommandOutput, AppError> {
-    match cmd {
-        AuditCmd::Create {
-            title,
-            content,
-            audit_type,
-            label,
-            reference,
-        } => {
+pub fn handle(
+    ctx: &Context,
+    scope: &DocumentScope,
+    verb: DocumentVerb,
+    args: &DocumentArgs,
+) -> Result<CommandOutput, AppError> {
+    match verb {
+        DocumentVerb::Create => {
             let id = create(
                 ctx,
-                &title,
-                &content,
-                audit_type.as_deref(),
-                &label,
-                &reference,
+                scope,
+                args.require("title")?,
+                args.require("content")?,
+                args.get("audit_type"),
+                args.get_all("label"),
+                args.get_all("reference"),
             )?;
-            let json = if ctx.json {
-                Some(serde_json::json!({"id": id}))
-            } else {
-                None
-            };
-            Ok(CommandOutput { text: id, json })
+            Ok(crate::document::typed_created(ctx, id))
         }
-        AuditCmd::List => list(ctx),
-        AuditCmd::View { id } => view(ctx, &id),
-        AuditCmd::Edit {
-            id,
-            title,
-            content,
-            audit_type,
-            editor,
-            label,
-            reference,
-        } => edit(
+        DocumentVerb::List => list(ctx, scope),
+        DocumentVerb::View => view(ctx, scope, args.require("id")?),
+        DocumentVerb::Edit => edit(
             ctx,
-            &id,
-            title.as_deref(),
-            content.as_deref(),
-            audit_type.as_deref(),
-            &label,
-            &reference,
-            editor,
+            scope,
+            args.require("id")?,
+            args.get("title"),
+            args.get("content"),
+            args.get("audit_type"),
+            args.get_all("label"),
+            args.get_all("reference"),
+            args.flag("editor"),
         ),
-        AuditCmd::Archive { id } => crate::document::archive(ctx, "audit", &id),
-        AuditCmd::Delete { id, force } => crate::document::delete(ctx, "audit", &id, force),
-        AuditCmd::Status { id, value } => crate::document::status(ctx, "audit", &id, &value),
+        other => Err(crate::document::unsupported_verb(other)),
     }
 }
 
@@ -114,42 +51,6 @@ fn sanitize_field(raw: &str) -> Result<String, AppError> {
         ));
     }
     Ok(value)
-}
-
-fn load_config(ctx: &Context) -> Result<Config, AppError> {
-    load_effective_config(&ctx.config_path, &ctx.project_dir)
-}
-
-fn type_entry(cfg: &Config) -> Result<DocTypeEntry, AppError> {
-    let entry = cfg
-        .document_types
-        .get("audit")
-        .ok_or_else(|| AppError::NotFound("document type not configured: audit".to_string()))?;
-    if !entry.enabled {
-        return Err(AppError::Validation(
-            "document type disabled: audit".to_string(),
-        ));
-    }
-    if entry.prefix.is_empty() {
-        return Err(AppError::Validation(
-            "document type prefix empty: audit".to_string(),
-        ));
-    }
-    Ok(entry.clone())
-}
-
-fn active_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let entry = type_entry(cfg)?;
-    let raw = ctx
-        .project_dir
-        .join(&cfg.doc_directory)
-        .join(&entry.directory);
-    Context::ensure_within(&ctx.project_dir, &raw)
-}
-
-fn archived_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let raw = active_dir(ctx, cfg)?.join("archived");
-    Context::ensure_within(&ctx.project_dir, &raw)
 }
 
 fn ensure_dirs(dir: &Path) -> Result<(), AppError> {
@@ -228,6 +129,7 @@ fn body_document(
 
 pub fn create(
     ctx: &Context,
+    scope: &DocumentScope,
     title_raw: &str,
     content_raw: &str,
     audit_type_raw: Option<&str>,
@@ -254,15 +156,12 @@ pub fn create(
         }
     }
 
-    let cfg = load_config(ctx)?;
-    let entry = type_entry(&cfg)?;
-    let active = active_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
+    let archived = scope.archived.clone();
     ensure_dirs(&active)?;
 
-    let next =
-        crate::record::identity::next_number(&active, &active.join("archived"), &entry.prefix);
-    let id =
-        crate::record::identity::format_id(&entry.prefix, next as i64, cfg.id_padding as usize);
+    let next = crate::record::identity::next_number(&active, &archived, &scope.prefix);
+    let id = crate::record::identity::format_id(&scope.prefix, next as i64, scope.id_padding);
 
     let body_doc = body_document(&id, &title, &audit_type, &content);
     let body = crate::record::document::render(&body_doc);
@@ -309,19 +208,17 @@ pub fn create(
     Ok(id)
 }
 
-pub fn list(ctx: &Context) -> Result<CommandOutput, AppError> {
-    let cfg = load_config(ctx)?;
-    let entry = type_entry(&cfg)?;
+pub fn list(ctx: &Context, scope: &DocumentScope) -> Result<CommandOutput, AppError> {
     let descriptor = crate::record::descriptor::descriptor_for_doc_type("audit")
         .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
     let dotted = descriptor.is_dotted_id();
-    let active = active_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
     let _ = ensure_dirs(&active);
 
     let records = crate::record::resolve::list_in_dir(
         ctx,
         &active,
-        std::slice::from_ref(&entry.prefix),
+        std::slice::from_ref(&scope.prefix),
         dotted,
     )?;
     let mut items: Vec<(String, String, String)> = Vec::new();
@@ -366,19 +263,17 @@ pub fn list(ctx: &Context) -> Result<CommandOutput, AppError> {
     Ok(CommandOutput { text, json })
 }
 
-pub fn view(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
+pub fn view(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<CommandOutput, AppError> {
     let requested = sanitize_field(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let entry = type_entry(&cfg)?;
     let descriptor = crate::record::descriptor::descriptor_for_doc_type("audit")
         .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
     let dotted = descriptor.is_dotted_id();
-    let active = active_dir(ctx, &cfg)?;
-    let deprecated = archived_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
+    let deprecated = scope.archived.clone();
     let _ = ensure_dirs(&active);
     let _ = ensure_dirs(&deprecated);
     let record =
-        active_or_deprecated(ctx, &active, &deprecated, &requested, &entry.prefix, dotted)?;
+        active_or_deprecated(ctx, &active, &deprecated, &requested, &scope.prefix, dotted)?;
     let id = record.id.clone();
     let path = record.path;
 
@@ -415,6 +310,7 @@ fn frontmatter_list_audit(content: &str, key: &str) -> Vec<String> {
 #[allow(clippy::too_many_arguments)]
 pub fn edit(
     ctx: &Context,
+    scope: &DocumentScope,
     id_raw: &str,
     title_raw: Option<&str>,
     content_raw: Option<&str>,
@@ -424,24 +320,24 @@ pub fn edit(
     editor: bool,
 ) -> Result<CommandOutput, AppError> {
     let requested = sanitize_field(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let entry = type_entry(&cfg)?;
     let descriptor = crate::record::descriptor::descriptor_for_doc_type("audit")
         .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
     let dotted = descriptor.is_dotted_id();
-    let active = active_dir(ctx, &cfg)?;
-    let deprecated = archived_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
+    let deprecated = scope.archived.clone();
     let _ = ensure_dirs(&active);
     let _ = ensure_dirs(&deprecated);
     let resolved =
-        active_or_deprecated(ctx, &active, &deprecated, &requested, &entry.prefix, dotted)?;
+        active_or_deprecated(ctx, &active, &deprecated, &requested, &scope.prefix, dotted)?;
     resolved.ensure_writable()?;
     let id = resolved.id.clone();
     let path = resolved.path.clone();
 
     let editor_cmd = if editor {
         Some(
-            cfg.effective_editor()
+            scope
+                .config
+                .effective_editor()
                 .ok_or_else(|| AppError::Runtime("no editor configured".to_string()))?,
         )
     } else {

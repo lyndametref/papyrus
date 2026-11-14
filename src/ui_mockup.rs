@@ -1,101 +1,50 @@
 #![allow(clippy::too_many_arguments)]
 use crate::CommandOutput;
-use crate::commands::load_effective_config;
-use crate::config::{Config, DocTypeEntry};
 use crate::context::Context;
+use crate::document::{DocumentArgs, DocumentScope, DocumentVerb};
 use crate::error::AppError;
 use crate::sanitize;
-use clap::Subcommand;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[derive(Subcommand, Debug)]
-pub enum UiMockupCmd {
-    Create {
-        title: String,
-        #[arg(long = "task")]
-        task: String,
-        #[arg(long = "spec", required = true)]
-        spec: Vec<String>,
-        #[arg(long = "ref")]
-        r#ref: Vec<String>,
-    },
-    List,
-    View {
-        id: String,
-    },
-    Edit {
-        id: String,
-        #[arg(long = "title")]
-        title: Option<String>,
-        #[arg(long = "task")]
-        task: Option<String>,
-        #[arg(long = "spec")]
-        spec: Option<Vec<String>>,
-        #[arg(long = "ref")]
-        r#ref: Option<Vec<String>>,
-        #[arg(long = "status", conflicts_with = "superseded_by")]
-        status: Option<String>,
-        #[arg(long = "superseded-by", conflicts_with = "status")]
-        superseded_by: Option<String>,
-        #[arg(long = "editor")]
-        editor: bool,
-    },
-    Archive {
-        id: String,
-    },
-    Delete {
-        id: String,
-        #[arg(long)]
-        force: bool,
-    },
-    Supersede {
-        old: String,
-        new: String,
-    },
-}
-
-pub fn run(ctx: &Context, cmd: UiMockupCmd) -> Result<CommandOutput, AppError> {
-    match cmd {
-        UiMockupCmd::Create {
-            title,
-            task,
-            spec,
-            r#ref,
-        } => {
-            let id = create(ctx, &title, &task, &spec, &r#ref)?;
-            let json = if ctx.json {
-                Some(serde_json::json!({"id": id}))
-            } else {
-                None
-            };
-            Ok(CommandOutput { text: id, json })
+pub fn handle(
+    ctx: &Context,
+    scope: &DocumentScope,
+    verb: DocumentVerb,
+    args: &DocumentArgs,
+) -> Result<CommandOutput, AppError> {
+    match verb {
+        DocumentVerb::Create => {
+            let id = create(
+                ctx,
+                scope,
+                args.require("title")?,
+                args.require("task")?,
+                args.get_all("spec"),
+                args.get_all("ref"),
+            )?;
+            Ok(crate::document::typed_created(ctx, id))
         }
-        UiMockupCmd::List => list(ctx),
-        UiMockupCmd::View { id } => view(ctx, &id),
-        UiMockupCmd::Edit {
-            id,
-            title,
-            task,
-            spec,
-            r#ref,
-            status,
-            superseded_by,
-            editor,
-        } => edit(
+        DocumentVerb::List => list(ctx, scope),
+        DocumentVerb::View => view(ctx, scope, args.require("id")?),
+        DocumentVerb::Edit => edit(
             ctx,
-            &id,
-            title.as_deref(),
-            task.as_deref(),
-            spec.as_deref(),
-            r#ref.as_deref(),
-            status.as_deref(),
-            superseded_by.as_deref(),
-            editor,
+            scope,
+            args.require("id")?,
+            args.get("title"),
+            args.get("task"),
+            args.flag("spec").then(|| args.get_all("spec")),
+            args.flag("ref").then(|| args.get_all("ref")),
+            args.get("status"),
+            args.get("superseded_by"),
+            args.flag("editor"),
         ),
-        UiMockupCmd::Archive { id } => archive(ctx, &id),
-        UiMockupCmd::Delete { id, force } => delete(ctx, &id, force),
-        UiMockupCmd::Supersede { old, new } => supersede(ctx, &old, &new),
+        DocumentVerb::Archive => archive(ctx, scope, args.require("id")?),
+        DocumentVerb::Delete => delete(ctx, scope, args.require("id")?, args.flag("force")),
+        DocumentVerb::Supersede => {
+            supersede(ctx, scope, args.require("old")?, args.require("new")?)
+        }
+        other => Err(crate::document::unsupported_verb(other)),
     }
 }
 
@@ -112,41 +61,6 @@ fn sanitize_field(raw: &str) -> Result<String, AppError> {
 
 fn sanitize_list(values: &[String]) -> Result<Vec<String>, AppError> {
     values.iter().map(|v| sanitize_field(v)).collect()
-}
-
-fn load_config(ctx: &Context) -> Result<Config, AppError> {
-    load_effective_config(&ctx.config_path, &ctx.project_dir)
-}
-
-fn type_entry(cfg: &Config) -> Result<DocTypeEntry, AppError> {
-    let entry = cfg
-        .document_types
-        .get("ui-mockup")
-        .ok_or_else(|| AppError::NotFound("document type not configured: ui-mockup".to_string()))?;
-    if !entry.enabled {
-        return Err(AppError::Validation(
-            "document type disabled: ui-mockup".to_string(),
-        ));
-    }
-    if entry.prefix.is_empty() {
-        return Err(AppError::Validation(
-            "document type prefix empty: ui-mockup".to_string(),
-        ));
-    }
-    Ok(entry.clone())
-}
-
-fn active_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    let entry = type_entry(cfg)?;
-    let raw = ctx
-        .project_dir
-        .join(&cfg.doc_directory)
-        .join(&entry.directory);
-    Context::ensure_within(&ctx.project_dir, &raw)
-}
-
-fn archived_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    Ok(active_dir(ctx, cfg)?.join("archived"))
 }
 
 fn ensure_dirs(dir: &Path) -> Result<(), AppError> {
@@ -511,6 +425,7 @@ fn run_editor(command: &str, path: &Path) -> Result<(), AppError> {
 
 fn create(
     ctx: &Context,
+    scope: &DocumentScope,
     title_raw: &str,
     task_raw: &str,
     specs_raw: &[String],
@@ -526,15 +441,11 @@ fn create(
     }
     let refs = sanitize_list(refs_raw)?;
 
-    let cfg = load_config(ctx)?;
-    let entry = type_entry(&cfg)?;
-    let active = active_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
     ensure_dirs(&active)?;
 
-    let next =
-        crate::record::identity::next_html_number(&active, &active.join("archived"), &entry.prefix);
-    let id =
-        crate::record::identity::format_id(&entry.prefix, next as i64, cfg.id_padding as usize);
+    let next = crate::record::identity::next_html_number(&active, &scope.archived, &scope.prefix);
+    let id = crate::record::identity::format_id(&scope.prefix, next as i64, scope.id_padding);
 
     let record = Mockup {
         id: id.clone(),
@@ -552,17 +463,15 @@ fn create(
     Ok(id)
 }
 
-fn list(ctx: &Context) -> Result<CommandOutput, AppError> {
-    let cfg = load_config(ctx)?;
-    let entry = type_entry(&cfg)?;
-    let active = active_dir(ctx, &cfg)?;
+fn list(ctx: &Context, scope: &DocumentScope) -> Result<CommandOutput, AppError> {
+    let active = scope.active.clone();
 
     let mut items: Vec<(String, String, String)> = Vec::new();
     if let Ok(rd) = fs::read_dir(&active) {
         for e in rd {
             let e = e.map_err(|err| AppError::Runtime(err.to_string()))?;
             let path = e.path();
-            if !path.is_file() || !is_record_path(&path, &entry.prefix) {
+            if !path.is_file() || !is_record_path(&path, &scope.prefix) {
                 continue;
             }
             let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
@@ -607,11 +516,10 @@ fn list(ctx: &Context) -> Result<CommandOutput, AppError> {
     Ok(CommandOutput { text, json })
 }
 
-fn view(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
+fn view(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<CommandOutput, AppError> {
     let id = sanitize_field(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
-    let deprecated = archived_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
+    let deprecated = scope.archived.clone();
     let path = resolve_record(ctx, &active, &deprecated, &id)?;
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
@@ -631,6 +539,7 @@ fn view(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
 
 fn edit(
     ctx: &Context,
+    scope: &DocumentScope,
     id_raw: &str,
     title_raw: Option<&str>,
     task_raw: Option<&str>,
@@ -648,9 +557,8 @@ fn edit(
     let status = status_raw.map(sanitize_field).transpose()?;
     let superseded_by = superseded_by_raw.map(sanitize_field).transpose()?;
 
-    let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
-    let deprecated = archived_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
+    let deprecated = scope.archived.clone();
     let path = resolve_record(ctx, &active, &deprecated, &id)?;
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
@@ -680,7 +588,9 @@ fn edit(
 
     let editor_cmd = if editor {
         Some(
-            cfg.effective_editor()
+            scope
+                .config
+                .effective_editor()
                 .ok_or_else(|| AppError::Runtime("no editor configured".to_string()))?,
         )
     } else {
@@ -751,11 +661,10 @@ fn edit(
     })
 }
 
-fn archive(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
+fn archive(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<CommandOutput, AppError> {
     let id = sanitize_field(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
-    let deprecated = archived_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
+    let deprecated = scope.archived.clone();
 
     let Some(path) = find_record(ctx, &active, &id)? else {
         if find_record(ctx, &deprecated, &id)?.is_some() {
@@ -810,15 +719,19 @@ fn archive(ctx: &Context, id_raw: &str) -> Result<CommandOutput, AppError> {
         json,
     })
 }
-pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<CommandOutput, AppError> {
+pub fn delete(
+    ctx: &Context,
+    scope: &DocumentScope,
+    id_raw: &str,
+    force: bool,
+) -> Result<CommandOutput, AppError> {
     let id = sanitize_field(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
-    let archived = archived_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
+    let archived = scope.archived.clone();
 
     // if active, archive first
     if find_record(ctx, &active, &id)?.is_some() {
-        archive(ctx, &id)?;
+        archive(ctx, scope, &id)?;
     } else if find_record(ctx, &archived, &id)?.is_none() {
         return Err(AppError::NotFound(format!("not found: {}", id)));
     }
@@ -866,7 +779,12 @@ pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<CommandOutput,
     })
 }
 
-pub fn supersede(ctx: &Context, old_raw: &str, new_raw: &str) -> Result<CommandOutput, AppError> {
+pub fn supersede(
+    ctx: &Context,
+    scope: &DocumentScope,
+    old_raw: &str,
+    new_raw: &str,
+) -> Result<CommandOutput, AppError> {
     let old = sanitize_field(old_raw)?;
     let new = sanitize_field(new_raw)?;
     if old == new {
@@ -875,9 +793,8 @@ pub fn supersede(ctx: &Context, old_raw: &str, new_raw: &str) -> Result<CommandO
             old
         )));
     }
-    let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
-    let archived = archived_dir(ctx, &cfg)?;
+    let active = scope.active.clone();
+    let archived = scope.archived.clone();
     let _ = resolve_record(ctx, &active, &archived, &new)?;
     // archive old with superseded_by set
     let old_path = resolve_record(ctx, &active, &archived, &old)?;
