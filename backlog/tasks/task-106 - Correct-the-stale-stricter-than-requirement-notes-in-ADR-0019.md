@@ -1,11 +1,11 @@
 ---
 id: TASK-106
 title: Correct stale ADR wording in ADR-0019 and ADR-0020
-status: To Do
+status: Initiated
 assignee:
   - architect
 created_date: '2026-11-13T21:24:00Z'
-updated_date: '2026-11-13T21:59:00Z'
+updated_date: '2026-11-14T07:43:00Z'
 labels:
   - architecture
 milestone: m-17
