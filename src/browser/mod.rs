@@ -1060,7 +1060,9 @@ fn config_page(state: &ServerState) -> Result<Response, HttpError> {
     for (key, value) in &flattened {
         let explicit = crate::config::yaml_get(&raw_value, key).is_some();
         let badge = if explicit { "explicit" } else { "default" };
-        let editable = key != "statuses";
+        // List-valued keys stay read-only here: the browser has no list
+        // editor and ADR-0024 keeps list editing on the CLI.
+        let editable = !crate::config::is_list_valued_key(key);
         let action = if editable {
             format!(
                 "<a class=\"btn\" href=\"/config/edit?key={}\">Edit</a>",
@@ -1115,7 +1117,7 @@ fn config_edit(request: Request, state: &ServerState) -> Result<Response, HttpEr
     let Some(current) = current else {
         return Err(HttpError::new(404));
     };
-    if key == "statuses" {
+    if crate::config::is_list_valued_key(&key) {
         return Err(HttpError::new(404));
     }
     let (project, bind_note) = chrome_for(&cfg, state);
@@ -1163,7 +1165,7 @@ fn config_submit(request: Request, state: &ServerState) -> Result<Response, Http
     let ctx = state.context();
     let flattened = cfg.flattened(&ctx.project_dir);
     let entry = flattened.iter().find(|(k, _)| k == &key);
-    if entry.is_none() || key == "statuses" {
+    if entry.is_none() || crate::config::is_list_valued_key(&key) {
         return Err(HttpError::new(404));
     }
 

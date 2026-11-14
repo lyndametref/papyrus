@@ -7779,6 +7779,14 @@ fn browser_config_effective_vs_explicit_badges() {
 fn browser_config_rejection_parity() {
     let dir = test_root("browser-config-reject");
     init_project(&dir);
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "config",
+        "set",
+        "document_types.audit.statuses",
+        "active, archived",
+    ]);
     let config_path = dir.join("papyrus.config.yml");
     let before = fs::read_to_string(&config_path).unwrap();
     let server = Server::start(&dir, &["--no-open"], &[]);
@@ -7790,6 +7798,17 @@ fn browser_config_rejection_parity() {
     assert_eq!(get(&server, "/config/edit?key=statuses").status, 404);
     let body2 = form_body(&[("key", "statuses"), ("value", "x")]);
     assert_eq!(post_form(&server, "/config", &body2).status, 404);
+    // List editing stays CLI-only: a document status list is shown read-only
+    // and is not accepted by the edit route or the submit route (TASK-111).
+    assert_eq!(
+        get(&server, "/config/edit?key=document_types.audit.statuses").status,
+        404
+    );
+    let body3 = form_body(&[
+        ("key", "document_types.audit.statuses"),
+        ("value", "active, archived"),
+    ]);
+    assert_eq!(post_form(&server, "/config", &body3).status, 404);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }

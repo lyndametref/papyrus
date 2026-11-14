@@ -4,6 +4,58 @@ use std::collections::BTreeMap;
 use std::net::IpAddr;
 use std::path::Path;
 
+/// Keys whose value is a YAML sequence of strings (ADR-0024 decision 1).
+///
+/// The document-statuses rule (`document_types.<slug>.statuses`) is declared by
+/// [`is_list_valued_key`] because it depends on the slug. Every other key keeps
+/// scalar semantics; this list must never be extended from the shape of a
+/// supplied value.
+pub const LIST_VALUED_KEYS: &[&str] = &["statuses"];
+
+/// The single list-key classifier (ADR-0024 downstream constraint 1).
+///
+/// Classification depends only on the key. `document_types.<slug>.statuses` is
+/// list-valued for exactly one non-empty slug segment.
+pub fn is_list_valued_key(key: &str) -> bool {
+    if LIST_VALUED_KEYS.contains(&key) {
+        return true;
+    }
+    let mut parts = key.split('.');
+    matches!(
+        (parts.next(), parts.next(), parts.next(), parts.next()),
+        (Some("document_types"), Some(slug), Some("statuses"), None) if !slug.is_empty()
+    )
+}
+
+/// Parse the comma-separated value form of a list-valued key (ADR-0024
+/// decision 2).
+///
+/// Surrounding whitespace is trimmed from each element; order, case, internal
+/// whitespace, and duplicates are preserved and no YAML interpretation is
+/// applied. An empty value, an element that is empty after trimming, and a
+/// value containing a control character are rejected with a message naming the
+/// key. Commas are separators only: there is no escape or quote form.
+pub fn parse_list_value(key: &str, raw: &str) -> Result<Vec<String>, String> {
+    if raw.chars().any(char::is_control) {
+        return Err(format!(
+            "{}: list value must not contain control characters",
+            key
+        ));
+    }
+    if raw.trim().is_empty() {
+        return Err(format!("{}: list value must not be empty", key));
+    }
+    let mut values = Vec::new();
+    for element in raw.split(',') {
+        let element = element.trim();
+        if element.is_empty() {
+            return Err(format!("{}: list element must not be empty", key));
+        }
+        values.push(element.to_string());
+    }
+    Ok(values)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct TypeEntry {
@@ -382,6 +434,12 @@ impl Config {
                 format!("document_types.{}.enabled", k),
                 v.enabled.to_string(),
             ));
+            if let Some(statuses) = &v.statuses {
+                out.push((
+                    format!("document_types.{}.statuses", k),
+                    format!("[{}]", statuses.join(", ")),
+                ));
+            }
         }
         out.push(("browser_host".to_string(), self.browser_host.clone()));
         out.push(("browser_port".to_string(), self.browser_port.to_string()));
@@ -685,6 +743,91 @@ pub fn yaml_unset(root: &mut yaml_serde::Value, key: &str) -> Result<(), String>
 
 pub fn validate_key_path(key: &str) -> bool {
     !key.is_empty() && !key.split('.').any(|p| p.is_empty())
+}
+
+/// Render a configuration value as YAML for persistence.
+///
+/// Mappings stay in block style, sequences are rendered inline as flow
+/// sequences (`[a, b]`), and scalars are quoted by the YAML serializer so the
+/// result reparses to the same value. An empty mapping renders as `{}`.
+/// The output is round-tripped through the parser before it is returned.
+pub fn to_config_yaml(value: &yaml_serde::Value) -> Result<String, String> {
+    let mut out = String::new();
+    match value {
+        yaml_serde::Value::Mapping(mapping) => {
+            if mapping.is_empty() {
+                out.push_str("{}\n");
+            } else {
+                render_block_mapping(mapping, 0, &mut out);
+            }
+        }
+        other => {
+            out.push_str(&render_yaml_flow(other));
+            out.push('\n');
+        }
+    }
+    let round_trip: yaml_serde::Value = yaml_serde::from_str(&out).map_err(|e| e.to_string())?;
+    if &round_trip != value {
+        return Err("rendered configuration does not round-trip".to_string());
+    }
+    Ok(out)
+}
+
+/// Render a value inline: sequences as `[a, b]`, mappings as `{k: v}`, scalars
+/// as their YAML scalar form.
+pub fn render_yaml_flow(value: &yaml_serde::Value) -> String {
+    match value {
+        yaml_serde::Value::Sequence(sequence) => {
+            let elements: Vec<String> = sequence.iter().map(render_yaml_flow).collect();
+            format!("[{}]", elements.join(", "))
+        }
+        yaml_serde::Value::Mapping(mapping) => {
+            let entries: Vec<String> = mapping
+                .iter()
+                .map(|(key, value)| {
+                    format!("{}: {}", render_yaml_flow(key), render_yaml_flow(value))
+                })
+                .collect();
+            format!("{{{}}}", entries.join(", "))
+        }
+        other => render_yaml_scalar(other),
+    }
+}
+
+fn render_block_mapping(mapping: &yaml_serde::Mapping, indent: usize, out: &mut String) {
+    let pad = " ".repeat(indent);
+    for (key, value) in mapping {
+        let key = render_yaml_scalar(key);
+        match value {
+            yaml_serde::Value::Mapping(inner) if !inner.is_empty() => {
+                out.push_str(&format!("{}{}:\n", pad, key));
+                render_block_mapping(inner, indent + 2, out);
+            }
+            other => {
+                out.push_str(&format!("{}{}: {}\n", pad, key, render_yaml_flow(other)));
+            }
+        }
+    }
+}
+
+fn render_yaml_scalar(value: &yaml_serde::Value) -> String {
+    match value {
+        yaml_serde::Value::Null => "null".to_string(),
+        yaml_serde::Value::Bool(flag) => flag.to_string(),
+        yaml_serde::Value::Number(number) => number.to_string(),
+        yaml_serde::Value::String(text) => {
+            if text.chars().any(char::is_control) {
+                // JSON string escaping is valid YAML double-quoted syntax and
+                // keeps a single line; a literal block would break the layout.
+                serde_json::to_string(text).unwrap_or_else(|_| "\"\"".to_string())
+            } else {
+                yaml_serde::to_string(&yaml_serde::Value::String(text.clone()))
+                    .map(|rendered| rendered.trim_end_matches('\n').to_string())
+                    .unwrap_or_else(|_| serde_json::to_string(text).unwrap_or_default())
+            }
+        }
+        other => render_yaml_flow(other),
+    }
 }
 
 pub fn write_config_file(path: &Path, content: &str) -> Result<(), AppError> {
@@ -1450,5 +1593,171 @@ mod tests {
         assert_eq!(config.project_name.as_deref(), Some("repair"));
         assert!(config.document_types.contains_key("deploy"));
         assert!(!config.document_types.contains_key("bad slug"));
+    }
+
+    #[test]
+    fn list_key_classification_covers_declared_shapes_only() {
+        for key in [
+            "statuses",
+            "document_types.audit.statuses",
+            "document_types.a.statuses",
+        ] {
+            assert!(
+                is_list_valued_key(key),
+                "key should be list-valued: {}",
+                key
+            );
+        }
+        for key in [
+            "default_status",
+            "document_types.audit.default_status",
+            "document_types.audit.prefix",
+            "document_types.audit.directory",
+            "document_types.audit.enabled",
+            "id_padding",
+            "browser_port",
+            "browser_host",
+            "document_types.a.b.statuses",
+            "document_types..statuses",
+            "document_types.statuses",
+            "statuses.x",
+            "Statuses",
+        ] {
+            assert!(!is_list_valued_key(key), "key should be scalar: {}", key);
+        }
+
+        // Every sequence-typed field in the configuration model is covered.
+        let value = yaml_serde::to_value(Config::default()).unwrap();
+        assert!(matches!(
+            yaml_get(&value, "statuses"),
+            Some(yaml_serde::Value::Sequence(_))
+        ));
+        assert!(is_list_valued_key("statuses"));
+        assert_eq!(LIST_VALUED_KEYS, &["statuses"]);
+    }
+
+    #[test]
+    fn parse_list_value_trims_and_preserves_order_and_duplicates() {
+        assert_eq!(
+            parse_list_value("statuses", " a , b ").unwrap(),
+            vec!["a".to_string(), "b".to_string()]
+        );
+        assert_eq!(
+            parse_list_value("statuses", "ToDo").unwrap(),
+            vec!["ToDo".to_string()]
+        );
+        assert_eq!(
+            parse_list_value("statuses", "B, a, B").unwrap(),
+            vec!["B".to_string(), "a".to_string(), "B".to_string()]
+        );
+        assert_eq!(
+            parse_list_value("statuses", "in review, done").unwrap(),
+            vec!["in review".to_string(), "done".to_string()]
+        );
+        // Elements are strings, never YAML values.
+        assert_eq!(
+            parse_list_value("statuses", "true,1,[a]").unwrap(),
+            vec!["true".to_string(), "1".to_string(), "[a]".to_string()]
+        );
+    }
+
+    #[test]
+    fn parse_list_value_rejects_empty_elements_and_control_characters() {
+        for raw in ["", "   ", ",", "a,,b", "a,", ",a", " , "] {
+            let err = parse_list_value("statuses", raw).unwrap_err();
+            assert!(err.starts_with("statuses:"), "{:?} => {}", raw, err);
+            assert!(err.contains("must not be empty"), "{:?} => {}", raw, err);
+        }
+        for raw in ["a\nb", "a\tb", "a\u{1}b", "\u{7}"] {
+            let err = parse_list_value("statuses", raw).unwrap_err();
+            assert!(err.starts_with("statuses:"), "{:?} => {}", raw, err);
+            assert!(
+                err.contains("must not contain control characters"),
+                "{:?} => {}",
+                raw,
+                err
+            );
+        }
+    }
+
+    #[test]
+    fn to_config_yaml_renders_sequences_in_flow_form() {
+        let value: yaml_serde::Value = yaml_serde::from_str(
+            "project_name: Acme\nstatuses:\n  - ToDo\n  - Initiated\n  - Done\n",
+        )
+        .unwrap();
+        let rendered = to_config_yaml(&value).unwrap();
+        assert!(
+            rendered.contains("statuses: [ToDo, Initiated, Done]\n"),
+            "{}",
+            rendered
+        );
+        assert!(!rendered.contains("- ToDo"), "{}", rendered);
+        let reparsed: yaml_serde::Value = yaml_serde::from_str(&rendered).unwrap();
+        assert_eq!(reparsed, value);
+    }
+
+    #[test]
+    fn to_config_yaml_keeps_nested_mappings_in_block_style() {
+        let value: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  audit:\n    prefix: AUD\n    statuses:\n      - active\n      - archived\n",
+        )
+        .unwrap();
+        let rendered = to_config_yaml(&value).unwrap();
+        assert!(
+            rendered.contains(
+                "document_types:\n  audit:\n    prefix: AUD\n    statuses: [active, archived]\n"
+            ),
+            "{}",
+            rendered
+        );
+    }
+
+    #[test]
+    fn to_config_yaml_quotes_ambiguous_and_multiline_scalars() {
+        let mut mapping = yaml_serde::Mapping::new();
+        mapping.insert(
+            yaml_serde::Value::String("flag".to_string()),
+            yaml_serde::Value::String("true".to_string()),
+        );
+        mapping.insert(
+            yaml_serde::Value::String("number".to_string()),
+            yaml_serde::Value::String("1".to_string()),
+        );
+        mapping.insert(
+            yaml_serde::Value::String("multiline".to_string()),
+            yaml_serde::Value::String("a\nb".to_string()),
+        );
+        let value = yaml_serde::Value::Mapping(mapping);
+        let rendered = to_config_yaml(&value).unwrap();
+        assert!(rendered.contains("flag: 'true'"), "{}", rendered);
+        assert!(rendered.contains("number: '1'"), "{}", rendered);
+        let reparsed: yaml_serde::Value = yaml_serde::from_str(&rendered).unwrap();
+        assert_eq!(reparsed, value);
+    }
+
+    #[test]
+    fn flattened_renders_document_status_lists_in_flow_form() {
+        let mut config = Config::default();
+        config.document_types.get_mut("audit").unwrap().statuses =
+            Some(vec!["active".to_string(), "archived".to_string()]);
+        let flattened: BTreeMap<String, String> = config
+            .flattened(Path::new("/project"))
+            .into_iter()
+            .collect();
+        assert_eq!(
+            flattened
+                .get("document_types.audit.statuses")
+                .map(String::as_str),
+            Some("[active, archived]")
+        );
+        assert!(
+            !flattened.contains_key("document_types.req.statuses"),
+            "entries without a declaration must not gain a statuses line"
+        );
+        assert_eq!(
+            flattened.get("statuses").map(String::as_str),
+            Some("[ToDo, Initiated, Refined, Implemented, Validated, Done]")
+        );
     }
 }

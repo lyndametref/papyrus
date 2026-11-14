@@ -94,7 +94,9 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        Print one effective value.
 
        <b style="color: light-dark(#8250df, #d2a8ff);">set &lt;key&gt; &lt;value&gt;</b>
-       Persist one value. The value is parsed as a YAML scalar.
+       Persist one value. For a scalar key the value is parsed as a YAML scalar, so a comma is ordinary data.
+
+       The list-valued keys <b>statuses</b> and <b>document_types.&lt;slug&gt;.statuses</b> take a comma-separated value, for example <b>papyrus config set statuses "ToDo, Initiated, Done"</b>. Each element is trimmed and the result is stored in <b>papyrus.config.yml</b> as a YAML flow sequence (<b>statuses: [ToDo, Initiated, Done]</b>); <b>config get</b> and <b>config list</b> print the same flow form. An empty or whitespace-only value, an element that is empty after trimming, and a value containing a control character are rejected and nothing is written. Commas, quotes, and backslashes are not escaped: every comma separates elements, and a value that must contain a comma can only be written by editing <b>papyrus.config.yml</b> directly. The resulting configuration is validated before it is written; an invalid list is refused and the file is unchanged.
 
        <b style="color: light-dark(#8250df, #d2a8ff);">unset &lt;key&gt;</b>
        Remove one key and fall back to its default.
@@ -1397,6 +1399,10 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
        <b style="color: light-dark(#8250df, #d2a8ff);">statuses</b>
        Ordered task statuses. Default: <b>["ToDo", "Initiated", "Refined", "Implemented", "Validated", "Done"]</b>.
        Use unique values; <b>default_status</b> must match one of them.
+       This is a list-valued key: write it with <b>papyrus config set statuses "ToDo, Initiated, Done"</b>.
+       The comma-separated form is split on commas, each element is trimmed, and the value is stored as a YAML flow sequence
+       (<b>[ToDo, Initiated, Done]</b>). An empty value or an empty element is rejected. Commas, quotes, and backslashes are
+       not escaped; a status that must contain a comma can only be written by editing the file directly.
 
        <b style="color: light-dark(#8250df, #d2a8ff);">default_status</b>
        Status assigned to new tasks. Default: <b>ToDo</b>.
@@ -1436,6 +1442,15 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
          test-case: { prefix: TC, directory: test-cases/,                enabled: true }
          test-report: { prefix: TR, directory: test-reports/,            enabled: true }
        </code>
+
+       Each entry may declare <b>statuses</b>, an ordered custom status list that must contain
+       <b>active</b> and <b>archived</b>, and <b>default_status</b>. <b>document_types.&lt;slug&gt;.statuses</b>
+       is a list-valued key: write it with
+       <b>papyrus config set document_types.audit.statuses "active, archived, open"</b>. It is stored as a YAML flow
+       sequence (<b>[active, archived, open]</b>), and an empty value, an empty element, or an invalid status is rejected
+       without writing. Commas, quotes, and backslashes are not escaped. A status list may be omitted, in which case the
+       type uses <b>active</b> and <b>archived</b>; removing the declaration with <b>config unset</b> returns to that
+       default and is refused when <b>default_status</b> would no longer be declared.
 
        The <b>nfreq</b> command uses the <b>nfr</b> type key. Additional types may
        be added. Disabled types cannot be created and are hidden from lists and search.

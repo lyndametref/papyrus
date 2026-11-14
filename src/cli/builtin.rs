@@ -13,6 +13,21 @@ pub enum ConfigCmd {
     /// Print one effective value.
     Get { key: String },
     /// Persist one value.
+    ///
+    /// List keys (`statuses` and `document_types.<slug>.statuses`) take a
+    /// comma-separated value, for example:
+    /// `papyrus config set statuses "ToDo, Initiated, Done"`. The value is
+    /// stored in papyrus.config.yml as a YAML flow sequence
+    /// (`statuses: [ToDo, Initiated, Done]`) and printed in the same form by
+    /// `config get` and `config list`. An empty or whitespace-only value and an
+    /// element that is empty after trimming are rejected, and nothing is
+    /// written. Commas, quotes, and backslashes are not escaped: every comma
+    /// separates elements, and quotes and backslashes have no special meaning.
+    /// A configured value that must contain a comma can only be written by
+    /// editing papyrus.config.yml directly.
+    ///
+    /// For every other key the value is a YAML scalar and a comma is ordinary
+    /// data.
     Set {
         key: String,
         #[arg(allow_hyphen_values = true)]
