@@ -1,6 +1,6 @@
 # Upgrading to Papyrus Release 1.0
 
-**Applies to:** Papyrus 1.0 and the one-time import of Backlog.md task and milestone records.
+**Applies to:** Papyrus 1.0, the one-time import of Backlog.md task and milestone records, and the move to configuration-defined document types.
 
 Release 1.0 completes the move to the Papyrus-native record layout. Papyrus no longer reads or writes the Backlog.md on-disk layout and ships `papyrus import backlog` as the only bridge from a Backlog.md store into Papyrus.
 
@@ -198,6 +198,114 @@ There is no `import undo`, no transaction across the whole run, and no automatic
 7. Keep `import-report.md`; it is the only mapping.
 
 These behaviours were exercised end to end for Release 1.0 against an isolated sample store; see [`packaging.md`](packaging.md).
+
+## Document types are now configuration-defined
+
+**Applies to:** every project that used a per-type document command, the `nfreq` alias, or a seeded `deploy` type, and every project with documents under a `deprecated/` folder.
+
+Release 1.0 makes the document command surface configuration. The command name is the `document_types` key, and only enabled keys exist as commands. `req` and `nfr` still work because they are default entries; the parser gives them no special treatment.
+
+### Who must act
+
+You must act if any of the following applies:
+
+- You used `papyrus nfreq ...`. The alias is gone; use `papyrus nfr ...`.
+- You used a per-type document command (`req`, `glossary`, `ui-spec`, `ui-mockup`, `tech-spec`, `audit`, `use-case`, `test-case`, `test-report`, `rule`) with `deprecate` or `restore`.
+- You relied on `deploy` being seeded. It is not; declare it before `papyrus deploy ...` works.
+- Your documents live under a `deprecated/` folder. Those files are no longer read, listed, or searched.
+
+The static per-type command blocks are removed from the command tree. A slug that is not an enabled `document_types` entry is an unknown command and exits `2`.
+
+### Command migration
+
+| Before | After |
+|---|---|
+| `papyrus req deprecate <id>` | `papyrus req archive <id>` |
+| `papyrus req restore <id>` | No command. Move the file into the type's active directory and set `status: active` (or another declared non-`archived` status) in the front matter. |
+| `papyrus nfreq <verb> ...` | `papyrus nfr <verb> ...` |
+| `papyrus deploy <verb> ...` | Declare a `deploy` entry in `document_types` first (edit `papyrus.config.yml`); then `papyrus deploy <verb> ...`. |
+| `papyrus <unknown-or-disabled-slug> ...` | Exit `2`. Enable or declare the slug in `document_types`. |
+| `papyrus <slug> restore <id>` | No document restore exists. |
+
+`req` and `nfr` are the default `document_types` entries `req` and `nfr`. Remove either entry and its command disappears.
+
+### `document_types` is a whole map
+
+- A `document_types` mapping in `papyrus.config.yml` replaces the default map wholesale. When the key is present, exactly its entries exist; no default entry is re-added.
+- Removing an entry stops managing its files. The files are not deleted and can be recovered by declaring the entry again.
+- `enabled: false` keeps the entry, its prefix reservation, and its files, but removes the command and the browser view.
+- `papyrus config set document_types.<slug>.<field>` materializes the eleven defaults when the key is absent and edits an existing entry. It cannot create a new entry; define a new entry by editing the file (see [Repairing an invalid configuration](#repairing-an-invalid-configuration)).
+- `papyrus init` writes these eleven defaults. `deploy` is not one of them:
+
+| Slug | Prefix | Directory (relative to `doc_directory`) |
+|---|---|---|
+| `req` | `REQ` | `requirements/business/` |
+| `nfr` | `NFR` | `requirements/non-functional/` |
+| `glossary` | `GLO` | `glossary/` |
+| `rule` | `RUL` | `business-rules/` |
+| `ui-spec` | `UI` | `specifications/ui/` |
+| `ui-mockup` | `MOCK` | `specifications/ui/mockups/` |
+| `audit` | `AUD` | `audit-records/` |
+| `tech-spec` | `TECH` | `technical/` |
+| `use-case` | `UC` | `use-cases/` |
+| `test-case` | `TC` | `test-cases/` |
+| `test-report` | `TR` | `test-reports/` |
+
+### Statuses
+
+- Every front-matter-backed document type has the fixed main statuses `active` and `archived`. Any explicit `statuses` list must declare each exactly once.
+- Custom statuses are optional, ordered front-matter values. They do not control visibility or location.
+- `default_status` is the status of a new record. It defaults to `active`, must be a declared status, and must not be `archived`.
+- `papyrus <slug> status <id> <value>` sets `active` or a declared custom status in place. It rejects `archived` with exit `4` and names `archive` as the way to archive.
+- `archive` is the only command that sets `archived`. It replaces any custom status with `archived`.
+- UI mockups are HTML records whose state lives in file metadata (`pending`, `approved`, `archived`). They have no `status` command, and declaring `statuses` or `default_status` on `ui-mockup` is invalid.
+
+### Archive location and no restore
+
+- An archived document moves to `<doc_directory>/<document_types.<slug>.directory>/archived/`.
+- Archived documents are hidden from lists, search, and the browser.
+- Documents have no `restore` command. To revive one by hand, move its file back into the type's active directory and set a declared non-`archived` status in the front matter.
+- `delete` on an active document archives it first and then removes the archived file. `--force` skips the confirmation prompt.
+
+### Legacy `deprecated/` folders
+
+A `deprecated/` folder is inert: Papyrus does not read, migrate, or inventory it. Recover records by hand:
+
+1. Move each file from `deprecated/` into the directory of its `document_types` entry.
+2. Set `status: active` (or another declared custom status) in its front matter. Use `status: archived` and move it into `archived/` if it should stay archived.
+3. Verify with `papyrus <slug> list` and `papyrus <slug> view <id>`.
+
+### Repairing an invalid configuration
+
+Configuration validation is fail-closed: while the configuration is invalid, every command that validates it exits `4` with a message naming `document_types.<slug>.<field>`.
+
+- Inspect values with `papyrus config get <key>` and `papyrus config list`. These read the configuration without running registry validation.
+- Repair an existing entry with `papyrus config set <key> <value>` or `papyrus config unset <key>`. Both validate the merged configuration and write nothing when it is invalid.
+- Define a malformed or new entry by editing `papyrus.config.yml` directly. A single `config set` cannot create a new type because the entry would still lack its required `prefix` or `directory`.
+- `papyrus init --force` replaces the configuration file in full (the eleven defaults when non-interactive). It is a last resort and discards custom entries and statuses.
+
+List-valued status keys (`statuses` and `document_types.<slug>.statuses`) take a comma-separated value:
+
+```sh
+papyrus config set document_types.audit.statuses "active, archived, review"
+```
+
+Each element is trimmed and stored as a YAML flow sequence (`[active, archived, review]`). An empty value, an element that is empty after trimming, and a value containing a control character are rejected and nothing is written. Commas, quotes, and backslashes are not escaped: every comma separates elements, so a status that must contain a comma can only be written by editing `papyrus.config.yml` directly. An invalid list is refused and the file is unchanged.
+
+### Man pages and NFR-03.003
+
+The document command family is generated from project configuration. Config-defined slugs have no man page: ADR-0021 remains Proposed and the scope decision is deferred. NFR-03.003 is not claimed for these slugs, and the gap is recorded as a release risk. This release adds no man-page source, generator, or package content for them.
+
+### Verify the upgrade
+
+1. `papyrus --help` lists the enabled document slugs, including `req` and `nfr`.
+2. `papyrus nfreq --help` exits `2`; `papyrus nfr --help` lists the `nfr` verbs.
+3. `papyrus deploy --help` exits `2` until a `deploy` entry is declared.
+4. `papyrus req archive REQ-003` moves the file to `<doc_directory>/requirements/business/archived/REQ-003.md`, and `papyrus req list` no longer shows it.
+5. `papyrus req status REQ-003 archived` exits `4` and mentions `archive`.
+6. `papyrus req status REQ-004 review` sets a declared custom status; `papyrus req archive REQ-004` replaces it with `archived`.
+7. Break the configuration (for example, remove `archived` from one `statuses` list); any command exits `4` naming the key. Repair it and confirm the command runs again.
+8. A file left under `deprecated/` is not listed. After the manual move and `status: active`, it is listed and viewable.
 
 ## Other user-visible changes in Release 1.0
 
