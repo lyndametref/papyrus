@@ -1475,15 +1475,20 @@ mod tests {
         }
         assert_eq!(
             registry.in_category(ArtifactCategory::Document).count(),
-            12,
-            "the default map still seeds deploy"
+            11,
+            "the default map seeds the eleven configured document types"
         );
+        assert!(registry.descriptor("deploy").is_none());
     }
 
     // 5
     #[test]
-    fn deploy_resolves_to_a_generic_descriptor() {
-        let registry = default_registry();
+    fn deploy_resolves_to_a_generic_descriptor_when_declared() {
+        let registry = ArtifactRegistry::build(&config_with(
+            "deploy",
+            entry("DEP", "architecture/deployment/"),
+        ))
+        .expect("explicit deploy configuration builds");
         let deploy = registry.descriptor("deploy").expect("deploy");
         assert_eq!(deploy.category, ArtifactCategory::Document);
         assert_eq!(deploy.label, "deploy");
@@ -1828,10 +1833,10 @@ mod tests {
     #[test]
     fn descriptor_total_equals_the_configured_set() {
         let registry = default_registry();
-        assert_eq!(registry.len(), 17);
+        assert_eq!(registry.len(), 16);
         assert_eq!(registry.in_category(ArtifactCategory::Backlog).count(), 3);
         assert_eq!(registry.in_category(ArtifactCategory::Decision).count(), 2);
-        assert_eq!(registry.in_category(ArtifactCategory::Document).count(), 12);
+        assert_eq!(registry.in_category(ArtifactCategory::Document).count(), 11);
         assert_eq!(
             Config::default().document_types.len() + Config::default().decision_types.len() + 3,
             registry.len()

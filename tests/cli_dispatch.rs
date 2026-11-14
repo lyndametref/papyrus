@@ -181,7 +181,6 @@ fn generated_help_lists_enabled_slugs_for_default_config() {
         "ui-spec",
         "ui-mockup",
         "audit",
-        "deploy",
         "tech-spec",
         "use-case",
         "test-case",
