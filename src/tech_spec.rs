@@ -9,6 +9,7 @@ use std::path::Path;
 pub fn handle(
     ctx: &Context,
     scope: &DocumentScope,
+    record: &crate::record::descriptor::RecordDescriptor,
     verb: DocumentVerb,
     args: &DocumentArgs,
 ) -> Result<CommandOutput, AppError> {
@@ -24,11 +25,12 @@ pub fn handle(
             )?;
             Ok(crate::document::typed_created(ctx, id))
         }
-        DocumentVerb::List => list(ctx, scope),
-        DocumentVerb::View => view(ctx, scope, args.require("id")?),
+        DocumentVerb::List => list(ctx, scope, record),
+        DocumentVerb::View => view(ctx, scope, record, args.require("id")?),
         DocumentVerb::Edit => edit(
             ctx,
             scope,
+            record,
             args.require("id")?,
             args.get("title"),
             args.get("description"),
@@ -203,10 +205,12 @@ fn create(
     Ok(id)
 }
 
-fn list(ctx: &Context, scope: &DocumentScope) -> Result<CommandOutput, AppError> {
-    let descriptor = crate::record::descriptor::descriptor_for_doc_type("tech-spec")
-        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
-    let dotted = descriptor.is_dotted_id();
+fn list(
+    ctx: &Context,
+    scope: &DocumentScope,
+    record: &crate::record::descriptor::RecordDescriptor,
+) -> Result<CommandOutput, AppError> {
+    let dotted = record.is_dotted_id();
     let active = scope.active.clone();
     let _ = ensure_dirs(&active);
 
@@ -258,11 +262,14 @@ fn list(ctx: &Context, scope: &DocumentScope) -> Result<CommandOutput, AppError>
     Ok(CommandOutput { text, json })
 }
 
-fn view(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<CommandOutput, AppError> {
+fn view(
+    ctx: &Context,
+    scope: &DocumentScope,
+    record: &crate::record::descriptor::RecordDescriptor,
+    id_raw: &str,
+) -> Result<CommandOutput, AppError> {
     let requested = sanitize_field(id_raw)?;
-    let descriptor = crate::record::descriptor::descriptor_for_doc_type("tech-spec")
-        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
-    let dotted = descriptor.is_dotted_id();
+    let dotted = record.is_dotted_id();
     let active = scope.active.clone();
     let deprecated = scope.archived.clone();
     let _ = ensure_dirs(&active);
@@ -306,6 +313,7 @@ fn frontmatter_list_tech(content: &str, key: &str) -> Vec<String> {
 fn edit(
     ctx: &Context,
     scope: &DocumentScope,
+    record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
     title_raw: Option<&str>,
     description_raw: Option<&str>,
@@ -314,9 +322,7 @@ fn edit(
     editor: bool,
 ) -> Result<CommandOutput, AppError> {
     let requested = sanitize_field(id_raw)?;
-    let descriptor = crate::record::descriptor::descriptor_for_doc_type("tech-spec")
-        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
-    let dotted = descriptor.is_dotted_id();
+    let dotted = record.is_dotted_id();
     let active = scope.active.clone();
     let deprecated = scope.archived.clone();
     let _ = ensure_dirs(&active);

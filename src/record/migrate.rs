@@ -78,38 +78,41 @@ pub fn is_managed_path(project_dir: &Path, path: &Path) -> bool {
 /// configured read locations (active, archive, or legacy alias)
 /// and its stem is a native Papyrus stem for that family. Backlog-shaped
 /// stems resolve to no descriptor and are therefore invisible.
-pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<&'static RecordDescriptor> {
+pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<RecordDescriptor> {
     if path.extension().and_then(|e| e.to_str()) != Some("md") {
         return None;
     }
     let stem = path.file_stem()?.to_str()?;
     let cfg = load_cfg_for(project_dir);
     let parent = path.parent()?;
+    // Backlog families keep their static descriptors.
     for desc in crate::record::descriptor::descriptors() {
         if !desc.matches_stem(&cfg, stem) {
             continue;
         }
         for dir in desc.resolve_read_directories(&cfg, project_dir) {
             if dir == parent {
-                return Some(desc);
+                return Some(*desc);
             }
         }
     }
-    // Config-defined (generic) document types.
-    for (slug, entry) in &cfg.document_types {
-        if crate::record::descriptor::descriptor_for_doc_type(slug).is_some() {
+    // Document types, including config-defined ones, come from the registry.
+    let registry = crate::registry::ArtifactRegistry::build(&cfg).ok()?;
+    for descriptor in registry.in_category(crate::registry::ArtifactCategory::Document) {
+        let Some(desc) = registry.record_descriptor(&descriptor.slug) else {
+            continue;
+        };
+        // Config-defined types stay inert unless enabled; built-in types were
+        // managed regardless of their activation state.
+        if !crate::registry::is_builtin_document_slug(&descriptor.slug) && !descriptor.enabled {
             continue;
         }
-        if !entry.enabled {
-            continue;
-        }
-        let desc = crate::record::descriptor::generic_document_descriptor(slug);
         if !desc.matches_stem(&cfg, stem) {
             continue;
         }
         for dir in desc.resolve_read_directories(&cfg, project_dir) {
             if dir == parent {
-                return Some(desc);
+                return Some(*desc);
             }
         }
     }
@@ -206,8 +209,8 @@ fn ensure_front_matter_internal(
     // Conflict detection applies to both shapes. A record that already
     // carries front matter is returned byte-identically: adoption never
     // completes missing keys and never retires sections on read.
-    let conflicts = scan_migration_conflicts(ctx, desc);
-    if let Some(reason) = blocking_conflict_for_path(ctx, &safe, desc, &content, &conflicts) {
+    let conflicts = scan_migration_conflicts(ctx, &desc);
+    if let Some(reason) = blocking_conflict_for_path(ctx, &safe, &desc, &content, &conflicts) {
         return Err(AppError::Validation(format!(
             "migration conflict at {}: {}",
             rel_path(&ctx.project_dir, &safe),
@@ -264,19 +267,19 @@ pub fn migrate_content(
 
     if desc.name == "task" || desc.name == "milestone" {
         let doc = document::parse(content)?;
-        let ops = adoption_ops(ctx, path, desc, content, &doc)?;
+        let ops = adoption_ops(ctx, path, &desc, content, &doc)?;
         let new_content = patch::apply_patch(&doc, &ops)?;
         return Ok((
             new_content,
             true,
             "added-front-matter".to_string(),
-            required_keys(desc),
+            required_keys(&desc),
         ));
     }
 
     // Document records (TASK-68): general keys plus audit type retirement.
     let (id, title) = extract_id_title(content, path);
-    let created = created_date(ctx, path, desc, content);
+    let created = created_date(ctx, path, &desc, content);
     let updated = frontmatter::utc_now();
 
     let mut keys: Vec<String> = GENERAL_KEYS.iter().map(|s| s.to_string()).collect();
@@ -1028,7 +1031,16 @@ pub fn migrate_corpus(ctx: &Context, dry_run: bool) -> Result<Vec<MigrationEntry
     let mut entries = Vec::new();
     let cfg = load_cfg(ctx);
     let mut seen: HashSet<PathBuf> = HashSet::new();
-    for desc in crate::record::descriptor::descriptors() {
+    // Backlog families plus every registry document record (ADR-0017).
+    let mut managed: Vec<RecordDescriptor> = crate::record::descriptor::descriptors().to_vec();
+    if let Ok(registry) = crate::registry::ArtifactRegistry::build(&cfg) {
+        managed.extend(
+            registry
+                .in_category(crate::registry::ArtifactCategory::Document)
+                .filter_map(|descriptor| registry.record_descriptor(&descriptor.slug).copied()),
+        );
+    }
+    for desc in &managed {
         for dir in desc.resolve_read_directories(&cfg, &ctx.project_dir) {
             let canon = dir.canonicalize().unwrap_or_else(|_| dir.clone());
             if !seen.insert(canon) || !dir.exists() {
@@ -1088,7 +1100,7 @@ fn process_file(
             let (action, keys) = match desc {
                 Some(desc) => {
                     let retired = document::parse(&content)
-                        .map(|doc| has_retired_sections(&doc, desc))
+                        .map(|doc| has_retired_sections(&doc, &desc))
                         .unwrap_or(false);
                     if retired {
                         ("would-retire-legacy-sections", existing_keys(&content))
@@ -1105,7 +1117,7 @@ fn process_file(
             });
         } else {
             let keys = match desc {
-                Some(desc) => required_keys(desc),
+                Some(desc) => required_keys(&desc),
                 None => Vec::new(),
             };
             entries.push(MigrationEntry {
@@ -1647,5 +1659,79 @@ mod tests {
         let msg = err.to_string();
         assert!(msg.contains("duplicate id"), "{}", msg);
         assert!(msg.contains("TASK-7"), "{}", msg);
+    }
+
+    #[test]
+    fn document_record_without_front_matter_adopts_registry_keys() {
+        let dir = tmpdir("document-adoption");
+        let c = ctx(&dir);
+        let legacy = "# AUD-001 Legacy Audit\n\n## Audit Type\nsecurity\n\n## Content\nfindings\n";
+        let path = dir.join("docs/audit-records/AUD-001.md");
+        write(&path, legacy);
+
+        let result = ensure_front_matter(&c, &path).unwrap();
+        assert!(result.contains("status: active"), "{result}");
+        assert!(result.contains("type: security"), "{result}");
+        assert!(!result.contains("## Audit Type"), "{result}");
+        assert!(result.contains("## Content\nfindings"), "{result}");
+    }
+
+    #[test]
+    fn deprecated_folder_is_not_managed_or_migrated() {
+        let dir = tmpdir("deprecated-inert");
+        let c = ctx(&dir);
+        let legacy = "# AUD-002 Old Audit\n\n## Content\nold\n";
+        let path = dir.join("docs/audit-records/deprecated/AUD-002.md");
+        write(&path, legacy);
+
+        assert!(managed_descriptor(&dir, &path).is_none());
+        let result = ensure_front_matter(&c, &path).unwrap();
+        assert_eq!(result, legacy);
+        assert_eq!(fs::read_to_string(&path).unwrap(), legacy);
+
+        let entries = migrate_corpus(&c, true).unwrap();
+        assert!(
+            !entries
+                .iter()
+                .any(|entry| entry.path.contains("deprecated")),
+            "{:?}",
+            entries
+        );
+    }
+
+    #[test]
+    fn config_defined_document_type_resolves_through_the_registry() {
+        let dir = tmpdir("generic-doc");
+        let c = ctx(&dir);
+        fs::write(
+            &c.config_path,
+            "project_name: Test\ndocument_types:\n  note:\n    prefix: NOTE\n    directory: notes/\n    enabled: true\n    statuses:\n      - active\n      - archived\n",
+        )
+        .unwrap();
+        let legacy = "# NOTE-001 A note\n\n## Description\nBody\n";
+        let path = dir.join("docs/notes/NOTE-001.md");
+        write(&path, legacy);
+
+        let desc = managed_descriptor(&dir, &path).expect("generic record is managed");
+        assert_eq!(desc.doc_type_key, Some("note"));
+
+        let result = ensure_front_matter(&c, &path).unwrap();
+        assert!(result.contains("status: active"), "{result}");
+        assert!(result.contains("Body"), "{result}");
+    }
+
+    #[test]
+    fn disabled_config_defined_document_type_stays_unmanaged() {
+        let dir = tmpdir("generic-doc-disabled");
+        let c = ctx(&dir);
+        fs::write(
+            &c.config_path,
+            "project_name: Test\ndocument_types:\n  note:\n    prefix: NOTE\n    directory: notes/\n    enabled: false\n",
+        )
+        .unwrap();
+        let path = dir.join("docs/notes/NOTE-001.md");
+        write(&path, "# NOTE-001 A note\n\n## Description\nBody\n");
+
+        assert!(managed_descriptor(&dir, &path).is_none());
     }
 }

@@ -30,6 +30,7 @@ pub fn handle(
     ctx: &Context,
     scope: &DocumentScope,
     registry: &ArtifactRegistry,
+    record: &crate::record::descriptor::RecordDescriptor,
     kind: Kind,
     verb: DocumentVerb,
     args: &DocumentArgs,
@@ -62,11 +63,12 @@ pub fn handle(
             )?;
             Ok(crate::document::typed_created(ctx, id))
         }
-        DocumentVerb::List => list(ctx, scope, kind),
-        DocumentVerb::View => view(ctx, scope, kind, args.require("id")?),
+        DocumentVerb::List => list(ctx, scope, record),
+        DocumentVerb::View => view(ctx, scope, record, args.require("id")?),
         DocumentVerb::Edit => edit(
             ctx,
             scope,
+            record,
             kind,
             args.require("id")?,
             args.get("title"),
@@ -95,19 +97,13 @@ pub fn sanitize_text(input: &str) -> Result<String, AppError> {
         .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))
 }
 
-fn kind_dotted(kind: Kind) -> Result<bool, AppError> {
-    let descriptor = crate::record::descriptor::descriptor_for_doc_type(kind.key())
-        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
-    Ok(descriptor.is_dotted_id())
-}
-
 fn resolve_kind_record(
     ctx: &Context,
     scope: &DocumentScope,
-    kind: Kind,
+    record: &crate::record::descriptor::RecordDescriptor,
     id: &str,
 ) -> Result<crate::record::resolve::ResolvedRecord, AppError> {
-    let dotted = kind_dotted(kind)?;
+    let dotted = record.is_dotted_id();
     let dirs = [scope.active.clone(), scope.archived.clone()];
     if let Some(record) = crate::record::resolve::resolve_in_dirs(
         ctx,
@@ -347,9 +343,9 @@ pub fn create(
 pub fn list(
     ctx: &Context,
     scope: &DocumentScope,
-    kind: Kind,
+    record: &crate::record::descriptor::RecordDescriptor,
 ) -> Result<crate::CommandOutput, AppError> {
-    let dotted = kind_dotted(kind)?;
+    let dotted = record.is_dotted_id();
     let active = scope.active.clone();
     ensure_dirs(&active).ok();
 
@@ -518,13 +514,13 @@ fn body_document_requirement(
 pub fn view(
     ctx: &Context,
     scope: &DocumentScope,
-    kind: Kind,
+    record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
 ) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let record = resolve_kind_record(ctx, scope, kind, &requested)?;
-    let id = record.id.clone();
-    let path = record.path;
+    let resolved = resolve_kind_record(ctx, scope, record, &requested)?;
+    let id = resolved.id.clone();
+    let path = resolved.path;
 
     let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
 
@@ -561,6 +557,7 @@ fn frontmatter_list_req(content: &str, key: &str) -> Vec<String> {
 pub fn edit(
     ctx: &Context,
     scope: &DocumentScope,
+    record: &crate::record::descriptor::RecordDescriptor,
     kind: Kind,
     id_raw: &str,
     title_raw: Option<&str>,
@@ -571,7 +568,7 @@ pub fn edit(
     editor: bool,
 ) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let resolved = resolve_kind_record(ctx, scope, kind, &requested)?;
+    let resolved = resolve_kind_record(ctx, scope, record, &requested)?;
     resolved.ensure_writable()?;
     let id = resolved.id.clone();
     let path = resolved.path.clone();
@@ -735,6 +732,12 @@ mod native_layout_tests {
         DocumentScope::resolve(c, registry.descriptor("req").unwrap()).unwrap()
     }
 
+    fn req_record(c: &Context) -> crate::record::descriptor::RecordDescriptor {
+        let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir).unwrap();
+        let registry = crate::registry::ArtifactRegistry::build(&cfg).unwrap();
+        *registry.record_descriptor("req").unwrap()
+    }
+
     #[test]
     fn dotted_ids_stay_distinct_during_resolution_and_listing() {
         let dir = tmpdir("dotted");
@@ -753,12 +756,13 @@ mod native_layout_tests {
         )
         .unwrap();
 
-        let one = view(&c, &scope, Kind::Req, "REQ-01.001").unwrap();
+        let record = req_record(&c);
+        let one = view(&c, &scope, &record, "REQ-01.001").unwrap();
         assert_eq!(one.json.unwrap()["id"], "REQ-01.001");
-        let two = view(&c, &scope, Kind::Req, "REQ-1.2").unwrap();
+        let two = view(&c, &scope, &record, "REQ-1.2").unwrap();
         assert_eq!(two.json.unwrap()["id"], "REQ-01.002");
 
-        let listed = list(&c, &scope, Kind::Req).unwrap();
+        let listed = list(&c, &scope, &record).unwrap();
         assert!(listed.text.contains("REQ-01.001"));
         assert!(listed.text.contains("REQ-01.002"));
     }

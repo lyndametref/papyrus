@@ -9,6 +9,7 @@ use std::path::Path;
 pub fn handle(
     ctx: &Context,
     scope: &DocumentScope,
+    record: &crate::record::descriptor::RecordDescriptor,
     verb: DocumentVerb,
     args: &DocumentArgs,
 ) -> Result<CommandOutput, AppError> {
@@ -27,11 +28,12 @@ pub fn handle(
             )?;
             Ok(crate::document::typed_created(ctx, id))
         }
-        DocumentVerb::List => list(ctx, scope),
-        DocumentVerb::View => view(ctx, scope, args.require("id")?),
+        DocumentVerb::List => list(ctx, scope, record),
+        DocumentVerb::View => view(ctx, scope, record, args.require("id")?),
         DocumentVerb::Edit => edit(
             ctx,
             scope,
+            record,
             args.require("id")?,
             args.get("title"),
             args.get("description"),
@@ -294,10 +296,12 @@ pub fn create(
     Ok(id)
 }
 
-pub fn list(ctx: &Context, scope: &DocumentScope) -> Result<CommandOutput, AppError> {
-    let descriptor = crate::record::descriptor::descriptor_for_doc_type("rule")
-        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
-    let dotted = descriptor.is_dotted_id();
+pub fn list(
+    ctx: &Context,
+    scope: &DocumentScope,
+    record: &crate::record::descriptor::RecordDescriptor,
+) -> Result<CommandOutput, AppError> {
+    let dotted = record.is_dotted_id();
     let active = scope.active.clone();
     let _ = ensure_dirs(&active);
 
@@ -349,11 +353,14 @@ pub fn list(ctx: &Context, scope: &DocumentScope) -> Result<CommandOutput, AppEr
     Ok(CommandOutput { text, json })
 }
 
-pub fn view(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<CommandOutput, AppError> {
+pub fn view(
+    ctx: &Context,
+    scope: &DocumentScope,
+    record: &crate::record::descriptor::RecordDescriptor,
+    id_raw: &str,
+) -> Result<CommandOutput, AppError> {
     let requested = sanitize_field(id_raw)?;
-    let descriptor = crate::record::descriptor::descriptor_for_doc_type("rule")
-        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
-    let dotted = descriptor.is_dotted_id();
+    let dotted = record.is_dotted_id();
     let active = scope.active.clone();
     let deprecated = scope.archived.clone();
     let _ = ensure_dirs(&active);
@@ -397,6 +404,7 @@ fn frontmatter_list_rule(content: &str, key: &str) -> Vec<String> {
 pub fn edit(
     ctx: &Context,
     scope: &DocumentScope,
+    record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
     title_raw: Option<&str>,
     description_raw: Option<&str>,
@@ -407,9 +415,7 @@ pub fn edit(
     editor: bool,
 ) -> Result<CommandOutput, AppError> {
     let requested = sanitize_field(id_raw)?;
-    let descriptor = crate::record::descriptor::descriptor_for_doc_type("rule")
-        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
-    let dotted = descriptor.is_dotted_id();
+    let dotted = record.is_dotted_id();
     let active = scope.active.clone();
     let deprecated = scope.archived.clone();
     let _ = ensure_dirs(&active);
@@ -574,11 +580,15 @@ mod native_layout_tests {
         DocumentScope::resolve(c, registry.descriptor("rule").unwrap()).unwrap()
     }
 
-    fn archive(c: &Context, id: &str) {
+    fn record(c: &Context) -> crate::record::descriptor::RecordDescriptor {
         let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir).unwrap();
         let registry = crate::registry::ArtifactRegistry::build(&cfg).unwrap();
-        let descriptor = registry.descriptor("rule").unwrap();
-        crate::document::archive_record(c, descriptor, Some(id.to_string())).unwrap();
+        *registry.record_descriptor("rule").unwrap()
+    }
+
+    fn archive(c: &Context, id: &str) {
+        let record = record(c);
+        crate::document::archive_record(c, &record, Some(id.to_string())).unwrap();
     }
 
     fn tmpdir(name: &str) -> PathBuf {
@@ -620,7 +630,8 @@ mod native_layout_tests {
         fs::write(&active, rule_record("RUL-016", "Legacy")).unwrap();
 
         let scope = scope(&c);
-        let viewed = view(&c, &scope, "RUL-16").unwrap();
+        let record = record(&c);
+        let viewed = view(&c, &scope, &record, "RUL-16").unwrap();
         assert_eq!(viewed.json.unwrap()["id"], "RUL-016");
 
         archive(&c, "RUL-016");

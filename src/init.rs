@@ -428,14 +428,14 @@ pub fn run_init_with_io<R: BufRead, W: Write>(
         let _ = fs::create_dir_all(dir);
     }
 
-    for (key, dt) in &config.document_types {
-        if !dt.enabled {
-            continue;
-        }
-        let Some(desc) = crate::record::descriptor::descriptor_for_doc_type(key) else {
-            continue;
-        };
-        if let Ok(dir) = desc.resolve_directory(&config, &project_dir) {
+    // Document directories follow the registry: one descriptor per configured
+    // document type, enabled or not, with the record facts carried by the same
+    // descriptor (ADR-0017 decision 1).
+    let registry = crate::registry::ArtifactRegistry::build(&config)?;
+    for descriptor in registry.enabled(crate::registry::ArtifactCategory::Document) {
+        if let Some(record) = registry.record_descriptor(&descriptor.slug)
+            && let Ok(dir) = record.resolve_directory(&config, &project_dir)
+        {
             let _ = fs::create_dir_all(&dir);
         }
     }

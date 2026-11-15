@@ -8,6 +8,7 @@ use std::fs;
 pub fn handle(
     ctx: &Context,
     scope: &DocumentScope,
+    record: &crate::record::descriptor::RecordDescriptor,
     verb: DocumentVerb,
     args: &DocumentArgs,
 ) -> Result<CommandOutput, AppError> {
@@ -23,11 +24,12 @@ pub fn handle(
             )?;
             Ok(crate::document::typed_created(ctx, id))
         }
-        DocumentVerb::List => list(ctx, scope),
-        DocumentVerb::View => view(ctx, scope, args.require("id")?),
+        DocumentVerb::List => list(ctx, scope, record),
+        DocumentVerb::View => view(ctx, scope, record, args.require("id")?),
         DocumentVerb::Edit => edit(
             ctx,
             scope,
+            record,
             args.require("id")?,
             args.get("term"),
             args.get("definition"),
@@ -50,18 +52,13 @@ fn sanitize_text(input: &str) -> Result<String, AppError> {
     Ok(value)
 }
 
-fn glossary_dotted() -> Result<bool, AppError> {
-    let descriptor = crate::record::descriptor::descriptor_for_doc_type("glossary")
-        .ok_or_else(|| AppError::Runtime("record descriptor is unavailable".to_string()))?;
-    Ok(descriptor.is_dotted_id())
-}
-
 fn resolve_glossary(
     ctx: &Context,
     scope: &DocumentScope,
+    record: &crate::record::descriptor::RecordDescriptor,
     id: &str,
 ) -> Result<crate::record::resolve::ResolvedRecord, AppError> {
-    let dotted = glossary_dotted()?;
+    let dotted = record.is_dotted_id();
     crate::record::resolve::resolve_in_dirs(
         ctx,
         &[scope.active.clone(), scope.archived.clone()],
@@ -183,8 +180,12 @@ pub fn create(
     Ok(id)
 }
 
-pub fn list(ctx: &Context, scope: &DocumentScope) -> Result<crate::CommandOutput, AppError> {
-    let dotted = glossary_dotted()?;
+pub fn list(
+    ctx: &Context,
+    scope: &DocumentScope,
+    record: &crate::record::descriptor::RecordDescriptor,
+) -> Result<crate::CommandOutput, AppError> {
+    let dotted = record.is_dotted_id();
     let active = scope.active.clone();
     let _ = ensure_dirs(&active);
 
@@ -241,12 +242,13 @@ pub fn list(ctx: &Context, scope: &DocumentScope) -> Result<crate::CommandOutput
 pub fn view(
     ctx: &Context,
     scope: &DocumentScope,
+    record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
 ) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let record = resolve_glossary(ctx, scope, &requested)?;
-    let id = record.id.clone();
-    let path = record.path;
+    let resolved = resolve_glossary(ctx, scope, record, &requested)?;
+    let id = resolved.id.clone();
+    let path = resolved.path;
 
     let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
     let text = content.clone();
@@ -282,6 +284,7 @@ fn frontmatter_list_glo(content: &str, key: &str) -> Vec<String> {
 pub fn edit(
     ctx: &Context,
     scope: &DocumentScope,
+    record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
     term_raw: Option<&str>,
     definition_raw: Option<&str>,
@@ -290,7 +293,7 @@ pub fn edit(
     editor: bool,
 ) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let resolved = resolve_glossary(ctx, scope, &requested)?;
+    let resolved = resolve_glossary(ctx, scope, record, &requested)?;
     resolved.ensure_writable()?;
     let id = resolved.id.clone();
     let path = resolved.path.clone();

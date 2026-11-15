@@ -231,9 +231,9 @@ pub fn write_atomic(ctx: &Context, target: &Path, content: &str) -> Result<(), A
             && let Some(desc) = crate::record::migrate::managed_descriptor(&ctx.project_dir, &safe)
         {
             // Conflict detection before lazy migration on the write path.
-            let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
+            let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, &desc);
             if let Some(reason) = crate::record::migrate::check_conflicts_for_path(
-                ctx, &safe, desc, &content, &conflicts,
+                ctx, &safe, &desc, &content, &conflicts,
             ) {
                 let rel = safe
                     .strip_prefix(&ctx.project_dir)

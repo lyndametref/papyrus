@@ -5,6 +5,7 @@ use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
 use crate::record;
+use crate::record::descriptor::RecordDescriptor;
 use crate::record::document::{self, Document, Section};
 use crate::record::patch::{self, PatchOp};
 use crate::registry::{
@@ -218,6 +219,14 @@ pub fn run(
     }
 
     let scope = DocumentScope::resolve(ctx, descriptor)?;
+    let record = registry
+        .record_descriptor(&descriptor.slug)
+        .ok_or_else(|| {
+            AppError::Runtime(format!(
+                "document_types.{}: record descriptor is unavailable",
+                descriptor.slug
+            ))
+        })?;
     let slug = invocation.slug.clone();
     match invocation.verb {
         DocumentVerb::Create
@@ -227,10 +236,10 @@ pub fn run(
         | DocumentVerb::Edit
         | DocumentVerb::Supersede => match descriptor.content_model {
             ContentModel::Generic => match invocation.verb {
-                DocumentVerb::Create => create_generic(ctx, descriptor, invocation, &slug),
-                DocumentVerb::List => list_records(ctx, descriptor, &slug),
-                DocumentVerb::View => view_record(ctx, descriptor, &slug, invocation.id),
-                DocumentVerb::Edit => edit_generic(ctx, descriptor, invocation, &slug),
+                DocumentVerb::Create => create_generic(ctx, descriptor, record, invocation),
+                DocumentVerb::List => list_records(ctx, record),
+                DocumentVerb::View => view_record(ctx, record, invocation.id),
+                DocumentVerb::Edit => edit_generic(ctx, descriptor, record, invocation),
                 other => Err(AppError::Validation(format!(
                     "document_types.{}: verb {} is not supported by the generic model",
                     slug,
@@ -241,6 +250,7 @@ pub fn run(
                 ctx,
                 descriptor,
                 registry,
+                record,
                 &scope,
                 invocation.verb,
                 &invocation.args,
@@ -253,17 +263,18 @@ pub fn run(
                     ctx,
                     descriptor,
                     registry,
+                    record,
                     &scope,
                     invocation.verb,
                     &invocation.args,
                 ),
                 _ => match invocation.verb {
-                    DocumentVerb::Archive => archive_record(ctx, descriptor, invocation.id),
+                    DocumentVerb::Archive => archive_record(ctx, record, invocation.id),
                     DocumentVerb::Delete => {
-                        delete_record(ctx, descriptor, invocation.id, invocation.force)
+                        delete_record(ctx, record, invocation.id, invocation.force)
                     }
                     DocumentVerb::Status => {
-                        status_record(ctx, descriptor, invocation.id, invocation.status_value)
+                        status_record(ctx, record, invocation.id, invocation.status_value)
                     }
                     _ => unreachable!("outer match limits record verbs"),
                 },
@@ -295,6 +306,7 @@ fn dispatch_typed(
     ctx: &Context,
     descriptor: &TypeDescriptor,
     registry: &ArtifactRegistry,
+    record: &RecordDescriptor,
     scope: &DocumentScope,
     verb: DocumentVerb,
     args: &DocumentArgs,
@@ -311,16 +323,16 @@ fn dispatch_typed(
                 crate::registry::RequirementKind::Business => crate::requirement::Kind::Req,
                 crate::registry::RequirementKind::NonFunctional => crate::requirement::Kind::Nfr,
             };
-            crate::requirement::handle(ctx, scope, registry, kind, verb, args)
+            crate::requirement::handle(ctx, scope, registry, record, kind, verb, args)
         }
-        TypedHandler::Glossary => crate::glossary::handle(ctx, scope, verb, args),
-        TypedHandler::Rule => crate::rule::handle(ctx, scope, verb, args),
-        TypedHandler::UiSpec => crate::ui_spec::handle(ctx, scope, verb, args),
-        TypedHandler::Audit => crate::audit::handle(ctx, scope, verb, args),
-        TypedHandler::TechSpec => crate::tech_spec::handle(ctx, scope, verb, args),
-        TypedHandler::UseCase => crate::use_case::handle(ctx, scope, verb, args),
-        TypedHandler::TestCase => crate::test_case::handle(ctx, scope, verb, args),
-        TypedHandler::TestReport => crate::test_report::handle(ctx, scope, verb, args),
+        TypedHandler::Glossary => crate::glossary::handle(ctx, scope, record, verb, args),
+        TypedHandler::Rule => crate::rule::handle(ctx, scope, record, verb, args),
+        TypedHandler::UiSpec => crate::ui_spec::handle(ctx, scope, record, verb, args),
+        TypedHandler::Audit => crate::audit::handle(ctx, scope, record, verb, args),
+        TypedHandler::TechSpec => crate::tech_spec::handle(ctx, scope, record, verb, args),
+        TypedHandler::UseCase => crate::use_case::handle(ctx, scope, record, verb, args),
+        TypedHandler::TestCase => crate::test_case::handle(ctx, scope, record, verb, args),
+        TypedHandler::TestReport => crate::test_report::handle(ctx, scope, record, verb, args),
         TypedHandler::UiMockup => crate::ui_mockup::handle(ctx, scope, verb, args),
         other => Err(AppError::Validation(format!(
             "document_types.{}: unsupported typed handler {:?}",
@@ -331,13 +343,6 @@ fn dispatch_typed(
 
 fn load_config(ctx: &Context) -> Result<Config, AppError> {
     load_effective_config(&ctx.config_path, &ctx.project_dir)
-}
-
-fn record_descriptor_for(slug: &str) -> Result<record::descriptor::RecordDescriptor, AppError> {
-    if let Some(rd) = record::descriptor::descriptor_for_doc_type(slug) {
-        return Ok(*rd);
-    }
-    Ok(*record::descriptor::generic_document_descriptor(slug))
 }
 
 fn sanitize_field(input: &str) -> Result<String, AppError> {
@@ -365,8 +370,8 @@ fn current_list(doc: &Document, key: &str) -> Vec<String> {
 fn create_generic(
     ctx: &Context,
     descriptor: &TypeDescriptor,
+    record: &RecordDescriptor,
     invocation: DocumentInvocation,
-    slug: &str,
 ) -> Result<crate::CommandOutput, AppError> {
     let title_raw = invocation
         .title
@@ -395,8 +400,7 @@ fn create_generic(
     }
 
     let cfg = load_config(ctx)?;
-    let rd = record_descriptor_for(slug)?;
-    let active = rd.resolve_directory(&cfg, &ctx.project_dir)?;
+    let active = record.resolve_directory(&cfg, &ctx.project_dir)?;
     fs::create_dir_all(&active).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     let archived_dir = active.join("archived");
@@ -484,8 +488,7 @@ fn create_generic(
 
 fn list_records(
     ctx: &Context,
-    _descriptor: &TypeDescriptor,
-    slug: &str,
+    record: &RecordDescriptor,
 ) -> Result<crate::CommandOutput, AppError> {
     // Read-path auto-relocation: records whose status is `archived` but which
     // still live in the active folder are relocated by `record::resolve::list_in_dir`
@@ -494,11 +497,10 @@ fn list_records(
     // `Err(Runtime)` naming both paths. The operation fails loudly rather than
     // returning a read-only handle.
     let cfg = load_config(ctx)?;
-    let rd = record_descriptor_for(slug)?;
-    let active = rd.resolve_directory(&cfg, &ctx.project_dir)?;
+    let active = record.resolve_directory(&cfg, &ctx.project_dir)?;
     let _ = fs::create_dir_all(&active);
-    let prefixes = rd.configured_prefixes(&cfg);
-    let dotted = rd.is_dotted_id();
+    let prefixes = record.configured_prefixes(&cfg);
+    let dotted = record.is_dotted_id();
     let records = record::resolve::list_in_dir(ctx, &active, &prefixes, dotted)?;
     let mut items: Vec<(String, String, String)> = Vec::new();
     for record in records {
@@ -538,18 +540,16 @@ fn list_records(
 
 fn view_record(
     ctx: &Context,
-    _descriptor: &TypeDescriptor,
-    slug: &str,
+    record: &RecordDescriptor,
     id: Option<String>,
 ) -> Result<crate::CommandOutput, AppError> {
     let id_raw = id.ok_or_else(|| AppError::Validation("id is required".to_string()))?;
     let requested = sanitize_field(&id_raw)?;
     let cfg = load_config(ctx)?;
-    let rd = record_descriptor_for(slug)?;
-    let active = rd.resolve_directory(&cfg, &ctx.project_dir)?;
+    let active = record.resolve_directory(&cfg, &ctx.project_dir)?;
     let _ = fs::create_dir_all(&active);
-    let prefixes = rd.configured_prefixes(&cfg);
-    let dotted = rd.is_dotted_id();
+    let prefixes = record.configured_prefixes(&cfg);
+    let dotted = record.is_dotted_id();
     let resolved = record::resolve::resolve_in_dirs(ctx, &[active], &requested, &prefixes, dotted)?;
     let record =
         resolved.ok_or_else(|| AppError::NotFound(format!("record not found: {}", requested)))?;
@@ -575,8 +575,8 @@ fn view_record(
 fn edit_generic(
     ctx: &Context,
     _descriptor: &TypeDescriptor,
+    record: &RecordDescriptor,
     invocation: DocumentInvocation,
-    slug: &str,
 ) -> Result<crate::CommandOutput, AppError> {
     let id_raw = invocation
         .id
@@ -585,11 +585,10 @@ fn edit_generic(
     let requested = sanitize_field(&id_raw)?;
 
     let cfg = load_config(ctx)?;
-    let rd = record_descriptor_for(slug)?;
-    let active = rd.resolve_directory(&cfg, &ctx.project_dir)?;
+    let active = record.resolve_directory(&cfg, &ctx.project_dir)?;
     let _ = fs::create_dir_all(&active);
-    let prefixes = rd.configured_prefixes(&cfg);
-    let dotted = rd.is_dotted_id();
+    let prefixes = record.configured_prefixes(&cfg);
+    let dotted = record.is_dotted_id();
     let resolved = record::resolve::resolve_in_dirs(
         ctx,
         std::slice::from_ref(&active),
@@ -718,13 +717,12 @@ fn edit_generic(
 
 pub fn archive_record(
     ctx: &Context,
-    descriptor: &TypeDescriptor,
+    record: &RecordDescriptor,
     id: Option<String>,
 ) -> Result<crate::CommandOutput, AppError> {
     let id_raw = id.ok_or_else(|| AppError::Validation("id is required".to_string()))?;
     let requested = sanitize_field(&id_raw)?;
-    let rd = record_descriptor_for(&descriptor.slug)?;
-    let _ = record::store::archive(ctx, &rd, &requested)?;
+    let _ = record::store::archive(ctx, record, &requested)?;
     let json = if ctx.json {
         Some(json!({"status": "ok", "id": requested}))
     } else {
@@ -738,13 +736,12 @@ pub fn archive_record(
 
 pub fn delete_record(
     ctx: &Context,
-    descriptor: &TypeDescriptor,
+    record: &RecordDescriptor,
     id: Option<String>,
     force: bool,
 ) -> Result<crate::CommandOutput, AppError> {
     let id_raw = id.ok_or_else(|| AppError::Validation("id is required".to_string()))?;
     let requested = sanitize_field(&id_raw)?;
-    let rd = record_descriptor_for(&descriptor.slug)?;
     if !force {
         use std::io::{self, Write};
         print!("Delete {}? [y/N] ", requested);
@@ -766,7 +763,7 @@ pub fn delete_record(
             });
         }
     }
-    record::store::delete(ctx, &rd, &requested)?;
+    record::store::delete(ctx, record, &requested)?;
     let json = if ctx.json {
         Some(json!({"status": "ok", "id": requested}))
     } else {
@@ -780,7 +777,7 @@ pub fn delete_record(
 
 pub fn status_record(
     ctx: &Context,
-    descriptor: &TypeDescriptor,
+    record: &RecordDescriptor,
     id: Option<String>,
     value: Option<String>,
 ) -> Result<crate::CommandOutput, AppError> {
@@ -792,18 +789,17 @@ pub fn status_record(
     let requested = sanitize_field(&id_raw)?;
     let value =
         value.ok_or_else(|| AppError::Validation("status value is required".to_string()))?;
-    let rd = record_descriptor_for(&descriptor.slug)?;
     // Auto-relocate archived-in-active records and surface undeclared statuses.
     let cfg = load_config(ctx)?;
-    let read_dirs = rd.resolve_read_directories(&cfg, &ctx.project_dir);
-    let prefixes = rd.configured_prefixes(&cfg);
-    let dotted = rd.is_dotted_id();
+    let read_dirs = record.resolve_read_directories(&cfg, &ctx.project_dir);
+    let prefixes = record.configured_prefixes(&cfg);
+    let dotted = record.is_dotted_id();
     if let Some(rec) =
         record::resolve::resolve_in_dirs(ctx, &read_dirs, &requested, &prefixes, dotted)?
     {
         let _ = record::store::read_document(ctx, &rec.path)?;
     }
-    record::store::set_status(ctx, &rd, &requested, &value)?;
+    record::store::set_status(ctx, record, &requested, &value)?;
     let json = if ctx.json {
         Some(json!({"status": "ok", "id": requested}))
     } else {

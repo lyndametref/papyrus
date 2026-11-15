@@ -11,6 +11,7 @@
 
 use crate::config::{Config, DocTypeEntry, TypeEntry};
 use crate::error::AppError;
+use crate::record::descriptor::RecordDescriptor;
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -285,6 +286,11 @@ pub struct TypeDescriptor {
     pub frontmatter_keys: Vec<&'static str>,
     pub id_shape: IdShape,
     pub archive_policy: ArchivePolicy,
+    /// The record-layer descriptor for a document type (ADR-0017 decision 1).
+    ///
+    /// `Some` for every document descriptor, `None` for backlog and decision
+    /// descriptors, whose record descriptors stay static.
+    pub record: Option<RecordDescriptor>,
 }
 
 impl TypeDescriptor {
@@ -2034,6 +2040,23 @@ struct DescriptorTemplate {
     frontmatter_extra: &'static [&'static str],
     archive: ArchivePolicy,
     create_options: CreateOptions,
+    /// Record-layer facts of a document type. Backlog and decision templates
+    /// leave this `None`; their record descriptors stay static.
+    record: Option<RecordFacts>,
+}
+
+/// The record-level facts a document template contributes to the record layer.
+///
+/// These are the values that used to live in the parallel static document
+/// table in `record::descriptor` (ADR-0017 decision 1).
+#[derive(Clone, Copy, Debug)]
+struct RecordFacts {
+    record_name: &'static str,
+    record_type: &'static str,
+    type_name: &'static str,
+    display_id_pattern: &'static str,
+    /// Type-specific front-matter keys only, in written order.
+    frontmatter_keys: &'static [&'static str],
 }
 
 const TASK_VERBS: &[Verb] = &[
@@ -2085,6 +2108,7 @@ const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
         ],
         archive: FRONTMATTER_ARCHIVE,
         create_options: NO_CREATE_OPTIONS,
+        record: None,
     },
     DescriptorTemplate {
         slug: "milestone",
@@ -2101,6 +2125,7 @@ const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_extra: &["release"],
         archive: FRONTMATTER_ARCHIVE,
         create_options: NO_CREATE_OPTIONS,
+        record: None,
     },
     DescriptorTemplate {
         slug: "release",
@@ -2117,6 +2142,7 @@ const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_extra: &[],
         archive: ArchivePolicy::None,
         create_options: NO_CREATE_OPTIONS,
+        record: None,
     },
 ];
 
@@ -2136,6 +2162,7 @@ const DECISION_TEMPLATE: DescriptorTemplate = DescriptorTemplate {
     frontmatter_extra: &["superseded_by"],
     archive: ArchivePolicy::None,
     create_options: NO_CREATE_OPTIONS,
+    record: None,
 };
 
 const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
@@ -2156,6 +2183,13 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
         create_options: REQUIRED_GROUP,
+        record: Some(RecordFacts {
+            record_name: "business requirement",
+            record_type: "requirement",
+            type_name: "requirement",
+            display_id_pattern: "REQ-###.###",
+            frontmatter_keys: &["status"],
+        }),
     },
     DescriptorTemplate {
         slug: "nfr",
@@ -2174,6 +2208,13 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
         create_options: REQUIRED_GROUP,
+        record: Some(RecordFacts {
+            record_name: "non-functional requirement",
+            record_type: "nfr",
+            type_name: "nfr",
+            display_id_pattern: "NFR-###.###",
+            frontmatter_keys: &["status"],
+        }),
     },
     DescriptorTemplate {
         slug: "glossary",
@@ -2190,6 +2231,13 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
         create_options: NO_CREATE_OPTIONS,
+        record: Some(RecordFacts {
+            record_name: "glossary term",
+            record_type: "glossary",
+            type_name: "glossary",
+            display_id_pattern: "GLO-###",
+            frontmatter_keys: &["status"],
+        }),
     },
     DescriptorTemplate {
         slug: "rule",
@@ -2206,6 +2254,13 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
         create_options: NO_CREATE_OPTIONS,
+        record: Some(RecordFacts {
+            record_name: "business rule",
+            record_type: "rule",
+            type_name: "rule",
+            display_id_pattern: "RUL-###",
+            frontmatter_keys: &["status"],
+        }),
     },
     DescriptorTemplate {
         slug: "ui-spec",
@@ -2222,6 +2277,13 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
         create_options: NO_CREATE_OPTIONS,
+        record: Some(RecordFacts {
+            record_name: "ui specification",
+            record_type: "ui-spec",
+            type_name: "ui_spec",
+            display_id_pattern: "UI-###",
+            frontmatter_keys: &["status"],
+        }),
     },
     DescriptorTemplate {
         slug: "ui-mockup",
@@ -2240,6 +2302,13 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_extra: &[],
         archive: HTML_METADATA_ARCHIVE,
         create_options: NO_CREATE_OPTIONS,
+        record: Some(RecordFacts {
+            record_name: "ui mockup",
+            record_type: "ui-mockup",
+            type_name: "ui_mockup",
+            display_id_pattern: "UI-###",
+            frontmatter_keys: &[],
+        }),
     },
     DescriptorTemplate {
         slug: "audit",
@@ -2256,6 +2325,13 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_extra: &["type"],
         archive: FRONTMATTER_ARCHIVE,
         create_options: NO_CREATE_OPTIONS,
+        record: Some(RecordFacts {
+            record_name: "audit record",
+            record_type: "audit",
+            type_name: "audit",
+            display_id_pattern: "AUD-###",
+            frontmatter_keys: &["status", "type"],
+        }),
     },
     DescriptorTemplate {
         slug: "tech-spec",
@@ -2272,6 +2348,13 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
         create_options: NO_CREATE_OPTIONS,
+        record: Some(RecordFacts {
+            record_name: "technical specification",
+            record_type: "tech-spec",
+            type_name: "tech_spec",
+            display_id_pattern: "TECH-###",
+            frontmatter_keys: &["status"],
+        }),
     },
     DescriptorTemplate {
         slug: "use-case",
@@ -2288,6 +2371,13 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
         create_options: NO_CREATE_OPTIONS,
+        record: Some(RecordFacts {
+            record_name: "use case",
+            record_type: "use-case",
+            type_name: "use_case",
+            display_id_pattern: "UC-###",
+            frontmatter_keys: &["status"],
+        }),
     },
     DescriptorTemplate {
         slug: "test-case",
@@ -2304,6 +2394,13 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
         create_options: NO_CREATE_OPTIONS,
+        record: Some(RecordFacts {
+            record_name: "test case",
+            record_type: "test-case",
+            type_name: "test_case",
+            display_id_pattern: "TC-###",
+            frontmatter_keys: &["status"],
+        }),
     },
     DescriptorTemplate {
         slug: "test-report",
@@ -2320,6 +2417,13 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
         create_options: NO_CREATE_OPTIONS,
+        record: Some(RecordFacts {
+            record_name: "test report",
+            record_type: "test-report",
+            type_name: "test_report",
+            display_id_pattern: "TR-###",
+            frontmatter_keys: &["status"],
+        }),
     },
 ];
 
@@ -2360,6 +2464,15 @@ impl ArtifactRegistry {
             .and_then(|index| self.descriptors.get(*index))
     }
 
+    /// The record-layer descriptor of a document type.
+    ///
+    /// This is the only slug-to-record lookup: record facts for document types
+    /// live on the registry descriptor (ADR-0017 decisions 1 and 4).
+    pub fn record_descriptor(&self, slug: &str) -> Option<&RecordDescriptor> {
+        self.descriptor(slug)
+            .and_then(|descriptor| descriptor.record.as_ref())
+    }
+
     pub fn descriptors(&self) -> impl Iterator<Item = &TypeDescriptor> + '_ {
         self.descriptors.iter()
     }
@@ -2388,6 +2501,13 @@ impl ArtifactRegistry {
     pub fn is_empty(&self) -> bool {
         self.descriptors.is_empty()
     }
+}
+
+/// Whether a document slug is declared by a built-in template.
+pub fn is_builtin_document_slug(slug: &str) -> bool {
+    DOCUMENT_TEMPLATES
+        .iter()
+        .any(|template| template.slug == slug)
 }
 
 /// Build descriptors in the canonical order, without validating invariants.
@@ -2453,6 +2573,7 @@ fn backlog_descriptor(cfg: &Config, template: &DescriptorTemplate) -> TypeDescri
         frontmatter_keys: frontmatter_keys(template),
         id_shape: template.id_shape,
         archive_policy: template.archive,
+        record: None,
     }
 }
 
@@ -2476,6 +2597,7 @@ fn decision_descriptor(slug: &str, entry: &TypeEntry) -> TypeDescriptor {
         frontmatter_keys: frontmatter_keys(&DECISION_TEMPLATE),
         id_shape: IdShape::Plain,
         archive_policy: ArchivePolicy::None,
+        record: None,
     }
 }
 
@@ -2537,6 +2659,15 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
         }
     };
 
+    let record = match template {
+        Some(template) => template
+            .record
+            .map(|facts| document_record(template, facts)),
+        None => Some(*crate::record::descriptor::generic_document_descriptor(
+            slug,
+        )),
+    };
+
     Ok(TypeDescriptor {
         slug: slug.to_string(),
         category: ArtifactCategory::Document,
@@ -2557,7 +2688,32 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
         frontmatter_keys,
         id_shape,
         archive_policy,
+        record,
     })
+}
+
+/// Project a document template's record facts into the record-layer shape.
+///
+/// `directory` and `subpath` stay at the record-layer defaults: the concrete
+/// location comes from the `document_types.<slug>.directory` entry that
+/// `RecordDescriptor::resolve_directory` reads through `doc_type_key`.
+fn document_record(template: &DescriptorTemplate, facts: RecordFacts) -> RecordDescriptor {
+    RecordDescriptor {
+        name: facts.record_name,
+        record_type: facts.record_type,
+        type_name: facts.type_name,
+        label: template.label,
+        display_id_pattern: facts.display_id_pattern,
+        directory: "doc",
+        subpath: "",
+        doc_type_key: Some(template.slug),
+        frontmatter_keys: facts.frontmatter_keys,
+        sections: match template.content {
+            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => schema.sections,
+            // Unreachable for a template, but keeps the projection total.
+            ContentModel::Generic => &["## Description"],
+        },
+    }
 }
 
 /// Resolve a document descriptor's status model from its entry (REQ-07.001).
@@ -2842,6 +2998,8 @@ fn is_relative_directory(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::path::Path;
 
     const TYPED_DOCUMENT_SLUGS: &[&str] = &[
         "req",
@@ -3395,40 +3553,173 @@ mod tests {
 
     // 19
     #[test]
-    fn registry_agrees_with_record_descriptor_for_default_documents() {
-        use crate::record::descriptor::descriptor_for_doc_type;
-
+    fn every_document_descriptor_has_a_record_and_no_other_slug_does() {
         let cfg = Config::default();
         let registry = ArtifactRegistry::build(&cfg).expect("registry builds");
-        for slug in TYPED_DOCUMENT_SLUGS {
-            let descriptor = registry.descriptor(slug).expect(slug);
-            let entry = cfg.document_types.get(*slug).expect("entry");
-            assert_eq!(descriptor.prefix, entry.prefix);
-            assert_eq!(descriptor.directory.relative, entry.directory);
+        let documents: Vec<&TypeDescriptor> =
+            registry.in_category(ArtifactCategory::Document).collect();
+        assert_eq!(documents.len(), TYPED_DOCUMENT_SLUGS.len());
 
-            match descriptor.content_model {
-                ContentModel::Typed(schema) => {
-                    let record = descriptor_for_doc_type(slug).expect("record descriptor");
-                    assert_eq!(record.doc_type_key, Some(*slug));
-                    assert_eq!(record.directory, "doc");
-                    assert_eq!(schema.sections, record.sections);
-                    assert_eq!(
-                        record.is_dotted_id(),
-                        descriptor.id_shape != IdShape::Plain,
-                        "{} id shape drifted",
-                        slug
-                    );
-                    assert_eq!(
-                        record.configured_prefixes(&cfg),
-                        vec![descriptor.prefix.clone()]
-                    );
-                }
-                ContentModel::HtmlMockup(_) => {
-                    assert_eq!(*slug, "ui-mockup");
-                    assert!(descriptor_for_doc_type(slug).is_none());
-                }
-                ContentModel::Generic => panic!("default document must be typed: {}", slug),
-            }
+        let with_record = documents
+            .iter()
+            .filter(|descriptor| registry.record_descriptor(&descriptor.slug).is_some())
+            .count();
+        assert_eq!(
+            with_record,
+            documents.len(),
+            "every document descriptor must carry a record descriptor"
+        );
+
+        for slug in ["task", "milestone", "release", "adr", "bdr"] {
+            assert!(
+                registry.record_descriptor(slug).is_none(),
+                "{slug} must not carry a document record descriptor"
+            );
+        }
+        assert!(registry.record_descriptor("deploy").is_none());
+        assert!(registry.record_descriptor("unknown").is_none());
+    }
+
+    // 20
+    #[test]
+    fn record_descriptor_fields_derive_from_their_registry_descriptor() {
+        let cfg = Config::default();
+        let registry = ArtifactRegistry::build(&cfg).expect("registry builds");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join("registry-record-fields");
+        fs::create_dir_all(&root).expect("tmp project");
+        let project = fs::canonicalize(&root).expect("canonical project");
+
+        for descriptor in registry.in_category(ArtifactCategory::Document) {
+            let slug = descriptor.slug.as_str();
+            let record = registry
+                .record_descriptor(slug)
+                .unwrap_or_else(|| panic!("record descriptor missing: {slug}"));
+
+            assert_eq!(record.doc_type_key, Some(slug), "{slug} doc-type key");
+            assert_eq!(record.label, descriptor.label, "{slug} label");
+            assert_eq!(
+                record.configured_prefixes(&cfg),
+                vec![descriptor.prefix.clone()],
+                "{slug} prefix"
+            );
+            assert_eq!(
+                record.is_dotted_id(),
+                descriptor.id_shape != IdShape::Plain,
+                "{slug} id shape"
+            );
+            // The registry also stores the general keys; the record keeps only
+            // the type-specific tail, in the same written order.
+            let expected_keys: Vec<&str> = descriptor
+                .frontmatter_keys
+                .iter()
+                .copied()
+                .skip(GENERAL_FRONTMATTER_KEYS.len())
+                .collect();
+            assert_eq!(
+                record.frontmatter_keys, expected_keys,
+                "{slug} front-matter keys"
+            );
+            assert_eq!(
+                record.has_frontmatter_key("status"),
+                descriptor.frontmatter_status_key().is_some(),
+                "{slug} status key"
+            );
+
+            let expected_sections: &[&str] = match descriptor.content_model {
+                ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => schema.sections,
+                ContentModel::Generic => &["## Description"],
+            };
+            assert_eq!(record.sections, expected_sections, "{slug} sections");
+
+            let expected_dir = project
+                .join(&cfg.doc_directory)
+                .join(&descriptor.directory.relative);
+            assert_eq!(
+                record
+                    .resolve_directory(&cfg, &project)
+                    .expect("record directory"),
+                expected_dir,
+                "{slug} directory"
+            );
+        }
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    // 21
+    #[test]
+    fn record_descriptor_resolves_builtin_and_config_defined_types_alike() {
+        let mut cfg = Config::default();
+        cfg.document_types
+            .insert("note".to_string(), entry("NOTE", "notes/"));
+        let registry = ArtifactRegistry::build(&cfg).expect("registry builds");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join("registry-record-parity");
+        fs::create_dir_all(&root).expect("tmp project");
+        let project = fs::canonicalize(&root).expect("canonical project");
+
+        let glossary = registry
+            .record_descriptor("glossary")
+            .expect("glossary record");
+        assert_eq!(glossary.doc_type_key, Some("glossary"));
+        assert_eq!(glossary.configured_prefixes(&cfg), vec!["GLO"]);
+        assert!(glossary.has_frontmatter_key("status"));
+        assert_eq!(glossary.sections, GLOSSARY_SECTIONS);
+        assert_eq!(glossary.record_type, "glossary");
+
+        let note = registry.record_descriptor("note").expect("note record");
+        assert_eq!(note.doc_type_key, Some("note"));
+        assert_eq!(note.configured_prefixes(&cfg), vec!["NOTE"]);
+        assert!(note.has_frontmatter_key("status"));
+        assert_eq!(note.sections, &["## Description"]);
+        assert_eq!(note.record_type, "document");
+        assert_eq!(note.label, "note");
+
+        let glossary_dir = project
+            .join(&cfg.doc_directory)
+            .join(&cfg.document_types["glossary"].directory);
+        let note_dir = project
+            .join(&cfg.doc_directory)
+            .join(&cfg.document_types["note"].directory);
+        assert_eq!(
+            glossary.resolve_directory(&cfg, &project).unwrap(),
+            glossary_dir
+        );
+        assert_eq!(note.resolve_directory(&cfg, &project).unwrap(), note_dir);
+        assert_ne!(glossary_dir, note_dir);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    // 22
+    #[test]
+    fn no_parallel_document_record_table_remains() {
+        use crate::record::descriptor::DESCRIPTORS as STATIC_RECORDS;
+
+        assert_eq!(STATIC_RECORDS.len(), 4, "only backlog families are static");
+        assert!(
+            STATIC_RECORDS
+                .iter()
+                .all(|descriptor| descriptor.doc_type_key.is_none()),
+            "static records must not describe document types"
+        );
+
+        let source = fs::read_to_string("src/record/descriptor.rs").expect("descriptor source");
+        let production = source
+            .split("#[cfg(test)]")
+            .next()
+            .expect("production lines");
+        // A per-slug literal would be a new parallel document table. The
+        // generic constructor's `Some(slug_static)` is allowed until TASK-121.
+        for forbidden in [
+            concat!("descriptor_for", "_doc_type"),
+            "doc_type_key: Some(\"",
+        ] {
+            assert!(
+                !production.contains(forbidden),
+                "src/record/descriptor.rs must not contain `{forbidden}`"
+            );
         }
     }
 
