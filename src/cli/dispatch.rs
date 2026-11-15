@@ -72,6 +72,29 @@ fn build_context(
     })
 }
 
+fn build_check_context(
+    project_raw: PathBuf,
+    config_path: PathBuf,
+    json: bool,
+    no_color: bool,
+) -> Result<Context, AppError> {
+    let project_dir = Context::canonical_project_dir(&project_raw)?;
+    let config_path = Context::ensure_within(&project_dir, &config_path).map_err(|_| {
+        AppError::Runtime(format!(
+            "configuration path resolves outside project directory: {}",
+            config_path.display()
+        ))
+    })?;
+    // The diagnostic command deliberately does not require the file to exist:
+    // a missing configuration is a finding, not a startup failure.
+    Ok(Context {
+        project_dir,
+        config_path,
+        json,
+        no_color,
+    })
+}
+
 fn dispatch_builtin(
     cmd: BuiltinCmd,
     project_raw: PathBuf,
@@ -98,7 +121,12 @@ fn dispatch_builtin(
                 } else {
                     None
                 },
+                ..Default::default()
             })
+        }
+        BuiltinCmd::Check => {
+            let ctx = build_check_context(project_raw, config_path, json, no_color)?;
+            crate::check::run(&ctx)
         }
         BuiltinCmd::Config { action } => {
             let ctx = build_context(project_raw, config_path, json, no_color)?;

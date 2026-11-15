@@ -1,0 +1,7 @@
+dangling-milestone: task TASK-002 — milestone MS-999 does not resolve to a milestone (backlog/tasks/TASK-002.md)
+dangling-release: milestone MS-001 — release REL-999 does not resolve to a release (backlog/milestones/MS-001-copy.md)
+dangling-release: milestone MS-001 — release REL-999 does not resolve to a release (backlog/milestones/MS-001.md)
+duplicate-id: milestone MS-001 — 2 records share this ID (backlog/milestones/MS-001-copy.md, backlog/milestones/MS-001.md)
+duplicate-id: task TASK-001 — 2 records share this ID (backlog/tasks/TASK-001-copy.md, backlog/tasks/TASK-001.md)
+frontmatter-conflict: tech-spec TECH-001 — heading title "Changed" disagrees with front matter title "Original" (docs/technical/TECH-001.md)
+self-dependency: task TASK-001 — dependency list contains TASK-001 (backlog/tasks/TASK-001.md)

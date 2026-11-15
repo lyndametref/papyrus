@@ -218,6 +218,7 @@ pub fn run(
     Ok(CommandOutput {
         text: String::new(),
         json: None,
+        ..Default::default()
     })
 }
 

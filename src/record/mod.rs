@@ -10,6 +10,7 @@ pub mod migrate;
 pub mod patch;
 pub mod relocate;
 pub mod resolve;
+pub mod scan;
 pub mod store;
 pub mod view;
 
@@ -29,3 +30,8 @@ pub use view::RecordView;
 pub use relocate::{RelocationReport, move_folder, relocate, relocate_folder};
 
 pub use store::RelocateError;
+
+// Read-only diagnostic access to the retired-section table and reader rules.
+pub(crate) use migrate::{
+    SectionList, SectionValue, retired_sections, section_list, section_scalar,
+};

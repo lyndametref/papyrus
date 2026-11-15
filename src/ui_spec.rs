@@ -275,7 +275,11 @@ fn list(
     } else {
         None
     };
-    Ok(CommandOutput { text, json })
+    Ok(CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 fn view(
@@ -306,7 +310,11 @@ fn view(
         None
     };
     let text = content.trim_end_matches('\n').to_string();
-    Ok(CommandOutput { text, json })
+    Ok(CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 fn frontmatter_list_ui(content: &str, key: &str) -> Vec<String> {
@@ -448,5 +456,6 @@ fn edit(
     Ok(CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }

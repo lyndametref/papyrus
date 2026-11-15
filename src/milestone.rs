@@ -91,7 +91,11 @@ pub fn run(ctx: &Context, cmd: MilestoneCmd) -> Result<crate::CommandOutput, App
             } else {
                 None
             };
-            Ok(crate::CommandOutput { text, json })
+            Ok(crate::CommandOutput {
+                text,
+                json,
+                ..Default::default()
+            })
         }
         MilestoneCmd::List => list(ctx),
         MilestoneCmd::View { id } => view(ctx, &id),
@@ -507,7 +511,11 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
         None
     };
 
-    Ok(crate::CommandOutput { text, json })
+    Ok(crate::CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
@@ -528,7 +536,11 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
     } else {
         None
     };
-    Ok(crate::CommandOutput { text, json })
+    Ok(crate::CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -700,6 +712,7 @@ pub fn edit(
     Ok(crate::CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 
@@ -749,7 +762,11 @@ pub fn close(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErr
     let json = ctx
         .json
         .then(|| serde_json::json!({"id": id, "status": "closed"}));
-    Ok(crate::CommandOutput { text: id, json })
+    Ok(crate::CommandOutput {
+        text: id,
+        json,
+        ..Default::default()
+    })
 }
 
 pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<crate::CommandOutput, AppError> {
@@ -776,6 +793,7 @@ pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<crate::Command
             return Ok(crate::CommandOutput {
                 text: String::new(),
                 json,
+                ..Default::default()
             });
         }
     }
@@ -790,6 +808,7 @@ pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<crate::Command
     Ok(crate::CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 

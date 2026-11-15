@@ -760,6 +760,7 @@ fn run_backlog(
             return Ok(crate::CommandOutput {
                 text: String::new(),
                 json: None,
+                ..Default::default()
             });
         } else {
             return Err(AppError::Runtime(format!(
@@ -934,6 +935,7 @@ fn run_backlog(
         Ok(crate::CommandOutput {
             text: String::new(),
             json: None,
+            ..Default::default()
         })
     } else {
         Err(AppError::Runtime(format!(

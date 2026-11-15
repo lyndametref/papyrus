@@ -264,7 +264,11 @@ pub fn list(
     } else {
         None
     };
-    Ok(CommandOutput { text, json })
+    Ok(CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 pub fn view(
@@ -295,7 +299,11 @@ pub fn view(
         None
     };
     let text = content.trim_end_matches('\n').to_string();
-    Ok(CommandOutput { text, json })
+    Ok(CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 fn frontmatter_list_audit(content: &str, key: &str) -> Vec<String> {
@@ -447,6 +455,7 @@ pub fn edit(
     Ok(CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 

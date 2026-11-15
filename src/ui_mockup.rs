@@ -513,7 +513,11 @@ fn list(ctx: &Context, scope: &DocumentScope) -> Result<CommandOutput, AppError>
     } else {
         None
     };
-    Ok(CommandOutput { text, json })
+    Ok(CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 fn view(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<CommandOutput, AppError> {
@@ -534,7 +538,11 @@ fn view(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<CommandOut
         None
     };
     let text = content.trim_end_matches('\n').to_string();
-    Ok(CommandOutput { text, json })
+    Ok(CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 fn edit(
@@ -650,6 +658,7 @@ fn edit(
     Ok(CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 
@@ -662,6 +671,7 @@ fn ok_output(ctx: &Context, id: &str) -> CommandOutput {
     CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     }
 }
 
@@ -760,6 +770,7 @@ pub fn delete(
             return Ok(CommandOutput {
                 text: String::new(),
                 json,
+                ..Default::default()
             });
         }
     }

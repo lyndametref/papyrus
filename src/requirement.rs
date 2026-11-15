@@ -411,7 +411,11 @@ pub fn list(
         None
     };
 
-    Ok(crate::CommandOutput { text, json })
+    Ok(crate::CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 pub fn parsed_from_document(doc: &crate::record::document::Document) -> ParsedDoc {
@@ -535,7 +539,11 @@ pub fn view(
     } else {
         None
     };
-    Ok(crate::CommandOutput { text, json })
+    Ok(crate::CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 fn frontmatter_list_req(content: &str, key: &str) -> Vec<String> {
@@ -694,6 +702,7 @@ pub fn edit(
     Ok(crate::CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 

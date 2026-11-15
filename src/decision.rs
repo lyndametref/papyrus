@@ -81,7 +81,11 @@ pub fn run(ctx: &Context, cmd: DecisionCmd) -> Result<crate::CommandOutput, AppE
             } else {
                 None
             };
-            Ok(crate::CommandOutput { text, json })
+            Ok(crate::CommandOutput {
+                text,
+                json,
+                ..Default::default()
+            })
         }
         DecisionCmd::List { decision_type } => list(ctx, decision_type.as_deref()),
         DecisionCmd::View { id } => view(ctx, &id),
@@ -511,7 +515,11 @@ pub fn list(
         None
     };
 
-    Ok(crate::CommandOutput { text, json })
+    Ok(crate::CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
@@ -533,7 +541,11 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
     } else {
         None
     };
-    Ok(crate::CommandOutput { text, json })
+    Ok(crate::CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 pub fn edit(
@@ -731,6 +743,7 @@ pub fn edit(
     Ok(crate::CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 

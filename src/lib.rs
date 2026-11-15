@@ -1,5 +1,6 @@
 pub mod audit;
 pub mod browser;
+pub mod check;
 pub mod cli;
 pub mod commands;
 pub mod config;
@@ -36,9 +37,12 @@ pub enum SearchType {
     Doc,
 }
 
+#[derive(Default)]
 pub struct CommandOutput {
     pub text: String,
     pub json: Option<serde_json::Value>,
+    /// Process exit status; findings use 4, every other command keeps 0.
+    pub exit_code: i32,
 }
 
 /// Parse `--limit`: a positive integer. Zero, negative, and non-integer values
@@ -89,6 +93,7 @@ pub fn run() -> Result<CommandOutput, error::AppError> {
     let first = prescan.first_positional.clone();
     let is_init = first.as_deref() == Some("init");
     let is_config = first.as_deref() == Some("config");
+    let is_check = first.as_deref() == Some("check");
     let is_help = prescan.help || first.as_deref() == Some("help");
     let is_version = prescan.version;
 
@@ -104,6 +109,10 @@ pub fn run() -> Result<CommandOutput, error::AppError> {
             };
             let reg = cfg.as_ref().and_then(|c| ArtifactRegistry::build(c).ok());
             (cfg, reg)
+        } else if is_check {
+            // The diagnostic command loads its own configuration, so the tree
+            // must exist before that load (ADR-0029 decision 2).
+            (None, None)
         } else if (is_help || is_version) && !config_path.exists() {
             let cfg = crate::config::Config::default();
             let reg = ArtifactRegistry::build(&cfg).ok();

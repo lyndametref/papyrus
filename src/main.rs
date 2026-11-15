@@ -7,7 +7,7 @@ fn main() {
     match run() {
         Ok(out) => {
             print_output(&out, json);
-            exit(0);
+            exit(out.exit_code);
         }
         Err(err) => {
             if json {

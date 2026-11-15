@@ -147,7 +147,11 @@ pub fn run(ctx: &Context, cmd: TaskCmd) -> Result<crate::CommandOutput, AppError
             } else {
                 None
             };
-            Ok(crate::CommandOutput { text, json })
+            Ok(crate::CommandOutput {
+                text,
+                json,
+                ..Default::default()
+            })
         }
         TaskCmd::List {
             status,
@@ -852,7 +856,11 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
     } else {
         None
     };
-    Ok(crate::CommandOutput { text, json })
+    Ok(crate::CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 fn frontmatter_scalar(content: &str, key: &str) -> Option<String> {
@@ -1339,6 +1347,7 @@ pub fn edit(
     Ok(crate::CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 
@@ -1590,7 +1599,11 @@ pub fn list(
 
     if !watch {
         let (text, json) = render(ctx, &cfg, &active);
-        return Ok(crate::CommandOutput { text, json });
+        return Ok(crate::CommandOutput {
+            text,
+            json,
+            ..Default::default()
+        });
     }
 
     install_sigint();
@@ -1630,6 +1643,7 @@ pub fn list(
     Ok(crate::CommandOutput {
         text: String::new(),
         json: None,
+        ..Default::default()
     })
 }
 
@@ -1706,6 +1720,7 @@ pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
     Ok(crate::CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 
@@ -1736,6 +1751,7 @@ pub fn restore(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
     Ok(crate::CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 
@@ -1763,6 +1779,7 @@ pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<crate::Command
             return Ok(crate::CommandOutput {
                 text: String::new(),
                 json,
+                ..Default::default()
             });
         }
     }
@@ -1776,6 +1793,7 @@ pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<crate::Command
     Ok(crate::CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 

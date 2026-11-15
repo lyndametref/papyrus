@@ -148,7 +148,11 @@ pub fn config_list(ctx: &Context) -> Result<CommandOutput, AppError> {
     } else {
         None
     };
-    Ok(CommandOutput { text, json })
+    Ok(CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 pub fn config_get(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
@@ -174,7 +178,11 @@ pub fn config_get(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
             } else {
                 None
             };
-            return Ok(CommandOutput { text: name, json });
+            return Ok(CommandOutput {
+                text: name,
+                json,
+                ..Default::default()
+            });
         }
     }
     if key == "editor" {
@@ -197,7 +205,11 @@ pub fn config_get(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
             } else {
                 None
             };
-            return Ok(CommandOutput { text, json });
+            return Ok(CommandOutput {
+                text,
+                json,
+                ..Default::default()
+            });
         }
     }
 
@@ -215,7 +227,11 @@ pub fn config_get(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
     } else {
         None
     };
-    Ok(CommandOutput { text, json })
+    Ok(CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput, AppError> {
@@ -303,7 +319,11 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
     } else {
         None
     };
-    Ok(CommandOutput { text, json })
+    Ok(CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
@@ -350,6 +370,7 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
     Ok(CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 

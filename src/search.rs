@@ -99,7 +99,11 @@ pub fn run(
         None
     };
 
-    Ok(CommandOutput { text, json })
+    Ok(CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 /// The collected document-type set: exactly the enabled `Document` descriptors,

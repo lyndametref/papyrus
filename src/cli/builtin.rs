@@ -61,6 +61,8 @@ pub enum BuiltinCmd {
         #[command(subcommand)]
         action: ConfigCmd,
     },
+    /// Run read-only project diagnostics.
+    Check,
     /// Manage milestones.
     Milestone {
         #[command(subcommand)]

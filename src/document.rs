@@ -290,7 +290,11 @@ pub(crate) fn typed_created(ctx: &Context, id: String) -> crate::CommandOutput {
     } else {
         None
     };
-    crate::CommandOutput { text: id, json }
+    crate::CommandOutput {
+        text: id,
+        json,
+        ..Default::default()
+    }
 }
 
 /// The error a module returns for a verb it does not own.
@@ -483,7 +487,11 @@ fn create_generic(
     } else {
         None
     };
-    Ok(crate::CommandOutput { text: id, json })
+    Ok(crate::CommandOutput {
+        text: id,
+        json,
+        ..Default::default()
+    })
 }
 
 fn list_records(
@@ -535,7 +543,11 @@ fn list_records(
     } else {
         None
     };
-    Ok(crate::CommandOutput { text, json })
+    Ok(crate::CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 fn view_record(
@@ -569,7 +581,11 @@ fn view_record(
         None
     };
     let text = content.trim_end_matches('\n').to_string();
-    Ok(crate::CommandOutput { text, json })
+    Ok(crate::CommandOutput {
+        text,
+        json,
+        ..Default::default()
+    })
 }
 
 fn edit_generic(
@@ -712,6 +728,7 @@ fn edit_generic(
     Ok(crate::CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 
@@ -731,6 +748,7 @@ pub fn archive_record(
     Ok(crate::CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 
@@ -760,6 +778,7 @@ pub fn delete_record(
             return Ok(crate::CommandOutput {
                 text: String::new(),
                 json,
+                ..Default::default()
             });
         }
     }
@@ -772,6 +791,7 @@ pub fn delete_record(
     Ok(crate::CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 
@@ -808,6 +828,7 @@ pub fn status_record(
     Ok(crate::CommandOutput {
         text: String::new(),
         json,
+        ..Default::default()
     })
 }
 

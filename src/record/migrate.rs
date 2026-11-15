@@ -336,14 +336,14 @@ pub fn migrate_content(
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum SectionValue {
+pub(crate) enum SectionValue {
     Missing,
     Valid(String),
     Invalid,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum SectionList {
+pub(crate) enum SectionList {
     Missing,
     Valid(Vec<String>),
     Invalid,
@@ -357,7 +357,7 @@ fn find_section<'a>(doc: &'a document::Document, name: &str) -> Option<&'a docum
 /// Parse a scalar metadata section. More than one non-empty line cannot be
 /// represented as a single front-matter value and is reported as invalid so
 /// the caller can keep the section in place.
-fn section_scalar(doc: &document::Document, name: &str) -> SectionValue {
+pub(crate) fn section_scalar(doc: &document::Document, name: &str) -> SectionValue {
     let Some(section) = find_section(doc, name) else {
         return SectionValue::Missing;
     };
@@ -376,7 +376,7 @@ fn section_scalar(doc: &document::Document, name: &str) -> SectionValue {
 
 /// Parse a metadata section that stores one item per line. Empty list items
 /// are invalid so the section is preserved rather than silently losing data.
-fn section_list(doc: &document::Document, name: &str) -> SectionList {
+pub(crate) fn section_list(doc: &document::Document, name: &str) -> SectionList {
     let Some(section) = find_section(doc, name) else {
         return SectionList::Missing;
     };
@@ -521,6 +521,26 @@ fn adoption_ops(
     Ok(ops)
 }
 
+/// Retired metadata sections of one record family.
+///
+/// The tuple is `(section name, front-matter key, is list)`; the table is the
+/// single source of truth for both retirement and the read-only conflict scan.
+pub(crate) fn retired_sections(
+    desc: &RecordDescriptor,
+) -> &'static [(&'static str, &'static str, bool)] {
+    match desc.name.as_ref() {
+        "task" => &[
+            ("Status", "status", false),
+            ("Assignee", "assignee", true),
+            ("Milestone", "milestone", false),
+            ("Labels", "labels", true),
+            ("Dependencies", "dependencies", true),
+        ],
+        "milestone" => &[("Release", "release", false)],
+        _ => &[],
+    }
+}
+
 /// Patch operations that retire legacy metadata sections and the title heading.
 ///
 /// A section whose value cannot be parsed is left in place and a warning names
@@ -531,17 +551,7 @@ pub(crate) fn retire_legacy_body_ops(
     desc: &RecordDescriptor,
     path: &Path,
 ) -> Vec<PatchOp> {
-    let retired: &[(&str, &str, bool)] = match desc.name.as_ref() {
-        "task" => &[
-            ("Status", "status", false),
-            ("Assignee", "assignee", true),
-            ("Milestone", "milestone", false),
-            ("Labels", "labels", true),
-            ("Dependencies", "dependencies", true),
-        ],
-        "milestone" => &[("Release", "release", false)],
-        _ => &[],
-    };
+    let retired = retired_sections(desc);
 
     let mut ops = Vec::new();
     for (section_name, key, is_list) in retired {
