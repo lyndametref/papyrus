@@ -58,6 +58,10 @@ fn cases() -> Vec<(String, Vec<String>)> {
     let mut out: Vec<(String, Vec<String>)> = Vec::new();
     out.push(("top".to_string(), vec!["--help".to_string()]));
     out.push(("version".to_string(), vec!["--version".to_string()]));
+    out.push((
+        "check".to_string(),
+        vec!["check".to_string(), "--help".to_string()],
+    ));
     for slug in TYPED_SLUGS.iter().chain(std::iter::once(&GENERIC_SLUG)) {
         out.push((
             format!("slug-{slug}"),

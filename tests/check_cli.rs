@@ -638,6 +638,39 @@ fn missing_configuration_is_reported_as_a_finding() {
 }
 
 #[test]
+fn check_help_is_frozen_and_available_with_an_invalid_configuration() {
+    let project = Project::new("help-invalid-config");
+    project.write("papyrus.config.yml", "statuses: [\n");
+
+    let help = project.run(&["check", "--help"]);
+    assert_eq!(help.status.code(), Some(0), "{}", stderr_of(&help));
+    let text = stdout_of(&help);
+    assert!(text.contains("Usage: papyrus check [OPTIONS]"), "{}", text);
+    for needle in [
+        "--fix",
+        "--force",
+        "duplicate-id",
+        "self-dependency",
+        "dependency-cycle",
+        "dangling-milestone",
+        "dangling-release",
+        "frontmatter-conflict",
+        "config-invalid",
+        "Nothing is written unless --fix is given",
+        "an invalid configuration is reported as one config-invalid finding per",
+        "Exit status: 0 when nothing was found; 4 when at least one finding was reported,",
+        "1 on an I/O failure; 2 on a usage error",
+    ] {
+        assert!(
+            text.contains(needle),
+            "help is missing {:?}:\n{}",
+            needle,
+            text
+        );
+    }
+}
+
+#[test]
 fn usage_and_io_failures_keep_their_exit_codes() {
     let project = Project::initialized("exit-codes");
     let usage = project.run(&["check", "--bogus"]);

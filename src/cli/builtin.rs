@@ -6,6 +6,34 @@ use crate::release;
 use crate::task;
 use clap::{Args, Subcommand};
 
+/// The frozen `papyrus check --help` description (specification §1.1).
+///
+/// The golden `tests/golden/cli-help/check.json` locks the rendered bytes, so
+/// this block is copied verbatim from the specification.
+const CHECK_LONG_ABOUT: &str = "\
+Run read-only project diagnostics.
+
+Nothing is written unless --fix is given. Findings are reported one per line as
+<kind>: <family> <subject> — <detail> (<locations>), sorted by kind, family,
+subject, and location. The finding kinds are duplicate-id, self-dependency,
+dependency-cycle, dangling-milestone, dangling-release, frontmatter-conflict,
+and config-invalid. --json emits the same report as one object with the keys
+findings, skipped, and repaired.
+
+--fix repairs duplicate record IDs only. It prints the planned reassignments and
+every reference they affect, then asks for confirmation; --force skips that
+prompt and requires --fix. A planned repair that cannot be applied is reported
+as repair-skipped. With repairs to apply, no terminal, and no --force, nothing
+is written and the run exits 2.
+
+The configuration is loaded tolerantly, like papyrus config get|set|unset|list:
+an invalid configuration is reported as one config-invalid finding per
+diagnostic line, the checks that need a valid document_types set are named as
+skipped, and the remaining checks still run.
+
+Exit status: 0 when nothing was found; 4 when at least one finding was reported,
+including a run whose repairs succeeded; 1 on an I/O failure; 2 on a usage error.";
+
 #[derive(Subcommand, Debug)]
 pub enum ConfigCmd {
     /// Print all effective keys.
@@ -62,6 +90,7 @@ pub enum BuiltinCmd {
         action: ConfigCmd,
     },
     /// Run read-only project diagnostics.
+    #[command(long_about = CHECK_LONG_ABOUT)]
     Check {
         /// Repair duplicate record IDs.
         #[arg(long)]
@@ -142,6 +171,7 @@ pub struct BuiltinEntry {
 pub const BUILTIN_COMMANDS: &[BuiltinEntry] = &[
     BuiltinEntry { name: "init" },
     BuiltinEntry { name: "config" },
+    BuiltinEntry { name: "check" },
     BuiltinEntry { name: "task" },
     BuiltinEntry { name: "milestone" },
     BuiltinEntry { name: "release" },

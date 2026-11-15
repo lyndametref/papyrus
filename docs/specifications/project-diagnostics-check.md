@@ -4,7 +4,7 @@
 **Architecture:** ADR-0029 (Read-Only Corpus Diagnostics with Duplicate-ID Repair), decisions 1-9
 **Milestone:** m-21
 **UI mockups:** none (CLI only)
-**Status:** In progress — read-only run implemented (TASK-137); duplicate-ID repair (`--fix`, `--force`) implemented (TASK-138)
+**Status:** In progress — read-only run implemented (TASK-137); duplicate-ID repair (`--fix`, `--force`) implemented (TASK-138); `check` reserved and the §1.1 command surface published (TASK-139)
 
 This specification fixes the diagnostic contract: the command surface, the two-stage
 configuration load, the scanned locations, the seven finding kinds, the finding model,
@@ -22,6 +22,43 @@ document is the implementation contract.
   `papyrus check --help` works on a project whose configuration is invalid
   (ADR-0029 decision 2).
 - `check` is CLI-only in this release; no browser route runs it.
+
+### 1.1 Published help text
+
+`papyrus check --help` exits 0 and prints the following long description verbatim,
+then a blank line, then clap's generated synopsis `Usage: papyrus check [OPTIONS]`
+and the option list. The description is the clap `long_about` of the `check`
+subcommand; the golden `tests/golden/cli-help/check.json` locks the rendered bytes.
+
+```text
+Run read-only project diagnostics.
+
+Nothing is written unless --fix is given. Findings are reported one per line as
+<kind>: <family> <subject> — <detail> (<locations>), sorted by kind, family,
+subject, and location. The finding kinds are duplicate-id, self-dependency,
+dependency-cycle, dangling-milestone, dangling-release, frontmatter-conflict,
+and config-invalid. --json emits the same report as one object with the keys
+findings, skipped, and repaired.
+
+--fix repairs duplicate record IDs only. It prints the planned reassignments and
+every reference they affect, then asks for confirmation; --force skips that
+prompt and requires --fix. A planned repair that cannot be applied is reported
+as repair-skipped. With repairs to apply, no terminal, and no --force, nothing
+is written and the run exits 2.
+
+The configuration is loaded tolerantly, like papyrus config get|set|unset|list:
+an invalid configuration is reported as one config-invalid finding per
+diagnostic line, the checks that need a valid document_types set are named as
+skipped, and the remaining checks still run.
+
+Exit status: 0 when nothing was found; 4 when at least one finding was reported,
+including a run whose repairs succeeded; 1 on an I/O failure; 2 on a usage error.
+```
+
+The short `about` stays `Run read-only project diagnostics`, which is the line
+`papyrus --help` lists; the long description never leaks into that list. No
+`override_usage` is added, and the text carries no version, path, or
+environment-specific detail.
 
 ## 2. Configuration load (two stages)
 

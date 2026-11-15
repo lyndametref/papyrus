@@ -183,3 +183,78 @@ fn record_descriptors_are_stable_and_registry_local() {
         vec!["GLO".to_string()]
     );
 }
+
+#[test]
+fn registry_free_tree_exposes_the_full_check_surface() {
+    let command = tree(None).expect("registry-free tree builds");
+    assert!(
+        command.find_subcommand("check").is_some(),
+        "check is a built-in command"
+    );
+    let error = command
+        .try_get_matches_from(["papyrus", "check", "--help"])
+        .expect_err("--help renders the command help");
+    assert_eq!(error.kind(), clap::error::ErrorKind::DisplayHelp);
+    let help = error.to_string();
+
+    assert!(help.contains("Usage: papyrus check [OPTIONS]"), "{help}");
+    for needle in [
+        "--fix",
+        "--force",
+        "duplicate-id",
+        "self-dependency",
+        "dependency-cycle",
+        "dangling-milestone",
+        "dangling-release",
+        "frontmatter-conflict",
+        "config-invalid",
+        "Nothing is written unless --fix is given",
+        "an invalid configuration is reported as one config-invalid finding per",
+        "Exit status: 0 when nothing was found; 4 when at least one finding was reported,",
+        "1 on an I/O failure; 2 on a usage error",
+    ] {
+        assert!(help.contains(needle), "help is missing {needle:?}:\n{help}");
+    }
+}
+
+#[test]
+fn registry_tree_lists_check_once_and_never_as_a_document_type() {
+    let registry = ArtifactRegistry::build(&Config::default()).expect("default registry");
+    let command = tree(Some(&registry)).expect("tree builds");
+    let names: Vec<&str> = command
+        .get_subcommands()
+        .map(|command| command.get_name())
+        .collect();
+    assert_eq!(
+        names.iter().filter(|name| **name == "check").count(),
+        1,
+        "check is listed exactly once: {names:?}"
+    );
+
+    let check = command.find_subcommand("check").expect("check built-in");
+    assert_eq!(
+        check.get_subcommands().count(),
+        0,
+        "check is not a document family"
+    );
+}
+
+#[test]
+fn check_document_slug_is_rejected_by_the_tree_guard() {
+    for slug in ["check", "Check", "CHECK"] {
+        let mut cfg = Config::default();
+        cfg.document_types
+            .insert(slug.to_string(), entry("CHECK", "checks/", true));
+        let registry = ArtifactRegistry::build(&cfg).expect("registry build accepts the slug");
+
+        let err = tree(Some(&registry)).expect_err("the tree guard rejects the slug");
+        assert_eq!(err.code(), 4);
+        assert_eq!(
+            err.to_string(),
+            format!(
+                "document_types.{}: slug conflicts with built-in type check",
+                slug
+            )
+        );
+    }
+}

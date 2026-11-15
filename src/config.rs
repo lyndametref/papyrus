@@ -1259,13 +1259,46 @@ mod tests {
 
     #[test]
     fn reserved_slug_conflicts_are_case_insensitive() {
-        for (slug, builtin) in [("Config", "config"), ("SEARCH", "search"), ("task", "task")] {
+        for (slug, builtin) in [
+            ("Config", "config"),
+            ("SEARCH", "search"),
+            ("task", "task"),
+            ("check", "check"),
+            ("Check", "check"),
+            ("CHECK", "check"),
+        ] {
             let err = validate_single(slug, entry("NOTE", "notes/")).unwrap_err();
-            assert!(
-                err.contains(&format!("slug conflicts with built-in type {}", builtin)),
-                "slug {:?} => {}",
-                slug,
-                err
+            assert_eq!(
+                err,
+                format!(
+                    "document_types.{}: slug conflicts with built-in type {}",
+                    slug, builtin
+                ),
+                "slug {:?} reports the configured spelling once",
+                slug
+            );
+        }
+    }
+
+    #[test]
+    fn every_builtin_command_name_is_reserved() {
+        let builtins: Vec<&str> = crate::cli::BUILTIN_COMMANDS
+            .iter()
+            .map(|builtin| builtin.name)
+            .collect();
+        assert!(
+            builtins.contains(&"check"),
+            "check is a built-in command name: {:?}",
+            builtins
+        );
+        for builtin in builtins {
+            let err = validate_single(builtin, entry("NOTE", "notes/")).unwrap_err();
+            assert_eq!(
+                err,
+                format!(
+                    "document_types.{}: slug conflicts with built-in type {}",
+                    builtin, builtin
+                )
             );
         }
     }
