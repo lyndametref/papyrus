@@ -1,4 +1,5 @@
 //! TASK-111: list-valued configuration keys in `config set|get|list`.
+//! TASK-122: document-type `default_status` in `config list`.
 //!
 //! Covers the comma-separated value form, flow-sequence persistence, validation
 //! before write, repair mode, `config unset`, JSON output, and help/docs.
@@ -442,6 +443,224 @@ fn no_escape_form_and_help_text() {
     assert!(help.contains("comma-separated"), "{}", help);
     assert!(help.contains("flow sequence"), "{}", help);
     assert!(help.contains("not escaped"), "{}", help);
+}
+
+fn config_list_lines(project: &Project) -> Vec<String> {
+    project
+        .ok(&["config", "list"])
+        .lines()
+        .map(str::to_string)
+        .collect()
+}
+
+fn line_index(lines: &[String], expected: &str) -> usize {
+    lines
+        .iter()
+        .position(|line| line == expected)
+        .unwrap_or_else(|| panic!("missing line {expected:?} in:\n{}", lines.join("\n")))
+}
+
+fn list_json(project: &Project) -> serde_json::Value {
+    let out = project.run_json(&["config", "list"]);
+    assert!(
+        out.status.success(),
+        "config list --json failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    serde_json::from_str(String::from_utf8_lossy(&out.stdout).trim()).unwrap()
+}
+
+const AUDIT_WITH_DEFAULT: &str = "document_types:\n  audit:\n    prefix: AUD\n    directory: audit-records/\n    statuses: [active, archived, open]\n    default_status: open\n";
+
+#[test]
+fn document_default_status_is_listed_after_statuses() {
+    let project = Project::new("default-status-declared");
+    project.write_config(
+        "document_types:\n  audit:\n    prefix: AUD\n    directory: audit-records/\n    enabled: true\n    statuses: [active, archived, open]\n    default_status: open\n  draft:\n    prefix: DRAFT\n    directory: drafts/\n    default_status: open\n  note:\n    prefix: NOTE\n    directory: notes/\n",
+    );
+    let lines = config_list_lines(&project);
+
+    let statuses = line_index(
+        &lines,
+        "document_types.audit.statuses: [active, archived, open]",
+    );
+    assert_eq!(
+        lines[statuses + 1],
+        "document_types.audit.default_status: open",
+        "default_status follows the same slug's statuses"
+    );
+
+    let enabled = line_index(&lines, "document_types.draft.enabled: true");
+    assert_eq!(
+        lines[enabled + 1],
+        "document_types.draft.default_status: open",
+        "default_status follows enabled when no status list is declared"
+    );
+
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.starts_with("document_types.note.default_status")),
+        "an entry without default_status gets no key: {:?}",
+        lines
+    );
+
+    let audit = line_index(&lines, "document_types.audit.prefix: AUD");
+    let draft = line_index(&lines, "document_types.draft.prefix: DRAFT");
+    let note = line_index(&lines, "document_types.note.prefix: NOTE");
+    assert!(
+        audit < draft && draft < note,
+        "slugs stay in ascending key order: {:?}",
+        lines
+    );
+}
+
+#[test]
+fn document_default_status_is_absent_when_undeclared() {
+    let project = Project::initialized("default-status-absent");
+    let lines = config_list_lines(&project);
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.starts_with("document_types.audit.default_status")),
+        "generated entries declare no default_status: {:?}",
+        lines
+    );
+
+    let json = list_json(&project);
+    assert!(
+        json["document_types"]["audit"]
+            .get("default_status")
+            .is_none()
+    );
+    assert!(
+        json["document_types"]["ui-mockup"]
+            .get("default_status")
+            .is_none()
+    );
+}
+
+#[test]
+fn unset_removes_the_listed_default_status() {
+    let project = Project::new("default-status-unset");
+    project.write_config(AUDIT_WITH_DEFAULT);
+    assert!(
+        project
+            .ok(&["config", "list"])
+            .contains("document_types.audit.default_status: open")
+    );
+
+    project.ok(&["config", "unset", "document_types.audit.default_status"]);
+
+    let list = project.ok(&["config", "list"]);
+    assert!(
+        !list.contains("document_types.audit.default_status"),
+        "unset must remove the listing line: {}",
+        list
+    );
+    assert!(
+        list_json(&project)["document_types"]["audit"]
+            .get("default_status")
+            .is_none()
+    );
+    assert_eq!(
+        project
+            .run(&["config", "get", "document_types.audit.default_status"])
+            .status
+            .code(),
+        Some(3)
+    );
+}
+
+#[test]
+fn invalid_default_status_stays_listed_while_set_and_unset_reject() {
+    let project = Project::new("default-status-invalid");
+    project.write_config(
+        "document_types:\n  audit:\n    prefix: AUD\n    directory: audit-records/\n    statuses: [active, archived]\n    default_status: open\n",
+    );
+
+    // Tolerant load: the rejected value stays inspectable.
+    let out = project.run(&["config", "list"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&out.stdout).contains("document_types.audit.default_status: open"),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.audit.default_status"])
+            .trim(),
+        "open"
+    );
+
+    // `config set` validates before write and names the offending key.
+    let before = project.read_config();
+    let out = project.run(&["config", "set", "task_prefix", "PAP"]);
+    assert_eq!(out.status.code(), Some(4));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("document_types.audit.default_status"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(project.read_config(), before, "file must stay unchanged");
+
+    // `config unset` also validates before write.
+    let out = project.run(&["config", "unset", "document_types.audit.statuses"]);
+    assert_eq!(out.status.code(), Some(4));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("document_types.audit.default_status"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(project.read_config(), before, "file must stay unchanged");
+
+    // Documented repair path: set a declared status and the listing follows.
+    project.ok(&[
+        "config",
+        "set",
+        "document_types.audit.default_status",
+        "active",
+    ]);
+    let list = project.ok(&["config", "list"]);
+    assert!(
+        list.contains("document_types.audit.default_status: active"),
+        "{}",
+        list
+    );
+    assert!(!list.contains("default_status: open"), "{}", list);
+}
+
+#[test]
+fn text_and_json_default_status_match_config_get() {
+    let project = Project::new("default-status-parity");
+    project.write_config(AUDIT_WITH_DEFAULT);
+
+    let text = project.ok(&["config", "list"]);
+    let line = text
+        .lines()
+        .find(|line| line.starts_with("document_types.audit.default_status: "))
+        .unwrap_or_else(|| panic!("missing default_status line: {}", text));
+    let text_value = line
+        .strip_prefix("document_types.audit.default_status: ")
+        .unwrap();
+
+    let json = list_json(&project);
+    assert_eq!(
+        json["document_types"]["audit"]["default_status"],
+        text_value
+    );
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.audit.default_status"])
+            .trim(),
+        text_value
+    );
 }
 
 #[test]

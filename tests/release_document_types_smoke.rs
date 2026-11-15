@@ -671,7 +671,11 @@ fn t117_05_invalid_configuration_fails_closed_and_repairs() {
         ),
         "archived"
     );
-    assert!(!run_ok(&project, &["config", "list"]).contains("document_types.note.default_status"));
+    assert!(
+        run_ok(&project, &["config", "list"])
+            .contains("document_types.note.default_status: archived"),
+        "G-4 resolved: the rejected default_status is printed by `config list`"
+    );
     let repair_default = run(
         &project,
         &[
