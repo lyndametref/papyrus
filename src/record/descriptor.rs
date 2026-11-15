@@ -108,14 +108,43 @@ impl RecordDescriptor {
         Context::ensure_within(project_dir, &raw)
     }
 
-    /// Canonical archive location of a backlog family, if the family has one.
+    /// Canonical lifecycle archive location of a backlog family, if the
+    /// family has one.
+    ///
+    /// Tasks are the only backlog family with a lifecycle archive location.
+    /// Milestones are closed in place and carry `ArchivePolicy::None`; their
+    /// legacy `<backlog_directory>/archive/milestones/` folder is read/import
+    /// only and is exposed by [`Self::resolve_read_import_directory`].
     pub fn resolve_archive_directory(
         &self,
         cfg: &Config,
         project_dir: &std::path::Path,
     ) -> Option<Result<std::path::PathBuf, AppError>> {
         match self.record_type {
-            "task" | "milestone" => {
+            "task" => {
+                let raw = project_dir
+                    .join(&cfg.backlog_directory)
+                    .join("archive")
+                    .join(self.subpath);
+                Some(Context::ensure_within(project_dir, &raw))
+            }
+            _ => None,
+        }
+    }
+
+    /// Read/import-only archive location of a family, if it has one.
+    ///
+    /// `<backlog_directory>/archive/milestones/` remains readable and is the
+    /// one-way Backlog.md import destination (ADR-0023 decisions 2 and 4).
+    /// It is not a lifecycle archive destination: no milestone command moves a
+    /// record into or out of it, and no command except the import creates it.
+    pub fn resolve_read_import_directory(
+        &self,
+        cfg: &Config,
+        project_dir: &std::path::Path,
+    ) -> Option<Result<std::path::PathBuf, AppError>> {
+        match self.record_type {
+            "milestone" => {
                 let raw = project_dir
                     .join(&cfg.backlog_directory)
                     .join("archive")
@@ -128,17 +157,20 @@ impl RecordDescriptor {
 
     /// Canonical archived location of a family, if the family has one.
     ///
-    /// Document descriptors resolve to `<active dir>/archived`. Task and
-    /// milestone descriptors resolve to their archive location so downstream
-    /// has one method for both active and archived paths. Decision and other
-    /// families have no archived location.
+    /// Document descriptors resolve to `<active dir>/archived` and task
+    /// descriptors resolve to their archive location. Milestones have no
+    /// archived lifecycle location (`ArchivePolicy::None`): their legacy
+    /// `<backlog_directory>/archive/milestones/` folder is read/import only
+    /// and is exposed by [`Self::resolve_read_import_directory`]. Decision and
+    /// other families have no archived location.
     pub fn resolve_archived_directory(
         &self,
         cfg: &crate::config::Config,
         project_dir: &std::path::Path,
     ) -> Option<Result<std::path::PathBuf, AppError>> {
         match self.record_type {
-            "task" | "milestone" => self.resolve_archive_directory(cfg, project_dir),
+            "task" => self.resolve_archive_directory(cfg, project_dir),
+            "milestone" => None,
             _ => {
                 if self.doc_type_key.is_some() {
                     let active = self.resolve_directory(cfg, project_dir).ok()?;
@@ -185,8 +217,9 @@ impl RecordDescriptor {
         }
     }
 
-    /// All locations a family may be read from: active, archived, and the
-    /// task/milestone legacy alias. No deprecated path is included.
+    /// All locations a family may be read from: active, archived, the
+    /// task/milestone legacy alias, and the milestone read/import archive
+    /// folder. No deprecated path is included.
     pub fn resolve_read_directories(
         &self,
         cfg: &Config,
@@ -197,6 +230,11 @@ impl RecordDescriptor {
             dirs.push(dir);
         }
         if let Some(Ok(dir)) = self.resolve_archived_directory(cfg, project_dir)
+            && !dirs.contains(&dir)
+        {
+            dirs.push(dir);
+        }
+        if let Some(Ok(dir)) = self.resolve_read_import_directory(cfg, project_dir)
             && !dirs.contains(&dir)
         {
             dirs.push(dir);
@@ -318,6 +356,51 @@ pub fn is_managed_record(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn milestone_has_no_lifecycle_archive_location() {
+        let cfg = Config::default();
+        let project = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".tmp");
+        let milestone = descriptor_for("milestone").expect("milestone");
+
+        assert!(
+            milestone
+                .resolve_archive_directory(&cfg, &project)
+                .is_none(),
+            "milestones have no lifecycle archive location"
+        );
+        assert!(
+            milestone
+                .resolve_archived_directory(&cfg, &project)
+                .is_none(),
+            "the record layer must not expose a milestone archive destination"
+        );
+        let import = milestone
+            .resolve_read_import_directory(&cfg, &project)
+            .expect("milestone has a read/import location")
+            .expect("read/import location stays in the project");
+        assert!(import.ends_with("backlog/archive/milestones"));
+
+        let dirs = milestone.resolve_read_directories(&cfg, &project);
+        assert_eq!(dirs.len(), 3);
+        assert!(dirs.iter().any(|d| d.ends_with("backlog/milestones")));
+        assert!(
+            dirs.iter()
+                .any(|d| d.ends_with("backlog/archive/milestones"))
+        );
+        assert!(
+            dirs.iter()
+                .any(|d| d.ends_with("backlog/milestones/archived"))
+        );
+
+        let task = descriptor_for("task").expect("task");
+        let task_archived = task
+            .resolve_archived_directory(&cfg, &project)
+            .expect("tasks keep a lifecycle archive location")
+            .expect("task archive stays in the project");
+        assert!(task_archived.ends_with("backlog/archive/tasks"));
+        assert!(task.resolve_read_import_directory(&cfg, &project).is_none());
+    }
 
     #[test]
     fn only_the_four_backlog_families_are_static() {

@@ -612,8 +612,10 @@ fn run_backlog(
 
         // dest path
         let dir = if rec.archived {
+            // Milestones have no lifecycle archive location; the one-way
+            // import is the only writer of the read/import archive folder.
             ms_desc
-                .resolve_archive_directory(&cfg, &ctx.project_dir)
+                .resolve_read_import_directory(&cfg, &ctx.project_dir)
                 .and_then(|r| r.ok())
                 .unwrap_or_else(|| {
                     ms_desc
