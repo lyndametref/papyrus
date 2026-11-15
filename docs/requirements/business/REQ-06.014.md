@@ -1,3 +1,11 @@
+---
+id: REQ-06.014
+title: "Display Config-Defined Document Types in the Browser"
+created_date: '2026-11-13T20:57:05Z'
+updated_date: '2026-11-15T15:57:53Z'
+labels: []
+references: []
+---
 # REQ-06.014 Display Config-Defined Document Types in the Browser
 
 ## User Story
@@ -46,6 +54,7 @@ A config-defined type uses the generic content model (REQ-07.004), so its edit v
 - REQ-06.003 — Describe Managed Artifacts and Their Lifecycles in the Browser
 - REQ-06.004 — Use Front-Matter Metadata in CLI and Browser Views
 - REQ-06.012 — Define Single Record View Layout
+- REQ-06.016 — Present a Uniform List View Across Artifact Families (shared list layout used by every document-type list view)
 - REQ-07.001 — Organize Artifacts into Three Categories (document status model)
 - REQ-07.002 — Configure Document Types and Slugs (declared statuses)
 - REQ-07.004 — Provide a Generic Content Model for Config-Defined Document Types

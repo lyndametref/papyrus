@@ -1,3 +1,11 @@
+---
+id: REQ-04.001
+title: "Create and Inspect Decisions"
+created_date: '2026-11-13T20:18:44Z'
+updated_date: '2026-11-15T15:47:28Z'
+labels: []
+references: []
+---
 # REQ-04.001 Create and Inspect Decisions
 
 ## User Story

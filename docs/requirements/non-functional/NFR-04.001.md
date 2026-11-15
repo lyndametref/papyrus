@@ -1,3 +1,11 @@
+---
+id: NFR-04.001
+title: "Persist Application Data Only in Text Files"
+created_date: '2026-11-08T15:55:54Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # NFR-04.001 Persist Application Data Only in Text Files
 
 ## Description

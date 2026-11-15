@@ -1,3 +1,11 @@
+---
+id: NFR-03.003
+title: "Provide Command Man Pages in the Debian Package"
+created_date: '2026-11-08T15:55:51Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # NFR-03.003 Provide Command Man Pages in the Debian Package
 
 ## Description

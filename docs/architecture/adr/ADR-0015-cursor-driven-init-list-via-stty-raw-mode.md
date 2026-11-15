@@ -1,3 +1,11 @@
+---
+id: ADR-0015
+title: "Cursor-Driven Init Artifact List via `stty` Cbreak Mode and a KeySource Seam"
+created_date: '2026-11-13T00:00:00Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # Cursor-Driven Init Artifact List via `stty` Cbreak Mode and a KeySource Seam
 
 ## Status

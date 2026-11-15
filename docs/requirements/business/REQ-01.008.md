@@ -1,3 +1,11 @@
+---
+id: REQ-01.008
+title: "Run Project Diagnostics (`papyrus check`)"
+created_date: '2026-11-15T15:46:30Z'
+updated_date: '2026-11-15T15:57:53Z'
+labels: []
+references: []
+---
 # REQ-01.008 Run Project Diagnostics (`papyrus check`)
 
 ## User Story
@@ -10,22 +18,32 @@ REQ-01 Project Setup and CLI Access
 Should have
 
 ## Description
-`papyrus check` is a read-only diagnostic by default. It scans the project corpus and configuration and prints a plain report of integrity findings. The checked categories are:
+`papyrus check` is a diagnostic command. It scans the project corpus and the configuration and prints a plain report of integrity findings. It is a tolerant repair surface: it loads the configuration the same tolerant way as `papyrus config get|set|unset|list` (REQ-01.002), so an invalid configuration does not block it, and it reports configuration findings instead of failing closed. The checked categories are:
 
 - Duplicate record IDs across all managed record types (task, milestone, release, decision, and every configured document type).
 - Self-referential task dependencies.
 - Dependency cycles among task dependencies.
 - Dangling references: a task whose `milestone` does not resolve to an existing milestone, and a milestone whose `release` does not resolve to an existing release.
-- Front-matter/section conflicts, where a record's front matter and its body disagree on a value that front matter is authoritative for (REQ-05.010).
+- Front-matter/section conflicts, described below.
 - Configuration validity (REQ-01.002, REQ-07.002), including invalid slugs, statuses, prefixes, directories, and duplicate keys.
+
+A front-matter/section conflict is a record that carries front matter and still retains a retired legacy metadata section for a field that front matter also carries, when the section's value disagrees with the front-matter value. The retired sections checked are `## Status`, `## Assignee`, `## Milestone`, `## Labels`, and `## Dependencies` on a task, and `## Release` on a milestone. Each section is read the way the legacy migration reads it — one non-empty line for `status`, `milestone`, and `release`, and a bullet list for `assignee`, `labels`, and `dependencies` — and list values are compared as sets of entries. A section that cannot be read to a single value for its field, for example a `## Status` section holding two non-empty lines, is reported as a conflict because agreement cannot be established. A retained section that agrees with the front matter is not reported. Where the record type keeps a `# <ID> <title>` body heading (REQ-05.010), a heading whose ID or title disagrees with the front matter is reported as the same kind of finding. Decision records are excluded: `## Status`, `## Date`, and `## References` are canonical body sections of a decision (REQ-05.010), not retired metadata.
 
 Each finding is reported with its kind, the affected record or location, and a detail. A run with no findings exits successfully.
 
-`--fix` applies repairs only where they are unambiguous and safe: it repairs duplicate record IDs (reassigning IDs so each record is unique) and performs no other repair. `--yes` skips confirmation prompts for the repairs performed under `--fix`. `--fix` does not migrate legacy `deprecated/` folders, does not repair dangling references, dependency cycles, self-references, front-matter/section conflicts, or invalid configuration, and does not modify records beyond the duplicate-ID repair. Those findings remain reported and unresolved.
+`papyrus check` never reads or inventories a `deprecated/` folder. Files under a `deprecated/` folder are not scanned, are not candidates for any finding, and produce no report entry (REQ-05.007).
 
-Configuration validity is checked first. If the effective configuration is invalid, `papyrus check` reports the configuration findings and does not run the checks that require a valid configuration; it still exits with a validation outcome.
+When the effective configuration is invalid, `papyrus check` reports the configuration findings and still runs the checks that do not depend on the effective `document_types` set: duplicate IDs among task, milestone, release, and decision records, self-referential task dependencies, dependency cycles, dangling `milestone` and `release` references, and front-matter/section conflicts on task and milestone records. Checks that need the effective `document_types` set — duplicate IDs across document records and front-matter/section conflicts on document records — are skipped, and the report names them as skipped.
 
-The command is CLI-only in this release; no browser affordance runs it. Output honors the global `--json` option (REQ-01.004).
+`--fix` applies repairs only where they are unambiguous and safe. It repairs duplicate record IDs and performs no other repair. For a duplicated ID, the record that keeps the ID is the one with the oldest `created_date`; when `created_date` values are equal or missing, the record at the lexicographically smallest project-relative path keeps the ID. Every other record carrying that ID is assigned a new ID from the regular allocator (REQ-01.005), and its file is renamed to the stem of the new ID. `--fix` does not rewrite references: a reference to a repaired ID is left unchanged, and the confirmation prompt lists every reference affected by the repair, naming the referring record and field, so the user can update them.
+
+`--fix` refuses to repair a duplicated ID when any record carrying it is either a record whose file stem and front-matter `id` disagree, because its identity is ambiguous, or a group record of a grouped requirement family (a `REQ-XX` or `NFR-XX` group record), because a group ID is structural and is not allocator-assigned. No record of that duplicated ID is changed, and the finding remains reported and unresolved.
+
+`--fix` prompts for confirmation before applying each repair, and `--force` skips those prompts. `--force` without `--fix` is a usage error (REQ-01.004). When standard input is not a terminal and `--force` is absent, `--fix` writes nothing and exits with a usage error that names `--force`, so an unattended run never blocks on a prompt. `--fix` does not migrate legacy `deprecated/` folders, does not repair dangling references, dependency cycles, self-references, front-matter/section conflicts, or invalid configuration, and does not modify records beyond the duplicate-ID repair. Those findings remain reported and unresolved.
+
+The exit code is 4 whenever the run found at least one finding, including a run in which `--fix` repaired every repairable finding. A run without findings exits 0.
+
+The command is CLI-only in this release; no browser affordance runs it. Output honors the global `--json` option (REQ-01.004), and the JSON form carries the same findings as the plain report.
 
 ## Acceptance Criteria
 - `papyrus check` runs the documented diagnostic checks and prints a plain report.
@@ -35,25 +53,42 @@ The command is CLI-only in this release; no browser affordance runs it. Output h
 - Dependency cycles among task dependencies are detected.
 - A task referencing a missing milestone is reported as a dangling reference.
 - A milestone referencing a missing release is reported as a dangling reference.
-- Front-matter/section conflicts are detected.
+- A task or milestone whose retained legacy section disagrees with its front matter is reported as a front-matter/section conflict naming the field and both values.
+- A `# <ID> <title>` body heading whose ID or title disagrees with the front matter is reported as a front-matter/section conflict.
+- A retained legacy section that cannot be read to a single value is reported as a front-matter/section conflict, while a retained section that agrees with the front matter is not reported.
+- A decision's `## Status`, `## Date`, and `## References` sections are not reported as front-matter/section conflicts.
 - Configuration validity is checked and any violation is reported.
 - A run with no findings exits with code 0.
-- A run with one or more findings exits with a validation outcome (exit code 4, REQ-01.004).
+- A run with one or more findings exits with code 4, including a run in which `--fix` repaired every repairable finding.
+- An invalid configuration does not stop `check`: the run reports the configuration findings instead of failing before the checks.
+- With an invalid configuration, the checks that do not depend on the `document_types` set still run, and the report names the skipped checks.
+- `check` loads the configuration tolerantly like `config get|set|unset|list` and does not refuse to run on an invalid configuration.
 - `--fix` repairs duplicate record IDs only.
-- Under `--fix`, repairs that require confirmation prompt unless `--yes` is given.
-- `--fix` does not migrate legacy `deprecated/` folders and does not repair dangling references, dependency cycles, self-references, front-matter/section conflicts, or invalid configuration.
-- When the effective configuration is invalid, configuration findings are reported and checks requiring a valid configuration are not run.
+- For a duplicated ID, the record with the oldest `created_date` keeps the ID; equal or missing dates are broken by the lexicographically smallest project-relative path.
+- Every other record carrying a duplicated ID receives a new ID from the regular allocator, and its file is renamed to the stem of the new ID.
+- `--fix` does not rewrite references to a repaired ID, and its confirmation prompt lists every affected reference with the referring record and field.
+- `--fix` refuses to repair a duplicated ID that involves a record whose file stem and front-matter `id` disagree, or a `REQ-XX` or `NFR-XX` group record, and changes none of that ID's records.
+- Under `--fix`, each repair prompts for confirmation unless `--force` is given.
+- `--force` without `--fix` is a usage error (exit code 2).
+- When standard input is not a terminal and `--force` is absent, `--fix` writes nothing and exits with a usage error naming `--force`.
+- `--fix` does not migrate `deprecated/` folders and does not repair dangling references, dependency cycles, self-references, front-matter/section conflicts, or invalid configuration.
+- `check` never reads or inventories a `deprecated/` folder and reports no finding for files in it.
+- `--json` renders the report, including every finding, as machine-readable JSON (REQ-01.004).
 - The command is available only from the CLI in this release; no browser affordance runs it.
 
 ## Traceability
 - README.md, `papyrus(1)` → COMMANDS → check (to be documented)
-- REQ-01.002 — Read and Edit Project Configuration (configuration validity, repair surfaces)
+- REQ-01.002 — Read and Edit Project Configuration (tolerant repair surfaces)
 - REQ-01.004 — Use Common CLI Controls and Outcomes (exit codes; global `--json`)
-- REQ-01.005 — Assign Stable Record IDs (duplicate-ID detection and repair)
+- REQ-01.005 — Assign Stable Record IDs (duplicate-ID detection, allocator used by `--fix`)
 - REQ-02.001 — Create and Describe Tasks (task dependencies)
 - REQ-02.003 — List and Filter Tasks (dependency readiness semantics)
-- REQ-03.001 — Manage Milestones (milestone `release` reference)
+- REQ-03.001 — Manage Milestones (milestone `release` reference; retired `## Release` section)
 - REQ-03.002 — Manage Releases (release lifecycle; dangling release reference context)
-- REQ-05.010 — Record Metadata in YAML Front Matter (front-matter/section conflicts)
+- REQ-05.007 — Manage Document Archive State and Deletion (inert `deprecated/` folder)
+- REQ-05.010 — Record Metadata in YAML Front Matter (front-matter authority; decision body sections)
 - REQ-07.002 — Configure Document Types and Slugs (configuration validity)
-- Maintainer decision 2026-11-15 (in-session feedback): `papyrus check` mirrors backlog doctor, scoped to papyrus corpus; `--fix` repairs duplicate IDs only; `--yes` skips confirmation; no legacy folder migration; CLI only; findings exit 4.
+- Maintainer decision 2026-11-15 (in-session feedback): `papyrus check` mirrors backlog doctor, scoped to papyrus corpus; `--fix` repairs duplicate IDs only; no legacy folder migration; CLI only; findings exit 4.
+- Project-owner decision 2026-11-15: `check` is a tolerant repair surface — it loads configuration tolerantly like `config get|set|unset|list`, reports configuration findings, still runs the checks that do not need a valid configuration, and exits 4 on findings.
+- Project-owner decision 2026-11-15: `--fix` skips prompts with `--force` (not `--yes`), and `--force` is meaningful only together with `--fix`; a duplicate-ID repair keeps the record with the oldest `created_date` and breaks ties by path; no inbound reference rewriting, and the confirmation lists the affected references; stem/front-matter mismatches and grouped-family group IDs are refused; the exit code is 4 when findings were found even if repaired.
+- Project-owner decision 2026-11-15: `check` never reads or inventories a `deprecated/` folder.

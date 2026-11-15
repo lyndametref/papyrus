@@ -1,3 +1,11 @@
+---
+id: REQ-06.016
+title: "Present a Uniform List View Across Artifact Families"
+created_date: '2026-11-15T15:46:30Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-06.016 Present a Uniform List View Across Artifact Families
 
 ## User Story

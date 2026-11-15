@@ -1,3 +1,11 @@
+---
+id: REQ-02.002
+title: "View and Edit Tasks"
+created_date: '2026-10-31T21:36:30Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-02.002 View and Edit Tasks
 
 ## User Story

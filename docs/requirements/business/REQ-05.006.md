@@ -1,3 +1,11 @@
+---
+id: REQ-05.006
+title: "Manage Audit Records"
+created_date: '2026-11-13T20:17:15Z'
+updated_date: '2026-11-15T15:47:28Z'
+labels: []
+references: []
+---
 # REQ-05.006 Manage Audit Records
 
 ## User Story

@@ -1,3 +1,11 @@
+---
+id: NFR-04.004
+title: "Renounce Backlog.md Compatibility and Provide Import"
+created_date: '2026-11-11T20:17:13Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # NFR-04.004 Renounce Backlog.md Compatibility and Provide Import
 
 ## Description

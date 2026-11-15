@@ -1,3 +1,11 @@
+---
+id: ADR-0006
+title: "Optimistic Concurrency and Atomic Record Writes for Browser Edits"
+created_date: '2026-11-03T00:00:00Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # Optimistic Concurrency and Atomic Record Writes for Browser Edits
 
 ## Status

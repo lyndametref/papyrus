@@ -1,3 +1,11 @@
+---
+id: NFR-06.001
+title: "License Papyrus Under GPL-3.0-or-later"
+created_date: '2026-10-31T22:22:31Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # NFR-06.001 License Papyrus Under GPL-3.0-or-later
 
 ## Description

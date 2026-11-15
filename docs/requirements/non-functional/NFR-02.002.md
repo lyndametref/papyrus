@@ -1,3 +1,11 @@
+---
+id: NFR-02.002
+title: "Sanitize Input"
+created_date: '2026-11-08T15:55:47Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # NFR-02.002 Sanitize Input
 
 ## Description

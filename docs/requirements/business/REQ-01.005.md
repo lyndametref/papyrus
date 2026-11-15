@@ -1,3 +1,11 @@
+---
+id: REQ-01.005
+title: "Assign Stable Record IDs"
+created_date: '2026-11-15T13:39:01Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-01.005 Assign Stable Record IDs
 
 ## User Story

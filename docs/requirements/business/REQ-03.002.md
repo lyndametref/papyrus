@@ -1,3 +1,11 @@
+---
+id: REQ-03.002
+title: "Manage Releases"
+created_date: '2026-11-13T20:18:34Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-03.002 Manage Releases
 
 ## User Story

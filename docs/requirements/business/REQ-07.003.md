@@ -1,3 +1,11 @@
+---
+id: REQ-07.003
+title: "Dispatch Config-Defined Document Commands"
+created_date: '2026-11-13T21:00:12Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-07.003 Dispatch Config-Defined Document Commands
 
 ## User Story

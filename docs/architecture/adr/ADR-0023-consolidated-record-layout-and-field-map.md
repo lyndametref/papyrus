@@ -1,3 +1,11 @@
+---
+id: ADR-0023
+title: "Consolidated Record Layout and Front-Matter Field Map"
+created_date: '2026-11-13T00:00:00Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # Consolidated Record Layout and Front-Matter Field Map
 
 ## Status

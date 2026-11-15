@@ -1,3 +1,11 @@
+---
+id: REQ-05.008
+title: "Manage UI Mockups"
+created_date: '2026-11-13T20:21:14Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-05.008 Manage UI Mockups
 
 ## User Story

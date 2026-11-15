@@ -1,3 +1,11 @@
+---
+id: REQ-05.013
+title: "Manage Test Cases"
+created_date: '2026-11-13T20:17:45Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-05.013 Manage Test Cases
 
 ## User Story

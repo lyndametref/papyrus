@@ -1,3 +1,11 @@
+---
+id: REQ-05.014
+title: "Manage Test Reports"
+created_date: '2026-11-13T20:17:45Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-05.014 Manage Test Reports
 
 ## User Story

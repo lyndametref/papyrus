@@ -1,3 +1,11 @@
+---
+id: ADR-0012
+title: "Papyrus-Owned Front Matter as the Single Record Metadata Source"
+created_date: '2026-11-11T00:00:00Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # Papyrus-Owned Front Matter as the Single Record Metadata Source
 
 ## Status

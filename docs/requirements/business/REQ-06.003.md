@@ -1,3 +1,11 @@
+---
+id: REQ-06.003
+title: "Describe Managed Artifacts and Their Lifecycles in the Browser"
+created_date: '2026-11-13T20:58:15Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-06.003 Describe Managed Artifacts and Their Lifecycles in the Browser
 
 ## User Story

@@ -1,3 +1,11 @@
+---
+id: REQ-05.001
+title: "Manage Business Requirements"
+created_date: '2026-11-13T20:16:44Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-05.001 Manage Business Requirements
 
 ## User Story

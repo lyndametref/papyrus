@@ -1,3 +1,11 @@
+---
+id: REQ-07.001
+title: "Organize Artifacts into Three Categories"
+created_date: '2026-11-13T20:59:51Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-07.001 Organize Artifacts into Three Categories
 
 ## User Story

@@ -1,3 +1,11 @@
+---
+id: REQ-05.003
+title: "Manage Glossary Terms"
+created_date: '2026-11-13T20:16:54Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-05.003 Manage Glossary Terms
 
 ## User Story

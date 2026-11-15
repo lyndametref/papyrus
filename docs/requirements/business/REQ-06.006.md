@@ -1,3 +1,11 @@
+---
+id: REQ-06.006
+title: "Display NFR Atomic Requirements Under Their Group in the Browser"
+created_date: '2026-11-11T19:57:25Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-06.006 Display NFR Atomic Requirements Under Their Group in the Browser
 
 ## User Story

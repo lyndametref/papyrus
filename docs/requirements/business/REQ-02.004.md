@@ -1,3 +1,11 @@
+---
+id: REQ-02.004
+title: "Archive, Restore, and Delete Tasks"
+created_date: '2026-10-31T21:36:30Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-02.004 Archive, Restore, and Delete Tasks
 
 ## User Story

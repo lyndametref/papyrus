@@ -1,8 +1,16 @@
+---
+id: ADR-0026
+title: "Mermaid-Only Offline Diagram Rendering, PlantUML Out of Scope"
+created_date: '2026-11-15T00:00:00Z'
+updated_date: '2026-11-15T15:58:31Z'
+labels: []
+references: []
+---
 # Mermaid-Only Offline Diagram Rendering, PlantUML Out of Scope
 
 ## Status
 
-Proposed (2026-11-15) — awaiting owner validation. Do not implement before acceptance.
+Proposed (2026-11-15) — PlantUML excluded by owner decision 2026-11-15; Mermaid-only scope confirmed; awaiting formal acceptance. Do not implement before acceptance.
 
 ## Date
 

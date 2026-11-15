@@ -1,3 +1,11 @@
+---
+id: REQ-01.003
+title: "Select Project and Configuration Context"
+created_date: '2026-11-11T19:54:18Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-01.003 Select Project and Configuration Context
 
 ## User Story

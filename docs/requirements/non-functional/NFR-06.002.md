@@ -1,3 +1,11 @@
+---
+id: NFR-06.002
+title: "Use Open-Source Dependencies That Permit GPLv3-or-Later Linking"
+created_date: '2026-11-08T15:56:07Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # NFR-06.002 Use Open-Source Dependencies That Permit GPLv3-or-Later Linking
 
 ## Description

@@ -1,3 +1,11 @@
+---
+id: REQ-07.004
+title: "Provide a Generic Content Model for Config-Defined Document Types"
+created_date: '2026-11-13T21:00:17Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-07.004 Provide a Generic Content Model for Config-Defined Document Types
 
 ## User Story

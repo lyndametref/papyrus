@@ -1,3 +1,11 @@
+---
+id: ADR-0020
+title: "Registry-Derived Browser Views for Config-Defined Document Types"
+created_date: '2026-11-13T00:00:00Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # Registry-Derived Browser Views for Config-Defined Document Types
 
 ## Status

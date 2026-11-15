@@ -1,3 +1,11 @@
+---
+id: NFR-01.003
+title: "Use the Browser Command and Interface Without Internet"
+created_date: '2026-10-31T22:22:31Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # NFR-01.003 Use the Browser Command and Interface Without Internet
 
 ## Description

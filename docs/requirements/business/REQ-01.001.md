@@ -1,3 +1,11 @@
+---
+id: REQ-01.001
+title: "Initialize a Papyrus Project"
+created_date: '2026-11-13T20:19:07Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-01.001 Initialize a Papyrus Project
 
 ## User Story
