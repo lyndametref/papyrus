@@ -2,7 +2,7 @@
 id: ADR-0026
 title: "Mermaid-Only Offline Diagram Rendering, PlantUML Out of Scope"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-15T15:58:31Z'
+updated_date: '2026-11-15T16:17:49Z'
 labels: []
 references: []
 ---
@@ -10,7 +10,7 @@ references: []
 
 ## Status
 
-Proposed (2026-11-15) — PlantUML excluded by owner decision 2026-11-15; Mermaid-only scope confirmed; awaiting formal acceptance. Do not implement before acceptance.
+Accepted (2026-11-15) — owner decision 2026-11-15: Mermaid-only offline diagram rendering, PlantUML excluded from product scope.
 
 ## Date
 
@@ -102,7 +102,7 @@ Mermaid quality also matters: it is JS code executing in the same origin as the 
 
 ## Open Questions
 
-1. **Confirm PlantUML exclusion** — the customer named PlantUML. Recommended: accept Mermaid-only in this release and record PlantUML as unsupported (source shown). Alternative: keep PlantUML as a future feature gated on a JVM-free Rust implementation.
+1. ~~Confirm PlantUML exclusion~~ — **resolved by owner decision 2026-11-15**: Mermaid-only in this release; PlantUML is unsupported and its fences display as source with a note (decision 2).
 2. **Accept `style-src 'self' 'unsafe-inline'`**, or require the sandboxed-iframe fallback? Recommended: accept it, on the grounds that `script-src 'self'` is untouched and `default-src 'none'` blocks all fetches.
 3. **Which Mermaid diagram types are in the supported set?** Recommended: the ones Mermaid renders without external resources — flowchart, sequence, class, state, ER, gantt, pie, journey, gitGraph. Mermaid's `mindmap`/`timeline`/`sankey` should be checked against the pinned version before being promised.
 4. **Should the input caps (100 KB / 1,000 lines / 500 edges) be configurable?** Recommended: fixed constants for this release; no configuration key.
