@@ -1,0 +1,51 @@
+{
+  "schema": "papyrus.list-characterization/1",
+  "family": "ui-mockup",
+  "url": "/?type=ui-mockup",
+  "captured_from_commit": "d60f71c9b5bc6a7e419e2cef682763e0c914160a",
+  "heading": "UI Mockups",
+  "count_note": "2 UI mockups",
+  "row_order": [
+    "MOCK-002",
+    "MOCK-003"
+  ],
+  "baseline_columns": [],
+  "baseline_row_shape": "ul",
+  "records": [
+    {
+      "id": "MOCK-002",
+      "title": "Mockup One",
+      "status": "pending",
+      "created": "(none)",
+      "updated": "(none)",
+      "labels": [],
+      "references": [],
+      "slots": {
+        "task": "TASK-001",
+        "specs": "UI-001"
+      },
+      "href": "/doc/MOCK-002",
+      "actions": []
+    },
+    {
+      "id": "MOCK-003",
+      "title": "Mockup Two",
+      "status": "pending",
+      "created": "(none)",
+      "updated": "(none)",
+      "labels": [],
+      "references": [],
+      "slots": {
+        "task": "TASK-002",
+        "specs": "UI-002"
+      },
+      "href": "/doc/MOCK-003",
+      "actions": []
+    }
+  ],
+  "grouped": [],
+  "excluded": [
+    "MOCK-001"
+  ],
+  "empty": false
+}

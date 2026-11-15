@@ -1,0 +1,51 @@
+{
+  "schema": "papyrus.list-characterization/1",
+  "family": "decision",
+  "url": "/?type=decision",
+  "captured_from_commit": "d60f71c9b5bc6a7e419e2cef682763e0c914160a",
+  "heading": "Decisions",
+  "count_note": "2 decisions",
+  "row_order": [
+    "ADR-001",
+    "BDR-001"
+  ],
+  "baseline_columns": [],
+  "baseline_row_shape": "ul",
+  "records": [
+    {
+      "id": "ADR-001",
+      "title": "Decision One",
+      "status": "proposed",
+      "created": "2026-11-15T19:07:09Z",
+      "updated": "2026-11-15T19:07:09Z",
+      "labels": [
+        "architecture"
+      ],
+      "references": [
+        "ADR-REF-1"
+      ],
+      "slots": {
+        "type": "adr"
+      },
+      "href": "/doc/ADR-001",
+      "actions": []
+    },
+    {
+      "id": "BDR-001",
+      "title": "Decision Two",
+      "status": "proposed",
+      "created": "2026-11-15T19:07:09Z",
+      "updated": "2026-11-15T19:07:09Z",
+      "labels": [],
+      "references": [],
+      "slots": {
+        "type": "bdr"
+      },
+      "href": "/doc/BDR-001",
+      "actions": []
+    }
+  ],
+  "grouped": [],
+  "excluded": [],
+  "empty": false
+}

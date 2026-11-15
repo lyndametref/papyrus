@@ -1,0 +1,47 @@
+{
+  "schema": "papyrus.list-characterization/1",
+  "family": "release",
+  "url": "/?type=release",
+  "captured_from_commit": "d60f71c9b5bc6a7e419e2cef682763e0c914160a",
+  "heading": "Releases",
+  "count_note": "2 releases",
+  "row_order": [
+    "REL-001",
+    "REL-002"
+  ],
+  "baseline_columns": [],
+  "baseline_row_shape": "ul",
+  "records": [
+    {
+      "id": "REL-001",
+      "title": "Release One",
+      "status": "planned",
+      "created": "2026-11-15T19:07:08Z",
+      "updated": "2026-11-15T19:07:08Z",
+      "labels": [
+        "release"
+      ],
+      "references": [
+        "REL-REF-1"
+      ],
+      "slots": {},
+      "href": "/doc/REL-001",
+      "actions": []
+    },
+    {
+      "id": "REL-002",
+      "title": "Release Two",
+      "status": "planned",
+      "created": "2026-11-15T19:07:08Z",
+      "updated": "2026-11-15T19:07:08Z",
+      "labels": [],
+      "references": [],
+      "slots": {},
+      "href": "/doc/REL-002",
+      "actions": []
+    }
+  ],
+  "grouped": [],
+  "excluded": [],
+  "empty": false
+}

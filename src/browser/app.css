@@ -146,6 +146,45 @@ textarea:focus-visible {
 .h3 { font-size: 17px; margin: 0; }
 .count { font-size: 13px; color: var(--muted); flex: none; }
 
+/* shared list layout (ADR-0028 decision 2, TASK-141) */
+.table-scroll { overflow-x: auto; }
+.muted { color: var(--muted); }
+.list--shared {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.list--shared th,
+.list--shared td {
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+.list--shared th {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.list--shared td.id-cell,
+.list--shared td.status-cell,
+.list--shared td.slot-cell,
+.list--shared td.created-cell,
+.list--shared td.updated-cell,
+.list--shared td.actions-cell { white-space: nowrap; }
+.list--shared td.title-cell { min-width: 220px; overflow-wrap: anywhere; }
+.list--shared tr[data-child-of] td.title-cell { padding-left: 34px; }
+.list--shared .row-tags,
+.list--shared .row-refs { list-style: none; margin: 4px 0 0; padding: 0; }
+.list--shared .row-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.list--shared .row-tags .tag { padding: 1px 6px; }
+.list--shared .row-refs { font-size: 12px; color: var(--muted); }
+.list--shared .row-refs li { display: inline; }
+.list--shared .row-refs li + li::before { content: ", "; }
+
 .group {
   border: 1px solid var(--line);
   border-radius: 6px;

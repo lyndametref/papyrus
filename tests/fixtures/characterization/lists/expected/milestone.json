@@ -1,0 +1,72 @@
+{
+  "schema": "papyrus.list-characterization/1",
+  "family": "milestone",
+  "url": "/?type=milestone",
+  "captured_from_commit": "d60f71c9b5bc6a7e419e2cef682763e0c914160a",
+  "heading": "Milestones",
+  "count_note": "3 milestones",
+  "row_order": [
+    "MS-001",
+    "MS-002",
+    "MS-003"
+  ],
+  "baseline_columns": [],
+  "baseline_row_shape": "ul",
+  "records": [
+    {
+      "id": "MS-001",
+      "title": "Milestone One",
+      "status": "open",
+      "created": "2026-11-15T19:07:08Z",
+      "updated": "2026-11-15T19:07:08Z",
+      "labels": [
+        "m1"
+      ],
+      "references": [
+        "REF-1"
+      ],
+      "slots": {
+        "release": "REL-001"
+      },
+      "href": "/doc/MS-001",
+      "actions": []
+    },
+    {
+      "id": "MS-002",
+      "title": "Milestone Two",
+      "status": "open",
+      "created": "2026-11-15T19:07:09Z",
+      "updated": "2026-11-15T19:07:09Z",
+      "labels": [
+        "m2"
+      ],
+      "references": [],
+      "slots": {
+        "release": "REL-002"
+      },
+      "href": "/doc/MS-002",
+      "actions": []
+    },
+    {
+      "id": "MS-003",
+      "title": "Milestone Three",
+      "status": "open",
+      "created": "2026-11-15T19:07:09Z",
+      "updated": "2026-11-15T19:07:09Z",
+      "labels": [
+        "m3"
+      ],
+      "references": [],
+      "slots": {
+        "release": ""
+      },
+      "href": "/doc/MS-003",
+      "actions": []
+    }
+  ],
+  "grouped": [],
+  "excluded": [
+    "MS-004"
+  ],
+  "empty": false
+}

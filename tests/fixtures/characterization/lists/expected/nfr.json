@@ -1,0 +1,76 @@
+{
+  "schema": "papyrus.list-characterization/1",
+  "family": "nfr",
+  "url": "/?type=nfr",
+  "captured_from_commit": "d60f71c9b5bc6a7e419e2cef682763e0c914160a",
+  "heading": "Requirements",
+  "count_note": "1 group · 2 requirements",
+  "row_order": [
+    "NFR-001",
+    "NFR-001.001",
+    "NFR-001.002"
+  ],
+  "baseline_columns": [],
+  "baseline_row_shape": "ul",
+  "records": [
+    {
+      "id": "NFR-001",
+      "title": "NFR Group One",
+      "status": "",
+      "created": "",
+      "updated": "",
+      "labels": [],
+      "references": [],
+      "slots": {
+        "group": ""
+      },
+      "href": "/doc/NFR-001",
+      "actions": []
+    },
+    {
+      "id": "NFR-001.001",
+      "title": "NFR One",
+      "status": "(none)",
+      "created": "2026-11-15T19:07:09Z",
+      "updated": "2026-11-15T19:07:09Z",
+      "labels": [
+        "perf"
+      ],
+      "references": [
+        "NFR-REF-1"
+      ],
+      "slots": {
+        "group": "NFR-001"
+      },
+      "href": "/doc/NFR-001.001",
+      "actions": []
+    },
+    {
+      "id": "NFR-001.002",
+      "title": "NFR Two",
+      "status": "(none)",
+      "created": "2026-11-15T19:07:09Z",
+      "updated": "2026-11-15T19:07:09Z",
+      "labels": [],
+      "references": [],
+      "slots": {
+        "group": "NFR-001"
+      },
+      "href": "/doc/NFR-001.002",
+      "actions": []
+    }
+  ],
+  "grouped": [
+    {
+      "group": "NFR-001",
+      "children": [
+        "NFR-001.001",
+        "NFR-001.002"
+      ]
+    }
+  ],
+  "excluded": [
+    "NFR-001.003"
+  ],
+  "empty": false
+}

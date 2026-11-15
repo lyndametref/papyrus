@@ -34,7 +34,11 @@ pub fn escape(value: &str) -> String {
     out
 }
 
-fn render_template(template: &str, escaped: &[(&str, &str)], raw: &[(&str, &str)]) -> String {
+pub(crate) fn render_template(
+    template: &str,
+    escaped: &[(&str, &str)],
+    raw: &[(&str, &str)],
+) -> String {
     let mut out = String::with_capacity(template.len() + 512);
     let mut rest = template;
     while let Some(start) = rest.find("{{") {
@@ -67,6 +71,25 @@ pub struct Chrome<'a> {
     pub project: &'a str,
     pub bind_note: &'a str,
     pub routes: &'a BrowserRoutes,
+}
+
+/// Wrap a rendered page body in the page shell (ADR-0028 decision 1).
+fn page(
+    chrome: Chrome<'_>,
+    slug: Option<&str>,
+    title: &str,
+    sidebar: &str,
+    body: String,
+) -> String {
+    crate::browser::shell::render(crate::browser::shell::Page {
+        title,
+        project: chrome.project,
+        bind_note: chrome.bind_note,
+        sidebar,
+        main: &body,
+        width: chrome.routes.page_width(slug.unwrap_or_default()),
+        nav_toggle: "",
+    })
 }
 
 fn content_handler(descriptor: &TypeDescriptor) -> Option<TypedHandler> {
@@ -749,7 +772,6 @@ fn backlog_list_section(
     } else {
         let singular = match handler {
             Some(TypedHandler::Task) => "task",
-            Some(TypedHandler::Milestone) => "milestone",
             Some(TypedHandler::Release) => "release",
             Some(TypedHandler::Decision) => "decision",
             Some(TypedHandler::Glossary) => "glossary term",
@@ -817,7 +839,6 @@ fn backlog_list_section(
                 }
                 parts.join(" \u{b7} ")
             }
-            Some(TypedHandler::Milestone) => record.release_id.clone().unwrap_or_default(),
             Some(TypedHandler::Decision) => {
                 let mut parts = Vec::new();
                 if let Some(s) = &record.status {
@@ -924,7 +945,6 @@ fn backlog_list_section(
 fn record_view_backlog_row_meta(record: &Record) -> String {
     let skip: &[&str] = match record.handler() {
         Some(TypedHandler::Task) => &["status", "milestone", "assignee"],
-        Some(TypedHandler::Milestone) => &["release"],
         Some(TypedHandler::Decision) => &["status"],
         _ => &[],
     };
@@ -1204,31 +1224,26 @@ pub fn board_page(
     } else {
         "Tasks grouped by milestone and status; releases separate milestones."
     };
-    render_template(
+    let body = render_template(
         LIST_TEMPLATE,
-        &[
-            ("title", "Papyrus \u{2014} Backlog"),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-            ("heading", "Backlog"),
-            ("subheading", subheading),
-        ],
-        &[
-            (
-                "sidebar",
-                &sidebar(
-                    chrome
-                        .routes
-                        .nav
-                        .iter()
-                        .find(|item| item.group == NavGroup::Backlog)
-                        .map(|item| item.slug.as_str()),
-                    cfg,
-                    chrome.routes,
-                ),
-            ),
-            ("section", &section),
-        ],
+        &[("heading", "Backlog"), ("subheading", subheading)],
+        &[("section", &section)],
+    );
+    page(
+        chrome,
+        None,
+        "Papyrus \u{2014} Backlog",
+        &sidebar(
+            chrome
+                .routes
+                .nav
+                .iter()
+                .find(|item| item.group == NavGroup::Backlog)
+                .map(|item| item.slug.as_str()),
+            cfg,
+            chrome.routes,
+        ),
+        body,
     )
 }
 
@@ -1246,7 +1261,15 @@ pub fn list_page(
         ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => Some(schema.handler),
     };
     let document_fields = descriptor.category == CategoryKind::Document;
-    let section_body = if descriptor.id_shape == crate::registry::IdShape::Grouped {
+    let section_body = if routes::list_layout(slug) == routes::ListLayout::Shared {
+        crate::browser::list::ListPlan::for_descriptor(
+            descriptor,
+            index,
+            &category_name(slug),
+            &crate::browser::list::count_note(slug, index.records.len()),
+        )
+        .render()
+    } else if descriptor.id_shape == crate::registry::IdShape::Grouped {
         list_section(descriptor, index, other_has_records)
     } else {
         backlog_list_section(slug, handler, index, document_fields)
@@ -1311,19 +1334,17 @@ pub fn list_page(
         subheading.to_string()
     };
     let title = format!("Papyrus \u{2014} {}", category_name(slug));
-    render_template(
+    let body = render_template(
         LIST_TEMPLATE,
-        &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-            ("heading", &heading),
-            ("subheading", &subheading),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(slug), cfg, chrome.routes)),
-            ("section", &section),
-        ],
+        &[("heading", &heading), ("subheading", &subheading)],
+        &[("section", &section)],
+    );
+    page(
+        chrome,
+        Some(slug),
+        &title,
+        &sidebar(Some(slug), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -1795,20 +1816,22 @@ pub fn view_page(
     } else {
         metadata_block_backlog(record, related_milestone, related_release)
     };
-    render_template(
+    let body = render_template(
         VIEW_TEMPLATE,
+        &[],
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &breadcrumb_html),
             ("page_head", &page_head),
             ("meta", &meta_html),
             ("content", &content),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -2085,20 +2108,22 @@ pub fn edit_page(
         escape(&record.title)
     );
     let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, resolved_group)),
             ("page_head", &page_head),
             ("meta", &metadata_block(record, resolved_group, true)),
             ("form", &form),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -2198,20 +2223,22 @@ pub fn edit_page_task(
         escape(&record.title)
     );
     let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", &form),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -2278,20 +2305,22 @@ pub fn edit_page_milestone(
         escape(&record.title)
     );
     let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", &form),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -2351,20 +2380,22 @@ pub fn edit_page_release(
         escape(&record.title)
     );
     let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", &form),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -2453,20 +2484,22 @@ pub fn edit_page_decision(
         escape(&record.title)
     );
     let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", &form),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -2575,20 +2608,22 @@ pub fn edit_page_glossary(
         escape(&record.title)
     );
     let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", &form),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -2656,20 +2691,22 @@ pub fn edit_page_ui_spec(
         escape(&record.title)
     );
     let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", &form),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -2790,20 +2827,22 @@ pub fn edit_page_ui_mockup(
         escape(&record.title)
     );
     let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", &form),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -2889,20 +2928,22 @@ pub fn edit_page_business_rule(
         escape(&record.title)
     );
     let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", &form),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -3019,20 +3060,22 @@ pub fn edit_page_audit_record(
         escape(&record.title)
     );
     let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", &form),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -3066,20 +3109,22 @@ pub fn conflict_page_audit_record(
     body.push_str("</dl></div>");
 
     let title_page = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title_page),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &body),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", ""),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title_page,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -3190,20 +3235,22 @@ pub fn edit_page_tech_spec(
         escape(&record.title)
     );
     let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", &form),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -3293,20 +3340,22 @@ pub fn edit_page_use_case(
         escape(&record.title)
     );
     let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", &form),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -3373,20 +3422,22 @@ pub fn conflict_page_use_case(
     body.push_str("</dl></div>");
 
     let title_page = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title_page),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &body),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", ""),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title_page,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -3461,20 +3512,22 @@ pub fn conflict_page_tech_spec(
     body.push_str("</dl></div>");
 
     let title_page = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title_page),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &body),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", ""),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title_page,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -3567,21 +3620,22 @@ pub fn error_page(status: u16, cfg: &Config, chrome: Chrome<'_>, actions: Option
     let actions = actions.unwrap_or(&default_actions);
     let title = format!("Papyrus \u{2014} {}", heading);
     let status_text = status.to_string();
-    render_template(
+    let body = render_template(
         ERROR_TEMPLATE,
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
             ("status_code", &status_text),
             ("heading", heading),
             ("message", message),
             ("hint", hint),
         ],
-        &[
-            ("sidebar", &sidebar(None, cfg, chrome.routes)),
-            ("actions", actions),
-        ],
+        &[("actions", actions)],
+    );
+    page(
+        chrome,
+        None,
+        &title,
+        &sidebar(None, cfg, chrome.routes),
+        body,
     )
 }
 
@@ -3592,12 +3646,9 @@ pub fn error_page(status: u16, cfg: &Config, chrome: Chrome<'_>, actions: Option
 pub fn tech_spec_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     let actions =
         "<a class=\"link\" href=\"/?type=tech-spec\">Back to technical specifications</a>";
-    render_template(
+    let body = render_template(
         ERROR_TEMPLATE,
         &[
-            ("title", "Papyrus \u{2014} Record not found"),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
             ("status_code", "404"),
             ("heading", "Record not found"),
             ("message", "That record does not exist or is not available."),
@@ -3607,29 +3658,27 @@ pub fn tech_spec_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
 The same page is used for an unknown address.",
             ),
         ],
-        &[
-            (
-                "sidebar",
-                &sidebar(
-                    routes::not_found_slug(routes::NotFoundPage::TechSpec),
-                    cfg,
-                    chrome.routes,
-                ),
-            ),
-            ("actions", actions),
-        ],
+        &[("actions", actions)],
+    );
+    page(
+        chrome,
+        None,
+        "Papyrus \u{2014} Record not found",
+        &sidebar(
+            routes::not_found_slug(routes::NotFoundPage::TechSpec),
+            cfg,
+            chrome.routes,
+        ),
+        body,
     )
 }
 
 /// Render the use-cases `404` page.
 pub fn use_case_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     let actions = "<a class=\"link\" href=\"/?type=use-case\">Back to Use Cases</a>";
-    render_template(
+    let body = render_template(
         ERROR_TEMPLATE,
         &[
-            ("title", "Papyrus \u{2014} Record not found"),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
             ("status_code", "404"),
             ("heading", "Record not found"),
             ("message", "That record does not exist or is not available."),
@@ -3638,29 +3687,27 @@ pub fn use_case_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
                 "Archived use cases are not listed and cannot be opened. The same page is used for an unknown address.",
             ),
         ],
-        &[
-            (
-                "sidebar",
-                &sidebar(
-                    routes::not_found_slug(routes::NotFoundPage::UseCase),
-                    cfg,
-                    chrome.routes,
-                ),
-            ),
-            ("actions", actions),
-        ],
+        &[("actions", actions)],
+    );
+    page(
+        chrome,
+        None,
+        "Papyrus \u{2014} Record not found",
+        &sidebar(
+            routes::not_found_slug(routes::NotFoundPage::UseCase),
+            cfg,
+            chrome.routes,
+        ),
+        body,
     )
 }
 
 /// Render the test-cases `404` page.
 pub fn test_case_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     let actions = "<a class=\"link\" href=\"/?type=test-case\">Back to Test Cases</a>";
-    render_template(
+    let body = render_template(
         ERROR_TEMPLATE,
         &[
-            ("title", "Papyrus \u{2014} Record not found"),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
             ("status_code", "404"),
             ("heading", "Record not found"),
             ("message", "That record does not exist or is not available."),
@@ -3669,29 +3716,27 @@ pub fn test_case_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
                 "Archived test cases are not listed and cannot be opened. The same page is used for an unknown address.",
             ),
         ],
-        &[
-            (
-                "sidebar",
-                &sidebar(
-                    routes::not_found_slug(routes::NotFoundPage::TestCase),
-                    cfg,
-                    chrome.routes,
-                ),
-            ),
-            ("actions", actions),
-        ],
+        &[("actions", actions)],
+    );
+    page(
+        chrome,
+        None,
+        "Papyrus \u{2014} Record not found",
+        &sidebar(
+            routes::not_found_slug(routes::NotFoundPage::TestCase),
+            cfg,
+            chrome.routes,
+        ),
+        body,
     )
 }
 
 /// Render the test-reports `404` page.
 pub fn test_report_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     let actions = "<a class=\"link\" href=\"/?type=test-report\">Back to Test Reports</a>";
-    render_template(
+    let body = render_template(
         ERROR_TEMPLATE,
         &[
-            ("title", "Papyrus \u{2014} Record not found"),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
             ("status_code", "404"),
             ("heading", "Record not found"),
             ("message", "That record does not exist or is not available."),
@@ -3700,17 +3745,18 @@ pub fn test_report_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
                 "Archived test reports are not listed and cannot be opened. The same page is used for an unknown address.",
             ),
         ],
-        &[
-            (
-                "sidebar",
-                &sidebar(
-                    routes::not_found_slug(routes::NotFoundPage::TestReport),
-                    cfg,
-                    chrome.routes,
-                ),
-            ),
-            ("actions", actions),
-        ],
+        &[("actions", actions)],
+    );
+    page(
+        chrome,
+        None,
+        "Papyrus \u{2014} Record not found",
+        &sidebar(
+            routes::not_found_slug(routes::NotFoundPage::TestReport),
+            cfg,
+            chrome.routes,
+        ),
+        body,
     )
 }
 
@@ -3759,20 +3805,22 @@ pub fn conflict_page(
     );
 
     let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &content),
             ("meta", ""),
             ("form", ""),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -3813,20 +3861,22 @@ pub fn conflict_page_ui_mockup(
     );
 
     let title_text = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title_text),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &content),
             ("meta", ""),
             ("form", ""),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title_text,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -3882,20 +3932,22 @@ pub fn conflict_page_business_rule(
         escape(&record.id)
     );
     let title_text = format!("Papyrus \u{2014} Edit {}", record.id);
-    render_template(
+    let body = render_template(
         EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &title_text),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &content),
             ("meta", &metadata_block_backlog(record, None, None)),
             ("form", &form),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &title_text,
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -4003,18 +4055,10 @@ pub fn lifecycle_page(
         "<p>The three categories are Backlog, Decisions, and Documents. Backlog.md <code>docs</code>, <code>drafts</code>, and project configuration files are excluded from every category. Configuration is a startup snapshot: document-type changes take effect on the next browser start.</p>",
     );
 
-    render_template(
+    let body = render_template(
         VIEW_TEMPLATE,
+        &[],
         &[
-            ("title", "Papyrus \u{2014} Managed artifacts & lifecycles"),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            (
-                "sidebar",
-                &sidebar_with_lifecycle(None, cfg, true, chrome.routes),
-            ),
             ("breadcrumb", ""),
             (
                 "page_head",
@@ -4023,6 +4067,13 @@ pub fn lifecycle_page(
             ("meta", ""),
             ("content", &sections),
         ],
+    );
+    page(
+        chrome,
+        None,
+        "Papyrus \u{2014} Managed artifacts & lifecycles",
+        &sidebar_with_lifecycle(None, cfg, true, chrome.routes),
+        body,
     )
 }
 
@@ -4277,22 +4328,20 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
 
     let title = "Papyrus \u{2014} Agent skills and workflows".to_string();
     let subheading = "Agent-facing instructions for configuring and operating Papyrus. Values reflect the effective project configuration. Read-only reference.";
-    render_template(
+    let body = render_template(
         LIST_TEMPLATE,
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
             ("heading", "Agent skills and workflows"),
             ("subheading", subheading),
         ],
-        &[
-            (
-                "sidebar",
-                &sidebar_with_skills(None, cfg, true, chrome.routes),
-            ),
-            ("section", &sections),
-        ],
+        &[("section", &sections)],
+    );
+    page(
+        chrome,
+        None,
+        &title,
+        &sidebar_with_skills(None, cfg, true, chrome.routes),
+        body,
     )
 }
 
@@ -4310,34 +4359,27 @@ pub struct InventoryCard {
 pub fn config_page(chrome: Chrome<'_>, section_html: &str, sidebar_html: &str) -> String {
     let title = "Papyrus \u{2014} Configuration".to_string();
     let subheading = "Effective configuration for the current project. Values come from built-in defaults and the config file.";
-    render_template(
+    let body = render_template(
         LIST_TEMPLATE,
-        &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-            ("heading", "Configuration"),
-            ("subheading", subheading),
-        ],
-        &[("sidebar", sidebar_html), ("section", section_html)],
-    )
+        &[("heading", "Configuration"), ("subheading", subheading)],
+        &[("section", section_html)],
+    );
+    page(chrome, None, &title, sidebar_html, body)
 }
 
 /// Render the single-key configuration edit page.
 pub fn config_edit_page(chrome: Chrome<'_>, sidebar_html: &str, section_html: &str) -> String {
     let title = "Papyrus \u{2014} Edit configuration".to_string();
     let subheading = "Edit one configuration key.";
-    render_template(
+    let body = render_template(
         LIST_TEMPLATE,
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
             ("heading", "Edit configuration"),
             ("subheading", subheading),
         ],
-        &[("sidebar", sidebar_html), ("section", section_html)],
-    )
+        &[("section", section_html)],
+    );
+    page(chrome, None, &title, sidebar_html, body)
 }
 
 pub fn inventory_page(cfg: &Config, chrome: Chrome<'_>, cards: &[InventoryCard]) -> String {
@@ -4364,19 +4406,17 @@ pub fn inventory_page(cfg: &Config, chrome: Chrome<'_>, cards: &[InventoryCard])
     section.push_str("</section>");
     let title = "Papyrus \u{2014} Browser inventory".to_string();
     let subheading = "All Papyrus record types in one navigation (REQ-06.002, NFR-01.002).";
-    render_template(
+    let body = render_template(
         LIST_TEMPLATE,
-        &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-            ("heading", "Browser inventory"),
-            ("subheading", subheading),
-        ],
-        &[
-            ("sidebar", &sidebar(None, cfg, chrome.routes)),
-            ("section", &section),
-        ],
+        &[("heading", "Browser inventory"), ("subheading", subheading)],
+        &[("section", &section)],
+    );
+    page(
+        chrome,
+        None,
+        &title,
+        &sidebar(None, cfg, chrome.routes),
+        body,
     )
 }
 
@@ -4439,20 +4479,23 @@ pub fn document_list_page(
             rows
         )
     };
-    render_template(
+    let body = render_template(
         DOCUMENT_LIST_TEMPLATE,
         &[
-            ("title", &title),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
             ("heading", &category_name(slug)),
             ("subheading", &routes::inventory_note(slug)),
         ],
         &[
-            ("sidebar", &sidebar(Some(slug), cfg, chrome.routes)),
             ("filter", &status_filter_html(descriptor, status)),
             ("section", &section),
         ],
+    );
+    page(
+        chrome,
+        Some(slug),
+        &title,
+        &sidebar(Some(slug), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -4538,23 +4581,22 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
         references,
         escape(&record.id)
     );
-    render_template(
+    let body = render_template(
         DOCUMENT_DETAIL_TEMPLATE,
+        &[],
         &[
-            (
-                "title",
-                &format!("Papyrus \u{2014} {} {}", record.id, record.title),
-            ),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &breadcrumb(record, None, None, None)),
             ("page_head", &page_head),
             ("meta", &meta),
             ("content", &content),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &format!("Papyrus \u{2014} {} {}", record.id, record.title),
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -4664,20 +4706,22 @@ pub fn document_edit_page(
         escape(&record.id),
         escape(&record.title)
     );
-    render_template(
+    let body = render_template(
         DOCUMENT_EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &format!("Papyrus \u{2014} Edit {}", record.id)),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", ""),
             ("form", &document_edit_form(record, values, errors, version)),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &format!("Papyrus \u{2014} Edit {}", record.id),
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
@@ -4709,39 +4753,43 @@ pub fn document_conflict_page(
         escape(&record.id),
         escape(&record.title)
     );
-    render_template(
+    let body = render_template(
         DOCUMENT_EDIT_TEMPLATE,
+        &[],
         &[
-            ("title", &format!("Papyrus \u{2014} Edit {}", record.id)),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(Some(record.slug()), cfg, chrome.routes)),
             ("breadcrumb", &edit_breadcrumb(record, None)),
             ("page_head", &page_head),
             ("meta", ""),
             ("form", &form),
         ],
+    );
+    page(
+        chrome,
+        Some(record.slug()),
+        &format!("Papyrus \u{2014} Edit {}", record.id),
+        &sidebar(Some(record.slug()), cfg, chrome.routes),
+        body,
     )
 }
 
 /// Generic document not-found page. It never echoes the requested ID.
 pub fn document_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     let content = "<p>The requested record was not found.</p><p><a class=\"link\" href=\"/\">Back to requirements</a></p>";
-    render_template(
+    let body = render_template(
         VIEW_TEMPLATE,
+        &[],
         &[
-            ("title", "Papyrus \u{2014} Not found"),
-            ("project", chrome.project),
-            ("bind_note", chrome.bind_note),
-        ],
-        &[
-            ("sidebar", &sidebar(None, cfg, chrome.routes)),
             ("breadcrumb", ""),
             ("page_head", "<h1 class=\"h1\">Not found</h1>"),
             ("meta", ""),
             ("content", content),
         ],
+    );
+    page(
+        chrome,
+        None,
+        "Papyrus \u{2014} Not found",
+        &sidebar(None, cfg, chrome.routes),
+        body,
     )
 }

@@ -402,7 +402,17 @@ fn browser_and_cli_metadata_parity() {
     run_ok(&["--dir", &arg_dir(&dir), "init", "Proj", "--no-git"]);
     let d = arg_dir(&dir);
     run_ok(&["--dir", &d, "task", "create", "Parity", "--label", "bug"]);
-    run_ok(&["--dir", &d, "milestone", "create", "Parity milestone"]);
+    run_ok(&[
+        "--dir",
+        &d,
+        "milestone",
+        "create",
+        "Parity milestone",
+        "--label",
+        "parity",
+        "--reference",
+        "PARITY-REF-1",
+    ]);
 
     let cli = json_ok(&["--dir", &d, "--json", "task", "view", "TASK-001"]);
     let cli_milestone = json_ok(&["--dir", &d, "--json", "milestone", "view", "MS-001"]);
@@ -419,14 +429,48 @@ fn browser_and_cli_metadata_parity() {
         api_milestone["metadata"], cli_milestone["metadata"],
         "milestone detail JSON metadata equals CLI view metadata"
     );
-    // The board cards do not print dates; the milestone row list remains the
-    // row-list parity surface and shows the same metadata values.
+    // The board cards do not print dates; the milestone list remains the
+    // row-list parity surface and now renders the shared layout (TASK-141).
     let list_html = get(&server, "/?type=milestone").text();
     let created = cli_milestone["metadata"]["created_date"].as_str().unwrap();
+    let updated = cli_milestone["metadata"]["updated_date"].as_str().unwrap();
+    // Header contract: the fixed structural order with the declared Release slot.
+    let header_order = [
+        "data-column=\"id\">ID",
+        "data-column=\"title\">Title",
+        "data-column=\"status\">Status",
+        "data-column=\"release\">Release",
+        "data-column=\"created\">Created",
+        "data-column=\"updated\">Updated",
+        "data-column=\"actions\">Actions",
+    ];
+    let mut cursor = 0;
+    for header in header_order {
+        let position = list_html[cursor..]
+            .find(header)
+            .unwrap_or_else(|| panic!("missing header {header}"));
+        cursor += position + header.len();
+    }
     assert!(
-        list_html.contains(created),
-        "milestone list shows created_date"
+        list_html.contains("data-list-layout=\"shared\""),
+        "milestone list uses the shared layout"
     );
+    assert!(
+        list_html.contains("data-row-id=\"MS-001\""),
+        "milestone row carries its ID hook"
+    );
+    // Row-level Created and Updated values reach the list cells.
+    let row = &list_html[list_html.find("data-row-id=\"MS-001\"").unwrap()..];
+    let row = &row[..row.find("</tr>").unwrap()];
+    assert!(row.contains(&format!("<td class=\"created-cell\">{created}</td>")));
+    assert!(row.contains(&format!("<td class=\"updated-cell\">{updated}</td>")));
+    // Labels and references render in the Title cell for parity (REQ-06.004).
+    assert!(row.contains("<ul class=\"row-tags\"><li class=\"tag\">parity</li></ul>"));
+    assert!(row.contains("<ul class=\"row-refs\"><li>PARITY-REF-1</li></ul>"));
+    // Every action carries a record-specific accessible name.
+    assert!(row.contains("aria-label=\"View MS-001\">View</a>"));
+    assert!(row.contains("aria-label=\"Edit MS-001\">Edit</a>"));
+
     let detail_html = get(&server, "/doc/TASK-001").text();
     assert!(
         detail_html.contains("Created date"),

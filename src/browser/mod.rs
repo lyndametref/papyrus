@@ -5,9 +5,11 @@
 
 pub mod assets;
 pub mod http;
+pub mod list;
 pub mod records;
 pub mod render;
 pub mod routes;
+pub mod shell;
 
 use crate::CommandOutput;
 use crate::commands::load_effective_config;

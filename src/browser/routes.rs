@@ -45,6 +45,29 @@ pub enum NotFoundPage {
     GenericDocument,
 }
 
+/// Server-side content-width decision for a route (ADR-0028 decision 3).
+///
+/// `Capped` is the default for every route. `Full` is reserved for the backlog
+/// kanban board and the UI-mockup preview route; assigning it to any other
+/// route requires an ADR amendment.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PageWidth {
+    #[default]
+    Capped,
+    Full,
+}
+
+/// Which list layout a family renders while both list paths exist (TASK-141).
+///
+/// `Legacy` is the default; TASK-142 sets every family to `Shared` and deletes
+/// this enum together with the legacy builders.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ListLayout {
+    Shared,
+    #[default]
+    Legacy,
+}
+
 /// Static presentation data for a built-in slug. It never decides existence.
 #[derive(Clone, Copy, Debug)]
 pub struct Presentation {
@@ -70,6 +93,11 @@ pub struct Presentation {
     pub not_found: NotFoundPage,
     /// Category whose aggregate navigation entry this slug represents.
     pub aggregate_group: Option<NavGroup>,
+    /// Declared family slot columns `(key, label)` for the shared list layout,
+    /// in order. Empty for families with no declared slot.
+    pub list_slots: &'static [(&'static str, &'static str)],
+    /// Which list layout this family renders.
+    pub list_layout: ListLayout,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -95,6 +123,8 @@ const fn builtin(
         api_paths: &[],
         not_found: NotFoundPage::GenericDocument,
         aggregate_group: None,
+        list_slots: &[],
+        list_layout: ListLayout::Legacy,
     }
 }
 
@@ -113,34 +143,56 @@ const fn as_aggregate(mut entry: Presentation, group: NavGroup) -> Presentation 
     entry
 }
 
+const fn with_slots(
+    mut entry: Presentation,
+    slots: &'static [(&'static str, &'static str)],
+) -> Presentation {
+    entry.list_slots = slots;
+    entry
+}
+
+const fn with_layout(mut entry: Presentation, layout: ListLayout) -> Presentation {
+    entry.list_layout = layout;
+    entry
+}
+
 /// The built-in presentation table, in navigation order.
 pub const PRESENTATION: &[Presentation] = &[
     as_aggregate(
         with_api(
-            builtin(
-                "task",
-                "Backlog",
-                "Tasks",
-                "tasks",
-                "Tasks move through the configured task statuses and are archived under the backlog archive folder.",
-                "Backlog tasks in this project.",
-                None,
-                100,
+            with_slots(
+                builtin(
+                    "task",
+                    "Backlog",
+                    "Tasks",
+                    "tasks",
+                    "Tasks move through the configured task statuses and are archived under the backlog archive folder.",
+                    "Backlog tasks in this project.",
+                    None,
+                    100,
+                ),
+                &[("milestone", "Milestone"), ("assignee", "Assignee")],
             ),
             &["/api/tasks"],
         ),
         NavGroup::Backlog,
     ),
     with_api(
-        builtin(
-            "milestone",
-            "Milestones",
-            "Milestones",
-            "milestones",
-            "Milestones move from open to closed.",
-            "Milestones in this project.",
-            None,
-            110,
+        with_layout(
+            with_slots(
+                builtin(
+                    "milestone",
+                    "Milestones",
+                    "Milestones",
+                    "milestones",
+                    "Milestones move from open to closed.",
+                    "Milestones in this project.",
+                    None,
+                    110,
+                ),
+                &[("release", "Release")],
+            ),
+            ListLayout::Shared,
         ),
         &["/api/milestones"],
     ),
@@ -159,53 +211,65 @@ pub const PRESENTATION: &[Presentation] = &[
     ),
     as_aggregate(
         with_api(
-            builtin(
-                "decision",
-                "Decisions",
-                "Decisions",
-                "decisions",
-                "Decisions move from proposed to accepted or rejected; an accepted decision may be deprecated or superseded.",
-                "Decisions in this project.",
-                None,
-                200,
+            with_slots(
+                builtin(
+                    "decision",
+                    "Decisions",
+                    "Decisions",
+                    "decisions",
+                    "Decisions move from proposed to accepted or rejected; an accepted decision may be deprecated or superseded.",
+                    "Decisions in this project.",
+                    None,
+                    200,
+                ),
+                &[("type", "Type")],
             ),
             &["/api/decisions"],
         ),
         NavGroup::Decisions,
     ),
-    builtin(
-        "req",
-        "Business requirements",
-        "Business requirements",
-        "business requirements",
-        "Requirements are active until archived; archive moves the file to archived folder.",
-        "Business requirements in this project.",
-        None,
-        10,
+    with_slots(
+        builtin(
+            "req",
+            "Business requirements",
+            "Business requirements",
+            "business requirements",
+            "Requirements are active until archived; archive moves the file to archived folder.",
+            "Business requirements in this project.",
+            None,
+            10,
+        ),
+        &[("group", "Group")],
     ),
     with_api(
-        builtin(
-            "rule",
-            "Business Rules",
-            "Business Rules",
-            "business rules",
-            "Business rules are active until archived; archive moves the file to archived folder.",
-            "Business rules in this project.",
-            Some("business-rule"),
-            20,
+        with_slots(
+            builtin(
+                "rule",
+                "Business Rules",
+                "Business Rules",
+                "business rules",
+                "Business rules are active until archived; archive moves the file to archived folder.",
+                "Business rules in this project.",
+                Some("business-rule"),
+                20,
+            ),
+            &[("applicability", "Applicability")],
         ),
         &["/api/business-rules", "/api/business-rule"],
     ),
     with_api(
-        builtin(
-            "audit",
-            "Audit Records",
-            "Audit Records",
-            "audit records",
-            "Audit records are active until archived; archive moves the file to archived folder.",
-            "Audit records in this project.",
-            Some("audit-record"),
-            30,
+        with_slots(
+            builtin(
+                "audit",
+                "Audit Records",
+                "Audit Records",
+                "audit records",
+                "Audit records are active until archived; archive moves the file to archived folder.",
+                "Audit records in this project.",
+                Some("audit-record"),
+                30,
+            ),
+            &[("audit_type", "Audit type")],
         ),
         &["/api/audit-records", "/api/audit-record"],
     ),
@@ -273,15 +337,18 @@ pub const PRESENTATION: &[Presentation] = &[
         ),
         NotFoundPage::TestReport,
     ),
-    builtin(
-        "nfr",
-        "Non-functional requirements",
-        "Non-functional requirements",
-        "non-functional requirements",
-        "Requirements are active until archived; archive moves the file to archived folder.",
-        "Non-functional requirements in this project.",
-        None,
-        80,
+    with_slots(
+        builtin(
+            "nfr",
+            "Non-functional requirements",
+            "Non-functional requirements",
+            "non-functional requirements",
+            "Requirements are active until archived; archive moves the file to archived folder.",
+            "Non-functional requirements in this project.",
+            None,
+            80,
+        ),
+        &[("group", "Group")],
     ),
     with_api(
         builtin(
@@ -310,15 +377,18 @@ pub const PRESENTATION: &[Presentation] = &[
         &["/api/ui-specs", "/api/ui-specifications", "/api/ui-spec"],
     ),
     with_api(
-        builtin(
-            "ui-mockup",
-            "UI Mockups",
-            "UI Mockups",
-            "UI mockups",
-            "UI mockups move from pending to approved, then archived.",
-            "UI mockups in this project.",
-            None,
-            110,
+        with_slots(
+            builtin(
+                "ui-mockup",
+                "UI Mockups",
+                "UI Mockups",
+                "UI mockups",
+                "UI mockups move from pending to approved, then archived.",
+                "UI mockups in this project.",
+                None,
+                110,
+            ),
+            &[("task", "Task"), ("specs", "Specs")],
         ),
         &["/api/ui-mockups", "/api/ui-mockup", "/api/mockups"],
     ),
@@ -327,6 +397,22 @@ pub const PRESENTATION: &[Presentation] = &[
 /// Presentation lookup for a built-in slug.
 pub fn presentation(slug: &str) -> Option<&'static Presentation> {
     PRESENTATION.iter().find(|entry| entry.slug == slug)
+}
+
+/// Declared family slot columns `(key, label)` for a slug.
+///
+/// A config-defined type has no presentation entry, therefore no slots.
+pub fn list_slots(slug: &str) -> &'static [(&'static str, &'static str)] {
+    presentation(slug)
+        .map(|entry| entry.list_slots)
+        .unwrap_or(&[])
+}
+
+/// Which list layout a family renders (TASK-141 transitional dispatch).
+pub fn list_layout(slug: &str) -> ListLayout {
+    presentation(slug)
+        .map(|entry| entry.list_layout)
+        .unwrap_or(ListLayout::Legacy)
 }
 
 /// The presentation slug that represents a category's aggregate list.
@@ -647,6 +733,18 @@ impl BrowserRoutes {
         selected.is_some() && selected == self.decision_view.as_deref()
     }
 
+    /// Server-side content-width decision for a route (ADR-0028 decision 3).
+    ///
+    /// Every route is `Capped` in this ticket. The backlog board is the only
+    /// future `Full` surface (TASK-144); no other route may return `Full`
+    /// without an ADR amendment.
+    pub fn page_width(&self, _slug: &str) -> PageWidth {
+        // TASK-144 owns the board's `Full` classification. No route is
+        // uncapped in this ticket, and a new `Full` route needs an ADR
+        // amendment.
+        PageWidth::Capped
+    }
+
     /// Choose the not-found page for an ID, if an enabled type claims it.
     pub fn not_found_page(&self, id: &str) -> Option<NotFoundPage> {
         self.id_rules
@@ -747,6 +845,71 @@ mod tests {
         assert_eq!(inventory, document_slugs);
         assert_eq!(canonical_api, document_slugs);
         assert_eq!(canonical_types, document_slugs);
+    }
+
+    #[test]
+    fn page_width_is_capped_for_every_enabled_slug() {
+        let cfg = Config::default();
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        let routes = BrowserRoutes::build(&registry);
+        for descriptor in registry.descriptors() {
+            if !descriptor.enabled {
+                continue;
+            }
+            assert_eq!(
+                routes.page_width(&descriptor.slug),
+                PageWidth::Capped,
+                "slug {}",
+                descriptor.slug
+            );
+        }
+        assert_eq!(routes.page_width(&routes.default_type), PageWidth::Capped);
+        assert_eq!(routes.page_width(""), PageWidth::Capped);
+    }
+
+    #[test]
+    fn reference_family_uses_the_shared_layout_and_declares_one_slot() {
+        assert_eq!(list_layout("milestone"), ListLayout::Shared);
+        assert_eq!(list_slots("milestone"), &[("release", "Release")]);
+    }
+
+    #[test]
+    fn every_other_family_stays_on_the_legacy_layout() {
+        let cfg = Config::default();
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        for descriptor in registry.enabled(CategoryKind::Document) {
+            if descriptor.slug == "milestone" {
+                continue;
+            }
+            assert_eq!(
+                list_layout(&descriptor.slug),
+                ListLayout::Legacy,
+                "slug {}",
+                descriptor.slug
+            );
+        }
+        assert_eq!(list_layout("release"), ListLayout::Legacy);
+        assert_eq!(list_layout("decision"), ListLayout::Legacy);
+        assert_eq!(list_layout("note"), ListLayout::Legacy);
+    }
+
+    #[test]
+    fn declared_slots_match_the_amended_adr_table() {
+        assert_eq!(
+            list_slots("task"),
+            &[("milestone", "Milestone"), ("assignee", "Assignee")]
+        );
+        assert_eq!(list_slots("release"), &[]);
+        assert_eq!(list_slots("decision"), &[("type", "Type")]);
+        assert_eq!(list_slots("req"), &[("group", "Group")]);
+        assert_eq!(list_slots("nfr"), &[("group", "Group")]);
+        assert_eq!(list_slots("audit"), &[("audit_type", "Audit type")]);
+        assert_eq!(list_slots("rule"), &[("applicability", "Applicability")]);
+        assert_eq!(
+            list_slots("ui-mockup"),
+            &[("task", "Task"), ("specs", "Specs")]
+        );
+        assert_eq!(list_slots("note"), &[]);
     }
 
     #[test]

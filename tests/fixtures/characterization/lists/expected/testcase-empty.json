@@ -1,0 +1,15 @@
+{
+  "schema": "papyrus.list-characterization/1",
+  "family": "testcase",
+  "url": "/?type=test-case",
+  "captured_from_commit": "d60f71c9b5bc6a7e419e2cef682763e0c914160a",
+  "heading": "Test Cases",
+  "count_note": "0 test cases",
+  "row_order": [],
+  "baseline_columns": [],
+  "baseline_row_shape": "ul",
+  "records": [],
+  "grouped": [],
+  "excluded": [],
+  "empty": true
+}

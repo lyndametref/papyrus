@@ -1,0 +1,53 @@
+{
+  "schema": "papyrus.list-characterization/1",
+  "family": "audit",
+  "url": "/?type=audit",
+  "captured_from_commit": "d60f71c9b5bc6a7e419e2cef682763e0c914160a",
+  "heading": "Audit Records",
+  "count_note": "2 audit records",
+  "row_order": [
+    "AUD-002",
+    "AUD-003"
+  ],
+  "baseline_columns": [],
+  "baseline_row_shape": "ul",
+  "records": [
+    {
+      "id": "AUD-002",
+      "title": "Audit One",
+      "status": "(none)",
+      "created": "2026-11-15T19:07:09Z",
+      "updated": "2026-11-15T19:07:09Z",
+      "labels": [
+        "audit"
+      ],
+      "references": [
+        "AUD-REF-1"
+      ],
+      "slots": {
+        "audit_type": "security"
+      },
+      "href": "/doc/AUD-002",
+      "actions": []
+    },
+    {
+      "id": "AUD-003",
+      "title": "Audit Two",
+      "status": "(none)",
+      "created": "2026-11-15T19:07:09Z",
+      "updated": "2026-11-15T19:07:09Z",
+      "labels": [],
+      "references": [],
+      "slots": {
+        "audit_type": "security"
+      },
+      "href": "/doc/AUD-003",
+      "actions": []
+    }
+  ],
+  "grouped": [],
+  "excluded": [
+    "AUD-001"
+  ],
+  "empty": false
+}

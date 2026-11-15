@@ -824,8 +824,10 @@ fn t114_15_generic_labels_and_references_round_trip() {
     let _ = fs::remove_dir_all(&d);
 }
 
-// Regression: milestone, release, and decision lists keep their previous
-// layout and do not gain the document status filter or shared row fields.
+// Regression: release and decision lists keep their previous layout and do not
+// gain the document status filter or shared row fields. The milestone list is
+// the TASK-141 reference family and intentionally moved to the shared layout
+// (ADR-0028 decision 9), so it is asserted separately.
 #[test]
 fn t114_16_non_document_lists_keep_previous_layout() {
     let d = init("16");
@@ -853,7 +855,7 @@ fn t114_16_non_document_lists_keep_previous_layout() {
     );
     run_ok(&d, &["decision", "create", "Decision One"]);
     let server = Server::start(&d);
-    for slug in ["milestone", "release", "decision"] {
+    for slug in ["release", "decision"] {
         let html = get(&server, &format!("/?type={}", slug)).text();
         assert!(
             !html.contains("class=\"filter\""),
@@ -866,6 +868,19 @@ fn t114_16_non_document_lists_keep_previous_layout() {
             );
         }
     }
+    // Contract change (TASK-141): the milestone list renders the shared layout.
+    let milestone = get(&server, "/?type=milestone").text();
+    assert!(milestone.contains("data-list-layout=\"shared\""));
+    assert!(milestone.contains("class=\"table list list--shared\""));
+    assert!(milestone.contains("data-row-id=\"MS-001\""));
+    assert!(
+        !milestone.contains("class=\"filter\""),
+        "milestone must not render the document status filter"
+    );
+    assert!(
+        !milestone.contains("<ul class=\"req-list\">"),
+        "the milestone list is no longer a ul row list"
+    );
     // A stray status parameter is ignored by non-document lists, as before.
     assert_eq!(get(&server, "/?type=milestone&status=bogus").status, 200);
     drop(server);
