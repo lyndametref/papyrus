@@ -583,7 +583,7 @@ mod native_layout_tests {
     fn record(c: &Context) -> crate::record::descriptor::RecordDescriptor {
         let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir).unwrap();
         let registry = crate::registry::ArtifactRegistry::build(&cfg).unwrap();
-        *registry.record_descriptor("rule").unwrap()
+        registry.record_descriptor("rule").cloned().unwrap()
     }
 
     fn archive(c: &Context, id: &str) {

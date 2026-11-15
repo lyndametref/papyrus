@@ -72,9 +72,10 @@ pub fn tree(
 }
 
 pub fn document_command(descriptor: &TypeDescriptor) -> Command {
-    let slug = descriptor.slug.clone();
-    let slug_static: &'static str = Box::leak(slug.clone().into_boxed_str());
-    let mut cmd = Command::new(slug_static).about(format!("Manage {} documents.", slug));
+    // clap's `string` feature lets the command own its name, so the slug does
+    // not need a `'static` leak (ADR-0016 decision 1, ADR-0017 decision 10).
+    let mut cmd = Command::new(descriptor.slug.clone())
+        .about(format!("Manage {} documents.", descriptor.slug));
 
     for spec in descriptor.ordered_verb_specs() {
         cmd = cmd.subcommand(verb_command(spec));

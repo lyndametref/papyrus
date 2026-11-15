@@ -4,18 +4,25 @@ use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
 
+use std::borrow::Cow;
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// The behavior facts of one record family.
+///
+/// The three configuration-derived fields `name`, `label`, and `doc_type_key`
+/// are owned-or-borrowed so the record descriptor of a config-defined document
+/// type can live in the `ArtifactRegistry` that owns its configuration
+/// (ADR-0017 decision 10: no cache). The remaining fields are static data.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RecordDescriptor {
-    pub name: &'static str,
+    pub name: Cow<'static, str>,
     pub record_type: &'static str,
     pub type_name: &'static str,
-    pub label: &'static str,
+    pub label: Cow<'static, str>,
     pub display_id_pattern: &'static str,
     pub directory: &'static str,
     pub subpath: &'static str,
-    pub doc_type_key: Option<&'static str>,
+    pub doc_type_key: Option<Cow<'static, str>>,
     pub frontmatter_keys: &'static [&'static str],
     pub sections: &'static [&'static str],
 }
@@ -42,6 +49,7 @@ impl RecordDescriptor {
                 .collect(),
             _ => self
                 .doc_type_key
+                .as_deref()
                 .and_then(|key| cfg.document_types.get(key))
                 .map(|entry| vec![entry.prefix.clone()])
                 .unwrap_or_default(),
@@ -87,7 +95,7 @@ impl RecordDescriptor {
                 )));
             }
         };
-        let raw = if let Some(key) = self.doc_type_key {
+        let raw = if let Some(key) = self.doc_type_key.as_deref() {
             let entry = cfg.document_types.get(key).ok_or_else(|| {
                 AppError::Validation(format!("unknown document type configuration key: {}", key))
             })?;
@@ -169,6 +177,7 @@ impl RecordDescriptor {
             "release" => vec!["planned".to_string(), "released".to_string()],
             _ if self.doc_type_key.is_some() => self
                 .doc_type_key
+                .as_deref()
                 .and_then(|k| cfg.document_types.get(k))
                 .and_then(|e| e.statuses.clone())
                 .unwrap_or_else(|| vec!["active".to_string(), "archived".to_string()]),
@@ -223,10 +232,10 @@ const DECISION_SECTIONS: &[&str] = &["## Status", "## Decision", "## Context", "
 
 pub const DESCRIPTORS: &[RecordDescriptor] = &[
     RecordDescriptor {
-        name: "task",
+        name: Cow::Borrowed("task"),
         record_type: "task",
         type_name: "task",
-        label: "Task",
+        label: Cow::Borrowed("Task"),
         display_id_pattern: "TASK-###",
         directory: "backlog",
         subpath: "tasks",
@@ -243,10 +252,10 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         sections: TASK_SECTIONS,
     },
     RecordDescriptor {
-        name: "milestone",
+        name: Cow::Borrowed("milestone"),
         record_type: "milestone",
         type_name: "milestone",
-        label: "Milestone",
+        label: Cow::Borrowed("Milestone"),
         display_id_pattern: "MS-###",
         directory: "backlog",
         subpath: "milestones",
@@ -255,10 +264,10 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         sections: MILESTONE_SECTIONS,
     },
     RecordDescriptor {
-        name: "release",
+        name: Cow::Borrowed("release"),
         record_type: "release",
         type_name: "release",
-        label: "Release",
+        label: Cow::Borrowed("Release"),
         display_id_pattern: "REL-###",
         directory: "backlog",
         subpath: "releases",
@@ -267,10 +276,10 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         sections: RELEASE_SECTIONS,
     },
     RecordDescriptor {
-        name: "decision",
+        name: Cow::Borrowed("decision"),
         record_type: "decision",
         type_name: "decision",
-        label: "Decision",
+        label: Cow::Borrowed("Decision"),
         display_id_pattern: "DEC-###",
         directory: "decision",
         subpath: "",
@@ -300,39 +309,6 @@ pub fn descriptor_for(name: &str) -> Option<&'static RecordDescriptor> {
             || d.type_name.to_lowercase() == needle
             || d.label.to_lowercase() == needle
     })
-}
-
-use std::collections::BTreeMap;
-use std::sync::{Mutex, OnceLock};
-
-static GENERIC_DESC_CACHE: OnceLock<Mutex<BTreeMap<String, &'static RecordDescriptor>>> =
-    OnceLock::new();
-
-/// Build (and cache) a runtime [`RecordDescriptor`] for a config-defined
-/// (generic) document type. The slug is leaked to satisfy the `'static`
-/// lifetime required by the record layer; the real directory, prefix, and
-/// status vocabulary are resolved through `doc_type_key`.
-pub fn generic_document_descriptor(slug: &str) -> &'static RecordDescriptor {
-    let cache = GENERIC_DESC_CACHE.get_or_init(|| Mutex::new(BTreeMap::new()));
-    let mut map = cache.lock().expect("generic descriptor cache poisoned");
-    if let Some(existing) = map.get(slug) {
-        return existing;
-    }
-    let slug_static: &'static str = Box::leak(slug.to_string().into_boxed_str());
-    let descriptor = Box::leak(Box::new(RecordDescriptor {
-        name: slug_static,
-        record_type: "document",
-        type_name: "document",
-        label: slug_static,
-        display_id_pattern: "GEN-###",
-        directory: "doc",
-        subpath: "",
-        doc_type_key: Some(slug_static),
-        frontmatter_keys: &["status"],
-        sections: &["## Description"],
-    }));
-    map.insert(slug.to_string(), descriptor);
-    descriptor
 }
 
 pub fn is_managed_record(name: &str) -> bool {

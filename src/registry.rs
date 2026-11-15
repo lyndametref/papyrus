@@ -13,6 +13,7 @@ use crate::config::{Config, DocTypeEntry, TypeEntry};
 use crate::error::AppError;
 use crate::record::descriptor::RecordDescriptor;
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -2663,9 +2664,21 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
         Some(template) => template
             .record
             .map(|facts| document_record(template, facts)),
-        None => Some(*crate::record::descriptor::generic_document_descriptor(
-            slug,
-        )),
+        // A config-defined type has no static template, so the registry builds
+        // its record facts inline from the type it already owns. The registry
+        // owns the descriptor; nothing is leaked or cached (ADR-0017 D10).
+        None => Some(RecordDescriptor {
+            name: Cow::Owned(slug.to_string()),
+            record_type: "document",
+            type_name: "document",
+            label: Cow::Owned(slug.to_string()),
+            display_id_pattern: "GEN-###",
+            directory: "doc",
+            subpath: "",
+            doc_type_key: Some(Cow::Owned(slug.to_string())),
+            frontmatter_keys: &["status"],
+            sections: &["## Description"],
+        }),
     };
 
     Ok(TypeDescriptor {
@@ -2699,14 +2712,14 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
 /// `RecordDescriptor::resolve_directory` reads through `doc_type_key`.
 fn document_record(template: &DescriptorTemplate, facts: RecordFacts) -> RecordDescriptor {
     RecordDescriptor {
-        name: facts.record_name,
+        name: Cow::Borrowed(facts.record_name),
         record_type: facts.record_type,
         type_name: facts.type_name,
-        label: template.label,
+        label: Cow::Borrowed(template.label),
         display_id_pattern: facts.display_id_pattern,
         directory: "doc",
         subpath: "",
-        doc_type_key: Some(template.slug),
+        doc_type_key: Some(Cow::Borrowed(template.slug)),
         frontmatter_keys: facts.frontmatter_keys,
         sections: match template.content {
             ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => schema.sections,
@@ -3597,7 +3610,11 @@ mod tests {
                 .record_descriptor(slug)
                 .unwrap_or_else(|| panic!("record descriptor missing: {slug}"));
 
-            assert_eq!(record.doc_type_key, Some(slug), "{slug} doc-type key");
+            assert_eq!(
+                record.doc_type_key.as_deref(),
+                Some(slug),
+                "{slug} doc-type key"
+            );
             assert_eq!(record.label, descriptor.label, "{slug} label");
             assert_eq!(
                 record.configured_prefixes(&cfg),
@@ -3663,14 +3680,14 @@ mod tests {
         let glossary = registry
             .record_descriptor("glossary")
             .expect("glossary record");
-        assert_eq!(glossary.doc_type_key, Some("glossary"));
+        assert_eq!(glossary.doc_type_key.as_deref(), Some("glossary"));
         assert_eq!(glossary.configured_prefixes(&cfg), vec!["GLO"]);
         assert!(glossary.has_frontmatter_key("status"));
         assert_eq!(glossary.sections, GLOSSARY_SECTIONS);
         assert_eq!(glossary.record_type, "glossary");
 
         let note = registry.record_descriptor("note").expect("note record");
-        assert_eq!(note.doc_type_key, Some("note"));
+        assert_eq!(note.doc_type_key.as_deref(), Some("note"));
         assert_eq!(note.configured_prefixes(&cfg), vec!["NOTE"]);
         assert!(note.has_frontmatter_key("status"));
         assert_eq!(note.sections, &["## Description"]);
@@ -3710,11 +3727,11 @@ mod tests {
             .split("#[cfg(test)]")
             .next()
             .expect("production lines");
-        // A per-slug literal would be a new parallel document table. The
-        // generic constructor's `Some(slug_static)` is allowed until TASK-121.
+        // A per-slug literal would be a new parallel document table, whether
+        // borrowed or owned (`doc_type_key: Some(` matches both forms).
         for forbidden in [
             concat!("descriptor_for", "_doc_type"),
-            "doc_type_key: Some(\"",
+            "doc_type_key: Some(",
         ] {
             assert!(
                 !production.contains(forbidden),
