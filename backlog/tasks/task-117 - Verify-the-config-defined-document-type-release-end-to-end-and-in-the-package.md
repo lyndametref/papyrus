@@ -5,7 +5,7 @@ status: Done
 assignee:
   - rust-dev
 created_date: '2026-11-13T21:27:00Z'
-updated_date: '2026-11-14T20:02:00Z'
+updated_date: '2026-11-15T10:38:00Z'
 labels:
   - rust
   - browser
@@ -272,6 +272,15 @@ Refined for execution. Added `docs/specifications/config-defined-document-types-
 Assumptions recorded: Debian Forky amd64 with Rust 1.99.1; no product/document edits in this task; historical ADRs/specs and backlog records excluded from the documentation no-drift scan; `note` is the fixture type.
 
 Open questions (non-blocking, defaults stated): who accepts a release-blocking gap (default: project owner in writing); whether a trivially stale README/upgrade-notes line may be fixed here (default: no, record only); whether a real-GUI browser run is required (default: no). Execution-ready: yes. Release readiness may still be `no` if G-4 or G-5 is confirmed release-blocking.
+
+---
+
+author: @orchestrator
+created: 2026-11-15T10:38:00Z
+
+---
+
+F-117-1 (low): closed by TASK-123 — sanitize_name/sanitize_path_string now reject C0, DEL and C1 control characters; create/edit exit 4 with no write. The separate sanitize_path_component/sanitize_path surface remains a follow-up candidate.
 
 ---
 <!-- COMMENTS:END -->

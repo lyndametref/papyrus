@@ -1,10 +1,19 @@
 use std::path::{Component, Path, PathBuf};
 
+/// Reject any Unicode control character (C0, DEL, and C1) from an already
+/// trimmed single-line value.
+fn has_control_character(value: &str) -> bool {
+    value.chars().any(char::is_control)
+}
+
 /// Normalize user-controlled input. Returns `None` if a valid value cannot be
 /// produced.
 pub fn sanitize_name(input: &str) -> Option<String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
+        return None;
+    }
+    if has_control_character(trimmed) {
         return None;
     }
     if trimmed.contains('\0') || trimmed.contains('\n') || trimmed.contains('\r') {
@@ -58,6 +67,9 @@ pub fn sanitize_path(input: &Path) -> Option<PathBuf> {
 pub fn sanitize_path_string(input: &str) -> Option<String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
+        return None;
+    }
+    if has_control_character(trimmed) {
         return None;
     }
     if trimmed.contains('\0') || trimmed.contains('\n') || trimmed.contains('\r') {
@@ -119,6 +131,75 @@ pub fn kebab_slug(input: &str) -> String {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod control_character_tests {
+    use super::{sanitize_name, sanitize_path_string};
+
+    /// Every C0 control character and DEL, embedded between ordinary
+    /// characters, must be rejected by both sanitizers.
+    #[test]
+    fn rejects_c0_and_del_for_both_sanitizers() {
+        let mut scalars: Vec<char> = (0u32..=0x1F).filter_map(char::from_u32).collect();
+        scalars.push('\u{7F}');
+        for ch in scalars {
+            let input = format!("a{ch}b");
+            assert_eq!(sanitize_name(&input), None, "sanitize_name accepted {ch:?}");
+            assert_eq!(
+                sanitize_path_string(&input),
+                None,
+                "sanitize_path_string accepted {ch:?}"
+            );
+        }
+    }
+
+    /// U+0080..U+009F (C1) is rejected for the same reason as C0: the shared
+    /// check uses `char::is_control()`.
+    #[test]
+    fn rejects_c1_sample_for_both_sanitizers() {
+        let input = "a\u{9B}b";
+        assert_eq!(sanitize_name(input), None);
+        assert_eq!(sanitize_path_string(input), None);
+    }
+
+    #[test]
+    fn accepts_legitimate_input() {
+        for sample in ["Release notes", "Résumé – v2", "a.b", "a-b", "x (y) 100%"] {
+            assert_eq!(sanitize_name(sample), Some(sample.to_string()));
+            assert_eq!(sanitize_path_string(sample), Some(sample.to_string()));
+        }
+        assert_eq!(
+            sanitize_path_string("docs/design.md"),
+            Some("docs/design.md".to_string())
+        );
+    }
+
+    #[test]
+    fn trims_before_rejecting_controls() {
+        assert_eq!(sanitize_name("  Ti\ttle  "), None);
+        assert_eq!(sanitize_path_string("  Ti\ttle  "), None);
+        assert_eq!(sanitize_name("\t"), None);
+        assert_eq!(sanitize_path_string("\t"), None);
+        assert_eq!(sanitize_name("   "), None);
+        assert_eq!(sanitize_path_string("   "), None);
+        assert_eq!(sanitize_name("Title\t"), Some("Title".to_string()));
+        assert_eq!(sanitize_path_string("Title\t"), Some("Title".to_string()));
+    }
+
+    #[test]
+    fn keeps_existing_rejections() {
+        for input in ["a\0b", "a\nb", "a\rb"] {
+            assert_eq!(sanitize_name(input), None, "{input:?}");
+            assert_eq!(sanitize_path_string(input), None, "{input:?}");
+        }
+        for input in ["a/b", "a\\b"] {
+            assert_eq!(sanitize_name(input), None, "{input:?}");
+        }
+        for input in ["a\\b", "a/../b", "/abs/path", "../../etc/passwd"] {
+            assert_eq!(sanitize_path_string(input), None, "{input:?}");
+        }
+    }
 }
 
 #[cfg(test)]
