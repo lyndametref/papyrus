@@ -12,6 +12,7 @@ pub enum PatchOp {
     SetSection(String, String),
     ClearSection(String),
     SetHeadingTitle(String),
+    SetHeadingId(String),
     ClearHeading,
 }
 
@@ -197,6 +198,27 @@ pub fn apply_patch(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> 
                 }
                 heading_changed = true;
             }
+            PatchOp::SetHeadingId(id) => {
+                let new_heading: Option<String> = match &heading {
+                    Some(h) => match h.strip_prefix("# ") {
+                        Some(rest) => match rest.split_once(' ') {
+                            Some((current, title)) if current != id => {
+                                Some(format!("# {} {}", id, title))
+                            }
+                            Some(_) => Some(h.clone()),
+                            None if rest != id => Some(format!("# {}", id)),
+                            None => Some(h.clone()),
+                        },
+                        None => Some(h.clone()),
+                    },
+                    None => None,
+                };
+                if heading != new_heading {
+                    heading = new_heading;
+                    changed = true;
+                }
+                heading_changed = true;
+            }
             PatchOp::ClearHeading => {
                 if heading.is_some() {
                     heading = None;
@@ -336,6 +358,31 @@ mod tests {
         let input = "---\nid: TASK-1\ntitle: T\n---\n\n## Description\nBody\n";
         let doc = document::parse(input).unwrap();
         let out = apply_patch(&doc, &[PatchOp::ClearHeading]).unwrap();
+        assert_eq!(out, input);
+    }
+
+    #[test]
+    fn set_heading_id_replaces_only_the_id() {
+        let input = "---\nid: TECH-001\ntitle: T\n---\n\n# TECH-001 T\n\n## Description\nBody\n";
+        let doc = document::parse(input).unwrap();
+        let out = apply_patch(&doc, &[PatchOp::SetHeadingId("TECH-002".into())]).unwrap();
+        assert!(out.contains("# TECH-002 T"), "got: {}", out);
+        assert!(!out.contains("# TECH-001 T"), "got: {}", out);
+    }
+
+    #[test]
+    fn set_heading_id_is_noop_when_equal() {
+        let input = "---\nid: TECH-001\ntitle: T\n---\n\n# TECH-001 T\n\n## Description\nBody\n";
+        let doc = document::parse(input).unwrap();
+        let out = apply_patch(&doc, &[PatchOp::SetHeadingId("TECH-001".into())]).unwrap();
+        assert_eq!(out, input);
+    }
+
+    #[test]
+    fn set_heading_id_never_inserts_a_heading() {
+        let input = "---\nid: TECH-001\ntitle: T\n---\n\n## Description\nBody\n";
+        let doc = document::parse(input).unwrap();
+        let out = apply_patch(&doc, &[PatchOp::SetHeadingId("TECH-002".into())]).unwrap();
         assert_eq!(out, input);
     }
 

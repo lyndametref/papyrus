@@ -449,6 +449,105 @@ pub fn is_timestamp_pub(v: &str) -> bool {
     is_timestamp(v)
 }
 
+/// Parse an ISO-8601 UTC timestamp with a `Z` or `±HH:MM` offset into UTC
+/// seconds since the Unix epoch.
+///
+/// This is the inverse of [`utc_from_unix`]: the accepted shape is
+/// `YYYY-MM-DDTHH:MM:SS` followed by `Z` or `±HH:MM`. Values outside the
+/// calendar or clock ranges resolve to `None`.
+pub fn timestamp_seconds(value: &str) -> Option<i64> {
+    let raw = value.trim();
+    if !raw.is_ascii() {
+        return None;
+    }
+    let bytes = raw.as_bytes();
+    let offset = match raw.len() {
+        20 if bytes[19] == b'Z' => 0,
+        25 => {
+            let sign: i64 = match bytes[19] {
+                b'+' => 1,
+                b'-' => -1,
+                _ => return None,
+            };
+            if bytes[22] != b':' {
+                return None;
+            }
+            let hours = parse_digits(&bytes[20..22])?;
+            let minutes = parse_digits(&bytes[23..25])?;
+            if hours > 23 || minutes > 59 {
+                return None;
+            }
+            sign * (i64::from(hours) * 3600 + i64::from(minutes) * 60)
+        }
+        _ => return None,
+    };
+    if bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes[10] != b'T'
+        || bytes[13] != b':'
+        || bytes[16] != b':'
+    {
+        return None;
+    }
+    let year = parse_digits(&bytes[0..4])? as i64;
+    let month = parse_digits(&bytes[5..7])?;
+    let day = parse_digits(&bytes[8..10])?;
+    if !(1..=12).contains(&month) || day < 1 || day > days_in_month(year, month) {
+        return None;
+    }
+    let hour = parse_digits(&bytes[11..13])?;
+    let minute = parse_digits(&bytes[14..16])?;
+    let second = parse_digits(&bytes[17..19])?;
+    if hour > 23 || minute > 59 || second > 59 {
+        return None;
+    }
+    let seconds = days_from_civil(year, month, day) * 86_400
+        + i64::from(hour) * 3_600
+        + i64::from(minute) * 60
+        + i64::from(second);
+    Some(seconds - offset)
+}
+
+fn parse_digits(bytes: &[u8]) -> Option<u32> {
+    let mut value = 0u32;
+    for &byte in bytes {
+        if !byte.is_ascii_digit() {
+            return None;
+        }
+        value = value.checked_mul(10)?.checked_add(u32::from(byte - b'0'))?;
+    }
+    Some(value)
+}
+
+fn is_leap_year(year: i64) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+fn days_in_month(year: i64, month: u32) -> u32 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if is_leap_year(year) => 29,
+        2 => 28,
+        _ => 0,
+    }
+}
+
+fn days_from_civil(year: i64, month: u32, day: u32) -> i64 {
+    // Howard Hinnant's days_from_civil, the inverse of `civil_from_unix`.
+    let year = if month <= 2 { year - 1 } else { year };
+    let era = if year >= 0 { year } else { year - 399 } / 400;
+    let year_of_era = year - era * 400;
+    let month_prime = if month > 2 {
+        i64::from(month) - 3
+    } else {
+        i64::from(month) + 9
+    };
+    let day_of_year = (153 * month_prime + 2) / 5 + i64::from(day) - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    era * 146_097 + day_of_era - 719_468
+}
+
 fn civil_from_unix(secs: i64) -> (i64, u32, u32, u32, u32, u32) {
     let days = secs.div_euclid(86400);
     let rem = secs.rem_euclid(86400);
@@ -529,6 +628,47 @@ mod tests {
         let (out, changed) = patch_raw(raw, "labels", Some("foo"));
         assert!(!changed);
         assert_eq!(out, raw);
+    }
+
+    #[test]
+    fn timestamp_seconds_round_trips_utc() {
+        assert_eq!(timestamp_seconds("1970-01-01T00:00:00Z"), Some(0));
+        for value in [
+            "2026-01-01T00:00:00Z",
+            "2026-11-15T17:30:00Z",
+            "2000-02-29T23:59:59Z",
+            "1969-12-31T23:59:59Z",
+        ] {
+            let seconds = timestamp_seconds(value).expect(value);
+            assert_eq!(utc_from_unix(seconds), value);
+        }
+    }
+
+    #[test]
+    fn timestamp_seconds_compares_offsets_as_instants() {
+        let utc = timestamp_seconds("2026-01-01T10:00:00Z").unwrap();
+        let ahead = timestamp_seconds("2026-01-01T12:00:00+02:00").unwrap();
+        let behind = timestamp_seconds("2026-01-01T05:00:00-05:00").unwrap();
+        assert_eq!(utc, ahead);
+        assert_eq!(utc, behind);
+    }
+
+    #[test]
+    fn timestamp_seconds_rejects_invalid_values() {
+        for value in [
+            "",
+            "not a date",
+            "2026-13-01T00:00:00Z",
+            "2026-02-30T00:00:00Z",
+            "2026-01-01T25:00:00Z",
+            "2026-01-01T00:61:00Z",
+            "2026-01-01T00:00:60Z",
+            "2026-01-01T00:00:00",
+            "2026-01-01T00:00:00+2:00",
+            "2026-01-01T00:00:00X",
+        ] {
+            assert_eq!(timestamp_seconds(value), None, "{:?}", value);
+        }
     }
 
     #[test]

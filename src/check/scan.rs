@@ -49,11 +49,16 @@ pub struct ScannedFamily<'a> {
 }
 
 /// Metadata read from one scanned record without touching the file.
+#[derive(Clone)]
 pub struct RecordMeta {
     pub rel: String,
+    pub path: std::path::PathBuf,
     pub key: String,
     pub display: String,
     pub number_count: usize,
+    pub numbers: Vec<i64>,
+    pub prefix: String,
+    pub version: String,
     pub frontmatter: Option<FrontMatter>,
     pub mismatch: bool,
     pub read_only: bool,
@@ -184,20 +189,29 @@ fn record_meta(
         (Some(_), Some((parts, prefix))) => parts.key(prefix) != stem_parts.key(&stem_prefix),
         (None, _) => false,
     };
-    let (key, display, number_count) = match frontmatter_parts {
-        Some((parts, prefix)) => (parts.key(&prefix), parts.display, parts.numbers.len()),
+    let (key, display, numbers, prefix) = match frontmatter_parts {
+        Some((parts, prefix)) => (parts.key(&prefix), parts.display, parts.numbers, prefix),
         None => (
             stem_parts.key(&stem_prefix),
             stem_parts.display,
-            stem_parts.numbers.len(),
+            stem_parts.numbers,
+            stem_prefix,
         ),
     };
+    let number_count = numbers.len();
     let read_only = is_read_only(cfg, project_dir, family.descriptor, path);
+    let metadata = fs::metadata(path).map_err(|error| {
+        AppError::Runtime(format!("cannot read record {}: {}", path.display(), error))
+    })?;
     Ok(Some(RecordMeta {
         rel: project_relative(project_dir, path),
+        path: path.to_path_buf(),
         key,
         display,
         number_count,
+        numbers,
+        prefix,
+        version: crate::record::store::version_token(&metadata),
         frontmatter,
         mismatch,
         read_only,
@@ -611,7 +625,7 @@ fn conflict(scanned: &ScannedFamily<'_>, record: &RecordMeta, detail: String) ->
     }
 }
 
-fn frontmatter_scalar(frontmatter: &FrontMatter, key: &str) -> Option<String> {
+pub(crate) fn frontmatter_scalar(frontmatter: &FrontMatter, key: &str) -> Option<String> {
     let value = frontmatter
         .data
         .get(yaml_serde::Value::String(key.to_string()))?;
@@ -627,7 +641,7 @@ fn frontmatter_scalar(frontmatter: &FrontMatter, key: &str) -> Option<String> {
     })
 }
 
-fn frontmatter_list(frontmatter: &FrontMatter, key: &str) -> Option<Vec<String>> {
+pub(crate) fn frontmatter_list(frontmatter: &FrontMatter, key: &str) -> Option<Vec<String>> {
     let value = frontmatter
         .data
         .get(yaml_serde::Value::String(key.to_string()))?;

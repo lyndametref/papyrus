@@ -11,6 +11,7 @@ pub const DANGLING_RELEASE: &str = "dangling-release";
 pub const DEPENDENCY_CYCLE: &str = "dependency-cycle";
 pub const DUPLICATE_ID: &str = "duplicate-id";
 pub const FRONTMATTER_CONFLICT: &str = "frontmatter-conflict";
+pub const REPAIR_SKIPPED: &str = "repair-skipped";
 pub const SELF_DEPENDENCY: &str = "self-dependency";
 
 /// One detected problem. `kind` is a stable public value.
@@ -46,8 +47,13 @@ fn compare_optional(left: &Option<String>, right: &Option<String>) -> Ordering {
     }
 }
 
-/// Render the plain report: one line per finding, then one skipped line.
-pub fn render_text(findings: &[Finding], skipped: &[&'static str]) -> String {
+/// Render the plain report: one line per finding, then the repair lines, then
+/// one skipped-checks line.
+pub fn render_text(
+    findings: &[Finding],
+    skipped: &[&'static str],
+    repair_lines: &[String],
+) -> String {
     let mut lines: Vec<String> = Vec::new();
     if findings.is_empty() {
         lines.push("no findings".to_string());
@@ -69,14 +75,15 @@ pub fn render_text(findings: &[Finding], skipped: &[&'static str]) -> String {
         line.push(')');
         lines.push(line);
     }
+    lines.extend(repair_lines.iter().cloned());
     if !skipped.is_empty() {
         lines.push(format!("skipped: {}", skipped.join(", ")));
     }
     lines.join("\n")
 }
 
-/// Render the machine-readable report. `repaired` stays empty for this run.
-pub fn to_json(findings: &[Finding], skipped: &[&'static str]) -> Value {
+/// Render the machine-readable report with the applied repairs.
+pub fn to_json(findings: &[Finding], skipped: &[&'static str], repaired: Vec<Value>) -> Value {
     let findings: Vec<Value> = findings
         .iter()
         .map(|finding| {
@@ -93,7 +100,7 @@ pub fn to_json(findings: &[Finding], skipped: &[&'static str]) -> Value {
     json!({
         "findings": findings,
         "skipped": skipped,
-        "repaired": Vec::<Value>::new(),
+        "repaired": repaired,
     })
 }
 

@@ -703,6 +703,86 @@ pub fn archive_content(
     Ok(())
 }
 
+/// Reassign a record's ID through the single write path.
+///
+/// A record without front matter keeps its identity in the file stem, so the
+/// repair is a rename with unchanged bytes. A record with front matter patches
+/// `id`, refreshes `updated_date`, and updates the body heading ID only when the
+/// heading already agrees with the front-matter `id`. The new path is written
+/// atomically before the old path is removed.
+pub fn reassign_id(ctx: &Context, path: &Path, new_id: &str) -> Result<PathBuf, AppError> {
+    if !crate::record::identity::is_valid_id_component(new_id) {
+        return Err(AppError::Validation(format!(
+            "invalid record id: {}",
+            new_id
+        )));
+    }
+    let source = resolve_path(ctx, path).map_err(|_| {
+        AppError::Runtime(format!(
+            "path resolves outside project directory: {}",
+            path.display()
+        ))
+    })?;
+    let extension = source
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
+    let file_name = if extension.is_empty() {
+        new_id.to_string()
+    } else {
+        format!("{}.{}", new_id, extension)
+    };
+    let destination = Context::ensure_within(&ctx.project_dir, &source.with_file_name(file_name))?;
+
+    let content = fs::read_to_string(&source).map_err(|error| {
+        AppError::Runtime(format!(
+            "cannot read record {}: {}",
+            source.display(),
+            error
+        ))
+    })?;
+
+    let front_matter = crate::record::frontmatter::parse(&content)?;
+    let Some(front_matter) = front_matter else {
+        move_record(ctx, &source, &destination)?;
+        return Ok(destination);
+    };
+
+    let current_id = crate::record::frontmatter::current_value_string(&front_matter.raw, "id")
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let doc = crate::record::document::parse(&content)?;
+    let (heading_id, _) = crate::record::document::heading_id_title(&doc);
+    let heading_matches = current_id
+        .as_deref()
+        .is_some_and(|current| !heading_id.is_empty() && heading_id.trim() == current);
+
+    let mut ops = vec![
+        crate::record::patch::PatchOp::SetFrontMatter("id".into(), new_id.to_string()),
+        crate::record::patch::PatchOp::SetFrontMatter(
+            "updated_date".into(),
+            crate::record::frontmatter::utc_now(),
+        ),
+    ];
+    if heading_matches {
+        ops.push(crate::record::patch::PatchOp::SetHeadingId(
+            new_id.to_string(),
+        ));
+    }
+    let patched = crate::record::patch::apply_patch(&doc, &ops)?;
+
+    write_atomic(ctx, &destination, &patched)?;
+    fs::remove_file(&source).map_err(|error| {
+        AppError::Runtime(format!(
+            "wrote {} but failed to remove {}: {}",
+            destination.display(),
+            source.display(),
+            error
+        ))
+    })?;
+    Ok(destination)
+}
+
 // Provide a Store struct alias for hidden tests that prefer OO style.
 pub struct Store;
 
@@ -795,6 +875,9 @@ impl Store {
     }
     pub fn version_token(meta: &fs::Metadata) -> String {
         version_token(meta)
+    }
+    pub fn reassign_id(ctx: &Context, path: &Path, new_id: &str) -> Result<PathBuf, AppError> {
+        reassign_id(ctx, path, new_id)
     }
 }
 
@@ -962,6 +1045,95 @@ mod tests {
         assert_eq!(after, path);
         assert_eq!(fs::read_to_string(&path).unwrap(), content);
         assert!(!dir.join("backlog/archive/milestones").exists());
+    }
+
+    fn reassign_fixture(name: &str) -> (Context, std::path::PathBuf) {
+        let dir = tmpdir(name);
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("docs/technical")).unwrap();
+        (c, dir)
+    }
+
+    #[test]
+    fn reassign_id_patches_id_updated_date_heading_and_preserves_the_rest() {
+        let (c, dir) = reassign_fixture("reassign-frontmatter");
+        let path = dir.join("docs/technical/TECH-001.md");
+        let content = "---\nid: TECH-001\ntitle: T\ncustom: kept\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2000-01-01T00:00:00Z'\n---\n\n# TECH-001 T\n\n## Description\n\nBody\n";
+        fs::write(&path, content).unwrap();
+
+        let new_path = reassign_id(&c, &path, "TECH-002").unwrap();
+        assert_eq!(new_path, dir.join("docs/technical/TECH-002.md"));
+        assert!(!path.exists(), "the old path is removed");
+        let written = fs::read_to_string(&new_path).unwrap();
+        assert!(written.contains("id: TECH-002"), "got: {}", written);
+        assert!(written.contains("# TECH-002 T"), "got: {}", written);
+        assert!(written.contains("custom: kept"), "got: {}", written);
+        assert!(!written.contains("TECH-001"), "got: {}", written);
+        assert!(
+            !written.contains("2000-01-01T00:00:00Z"),
+            "got: {}",
+            written
+        );
+        let frontmatter = crate::record::frontmatter::parse(&written)
+            .unwrap()
+            .expect("front matter");
+        let updated =
+            crate::record::frontmatter::current_value_string(&frontmatter.raw, "updated_date")
+                .expect("updated_date");
+        assert!(
+            crate::record::frontmatter::timestamp_seconds(&updated).is_some(),
+            "updated_date is ISO-8601 UTC: {}",
+            updated
+        );
+        let parsed = crate::record::identity::parse_id_parts(
+            new_path.file_stem().unwrap().to_str().unwrap(),
+            "TECH",
+            false,
+        )
+        .expect("new stem parses");
+        assert_eq!(parsed.display, "TECH-002");
+    }
+
+    #[test]
+    fn reassign_id_leaves_a_disagreeing_heading_untouched() {
+        let (c, dir) = reassign_fixture("reassign-heading");
+        let path = dir.join("docs/technical/TECH-001.md");
+        let body = "\n# OTHER T\n\n## Description\n\nBody\n";
+        let content = format!(
+            "---\nid: TECH-001\ntitle: T\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2000-01-01T00:00:00Z'\n---\n{}",
+            body
+        );
+        fs::write(&path, &content).unwrap();
+
+        let new_path = reassign_id(&c, &path, "TECH-002").unwrap();
+        let written = fs::read_to_string(&new_path).unwrap();
+        assert!(written.contains("# OTHER T"), "got: {}", written);
+        assert!(written.contains("id: TECH-002"), "got: {}", written);
+        let (_, new_body) = crate::record::frontmatter::split(&written).unwrap();
+        assert_eq!(new_body, body, "the body is byte-identical");
+    }
+
+    #[test]
+    fn reassign_id_renames_a_record_without_front_matter_with_identical_bytes() {
+        let (c, dir) = reassign_fixture("reassign-html");
+        let path = dir.join("docs/technical/UI-001-dashboard.html");
+        let bytes = b"<!doctype html>\n<title>Dashboard</title>\n";
+        fs::write(&path, bytes).unwrap();
+
+        let new_path = reassign_id(&c, &path, "UI-002").unwrap();
+        assert_eq!(new_path, dir.join("docs/technical/UI-002.html"));
+        assert!(!path.exists(), "the old path is removed");
+        assert_eq!(fs::read(&new_path).unwrap(), bytes);
+    }
+
+    #[test]
+    fn reassign_id_rejects_an_unsafe_id() {
+        let (c, dir) = reassign_fixture("reassign-unsafe");
+        let path = dir.join("docs/technical/TECH-001.md");
+        fs::write(&path, "---\nid: TECH-001\n---\n").unwrap();
+        let error = reassign_id(&c, &path, "../escape").unwrap_err();
+        assert!(matches!(error, AppError::Validation(_)), "{:?}", error);
+        assert!(path.exists(), "a refused id writes nothing");
     }
 
     #[test]

@@ -124,9 +124,9 @@ fn dispatch_builtin(
                 ..Default::default()
             })
         }
-        BuiltinCmd::Check => {
+        BuiltinCmd::Check { fix, force } => {
             let ctx = build_check_context(project_raw, config_path, json, no_color)?;
-            crate::check::run(&ctx)
+            crate::check::run(&ctx, fix, force)
         }
         BuiltinCmd::Config { action } => {
             let ctx = build_context(project_raw, config_path, json, no_color)?;

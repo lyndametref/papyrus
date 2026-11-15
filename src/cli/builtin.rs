@@ -62,7 +62,14 @@ pub enum BuiltinCmd {
         action: ConfigCmd,
     },
     /// Run read-only project diagnostics.
-    Check,
+    Check {
+        /// Repair duplicate record IDs.
+        #[arg(long)]
+        fix: bool,
+        /// Skip the repair confirmation prompt; requires --fix.
+        #[arg(long, requires = "fix")]
+        force: bool,
+    },
     /// Manage milestones.
     Milestone {
         #[command(subcommand)]

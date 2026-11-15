@@ -655,6 +655,406 @@ fn usage_and_io_failures_keep_their_exit_codes() {
     assert_eq!(stdout_of(&io), "", "I/O failures use the error path");
 }
 
+fn set_created_date(project: &Project, relative: &str, value: &str) {
+    let content = project.read(relative);
+    let mut lines: Vec<String> = content
+        .lines()
+        .map(|line| {
+            if line.starts_with("created_date:") {
+                format!("created_date: '{}'", value)
+            } else {
+                line.to_string()
+            }
+        })
+        .collect();
+    lines.push(String::new());
+    project.write(relative, &lines.join("\n"));
+}
+
+fn updated_date_of(project: &Project, relative: &str) -> String {
+    let content = project.read(relative);
+    content
+        .lines()
+        .find_map(|line| line.strip_prefix("updated_date:"))
+        .map(|value| value.trim().trim_matches('\'').to_string())
+        .expect("updated_date")
+}
+
+#[test]
+fn fix_keeps_the_earliest_created_date_over_path_order() {
+    let project = Project::initialized("fix-keeper-date");
+    project.ok(&["task", "create", "Original"]);
+    project.copy(
+        "backlog/tasks/TASK-001.md",
+        "backlog/tasks/TASK-001-copy.md",
+    );
+    // The copy sorts first by path, but the original is the earliest record.
+    set_created_date(
+        &project,
+        "backlog/tasks/TASK-001.md",
+        "2026-01-01T00:00:00Z",
+    );
+    set_created_date(
+        &project,
+        "backlog/tasks/TASK-001-copy.md",
+        "2026-02-01T00:00:00Z",
+    );
+
+    let out = project.run(&["check", "--fix", "--force"]);
+    assert_eq!(out.status.code(), Some(4), "{}", stderr_of(&out));
+    assert!(
+        stdout_of(&out).contains(
+            "repaired: task TASK-001 -> TASK-002 (backlog/tasks/TASK-001-copy.md -> backlog/tasks/TASK-002.md)"
+        ),
+        "{}",
+        stdout_of(&out)
+    );
+    assert!(
+        project.path("backlog/tasks/TASK-001.md").exists(),
+        "keeper stays"
+    );
+    assert!(!project.path("backlog/tasks/TASK-001-copy.md").exists());
+    assert!(project.path("backlog/tasks/TASK-002.md").exists());
+    assert!(
+        project
+            .read("backlog/tasks/TASK-002.md")
+            .contains("id: TASK-002")
+    );
+}
+
+#[test]
+fn fix_tie_breaks_on_the_lowest_project_relative_path() {
+    let project = Project::initialized("fix-keeper-path");
+    project.ok(&["task", "create", "Original"]);
+    project.copy(
+        "backlog/tasks/TASK-001.md",
+        "backlog/tasks/TASK-001-copy.md",
+    );
+    set_created_date(
+        &project,
+        "backlog/tasks/TASK-001.md",
+        "2026-01-01T00:00:00Z",
+    );
+    set_created_date(
+        &project,
+        "backlog/tasks/TASK-001-copy.md",
+        "2026-01-01T00:00:00Z",
+    );
+
+    let out = project.run(&["check", "--fix", "--force"]);
+    assert_eq!(out.status.code(), Some(4), "{}", stderr_of(&out));
+    assert!(
+        stdout_of(&out).contains(
+            "repaired: task TASK-001 -> TASK-002 (backlog/tasks/TASK-001.md -> backlog/tasks/TASK-002.md)"
+        ),
+        "{}",
+        stdout_of(&out)
+    );
+    assert!(
+        project.path("backlog/tasks/TASK-001-copy.md").exists(),
+        "copy is the keeper"
+    );
+    assert!(!project.path("backlog/tasks/TASK-001.md").exists());
+}
+
+#[test]
+fn fix_allocates_two_group_members_sequentially_in_one_run() {
+    let project = Project::initialized("fix-allocation");
+    project.ok(&["task", "create", "Original"]);
+    project.copy("backlog/tasks/TASK-001.md", "backlog/tasks/TASK-001-b.md");
+    project.copy("backlog/tasks/TASK-001.md", "backlog/tasks/TASK-001-a.md");
+    for relative in [
+        "backlog/tasks/TASK-001-a.md",
+        "backlog/tasks/TASK-001-b.md",
+        "backlog/tasks/TASK-001.md",
+    ] {
+        set_created_date(&project, relative, "2026-01-01T00:00:00Z");
+    }
+
+    let out = project.run(&["check", "--fix", "--force"]);
+    assert_eq!(out.status.code(), Some(4), "{}", stderr_of(&out));
+    let text = stdout_of(&out);
+    assert!(
+        text.contains(
+            "repaired: task TASK-001 -> TASK-002 (backlog/tasks/TASK-001-b.md -> backlog/tasks/TASK-002.md)"
+        ),
+        "{}",
+        text
+    );
+    assert!(
+        text.contains(
+            "repaired: task TASK-001 -> TASK-003 (backlog/tasks/TASK-001.md -> backlog/tasks/TASK-003.md)"
+        ),
+        "{}",
+        text
+    );
+    assert!(project.path("backlog/tasks/TASK-001-a.md").exists());
+    assert!(project.path("backlog/tasks/TASK-002.md").exists());
+    assert!(project.path("backlog/tasks/TASK-003.md").exists());
+}
+
+#[test]
+fn fix_refuses_the_three_refusal_classes_and_writes_nothing() {
+    let project = Project::initialized("fix-refusals");
+    // 1. front-matter id and stem disagree.
+    project.ok(&["task", "create", "Mismatch"]);
+    project.copy(
+        "backlog/tasks/TASK-001.md",
+        "backlog/tasks/TASK-002-copy.md",
+    );
+    // 2. a member in the read-only legacy directory.
+    project.ok(&["task", "create", "Legacy"]);
+    fs::create_dir_all(project.path("backlog/tasks/archived")).expect("legacy directory");
+    project.copy(
+        "backlog/tasks/TASK-003.md",
+        "backlog/tasks/archived/TASK-003.md",
+    );
+    // 3. a grouped-family group ID.
+    project.ok(&["req", "create-group", "--title", "Group"]);
+    project.copy(
+        "docs/requirements/business/REQ-001.md",
+        "docs/requirements/business/REQ-001-copy.md",
+    );
+
+    let before = snapshot(&project.path);
+    let (value, code) = project.json(&["check", "--fix", "--force"]);
+    let after = snapshot(&project.path);
+    assert_eq!(code, Some(4), "refusals still report findings");
+    assert_eq!(value["repaired"], json!([]));
+    assert_eq!(
+        findings_of(&value, "duplicate-id").len(),
+        3,
+        "each refusal stays reported: {}",
+        value
+    );
+    for finding in findings_of(&value, "duplicate-id") {
+        assert_eq!(finding["fixable"], false, "{}", finding);
+    }
+    assert_eq!(before, after, "a refused plan writes nothing");
+}
+
+#[test]
+fn fix_lists_references_and_never_rewrites_the_referring_file() {
+    let project = Project::initialized("fix-references");
+    project.ok(&["task", "create", "Original"]);
+    project.copy(
+        "backlog/tasks/TASK-001.md",
+        "backlog/tasks/TASK-001-copy.md",
+    );
+    set_created_date(
+        &project,
+        "backlog/tasks/TASK-001.md",
+        "2026-01-01T00:00:00Z",
+    );
+    set_created_date(
+        &project,
+        "backlog/tasks/TASK-001-copy.md",
+        "2026-01-01T00:00:00Z",
+    );
+    project.ok(&["task", "create", "Referring"]);
+    project.replace(
+        "backlog/tasks/TASK-002.md",
+        "milestone: null",
+        "milestone: TASK-001",
+    );
+    project.replace(
+        "backlog/tasks/TASK-002.md",
+        "dependencies: []",
+        "dependencies:\n  - TASK-001",
+    );
+    let referring = project.read("backlog/tasks/TASK-002.md");
+
+    let out = project.run(&["check", "--fix", "--force"]);
+    assert_eq!(out.status.code(), Some(4), "{}", stderr_of(&out));
+    let text = stdout_of(&out);
+    assert!(
+        text.contains(
+            "repaired: task TASK-001 -> TASK-003 (backlog/tasks/TASK-001.md -> backlog/tasks/TASK-003.md)"
+        ),
+        "{}",
+        text
+    );
+    let dependencies = text
+        .find(r#"reference: task TASK-002 (backlog/tasks/TASK-002.md) dependencies = "TASK-001""#);
+    let milestone =
+        text.find(r#"reference: task TASK-002 (backlog/tasks/TASK-002.md) milestone = "TASK-001""#);
+    assert!(dependencies.is_some() && milestone.is_some(), "{}", text);
+    assert!(
+        dependencies < milestone,
+        "references keep their sorted order: {}",
+        text
+    );
+    assert_eq!(
+        project.read("backlog/tasks/TASK-002.md"),
+        referring,
+        "the referring file is byte-identical"
+    );
+}
+
+#[test]
+fn fix_exits_four_after_repair_and_a_second_run_is_clean_and_writes_nothing() {
+    let project = Project::initialized("fix-idempotent");
+    project.ok(&["task", "create", "Original"]);
+    project.copy(
+        "backlog/tasks/TASK-001.md",
+        "backlog/tasks/TASK-001-copy.md",
+    );
+
+    let first = project.run(&["check", "--fix", "--force"]);
+    assert_eq!(first.status.code(), Some(4));
+    let after_first = snapshot(&project.path);
+    let second = project.run(&["check", "--fix", "--force"]);
+    assert_eq!(second.status.code(), Some(0), "{}", stdout_of(&second));
+    assert_eq!(stdout_of(&second).trim(), "no findings");
+    assert_eq!(
+        snapshot(&project.path),
+        after_first,
+        "the second run writes nothing"
+    );
+}
+
+#[test]
+fn fix_without_force_on_piped_stdin_exits_two_and_writes_nothing() {
+    let project = Project::initialized("fix-non-terminal");
+    project.ok(&["task", "create", "Original"]);
+    project.copy(
+        "backlog/tasks/TASK-001.md",
+        "backlog/tasks/TASK-001-copy.md",
+    );
+    let before = snapshot(&project.path);
+
+    let out = project.run(&["check", "--fix"]);
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(stdout_of(&out), "");
+    assert!(
+        stderr_of(&out).contains("--fix requires --force when standard input is not a terminal"),
+        "{}",
+        stderr_of(&out)
+    );
+    assert_eq!(snapshot(&project.path), before);
+}
+
+#[test]
+fn force_without_fix_is_a_clap_usage_error_before_any_scan() {
+    let project = Project::initialized("fix-force-usage");
+    project.ok(&["task", "create", "Original"]);
+    project.copy(
+        "backlog/tasks/TASK-001.md",
+        "backlog/tasks/TASK-001-copy.md",
+    );
+    let before = snapshot(&project.path);
+
+    let out = project.run(&["check", "--force"]);
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(stdout_of(&out), "");
+    assert!(!stderr_of(&out).is_empty(), "clap names the missing --fix");
+    assert_eq!(snapshot(&project.path), before);
+}
+
+#[test]
+fn fix_with_nothing_to_repair_never_prompts_and_exits_zero() {
+    let project = Project::initialized("fix-clean");
+    let out = project.run(&["check", "--fix"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr_of(&out));
+    assert_eq!(stdout_of(&out).trim(), "no findings");
+    assert_eq!(stderr_of(&out), "");
+}
+
+#[test]
+fn fix_repairs_a_crash_state_left_by_the_two_write_steps() {
+    let project = Project::initialized("fix-crash");
+    project.ok(&["task", "create", "Original"]);
+    project.copy(
+        "backlog/tasks/TASK-001.md",
+        "backlog/tasks/TASK-001-copy.md",
+    );
+    set_created_date(
+        &project,
+        "backlog/tasks/TASK-001.md",
+        "2026-01-01T00:00:00Z",
+    );
+    set_created_date(
+        &project,
+        "backlog/tasks/TASK-001-copy.md",
+        "2026-01-01T00:00:00Z",
+    );
+    let original = project.read("backlog/tasks/TASK-001.md");
+
+    assert_eq!(
+        project.run(&["check", "--fix", "--force"]).status.code(),
+        Some(4)
+    );
+    assert!(project.path("backlog/tasks/TASK-002.md").exists());
+    // Crash state: the new file exists and the old file reappears.
+    project.write("backlog/tasks/TASK-001.md", &original);
+
+    let out = project.run(&["check", "--fix", "--force"]);
+    assert_eq!(out.status.code(), Some(4), "{}", stdout_of(&out));
+    assert!(!project.path("backlog/tasks/TASK-001.md").exists());
+    assert!(project.path("backlog/tasks/TASK-002.md").exists());
+    assert!(project.path("backlog/tasks/TASK-003.md").exists());
+    let clean = project.run(&["check"]);
+    assert_eq!(clean.status.code(), Some(0), "{}", stdout_of(&clean));
+}
+
+#[test]
+fn fix_force_text_and_json_reports_match_the_goldens() {
+    let text_project = Project::initialized("fix-golden-text");
+    let json_project = Project::initialized("fix-golden-json");
+    for project in [&text_project, &json_project] {
+        project.ok(&["task", "create", "Alpha"]);
+        project.copy(
+            "backlog/tasks/TASK-001.md",
+            "backlog/tasks/TASK-001-copy.md",
+        );
+        set_created_date(project, "backlog/tasks/TASK-001.md", "2026-01-01T00:00:00Z");
+        set_created_date(
+            project,
+            "backlog/tasks/TASK-001-copy.md",
+            "2026-01-01T00:00:00Z",
+        );
+        project.ok(&["task", "create", "Beta"]);
+        project.replace(
+            "backlog/tasks/TASK-002.md",
+            "milestone: null",
+            "milestone: TASK-001",
+        );
+    }
+
+    let text = text_project.run(&["check", "--fix", "--force"]);
+    assert_eq!(text.status.code(), Some(4), "{}", stderr_of(&text));
+    let json = json_project.run_json(&["check", "--fix", "--force"]);
+    assert_eq!(json.status.code(), Some(4), "{}", stderr_of(&json));
+
+    let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/check");
+    assert_eq!(
+        stdout_of(&text),
+        fs::read_to_string(golden.join("fix-report.txt")).expect("fix text golden")
+    );
+    assert_eq!(
+        stdout_of(&json),
+        fs::read_to_string(golden.join("fix-report.json")).expect("fix json golden")
+    );
+
+    for project in [&text_project, &json_project] {
+        let updated = updated_date_of(project, "backlog/tasks/TASK-003.md");
+        assert!(
+            papyrus::record::frontmatter::timestamp_seconds(&updated).is_some(),
+            "updated_date keeps the ISO-8601 UTC shape: {}",
+            updated
+        );
+    }
+}
+
+fn findings_of<'a>(value: &'a Value, kind: &str) -> Vec<&'a Value> {
+    value["findings"]
+        .as_array()
+        .expect("findings array")
+        .iter()
+        .filter(|finding| finding["kind"] == kind)
+        .collect()
+}
+
 fn snapshot(root: &Path) -> BTreeMap<PathBuf, (Vec<u8>, SystemTime)> {
     let mut files = BTreeMap::new();
     walk(root, root, &mut files);
