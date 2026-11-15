@@ -503,6 +503,55 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        <b style="color: light-dark(#1a7f37, #3fb950);">--limit &lt;n&gt;</b>
        Maximum number of results.
 
+<b style="color: light-dark(#0969da, #58a6ff);">check</b>
+
+       Run read-only project diagnostics. One run scans every managed record family - task, milestone, release, decision, and every configured document type - together with the configuration, and reports integrity findings. <b>papyrus check</b> is CLI-only: no browser route runs it.
+       <code style="font-weight: bold;">
+       papyrus check [--fix] [--force]
+       </code>
+       <b>--json</b>, <b>--dir</b>, <b>--config</b>, and <b>--no-color</b> apply as GLOBAL OPTIONS.
+
+       <b style="color: light-dark(#1a7f37, #3fb950);">--fix</b>
+       Repair duplicate record IDs.
+
+       <b style="color: light-dark(#1a7f37, #3fb950);">--force</b>
+       Skip the repair confirmation prompt; requires <b>--fix</b>.
+
+       Findings are reported one per line as &lt;kind&gt;: &lt;family&gt; &lt;subject&gt; — &lt;detail&gt; (&lt;locations&gt;), sorted by kind, family, subject, and location; the family and subject parts are omitted when a finding carries none. A clean run prints exactly <b>no findings</b>. When a check was skipped, one final <b>skipped: &lt;identifiers&gt;</b> line follows. <b>--json</b> emits the same report as one object with the keys <b>findings</b>, <b>skipped</b>, and <b>repaired</b>.
+
+       The seven finding kinds are:
+
+          <b style="color: light-dark(#8250df, #d2a8ff);">duplicate-id</b>
+          Two or more records of one family share a canonical ID. This is the only kind <b>--fix</b> repairs.
+
+          <b style="color: light-dark(#8250df, #d2a8ff);">self-dependency</b>
+          A task whose dependency list names its own ID.
+
+          <b style="color: light-dark(#8250df, #d2a8ff);">dependency-cycle</b>
+          Tasks whose dependencies form a cycle. One finding per cycle.
+
+          <b style="color: light-dark(#8250df, #d2a8ff);">dangling-milestone</b>
+          A task names a milestone that does not resolve to a scanned milestone.
+
+          <b style="color: light-dark(#8250df, #d2a8ff);">dangling-release</b>
+          A milestone names a release that does not resolve to a scanned release.
+
+          <b style="color: light-dark(#8250df, #d2a8ff);">frontmatter-conflict</b>
+          Front matter and a retained body section disagree - <b>## Status</b>, <b>## Assignee</b>, <b>## Milestone</b>, <b>## Labels</b>, <b>## Dependencies</b>, or a milestone's <b>## Release</b> - or a document's <b># &lt;ID&gt; &lt;title&gt;</b> heading disagrees with its front matter. Decisions are excluded.
+
+          <b style="color: light-dark(#8250df, #d2a8ff);">config-invalid</b>
+          One configuration diagnostic line. It carries no family and no subject, and its location is the configuration file.
+
+       Nothing is written unless <b>--fix</b> is given: a plain run renames, relocates, and rewrites nothing. A legacy <b>deprecated/</b> folder is inert - it is never read, never listed, and produces no finding (REQ-05.007).
+
+       A repair run changes identity and nothing else, and it repairs <b>duplicate-id</b> findings only; every other finding stays in the report and unresolved. Within a duplicate group the keeper is the record with the earliest valid <b>created_date</b>, records with a missing or unparsable date rank last, and a remaining tie goes to the smallest project-relative path. Every other record receives the next ID from the allocator and its file is renamed to the new stem. The plan and the single confirmation prompt for the whole run are written to standard error, so <b>--json</b> stays parseable. Affected references are listed and never rewritten. <b>--force</b> skips the prompt and requires <b>--fix</b>. A planned repair that cannot be applied is reported as <b>repair-skipped</b>. With repairs to apply, no terminal, and no <b>--force</b>, nothing is written and the run exits 2.
+
+       The configuration is loaded tolerantly, like <b>papyrus config get|set|unset|list</b>, so an invalid configuration does not block the run: each diagnostic line becomes one <b>config-invalid</b> finding, the checks that need a valid <b>document_types</b> set are named as skipped, and the remaining checks still run.
+
+       Intended use: run <b>papyrus check</b> read-only, inspect the report, then repair with <b>papyrus check --fix</b> interactively or <b>papyrus check --fix --force</b> unattended, and re-run <b>papyrus check</b>. The second run reports <b>no findings</b> and exits 0, and a further <b>--fix</b> writes nothing.
+
+       Exit status: <b>0</b> when nothing was found; <b>4</b> when at least one finding was reported, including a run whose repairs succeeded, a cancelled run, and a skipped repair; <b>1</b> on an I/O failure; <b>2</b> on a usage error, which covers a parse error, <b>--force</b> without <b>--fix</b>, and the non-terminal refusal. Exit status 4 is a findings outcome here, not an error.
+
 <b style="color: light-dark(#0969da, #58a6ff);">STATUSES</b>
 
 <b style="color: light-dark(#0969da, #58a6ff);">Tasks</b>

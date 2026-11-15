@@ -12,7 +12,7 @@ Based on REQ-02.001 — Create and Describe Tasks and REQ-02.002 — View and Ed
 
 Applies to all invocations of `papyrus task` and the project data they manage. The excerpt below reproduces relevant manpage behavior verbatim; heading identifies README section and exact source line range.
 
-### papyrus(1): task — `README.md` lines 109–228
+### papyrus(1): task — `README.md` lines 153–271
 
 ```text
 task
