@@ -3,11 +3,11 @@ id: TASK-127
 title: >-
   Correct browser and init specifications to the settled archive lifecycles and
   directory creation
-status: Initiated
+status: Refined
 assignee:
   - business-analyst
 created_date: '2026-11-15T11:28:00Z'
-updated_date: '2026-11-15T12:42:00Z'
+updated_date: '2026-11-15T13:00:00Z'
 labels:
   - docs
   - specifications
