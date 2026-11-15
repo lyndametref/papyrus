@@ -1,3 +1,11 @@
+---
+id: ADR-0021
+title: "Man Page Strategy for a Dynamic Command Surface"
+created_date: '2026-11-13T00:00:00Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # Man Page Strategy for a Dynamic Command Surface
 
 ## Status

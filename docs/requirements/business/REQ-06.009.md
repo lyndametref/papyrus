@@ -1,3 +1,11 @@
+---
+id: REQ-06.009
+title: "Set Browser Page Title Branding"
+created_date: '2026-11-11T19:57:56Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-06.009 Set Browser Page Title Branding
 
 ## User Story

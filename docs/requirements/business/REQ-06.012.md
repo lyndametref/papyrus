@@ -1,3 +1,11 @@
+---
+id: REQ-06.012
+title: "Define Single Record View Layout"
+created_date: '2026-11-11T19:58:28Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-06.012 Define Single Record View Layout
 
 ## User Story

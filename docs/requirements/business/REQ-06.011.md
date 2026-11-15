@@ -1,3 +1,11 @@
+---
+id: REQ-06.011
+title: "Adjust Glossary Landing Page Display"
+created_date: '2026-11-11T19:58:13Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-06.011 Adjust Glossary Landing Page Display
 
 ## User Story

@@ -1,3 +1,11 @@
+---
+id: ADR-0007
+title: "YAML Front Matter as the Single Record Metadata Source"
+created_date: '2026-11-08T00:00:00Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # YAML Front Matter as the Single Record Metadata Source
 
 ## Status

@@ -1,3 +1,11 @@
+---
+id: REQ-01.004
+title: "Use Common CLI Controls and Outcomes"
+created_date: '2026-11-13T20:57:33Z'
+updated_date: '2026-11-15T15:57:53Z'
+labels: []
+references: []
+---
 # REQ-01.004 Use Common CLI Controls and Outcomes
 
 ## User Story
@@ -10,17 +18,20 @@ REQ-01 Project Setup and CLI Access
 Must have
 
 ## Description
-Papyrus provides global JSON, color, version, and help options. `--json` applies to commands that produce output, including errors. Color can also be disabled with `NO_COLOR`. The man page defines distinct exit statuses for success, runtime error, usage error, not-found, and validation/conflict outcomes. An invalid effective configuration is a validation outcome reported before any command work begins, except for the repair surfaces (REQ-01.002, REQ-07.002).
+Papyrus provides global JSON, color, version, and help options. `--json` applies to commands that produce output, including errors. Color can also be disabled with `NO_COLOR`. The man page defines distinct exit statuses for success, runtime error, usage error, not-found, and validation/conflict outcomes. An invalid effective configuration is a validation outcome reported before any command work begins, except for the repair surfaces (REQ-01.002, REQ-01.008, REQ-07.002).
 
 ## Acceptance Criteria
 - `--version` prints the version and exits; `-h`/`--help` prints help, and command help is available as `papyrus <command> --help`.
 - `--json` produces machine-readable JSON for output-producing commands, including error output.
 - `--no-color` or setting `NO_COLOR` disables ANSI color output.
 - Success, runtime error, usage error, record-not-found, and validation/conflict outcomes use exit codes 0, 1, 2, 3, and 4 respectively.
-- An invalid effective configuration produces a validation outcome (exit code 4) before command dispatch, except for `config get`, `config set`, `config unset`, `config list`, and `init --force` (REQ-01.002, REQ-07.002).
+- An invalid effective configuration produces a validation outcome (exit code 4) before command dispatch, except for `config get`, `config set`, `config unset`, `config list`, `init --force`, and `check` (REQ-01.002, REQ-01.008, REQ-07.002).
+- `papyrus check` still runs with an invalid configuration, reports the configuration findings, and exits with code 4 when findings exist (REQ-01.008).
 
 ## Traceability
 - README.md, `papyrus(1)` → GLOBAL OPTIONS (lines 35–53), ENVIRONMENT (lines 853–854), EXIT STATUS (lines 859–874)
 - REQ-01.002 — Read and Edit Project Configuration (repair surfaces)
+- REQ-01.008 — Run Project Diagnostics (`check` exits 4 on findings under an invalid configuration)
 - REQ-07.002 — Configure Document Types and Slugs (fail-closed configuration validation)
 - Project-owner decision 2026-11-13 (D4): the validation outcome for an invalid configuration applies to every command except the repair surfaces.
+- Project-owner decision 2026-11-15: `papyrus check` is a tolerant repair surface and therefore also exempt from the pre-dispatch validation outcome.

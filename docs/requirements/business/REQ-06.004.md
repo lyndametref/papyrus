@@ -1,3 +1,11 @@
+---
+id: REQ-06.004
+title: "Use Front-Matter Metadata in CLI and Browser Views"
+created_date: '2026-11-13T20:56:43Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-06.004 Use Front-Matter Metadata in CLI and Browser Views
 
 ## User Story

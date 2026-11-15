@@ -1,8 +1,16 @@
+---
+id: ADR-0028
+title: "Browser Shell: Shared List Layout, Content-Width Contract, and Collapsible Navigation"
+created_date: '2026-11-15T00:00:00Z'
+updated_date: '2026-11-15T15:58:31Z'
+labels: []
+references: []
+---
 # Browser Shell: Shared List Layout, Content-Width Contract, and Collapsible Navigation
 
 ## Status
 
-Proposed (2026-11-15) — awaiting owner validation. Do not implement before acceptance.
+Accepted (2026-11-15) — owner decision 2026-11-15: one shared shell and list layout, server-side `PageWidth` width contract, `localStorage` navigation persistence (default expanded), and the mockup full-width class only (preview route out of scope).
 
 ## Date
 
@@ -54,7 +62,7 @@ Forces: one layout for a type set that changes at runtime (ADR-0017, ADR-0020); 
    - Markup: one `<button class="nav-toggle" type="button" aria-expanded="true" aria-controls="site-nav">` in the shell header on **every** page, and `<nav id="site-nav">` for the existing sidebar.
    - State: `localStorage` key `papyrus.nav` with values `"collapsed"`/`"expanded"`. Collapsed state sets `data-nav="collapsed"` on `<html>`; CSS then removes the sidebar from the grid (`grid-template-columns: 0 minmax(0, 1fr)`), hides it from the accessibility tree (`hidden` attribute set by script), and drops the `.main` left border, so the reclaimed width is real layout width, not a negative margin.
    - No flash of the wrong state: a new asset `/assets/nav-state.js` (≈15 lines) is loaded **synchronously in `<head>`**, reads the stored value, and sets `document.documentElement.dataset.nav` before first paint. `app.js` stays `defer` and only handles the toggle and the existing form guard.
-   - Default: expanded. When no stored value exists, the state is expanded at every viewport width; the current "auto-collapse below 480 px" behaviour is removed, because it competes with a persisted user preference and REQ-06.015 makes the collapsed state the user's choice.
+   - Default: expanded. When no stored value exists, the state is expanded at every viewport width; the current "auto-collapse below 480 px" behaviour is removed, because it competes with a persisted user preference and REQ-06.015 makes the collapsed state the user's choice. `localStorage` is the only persistence mechanism (constraint 5): no cookie, no server state, no configuration key.
    - Degradation: with JavaScript disabled the button is not rendered (`<noscript>`-style server-side omission is not possible without JS detection, so the button carries `hidden` and a two-line asset removes `hidden`), the nav is expanded and fully usable, and any `localStorage` throw (private mode, quota, disabled storage) is caught and ignored, leaving in-memory state for the session.
    - Rejected alternatives: a cookie (ADR-0005 forbids cookies and sessions, and it would make the server stateful per client), server-side state in the project or user config (a write path, a concurrency surface, and per-user state in a project file), a query parameter on every link (breaks persistence across navigation and deep links), and a CSS-only checkbox (state cannot survive navigation).
 
@@ -62,7 +70,7 @@ Forces: one layout for a type set that changes at runtime (ADR-0017, ADR-0020); 
 
 6. **No new dependency, template engine, or client framework.** Lists are rendered server-side into the same `{{name}}` placeholder templates; the two scripts are classic scripts; the CSS is the existing stylesheet plus new rules.
 
-7. **UI-mockup previews are out of scope here, but constrained.** REQ-06.015 presupposes a mockup preview surface; none exists, and the stored review packages contain their own HTML/CSS/JS (ADR-0005 and the mockup specification currently forbid serving the package at all). This ADR fixes only the `PageWidth::Full` classification and records the binding constraint: any future preview route must serve the package as a **sandboxed, opaque-origin document** (`sandbox` without `allow-same-origin`, its own CSP, `X-Frame-Options`/`frame-ancestors` adjusted only for that route), because serving an author-supplied HTML package same-origin would give it access to the browser write API. That route requires its own ADR before implementation.
+7. **UI-mockup previews are out of scope here; only the mockup full-width class is defined.** REQ-06.015 presupposes a mockup preview surface; none exists, and the stored review packages contain their own HTML/CSS/JS (ADR-0005 and the mockup specification currently forbid serving the package at all). This ADR fixes only the `PageWidth::Full` classification and the `.app--full` class that a mockup preview will use, and records the binding constraint: any future preview route must serve the package as a **sandboxed, opaque-origin document** (`sandbox` without `allow-same-origin`, its own CSP, `X-Frame-Options`/`frame-ancestors` adjusted only for that route), because serving an author-supplied HTML package same-origin would give it access to the browser write API. That route requires its own ADR before implementation and is not part of this decision.
 
 8. **Accessibility and browser support are part of the contract.** The toggle is keyboard operable with a visible focus ring, `aria-expanded` and `aria-controls` stay in sync, the collapsed nav is removed with `hidden` rather than only visually hidden, and the layout is verified at the existing 320/480/720 px breakpoints and in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001).
 
@@ -106,12 +114,12 @@ Forces: one layout for a type set that changes at runtime (ADR-0017, ADR-0020); 
 | Set the width class from JavaScript | Rejected | Breaks no-JS equality and makes the route contract untestable server-side. |
 | Serve the mockup preview inside the same page markup | Rejected | Same-origin script execution from an author-supplied package; violates ADR-0005's security model and the mockup specification's "never served" rule. |
 
-## Open Questions
+## Resolved questions (owner, 2026-11-15)
 
-- **Where does the toggle live?** Recommended: in the site header, left of the brand, always visible. Design may refine position and icon.
-- **Should the collapsed state also hide the nav at 480 px and below by default on a first visit?** Current decision: no — the default is expanded at every width, per REQ-06.015; design may propose a responsive default, but it would be a requirement change.
-- **Is the shared list allowed to show fewer family-specific fields than today?** REQ-06.016 says visual specifics are design decisions; the recommendation is to keep every field that exists today as a slot.
-- **Does the mockup preview belong to this release?** REQ-06.015 assumes it exists; it does not. Recommended: build the preview as a separate feature with its own ADR (sandboxed route), and land the width class now.
+1. **Navigation persistence** — decided: `localStorage` under `papyrus.nav`, default expanded at every viewport width; no automatic narrow-viewport collapse (decision 4).
+2. **UI-mockup scope** — decided: this ADR fixes the mockup full-width class (`PageWidth::Full` / `.app--full`) only; the preview route is out of scope and needs its own ADR (decision 7).
+3. **Family-specific fields in the shared list** — decided: every field that exists today is kept as a declared slot; visual trimming is a design decision, not a structural one.
+4. **Toggle position** — a design refinement (header, left of the brand, always visible); it carries no architectural consequence.
 
 ## Downstream constraints
 

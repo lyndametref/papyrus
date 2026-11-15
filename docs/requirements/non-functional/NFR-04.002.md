@@ -1,3 +1,11 @@
+---
+id: NFR-04.002
+title: "Restrict File Access to the Project Directory"
+created_date: '2026-11-08T15:55:57Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # NFR-04.002 Restrict File Access to the Project Directory
 
 ## Description

@@ -1,3 +1,11 @@
+---
+id: ADR-0010
+title: "Papyrus-Native On-Disk Record Layout and Path Convention"
+created_date: '2026-11-11T00:00:00Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # Papyrus-Native On-Disk Record Layout and Path Convention
 
 ## Status

@@ -1,8 +1,16 @@
+---
+id: ADR-0025
+title: "Bundled KaTeX Client-Side Math Rendering"
+created_date: '2026-11-15T00:00:00Z'
+updated_date: '2026-11-15T15:58:31Z'
+labels: []
+references: []
+---
 # Bundled KaTeX Client-Side Math Rendering
 
 ## Status
 
-Proposed (2026-11-15) — awaiting owner validation. Do not implement before acceptance.
+Accepted (2026-11-15) — owner decision 2026-11-15: KaTeX is the accepted math renderer, with the `$$...$$` / `$...$` (`\$` escape) / fenced `math|tex|latex` delimiter set and curated-prose-only scope (no record-body view).
 
 ## Date
 
@@ -29,7 +37,7 @@ REQ-06.017 states that rendering happens **in the browser only** and that CLI ou
 
 2. **The server does a non-Markdown pre-pass over each displayed prose field and emits placeholders.** This is the whole of the server-side work and it is not a Markdown renderer:
 
-   - Recognized forms: `$$...$$` (display), `$...$` (inline), and a fenced block whose info string is `math`, `tex`, or `latex` (display). A backslash-escaped `\$` is literal text.
+   - The public delimiter contract is exactly three forms: `$$...$$` (display), `$...$` (inline, a backslash-escaped `\$` is a literal dollar and never opens math), and a fenced block whose info string is `math`, `tex`, or `latex` (display). No other delimiter is recognized: `\(...\)` and `\[...\]` stay literal text.
    - Fenced blocks whose info string is not a recognized math/diagram language stay literal text (they are code).
    - The pass only splits a displayed field into an ordered list of segments: *literal text* (escaped exactly as today) and *math* (a `<span class="math" data-tex="…">` or `<div class="math math--display" data-tex="…">` container whose inner content is the escaped source).
    - Nothing else about Markdown is interpreted. Headings, lists, tables, emphasis, links, and raw HTML remain literal text, exactly as ADR-0005 decided. This pass is the only new interpretation of record content and it is limited to math/diagram delimiters.
@@ -52,7 +60,7 @@ REQ-06.017 states that rendering happens **in the browser only** and that CLI ou
 
 7. **Sanitisation is structural.** `trust: false` disables `\href`, `\url`, `\includegraphics`, `\htmlClass`, and `\htmlData`; KaTeX output is built from its own text nodes; the TeX source reaches it as a string attribute, never as HTML. The attribute is escaped by the existing escaping rules. A record cannot make KaTeX emit a script or a remote reference.
 
-8. **Scope of rendering: displayed prose fields only.** `description`, `story`, `rationale`, `applicability`, `definition`, `view`, `context`, `consequences`, `content`, and the generic document body text. IDs, titles, labels, list cells, metadata rows, and form inputs stay literal — they are identity, not prose, and KaTeX inside a list cell would break the shared list layout (ADR-0028).
+8. **Scope of rendering: curated prose fields only.** `description`, `story`, `rationale`, `applicability`, `definition`, `view`, `context`, `consequences`, `content`, and the generic document body text. IDs, titles, labels, list cells, metadata rows, and form inputs stay literal — they are identity, not prose, and KaTeX inside a list cell would break the shared list layout (ADR-0028). This ADR adds **no record-body view**: no page renders a raw record body, and a future body view is a separate feature that reuses this pre-pass rather than widening this scope silently.
 
 9. **No new Rust crate, no new build step.** The only new artifacts are vendored browser assets; `Cargo.toml` is untouched. `cargo build` stays the entire build.
 
@@ -95,11 +103,11 @@ REQ-06.017 states that rendering happens **in the browser only** and that CLI ou
 | Render math into the stored record at write time (SVG or MathML in the file) | Rejected | Rewrites record content, breaks source-of-truth and the preservation rule (ADR-0013), and duplicates the rendering contract in the CLI. |
 | Full Markdown rendering (headings, lists, emphasis, math) | Rejected | Contradicts ADR-0005 and expands the sanitisation surface far beyond this requirement. |
 
-## Open Questions
+## Resolved questions (owner, 2026-11-15)
 
-- **Is the full record body meant to be rendered?** REQ-06.017 says math and diagrams embedded "when it displays record bodies", but no browser view displays a record body today; this ADR renders the curated prose fields instead. A full-body view is a separate feature (it is also the only way a `mermaid` fence inside a `## Notes` section becomes visible). Owner: product / business analyst.
-- **Which delimiter set is the public contract?** `$$…$$` + `$…$` + fenced `math|tex|latex` is the recommendation. If the product owner prefers `\(…\)`/`\[…\]` only, the pre-pass rules change and the documentation changes with them.
-- **Should math be renderable in list views and metadata rows?** Current decision: no (structure and identity stay literal).
+1. **Delimiter set** — decided: `$$...$$` (display), `$...$` (inline, `\$` escapes a literal dollar), and a fenced block with info string `math`, `tex`, or `latex` (display). `\(...\)` and `\[...\]` are not recognized.
+2. **Record body** — decided: rendering applies to the curated prose fields of decision 8 only; no full record-body view is added by this ADR.
+3. **Lists and metadata rows** — decided: no math rendering there; structure and identity stay literal (decision 8).
 
 ## Downstream constraints
 

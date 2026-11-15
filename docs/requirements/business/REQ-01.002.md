@@ -1,3 +1,11 @@
+---
+id: REQ-01.002
+title: "Read and Edit Project Configuration"
+created_date: '2026-11-13T21:18:37Z'
+updated_date: '2026-11-15T15:57:53Z'
+labels: []
+references: []
+---
 # REQ-01.002 Read and Edit Project Configuration
 
 ## User Story
@@ -16,7 +24,7 @@ Values supplied to `set` follow the key's shape. A scalar key keeps the current 
 
 When an artifact's folder is changed with `papyrus config set` — a document type's `directory`, or `backlog_directory`, `decision_directory`, or `doc_directory` — the entire content of the original folder is moved to the new folder. The move covers every file and subfolder, not only Papyrus-managed records. It happens during the `set` command (not later, not lazily), it is a move rather than a copy, and it is atomic: if any entry cannot be moved, for example because an entry with the same relative path already exists at the destination, nothing is moved, both folders are left as they were, the configuration value is not persisted, and the command reports a conflict (REQ-01.004). After a successful move the original folder no longer holds the moved content.
 
-The effective configuration is validated at load (REQ-07.002), including each document type's `statuses` and `default_status`. While the effective configuration is invalid, every command fails closed with a validation outcome (REQ-01.004) except the repair surfaces: `papyrus config get|set|unset|list` load the configuration tolerantly, validate the configuration that would result from the requested change, and refuse a write that would still be invalid; `papyrus init --force` replaces the file with the generated default configuration. A broken configuration is therefore always repairable through Papyrus.
+The effective configuration is validated at load (REQ-07.002), including each document type's `statuses` and `default_status`. While the effective configuration is invalid, every command fails closed with a validation outcome (REQ-01.004) except the repair surfaces: `papyrus config get|set|unset|list` load the configuration tolerantly, validate the configuration that would result from the requested change, and refuse a write that would still be invalid; `papyrus init --force` replaces the file with the generated default configuration; `papyrus check` loads the configuration tolerantly, reports the configuration findings, and runs the checks that do not depend on the effective `document_types` set (REQ-01.008). A broken configuration is therefore always repairable through Papyrus.
 
 ## Acceptance Criteria
 - `papyrus config list` prints effective keys including defaults.
@@ -33,9 +41,10 @@ The effective configuration is validated at load (REQ-07.002), including each do
 - Adding a `document_types.<slug>` entry creates a new document type whose slug becomes its CLI command name (REQ-07.002).
 - A configuration with an invalid document slug or a slug that collides with a built-in command name is rejected with a validation outcome (REQ-01.004, REQ-07.002).
 - `document_types.<slug>.statuses` and `document_types.<slug>.default_status` are ordinary configuration keys: they are read by `config get` and written by `config set`, and their values are validated at load as described in REQ-07.002.
-- While the effective configuration is invalid, every command fails closed with a validation outcome (REQ-01.004) except `config get`, `config set`, `config unset`, `config list`, and `init --force`.
+- While the effective configuration is invalid, every command fails closed with a validation outcome (REQ-01.004) except `config get`, `config set`, `config unset`, `config list`, `init --force`, and `check`.
 - `config get|set|unset|list` load an otherwise invalid configuration, validate the configuration that would result from the requested change, and refuse to write a configuration that is still invalid.
 - `init --force` can replace an invalid configuration file with the generated default configuration.
+- `papyrus check` loads an invalid configuration tolerantly, reports the configuration findings, runs the checks that do not depend on the effective `document_types` set, and exits with a validation outcome when findings exist (REQ-01.008).
 - When an artifact's folder is changed via `papyrus config set`, every file and subfolder of the original folder is moved to the new folder.
 - The move is performed as part of the `set` command, not lazily; afterwards the original folder no longer holds the moved content and is removed once empty.
 - If the move cannot complete (destination entry conflict or write failure), the command reports a conflict, persists no configuration change, and leaves both folders unchanged.
@@ -47,10 +56,12 @@ The effective configuration is validated at load (REQ-07.002), including each do
 - README.md, `papyrus-config(5)` → KEYS (lines 945–1026)
 - REQ-01.004 — Use Common CLI Controls and Outcomes (conflict and validation outcomes)
 - REQ-01.001 — Initialize a Papyrus Project (`init --force` repair path)
+- REQ-01.008 — Run Project Diagnostics (`check` as a tolerant configuration-reading surface)
 - REQ-06.008 — Provide a Browser Configuration View (folder moves must be performed by `config set`)
 - REQ-07.001 — Organize Artifacts into Three Categories (document statuses)
 - REQ-07.002 — Configure Document Types and Slugs (status-list validation, fail-closed repair surface)
 - Maintainer decision 2026-11-11: a folder change moves all files of the original folder (not only managed records), synchronously, as an atomic move with conflict failure and no partial move.
 - Project-owner decision 2026-11-13 (D4): invalid configuration fails closed for all commands except `config get|set|unset|list` and `init --force`, which are the repair path.
+- Project-owner decision 2026-11-15: `papyrus check` joins the tolerant configuration-reading surfaces. It loads an invalid configuration, reports the configuration findings, and repairs no configuration value.
 - Project-owner decision 2026-11-13 (D5): document status lists and their default are configuration keys validated at load.
 - Project-owner decision 2026-11-13 (list-valued keys): `config set` accepts a comma-separated value for list-valued keys and writes it as a YAML flow sequence; scalar keys keep scalar behavior; commas are not escapable; an empty value for a list key is invalid; the resulting configuration is validated before it is persisted.

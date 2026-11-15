@@ -1,3 +1,11 @@
+---
+id: REQ-05.011
+title: "Maintain Record Metadata Through All Commands"
+created_date: '2026-11-13T20:55:54Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-05.011 Maintain Record Metadata Through All Commands
 
 ## User Story

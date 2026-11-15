@@ -1,3 +1,11 @@
+---
+id: REQ-01.006
+title: "Interactive Init Walkthrough at `papyrus init <project_name>`"
+created_date: '2026-11-13T20:57:55Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-01.006 Interactive Init Walkthrough at `papyrus init <project_name>`
 
 ## User Story

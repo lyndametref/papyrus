@@ -1,3 +1,11 @@
+---
+id: REQ-01.007
+title: "ID Padding Constraint for File IDs"
+created_date: '2026-11-09T19:25:08Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-01.007 ID Padding Constraint for File IDs
 
 ## User Story

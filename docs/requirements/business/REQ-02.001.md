@@ -1,3 +1,11 @@
+---
+id: REQ-02.001
+title: "Create and Describe Tasks"
+created_date: '2026-10-31T21:37:01Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-02.001 Create and Describe Tasks
 
 ## User Story

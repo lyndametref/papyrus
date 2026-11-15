@@ -1,3 +1,11 @@
+---
+id: ADR-0009
+title: "Shared Record Envelope and Unified Write Path for CLI and Browser"
+created_date: '2026-11-08T00:00:00Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # Shared Record Envelope and Unified Write Path for CLI and Browser
 
 ## Status

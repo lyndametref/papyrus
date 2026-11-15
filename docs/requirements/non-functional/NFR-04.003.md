@@ -1,3 +1,11 @@
+---
+id: NFR-04.003
+title: "Keep Task and Milestone Files Interoperable with Backlog.md"
+created_date: '2026-11-11T19:56:15Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # NFR-04.003 Keep Task and Milestone Files Interoperable with Backlog.md
 
 ## Description

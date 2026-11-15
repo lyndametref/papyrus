@@ -1,3 +1,11 @@
+---
+id: REQ-06.001
+title: "Search Project Records"
+created_date: '2026-11-13T20:19:47Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-06.001 Search Project Records
 
 ## User Story

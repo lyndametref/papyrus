@@ -1,3 +1,11 @@
+---
+id: NFR-05.001
+title: "Display the Browser Interface in Named Browsers"
+created_date: '2026-11-08T15:56:02Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # NFR-05.001 Display the Browser Interface in Named Browsers
 
 ## Description

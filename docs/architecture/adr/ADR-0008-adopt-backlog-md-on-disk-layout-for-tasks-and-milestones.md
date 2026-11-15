@@ -1,3 +1,11 @@
+---
+id: ADR-0008
+title: "Adopt the Backlog.md On-Disk Layout for Task and Milestone Records"
+created_date: '2026-11-08T00:00:00Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # Adopt the Backlog.md On-Disk Layout for Task and Milestone Records
 
 ## Status

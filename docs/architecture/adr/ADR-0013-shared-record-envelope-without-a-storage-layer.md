@@ -1,3 +1,11 @@
+---
+id: ADR-0013
+title: "Shared Record Envelope and Single Write Path Without a Storage Layer"
+created_date: '2026-11-11T00:00:00Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # Shared Record Envelope and Single Write Path Without a Storage Layer
 
 ## Status

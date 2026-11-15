@@ -1,3 +1,11 @@
+---
+id: NFR-03.002
+title: "Distribute Papyrus as a Debian Package"
+created_date: '2026-11-02T19:22:10Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # NFR-03.002 Distribute Papyrus as a Debian Package
 
 ## Description

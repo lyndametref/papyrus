@@ -1,3 +1,11 @@
+---
+id: ADR-0016
+title: "Runtime Config-Derived Command Dispatch for Document Slugs"
+created_date: '2026-11-13T00:00:00Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # Runtime Config-Derived Command Dispatch for Document Slugs
 
 ## Status

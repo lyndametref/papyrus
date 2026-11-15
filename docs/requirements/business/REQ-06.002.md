@@ -1,3 +1,11 @@
+---
+id: REQ-06.002
+title: "Serve the Local Web Interface"
+created_date: '2026-10-31T21:36:30Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-06.002 Serve the Local Web Interface
 
 ## User Story

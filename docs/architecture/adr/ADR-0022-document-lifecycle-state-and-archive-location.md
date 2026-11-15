@@ -1,3 +1,11 @@
+---
+id: ADR-0022
+title: "Document Lifecycle State and Archive Location"
+created_date: '2026-11-13T00:00:00Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # Document Lifecycle State and Archive Location
 
 ## Status

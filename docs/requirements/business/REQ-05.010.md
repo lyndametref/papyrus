@@ -1,3 +1,11 @@
+---
+id: REQ-05.010
+title: "Record Metadata in YAML Front Matter"
+created_date: '2026-11-13T20:58:56Z'
+updated_date: '2026-11-15T15:47:28Z'
+labels: []
+references: []
+---
 # REQ-05.010 Record Metadata in YAML Front Matter
 
 ## User Story

@@ -1,3 +1,11 @@
+---
+id: NFR-03.001
+title: "Implement Papyrus in Rust"
+created_date: '2026-10-31T21:57:54Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # NFR-03.001 Implement Papyrus in Rust
 
 ## Description

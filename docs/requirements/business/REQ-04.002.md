@@ -1,3 +1,11 @@
+---
+id: REQ-04.002
+title: "Update and Supersede Decisions"
+created_date: '2026-11-13T20:18:52Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-04.002 Update and Supersede Decisions
 
 ## User Story

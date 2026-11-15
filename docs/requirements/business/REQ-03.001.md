@@ -1,3 +1,11 @@
+---
+id: REQ-03.001
+title: "Manage Milestones"
+created_date: '2026-11-15T13:39:01Z'
+updated_date: '2026-11-15T15:47:28Z'
+labels: []
+references: []
+---
 # REQ-03.001 Manage Milestones
 
 ## User Story

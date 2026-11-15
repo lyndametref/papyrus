@@ -1,3 +1,11 @@
+---
+id: NFR-01.001
+title: "Provide Papyrus as a Command-Line Tool"
+created_date: '2026-10-31T21:42:26Z'
+updated_date: '2026-11-15T15:47:30Z'
+labels: []
+references: []
+---
 # NFR-01.001 Provide Papyrus as a Command-Line Tool
 
 ## Description

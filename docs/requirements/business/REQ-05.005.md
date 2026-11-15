@@ -1,3 +1,11 @@
+---
+id: REQ-05.005
+title: "Manage Business Rules"
+created_date: '2026-11-13T20:17:02Z'
+updated_date: '2026-11-15T15:47:29Z'
+labels: []
+references: []
+---
 # REQ-05.005 Manage Business Rules
 
 ## User Story

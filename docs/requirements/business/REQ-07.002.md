@@ -1,3 +1,11 @@
+---
+id: REQ-07.002
+title: "Configure Document Types and Slugs"
+created_date: '2026-11-13T21:19:03Z'
+updated_date: '2026-11-15T15:57:53Z'
+labels: []
+references: []
+---
 # REQ-07.002 Configure Document Types and Slugs
 
 ## User Story
@@ -30,7 +38,7 @@ Entries are fully ordinary. The default entries seeded by `papyrus init` have no
 
 All default entries are enabled unless the interactive walkthrough (REQ-01.006) disables an artifact. `deploy` is not part of the default set; a project may still add it, like any other user-defined type, by declaring a `deploy` entry.
 
-Configuration loading validates every entry. A slug must be usable as a command name: non-empty, composed of ASCII letters, digits, `-`, and `_`, not starting with `-`, and free of whitespace, control characters, and path separators. A slug must not equal a built-in command name — `init`, `config`, `task`, `milestone`, `release`, `decision`, `search`, `browser`, `import`, `help`, or `version` — so a configured document type can never shadow a built-in command; the comparison is case-insensitive, so `Config` is rejected as well as `config`. Each entry must have a non-empty `prefix` and a `directory` that is relative and stays inside the project directory (NFR-04.002). A `prefix` must be unique across all configured document types, including disabled entries. Two enabled entries must not declare the same `directory`. Values that fail these rules are rejected as configuration errors and are never silently cleaned or normalized (NFR-02.002).
+Configuration loading validates every entry. A slug must be usable as a command name: non-empty, composed of ASCII letters, digits, `-`, and `_`, not starting with `-`, and free of whitespace, control characters, and path separators. A slug must not equal a built-in command name — `init`, `config`, `check`, `task`, `milestone`, `release`, `decision`, `search`, `browser`, `import`, `help`, or `version` — so a configured document type can never shadow a built-in command; the comparison is case-insensitive, so `Config` is rejected as well as `config`. Each entry must have a non-empty `prefix` and a `directory` that is relative and stays inside the project directory (NFR-04.002). A `prefix` must be unique across all configured document types, including disabled entries. Two enabled entries must not declare the same `directory`. Values that fail these rules are rejected as configuration errors and are never silently cleaned or normalized (NFR-02.002).
 
 A `document_types` mapping that declares the same slug key twice is invalid configuration and is rejected; a repeated key is never resolved by keeping the first or the last occurrence.
 
@@ -38,7 +46,7 @@ A `document_types` mapping that declares the same slug key twice is invalid conf
 
 `statuses` is a list-valued configuration key. `papyrus config set document_types.<slug>.statuses active,archived,custom` writes it from a comma-separated value and stores it as a YAML flow sequence (REQ-01.002). Commas are separators with no escape form, so a status value can never contain a comma — which the status character rules already exclude — and an empty value is rejected rather than written as an empty list. The configuration that would result is validated before it is persisted, so an invalid list is refused and nothing is written.
 
-A violating configuration is rejected with a validation outcome (REQ-01.004) that names the offending slug or key. Validation is fail-closed and there is no partially valid document-type set: every command refuses to run while the effective configuration is invalid, with two repair surfaces. `papyrus config get|set|unset|list` loads the configuration tolerantly, validates the configuration that would result from the change, and refuses an invalid write. `papyrus init --force` replaces the configuration file with the generated default set. A user can therefore always repair a broken configuration through Papyrus itself.
+A violating configuration is rejected with a validation outcome (REQ-01.004) that names the offending slug or key. Validation is fail-closed and there is no partially valid document-type set: every command refuses to run while the effective configuration is invalid, with three exceptions that stay available. `papyrus config get|set|unset|list` loads the configuration tolerantly, validates the configuration that would result from the change, and refuses an invalid write. `papyrus init --force` replaces the configuration file with the generated default set. `papyrus check` loads the configuration tolerantly, reports the configuration findings, and runs the checks that do not depend on the effective `document_types` set (REQ-01.008). A user can therefore always repair a broken configuration through Papyrus itself.
 
 Adding an entry adds a document type and its command; disabling an entry removes its CLI command and browser views while leaving existing files untouched; removing an entry stops managing those records without deleting files.
 
@@ -51,7 +59,7 @@ Adding an entry adds a document type and its command; disabling an entry removes
 - The default entries have no reserved status: any entry can be renamed, removed, disabled, or given a different prefix or folder by editing the configuration.
 - A new document type can be added by editing `papyrus.config.yml` or with `papyrus config set`, without a code change.
 - A slug is validated at configuration load: it is non-empty, uses only ASCII letters, digits, `-`, and `_`, does not start with `-`, and contains no whitespace, control character, or path separator; a violating value is rejected and not silently cleaned or normalized (NFR-02.002).
-- A slug equal to `init`, `config`, `task`, `milestone`, `release`, `decision`, `search`, `browser`, `import`, `help`, or `version` is rejected with a validation outcome naming the conflict, and the comparison is case-insensitive, so a slug such as `Config` or `SEARCH` is rejected too.
+- A slug equal to `init`, `config`, `check`, `task`, `milestone`, `release`, `decision`, `search`, `browser`, `import`, `help`, or `version` is rejected with a validation outcome naming the conflict, and the comparison is case-insensitive, so a slug such as `Config` or `SEARCH` is rejected too.
 - Each entry must have a non-empty `prefix` and a `directory` that is relative and inside the project directory (NFR-04.002); a violating entry is rejected at configuration load.
 - A `prefix` declared by more than one entry is rejected at configuration load, including when one of those entries is disabled.
 - Two enabled entries that declare the same `directory` are rejected at configuration load; disabled entries do not take part in this check.
@@ -64,7 +72,9 @@ Adding an entry adds a document type and its command; disabling an entry removes
 - A `statuses` declaration on the `ui-mockup` entry is rejected at configuration load, because UI mockups keep their state in HTML metadata (REQ-05.008).
 - A `document_types` mapping that declares the same slug key twice is rejected as invalid configuration, and neither occurrence is silently preferred.
 - An invalid configuration blocks every command with a validation outcome (REQ-01.004); no partially valid document-type set is used.
-- The repair surfaces for an invalid configuration are `papyrus config get|set|unset|list`, which load tolerantly, validate the resulting configuration, and refuse an invalid write, and `papyrus init --force`, which replaces the file with the generated default set.
+- The tolerant surfaces available while the configuration is invalid are `papyrus config get|set|unset|list`, which load tolerantly, validate the resulting configuration, and refuse an invalid write, `papyrus init --force`, which replaces the file with the generated default set, and `papyrus check`, which reports the configuration findings.
+- `papyrus check` stays available while the configuration is invalid: it loads the configuration tolerantly, reports the configuration findings, and runs only the checks that do not depend on the effective `document_types` set (REQ-01.008).
+- A configured slug `check` is rejected like any other built-in command name, so the diagnostics command can never be shadowed.
 - A disabled entry has no CLI command and no browser view, and its existing files are untouched.
 - Removing an entry stops managing its records and deletes no file.
 - The non-functional requirement family is addressed by its slug `nfr`; the former `nfreq` command name is not retained as an alias.
@@ -81,10 +91,13 @@ Adding an entry adds a document type and its command; disabling an entry removes
 - Project-owner decision 2026-11-13 (D4): configuration validation is fail-closed for every command except `config get|set|unset|list` (tolerant load, validate the resulting configuration, refuse an invalid write) and `init --force`, so a broken configuration is always repairable through Papyrus.
 - Project-owner decision 2026-11-13 (D5): `document_types.<slug>.statuses` and `document_types.<slug>.default_status` are validated at load for non-emptiness, uniqueness, the presence of the fixed `active`/`archived` values, and slug-style characters.
 - Owner-confirmed decision 2026-11-13 (validation): duplicate `document_types` keys are invalid configuration rather than last-wins; reserved built-in name matching is case-insensitive; `prefix` is unique across all entries including disabled ones; duplicate `directory` values among enabled entries are rejected.
+- Project-owner decision 2026-11-15: `check` is a reserved built-in command name, so it is added to the built-in slug list and a document type can never be configured with the slug `check`.
+- Project-owner decision 2026-11-15: `check` is a tolerant configuration-reading surface and is exempt from the fail-closed configuration gate (REQ-01.008).
 - Project-owner decision 2026-11-13 (list-valued keys): `statuses` is set through `papyrus config set` from a comma-separated value written as a YAML flow sequence (REQ-01.002); commas are not escapable; an empty value is invalid.
 - ADR-0019 — Fail-Closed Document-Type Configuration Validation (accepted 2026-11-13).
 - Current state: `src/config.rs` already accepts arbitrary `document_types` keys with `prefix`, `directory`, and `enabled`.
 - REQ-01.001 — Initialize a Papyrus Project, REQ-01.002 — Read and Edit Project Configuration
+- REQ-01.008 — Run Project Diagnostics (`check` as a reserved command name and tolerant surface)
 - REQ-01.006 — Interactive Init Walkthrough (default artifact set)
 - REQ-07.001 — Organize Artifacts into Three Categories (document status model)
 - REQ-07.003 — Dispatch Config-Defined Document Commands
