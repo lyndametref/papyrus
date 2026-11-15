@@ -1,6 +1,6 @@
 # Feature Specification — Project Initialization and Configuration Commands
 
-**Ticket:** TASK-2 / TASK-85 (spec revision); TASK-111 (list-valued configuration keys revision); TASK-112 (default document set and document-status seeding revision); TASK-122 (config list default_status revision)
+**Ticket:** TASK-2 / TASK-85 (spec revision); TASK-111 (list-valued configuration keys revision); TASK-112 (default document set and document-status seeding revision); TASK-122 (config list default_status revision); TASK-127 (init directory-set revision)
 **Milestone:** m-0 (Rust CLI Foundation and Requirements)
 **Status:** Refined (execution-ready)
 **UI mockups:** none
@@ -16,6 +16,8 @@ It was revised again (TASK-111) so that the list-valued keys `statuses` and `doc
 It was revised again (TASK-112) so that the generated default configuration is the eleven-entry document-type set of REQ-07.002 without `deploy`, and so that every front-matter-backed default document type carries the seeded status list `[active, archived]` while `ui-mockup` carries none and no entry carries `default_status` (REQ-07.001, REQ-07.002, REQ-05.008, ADR-0019).
 
 It was revised again (TASK-122) so that `papyrus config list` also prints `document_types.<slug>.default_status` for each entry that declares one, closing G-4 of TASK-117: an invalid `default_status` is now visible on the inspection surface an operator uses before repairing it (REQ-01.002, BR-003, ADR-0019).
+
+It was revised again (TASK-127) so that OQ-1 is resolved: section 2 item 4 now names the exact directory set init creates, states that no `archived/`, `deprecated/`, or `backlog_directory/archive/` folder is pre-created, and keeps the no-overwrite rule (ADR-0022, ADR-0023, REQ-07.001).
 
 ## Scope
 
@@ -62,7 +64,12 @@ It was revised again (TASK-122) so that `papyrus config list` also prints `docum
 1. `papyrus init <name>` initializes the current directory; `papyrus --dir <path> init <name>` initializes `<path>`, creating it if absent.
 2. `<name>` is required and is stored as `project_name` in `papyrus.config.yml`.
 3. Initialization runs the interactive walkthrough (REQ-01.006) to select activated artifacts and collect their prefixes/folders (TTY mode; defaults in non-TTY mode) before creating the backlog store, the documentation structure, and `papyrus.config.yml`.
-4. Created directories are derived from effective configuration (defaults when no config exists yet): at minimum the configured backlog directory and documentation root directory.
+4. **Created directory set.** Created directories are derived from effective configuration (defaults when no configuration exists yet). Initialization creates exactly:
+   - the configured `backlog_directory` with its `tasks/`, `milestones/`, and `releases/` subfolders (task, milestone, and release are always active);
+   - the configured `doc_directory`, always;
+   - the configured `decision_directory`, only when at least one decision type is enabled; if none is enabled the directory is not created but its configured (default) value is still written to `papyrus.config.yml`;
+   - the configured active directory of each enabled document type (that type's `directory`, relative to `doc_directory`); a disabled document type's directory is not created.
+   No `archived/` subfolder is pre-created: it appears when the first record of that type is archived (ADR-0022 decision 2). No `deprecated/` subfolder is created or read (ADR-0022 decision 6), and no `backlog_directory/archive/` folder is created by init; archive folders appear when the first archive operation of the family that uses them runs (ADR-0023 decision 2). Existing directories are reused and existing files are never overwritten (items 6–8).
 5. `--no-git` suppresses Git repository initialization.
 6. Initialization succeeds in a non-empty target directory. Files other than `papyrus.config.yml` are never modified by `init`.
 7. An existing `papyrus.config.yml` blocks initialization unless `--force` is given. Without `--force`, initialization fails with a conflict outcome (exit code 4) and writes nothing.
@@ -155,16 +162,16 @@ It was revised again (TASK-122) so that `papyrus config list` also prints `docum
 
 ## Open questions
 
-- OQ-1: The exact set of directories/files that constitute the "documentation structure" created by `init` is not specified by the man page; implementation creates configured directories as needed and must not overwrite existing files. Residual detail (for example whether deprecated subfolders are pre-created) is implementation-defined and should be documented.
+- None. OQ-1 (the directory set created by `init` and whether inactive subfolders are pre-created) is resolved by section 2 item 4: the exact directory set is specified, no `archived/`, `deprecated/`, or `backlog_directory/archive/` folder is pre-created, and the no-overwrite rule is unchanged.
 
 ## Traceability
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-01, REQ-01.001, REQ-01.002, REQ-01.003, REQ-01.004, REQ-01.005, REQ-01.006, REQ-01.007, REQ-07.002 |
+| Requirement | REQ-01, REQ-01.001, REQ-01.002, REQ-01.003, REQ-01.004, REQ-01.005, REQ-01.006, REQ-01.007, REQ-07.001, REQ-07.002 |
 | Non-functional | NFR-02.001, NFR-02.002, NFR-04.001, NFR-04.002 |
 | Business rule | BR-002 (init), BR-003 (config), BR-016 (keys/precedence), BR-001 (command behavior) |
-| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002), ADR-0010 decision 8 (whole-folder relocation), ADR-0013 stage 5 (relocation implementation), ADR-0019 (fail-closed validation and repair), ADR-0024 (list-valued keys) |
-| Ticket | TASK-2, TASK-85, TASK-111, TASK-112, TASK-122 |
+| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002), ADR-0010 decision 8 (whole-folder relocation), ADR-0013 stage 5 (relocation implementation), ADR-0019 (fail-closed validation and repair), ADR-0022 (archive location, no restore), ADR-0023 decision 2 (active and archive locations), ADR-0024 (list-valued keys) |
+| Ticket | TASK-2, TASK-85, TASK-111, TASK-112, TASK-122, TASK-127 |
 | UI mockups | none |
 path: docs/specifications/project-initialization-and-configuration.md

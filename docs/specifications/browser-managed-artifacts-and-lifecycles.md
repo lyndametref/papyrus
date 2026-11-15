@@ -7,6 +7,8 @@
 
 > **Superseded in part (TASK-114):** the fixed twelve-section set and the "covered set does not change with `document_types`" rule are replaced by the registry-derived three-category page in [`browser-config-defined-document-types.md`](browser-config-defined-document-types.md) (REQ-06.003 revision of 2026-11-13). The page route, shell, and read-only configuration rules in this document remain in force.
 
+> **Revised (TASK-127):** the section 4 lifecycle wording now follows the settled archive lifecycles: documents `active -> archived` with no restore (plus configured custom statuses, front-matter only), UI mockups `pending -> approved -> archived` (supersede, no restore), milestones `open -> closed` via `papyrus milestone close`, releases `planned -> released` with no archive, decisions unchanged (Nygard status `deprecated`). Sources: ADR-0022, ADR-0023, REQ-03.001, REQ-03.002, REQ-05.007, REQ-07.001.
+
 ## Purpose
 
 Add a read-only page to the offline, project-local web interface that describes every managed artifact/document type and its lifecycle, per REQ-06.003. The page is a single static view with one section per fixed record type; task states are derived from the configured task statuses (REQ-01.002); every other type uses the lifecycle documented for that type. It advances NFR-01.002 (display all Papyrus content) by giving contributors a single place to learn what each record type is and how it moves through its states.
@@ -25,7 +27,7 @@ Add a read-only page to the offline, project-local web interface that describes 
 
 ### Out of scope
 
-- Listing, viewing, editing, creating, deprecating, restoring, archiving, deleting, or searching any record from this page; all record lifecycle operations remain CLI-only, consistent with the baseline no-lifecycle-operations stance (REQ-05.007).
+- Listing, viewing, editing, creating, archiving, deleting, or searching any record from this page; all record lifecycle operations remain CLI-only, consistent with the baseline no-lifecycle-operations stance (REQ-05.007).
 - Any API endpoint for the page; the page is HTML only.
 - Adding a new record type, changing configured `document_types`, or deriving the covered set from configuration. The covered set is fixed by REQ-06.003 and does not change with `document_types`.
 - Describing Backlog.md `docs`, `drafts`, or project configuration files.
@@ -64,19 +66,19 @@ Each section's lifecycle paragraph uses the documented lifecycle for that type:
 
 | Section | Lifecycle paragraph |
 | --- | --- |
-| Milestones | `Lifecycle: active → archived. Archiving a milestone is separate from task workflow status.` |
+| Milestones | `Lifecycle: open → closed. The only transition is open → closed through papyrus milestone close <id>; milestones are not archived and have no restore. Closing a milestone is separate from task workflow status.` |
 | Releases | `Lifecycle: planned → released. released is delivery completion, distinct from archiving; releases are not archived. The transition is performed explicitly via papyrus release close <id>.` |
 | Decisions | `Lifecycle: proposed → accepted \| rejected; accepted → deprecated \| superseded.` |
-| Business requirements | `Lifecycle: active → deprecated (restored via restore).` |
-| Non-functional requirements | `Lifecycle: active → deprecated (restored via restore).` |
-| Glossary terms | `Lifecycle: active → deprecated (restored via restore).` |
-| UI specifications | `Lifecycle: active → deprecated (restored via restore).` |
-| Technical specifications | `Lifecycle: active → deprecated (restored via restore).` |
-| UI mockups | `Lifecycle: pending → approved → deprecated (restored via restore; supersession via ui-mockup supersede).` |
-| Business rules | `Lifecycle: active → deprecated (restored via restore).` |
-| Audit records | `Lifecycle: active → deprecated (restored via restore).` |
+| Business requirements | `Lifecycle: active → archived. Archiving sets status to archived and moves the file to archived/; there is no restore. Plus any configured custom statuses, which are front-matter values only.` |
+| Non-functional requirements | `Lifecycle: active → archived. Archiving sets status to archived and moves the file to archived/; there is no restore. Plus any configured custom statuses, which are front-matter values only.` |
+| Glossary terms | `Lifecycle: active → archived. Archiving sets status to archived and moves the file to archived/; there is no restore. Plus any configured custom statuses, which are front-matter values only.` |
+| UI specifications | `Lifecycle: active → archived. Archiving sets status to archived and moves the file to archived/; there is no restore. Plus any configured custom statuses, which are front-matter values only.` |
+| Technical specifications | `Lifecycle: active → archived. Archiving sets status to archived and moves the file to archived/; there is no restore. Plus any configured custom statuses, which are front-matter values only.` |
+| UI mockups | `Lifecycle: pending → approved → archived. Archived is reached by archiving or by supersession via ui-mockup supersede; there is no restore.` |
+| Business rules | `Lifecycle: active → archived. Archiving sets status to archived and moves the file to archived/; there is no restore. Plus any configured custom statuses, which are front-matter values only.` |
+| Audit records | `Lifecycle: active → archived. Archiving sets status to archived and moves the file to archived/; there is no restore. Plus any configured custom statuses, which are front-matter values only.` |
 
-1. The wording above is normative for this page and is taken from REQ-03.001, REQ-03.002, REQ-04.001, REQ-05.006, REQ-05.007, and REQ-05.008. It intentionally differs from the shorthand sentences in MOCK-0010 where those conflict with the documented lifecycles.
+1. The wording above is normative for this page and is taken from REQ-03.001, REQ-03.002, REQ-04.001, REQ-05.006, REQ-05.007, REQ-05.008, and REQ-07.001, with the lifecycle operations of ADR-0022 and the layout contract of ADR-0023. It intentionally differs from the shorthand sentences in MOCK-0010 where those conflict with the documented lifecycles.
 2. The page does not state that a release becomes released when its milestone set is complete, that a milestone closes when its tasks are complete, that documents move through a Draft → Approved phase, or that audit records are immutable; none of those is documented.
 3. All lifecycle sentences are static text; they are not derived from project data.
 
@@ -135,11 +137,11 @@ Each section's lifecycle paragraph uses the documented lifecycle for that type:
 
 ## Related artifacts
 
-- Requirement: `docs/requirements/business/REQ-06.003.md` (primary); `docs/requirements/business/REQ-06.006.md`; `docs/requirements/business/REQ-06.007.md`; `docs/requirements/business/REQ-06.008.md`; `docs/requirements/business/REQ-06.009.md`; `docs/requirements/business/REQ-06.010.md`; `docs/requirements/business/REQ-06.011.md`; `docs/requirements/business/REQ-06.012.md`; `docs/requirements/business/REQ-01.002.md`; `docs/requirements/business/REQ-01.003.md`; `docs/requirements/business/REQ-03.001.md`; `docs/requirements/business/REQ-03.002.md`; `docs/requirements/business/REQ-04.001.md`; `docs/requirements/business/REQ-05.006.md`; `docs/requirements/business/REQ-05.007.md`; `docs/requirements/business/REQ-05.008.md`; `docs/requirements/non-functional/NFR-01.002.md`; `docs/requirements/non-functional/NFR-01.003.md`
+- Requirement: `docs/requirements/business/REQ-06.003.md` (primary); `docs/requirements/business/REQ-06.006.md`; `docs/requirements/business/REQ-06.007.md`; `docs/requirements/business/REQ-06.008.md`; `docs/requirements/business/REQ-06.009.md`; `docs/requirements/business/REQ-06.010.md`; `docs/requirements/business/REQ-06.011.md`; `docs/requirements/business/REQ-06.012.md`; `docs/requirements/business/REQ-01.002.md`; `docs/requirements/business/REQ-01.003.md`; `docs/requirements/business/REQ-03.001.md`; `docs/requirements/business/REQ-03.002.md`; `docs/requirements/business/REQ-04.001.md`; `docs/requirements/business/REQ-05.006.md`; `docs/requirements/business/REQ-05.007.md`; `docs/requirements/business/REQ-05.008.md`; `docs/requirements/business/REQ-07.001.md`; `docs/requirements/non-functional/NFR-01.002.md`; `docs/requirements/non-functional/NFR-01.003.md`
 - UI description: `docs/specifications/ui/browser-front-matter-and-lifecycle-ui.md`
 - UI mockup: `docs/specifications/ui/mockups/MOCK-0010-browser-front-matter-and-lifecycle-review.html` (approved)
 - Baseline browser spec: `docs/specifications/browser-requirements.md`
-- Task status source: `docs/business-rules/BR-001-papyrus-command-behavior.md`, `docs/business-rules/BR-006-papyrus-milestone-command-behavior.md`, `docs/business-rules/BR-007-papyrus-release-command-behavior.md`, `docs/business-rules/BR-008-papyrus-decision-command-behavior.md`
+- Task status source: `docs/business-rules/BR-001-papyrus-command-behavior.md`, `docs/business-rules/BR-006-milestone-command-behavior.md`, `docs/business-rules/BR-007-release-command-behavior.md`, `docs/business-rules/BR-008-papyrus-decision-command-behavior.md`
 - Milestone: `m-12`
 - Dependency: TASK-66 (Done), TASK-86
 - Implementation: TASK-95 (per-artifact descriptions and read-only configuration, section 4a)

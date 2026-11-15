@@ -1,6 +1,6 @@
 # Feature Specification — Interactive Init Walkthrough for Artifact Activation
 
-**Ticket:** TASK-75 / TASK-85 (spec revision) / TASK-104 (cursor-driven list revision) / TASK-112 (default-set and status-seeding revision)
+**Ticket:** TASK-75 / TASK-85 (spec revision) / TASK-104 (cursor-driven list revision) / TASK-112 (default-set and status-seeding revision) / TASK-127 (directory-creation revision)
 **Milestone:** m-12 (Final Cross-Type Integration)
 **Status:** Refined (execution-ready)
 **UI mockups:** none
@@ -12,6 +12,8 @@ Deliver the interactive walkthrough at `papyrus init <project_name>` required by
 This specification was revised (TASK-85) so that the walkthrough matches REQ-01.006: a single artifact list with task, milestone, and release always active; per-activated-artifact prefix/folder prompts; shared roots prompted once; defaults in brackets; validation hints naming the default equivalent; inactive types written with `enabled: false`; and TTY-only execution with no new flag or environment variable. It was revised again (TASK-104) to fix the presentation contract: the list is cursor-driven (one highlighted selectable row, Up/Down and `k`/`j` navigation, Space toggle, Enter confirm, redraw on every keypress, clamped navigation, core rows never highlighted, typed token input rejected, end of input confirming and continuing) and the offered document-type set includes `use-case`, `test-case`, and `test-report`.
 
 It was revised again (TASK-112) so that the offered document-type set is exactly the eleven-entry default set of REQ-07.002 — `req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`, with `deploy` removed — and so that the generated configuration seeds the document status model: `statuses: [active, archived]` for every front-matter-backed document type, no `statuses` for `ui-mockup`, and no `default_status` on any entry.
+
+It was revised again (TASK-127) so that section 6 states the settled directory-creation contract: only the activated type's active directory is created, `archived/` appears on the first archive, and no `deprecated/` subfolder and no `backlog_directory/archive/` folder is pre-created (ADR-0022, ADR-0023 decision 2).
 
 ## Scope
 
@@ -30,7 +32,7 @@ It was revised again (TASK-112) so that the offered document-type set is exactly
 - Preservation of `--force` and `--no-git` behavior (REQ-01.001).
 - Final configuration validation before writing (REQ-01.007).
 - README/manpage (`papyrus(1)` init section) and BR-002 wording update describing the walkthrough.
-- Directory creation limited to activated artifacts (core always; decision/document types only when activated).
+- Directory creation limited to activated artifacts (core always; decision/document types only when activated) and to their active directories only: no `archived/`, no `deprecated/`, and no `backlog_directory/archive/` folder is pre-created by init.
 
 ### Out of scope
 
@@ -94,10 +96,11 @@ It was revised again (TASK-112) so that the offered document-type set is exactly
 
 ### 6. Directory creation
 
-1. Core directories are always created: configured `backlog_directory` with `tasks/`, `milestones/`, `releases/` subfolders; configured `doc_directory`.
+1. Core directories are always created: configured `backlog_directory` with its `tasks/`, `milestones/`, and `releases/` subfolders, and the configured `doc_directory`. No `archive/` folder is created under `backlog_directory`.
 2. The configured `decision_directory` is created only if at least one decision type is activated; if none are activated it is not created, but its configured (default) value is still written to `papyrus.config.yml`.
-3. For document types, a type's directory (relative to `doc_directory`) and its `deprecated/` subfolder are created only if that type is activated.
-4. Inactive artifacts' directories are not created by init.
+3. For each activated document type, only that type's active directory (relative to `doc_directory`) is created.
+4. An `archived/` subfolder is not pre-created for any type; it appears when the first record of that type is archived (ADR-0022 decision 2). No `deprecated/` subfolder is created for any type, and no `backlog_directory/archive/` folder is created by init: archive folders are created by the first archive operation of the family that uses them (ADR-0022, ADR-0023 decision 2).
+5. Inactive artifacts' directories are not created by init.
 
 ### 7. Non-interactive/CI defaults
 
@@ -158,7 +161,7 @@ It was revised again (TASK-112) so that the offered document-type set is exactly
 | Ticket | TASK-75, TASK-85, TASK-104 |
 | Requirements | REQ-01.006, REQ-01.001, REQ-01.002, REQ-01.003, REQ-01.007, REQ-05.012, REQ-05.013, REQ-05.014 |
 | Business rule | BR-016, BR-002, BR-018, BR-019, BR-020 |
-| ADR | ADR-0001, ADR-0004, ADR-0005 (dependency baseline), ADR-0010 decision 8 (shared relocation routine), ADR-0013 stage 5 |
+| ADR | ADR-0001, ADR-0004, ADR-0005 (dependency baseline), ADR-0010 decision 8 (shared relocation routine), ADR-0013 stage 5, ADR-0022 (archive location and no restore), ADR-0023 decision 2 (active and archive locations) |
 | Related tickets | TASK-2 (config foundation), TASK-74 (id_padding constraint), TASK-85 (spec revision), TASK-104 (cursor-driven list revision) |
 | UI mockups | none |
 path: docs/specifications/interactive-init-walkthrough-for-artifact-activation.md
