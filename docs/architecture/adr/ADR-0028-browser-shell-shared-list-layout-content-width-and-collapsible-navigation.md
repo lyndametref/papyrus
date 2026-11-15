@@ -2,7 +2,7 @@
 id: ADR-0028
 title: "Browser Shell: Shared List Layout, Content-Width Contract, and Collapsible Navigation"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-15T15:58:31Z'
+updated_date: '2026-11-15T18:37:06Z'
 labels: []
 references: []
 ---
@@ -10,7 +10,7 @@ references: []
 
 ## Status
 
-Accepted (2026-11-15) — owner decision 2026-11-15: one shared shell and list layout, server-side `PageWidth` width contract, `localStorage` navigation persistence (default expanded), and the mockup full-width class only (preview route out of scope).
+Accepted (2026-11-15) — owner decision 2026-11-15: one shared shell and list layout, server-side `PageWidth` width contract, `localStorage` navigation persistence (default expanded), and the mockup full-width class only (preview route out of scope); amended 2026-11-15 by architecture review at TASK-141 blocker resolution (decision 2 column order and slot table, new decision 9; no status change), explicit owner confirmation pending.
 
 ## Date
 
@@ -37,16 +37,20 @@ Forces: one layout for a type set that changes at runtime (ADR-0017, ADR-0020); 
 2. **One shared list layout with a server-built column plan.** `browser::list` builds, per list page:
 
    ```rust
-   pub struct ListPlan { pub heading: String, pub count_note: String, pub columns: Vec<Column>, pub rows: Vec<Row> }
+   pub struct ListPlan { pub heading: String, pub count_note: String, pub columns: Vec<Column>, pub rows: Vec<Row>, pub empty: Option<EmptyState> }
    pub struct Column { pub key: &'static str, pub label: &'static str, pub class: &'static str }
-   pub struct Row { pub id: String, pub href: String, pub cells: Vec<String>, pub actions: Vec<(String, String)>, pub children: Vec<Row> }
+   pub struct Row { pub id: String, pub title: String, pub href: String, pub cells: Vec<String>, pub labels: Vec<String>, pub references: Vec<String>, pub actions: Vec<(String, String)>, pub children: Vec<Row> }
    ```
 
-   - The fixed column order for every family is: ID, Title, Status, family slot(s), Updated, Actions. Only the *labels and presence* of the family slot(s) vary, and they come from the descriptor plus the presentation table (ADR-0020), never from a per-family template or a `match` on slug.
-   - Family slots are declared data: task → `Milestone`, `Assignee`; milestone → `Release`; release → `Status`; decision → `Type`; requirement/nfr → `Group`; audit → `Audit type`; rule → `Applicability`; ui-mockup → `Task`, `Specs`; generic document → none (ID, Title, Status, Updated, Actions).
+   - The fixed column order for every family is: ID, Title, Status, family slot(s), Created, Updated, Actions. Only the *labels and presence* of the family slot(s) vary, and they come from the descriptor plus the presentation table (ADR-0020), never from a per-family template or a `match` on slug.
+   - Family slots are declared data: task → `Milestone`, `Assignee`; milestone → `Release`; release → none; decision → `Type`; requirement/nfr → `Group`; audit → `Audit type`; rule → `Applicability`; ui-mockup → `Task`, `Specs`; generic document → none (ID, Title, Status, Created, Updated, Actions).
+   - Slot keys are reserved-key safe: a declared slot key may not be `id`, `title`, `status`, `created`, `updated`, or `actions`, and may not repeat inside one family. Structural columns are fixed, so a slot can never duplicate or reorder one.
+   - The Title cell carries the record's labels and references below the link, rendered by the shared list from escaped values. They are general front-matter metadata, not family data, so they are structural (never a slot) and identical for every family.
    - Grouped families (requirements/NFR) use the hierarchical row variant (`Row::children`): the group row plus its member rows in the same table body, not a second template.
    - Action placement is fixed: the last cell, in the order `View`, `Edit`, and any family action that already exists. Archive/delete/create controls stay at page level (unchanged).
    - Archived records remain excluded because indexing is enabled-only and active-only (ADR-0020 decision 7); the layout never sees them.
+
+   *Revision (2026-11-15, architecture review at TASK-141 blocker resolution): the fixed order previously read `ID, Title, Status, family slot(s), Updated, Actions`, the slot table declared release → `Status`, and the row carried no title, labels, or references. The order now includes `Created`, release declares no slot, and the row carries the title plus labels/references in the Title cell, because REQ-06.004 is a must-have requirement whose acceptance criteria require the browser list to show the same front-matter values as the CLI, including `created_date`, `labels`, and `references`. Dropping them would have required a business-requirement change, not an architecture decision. Resolved question 3 is satisfied structurally by this order instead of by ad-hoc per-family slots. No other part of decision 2 changed.*
 
 3. **The width decision is made on the server, per route.** `routes.rs` gains a route property:
 
@@ -73,6 +77,14 @@ Forces: one layout for a type set that changes at runtime (ADR-0017, ADR-0020); 
 7. **UI-mockup previews are out of scope here; only the mockup full-width class is defined.** REQ-06.015 presupposes a mockup preview surface; none exists, and the stored review packages contain their own HTML/CSS/JS (ADR-0005 and the mockup specification currently forbid serving the package at all). This ADR fixes only the `PageWidth::Full` classification and the `.app--full` class that a mockup preview will use, and records the binding constraint: any future preview route must serve the package as a **sandboxed, opaque-origin document** (`sandbox` without `allow-same-origin`, its own CSP, `X-Frame-Options`/`frame-ancestors` adjusted only for that route), because serving an author-supplied HTML package same-origin would give it access to the browser write API. That route requires its own ADR before implementation and is not part of this decision.
 
 8. **Accessibility and browser support are part of the contract.** The toggle is keyboard operable with a visible focus ring, `aria-expanded` and `aria-controls` stay in sync, the collapsed nav is removed with `hidden` rather than only visually hidden, and the layout is verified at the existing 320/480/720 px breakpoints and in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001).
+
+   The shared list is part of the same contract: every header cell keeps `scope="col"`, every row action link carries an accessible name that includes the record ID (`aria-label="View {id}"`, `aria-label="Edit {id}"`), because twenty identical "View" links are ambiguous to screen-reader and voice users, and the grouped child rows expose their parent through `data-child-of` plus a visual indent that is not colour-only.
+
+9. **The migration to the shared layout is dispatched by declared data, and its reference family is the milestone list.**
+
+   - The reference family for the first migration is `milestone` (`/?type=milestone`): it is a real list route with a populated and an empty state, it carries one family slot (`Release`), it is the browser side of the REQ-06.004 parity surface, and it is the only family whose list is both a `<ul>` row list and a parity target. The task family cannot be the reference: `GET /?type=task` is the REQ-06.013 kanban board, and the task family has no list route to migrate.
+   - While both list paths exist, `list_page` chooses the shared builder or the legacy builder from a declared presentation field, `list_layout: ListLayout { Shared, Legacy }` (default `Legacy`). No `match` on a slug or handler is introduced for the migration. TASK-142 sets every family to `Shared` and deletes the field together with the legacy builders in the same change, so no transitional branch can survive.
+   - The task family has no shared-list surface and gets none from this ADR. REQ-06.013 owns the backlog view; the task slots stay declared for a future task list, which requires its own decision.
 
 ## Consequences
 
@@ -121,6 +133,21 @@ Forces: one layout for a type set that changes at runtime (ADR-0017, ADR-0020); 
 3. **Family-specific fields in the shared list** — decided: every field that exists today is kept as a declared slot; visual trimming is a design decision, not a structural one.
 4. **Toggle position** — a design refinement (header, left of the brand, always visible); it carries no architectural consequence.
 
+## Amendment (2026-11-15) — TASK-141 blocker resolution
+
+Resolved by architecture review while TASK-141 was blocked on two contract questions and no owner was available. This section and the revision notes inside decisions 2 and 9 take effect immediately so implementation can start; explicit owner confirmation is requested, and if it is refused the amendment is withdrawn in favour of a superseding ADR.
+
+- **OQ-1 — reference family: milestone list (confirmed against the refiner's recommendation).** `/?type=milestone` is the only family that is simultaneously a real list route, a populated *and* empty state, a family slot carrier (`Release`), a `<ul>` → `<table>` migration, and the browser side of the REQ-06.004 parity surface. The task family is not eligible: `/?type=task` is the REQ-06.013 board and no task list route exists. The milestone list is not grouped and has no status filter, so the grouped row variant and the filter path are proven by `ListPlan` unit tests in TASK-141 and first exercised end-to-end by migrating requirements/NFRs first in TASK-142.
+- **OQ-2 — `created_date` stays, as a structural column: option (a).** The fixed order becomes `ID, Title, Status, family slot(s), Created, Updated, Actions`. The alternative (keep the order, relax parity to Updated-only on lists) was rejected because REQ-06.004 is a must-have requirement whose acceptance criteria require the browser *list* to show the same front-matter values as the CLI, including `created_date`, `labels`, and `references`; relaxing it is a business-requirement change, not an architecture one. `labels` and `references`, which today survive only in an ad-hoc metadata line, are carried in the Title cell so list parity does not regress when the list builders are deleted.
+- **OQ-3 — release declares no family slot.** `Status` is the fixed Status column for every family; declaring it as a slot produced two status cells. Reserved-key validation (decision 2) prevents the class of error, not just this instance. No data is lost: the release list shows `planned`/`released` from the same `record.status` the slot would have read.
+- **Task family has no shared-list surface.** REQ-06.016 governs list views; the task family's browser view is the REQ-06.013 board. TASK-142 therefore treats tasks as a board-regression check, not a list migration.
+- **Mockup brief changes.** The pending shell/shared-list mockup must show the seven-column order above, the Title-cell tag line, and the row action cell with per-row accessible names. The mockup gate is unchanged: AC2/AC3 work still waits for the approved MOCK id.
+- **Not changed by this amendment:** decisions 1, 3, 4, 5, 6, 7, 8; `PageWidth`; CSP; the navigation model; the archive-exclusion rule.
+
+**Precedence while the feature specification is stale.** `docs/specifications/browser-shell-shared-list-layout-and-page-width.md` still states the pre-amendment column order and leaves OQ-1..OQ-3 open (this review had no write access to `docs/specifications/`). This ADR governs until that specification is updated; the required specification edits are listed in TASK-141.
+
+**Ticket text to apply (TASK-141).** The reference family is `milestone` (not `task`); AC2/DoD#4 use the header sequence `ID, Title, Status, family slot(s), Created, Updated, Actions`; the parity assertion is `created` **and** `updated` in the row cells plus `labels`/`references` in the title cell; the transitional dispatch is the `list_layout` presentation field. TASK-142 migrates requirements/NFRs first, then ui-mockup, then the flat document families, then config-defined types, and treats the task family as a board-regression check only.
+
 ## Downstream constraints
 
 1. `document_list.html` and any per-family list builder must not survive; every list view renders through the shared layout, including config-defined types.
@@ -132,6 +159,12 @@ Forces: one layout for a type set that changes at runtime (ADR-0017, ADR-0020); 
 7. An in-page full-width region must never cause page-level horizontal scrolling; wide content scrolls inside its own container.
 8. A mockup preview route may not be added under this ADR; it needs its own decision covering sandboxing, CSP, and `X-Frame-Options`.
 9. ADR-0020 downstream constraint 5 ("no new asset or dependency") is amended by this ADR: one small same-origin script asset is added; the no-dependency and no-template-engine rules stand.
+10. The structural column set of a shared list is fixed at `id`, `title`, `status`, family slot(s), `created`, `updated`, `actions`. No family adds, removes, or reorders a structural column, and no slot key may be a reserved key (`id`, `title`, `status`, `created`, `updated`, `actions`) or repeat.
+11. Labels and references are rendered for every family in the Title cell by the shared list from escaped values. They are never a slot and never a per-family template concern.
+12. While two list paths exist, the choice between them is the declared presentation `list_layout` field. A `match` on a slug or handler for a list, even transitional, violates constraint 2.
+13. The task family has no shared-list surface while REQ-06.013 owns the backlog view. Adding a task list requires its own decision; the declared task slots do not imply one.
+14. Every list row action link carries a record-specific accessible name; a bare repeated `View`/`Edit` label is not conformant.
+15. Seven columns at 320 px must not introduce page-level horizontal scrolling: the shared table scrolls inside its own container, on the same principle as constraint 7. The exact treatment (scroll container or stacked rows) is the mockup's decision, not a per-family one.
 
 ## References
 
@@ -140,6 +173,7 @@ Forces: one layout for a type set that changes at runtime (ADR-0017, ADR-0020); 
 - `docs/requirements/business/REQ-06.013.md` — the kanban board that must render uncapped.
 - `docs/requirements/business/REQ-06.009.md`, `REQ-06.012.md`, `REQ-06.014.md` — shared header, record layout, config-defined list views.
 - `docs/requirements/business/REQ-05.007.md` — archived records never listed.
+- `docs/requirements/business/REQ-06.004.md` — CLI/browser metadata parity; source of the `Created` column and the Title-cell labels/references rule.
 - `docs/requirements/non-functional/NFR-01.002.md`, `NFR-01.003.md`, `NFR-05.001.md`.
 - `docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md` — templates, assets, CSP, no cookies, progressive enhancement.
 - `docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md` — descriptor fields that feed the column plan.
