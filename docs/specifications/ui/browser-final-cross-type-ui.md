@@ -35,7 +35,12 @@ A single view listing all record types as cards with illustrative counts. Repres
 
 ## 5. Metadata display
 
-- List rows show at least id, title, created_date, updated_date, labels, references, and type-specific keys (e.g. task status, milestone release) in a metadata line beneath the primary link.
+> **Reconciled under TASK-141 (2026-11-15).** List views are no longer a `ul` of rows with a metadata line. Per ADR-0028 decision 2 (as amended 2026-11-15) every list is one shared table with the fixed column order `ID, Title, Status, family slot(s), Created, Updated, Actions`; `Status` is its own column, `Created` is its own column, and labels and references move into the Title cell. Layout: [`browser-shell-and-shared-list-ui.md`](browser-shell-and-shared-list-ui.md); mockup [`mockups/MOCK-0016-browser-shell-and-shared-list-layout-review.html`](mockups/MOCK-0016-browser-shell-and-shared-list-layout-review.html).
+
+- List views render through the one shared list layout: a table with header cells `ID`, `Title`, `Status`, the family slot(s) (e.g. milestone `Release`), `Created`, `Updated`, `Actions`, each header cell carrying `scope="col"`. There is no metadata line and no per-family row shape.
+- `Created` and `Updated` are their own columns and show the stored front-matter values read-only. `Status` is the structural status column for every family; a family does not repeat it as a slot.
+- Labels and references appear in the `Title` cell, beneath the title link: a tag line with one tag per label and a muted references line with the identifiers; a record with neither shows no tag area. There is no prefix text and no metadata line. They are general front-matter metadata, identical for every family, and are not a family slot.
+- The `Actions` cell is last: `View`, then `Edit`, each with a record-specific accessible name (`View {id}`, `Edit {id}`); a family action, where one already exists, follows `Edit`. The milestone family has none.
 - Detail view shows a metadata block (`dl`) with: Record ID, Title, Created date, Updated date, Labels, References, plus type-specific keys (Status, Assignee, Milestone, Dependencies, Documentation for tasks; Release for milestones; none extra for releases/technical specifications except general keys).
 - Created date and updated date are rendered read-only in detail and edit (clearly marked "(read-only)"); timestamps are ISO-8601 UTC strings as stored.
 - Labels and references are shown as tags in view and as a tag add/remove interaction in edit (reusing MOCK-0002).
@@ -65,7 +70,7 @@ Reused from MOCK-0001: 404 unknown, 404 deprecated, 400, 405, 415, 500, each wit
 
 - Inventory: type cards/links for represented types.
 - Sidebar entry links for represented types (active state + `aria-current`).
-- List: sidebar entry, row links, Edit.
+- List: sidebar entry, Title-cell link, View and Edit row actions.
 - View: breadcrumb links, Edit.
 - Edit: title input, description textarea, status select, milestone input, label/reference tag add-remove, Save changes, Cancel, hidden version, read-only timestamps.
 - Lifecycle: sidebar entry.

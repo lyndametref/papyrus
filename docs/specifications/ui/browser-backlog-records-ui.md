@@ -3,7 +3,8 @@
 **Ticket:** TASK-11
 **Specification:** [`../browser-tasks-milestones-and-releases.md`](../browser-tasks-milestones-and-releases.md) — sections 3–9 and UI design handoff
 **Mockup package:** [`mockups/MOCK-0002-browser-backlog-records-review.html`](mockups/MOCK-0002-browser-backlog-records-review.html) — one self-contained review package (review landing, web prototype); registry [`mockups/README.md`](mockups/README.md)
-**Status:** `approved` — explicitly approved by the user on 2026-11-12 (UTC) (TASK-102). Revision (per-milestone kanban board, REQ-06.013) approved; TASK-103 implementation may proceed.
+**Mockup package (TASK-147):** [`mockups/MOCK-0017-browser-cleanup-all-board-action-review.html`](mockups/MOCK-0017-browser-cleanup-all-board-action-review.html) — `draft`, pending explicit user approval; the `Clean up all` column action revision.
+**Status:** `approved` — explicitly approved by the user on 2026-11-12 (UTC) (TASK-102). Revision (per-milestone kanban board, REQ-06.013) approved; TASK-103 implementation may proceed. The TASK-147 revision (MOCK-0017) is `draft` and does not extend this approval.
 
 ## 1. Purpose and scope
 
@@ -38,6 +39,17 @@ Header (product name, project name, static offline/bind note), persistent left s
 - Empty states and long-title wrapping as in MOCK-0001.
 - Presentation details resolved by the MOCK-0002 revision (TASK-102) and recorded above: card contents beyond the task ID and title (assignee + labels); column widths (equal thirds); separator styling (bold, 2 px bottom border, names the release); non-drag status control shape (compact select dropdown); default expansion state (first milestone with tasks expanded, others collapsed); empty-column placeholder text ("No tasks in this status.").
 
+### 4a. Per-milestone `Clean up all` action (TASK-147, MOCK-0017)
+
+- **Placement.** The action is a link labelled `Clean up all`, drawn inside the header of the final configured task status column (the last configured status, `Done` by default), directly beneath that column's status heading and above its first card. Its accessible name names the status and the milestone, for example `Clean up all Done tasks in MS-001`. It appears only in the header of that column of a milestone board: no other column, no `Unconfigured status` column, and no `Tasks without a milestone` section carries it.
+- **Visibility.** The action is drawn from configuration only, never from data: it is present whenever the final configured status differs from `active`, including when the column is empty and for a collapsed or closed milestone board. When the final configured status is `active`, no milestone board draws the action.
+- **Confirmation warning region.** Activating the action opens a server-rendered region below the milestone heading and above the milestone's columns; it is not a dialog, overlay, or script-driven prompt. While the region is open, the column header no longer shows the `Clean up all` link. Reading order inside the region: a heading that starts with `Warning` and names the milestone and the status; a sentence naming the milestone, stating the count and that archiving removes those tasks from this board and touches no other milestone; a sentence introducing the ID list; the affected task IDs in ascending order, one per bullet, as `<strong>ID</strong> — title`; then the controls.
+- **Controls.** One confirm control named `Archive {count} tasks` (submit) and one `Cancel` link. `Cancel` is a plain link back to the board with that milestone expanded; it resolves nothing and archives nothing. The region carries no other control and no close icon.
+- **Empty column.** When the column holds no task for the milestone, the action is still offered in the column header before activation. After activation the region keeps the heading and names the milestone and status, then states that the column is empty and that no task will be archived; it contains no confirm control, no form, and only the `Cancel` link.
+- **Failure report.** When some archives fail, the board re-renders with an alert region above the release groups. The alert keeps `role="alert"`, a heading (`Clean up all finished with failures`), the page subtitle `Some tasks could not be archived.`, a sentence stating how many tasks were archived out of the total and naming the milestone, and a list of each failed task ID with its message. Successfully archived tasks are absent from the re-read board; failed tasks stay in their column with their status unchanged, and the action is offered again.
+- **Meaning is never colour-only.** The action is a text link, the region is introduced by the word `Warning`, the alert is introduced by its heading and counts, and every failed task is named in text.
+- **320 CSS px.** Columns stack in configured status order and the warning region keeps its reading order: heading, milestone and count sentence, ID list, controls. The confirm control spans the available width and the `Cancel` link sits below it. In the action state the link sits under the status heading and wraps inside the column; the page gains no horizontal scrollbar.
+
 ## 5. Record views
 
 - Task: metadata block (ID, form, category, status, milestone link-or-text, assignee, labels as framed tags, dependencies links both directions (depends on / depended on by), acceptance criteria as bullet list, comments), description, breadcrumb `Backlog › ID`, single Edit.
@@ -59,17 +71,21 @@ Reused from MOCK-0001: 404 unknown/archived, 400, 405, 415, 500. 320 px list and
 
 List: sidebar links, task card links, milestone expand/collapse, drag handle for status change, per-card status select (non-drag). View: breadcrumb links, Edit, milestone/dependency links. Edit: inputs, textareas, select, search boxes, tag remove/add buttons, Save, Cancel, hidden version. Error: recovery link.
 
+Board, `Clean up all` action (TASK-147): one `Clean up all` link per milestone board, in the final configured status column header; the confirmation warning region's `Archive {count} tasks` submit control and `Cancel` link; no confirm control in the empty-column warning. The failure alert carries no control.
+
 ## 9. MOCK register
 
 | MOCK | Type | Artifact | Contents |
 | --- | --- | --- | --- |
 | MOCK-0002 | scenario | [`mockups/MOCK-0002-browser-backlog-records-review.html`](mockups/MOCK-0002-browser-backlog-records-review.html) | Review landing, 27-view web prototype (kanban board revision) |
+| MOCK-0017 | scenario | [`mockups/MOCK-0017-browser-cleanup-all-board-action-review.html`](mockups/MOCK-0017-browser-cleanup-all-board-action-review.html) | Review landing, 6-view web prototype: milestone list context, column action, confirmation warning, empty-column warning, failure report, 320 px |
 
 ## 10. Approval status
 
 | MOCK | Status |
 | --- | --- |
 | MOCK-0002 | `approved` — explicitly approved by the user on 2026-11-12 (UTC) (TASK-102). Revision (per-milestone kanban board, REQ-06.013) approved; baseline approval 2026-11-04 (TASK-11) superseded by this revision. |
+| MOCK-0017 | `draft` — awaiting explicit user approval (TASK-147). Not approved; the `Clean up all` column action, confirmation warning, and failure report must not be implemented as final UI before approval. |
 
 ## Traceability
 

@@ -1,0 +1,966 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' file: 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>MOCK-0017 — Clean up all board action review</title>
+<link rel="stylesheet" href="wireframe.css">
+<style>
+  /* Board, column action, warning region, and failure list — wireframe tokens only. */
+  .b-side { flex: 0 0 210px; max-width: 210px; border-right: 1px solid var(--wf-border); padding-right: 12px; }
+  .b-side-group { margin: 10px 0 2px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--wf-muted); font-weight: 700; }
+  .b-side-item { display: block; color: var(--wf-muted); }
+  .b-main { padding-left: 4px; }
+
+  .b-release { font-weight: 700; padding: 8px 0; border-bottom: 2px solid var(--wf-border); margin: 12px 0 8px; }
+  .b-milestone { border: 1px solid var(--wf-border); border-radius: var(--wf-radius); padding: 10px 12px; margin: 12px 0; }
+  .b-milestone-head { font-weight: 700; }
+  .b-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--wf-gap); margin-top: 10px; }
+  .b-column { border: 1px solid var(--wf-border); border-radius: var(--wf-radius); padding: 10px; background: var(--wf-fill-2); min-width: 0; }
+  .b-column h3 { margin: 0 0 6px; font-size: 13px; }
+  .b-col-action { margin: 0 0 8px; font-size: 12px; }
+  .b-card { border: 1px solid var(--wf-border); border-radius: var(--wf-radius); background: var(--wf-bg); padding: 8px; margin: 0 0 8px; }
+  .b-card p { margin: 0 0 6px; }
+  .b-drag { color: var(--wf-muted); letter-spacing: 2px; margin-right: 4px; }
+  .b-card-title { font-weight: 600; }
+  .b-status { width: 100%; max-width: 160px; padding: 3px 6px; border: 1px solid var(--wf-border); border-radius: 4px; background: var(--wf-bg); font: inherit; font-size: 12px; }
+  .b-card .wf-label { margin: 4px 0 2px; }
+  .b-card-change { margin-top: 6px; font-size: 12px; padding: 3px 10px; }
+  .b-empty { color: var(--wf-muted); margin: 0; font-size: 12px; }
+
+  .b-confirm { border: 2px solid var(--wf-accent); border-radius: var(--wf-radius); background: var(--wf-fill-2); padding: 12px; margin: 10px 0 12px; }
+  .b-confirm h3 { margin: 0 0 6px; font-size: 14px; }
+  .b-confirm p { margin: 0 0 6px; }
+  .b-confirm-list { margin: 6px 0 10px 18px; padding: 0; }
+  .b-confirm-list li { margin: 2px 0; }
+  .b-confirm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0; }
+
+  .b-alert { border: 2px solid var(--wf-accent); border-radius: var(--wf-radius); background: var(--wf-fill-2); padding: 12px; margin: 0 0 12px; }
+  .b-alert h2 { margin: 0 0 6px; font-size: 15px; }
+  .b-alert p { margin: 0 0 6px; }
+  .b-alert-list { margin: 6px 0 0 18px; padding: 0; }
+
+  .b-narrow { padding: 12px 0 0; }
+  .b-phone { width: 320px; margin: 0 auto; border: 1px solid var(--wf-border); border-radius: 8px; padding: 10px; background: var(--wf-bg); }
+  .b-phone .b-board { grid-template-columns: minmax(0, 1fr); }
+  .b-phone .b-status { max-width: none; }
+  .b-phone .wf-bar { flex-wrap: wrap; gap: 8px; }
+  .b-phone .b-confirm-actions { align-items: stretch; }
+  .b-phone .b-confirm-actions .wf-button { width: 100%; }
+  .b-toggle { display: inline-flex; align-items: center; gap: 6px; margin: 8px 0; font-size: 12px; }
+  .b-toggle button { border: 1px solid var(--wf-border); border-radius: 4px; background: var(--wf-fill); color: var(--wf-fg); font: inherit; font-size: 12px; padding: 3px 8px; }
+</style>
+</head>
+<body data-mock-id="MOCK-0017">
+
+<header class="wf-chrome" role="navigation" aria-label="Review navigation (not part of the design)">
+  <span class="wf-chrome-label">Review</span>
+  <a class="wf-chrome-btn" href="#index">Overview</a>
+  <a class="wf-chrome-btn" href="#web">Web</a>
+  <span class="wf-chrome-note">Scaffolding for review only — not part of the mockup.</span>
+</header>
+
+<!-- 1. REVIEW LANDING -->
+<section class="wf-review wf-index is-active" data-review="index" data-screen="index">
+  <div class="wf-container">
+    <p class="wf-eyebrow">MOCK-0017 · Wireframe review · draft</p>
+    <h1 class="wf-title">Clean up all — per-milestone bulk archive</h1>
+    <p class="wf-subtitle">The <code>Clean up all</code> action in the final configured task status column of a milestone board, its server-rendered confirmation warning above the columns, the empty-column warning, the post-action failure report, and the 320 px treatment. Grayscale wireframe only — no library, framework, or visual-style choice.</p>
+
+    <div class="wf-box wf-ticket">
+      <h2 class="wf-section-title">Ticket</h2>
+      <p><strong>TASK-147</strong> — Add the per-milestone <code>Clean up all</code> board action</p>
+      <p class="wf-note">Sources: REQ-06.013 (revised 2026-11-15), REQ-02.003, REQ-02.004, REQ-05.007; <code>docs/specifications/browser-tasks-milestones-and-releases.md</code> §3 “Clean up all (per-milestone bulk archive)” clauses 1–13 and presentation items 7–9; tests T-11k–T-11p; UI description <code>docs/specifications/ui/browser-backlog-records-ui.md</code>.</p>
+      <p class="wf-note">Context reused unchanged: the shell and shared layout of MOCK-0016 (TASK-141) and the per-milestone kanban board of approved MOCK-0002 (TASK-102). Action scope in every view is the milestone that hosts the board.</p>
+    </div>
+
+    <h2 class="wf-section-title">Review contents</h2>
+    <div class="wf-cards">
+      <article class="wf-box wf-card">
+        <span class="wf-badge">Web · 6 views</span>
+        <h3>Web prototype</h3>
+        <p>Milestone list context, the board with the column action, the populated confirmation warning, the empty-column warning, the partial-failure report, and the 320 px layout.</p>
+        <a class="wf-button" href="#web">Open web prototype</a>
+      </article>
+    </div>
+
+    <h2 class="wf-section-title">Views in the web prototype</h2>
+    <table class="wf-table">
+      <caption class="wf-note" style="text-align:left;padding:4px 0">Prototype view order and the state each one shows.</caption>
+      <thead>
+        <tr><th scope="col">View</th><th scope="col">State shown</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><a class="wf-link" href="#web/list-milestones">list-milestones</a></td><td>Milestone list in the shell — context only, no action.</td></tr>
+        <tr><td><a class="wf-link" href="#web/board-action">board-action</a></td><td>Milestone board; <code>Clean up all</code> in the final configured column (<code>Done</code>) only; no action in other columns or the without-milestone section.</td></tr>
+        <tr><td><a class="wf-link" href="#web/board-confirm">board-confirm</a></td><td>Confirmation warning above the columns with the affected task IDs and titles, count, milestone name, confirm and cancel.</td></tr>
+        <tr><td><a class="wf-link" href="#web/board-confirm-empty">board-confirm-empty</a></td><td>Empty final column: action still offered, warning states that nothing will be archived, no confirm control.</td></tr>
+        <tr><td><a class="wf-link" href="#web/board-cleanup-failed">board-cleanup-failed</a></td><td>Partial failure: alert names the archived/total counts and lists each failed ID with its message; archived tasks are gone; action offered again.</td></tr>
+        <tr><td><a class="wf-link" href="#web/narrow-320">narrow-320</a></td><td>320 CSS px: confirmation warning, stacked columns, and full-width confirm and cancel controls.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 class="wf-section-title">What to review</h2>
+    <div class="wf-box">
+      <ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px">
+        <li><strong>Placement.</strong> The action sits inside the column header of the final configured status column, directly beneath the status heading; no other column, the trailing <code>Unconfigured status</code> column, or the <code>Tasks without a milestone</code> section offers it.</li>
+        <li><strong>Warning region.</strong> Server-rendered above the milestone's columns and below the milestone heading: names the milestone and status, states the count as the word <em>warning</em> plus a sentence, lists IDs in ascending order with titles, then the controls.</li>
+        <li><strong>Empty column.</strong> The action is still present before activation; after activation the warning states that nothing will be archived and only <em>Cancel</em> is offered.</li>
+        <li><strong>Failure report.</strong> A <code>role="alert"</code> region above the release groups names the archive counts and lists each failed ID with its message; the rest of the column is already archived.</li>
+        <li><strong>320 px.</strong> The action, the warning text, the ID list, and the controls stack in one column; the confirm control spans the available width.</li>
+      </ul>
+    </div>
+    <p class="wf-note">Annotation (not part of the design): the package shows the web platform only. Selecting a current status, dragging cards, and the task record view are unchanged behaviour; their layouts stay as approved in MOCK-0002.</p>
+  </div>
+</section>
+
+<!-- 2. WEB PROTOTYPE -->
+<div class="wf-proto" data-platform="web">
+  <nav class="wf-proto-nav" aria-label="Web views (review navigation)">
+    <span class="wf-chrome-label">Web views</span>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-milestones">Milestones</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/board-action">Board</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/board-confirm">Confirm</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/board-confirm-empty">Empty column</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/board-cleanup-failed">Failure</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/narrow-320">320 px</a>
+  </nav>
+
+  <div class="wf-frame wf-frame--desktop">
+
+    <!-- VIEW 1: milestone list context -->
+    <section class="wf-screen" data-platform="web" data-screen="list-milestones">
+      <div class="wf-container">
+        <header class="wf-bar" role="banner" aria-label="Shared header (site-header)">
+          <span class="wf-badge" aria-hidden="true">P</span>
+          <span>
+            <span style="display:block;font-weight:700">Papyrus</span>
+            <span class="wf-note">papyrus</span>
+          </span>
+          <span class="wf-note" style="margin-left:auto;text-align:right">Local browser<br>offline · 127.0.0.1:6420</span>
+        </header>
+
+        <div class="wf-row" style="margin-top:12px;align-items:flex-start">
+          <aside class="b-side" aria-label="Document types (site-nav)">
+            <p class="wf-section-title" style="margin-top:0">Document types</p>
+            <p class="b-side-group">Backlog</p>
+            <a class="wf-link" href="#web/list-milestones" data-goto="list-milestones" aria-current="page"><strong>Backlog</strong></a>
+            <p class="b-side-group">Decisions</p>
+            <span class="b-side-item">Decisions</span>
+            <p class="b-side-group">Documents</p>
+            <span class="b-side-item">Business requirements</span>
+            <span class="b-side-item">Business Rules</span>
+            <span class="b-side-item">Audit Records</span>
+            <span class="b-side-item">Technical Specifications</span>
+            <span class="b-side-item">Use Cases</span>
+            <span class="b-side-item">Test Cases</span>
+            <span class="b-side-item">Test Reports</span>
+            <span class="b-side-item">Non-functional requirements</span>
+            <span class="b-side-item">Glossary</span>
+            <span class="b-side-item">UI Specifications</span>
+            <span class="b-side-item">UI Mockups</span>
+            <p class="b-side-group">Project</p>
+            <span class="b-side-item">Configuration</span>
+            <span class="b-side-item">Managed artifacts &amp; lifecycles</span>
+            <span class="b-side-item">Agent skills &amp; workflows</span>
+          </aside>
+
+          <main class="wf-col b-main">
+            <nav class="wf-note" aria-label="Breadcrumb" style="margin-bottom:8px">
+              <a class="wf-link" href="#web/board-action" data-goto="board-action">Backlog</a> / Milestones
+            </nav>
+            <h1 class="wf-title">Milestones</h1>
+            <p class="wf-subtitle">Backlog milestones with their release and status. Selecting a milestone on the board below is the way to reach the task board.</p>
+
+            <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+              <h2 style="font-size:15px;margin:0">Milestones</h2>
+              <p class="wf-note" style="margin:0">2 milestones</p>
+            </div>
+
+            <div style="overflow-x:auto">
+              <table class="wf-table" data-list-layout="shared" aria-label="Milestones" style="min-width:680px">
+                <thead>
+                  <tr>
+                    <th scope="col" data-column="id">ID</th>
+                    <th scope="col" data-column="title">Title</th>
+                    <th scope="col" data-column="status">Status</th>
+                    <th scope="col" data-column="release">Release</th>
+                    <th scope="col" data-column="created">Created</th>
+                    <th scope="col" data-column="updated">Updated</th>
+                    <th scope="col" data-column="actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr data-row-id="MS-001">
+                    <td style="white-space:nowrap">MS-001</td>
+                    <td>
+                      <span class="wf-link">Diagnostics, browser shell, and offline rendering</span>
+                      <span style="display:block;margin-top:4px"><span class="wf-badge">browser</span> <span class="wf-badge">shell</span></span>
+                    </td>
+                    <td><span class="wf-badge">In Progress</span></td>
+                    <td style="white-space:nowrap">REL-004</td>
+                    <td style="white-space:nowrap">2026-11-15</td>
+                    <td style="white-space:nowrap">2026-11-15</td>
+                    <td style="white-space:nowrap"><a class="wf-link" href="#web/board-action" data-goto="board-action" aria-label="Open the task board for MS-001">Board</a></td>
+                  </tr>
+                  <tr data-row-id="MS-002">
+                    <td style="white-space:nowrap">MS-002</td>
+                    <td>
+                      <span class="wf-link">Release verification and asset budget</span>
+                      <span style="display:block;margin-top:4px"><span class="wf-badge">release</span></span>
+                    </td>
+                    <td><span class="wf-badge">Done</span></td>
+                    <td style="white-space:nowrap">REL-004</td>
+                    <td style="white-space:nowrap">2026-11-13</td>
+                    <td style="white-space:nowrap">2026-11-15</td>
+                    <td style="white-space:nowrap"><a class="wf-link" href="#web/board-action" data-goto="board-action" aria-label="Open the task board for MS-002">Board</a></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </main>
+        </div>
+
+        <footer class="wf-footer" aria-label="Footer (site-footer)">Papyrus local browser — every page is served from this project; no network access.</footer>
+      </div>
+      <p class="wf-note">Annotation (not part of the design): context view only. The milestone list is unchanged by this ticket; the <code>Board</code> action leads to the task board state that this mockup reviews.</p>
+    </section>
+
+    <!-- VIEW 2: board with the column action -->
+    <section class="wf-screen" data-platform="web" data-screen="board-action">
+      <div class="wf-container">
+        <header class="wf-bar" role="banner" aria-label="Shared header (site-header)">
+          <span class="wf-badge" aria-hidden="true">P</span>
+          <span>
+            <span style="display:block;font-weight:700">Papyrus</span>
+            <span class="wf-note">papyrus</span>
+          </span>
+          <span class="wf-note" style="margin-left:auto;text-align:right">Local browser<br>offline · 127.0.0.1:6420</span>
+        </header>
+
+        <div class="wf-row" style="margin-top:12px;align-items:flex-start">
+          <aside class="b-side" aria-label="Document types (site-nav)">
+            <p class="wf-section-title" style="margin-top:0">Document types</p>
+            <p class="b-side-group">Backlog</p>
+            <a class="wf-link" href="#web/board-action" data-goto="board-action" aria-current="page"><strong>Backlog</strong></a>
+            <p class="b-side-group">Decisions</p>
+            <span class="b-side-item">Decisions</span>
+            <p class="b-side-group">Documents</p>
+            <span class="b-side-item">Business requirements</span>
+            <span class="b-side-item">Business Rules</span>
+            <span class="b-side-item">Audit Records</span>
+            <span class="b-side-item">Technical Specifications</span>
+            <span class="b-side-item">Use Cases</span>
+            <span class="b-side-item">Test Cases</span>
+            <span class="b-side-item">Test Reports</span>
+            <span class="b-side-item">Non-functional requirements</span>
+            <span class="b-side-item">Glossary</span>
+            <span class="b-side-item">UI Specifications</span>
+            <span class="b-side-item">UI Mockups</span>
+            <p class="b-side-group">Project</p>
+            <span class="b-side-item">Configuration</span>
+            <span class="b-side-item">Managed artifacts &amp; lifecycles</span>
+            <span class="b-side-item">Agent skills &amp; workflows</span>
+          </aside>
+
+          <main class="wf-col b-main">
+            <h1 class="wf-title">Backlog</h1>
+            <p class="wf-subtitle">Tasks grouped by milestone and status; releases separate milestones.</p>
+
+            <section aria-label="Release REL-004">
+              <p class="b-release">REL-004 — Release 4.0</p>
+
+              <details class="b-milestone" open>
+                <summary class="b-milestone-head">MS-001 — Diagnostics, browser shell, and offline rendering</summary>
+                <div class="b-board">
+                  <section aria-label="To Do">
+                    <h3>To Do</h3>
+                    <article class="b-card">
+                      <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-146 — Refine the page shell ticket</span></p>
+                      <p class="wf-note">Assignee: alice</p>
+                      <p class="wf-label"><label for="status-146">Status</label></p>
+                      <select class="b-status" id="status-146" aria-label="Change status for TASK-146">
+                        <option selected>To Do</option>
+                        <option>In Progress</option>
+                        <option>Done</option>
+                      </select>
+                      <button class="wf-button b-card-change" type="submit">Change status</button>
+                    </article>
+                  </section>
+
+                  <section aria-label="In Progress">
+                    <h3>In Progress</h3>
+                    <article class="b-card">
+                      <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-144 — Add the navigation toggle</span></p>
+                      <p class="wf-note">Assignee: bob · Labels: <span class="wf-badge">shell</span></p>
+                      <p class="wf-label"><label for="status-144">Status</label></p>
+                      <select class="b-status" id="status-144" aria-label="Change status for TASK-144">
+                        <option>To Do</option>
+                        <option selected>In Progress</option>
+                        <option>Done</option>
+                      </select>
+                      <button class="wf-button b-card-change" type="submit">Change status</button>
+                    </article>
+                  </section>
+
+                  <section aria-label="Done">
+                    <h3>Done</h3>
+                    <p class="b-col-action"><a class="wf-link" href="#web/board-confirm" data-goto="board-confirm" aria-label="Clean up all Done tasks in MS-001">Clean up all</a></p>
+                    <article class="b-card">
+                      <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-145 — Pack the verification assets</span></p>
+                      <p class="wf-note">Assignee: carol</p>
+                      <p class="wf-label"><label for="status-145">Status</label></p>
+                      <select class="b-status" id="status-145" aria-label="Change status for TASK-145">
+                        <option>To Do</option>
+                        <option>In Progress</option>
+                        <option selected>Done</option>
+                      </select>
+                      <button class="wf-button b-card-change" type="submit">Change status</button>
+                    </article>
+                    <article class="b-card">
+                      <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-147 — Add the Clean up all board action</span></p>
+                      <p class="wf-note">Assignee: (none)</p>
+                      <p class="wf-label"><label for="status-147">Status</label></p>
+                      <select class="b-status" id="status-147" aria-label="Change status for TASK-147">
+                        <option>To Do</option>
+                        <option>In Progress</option>
+                        <option selected>Done</option>
+                      </select>
+                      <button class="wf-button b-card-change" type="submit">Change status</button>
+                    </article>
+                  </section>
+                </div>
+                <p class="wf-note">Drag a task card to another status column to change its status, or use the status control on the card.</p>
+              </details>
+
+              <details class="b-milestone">
+                <summary class="b-milestone-head">MS-002 — Release verification and asset budget (collapsed)</summary>
+              </details>
+            </section>
+
+            <section aria-label="Tasks without a milestone">
+              <h2 style="font-size:15px;margin:16px 0 0">Tasks without a milestone</h2>
+              <div class="b-board">
+                <section aria-label="To Do">
+                  <h3>To Do</h3>
+                  <p class="b-empty">No tasks in this status.</p>
+                </section>
+                <section aria-label="In Progress">
+                  <h3>In Progress</h3>
+                  <p class="b-empty">No tasks in this status.</p>
+                </section>
+                <section aria-label="Done">
+                  <h3>Done</h3>
+                  <article class="b-card">
+                    <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-151 — Loose follow-up without a milestone</span></p>
+                    <p class="wf-note">Assignee: (none)</p>
+                    <p class="wf-label"><label for="status-151">Status</label></p>
+                    <select class="b-status" id="status-151" aria-label="Change status for TASK-151">
+                      <option>To Do</option>
+                      <option>In Progress</option>
+                      <option selected>Done</option>
+                    </select>
+                    <button class="wf-button b-card-change" type="submit">Change status</button>
+                  </article>
+                </section>
+              </div>
+            </section>
+          </main>
+        </div>
+
+        <footer class="wf-footer" aria-label="Footer (site-footer)">Papyrus local browser — every page is served from this project; no network access.</footer>
+      </div>
+      <p class="wf-note">Annotation (not part of the design): the action is drawn in the header of the final configured status column (<code>Done</code>) of the milestone board only. <code>To Do</code>, <code>In Progress</code>, and the <code>Tasks without a milestone</code> section deliberately carry no action. Card titles are context and are not repeated as links in this package.</p>
+    </section>
+
+    <!-- VIEW 3: confirmation warning, populated -->
+    <section class="wf-screen" data-platform="web" data-screen="board-confirm">
+      <div class="wf-container">
+        <header class="wf-bar" role="banner" aria-label="Shared header (site-header)">
+          <span class="wf-badge" aria-hidden="true">P</span>
+          <span>
+            <span style="display:block;font-weight:700">Papyrus</span>
+            <span class="wf-note">papyrus</span>
+          </span>
+          <span class="wf-note" style="margin-left:auto;text-align:right">Local browser<br>offline · 127.0.0.1:6420</span>
+        </header>
+
+        <div class="wf-row" style="margin-top:12px;align-items:flex-start">
+          <aside class="b-side" aria-label="Document types (site-nav)">
+            <p class="wf-section-title" style="margin-top:0">Document types</p>
+            <p class="b-side-group">Backlog</p>
+            <a class="wf-link" href="#web/board-action" data-goto="board-action" aria-current="page"><strong>Backlog</strong></a>
+            <p class="b-side-group">Decisions</p>
+            <span class="b-side-item">Decisions</span>
+            <p class="b-side-group">Documents</p>
+            <span class="b-side-item">Business requirements</span>
+            <span class="b-side-item">Business Rules</span>
+            <span class="b-side-item">Audit Records</span>
+            <span class="b-side-item">Technical Specifications</span>
+            <span class="b-side-item">Use Cases</span>
+            <span class="b-side-item">Test Cases</span>
+            <span class="b-side-item">Test Reports</span>
+            <span class="b-side-item">Non-functional requirements</span>
+            <span class="b-side-item">Glossary</span>
+            <span class="b-side-item">UI Specifications</span>
+            <span class="b-side-item">UI Mockups</span>
+            <p class="b-side-group">Project</p>
+            <span class="b-side-item">Configuration</span>
+            <span class="b-side-item">Managed artifacts &amp; lifecycles</span>
+            <span class="b-side-item">Agent skills &amp; workflows</span>
+          </aside>
+
+          <main class="wf-col b-main">
+            <h1 class="wf-title">Backlog</h1>
+            <p class="wf-subtitle">Tasks grouped by milestone and status; releases separate milestones.</p>
+
+            <section aria-label="Release REL-004">
+              <p class="b-release">REL-004 — Release 4.0</p>
+
+              <details class="b-milestone" open>
+                <summary class="b-milestone-head">MS-001 — Diagnostics, browser shell, and offline rendering</summary>
+
+                <section class="b-confirm" role="region" aria-label="Clean up all Done tasks in MS-001">
+                  <h3>Warning: archive all Done tasks in MS-001</h3>
+                  <p>Milestone <strong>MS-001 — Diagnostics, browser shell, and offline rendering</strong>. The <strong>Done</strong> column holds <strong>2 tasks</strong> for this milestone; archiving removes them from this board. No other milestone and no task without a milestone is affected.</p>
+                  <p>Task IDs to be archived, in ascending order:</p>
+                  <ul class="b-confirm-list">
+                    <li><strong>TASK-145</strong> — Pack the verification assets</li>
+                    <li><strong>TASK-147</strong> — Add the Clean up all board action</li>
+                  </ul>
+                  <form class="b-confirm-actions" method="post" action="/?type=task">
+                    <input type="hidden" name="cleanup" value="1">
+                    <input type="hidden" name="milestone" value="MS-001">
+                    <input type="hidden" name="expand" value="MS-001">
+                    <button class="wf-button wf-button-primary" type="submit" data-goto="board-cleanup-failed">Archive 2 tasks</button>
+                    <a class="wf-link" href="#web/board-action" data-goto="board-action">Cancel</a>
+                  </form>
+                </section>
+
+                <div class="b-board">
+                  <section aria-label="To Do">
+                    <h3>To Do</h3>
+                    <article class="b-card">
+                      <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-146 — Refine the page shell ticket</span></p>
+                      <p class="wf-note">Assignee: alice</p>
+                      <p class="wf-label"><label for="status-146b">Status</label></p>
+                      <select class="b-status" id="status-146b" aria-label="Change status for TASK-146">
+                        <option selected>To Do</option>
+                        <option>In Progress</option>
+                        <option>Done</option>
+                      </select>
+                      <button class="wf-button b-card-change" type="submit">Change status</button>
+                    </article>
+                  </section>
+
+                  <section aria-label="In Progress">
+                    <h3>In Progress</h3>
+                    <article class="b-card">
+                      <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-144 — Add the navigation toggle</span></p>
+                      <p class="wf-note">Assignee: bob · Labels: <span class="wf-badge">shell</span></p>
+                      <p class="wf-label"><label for="status-144b">Status</label></p>
+                      <select class="b-status" id="status-144b" aria-label="Change status for TASK-144">
+                        <option>To Do</option>
+                        <option selected>In Progress</option>
+                        <option>Done</option>
+                      </select>
+                      <button class="wf-button b-card-change" type="submit">Change status</button>
+                    </article>
+                  </section>
+
+                  <section aria-label="Done">
+                    <h3>Done</h3>
+                    <article class="b-card">
+                      <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-145 — Pack the verification assets</span></p>
+                      <p class="wf-note">Assignee: carol</p>
+                      <p class="wf-label"><label for="status-145b">Status</label></p>
+                      <select class="b-status" id="status-145b" aria-label="Change status for TASK-145">
+                        <option>To Do</option>
+                        <option>In Progress</option>
+                        <option selected>Done</option>
+                      </select>
+                      <button class="wf-button b-card-change" type="submit">Change status</button>
+                    </article>
+                    <article class="b-card">
+                      <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-147 — Add the Clean up all board action</span></p>
+                      <p class="wf-note">Assignee: (none)</p>
+                      <p class="wf-label"><label for="status-147b">Status</label></p>
+                      <select class="b-status" id="status-147b" aria-label="Change status for TASK-147">
+                        <option>To Do</option>
+                        <option>In Progress</option>
+                        <option selected>Done</option>
+                      </select>
+                      <button class="wf-button b-card-change" type="submit">Change status</button>
+                    </article>
+                  </section>
+                </div>
+                <p class="wf-note">Drag a task card to another status column to change its status, or use the status control on the card.</p>
+              </details>
+
+              <details class="b-milestone">
+                <summary class="b-milestone-head">MS-002 — Release verification and asset budget (collapsed)</summary>
+              </details>
+            </section>
+
+            <section aria-label="Tasks without a milestone">
+              <h2 style="font-size:15px;margin:16px 0 0">Tasks without a milestone</h2>
+              <div class="b-board">
+                <section aria-label="To Do">
+                  <h3>To Do</h3>
+                  <p class="b-empty">No tasks in this status.</p>
+                </section>
+                <section aria-label="In Progress">
+                  <h3>In Progress</h3>
+                  <p class="b-empty">No tasks in this status.</p>
+                </section>
+                <section aria-label="Done">
+                  <h3>Done</h3>
+                  <article class="b-card">
+                    <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-151 — Loose follow-up without a milestone</span></p>
+                    <p class="wf-note">Assignee: (none)</p>
+                    <p class="wf-label"><label for="status-151b">Status</label></p>
+                    <select class="b-status" id="status-151b" aria-label="Change status for TASK-151">
+                      <option>To Do</option>
+                      <option>In Progress</option>
+                      <option selected>Done</option>
+                    </select>
+                    <button class="wf-button b-card-change" type="submit">Change status</button>
+                  </article>
+                </section>
+              </div>
+            </section>
+          </main>
+        </div>
+
+        <footer class="wf-footer" aria-label="Footer (site-footer)">Papyrus local browser — every page is served from this project; no network access.</footer>
+      </div>
+      <p class="wf-note">Annotation (not part of the design): the warning region is server-rendered on the board page, directly below the milestone heading and above the columns. While it is open, the column's <code>Clean up all</code> action is replaced by this region. <em>Cancel</em> is a plain link back to the board and archives nothing. The confirm control names the count. The task list here is a warning of what will be archived; the set is re-derived at confirmation time.</p>
+    </section>
+
+    <!-- VIEW 4: empty column warning -->
+    <section class="wf-screen" data-platform="web" data-screen="board-confirm-empty">
+      <div class="wf-container">
+        <header class="wf-bar" role="banner" aria-label="Shared header (site-header)">
+          <span class="wf-badge" aria-hidden="true">P</span>
+          <span>
+            <span style="display:block;font-weight:700">Papyrus</span>
+            <span class="wf-note">papyrus</span>
+          </span>
+          <span class="wf-note" style="margin-left:auto;text-align:right">Local browser<br>offline · 127.0.0.1:6420</span>
+        </header>
+
+        <div class="wf-row" style="margin-top:12px;align-items:flex-start">
+          <aside class="b-side" aria-label="Document types (site-nav)">
+            <p class="wf-section-title" style="margin-top:0">Document types</p>
+            <p class="b-side-group">Backlog</p>
+            <a class="wf-link" href="#web/board-action" data-goto="board-action" aria-current="page"><strong>Backlog</strong></a>
+            <p class="b-side-group">Decisions</p>
+            <span class="b-side-item">Decisions</span>
+            <p class="b-side-group">Documents</p>
+            <span class="b-side-item">Business requirements</span>
+            <span class="b-side-item">Business Rules</span>
+            <span class="b-side-item">Audit Records</span>
+            <span class="b-side-item">Technical Specifications</span>
+            <span class="b-side-item">Use Cases</span>
+            <span class="b-side-item">Test Cases</span>
+            <span class="b-side-item">Test Reports</span>
+            <span class="b-side-item">Non-functional requirements</span>
+            <span class="b-side-item">Glossary</span>
+            <span class="b-side-item">UI Specifications</span>
+            <span class="b-side-item">UI Mockups</span>
+            <p class="b-side-group">Project</p>
+            <span class="b-side-item">Configuration</span>
+            <span class="b-side-item">Managed artifacts &amp; lifecycles</span>
+            <span class="b-side-item">Agent skills &amp; workflows</span>
+          </aside>
+
+          <main class="wf-col b-main">
+            <h1 class="wf-title">Backlog</h1>
+            <p class="wf-subtitle">Tasks grouped by milestone and status; releases separate milestones.</p>
+
+            <section aria-label="Release REL-004">
+              <p class="b-release">REL-004 — Release 4.0</p>
+
+              <details class="b-milestone" open>
+                <summary class="b-milestone-head">MS-001 — Diagnostics, browser shell, and offline rendering</summary>
+
+                <section class="b-confirm" role="region" aria-label="Clean up all Done tasks in MS-001">
+                  <h3>Warning: archive all Done tasks in MS-001</h3>
+                  <p>Milestone <strong>MS-001 — Diagnostics, browser shell, and offline rendering</strong>. The <strong>Done</strong> column is empty for this milestone, so <strong>no task will be archived</strong>; confirming is not offered.</p>
+                  <p class="b-confirm-actions"><a class="wf-link" href="#web/board-action" data-goto="board-action">Cancel</a></p>
+                </section>
+
+                <div class="b-board">
+                  <section aria-label="To Do">
+                    <h3>To Do</h3>
+                    <article class="b-card">
+                      <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-146 — Refine the page shell ticket</span></p>
+                      <p class="wf-note">Assignee: alice</p>
+                      <p class="wf-label"><label for="status-146c">Status</label></p>
+                      <select class="b-status" id="status-146c" aria-label="Change status for TASK-146">
+                        <option selected>To Do</option>
+                        <option>In Progress</option>
+                        <option>Done</option>
+                      </select>
+                      <button class="wf-button b-card-change" type="submit">Change status</button>
+                    </article>
+                  </section>
+
+                  <section aria-label="In Progress">
+                    <h3>In Progress</h3>
+                    <article class="b-card">
+                      <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-144 — Add the navigation toggle</span></p>
+                      <p class="wf-note">Assignee: bob · Labels: <span class="wf-badge">shell</span></p>
+                      <p class="wf-label"><label for="status-144c">Status</label></p>
+                      <select class="b-status" id="status-144c" aria-label="Change status for TASK-144">
+                        <option>To Do</option>
+                        <option selected>In Progress</option>
+                        <option>Done</option>
+                      </select>
+                      <button class="wf-button b-card-change" type="submit">Change status</button>
+                    </article>
+                  </section>
+
+                  <section aria-label="Done">
+                    <h3>Done</h3>
+                    <p class="b-empty">No tasks in this status.</p>
+                  </section>
+                </div>
+                <p class="wf-note">Drag a task card to another status column to change its status, or use the status control on the card.</p>
+              </details>
+
+              <details class="b-milestone">
+                <summary class="b-milestone-head">MS-002 — Release verification and asset budget (collapsed)</summary>
+              </details>
+            </section>
+          </main>
+        </div>
+
+        <footer class="wf-footer" aria-label="Footer (site-footer)">Papyrus local browser — every page is served from this project; no network access.</footer>
+      </div>
+      <p class="wf-note">Annotation (not part of the design): before activation the empty <code>Done</code> column still offers <code>Clean up all</code> in its header — see the board view; the action never depends on the column contents. After activation the warning states that nothing will be archived and carries only <em>Cancel</em>: no confirm control and no form.</p>
+    </section>
+
+    <!-- VIEW 5: partial-failure report -->
+    <section class="wf-screen" data-platform="web" data-screen="board-cleanup-failed">
+      <div class="wf-container">
+        <header class="wf-bar" role="banner" aria-label="Shared header (site-header)">
+          <span class="wf-badge" aria-hidden="true">P</span>
+          <span>
+            <span style="display:block;font-weight:700">Papyrus</span>
+            <span class="wf-note">papyrus</span>
+          </span>
+          <span class="wf-note" style="margin-left:auto;text-align:right">Local browser<br>offline · 127.0.0.1:6420</span>
+        </header>
+
+        <div class="wf-row" style="margin-top:12px;align-items:flex-start">
+          <aside class="b-side" aria-label="Document types (site-nav)">
+            <p class="wf-section-title" style="margin-top:0">Document types</p>
+            <p class="b-side-group">Backlog</p>
+            <a class="wf-link" href="#web/board-action" data-goto="board-action" aria-current="page"><strong>Backlog</strong></a>
+            <p class="b-side-group">Decisions</p>
+            <span class="b-side-item">Decisions</span>
+            <p class="b-side-group">Documents</p>
+            <span class="b-side-item">Business requirements</span>
+            <span class="b-side-item">Business Rules</span>
+            <span class="b-side-item">Audit Records</span>
+            <span class="b-side-item">Technical Specifications</span>
+            <span class="b-side-item">Use Cases</span>
+            <span class="b-side-item">Test Cases</span>
+            <span class="b-side-item">Test Reports</span>
+            <span class="b-side-item">Non-functional requirements</span>
+            <span class="b-side-item">Glossary</span>
+            <span class="b-side-item">UI Specifications</span>
+            <span class="b-side-item">UI Mockups</span>
+            <p class="b-side-group">Project</p>
+            <span class="b-side-item">Configuration</span>
+            <span class="b-side-item">Managed artifacts &amp; lifecycles</span>
+            <span class="b-side-item">Agent skills &amp; workflows</span>
+          </aside>
+
+          <main class="wf-col b-main">
+            <h1 class="wf-title">Backlog</h1>
+            <p class="wf-subtitle">Some tasks could not be archived.</p>
+
+            <div class="b-alert" role="alert">
+              <h2>Clean up all finished with failures</h2>
+              <p>Archived <strong>1 of 2</strong> tasks in <strong>MS-001</strong>. The remaining task stays in its column with its status unchanged.</p>
+              <p>Failed task:</p>
+              <ul class="b-alert-list">
+                <li><strong>TASK-147</strong> — already archived: TASK-147</li>
+              </ul>
+            </div>
+
+            <section aria-label="Release REL-004">
+              <p class="b-release">REL-004 — Release 4.0</p>
+
+              <details class="b-milestone" open>
+                <summary class="b-milestone-head">MS-001 — Diagnostics, browser shell, and offline rendering</summary>
+                <div class="b-board">
+                  <section aria-label="To Do">
+                    <h3>To Do</h3>
+                    <article class="b-card">
+                      <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-146 — Refine the page shell ticket</span></p>
+                      <p class="wf-note">Assignee: alice</p>
+                      <p class="wf-label"><label for="status-146d">Status</label></p>
+                      <select class="b-status" id="status-146d" aria-label="Change status for TASK-146">
+                        <option selected>To Do</option>
+                        <option>In Progress</option>
+                        <option>Done</option>
+                      </select>
+                      <button class="wf-button b-card-change" type="submit">Change status</button>
+                    </article>
+                  </section>
+
+                  <section aria-label="In Progress">
+                    <h3>In Progress</h3>
+                    <article class="b-card">
+                      <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-144 — Add the navigation toggle</span></p>
+                      <p class="wf-note">Assignee: bob · Labels: <span class="wf-badge">shell</span></p>
+                      <p class="wf-label"><label for="status-144d">Status</label></p>
+                      <select class="b-status" id="status-144d" aria-label="Change status for TASK-144">
+                        <option>To Do</option>
+                        <option selected>In Progress</option>
+                        <option>Done</option>
+                      </select>
+                      <button class="wf-button b-card-change" type="submit">Change status</button>
+                    </article>
+                  </section>
+
+                  <section aria-label="Done">
+                    <h3>Done</h3>
+                    <p class="b-col-action"><a class="wf-link" href="#web/board-confirm" data-goto="board-confirm" aria-label="Clean up all Done tasks in MS-001">Clean up all</a></p>
+                    <article class="b-card">
+                      <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-147 — Add the Clean up all board action</span></p>
+                      <p class="wf-note">Assignee: (none)</p>
+                      <p class="wf-label"><label for="status-147d">Status</label></p>
+                      <select class="b-status" id="status-147d" aria-label="Change status for TASK-147">
+                        <option>To Do</option>
+                        <option>In Progress</option>
+                        <option selected>Done</option>
+                      </select>
+                      <button class="wf-button b-card-change" type="submit">Change status</button>
+                    </article>
+                  </section>
+                </div>
+                <p class="wf-note">Drag a task card to another status column to change its status, or use the status control on the card.</p>
+              </details>
+
+              <details class="b-milestone">
+                <summary class="b-milestone-head">MS-002 — Release verification and asset budget (collapsed)</summary>
+              </details>
+            </section>
+
+            <section aria-label="Tasks without a milestone">
+              <h2 style="font-size:15px;margin:16px 0 0">Tasks without a milestone</h2>
+              <div class="b-board">
+                <section aria-label="To Do">
+                  <h3>To Do</h3>
+                  <p class="b-empty">No tasks in this status.</p>
+                </section>
+                <section aria-label="In Progress">
+                  <h3>In Progress</h3>
+                  <p class="b-empty">No tasks in this status.</p>
+                </section>
+                <section aria-label="Done">
+                  <h3>Done</h3>
+                  <article class="b-card">
+                    <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-151 — Loose follow-up without a milestone</span></p>
+                    <p class="wf-note">Assignee: (none)</p>
+                    <p class="wf-label"><label for="status-151d">Status</label></p>
+                    <select class="b-status" id="status-151d" aria-label="Change status for TASK-151">
+                      <option>To Do</option>
+                      <option>In Progress</option>
+                      <option>Done</option>
+                    </select>
+                    <button class="wf-button b-card-change" type="submit">Change status</button>
+                  </article>
+                </section>
+              </div>
+            </section>
+          </main>
+        </div>
+
+        <footer class="wf-footer" aria-label="Footer (site-footer)">Papyrus local browser — every page is served from this project; no network access.</footer>
+      </div>
+      <p class="wf-note">Annotation (not part of the design): the alert is above the release groups and keeps <code>role="alert"</code>. It names the archived and total counts, then lists each failed task ID with its message, in ascending ID order. Archived tasks (TASK-145 here) are already gone from the re-read board, and the action is offered again. Colour is not the carrier: the heading, the counts, and the list carry the meaning.</p>
+    </section>
+
+    <!-- VIEW 6: 320 CSS px -->
+    <section class="wf-screen" data-platform="web" data-screen="narrow-320">
+      <div class="wf-container b-narrow">
+        <p class="wf-note" style="margin:0 0 8px"><strong>320 CSS px</strong> — confirmation warning with stacked columns and full-width controls.</p>
+        <div class="b-phone">
+          <header class="wf-bar" role="banner" aria-label="Shared header (site-header)">
+            <span class="wf-badge" aria-hidden="true">P</span>
+            <span>
+              <span style="display:block;font-weight:700">Papyrus</span>
+              <span class="wf-note">papyrus</span>
+            </span>
+          </header>
+
+          <div class="b-toggle">
+            <button type="button" aria-expanded="false" aria-controls="narrow-nav">Document types</button>
+            <span class="wf-note">menu closed</span>
+          </div>
+          <div id="narrow-nav" hidden>
+            <a class="wf-link" href="#web/board-action" data-goto="board-action" aria-current="page">Backlog</a>
+          </div>
+
+          <h1 class="wf-title">Backlog</h1>
+
+          <p class="b-release">REL-004 — Release 4.0</p>
+
+          <details class="b-milestone" open>
+            <summary class="b-milestone-head">MS-001 — Diagnostics, browser shell, and offline rendering</summary>
+
+            <section class="b-confirm" role="region" aria-label="Clean up all Done tasks in MS-001">
+              <h3>Warning: archive all Done tasks in MS-001</h3>
+              <p>Milestone <strong>MS-001</strong>. The <strong>Done</strong> column holds <strong>2 tasks</strong>; archiving removes them from this board.</p>
+              <ul class="b-confirm-list">
+                <li><strong>TASK-145</strong> — Pack the verification assets</li>
+                <li><strong>TASK-147</strong> — Add the Clean up all board action</li>
+              </ul>
+              <form class="b-confirm-actions" method="post" action="/?type=task">
+                <input type="hidden" name="cleanup" value="1">
+                <input type="hidden" name="milestone" value="MS-001">
+                <input type="hidden" name="expand" value="MS-001">
+                <button class="wf-button wf-button-primary" type="submit" data-goto="board-cleanup-failed">Archive 2 tasks</button>
+                <a class="wf-link" href="#web/board-action" data-goto="board-action">Cancel</a>
+              </form>
+            </section>
+
+            <div class="b-board">
+              <section aria-label="To Do">
+                <h3>To Do</h3>
+                <article class="b-card">
+                  <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-146 — Refine the page shell ticket</span></p>
+                  <p class="wf-note">Assignee: alice</p>
+                  <p class="wf-label"><label for="status-146n">Status</label></p>
+                  <select class="b-status" id="status-146n" aria-label="Change status for TASK-146">
+                    <option selected>To Do</option>
+                    <option>In Progress</option>
+                    <option>Done</option>
+                  </select>
+                  <button class="wf-button b-card-change" type="submit">Change status</button>
+                </article>
+              </section>
+
+              <section aria-label="In Progress">
+                <h3>In Progress</h3>
+                <article class="b-card">
+                  <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-144 — Add the navigation toggle</span></p>
+                  <p class="wf-note">Assignee: bob</p>
+                  <p class="wf-label"><label for="status-144n">Status</label></p>
+                  <select class="b-status" id="status-144n" aria-label="Change status for TASK-144">
+                    <option>To Do</option>
+                    <option selected>In Progress</option>
+                    <option>Done</option>
+                  </select>
+                  <button class="wf-button b-card-change" type="submit">Change status</button>
+                </article>
+              </section>
+
+              <section aria-label="Done">
+                <h3>Done</h3>
+                <article class="b-card">
+                  <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-145 — Pack the verification assets</span></p>
+                  <p class="wf-note">Assignee: carol</p>
+                  <p class="wf-label"><label for="status-145n">Status</label></p>
+                  <select class="b-status" id="status-145n" aria-label="Change status for TASK-145">
+                    <option>To Do</option>
+                    <option>In Progress</option>
+                    <option selected>Done</option>
+                  </select>
+                  <button class="wf-button b-card-change" type="submit">Change status</button>
+                </article>
+                <article class="b-card">
+                  <p><span class="b-drag" aria-hidden="true">⁞⁞</span><span class="b-card-title">TASK-147 — Add the Clean up all board action</span></p>
+                  <p class="wf-note">Assignee: (none)</p>
+                  <p class="wf-label"><label for="status-147n">Status</label></p>
+                  <select class="b-status" id="status-147n" aria-label="Change status for TASK-147">
+                    <option>To Do</option>
+                    <option>In Progress</option>
+                    <option selected>Done</option>
+                  </select>
+                  <button class="wf-button b-card-change" type="submit">Change status</button>
+                </article>
+              </section>
+            </div>
+          </details>
+        </div>
+      </div>
+      <p class="wf-note">Annotation (not part of the design): at 320 CSS px the columns stack in configured status order and the warning region keeps the same reading order — heading, milestone, count sentence, ID list, controls. The confirm control is full width and the cancel link sits below it. In the action state the same <code>Clean up all</code> link sits directly under the <code>Done</code> heading and wraps inside the column; the page gains no horizontal scrollbar.</p>
+    </section>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var all = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+  var one = function (sel, root) { return (root || document).querySelector(sel); };
+
+  function parse(hash) {
+    var raw = String(hash || '').replace(/^#\/?/, '');
+    if (!raw || raw === 'index') return { mode: 'index' };
+    var bits = raw.split('/');
+    return { mode: 'proto', platform: bits[0], screen: bits[1] || '' };
+  }
+
+  function go(hash) { location.hash = hash; }
+
+  function render() {
+    var state = parse(location.hash);
+    var index = one('[data-review="index"]');
+
+    all('.wf-chrome a').forEach(function (a) {
+      var target = String(a.getAttribute('href') || '').replace(/^#\/?/, '').split('/')[0];
+      var active = (state.mode === 'index' && target === 'index') || (state.mode === 'proto' && target === state.platform);
+      a.classList.toggle('is-active', active);
+      if (active) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+    });
+
+    if (state.mode === 'proto') {
+      var proto = one('.wf-proto[data-platform="' + state.platform + '"]');
+      if (!proto) { go('#index'); return; }
+      var screens = all('.wf-screen', proto);
+      var screen = state.screen ? one('.wf-screen[data-screen="' + state.screen + '"]', proto) : screens[0];
+      if (!screen || screens.indexOf(screen) === -1) screen = screens[0];
+      var screenId = screen.getAttribute('data-screen');
+      if (state.screen !== screenId) { go('#' + state.platform + '/' + screenId); return; }
+
+      proto.classList.add('is-active');
+      index.classList.remove('is-active');
+      screens.forEach(function (s) { s.classList.toggle('is-active', s === screen); });
+      all('.wf-view-link', proto).forEach(function (link) {
+        var active = link.getAttribute('href') === '#' + state.platform + '/' + screenId;
+        link.classList.toggle('is-active', active);
+        if (active) link.setAttribute('aria-current', 'true'); else link.removeAttribute('aria-current');
+      });
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    all('.wf-proto').forEach(function (p) { p.classList.remove('is-active'); });
+    all('[data-review]').forEach(function (s) { s.classList.remove('is-active'); });
+    if (index) index.classList.add('is-active');
+  }
+
+  document.addEventListener('click', function (e) {
+    var target = e.target.closest('[data-goto]');
+    if (!target) return;
+    e.preventDefault();
+    var state = parse(location.hash);
+    if (state.mode === 'proto') go('#' + state.platform + '/' + target.getAttribute('data-goto'));
+    else go('#web/' + target.getAttribute('data-goto'));
+  });
+
+  window.addEventListener('hashchange', render);
+  render();
+})();
+</script>
+</body>
+</html>
