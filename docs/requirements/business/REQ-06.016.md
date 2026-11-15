@@ -1,0 +1,35 @@
+# REQ-06.016 Present a Uniform List View Across Artifact Families
+
+## User Story
+As a project contributor, I want every artifact list view to use one shared layout so that browsing, scanning, and acting on records is consistent across the project.
+
+## Group
+REQ-06 Search and Local Web Interface
+
+## Criticality
+Should have
+
+## Description
+Every browser list view for every artifact family — tasks, milestones, releases, decisions, and every document type, including audit records and technical specifications — uses a single shared list layout. The shared layout fixes the common header, row and column structure, and the placement of actions; family-specific fields populate designated slots within it rather than introducing a separate layout. No artifact family uses a bespoke list template that diverges from the shared layout. Archived records remain excluded from every list view (REQ-05.007).
+
+Visual specifics — exact columns, spacing, and styling — remain design decisions; a redesign session may refine them, but the single shared layout contract holds. The layout applies to browser list views only and does not change CLI list output.
+
+## Acceptance Criteria
+- Every browser list view for every artifact family uses the same shared list layout.
+- The header, row and column structure, and action placement are consistent across all artifact families.
+- Family-specific content appears in designated slots of the shared layout rather than through a separate list template.
+- No artifact family uses a bespoke list view that diverges from the shared layout.
+- Archived records are excluded from every list view.
+- The shared layout renders and is usable in the supported browsers (NFR-05.001) and requires no network access (NFR-01.003).
+
+## Traceability
+- Source: customer-feedback handoff — Key Account Manager, Item 7, raw quote:
+  - "On all view listing artifacts (audit, tech-spec, etc...) we want to make sure to have a uniform view. organise a session with ui-design to redesign those views"
+- Product decision 2026-11-15 (in-session): "uniform" means one shared layout for every record family, not only consistent headers, columns, and actions.
+- REQ-06.002 — Serve the Local Web Interface
+- REQ-06.004 — Use Front-Matter Metadata in CLI and Browser Views (shared metadata projection)
+- REQ-06.014 — Display Config-Defined Document Types in the Browser (list views for every document type)
+- REQ-05.007 — Manage Document Archive State and Deletion (archived records hidden from lists)
+- NFR-01.002 — Display, View, and Edit All Papyrus Content in a Local Browser
+- NFR-01.003 — Use the Browser Command and Interface Without Internet
+- NFR-05.001 — Display the Browser Interface in Named Browsers
