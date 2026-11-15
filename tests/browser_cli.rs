@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdout, Command, Stdio};
 use std::time::{Duration, Instant};
 
+use papyrus::browser::assets::{self, ASSETS};
+
 fn bin() -> Command {
     Command::new(env!("CARGO_BIN_EXE_papyrus"))
 }
@@ -8124,4 +8126,211 @@ fn readme_documents_browser_debug() {
     assert!(readme.contains("--debug"));
     assert!(readme.contains("Logs one line per received request"));
     assert!(readme.contains("Request headers and bodies are never logged"));
+}
+
+// TASK-143 AC #1, #2, #8: the asset table serves every entry by exact match,
+// with binary bodies, unchanged global headers, 404 on a miss for every method,
+// and 405 with the existing Allow header on a wrong method.
+#[test]
+fn t143_asset_table_serves_every_entry() {
+    let dir = fixture("assets-table");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    for asset in ASSETS {
+        let response = get(&server, asset.path);
+        assert_eq!(response.status, 200, "GET {}", asset.path);
+        assert_eq!(
+            response.header("Content-Type"),
+            Some(asset.mime),
+            "Content-Type {}",
+            asset.path
+        );
+        assert_eq!(
+            response.header("Cache-Control"),
+            Some("no-store"),
+            "Cache-Control {}",
+            asset.path
+        );
+        let length = asset.bytes.len().to_string();
+        assert_eq!(
+            response.header("Content-Length"),
+            Some(length.as_str()),
+            "Content-Length {}",
+            asset.path
+        );
+        assert_eq!(response.body, asset.bytes, "body {}", asset.path);
+
+        let head = request(server.port, "HEAD", asset.path, &[], None);
+        assert_eq!(head.status, 200, "HEAD {}", asset.path);
+        assert!(head.body.is_empty(), "HEAD body {}", asset.path);
+        assert_eq!(
+            head.header("Content-Type"),
+            Some(asset.mime),
+            "HEAD Content-Type {}",
+            asset.path
+        );
+        assert_eq!(
+            head.header("Content-Length"),
+            Some(length.as_str()),
+            "HEAD Content-Length {}",
+            asset.path
+        );
+        assert_eq!(
+            head.header("Cache-Control"),
+            Some("no-store"),
+            "HEAD Cache-Control {}",
+            asset.path
+        );
+    }
+
+    for method in ["PUT", "DELETE", "OPTIONS"] {
+        let response = request(server.port, method, "/assets/katex/katex.min.js", &[], None);
+        assert_eq!(response.status, 405, "{} asset", method);
+        assert_eq!(response.header("Allow"), Some("GET, HEAD, POST"));
+    }
+    let post = request(
+        server.port,
+        "POST",
+        "/assets/katex/katex.min.js",
+        &[],
+        Some(b""),
+    );
+    assert_eq!(post.status, 405, "POST asset");
+    assert_eq!(post.header("Allow"), Some("GET, HEAD, POST"));
+
+    for path in ["/assets/nope", "/assets/", "/assets/app.css/"] {
+        for method in ["GET", "HEAD"] {
+            let response = request(server.port, method, path, &[], None);
+            assert_eq!(response.status, 404, "{} {}", method, path);
+        }
+        let response = request(server.port, "POST", path, &[], Some(b""));
+        assert_eq!(response.status, 404, "POST {}", path);
+    }
+
+    let query = request(
+        server.port,
+        "GET",
+        "/assets/katex/katex.min.js?x=1",
+        &[],
+        None,
+    );
+    assert_eq!(query.status, 200);
+    assert_eq!(
+        query.body,
+        include_bytes!("../src/browser/vendor/katex/0.16.11/katex.min.js")
+    );
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-143 AC #7: one table-wide scan replacing the per-page assertion that
+// ADR-0027 decision 10 asks the existing scans to gain.
+#[test]
+fn t143_table_wide_offline_scan() {
+    let dir = fixture("assets-offline-wide");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    for asset in ASSETS {
+        assert!(!asset.path.ends_with(".map"), "source map {}", asset.path);
+        assert!(!asset.path.contains(".."), "dot segment {}", asset.path);
+
+        if asset.mime == "text/css; charset=utf-8" {
+            let css = String::from_utf8_lossy(asset.bytes);
+            assert!(!css.contains("@import"), "@import in {}", asset.path);
+            let mut rest = css.as_ref();
+            while let Some(start) = rest.find("url(") {
+                let after = &rest[start + 4..];
+                let end = after
+                    .find(')')
+                    .unwrap_or_else(|| panic!("unterminated url( in {}", asset.path));
+                let value = after[..end]
+                    .trim()
+                    .trim_matches(|character| character == '\'' || character == '"')
+                    .trim();
+                assert!(!value.contains("://"), "scheme in url({value})");
+                assert!(!value.starts_with('/'), "absolute url({value})");
+                assert!(!value.starts_with("data:"), "data url({value})");
+                assert!(!value.contains(".."), "dot segment in url({value})");
+                let name = value.strip_prefix("fonts/").unwrap_or_else(|| {
+                    panic!("url({value}) in {} is not under fonts/", asset.path)
+                });
+                assert!(!name.is_empty(), "empty font name in {}", asset.path);
+                assert!(
+                    !name.contains('/'),
+                    "url({value}) in {} has more than one segment",
+                    asset.path
+                );
+                let (stem, extension) = name
+                    .rsplit_once('.')
+                    .unwrap_or_else(|| panic!("url({value}) has no extension"));
+                assert!(
+                    matches!(extension, "woff2" | "woff" | "ttf"),
+                    "unexpected font extension in url({value})"
+                );
+                let sibling = format!("/assets/katex/fonts/{stem}.woff2");
+                assert!(
+                    assets::lookup(&sibling).is_some(),
+                    "url({value}) has no woff2 sibling {sibling}"
+                );
+                rest = &after[end + 1..];
+            }
+        }
+
+        if asset.mime.starts_with("text/") {
+            let text = String::from_utf8_lossy(asset.bytes);
+            assert!(
+                !text.contains("sourceMappingURL"),
+                "sourceMappingURL in {}",
+                asset.path
+            );
+        }
+    }
+
+    fn attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
+        let start = tag.find(&format!("{name}=\""))? + name.len() + 2;
+        let end = tag[start..].find('"')? + start;
+        Some(&tag[start..end])
+    }
+
+    for path in ["/?type=req", "/doc/REQ-001.001", "/doc/REQ-001.001/edit"] {
+        let html = get(&server, path).text();
+        for external in ["http://", "https://", "//cdn"] {
+            assert!(!html.contains(external), "external {external} in {path}");
+        }
+        for chunk in html.split("<link").skip(1) {
+            let tag = &chunk[..chunk.find('>').unwrap_or(chunk.len())];
+            if let Some(href) = attribute(tag, "href") {
+                assert!(
+                    href.starts_with("/assets/"),
+                    "link href {href} in {path} is not an asset"
+                );
+            }
+        }
+        for chunk in html.split("<script").skip(1) {
+            let tag = &chunk[..chunk.find('>').unwrap_or(chunk.len())];
+            if let Some(src) = attribute(tag, "src") {
+                assert!(
+                    src.starts_with("/assets/"),
+                    "script src {src} in {path} is not an asset"
+                );
+            }
+        }
+    }
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-143 AC #2: the asset module never touches the filesystem and never
+// performs path handling.
+#[test]
+fn t143_asset_module_is_filesystem_free() {
+    let source = include_str!("../src/browser/assets.rs");
+    for forbidden in ["std::fs", "File::open", "Path", "PathBuf"] {
+        assert!(
+            !source.contains(forbidden),
+            "src/browser/assets.rs must not contain {forbidden:?}"
+        );
+    }
 }

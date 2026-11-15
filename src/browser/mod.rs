@@ -3,6 +3,7 @@
 //!
 //! The behavior contract is `docs/specifications/browser-requirements.md`.
 
+pub mod assets;
 pub mod http;
 pub mod records;
 pub mod render;
@@ -29,8 +30,6 @@ use std::time::{Duration, Instant};
 
 const MAX_CONNECTIONS: usize = 16;
 const IO_TIMEOUT: Duration = Duration::from_secs(5);
-const APP_CSS: &str = include_str!("app.css");
-const APP_JS: &str = include_str!("app.js");
 
 /// Effective browser settings after applying the precedence chain.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -605,22 +604,13 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
 
     // Route matching happens before method rejection: an unknown path is 404
     // for every method, while a known path with a disallowed method is 405.
-    if path == "/assets/app.css" {
-        return match method {
-            Method::Get | Method::Head => {
-                Ok(Response::text(200, "text/css; charset=utf-8", APP_CSS))
-            }
-            _ => Err(HttpError::new(405)),
-        };
-    }
-    if path == "/assets/app.js" {
-        return match method {
-            Method::Get | Method::Head => Ok(Response::text(
-                200,
-                "text/javascript; charset=utf-8",
-                APP_JS,
-            )),
-            _ => Err(HttpError::new(405)),
+    if path.starts_with("/assets/") {
+        return match assets::lookup(&path) {
+            Some(asset) => match method {
+                Method::Get | Method::Head => Ok(Response::bytes(200, asset.mime, asset.bytes)),
+                _ => Err(HttpError::new(405)),
+            },
+            None => Err(HttpError::new(404)),
         };
     }
 

@@ -439,6 +439,15 @@ impl Response {
         }
     }
 
+    pub fn bytes(status: u16, content_type: &'static str, body: &'static [u8]) -> Self {
+        Self {
+            status,
+            content_type,
+            body: body.to_vec(),
+            extra_headers: Vec::new(),
+        }
+    }
+
     pub fn redirect(location: &str) -> Self {
         let mut response = Self::text(303, "text/plain; charset=utf-8", "");
         response
@@ -542,6 +551,16 @@ mod tests {
         assert!(parse_target("*").is_err());
         assert!(parse_target("/a%2Fb").is_err());
         assert!(parse_target(&format!("/{}", "a".repeat(MAX_TARGET))).is_err());
+    }
+
+    #[test]
+    fn binary_response_preserves_non_utf8_bytes() {
+        let body: &'static [u8] = &[0x00, 0xff, 0x80, b'a'];
+        let response = Response::bytes(200, "font/woff2", body);
+        assert_eq!(response.status, 200);
+        assert_eq!(response.content_type, "font/woff2");
+        assert_eq!(response.body, body);
+        assert!(response.extra_headers.is_empty());
     }
 
     #[test]

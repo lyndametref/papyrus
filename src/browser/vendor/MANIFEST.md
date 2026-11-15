@@ -1,0 +1,39 @@
+# Embedded browser asset manifest
+
+Auditable record of every file embedded through `src/browser/assets.rs`.
+Rows are sorted by request path; `bytes` are decimal and `sha256` is lowercase hexadecimal.
+`LICENSE`, `UPSTREAM.md`, and this manifest are not served and have no row.
+
+## Vendored assets
+
+| path | package | version | licence | upstream | bytes | sha256 |
+|---|---|---|---|---|---|---|
+| `/assets/katex/fonts/KaTeX_AMS-Regular.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 28076 | `0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308` |
+| `/assets/katex/fonts/KaTeX_Caligraphic-Bold.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 6912 | `de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c` |
+| `/assets/katex/fonts/KaTeX_Caligraphic-Regular.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 6908 | `5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b` |
+| `/assets/katex/fonts/KaTeX_Fraktur-Bold.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 11348 | `74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f` |
+| `/assets/katex/fonts/KaTeX_Fraktur-Regular.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 11316 | `51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc` |
+| `/assets/katex/fonts/KaTeX_Main-Bold.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 25324 | `0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021` |
+| `/assets/katex/fonts/KaTeX_Main-BoldItalic.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 16780 | `99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b` |
+| `/assets/katex/fonts/KaTeX_Main-Italic.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 16988 | `97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267` |
+| `/assets/katex/fonts/KaTeX_Main-Regular.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 26272 | `c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866` |
+| `/assets/katex/fonts/KaTeX_Math-BoldItalic.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 16400 | `dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1` |
+| `/assets/katex/fonts/KaTeX_Math-Italic.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 16440 | `7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264` |
+| `/assets/katex/fonts/KaTeX_SansSerif-Bold.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 12216 | `e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62` |
+| `/assets/katex/fonts/KaTeX_SansSerif-Italic.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 12028 | `00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a` |
+| `/assets/katex/fonts/KaTeX_SansSerif-Regular.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 10344 | `68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342` |
+| `/assets/katex/fonts/KaTeX_Script-Regular.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 9644 | `036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b` |
+| `/assets/katex/fonts/KaTeX_Size1-Regular.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 5468 | `6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe` |
+| `/assets/katex/fonts/KaTeX_Size2-Regular.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 5208 | `d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd` |
+| `/assets/katex/fonts/KaTeX_Size3-Regular.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 3624 | `73d591271b1604960cb10bb90fee021670af7297017e0e98480b332d11f51995` |
+| `/assets/katex/fonts/KaTeX_Size4-Regular.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 4928 | `a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0` |
+| `/assets/katex/fonts/KaTeX_Typewriter-Regular.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 13568 | `71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b` |
+| `/assets/katex/katex.min.css` | KaTeX | 0.16.11 | MIT | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 23335 | `717bc9ae7853b61f0f76455dddf0ecd4f527a783f42de2ac24684899c1c46258` |
+| `/assets/katex/katex.min.js` | KaTeX | 0.16.11 | MIT | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 275414 | `e6bfe5deebd4c7ccd272055bab63bd3ab2c73b907b6e6a22d352740a81381fd4` |
+
+## First-party assets
+
+| path | bytes | sha256 |
+|---|---|---|
+| `/assets/app.css` | 14151 | `729e85f450538c1183e6957a9ddc3b44811de8df734ba1a2513369054d71415d` |
+| `/assets/app.js` | 7795 | `b8efe06333a46fbca1e78e4ca890d622e3248b285161d8fd07e08debe8f64c35` |
