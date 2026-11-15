@@ -188,8 +188,10 @@ impl ListPlan {
             }
         }
         format!(
-            "<div class=\"table-scroll\"><table class=\"table list list--shared\" data-list-layout=\"shared\" aria-label=\"{}\">\
+            "<div class=\"table-scroll\" role=\"region\" aria-label=\"{}\" tabindex=\"0\">\
+<table class=\"table list list--shared\" data-list-layout=\"shared\" aria-label=\"{}\">\
 <thead><tr>{}</tr></thead><tbody>{}</tbody></table></div>",
+            escape(&self.heading),
             escape(&self.heading),
             header,
             rows
@@ -275,7 +277,7 @@ pub fn validate_slots(slots: &[(&'static str, &'static str)]) {
 fn row_for(record: &Record, slots: &[(&'static str, &'static str)]) -> Row {
     let id = record.id.clone();
     let href = format!("/doc/{id}");
-    let mut cells = vec![status_cell(record)];
+    let mut cells = vec![status_cell(record.status.as_deref())];
     for (key, _) in slots {
         cells.push(slot_cell(key, record));
     }
@@ -296,11 +298,13 @@ fn row_for(record: &Record, slots: &[(&'static str, &'static str)]) -> Row {
     }
 }
 
-fn status_cell(record: &Record) -> String {
-    format!(
-        "<span class=\"row-status tag\">{}</span>",
-        escape(&record.status_text())
-    )
+/// Status cell: a status tag when the record has a status, muted text when it
+/// is unset (UI description §4.2).
+fn status_cell(status: Option<&str>) -> String {
+    match status.filter(|value| !value.is_empty()) {
+        Some(status) => format!("<span class=\"row-status tag\">{}</span>", escape(status)),
+        None => "<span class=\"muted\">(none)</span>".to_string(),
+    }
 }
 
 /// One family slot value. This is a match on the slot key only — never on a
@@ -544,6 +548,12 @@ mod tests {
             );
         }
         assert!(html.contains("<tbody><tr data-row-id=\"MS-001\">"));
+        assert!(
+            html.contains(
+                "<div class=\"table-scroll\" role=\"region\" aria-label=\"Milestones\" tabindex=\"0\">"
+            ),
+            "the narrow-width scroll container is keyboard focusable and labelled"
+        );
     }
 
     #[test]
@@ -648,6 +658,16 @@ mod tests {
         assert!(html.contains("<li class=\"tag\">&lt;b&gt;</li>"));
         assert!(html.contains("<li>a&amp;b</li>"));
         assert!(!html.contains("<b>"));
+    }
+
+    #[test]
+    fn unset_status_is_muted_text_not_a_tag() {
+        assert_eq!(
+            status_cell(Some("open")),
+            "<span class=\"row-status tag\">open</span>"
+        );
+        assert_eq!(status_cell(None), "<span class=\"muted\">(none)</span>");
+        assert_eq!(status_cell(Some("")), "<span class=\"muted\">(none)</span>");
     }
 
     #[test]

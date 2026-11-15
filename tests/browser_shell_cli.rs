@@ -168,6 +168,12 @@ fn milestone_list_uses_the_shared_layout_and_other_families_stay_legacy() {
     assert!(milestone.contains("data-column=\"release\">Release"));
     assert!(milestone.contains("data-row-id=\"MS-001\""));
     assert!(milestone.contains("aria-label=\"View MS-001\""));
+    assert!(
+        milestone.contains(
+            "<div class=\"table-scroll\" role=\"region\" aria-label=\"Milestones\" tabindex=\"0\">"
+        ),
+        "the narrow-width scroll container is focusable and labelled from the list heading"
+    );
 
     let note = server.get("/?type=note");
     assert!(
