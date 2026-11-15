@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13.
+Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-15 by owner decision (decision 3 delivered delegation split) without status change.
 
 ## Date
 
@@ -35,7 +35,14 @@ Forces: a config-defined type must not require a code change (REQ-07.002/REQ-07.
 
    Because the status list comes from configuration, the generic handler validates `status` values against the registry's validated list (ADR-0019) and never against a hard-coded set. UI mockups have no front-matter status, no custom statuses, and no `status` verb (REQ-05.008).
 
-3. **One implementation, `src/document.rs`, parameterized by descriptor.** `document::create | list | view | edit | archive | delete | status` take a `TypeDescriptor` from the registry (ADR-0017). There is no `if slug == …` in this module. A config-defined type is handled here; a built-in `Typed` descriptor is also handled here for the baseline verbs and `status`, and delegates only its extension verbs (`create-group`, `supersede`) to type-specific code.
+3. **One implementation, `src/document.rs`, parameterized by descriptor.** `document::run(ctx, registry, invocation)` is the single entry for every document type, and the `create | list | view | edit | archive | delete | status` handlers take a `TypeDescriptor` from the registry (ADR-0017). There is no `if slug == …` in this module. The delivered delegation split is:
+   - `ContentModel::Generic` — the handler performs every verb itself;
+   - `ContentModel::Typed(_)` — `create`, `create-group`, `list`, `view`, `edit`, and `supersede` are dispatched to the owning module through `TypedHandler`, while `archive`, `delete`, and `status` stay on the shared `document.rs` path;
+   - `ContentModel::HtmlMockup` — every verb, including `archive` and `delete`, is dispatched to the mockup module.
+
+   A mockup's `archive` and `delete` stay in the mockup module because the record is HTML with metadata in an embedded comment, not front matter; that module must perform the move through `record::store::archive_content` (destination written before the source is unlinked, ADR-0022 decision 2) and must not reimplement the shared front-matter patch path; the delegation is keyed on `ContentModel::HtmlMockup`, never on the `ui-mockup` slug, so `src/document.rs` introduces no slug literal; a mockup has no `status` verb.
+
+   *Revision (2026-11-15, owner decision): this decision previously stated that a typed descriptor delegates only its extension verbs and that the baseline verbs are handled here. The delivered split is broader on both sides — typed modules also own the content verbs `create`/`list`/`view`/`edit` and their extensions, and the mockup module owns `archive` and `delete` as well — so the per-verb ownership above replaces the earlier sentence.*
 
 4. **All file access goes through the shared record layer.** Reads use `record::document`; writes use `record::patch` and `record::store::write_atomic`; the path is `record::store::resolve_directory` with `Context::ensure_within` (NFR-04.002). `src/document.rs` may not format a `---` block, re-render a body, or call `fs::write`.
 

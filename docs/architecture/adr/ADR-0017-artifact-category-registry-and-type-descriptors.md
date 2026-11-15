@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13.
+Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-15 by owner decision (decision 2 `verbs` row, decision 3, decision 4 CLI bullet, and downstream constraint 3) without status change.
 
 ## Date
 
@@ -29,7 +29,7 @@ Forces: one structural model for CLI, record layer, search, and browser (otherwi
 ## Decision
 
 1. **One registry, built at startup, describes every artifact type.** `src/registry.rs` exposes `ArtifactRegistry` with three category collections and one descriptor type. It is assembled from two sources, in this order:
-   - the static built-in descriptors (`cli::BUILTIN_COMMANDS` handlers plus `record::descriptor` entries) for tasks, milestones, releases, and decisions;
+   - the static built-in descriptors (the built-in templates in `src/registry.rs` plus `record::descriptor` entries) for tasks, milestones, releases, and decisions;
    - one runtime `TypeDescriptor` per `document_types` entry, derived mechanically from `DocTypeEntry` plus the static document descriptor of the same slug when one exists.
 
    A slug that has no static descriptor resolves to the **generic** document descriptor (ADR-0018). The registry is the only object that maps a slug to behavior; no module may hold a second list of type names.
@@ -40,20 +40,26 @@ Forces: one structural model for CLI, record layer, search, and browser (otherwi
    |---|---|---|
    | `category` | `Backlog`, `Decision`, `Document` | REQ-07.001 |
    | `status_model` | `Fixed(&[State])`, `TaskConfigurable { statuses, default }`, or `DocumentMain { main: [active, archived], custom: &[State], default: State }` | REQ-07.001, REQ-01.002 |
-   | `verbs` | the baseline verbs plus `status` where the type has front-matter status, plus declared extensions | REQ-07.003, REQ-05.001/002/008 |
+   | `verbs` | every descriptor in every category: task `create/list/view/edit/archive/restore/delete`; milestone `create/list/view/edit/archive/delete`; release `create/list/view/edit/close`; decision `create/list/view/edit`; document `create/list/view/edit/archive/delete`, plus `status` where the type stores a front-matter status, plus declared extensions | REQ-02.001–004, REQ-03.001–002, REQ-04.001, REQ-07.003, REQ-05.001/002/008 |
    | `content_model` | `Generic`, `Typed(&'static TypedSchema)`, `HtmlMockup` | REQ-07.004, REQ-05.008 |
    | `frontmatter_keys` | general keys plus per-type keys (`status` included only for a type that stores it) | REQ-05.010, ADR-0012 |
    | `id_shape` | `Plain`, `Dotted`, `Grouped` | REQ-01.005, REQ-05.001/002 |
    | `archive_policy` | `ArchivedFolder { state_field }` or `None` | REQ-05.007, REQ-04.002 |
 
+   *Revision (2026-11-15, owner decision): the `verbs` row previously described the field as the document baseline plus `status` plus extensions, which read as a document-only field. `verbs` exists on every descriptor in every category, and the delivered sets are the ones listed above (backlog and decision sets from REQ-02.001–004, REQ-03.001–002, and REQ-04.001). The same correction applies to decision 1's assembly sentence, which no longer refers to `cli::BUILTIN_COMMANDS` handlers because that table carries names only (ADR-0016 decision 2).*
+
    Only tasks are `TaskConfigurable`. Milestones, releases, and decisions are `Fixed`. A document descriptor is `DocumentMain`: `active` and `archived` are always present and cannot be removed, renamed, or replaced; every other declared value is a custom status; `custom` is empty when the entry declares no `statuses`; `default` is the entry's `default_status` or `active`. The registry never stores a second copy of the status list — it reads it from the validated configuration (ADR-0019). Configuration cannot change a descriptor's category, fixed lifecycle, verbs, content model, or id shape (REQ-07.001).
 
-3. **The baseline verbs are a lower bound; type-specific verbs are declared extensions of a built-in descriptor.** `create`, `list`, `view`, `edit`, `archive`, `delete` are present on every descriptor in the `Document` category; `status` is present when the descriptor's status model stores a front-matter `status` (so every front-matter-backed document type, but not UI mockups). A built-in document descriptor may add a verb (`create-group`, `supersede`) and may add a required argument (`--group`), with its handler named by the descriptor. A config-defined descriptor has exactly the baseline plus `status`, and no extension point: REQ-07.004 forbids per-type schema and REQ-07.002 forbids per-type code. This is the owner's decision of 2026-11-13 (D1) on REQ-07.003's "same command family" wording: the shared family is the baseline, and the `req`/`nfr`/`ui-mockup` groups are unchanged.
+3. **The baseline verbs are a lower bound; `verbs` is a field of every descriptor, and document extensions are declared on a built-in descriptor.** `verbs` is **not** a document-only field: it is present on every descriptor in every category (decision 2), so a task, milestone, release, or decision descriptor states its own verb set. Within the `Document` category the baseline family `create`, `list`, `view`, `edit`, `archive`, `delete` remains a **lower bound** present on every descriptor; `status` is present only when the descriptor's status model stores a front-matter `status` (so every front-matter-backed document type, but not UI mockups). A built-in document descriptor may add a verb (`create-group`, `supersede`) and may add a required argument (`--group`), with its handler named by the descriptor. A config-defined descriptor has exactly the baseline plus `status`, and no extension point: REQ-07.004 forbids per-type schema and REQ-07.002 forbids per-type code. This is the owner's decision of 2026-11-13 (D1) on REQ-07.003's "same command family" wording: the shared family is the baseline, and the `req`/`nfr`/`ui-mockup` groups are unchanged.
+
+   *Revision (2026-11-15, owner decision): this decision previously presented the baseline verbs without stating that `verbs` is carried by every descriptor in every category; the field's scope and the conditional `status` rule are now explicit and the D1 rationale sentence is unchanged.*
 
 4. **One dispatch point per category, driven by the descriptor.**
-   - CLI: `cli::tree` inserts the descriptor's verbs (ADR-0016); the handler receives the descriptor, never a slug literal.
+   - CLI: `cli::tree` inserts **document** verbs from the descriptor (ADR-0016), and the document handler receives the descriptor, never a slug literal. Backlog and decision commands are not tree-built: they are `clap` **derive** commands declared in their family modules (`src/task.rs`, `src/milestone.rs`, `src/release.rs`, `src/decision.rs`), and only their names come from `cli::BUILTIN_COMMANDS` — `cli::tree` grants them no descriptor-driven verb set.
    - Record layer: `record::descriptor` keeps the static definitions and gains `Registry::descriptor(slug)`; `descriptor_for_doc_type` is replaced by a registry lookup so config-defined types are first-class readers/writers.
    - Search and browser: both iterate `registry.enabled(category)` instead of a static list of keys.
+
+   *Revision (2026-11-15, owner decision): this decision previously said that `cli::tree` inserts "the descriptor's verbs", which is true only for the `Document` category. `src/cli/tree.rs` skips every non-document descriptor, so backlog and decision verbs come from their `clap` derive enums and `BUILTIN_COMMANDS` supplies only their names; the document surface is the only descriptor-driven one.*
 
 5. **The registry does not write, parse, or format records.** It supplies metadata only. Every read and write still goes through `record::document`, `record::patch`, `record::identity`, and `record::store` (ADR-0013 decisions 1–4, ADR-0012 decision 6). Archive, delete, and supersede are expressed as `PatchOp` sequences plus `record::store` moves (ADR-0022). A descriptor may not contain a `render_*`, `parse_*`, or `fs::write` path.
 
@@ -111,7 +117,9 @@ Forces: one structural model for CLI, record layer, search, and browser (otherwi
 
 1. No module other than `src/registry.rs` may enumerate document-type keys or map a slug to behavior.
 2. `record::store` remains the only writer and `record::patch` the only mutation API; descriptors carry no I/O.
-3. Every descriptor's `archive_policy` follows REQ-05.007 and ADR-0022; decisions have no archive policy.
+3. Every descriptor's `archive_policy` follows REQ-05.007 and ADR-0022; decisions **and releases** have no archive policy (`ArchivePolicy::None`), and every other descriptor uses `ArchivedFolder` (ADR-0023 decision 2).
+
+   *Revision (2026-11-15, owner decision): this constraint previously named only decisions as having no archive policy. Releases are the second family that never moves: their descriptor carries `ArchivePolicy::None` and `release close` rewrites `status` in place (ADR-0023 decision 2).*
 4. Descriptor fields must be derivable from REQ-07.001/002/003/004 and REQ-05.010; a field that cannot be traced to a requirement is not added.
 5. The per-type modules may keep validation and patch construction but must lose their `clap` enums, their dispatch `match`, and their directory/ID logic.
 6. A descriptor's custom status list is the validated configuration's list, read-only; no command may add, remove, or rename a status at runtime, and `archived` is never accepted as a custom value.
@@ -119,6 +127,7 @@ Forces: one structural model for CLI, record layer, search, and browser (otherwi
 ## References
 
 - `docs/requirements/business/REQ-07.md`, `REQ-07.001.md`, `REQ-07.002.md`, `REQ-07.003.md`, `REQ-07.004.md`.
+- `docs/requirements/business/REQ-02.001.md`–`REQ-02.004.md`, `REQ-03.001.md`–`REQ-03.002.md`, `REQ-04.001.md` — task, milestone, release, and decision verb sets carried by `verbs`.
 - `docs/requirements/business/REQ-05.001.md`, `REQ-05.002.md`, `REQ-05.007.md`, `REQ-05.008.md`, `REQ-05.010.md`.
 - `docs/requirements/business/REQ-01.002.md`, `REQ-01.005.md`.
 - `docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md` — configured directories and identity.
