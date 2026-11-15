@@ -10,7 +10,7 @@ homepage = "https://github.com/papyrus/papyrus"
 readme = "README.md"
 
 [dependencies]
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive", "string"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 yaml_serde = "0.10"

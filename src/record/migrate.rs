@@ -92,7 +92,7 @@ pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<RecordDescr
         }
         for dir in desc.resolve_read_directories(&cfg, project_dir) {
             if dir == parent {
-                return Some(*desc);
+                return Some(desc.clone());
             }
         }
     }
@@ -112,7 +112,7 @@ pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<RecordDescr
         }
         for dir in desc.resolve_read_directories(&cfg, project_dir) {
             if dir == parent {
-                return Some(*desc);
+                return Some(desc.clone());
             }
         }
     }
@@ -306,6 +306,7 @@ pub fn migrate_content(
         let cfg = load_cfg(ctx);
         let status = desc
             .doc_type_key
+            .as_deref()
             .and_then(|k| cfg.document_types.get(k))
             .and_then(|e| e.default_status.clone())
             .unwrap_or_else(|| "active".to_string());
@@ -530,7 +531,7 @@ pub(crate) fn retire_legacy_body_ops(
     desc: &RecordDescriptor,
     path: &Path,
 ) -> Vec<PatchOp> {
-    let retired: &[(&str, &str, bool)] = match desc.name {
+    let retired: &[(&str, &str, bool)] = match desc.name.as_ref() {
         "task" => &[
             ("Status", "status", false),
             ("Assignee", "assignee", true),
@@ -605,7 +606,7 @@ pub(crate) fn retire_legacy_body_ops(
 /// Whether a record that already carries front matter still has a retired
 /// metadata section or a title heading.
 pub(crate) fn has_retired_sections(doc: &document::Document, desc: &RecordDescriptor) -> bool {
-    let retired: &[&str] = match desc.name {
+    let retired: &[&str] = match desc.name.as_ref() {
         "task" => &["Status", "Assignee", "Milestone", "Labels", "Dependencies"],
         "milestone" => &["Release"],
         _ => &[],
@@ -1037,7 +1038,7 @@ pub fn migrate_corpus(ctx: &Context, dry_run: bool) -> Result<Vec<MigrationEntry
         managed.extend(
             registry
                 .in_category(crate::registry::ArtifactCategory::Document)
-                .filter_map(|descriptor| registry.record_descriptor(&descriptor.slug).copied()),
+                .filter_map(|descriptor| registry.record_descriptor(&descriptor.slug).cloned()),
         );
     }
     for desc in &managed {
@@ -1713,7 +1714,7 @@ mod tests {
         write(&path, legacy);
 
         let desc = managed_descriptor(&dir, &path).expect("generic record is managed");
-        assert_eq!(desc.doc_type_key, Some("note"));
+        assert_eq!(desc.doc_type_key.as_deref(), Some("note"));
 
         let result = ensure_front_matter(&c, &path).unwrap();
         assert!(result.contains("status: active"), "{result}");
