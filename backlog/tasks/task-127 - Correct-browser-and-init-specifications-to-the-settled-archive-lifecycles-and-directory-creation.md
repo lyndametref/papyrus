@@ -3,11 +3,11 @@ id: TASK-127
 title: >-
   Correct browser and init specifications to the settled archive lifecycles and
   directory creation
-status: Refined
+status: Implemented
 assignee:
   - business-analyst
 created_date: '2026-11-15T11:28:00Z'
-updated_date: '2026-11-15T13:00:00Z'
+updated_date: '2026-11-15T13:13:00Z'
 labels:
   - docs
   - specifications
@@ -15,6 +15,7 @@ milestone: m-19
 dependencies:
   - TASK-130
   - TASK-131
+  - TASK-132
 references:
   - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md
@@ -49,10 +50,10 @@ ordinal: 41320
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 browser-managed-artifacts-and-lifecycles.md states documents active -> archived with no restore, mockups pending -> approved -> archived, milestones open -> closed, and releases planned -> released with no archive
-- [ ] #2 the read-only operation sentence no longer names deprecating or restoring, and no row retains deprecated lifecycle wording
-- [ ] #3 interactive-init-walkthrough-for-artifact-activation.md section 6 states that only the active type directory is created and archived/ appears on first archive; no deprecated/ subfolder is created
-- [ ] #4 project-initialization-and-configuration.md OQ-1 is resolved with the exact init directory set, the no-pre-created archived/deprecated rule, and the no-overwrite rule
-- [ ] #5 A grep for deprecated in the three pages finds only decision-status references or an explicitly historical note, never a document lifecycle or pre-created folder
-- [ ] #6 The pages agree with ADR-0016, ADR-0017, ADR-0018 decision 3, ADR-0022, and ADR-0023 with no contradicting lifecycle statement
+- [x] #1 browser-managed-artifacts-and-lifecycles.md states documents active -> archived with no restore, mockups pending -> approved -> archived, milestones open -> closed, and releases planned -> released with no archive
+- [x] #2 the read-only operation sentence no longer names deprecating or restoring, and no row retains deprecated lifecycle wording
+- [x] #3 interactive-init-walkthrough-for-artifact-activation.md section 6 states that only the active type directory is created and archived/ appears on first archive; no deprecated/ subfolder is created
+- [x] #4 project-initialization-and-configuration.md OQ-1 is resolved with the exact init directory set, the no-pre-created archived/deprecated rule, and the no-overwrite rule
+- [x] #5 A grep for deprecated in the three pages finds only decision-status references or an explicitly historical note, never a document lifecycle or pre-created folder
+- [x] #6 The pages agree with ADR-0016, ADR-0017, ADR-0018 decision 3, ADR-0022, and ADR-0023 with no contradicting lifecycle statement
 <!-- AC:END -->

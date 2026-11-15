@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-15 by owner decision (decision 2 release archive location) without status change.
+Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-15 by owner decision (decision 2 release archive location) without status change; amended again 2026-11-15 by owner decision (decision 2 milestone archive location, decision 3, decision 4 legacy alias qualification, downstream constraint 2, and the decision 9 supersession bullet) without status change.
 
 ## Date
 
@@ -30,7 +30,7 @@ Forces: one identity, one file, one name (ADR-0010 decision 1); configuration-dr
    | Record family | Active location | Archive location |
    |---|---|---|
    | Task | `<backlog_directory>/tasks/` | `<backlog_directory>/archive/tasks/` |
-   | Milestone | `<backlog_directory>/milestones/` | `<backlog_directory>/archive/milestones/` |
+   | Milestone | `<backlog_directory>/milestones/` | none — never moved by a milestone command; its state is the front-matter status (`open` or `closed`) |
    | Release | `<backlog_directory>/releases/` | none — the record is never moved; its state is the front-matter status |
    | Decision (ADR, BDR) | `<decision_directory>/` | none — the record is never moved; its state is the `## Status` line, which keeps it in the ADR index |
    | Document, any configured type (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`, and every user-added slug) | `<doc_directory>/<type directory>/` | `<doc_directory>/<type directory>/archived/` |
@@ -41,18 +41,26 @@ Forces: one identity, one file, one name (ADR-0010 decision 1); configuration-dr
 
    *Revision (2026-11-15, owner decision): the Release row previously listed `<backlog_directory>/archive/releases/` as its archive location. Releases never move — the descriptor carries `ArchivePolicy::None` and the record's state is its front-matter `status`, so the row and the sentence above now record the delivered contract.*
 
+   A milestone likewise has no archive location and no milestone command moves the record: `papyrus milestone close <id>` rewrites `status` from `open` to `closed` and refreshes `updated_date` in place through the single write path (REQ-03.001, ADR-0022 decision 5), and the milestone descriptor carries `ArchivePolicy::None`. The legacy `<backlog_directory>/archive/milestones/` folder is a **read/import location only**: the milestone resolver still reads it, and the one-way Backlog.md import writes archived source milestones there (ADR-0011). No milestone command archives, restores, migrates, or relocates a record into or out of that folder, and no milestone command creates it; the import is the only writer that creates archived milestone records there. A milestone file under that folder remains readable legacy data: this ADR introduces no migration, relocation, or deletion of it, and no command archives or restores a milestone.
+
+   *Revision (2026-11-15, owner decision): the Milestone row previously listed `<backlog_directory>/archive/milestones/` as its archive location. Milestones never move — `papyrus milestone close <id>` writes `status` and `updated_date` in place, and the milestone archive and restore verbs were removed (ADR-0022 decision 5). The row and the paragraph above now record the delivered contract, including the legacy read/import exception for `<backlog_directory>/archive/milestones/`.*
+
 3. **`archived/` is the only inactive location for document records.**
    - A `deprecated/` folder is **not** read, listed, searched, indexed by the browser, migrated, moved, or renamed. Its files stay exactly where they are until a human acts outside Papyrus. No code path may resolve it, and no descriptor may name it.
-   - No Papyrus command returns an archived document to `active`; there is no document restore. Only tasks and milestones keep archive/restore, because REQ-01.005 requires their IDs to survive that cycle.
+   - No Papyrus command returns an archived document to `active`; there is no document restore. Only tasks keep archive/restore, because REQ-01.005 requires task IDs to survive that cycle. Milestones have no archive or restore: their lifecycle is fixed `open -> closed` and `papyrus milestone close <id>` closes them in place (REQ-03.001, ADR-0022 decision 5).
    - Archive and delete follow ADR-0022: archive patches `status` to `archived` and writes the destination before removing the source; delete archives an active record first and then removes the file; decisions have no archive or restore operation (REQ-04.002).
+
+   *Revision (2026-11-15, owner decision): this decision previously said that tasks and milestones keep archive/restore. Only tasks do, because REQ-01.005 requires task IDs to survive that cycle; milestones are closed in place and have no archive or restore verb (ADR-0022 decision 5). ADR-0017 decision 2 records the milestone verb set.*
 
 4. **ID allocation, file names, resolution, relocation, and import are unchanged from ADR-0010 except for the allocation scope.**
    - One number space per family (tasks, milestones, releases, each decision prefix, each document prefix). Allocation is `max(number present in the **active and archived** locations of that family) + 1`, minimum 1. **`deprecated/` locations are excluded** because they are unmanaged and unread; a number already used by a file that a human left in `deprecated/` can therefore be allocated again, which is accepted as the consequence of not reading that folder.
    - File names: `<ID>.md`, with `<ID>` carrying the configured prefix and padding as a minimum; decisions keep `<ID>-<kebab-case-slug>.md` and the slug is cosmetic and never regenerated; title edits never rename a file. Slug-named document records keep their names (for example `BR-016-<slug>.md`).
-   - Resolution is read-tolerant and never used to write: a stem `<PREFIX>-<digits>` with optional `-<slug>`/` - <slug>`, prefix compared case-insensitively, leading zeros optional; front-matter `id` is authoritative and a disagreement with the stem marks the record invalid and refuses writes. Backlog.md storage stems are not recognized (ADR-0011 is the only bridge). Legacy archive aliases `<backlog_directory>/tasks/archived/` and `<backlog_directory>/milestones/archived/` remain readable as archived tasks and milestones and are never written.
+   - Resolution is read-tolerant and never used to write: a stem `<PREFIX>-<digits>` with optional `-<slug>`/` - <slug>`, prefix compared case-insensitively, leading zeros optional; front-matter `id` is authoritative and a disagreement with the stem marks the record invalid and refuses writes. Backlog.md storage stems are not recognized (ADR-0011 is the only bridge). Legacy archive aliases `<backlog_directory>/tasks/archived/` and `<backlog_directory>/milestones/archived/` remain readable as archived tasks and milestones and are never written by a command. For milestones, `<backlog_directory>/archive/milestones/` is additionally a read/import location: the resolver reads it and the one-way import writes archived source milestones there, but no milestone command archives, restores, migrates, or relocates a record into or out of it and no milestone command creates it (decision 2).
    - A configured folder change during `config set` moves every file and subfolder through the single relocation routine with pre-check, rollback, and containment (REQ-01.002, ADR-0013); it is never lazy.
    - `papyrus.config.yml` is the only source of prefixes, padding, roots, directories, and status vocabularies; `backlog/config.yml` is not read. A status value outside the configured vocabulary is preserved verbatim and reported, never normalized.
    - Import writes native records only; a project still in the Backlog.md layout must import before the layout switchover, and the release that ships the layout ships the import and its upgrade note.
+
+   *Revision (2026-11-15, owner decision): the legacy-alias sentence previously said that the milestone legacy alias and the milestone archive folder are never written. The alias is read-only, but `<backlog_directory>/archive/milestones/` is also a read/import location that the one-way import writes to; the sentence now states that exception and repeats that no milestone command archives, restores, migrates, or relocates a record into or out of it (decision 2).*
 
 5. **Field map.** Every managed Markdown record carries the general keys in canonical order `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, followed by its type-specific keys.
 
@@ -78,7 +86,7 @@ Forces: one identity, one file, one name (ADR-0010 decision 1); configuration-dr
 8. **Unchanged metadata rules carried forward from ADR-0012.** `id` and every reference value are Papyrus IDs (no storage ID, no translation); front matter is the only metadata store and is never mirrored into a `## ` section; `record::frontmatter` owns parsing, patching, and serialization with unknown keys and order preserved; serialization is Papyrus-documented and Backlog-independent using `yaml_serde`; the heading policy is unchanged (tasks and milestones have no `#` heading, every other Markdown record type has a generated `# <ID> <title>`, frozen ADR bodies gain only the front-matter block); decisions keep `## Date` and `## References` additively and never move `status`/`type` into front matter; UI mockups are excluded from front matter; backfilling front matter on frozen records is permitted as a metadata-only change; Markdown that no descriptor claims is out of scope.
 
 9. **What this ADR replaces, relative to ADR-0010 and ADR-0012.**
-   - Replaced from ADR-0010: decision 2's table (the `deprecated/` idle column, the "Inactive location" for decisions, and the `deploy`-as-default example are replaced by decision 2 above), decision 5's allocation scope (deprecated locations excluded), and decision 7 (deprecate/restore for documents replaced by archive-only; archive/restore for tasks and milestones restated unchanged).
+   - Replaced from ADR-0010: decision 2's table (the `deprecated/` idle column, the "Inactive location" for decisions, and the `deploy`-as-default example are replaced by decision 2 above), decision 5's allocation scope (deprecated locations excluded), and decision 7 (deprecate/restore for documents replaced by archive-only; archive/restore restated unchanged for tasks, and milestones restated as close-only with no archive or restore).
    - Replaced from ADR-0012: decision 2's field map (superseded by decision 5 above, which adds `status` and the document rows) and decision 8's write-path list and decision 10's exemption list (both restated in decisions 7 and 6).
    - Remaining in force from ADR-0010 through this restatement: one identity per record and file (decision 1); configuration-driven paths and containment (decision 2's principle); file naming and non-renaming (decision 3); read-tolerant resolution and authoritative front-matter `id` (decision 4); numbering immutability apart from the allocation scope (decision 5); no shape conversion (decision 6); atomic, non-destructive moves (decision 7's mechanism); whole-folder relocation during `config set` (decision 8); configuration as the only source of paths and statuses (decision 9); import writes native records only (decision 10); the switchover rule requiring import in the same release and an upgrade note (decision 11).
    - Remaining in force from ADR-0012 through this restatement: decisions 1, 3, 4, 5, 6, 7, 9, 11, 12, 13, 14, 15 and the corrected decisions 8 and 10 above.
@@ -125,7 +133,7 @@ Forces: one identity, one file, one name (ADR-0010 decision 1); configuration-dr
 ## Downstream constraints
 
 1. `deprecated/` must not appear in any descriptor, resolver, browser route, search path, documentation, or test fixture after this ADR, except in the historical ADR bodies and in the upgrade note that tells users the folder is inert.
-2. Document restore must not exist in any surface; tasks and milestones keep their archive/restore pair.
+2. Document restore must not exist in any surface; only tasks keep their archive/restore pair, and milestones are closed in place with no archive or restore.
 3. Allocation scans active and archived locations only, and excludes `deprecated/`.
 4. The field map in decision 5 is authoritative; adding or removing a key requires a registry change (ADR-0012 decision 6 as carried forward) and an update to this ADR.
 5. `status` is never a create or edit option for a front-matter document; only `status` and `archive` write it.

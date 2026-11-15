@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-15 by owner decision (decision 2 `verbs` row, decision 3, decision 4 CLI bullet, and downstream constraint 3) without status change.
+Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-15 by owner decision (decision 2 `verbs` row, decision 3, decision 4 CLI bullet, and downstream constraint 3) without status change; amended again 2026-11-15 by owner decision (decision 2 milestone verb set: `close` replaces `archive`, no `restore`; downstream constraint 3 milestone archive policy) without status change.
 
 ## Date
 
@@ -40,13 +40,15 @@ Forces: one structural model for CLI, record layer, search, and browser (otherwi
    |---|---|---|
    | `category` | `Backlog`, `Decision`, `Document` | REQ-07.001 |
    | `status_model` | `Fixed(&[State])`, `TaskConfigurable { statuses, default }`, or `DocumentMain { main: [active, archived], custom: &[State], default: State }` | REQ-07.001, REQ-01.002 |
-   | `verbs` | every descriptor in every category: task `create/list/view/edit/archive/restore/delete`; milestone `create/list/view/edit/archive/delete`; release `create/list/view/edit/close`; decision `create/list/view/edit`; document `create/list/view/edit/archive/delete`, plus `status` where the type stores a front-matter status, plus declared extensions | REQ-02.001–004, REQ-03.001–002, REQ-04.001, REQ-07.003, REQ-05.001/002/008 |
+   | `verbs` | every descriptor in every category: task `create/list/view/edit/archive/restore/delete`; milestone `create/list/view/edit/close/delete`; release `create/list/view/edit/close`; decision `create/list/view/edit`; document `create/list/view/edit/archive/delete`, plus `status` where the type stores a front-matter status, plus declared extensions | REQ-02.001–004, REQ-03.001–002, REQ-04.001, REQ-07.003, REQ-05.001/002/008 |
    | `content_model` | `Generic`, `Typed(&'static TypedSchema)`, `HtmlMockup` | REQ-07.004, REQ-05.008 |
    | `frontmatter_keys` | general keys plus per-type keys (`status` included only for a type that stores it) | REQ-05.010, ADR-0012 |
    | `id_shape` | `Plain`, `Dotted`, `Grouped` | REQ-01.005, REQ-05.001/002 |
    | `archive_policy` | `ArchivedFolder { state_field }` or `None` | REQ-05.007, REQ-04.002 |
 
    *Revision (2026-11-15, owner decision): the `verbs` row previously described the field as the document baseline plus `status` plus extensions, which read as a document-only field. `verbs` exists on every descriptor in every category, and the delivered sets are the ones listed above (backlog and decision sets from REQ-02.001–004, REQ-03.001–002, and REQ-04.001). The same correction applies to decision 1's assembly sentence, which no longer refers to `cli::BUILTIN_COMMANDS` handlers because that table carries names only (ADR-0016 decision 2).*
+
+   *Revision (2026-11-15, owner decision): the milestone entry in the `verbs` row previously read `create/list/view/edit/archive/delete`. The milestone lifecycle is fixed to `open -> closed` (REQ-03.001, REQ-07.001) and is delivered by `papyrus milestone close <id>`, which rewrites `status` and `updated_date` in place through the single write path; milestone archive and milestone restore do not exist. No other category's verb set in that row changes, and ADR-0022 decision 5 and ADR-0023 decision 2 record the same contract.*
 
    Only tasks are `TaskConfigurable`. Milestones, releases, and decisions are `Fixed`. A document descriptor is `DocumentMain`: `active` and `archived` are always present and cannot be removed, renamed, or replaced; every other declared value is a custom status; `custom` is empty when the entry declares no `statuses`; `default` is the entry's `default_status` or `active`. The registry never stores a second copy of the status list — it reads it from the validated configuration (ADR-0019). Configuration cannot change a descriptor's category, fixed lifecycle, verbs, content model, or id shape (REQ-07.001).
 
@@ -117,9 +119,11 @@ Forces: one structural model for CLI, record layer, search, and browser (otherwi
 
 1. No module other than `src/registry.rs` may enumerate document-type keys or map a slug to behavior.
 2. `record::store` remains the only writer and `record::patch` the only mutation API; descriptors carry no I/O.
-3. Every descriptor's `archive_policy` follows REQ-05.007 and ADR-0022; decisions **and releases** have no archive policy (`ArchivePolicy::None`), and every other descriptor uses `ArchivedFolder` (ADR-0023 decision 2).
+3. Every descriptor's `archive_policy` follows REQ-05.007 and ADR-0022: tasks use `ArchivedFolder`; milestones, decisions, and releases use `ArchivePolicy::None`; document descriptors use `ArchivedFolder` (ADR-0023 decision 2).
 
    *Revision (2026-11-15, owner decision): this constraint previously named only decisions as having no archive policy. Releases are the second family that never moves: their descriptor carries `ArchivePolicy::None` and `release close` rewrites `status` in place (ADR-0023 decision 2).*
+
+   *Revision (2026-11-15, owner decision): the milestone descriptor also carries `ArchivePolicy::None`; this constraint previously assigned `ArchivedFolder` to it. The milestone lifecycle is `open -> closed` by `papyrus milestone close <id>`, which writes `status` and `updated_date` in place, and no milestone command archives or restores a milestone. The legacy `<backlog_directory>/archive/milestones/` folder is a read/import location only, not a lifecycle archive destination (ADR-0023 decisions 2 and 4).*
 4. Descriptor fields must be derivable from REQ-07.001/002/003/004 and REQ-05.010; a field that cannot be traced to a requirement is not added.
 5. The per-type modules may keep validation and patch construction but must lose their `clap` enums, their dispatch `match`, and their directory/ID logic.
 6. A descriptor's custom status list is the validated configuration's list, read-only; no command may add, remove, or rename a status at runtime, and `archived` is never accepted as a custom value.
