@@ -2,7 +2,7 @@
 id: REQ-01.008
 title: "Run Project Diagnostics (`papyrus check`)"
 created_date: '2026-11-15T15:46:30Z'
-updated_date: '2026-11-15T15:57:53Z'
+updated_date: '2026-11-15T18:06:09Z'
 labels: []
 references: []
 ---
@@ -35,9 +35,9 @@ Each finding is reported with its kind, the affected record or location, and a d
 
 When the effective configuration is invalid, `papyrus check` reports the configuration findings and still runs the checks that do not depend on the effective `document_types` set: duplicate IDs among task, milestone, release, and decision records, self-referential task dependencies, dependency cycles, dangling `milestone` and `release` references, and front-matter/section conflicts on task and milestone records. Checks that need the effective `document_types` set — duplicate IDs across document records and front-matter/section conflicts on document records — are skipped, and the report names them as skipped.
 
-`--fix` applies repairs only where they are unambiguous and safe. It repairs duplicate record IDs and performs no other repair. For a duplicated ID, the record that keeps the ID is the one with the oldest `created_date`; when `created_date` values are equal or missing, the record at the lexicographically smallest project-relative path keeps the ID. Every other record carrying that ID is assigned a new ID from the regular allocator (REQ-01.005), and its file is renamed to the stem of the new ID. `--fix` does not rewrite references: a reference to a repaired ID is left unchanged, and the confirmation prompt lists every reference affected by the repair, naming the referring record and field, so the user can update them.
+`--fix` applies repairs only where they are unambiguous and safe. It repairs duplicate record IDs and performs no other repair. For a duplicated ID, the record that keeps the ID follows a fixed keeper order: the keeper is the record with the earliest valid `created_date`; a record whose `created_date` is missing or cannot be parsed ranks after every record with a valid date; and a remaining tie — equal valid dates, or two records without a valid date — is broken by the lexicographically smallest project-relative path. Every other record carrying that ID is assigned a new ID from the regular allocator (REQ-01.005), and its file is renamed to the stem of the new ID. `--fix` does not rewrite references: a reference to a repaired ID is left unchanged, and the confirmation prompt lists every reference affected by the repair, naming the referring record and field, so the user can update them.
 
-`--fix` refuses to repair a duplicated ID when any record carrying it is either a record whose file stem and front-matter `id` disagree, because its identity is ambiguous, or a group record of a grouped requirement family (a `REQ-XX` or `NFR-XX` group record), because a group ID is structural and is not allocator-assigned. No record of that duplicated ID is changed, and the finding remains reported and unresolved.
+`--fix` refuses to repair a duplicated ID when any record carrying it meets one of three conditions: the record's file stem and front-matter `id` disagree, because its identity is ambiguous; the record is a group record of a grouped requirement family (a `REQ-XX` or `NFR-XX` group record), because a group ID is structural and is not allocator-assigned; or the record — the keeper or any other record carrying the ID — lives in a read-only legacy directory, because repairing it would require the legacy migration this requirement forbids. No record of that duplicated ID is changed, and the finding remains reported and unresolved.
 
 `--fix` prompts for confirmation before applying each repair, and `--force` skips those prompts. `--force` without `--fix` is a usage error (REQ-01.004). When standard input is not a terminal and `--force` is absent, `--fix` writes nothing and exits with a usage error that names `--force`, so an unattended run never blocks on a prompt. `--fix` does not migrate legacy `deprecated/` folders, does not repair dangling references, dependency cycles, self-references, front-matter/section conflicts, or invalid configuration, and does not modify records beyond the duplicate-ID repair. Those findings remain reported and unresolved.
 
@@ -64,10 +64,10 @@ The command is CLI-only in this release; no browser affordance runs it. Output h
 - With an invalid configuration, the checks that do not depend on the `document_types` set still run, and the report names the skipped checks.
 - `check` loads the configuration tolerantly like `config get|set|unset|list` and does not refuse to run on an invalid configuration.
 - `--fix` repairs duplicate record IDs only.
-- For a duplicated ID, the record with the oldest `created_date` keeps the ID; equal or missing dates are broken by the lexicographically smallest project-relative path.
+- For a duplicated ID, the keeper is the record with the earliest valid `created_date`; a record with a missing or unparsable `created_date` ranks after every record with a valid date, and a remaining tie — equal valid dates, or two records without a valid date — is broken by the lexicographically smallest project-relative path.
 - Every other record carrying a duplicated ID receives a new ID from the regular allocator, and its file is renamed to the stem of the new ID.
 - `--fix` does not rewrite references to a repaired ID, and its confirmation prompt lists every affected reference with the referring record and field.
-- `--fix` refuses to repair a duplicated ID that involves a record whose file stem and front-matter `id` disagree, or a `REQ-XX` or `NFR-XX` group record, and changes none of that ID's records.
+- `--fix` refuses to repair a duplicated ID that involves a record whose file stem and front-matter `id` disagree, a `REQ-XX` or `NFR-XX` group record, or a record — keeper or any other record carrying the ID — in a read-only legacy directory, and changes none of that ID's records.
 - Under `--fix`, each repair prompts for confirmation unless `--force` is given.
 - `--force` without `--fix` is a usage error (exit code 2).
 - When standard input is not a terminal and `--force` is absent, `--fix` writes nothing and exits with a usage error naming `--force`.
@@ -90,5 +90,6 @@ The command is CLI-only in this release; no browser affordance runs it. Output h
 - REQ-07.002 — Configure Document Types and Slugs (configuration validity)
 - Maintainer decision 2026-11-15 (in-session feedback): `papyrus check` mirrors backlog doctor, scoped to papyrus corpus; `--fix` repairs duplicate IDs only; no legacy folder migration; CLI only; findings exit 4.
 - Project-owner decision 2026-11-15: `check` is a tolerant repair surface — it loads configuration tolerantly like `config get|set|unset|list`, reports configuration findings, still runs the checks that do not need a valid configuration, and exits 4 on findings.
-- Project-owner decision 2026-11-15: `--fix` skips prompts with `--force` (not `--yes`), and `--force` is meaningful only together with `--fix`; a duplicate-ID repair keeps the record with the oldest `created_date` and breaks ties by path; no inbound reference rewriting, and the confirmation lists the affected references; stem/front-matter mismatches and grouped-family group IDs are refused; the exit code is 4 when findings were found even if repaired.
+- Project-owner decision 2026-11-15: `--fix` skips prompts with `--force` (not `--yes`), and `--force` is meaningful only together with `--fix`; a duplicate-ID repair keeps the record with the earliest valid `created_date`, ranks records with a missing or unparsable `created_date` after all dated records, and breaks remaining ties by path; no inbound reference rewriting, and the confirmation lists the affected references; stem/front-matter mismatches, grouped-family group IDs, and duplicates involving a read-only legacy directory are refused; the exit code is 4 when findings were found even if repaired.
+- ADR-0029 — Read-Only Corpus Diagnostics (`papyrus check`) with Duplicate-ID Repair (keeper order, reassignment, refusal classes, `--force`).
 - Project-owner decision 2026-11-15: `check` never reads or inventories a `deprecated/` folder.
