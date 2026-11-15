@@ -804,7 +804,8 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
         }
         return match method {
             Method::Get | Method::Head => list_page(&request, state),
-            _ => Err(HttpError::new(405)),
+            Method::Post => board_cleanup_post(&request, state),
+            Method::Other => Err(HttpError::new(405)),
         };
     }
     if let Some(rest) = path.strip_prefix("/doc/") {
@@ -923,6 +924,7 @@ fn render_board_page(
     cfg: &Config,
     expand: Option<&str>,
     alert: Option<render::BoardAlert<'_>>,
+    cleanup: Option<&render::BoardCleanup<'_>>,
 ) -> String {
     let ctx = state.context();
     let task_slug = state
@@ -941,7 +943,178 @@ fn render_board_page(
         bind_note: &bind_note,
         routes: &state.routes,
     };
-    render::board_page(cfg, &tasks, &milestones, &releases, expand, alert, chrome)
+    render::board_page(
+        cfg,
+        &tasks,
+        &milestones,
+        &releases,
+        expand,
+        alert,
+        cleanup,
+        chrome,
+    )
+}
+
+/// The task type slug backing the Backlog board.
+fn board_task_slug(state: &ServerState) -> &str {
+    state
+        .routes
+        .nav
+        .iter()
+        .find(|item| item.group == routes::NavGroup::Backlog)
+        .map(|item| item.slug.as_str())
+        .unwrap_or_default()
+}
+
+/// The final configured task status when the board may offer `Clean up all`.
+/// `active` (and an empty configuration) disables the action.
+fn cleanup_final_status(cfg: &Config) -> Option<&str> {
+    cfg.statuses
+        .last()
+        .map(String::as_str)
+        .filter(|status| *status != "active")
+}
+
+/// Render the server-side `Clean up all` preview without writing anything: the
+/// named milestone stays expanded and the column action is replaced by the
+/// confirmation region.
+fn board_cleanup_preview(
+    state: &ServerState,
+    cfg: &Config,
+    milestone_id: &str,
+) -> Result<Response, HttpError> {
+    let status = cleanup_final_status(cfg).ok_or_else(|| HttpError::new(404))?;
+    let ctx = state.context();
+    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone);
+    let milestone = milestones
+        .records
+        .iter()
+        .find(|milestone| milestone.id == milestone_id)
+        .ok_or_else(|| HttpError::new(404))?;
+    let tasks = enabled_index(&ctx, cfg, state, board_task_slug(state));
+    let selected: Vec<&Record> = tasks
+        .records
+        .iter()
+        .filter(|task| {
+            task.milestone_id.as_deref() == Some(milestone.id.as_str())
+                && task.status.as_deref() == Some(status)
+        })
+        .collect();
+    let cleanup = render::BoardCleanup {
+        milestone,
+        status,
+        tasks: &selected,
+    };
+    Ok(Response::html(
+        200,
+        render_board_page(
+            state,
+            cfg,
+            Some(milestone.id.as_str()),
+            None,
+            Some(&cleanup),
+        ),
+    ))
+}
+
+/// `POST /?type=...` is the `Clean up all` confirm action, and only on the task
+/// board. Every other `?type=` view keeps rejecting POST with `405`.
+fn board_cleanup_post(request: &Request, state: &ServerState) -> Result<Response, HttpError> {
+    let slug = type_from_query(request, state)?;
+    let descriptor = view_descriptor(state, &slug).ok_or_else(|| HttpError::new(404))?;
+    if handler_of(&descriptor) == Some(TypedHandler::Task) {
+        board_cleanup_submit(request, state)
+    } else {
+        Err(HttpError::new(405))
+    }
+}
+
+/// Handle the `Clean up all` confirm submission: archive every task of the
+/// hosting milestone's final column through the existing `task::archive`
+/// entry point and report per-task failures without aborting the rest.
+fn board_cleanup_submit(request: &Request, state: &ServerState) -> Result<Response, HttpError> {
+    if media_type(request) != "application/x-www-form-urlencoded" {
+        return Err(HttpError::new(415));
+    }
+    let fields = parse_form(&request.body)?;
+    if form_field(&fields, "cleanup") != Some("1") {
+        return Err(HttpError::new(400));
+    }
+    let milestone_id = form_field(&fields, "milestone").unwrap_or("").trim();
+    if milestone_id.is_empty() {
+        return Err(HttpError::new(400));
+    }
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let Some(status) = cleanup_final_status(&cfg) else {
+        let message = "Clean up all is not available for this status configuration.";
+        let html = render_board_page(
+            state,
+            &cfg,
+            Some(milestone_id),
+            Some(render::BoardAlert {
+                heading: "Clean up all is not available",
+                message,
+                details: &[],
+                subheading: message,
+            }),
+            None,
+        );
+        return Ok(Response::html(422, html));
+    };
+    let ctx = state.context();
+    let milestones = enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Milestone);
+    if !milestones
+        .records
+        .iter()
+        .any(|milestone| milestone.id == milestone_id)
+    {
+        return Err(HttpError::new(404));
+    }
+    // Re-derive the set from the current stored data, so the preview is a
+    // warning and not a fixed list of submitted IDs.
+    let tasks = enabled_index(&ctx, &cfg, state, board_task_slug(state));
+    let selected: Vec<String> = tasks
+        .records
+        .iter()
+        .filter(|task| {
+            task.milestone_id.as_deref() == Some(milestone_id)
+                && task.status.as_deref() == Some(status)
+        })
+        .map(|task| task.id.clone())
+        .collect();
+    let total = selected.len();
+    let mut archived = 0usize;
+    let mut failures: Vec<String> = Vec::new();
+    for id in &selected {
+        match crate::task::archive(&ctx, id) {
+            Ok(_) => archived += 1,
+            Err(error) => failures.push(format!("{} \u{2014} {}", id, error)),
+        }
+    }
+    if failures.is_empty() {
+        let type_key = routes::legacy_url_key(board_task_slug(state));
+        return Ok(Response::redirect(&format!(
+            "/?type={}&expand={}",
+            type_key, milestone_id
+        )));
+    }
+    let message = format!(
+        "Archived {} of {} tasks in {}.",
+        archived, total, milestone_id
+    );
+    let html = render_board_page(
+        state,
+        &cfg,
+        Some(milestone_id),
+        Some(render::BoardAlert {
+            heading: "Clean up all finished with failures",
+            message: &message,
+            details: &failures,
+            subheading: "Some tasks could not be archived.",
+        }),
+        None,
+    );
+    Ok(Response::html(200, html))
 }
 
 fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpError> {
@@ -950,10 +1123,15 @@ fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpErr
     let descriptor = view_descriptor(state, &slug).ok_or_else(|| HttpError::new(404))?;
     let descriptor = &descriptor;
     if handler_of(descriptor) == Some(TypedHandler::Task) {
+        if let Some(milestone) = http::query_param(&request.target.query, "cleanup")?
+            && !milestone.trim().is_empty()
+        {
+            return board_cleanup_preview(state, &cfg, &milestone);
+        }
         let expand = http::query_param(&request.target.query, "expand")?;
         return Ok(Response::html(
             200,
-            render_board_page(state, &cfg, expand.as_deref(), None),
+            render_board_page(state, &cfg, expand.as_deref(), None, None),
         ));
     }
     // The status filter and shared row-field order belong to document-type
@@ -1671,7 +1849,10 @@ fn board_failure_response(
         Some(render::BoardAlert {
             heading: "Status change failed",
             message,
+            details: &[],
+            subheading: "Status change could not be persisted.",
         }),
+        None,
     );
     Response::html(status_code, html)
 }

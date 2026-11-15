@@ -956,6 +956,18 @@ fn record_view_backlog_row_meta(record: &Record) -> String {
 pub struct BoardAlert<'a> {
     pub heading: &'a str,
     pub message: &'a str,
+    /// Per-item failure lines rendered as a list below the message.
+    pub details: &'a [String],
+    /// Page subtitle shown while the alert is on screen.
+    pub subheading: &'a str,
+}
+
+/// The open `Clean up all` confirmation region of one milestone board.
+#[derive(Clone, Copy)]
+pub struct BoardCleanup<'a> {
+    pub milestone: &'a Record,
+    pub status: &'a str,
+    pub tasks: &'a [&'a Record],
 }
 
 fn board_milestone_for<'a>(task: &Record, milestones: &'a Index) -> Option<&'a Record> {
@@ -1036,7 +1048,76 @@ fn board_card(task: &Record, cfg: &Config, expand: Option<&str>) -> String {
     card
 }
 
-fn board_columns(cfg: &Config, tasks: &[&Record], expand: Option<&str>) -> String {
+/// The `Clean up all` link shown in the final configured status column header
+/// of a milestone board.
+fn board_cleanup_action(milestone: &Record, status: &str) -> String {
+    format!(
+        "<p class=\"board-column-action\"><a class=\"link board-cleanup\" href=\"/?type=task&expand={id}&cleanup={id}\" aria-label=\"Clean up all {status} tasks in {id}\">Clean up all</a></p>",
+        id = escape(&milestone.id),
+        status = escape(status)
+    )
+}
+
+/// The server-rendered confirmation region of the `Clean up all` action.
+fn board_cleanup_confirm(cleanup: &BoardCleanup<'_>) -> String {
+    let id = escape(&cleanup.milestone.id);
+    let status = escape(cleanup.status);
+    let title = escape(&cleanup.milestone.title);
+    let cancel = format!(
+        "<a class=\"link\" href=\"/?type=task&expand={}\">Cancel</a>",
+        id
+    );
+    let mut html = format!(
+        "<section class=\"board-confirm\" role=\"region\" aria-label=\"Clean up all {} tasks in {}\">\
+<h3 class=\"h3\">Warning: archive all {} tasks in {}</h3>",
+        status, id, status, id
+    );
+    if cleanup.tasks.is_empty() {
+        html.push_str(&format!(
+            "<p>Milestone <strong>{} \u{2014} {}</strong>. The <strong>{}</strong> column is empty for this milestone, so <strong>no task will be archived</strong>; confirming is not offered.</p>",
+            id, title, status
+        ));
+        html.push_str(&format!(
+            "<p class=\"board-confirm-actions\">{}</p>",
+            cancel
+        ));
+    } else {
+        let count = plural(cleanup.tasks.len(), "task", "tasks");
+        html.push_str(&format!(
+            "<p>Milestone <strong>{} \u{2014} {}</strong>. The <strong>{}</strong> column holds <strong>{}</strong> for this milestone; archiving removes them from this board. No other milestone and no task without a milestone is affected.</p>",
+            id, title, status, count
+        ));
+        html.push_str("<p>Task IDs to be archived, in ascending order:</p><ul>");
+        for task in cleanup.tasks {
+            html.push_str(&format!(
+                "<li><strong>{}</strong> \u{2014} {}</li>",
+                escape(&task.id),
+                escape(&task.title)
+            ));
+        }
+        html.push_str("</ul>");
+        html.push_str(&format!(
+            "<form class=\"board-confirm-actions\" method=\"post\" action=\"/?type=task\">\
+<input type=\"hidden\" name=\"cleanup\" value=\"1\">\
+<input type=\"hidden\" name=\"milestone\" value=\"{id}\">\
+<input type=\"hidden\" name=\"expand\" value=\"{id}\">\
+<button type=\"submit\">Archive {count}</button>{cancel}</form>",
+            id = id,
+            count = count,
+            cancel = cancel
+        ));
+    }
+    html.push_str("</section>");
+    html
+}
+
+fn board_columns(
+    cfg: &Config,
+    tasks: &[&Record],
+    milestone: Option<&Record>,
+    cleanup: Option<&BoardCleanup<'_>>,
+) -> String {
+    let final_status = cfg.statuses.last().map(String::as_str);
     let mut html = String::from("<div class=\"board-columns\">");
     for status in &cfg.statuses {
         let matching: Vec<&Record> = tasks
@@ -1049,11 +1130,21 @@ fn board_columns(cfg: &Config, tasks: &[&Record], expand: Option<&str>) -> Strin
             escape(status),
             escape(status)
         ));
+        // The action belongs to the final configured status column of a
+        // milestone board only, never to the unconfigured column or to the
+        // without-milestone section, and never when the status is `active`.
+        if let Some(milestone) = milestone
+            && final_status == Some(status.as_str())
+            && final_status != Some("active")
+            && cleanup.is_none()
+        {
+            html.push_str(&board_cleanup_action(milestone, status));
+        }
         if matching.is_empty() {
             html.push_str("<p class=\"board-empty\">No tasks in this status.</p>");
         } else {
             for task in matching {
-                html.push_str(&board_card(task, cfg, expand));
+                html.push_str(&board_card(task, cfg, milestone.map(|m| m.id.as_str())));
             }
         }
         html.push_str("</section>");
@@ -1084,13 +1175,17 @@ fn board_milestone_section(
     tasks: &[&Record],
     cfg: &Config,
     open: bool,
+    cleanup: Option<&BoardCleanup<'_>>,
 ) -> String {
+    let cleanup = cleanup.filter(|cleanup| cleanup.milestone.id == milestone.id);
+    let confirm = cleanup.map(board_cleanup_confirm).unwrap_or_default();
     format!(
-        "<details class=\"board-milestone\"{}><summary>{} \u{2014} {}</summary>{}</details>",
+        "<details class=\"board-milestone\"{}><summary>{} \u{2014} {}</summary>{}{}</details>",
         if open { " open" } else { "" },
         escape(&milestone.id),
         escape(&milestone.title),
-        board_columns(cfg, tasks, Some(milestone.id.as_str()))
+        confirm,
+        board_columns(cfg, tasks, Some(milestone), cleanup)
     )
 }
 
@@ -1103,15 +1198,24 @@ pub fn board_page(
     releases: &Index,
     expand: Option<&str>,
     alert: Option<BoardAlert<'_>>,
+    cleanup: Option<&BoardCleanup<'_>>,
     chrome: Chrome<'_>,
 ) -> String {
     let mut section = String::new();
     if let Some(alert) = alert {
         section.push_str(&format!(
-            "<div class=\"alert\" role=\"alert\"><h2>{}</h2><p>{}</p></div>",
+            "<div class=\"alert\" role=\"alert\"><h2>{}</h2><p>{}</p>",
             escape(alert.heading),
             escape(alert.message)
         ));
+        if !alert.details.is_empty() {
+            section.push_str("<ul>");
+            for detail in alert.details {
+                section.push_str(&format!("<li>{}</li>", escape(detail)));
+            }
+            section.push_str("</ul>");
+        }
+        section.push_str("</div>");
     }
 
     if tasks.is_empty() && milestones.is_empty() {
@@ -1202,6 +1306,7 @@ pub fn board_page(
                     &milestone_tasks,
                     cfg,
                     open_id == Some(milestone.id.as_str()),
+                    cleanup,
                 ));
             }
         }
@@ -1214,16 +1319,15 @@ pub fn board_page(
         if !unassigned.is_empty() {
             section.push_str(&format!(
                 "<details class=\"board-milestone\" open><summary>Tasks without a milestone</summary>{}</details>",
-                board_columns(cfg, &unassigned, None)
+                board_columns(cfg, &unassigned, None, None)
             ));
         }
     }
 
-    let subheading = if alert.is_some() {
-        "Status change could not be persisted."
-    } else {
-        "Tasks grouped by milestone and status; releases separate milestones."
-    };
+    let subheading = alert.map_or(
+        "Tasks grouped by milestone and status; releases separate milestones.",
+        |alert| alert.subheading,
+    );
     let body = render_template(
         LIST_TEMPLATE,
         &[("heading", "Backlog"), ("subheading", subheading)],

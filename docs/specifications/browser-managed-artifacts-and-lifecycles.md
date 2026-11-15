@@ -9,6 +9,8 @@
 
 > **Revised (TASK-127):** the section 4 lifecycle wording now follows the settled archive lifecycles: documents `active -> archived` with no restore (plus configured custom statuses, front-matter only), UI mockups `pending -> approved -> archived` (supersede, no restore), milestones `open -> closed` via `papyrus milestone close`, releases `planned -> released` with no archive, decisions unchanged (Nygard status `deprecated`). Sources: ADR-0022, ADR-0023, REQ-03.001, REQ-03.002, REQ-05.007, REQ-07.001.
 
+> **Revised (TASK-147, 2026-11-15):** the scope bullet and section 3 clause 3 no longer assert that every record lifecycle operation is CLI-only, because the 2026-11-15 revision of REQ-06.013 gives the Backlog board task status change and the per-milestone `Clean up all` archive action. This page still offers no lifecycle operation, and creating, restoring, and deleting records remain CLI-only.
+
 ## Purpose
 
 Add a read-only page to the offline, project-local web interface that describes every managed artifact/document type and its lifecycle, per REQ-06.003. The page is a single static view with one section per fixed record type; task states are derived from the configured task statuses (REQ-01.002); every other type uses the lifecycle documented for that type. It advances NFR-01.002 (display all Papyrus content) by giving contributors a single place to learn what each record type is and how it moves through its states.
@@ -27,7 +29,7 @@ Add a read-only page to the offline, project-local web interface that describes 
 
 ### Out of scope
 
-- Listing, viewing, editing, creating, archiving, deleting, or searching any record from this page; all record lifecycle operations remain CLI-only, consistent with the baseline no-lifecycle-operations stance (REQ-05.007).
+- Listing, viewing, editing, creating, archiving, deleting, or searching any record from this page; no lifecycle operation is offered here, and the browser's task lifecycle operations (status change and the board's `Clean up all` action of REQ-06.013) live on the Backlog board. Creating, restoring, and deleting records remain CLI-only.
 - Any API endpoint for the page; the page is HTML only.
 - Adding a new record type, changing configured `document_types`, or deriving the covered set from configuration. The covered set is fixed by REQ-06.003 and does not change with `document_types`.
 - Describing Backlog.md `docs`, `drafts`, or project configuration files.
@@ -56,7 +58,7 @@ Add a read-only page to the offline, project-local web interface that describes 
 
 1. The task section heading is `Tasks`.
 2. The lifecycle paragraph states the configured task statuses in their configured order, joined by ` → `, for example `States: ToDo → Initiated → Refined → Implemented → Validated → Done.` with default configuration.
-3. The paragraph also states that the states and transitions are derived from the configured task statuses (REQ-01.002) and that task lifecycle operations are CLI-only.
+3. The paragraph also states that the states and transitions are derived from the configured task statuses (REQ-01.002). It does not claim that task lifecycle operations are CLI-only, because the Backlog board offers status change and the per-milestone `Clean up all` archive action (REQ-06.013); creating, restoring, and deleting tasks remain CLI-only and are not described as browser operations on this page.
 4. Only the configured status names are rendered. No per-state description is required for custom statuses; the configured order is the transition order.
 5. When the configured status list is empty or invalid, the server falls back to its configured/default status handling rather than rendering an empty task section; the task section never renders an empty state list.
 

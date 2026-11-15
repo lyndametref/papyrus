@@ -3272,6 +3272,416 @@ fn t103f_status_change_write_failure() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+// ---- T-147 per-milestone `Clean up all` board action ----
+
+/// Board fixture for the bulk cleanup action: default statuses (final `Done`),
+/// `MS-001` with two `Done` tasks and one `ToDo` task, `MS-002` with one `Done`
+/// task, a `Done` task without a milestone, and an archived `Done` task.
+fn cleanup_fixture(name: &str) -> PathBuf {
+    let dir = test_root(name);
+    init_project(&dir);
+    create_milestone_no_release(&dir, "Milestone One"); // MS-001
+    create_milestone_no_release(&dir, "Milestone Two"); // MS-002
+    create_task(&dir, "Task One", "MS-001"); // TASK-001
+    create_task(&dir, "Task Two", "MS-001"); // TASK-002
+    create_task(&dir, "Task Three", "MS-001"); // TASK-003
+    create_task(&dir, "Task Four", "MS-002"); // TASK-004
+    create_task_no_milestone(&dir, "Task Five"); // TASK-005
+    create_task(&dir, "Task Six", "MS-001"); // TASK-006
+    set_task_status(&dir, "TASK-001", "Done");
+    set_task_status(&dir, "TASK-002", "Done");
+    set_task_status(&dir, "TASK-004", "Done");
+    set_task_status(&dir, "TASK-005", "Done");
+    set_task_status(&dir, "TASK-006", "Done");
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "task",
+        "archive",
+        "TASK-006",
+    ]);
+    dir
+}
+
+/// The server-rendered confirmation region of the previewed milestone board.
+fn cleanup_region(html: &str) -> &str {
+    let marker = "class=\"board-confirm\"";
+    let start = html
+        .find(marker)
+        .unwrap_or_else(|| panic!("cleanup region missing"));
+    let end = html[start..]
+        .find("</section>")
+        .map(|offset| start + offset)
+        .unwrap_or(html.len());
+    &html[start..end]
+}
+
+fn count_occurrences(html: &str, needle: &str) -> usize {
+    html.matches(needle).count()
+}
+
+/// Every regular file in `dir` with its bytes, sorted by name.
+fn files_in(dir: &Path) -> Vec<(String, Vec<u8>)> {
+    let mut out: Vec<(String, Vec<u8>)> = Vec::new();
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                out.push((
+                    entry.file_name().to_string_lossy().to_string(),
+                    fs::read(&path).unwrap(),
+                ));
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+fn archive_task_count(dir: &Path) -> usize {
+    fs::read_dir(dir.join("backlog/archive/tasks"))
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter(|entry| entry.path().is_file())
+                .count()
+        })
+        .unwrap_or(0)
+}
+
+/// T-11k: the action is offered only in the final configured status column of
+/// a milestone board, never when that status is `active`, never in another
+/// column, never in the unconfigured column, and never in the without-milestone
+/// section. A single configured status is the final column.
+#[test]
+fn t147a_cleanup_visibility() {
+    let dir = cleanup_fixture("t147a");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+
+    // One action per milestone board (both milestones render).
+    assert_eq!(count_occurrences(&html, "Clean up all</a>"), 2);
+    let done = column_containing(&html, "Done");
+    assert!(done.contains("Clean up all</a>"));
+    assert!(done.contains("aria-label=\"Clean up all Done tasks in MS-001\""));
+    assert!(!column_containing(&html, "ToDo").contains("Clean up all"));
+    let unassigned = html
+        .split("Tasks without a milestone")
+        .nth(1)
+        .expect("without-milestone section");
+    assert!(!unassigned.contains("Clean up all"));
+
+    // A task in no configured status gets the trailing column, which never
+    // carries the action.
+    let path = backlog_record_path(&dir, "tasks", "TASK-003");
+    let text = fs::read_to_string(&path).unwrap();
+    fs::write(&path, text.replace("status: ToDo", "status: Bogus")).unwrap();
+    let html = get(&server, "/?type=task").text();
+    let unconfigured = column_containing(&html, "");
+    assert!(unconfigured.contains("Unconfigured status"));
+    assert!(!unconfigured.contains("Clean up all"));
+    assert_eq!(count_occurrences(&html, "Clean up all</a>"), 2);
+
+    // A final configured status of `active` offers no action anywhere.
+    set_statuses(&dir, &["ToDo", "Initiated", "active"], "ToDo");
+    let html = get(&server, "/?type=task").text();
+    assert!(!html.contains("Clean up all"));
+
+    // A single configured status is the final column and offers the action.
+    set_statuses(&dir, &["Done"], "Done");
+    let html = get(&server, "/?type=task").text();
+    assert_eq!(count_occurrences(&html, "Clean up all</a>"), 2);
+    assert!(column_containing(&html, "Done").contains("Clean up all"));
+    assert!(!column_containing(&html, "").contains("Clean up all"));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// T-11l: the preview lists exactly that milestone's tasks in the final column
+/// in ascending ID order, and cancel (a plain GET) archives nothing.
+#[test]
+fn t147b_cleanup_preview_and_cancel() {
+    let dir = cleanup_fixture("t147b");
+    let tasks_dir = dir.join("backlog/tasks");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let before = files_in(&tasks_dir);
+
+    let response = get(&server, "/?type=task&expand=MS-001&cleanup=MS-001");
+    assert_eq!(response.status, 200);
+    let html = response.text();
+    assert!(html.contains("<details class=\"board-milestone\" open><summary>MS-001"));
+    let region = cleanup_region(&html);
+    assert!(region.contains("role=\"region\""));
+    assert!(region.contains("aria-label=\"Clean up all Done tasks in MS-001\""));
+    assert!(region.contains("Warning"));
+    assert!(region.contains("MS-001"));
+    assert!(region.contains("2 tasks"));
+    let first = region.find("TASK-001").expect("TASK-001 in preview");
+    let second = region.find("TASK-002").expect("TASK-002 in preview");
+    assert!(first < second, "ascending ID order");
+    for absent in ["TASK-003", "TASK-004", "TASK-005", "TASK-006"] {
+        assert!(!region.contains(absent), "{} must not be previewed", absent);
+    }
+    assert!(region.contains("action=\"/?type=task\""));
+    assert!(region.contains("name=\"cleanup\" value=\"1\""));
+    assert!(region.contains("name=\"milestone\" value=\"MS-001\""));
+    assert!(region.contains("Archive 2 tasks"));
+    assert!(region.contains("href=\"/?type=task&expand=MS-001\""));
+    // The previewed milestone's action is replaced by the region; the other
+    // milestone board still offers it.
+    assert_eq!(count_occurrences(&html, "Clean up all</a>"), 1);
+
+    // Preview writes nothing.
+    assert_eq!(files_in(&tasks_dir), before);
+    assert_eq!(archive_task_count(&dir), 1); // TASK-006 only
+    assert!(!dir.join("backlog/archive/tasks/TASK-001.md").exists());
+    assert!(!dir.join("backlog/archive/tasks/TASK-002.md").exists());
+
+    // Cancel is a plain GET that archives nothing.
+    let cancel = get(&server, "/?type=task&expand=MS-001");
+    assert_eq!(cancel.status, 200);
+    assert!(cancel.text().contains("Clean up all</a>"));
+    assert_eq!(files_in(&tasks_dir), before);
+    assert_eq!(archive_task_count(&dir), 1);
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// T-11m: confirming archives every matching task, redirects to the expanded
+/// board, and the re-read board no longer shows them.
+#[test]
+fn t147c_cleanup_full_success() {
+    let dir = cleanup_fixture("t147c");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    let body = form_body(&[
+        ("cleanup", "1"),
+        ("milestone", "MS-001"),
+        ("expand", "MS-001"),
+    ]);
+    let response = post_form(&server, "/?type=task", &body);
+    assert_eq!(response.status, 303);
+    assert_eq!(
+        response.header("Location"),
+        Some("/?type=task&expand=MS-001")
+    );
+
+    for id in ["TASK-001", "TASK-002"] {
+        let archived = dir.join("backlog/archive/tasks").join(format!("{}.md", id));
+        assert!(archived.exists(), "{} archived", id);
+        let text = fs::read_to_string(&archived).unwrap();
+        assert!(text.contains("status: Done"), "{} keeps status", id);
+        assert!(!backlog_record_path(&dir, "tasks", id).exists());
+        assert_eq!(get(&server, &format!("/doc/{}", id)).status, 404);
+    }
+    assert!(backlog_record_path(&dir, "tasks", "TASK-003").exists());
+
+    let html = get(&server, "/?type=task").text();
+    assert!(!html.contains("TASK-001"));
+    assert!(!html.contains("TASK-002"));
+    assert!(html.contains("TASK-004"));
+    assert!(html.contains("TASK-005"));
+    // MS-002 still offers its action; MS-001 (now empty) offers it again.
+    assert_eq!(count_occurrences(&html, "Clean up all</a>"), 2);
+    assert!(column_containing(&html, "Done").contains("Clean up all"));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// T-11n: one induced archive failure is reported per task without aborting
+/// the remaining archives; the response is `200` with an alert.
+#[test]
+fn t147d_cleanup_partial_failure() {
+    let dir = cleanup_fixture("t147d");
+    let archived = dir.join("backlog/archive/tasks");
+    fs::create_dir_all(&archived).unwrap();
+    // A destination that already exists makes `task::archive` refuse that one
+    // task. A directory is used because an archived *file* with the same ID
+    // would be dropped from the board index as a duplicate before the action
+    // runs, so the failure would not be observable through the browser.
+    fs::create_dir_all(archived.join("TASK-002.md")).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    let body = form_body(&[
+        ("cleanup", "1"),
+        ("milestone", "MS-001"),
+        ("expand", "MS-001"),
+    ]);
+    let response = post_form(&server, "/?type=task", &body);
+    assert_eq!(response.status, 200);
+    let html = response.text();
+
+    // The first task was still archived although the second failed.
+    assert!(archived.join("TASK-001.md").exists());
+    assert!(!backlog_record_path(&dir, "tasks", "TASK-001").exists());
+    let failed = backlog_record_path(&dir, "tasks", "TASK-002");
+    assert!(failed.exists());
+    assert!(
+        fs::read_to_string(&failed)
+            .unwrap()
+            .contains("status: Done")
+    );
+
+    let alert_start = html.find("role=\"alert\"").expect("alert region");
+    let alert = &html[alert_start..];
+    assert!(alert.contains("Clean up all finished with failures"));
+    assert!(alert.contains("Archived 1 of 2 tasks in MS-001."));
+    assert!(html.contains("Some tasks could not be archived."));
+    assert!(alert.contains("TASK-002"));
+    assert!(alert.contains("already archived: TASK-002"));
+    assert!(!alert.contains("TASK-001"));
+
+    // The failed task stays in its column; no other milestone is touched.
+    assert!(column_containing(&html, "Done").contains("TASK-002"));
+    assert!(!html.contains("TASK-001"));
+    assert!(backlog_record_path(&dir, "tasks", "TASK-004").exists());
+    assert!(backlog_record_path(&dir, "tasks", "TASK-005").exists());
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// T-11o: only the hosting milestone's tasks are archived; an identically
+/// named column elsewhere and a without-milestone task are untouched.
+#[test]
+fn t147e_cleanup_milestone_scoping() {
+    let dir = cleanup_fixture("t147e");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    let preview = get(&server, "/?type=task&expand=MS-002&cleanup=MS-002").text();
+    let region = cleanup_region(&preview);
+    assert!(region.contains("TASK-004"));
+    for absent in ["TASK-001", "TASK-002", "TASK-005"] {
+        assert!(!region.contains(absent), "{} must not be previewed", absent);
+    }
+
+    let body = form_body(&[
+        ("cleanup", "1"),
+        ("milestone", "MS-002"),
+        ("expand", "MS-002"),
+    ]);
+    let response = post_form(&server, "/?type=task", &body);
+    assert_eq!(response.status, 303);
+    assert_eq!(
+        response.header("Location"),
+        Some("/?type=task&expand=MS-002")
+    );
+
+    assert!(dir.join("backlog/archive/tasks/TASK-004.md").exists());
+    assert!(!backlog_record_path(&dir, "tasks", "TASK-004").exists());
+    for id in ["TASK-001", "TASK-002", "TASK-005"] {
+        assert!(
+            backlog_record_path(&dir, "tasks", id).exists(),
+            "{} untouched",
+            id
+        );
+    }
+
+    let html = get(&server, "/?type=task").text();
+    assert!(!html.contains("TASK-004"));
+    assert!(html.contains("TASK-001"));
+    assert!(html.contains("TASK-002"));
+    assert!(html.contains("TASK-005"));
+
+    // MS-002's final column is now empty: the action is still offered, the
+    // warning lists nothing, and no confirm control is rendered.
+    let empty = get(&server, "/?type=task&expand=MS-002&cleanup=MS-002").text();
+    let region = cleanup_region(&empty);
+    assert!(region.contains("MS-002"));
+    assert!(region.contains("no task will be archived"));
+    assert!(!region.contains("<form"));
+    assert!(!region.contains("<button"));
+    assert!(region.contains("href=\"/?type=task&expand=MS-002\""));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// T-11p: archived tasks stay excluded and the action's guards hold; no other
+/// `/?type=` route accepts a POST.
+#[test]
+fn t147f_cleanup_archived_exclusion_and_guards() {
+    let dir = cleanup_fixture("t147f");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let body = form_body(&[
+        ("cleanup", "1"),
+        ("milestone", "MS-001"),
+        ("expand", "MS-001"),
+    ]);
+
+    assert_eq!(post_form(&server, "/?type=task", &body).status, 303);
+    let html = get(&server, "/?type=task").text();
+    assert!(!html.contains("TASK-001"));
+    assert!(!html.contains("TASK-002"));
+    assert_eq!(get(&server, "/doc/TASK-001").status, 404);
+    assert_eq!(get(&server, "/doc/TASK-002").status, 404);
+
+    // A repeated confirm archives nothing and still redirects.
+    let repeated = post_form(&server, "/?type=task", &body);
+    assert_eq!(repeated.status, 303);
+    assert_eq!(archive_task_count(&dir), 3); // TASK-006, TASK-001, TASK-002
+
+    // Unknown and archived milestones are 404.
+    let unknown = form_body(&[
+        ("cleanup", "1"),
+        ("milestone", "MS-999"),
+        ("expand", "MS-999"),
+    ]);
+    assert_eq!(post_form(&server, "/?type=task", &unknown).status, 404);
+    let milestone_archive = dir.join("backlog/archive/milestones");
+    fs::create_dir_all(&milestone_archive).unwrap();
+    fs::rename(
+        dir.join("backlog/milestones/MS-002.md"),
+        milestone_archive.join("MS-002.md"),
+    )
+    .unwrap();
+    let archived_milestone = form_body(&[
+        ("cleanup", "1"),
+        ("milestone", "MS-002"),
+        ("expand", "MS-002"),
+    ]);
+    assert_eq!(
+        post_form(&server, "/?type=task", &archived_milestone).status,
+        404
+    );
+
+    // A missing milestone field is 400.
+    let missing = form_body(&[("cleanup", "1"), ("expand", "MS-001")]);
+    assert_eq!(post_form(&server, "/?type=task", &missing).status, 400);
+
+    // The media-type guard still applies to the board route.
+    let response = request(
+        server.port,
+        "POST",
+        "/?type=task",
+        &[("Content-Type", "application/json")],
+        Some(b"cleanup=1&milestone=MS-001"),
+    );
+    assert_eq!(response.status, 415);
+
+    // A final configured status of `active` refuses the action.
+    set_statuses(&dir, &["ToDo", "Initiated", "active"], "ToDo");
+    let response = post_form(&server, "/?type=task", &body);
+    assert_eq!(response.status, 422);
+    assert!(
+        response
+            .text()
+            .contains("Clean up all is not available for this status configuration.")
+    );
+
+    // No other `/?type=` view accepts a POST.
+    let other = form_body(&[("cleanup", "1"), ("milestone", "MS-001")]);
+    assert_eq!(post_form(&server, "/?type=req", &other).status, 405);
+    assert_eq!(post_form(&server, "/?type=milestone", &other).status, 405);
+    assert_eq!(post_form(&server, "/?type=release", &other).status, 405);
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 // ---- T-15 decision scenarios ----
 
 fn create_decision(dir: &Path, title: &str) -> String {

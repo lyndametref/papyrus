@@ -406,6 +406,36 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 .board-empty { color: var(--muted); font-style: italic; font-size: 13px; margin: 0; }
+.board-column-action { margin: 0 0 8px; }
+.board-column-action .board-cleanup { font-size: 12px; }
+.board-confirm {
+  margin: 12px 12px 0;
+  padding: 12px 14px;
+  border: 2px solid var(--strong);
+  border-radius: 6px;
+  background: var(--box);
+}
+.board-confirm .h3 { font-size: 14px; margin: 0 0 8px; }
+.board-confirm p { margin: 0 0 8px; }
+.board-confirm ul { margin: 0 0 10px; padding-left: 20px; }
+.board-confirm li { margin: 2px 0; overflow-wrap: anywhere; }
+.board-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  margin: 0;
+}
+.board-confirm button {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
 .board-card {
   margin-top: 10px;
   padding: 10px;
@@ -458,4 +488,6 @@ textarea:focus-visible {
   .card-status { align-items: stretch; }
   .card-status select,
   .card-status button { width: 100%; }
+  .board-confirm-actions { flex-direction: column; align-items: stretch; }
+  .board-confirm button { width: 100%; }
 }
