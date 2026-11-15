@@ -109,7 +109,7 @@ fn table_driven_builtin_help() {
         (
             "milestone",
             &["milestone", "--help"],
-            &["create", "list", "view", "edit", "archive", "delete"],
+            &["create", "list", "view", "edit", "close", "delete"],
         ),
         (
             "release",

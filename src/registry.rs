@@ -2074,7 +2074,7 @@ const MILESTONE_VERBS: &[Verb] = &[
     Verb::List,
     Verb::View,
     Verb::Edit,
-    Verb::Archive,
+    Verb::Close,
     Verb::Delete,
 ];
 const RELEASE_VERBS: &[Verb] = &[
@@ -3104,7 +3104,26 @@ mod tests {
 
         let milestone = registry.descriptor("milestone").expect("milestone");
         assert_eq!(milestone.verbs, MILESTONE_VERBS.to_vec());
-        assert!(!milestone.has_verb(Verb::Restore));
+        assert_eq!(
+            milestone.verbs,
+            vec![
+                Verb::Create,
+                Verb::List,
+                Verb::View,
+                Verb::Edit,
+                Verb::Close,
+                Verb::Delete
+            ],
+            "milestone verbs are exactly create, list, view, edit, close, delete"
+        );
+        assert!(milestone.has_verb(Verb::Close));
+        for absent in [Verb::Archive, Verb::Restore, Verb::Status] {
+            assert!(
+                !milestone.has_verb(absent),
+                "milestone must not expose {}",
+                absent.as_str()
+            );
+        }
 
         let release = registry.descriptor("release").expect("release");
         assert_eq!(release.verbs, RELEASE_VERBS.to_vec());
