@@ -27,8 +27,14 @@ pub fn sanitize_name(input: &str) -> Option<String> {
 }
 
 pub fn sanitize_path_component(input: &str) -> Option<String> {
+    // Evaluate the control-character predicate on the raw component before the
+    // trim below: failing input must be rejected, not silently shortened
+    // (NFR-02.002). This also subsumes the former explicit NUL check.
+    if has_control_character(input) {
+        return None;
+    }
     let trimmed = input.trim();
-    if trimmed.is_empty() || trimmed.contains('\0') {
+    if trimmed.is_empty() {
         return None;
     }
     // Prevent traversal segments.
@@ -135,7 +141,8 @@ pub fn kebab_slug(input: &str) -> String {
 
 #[cfg(test)]
 mod control_character_tests {
-    use super::{sanitize_name, sanitize_path_string};
+    use super::{sanitize_name, sanitize_path, sanitize_path_component, sanitize_path_string};
+    use std::path::{Path, PathBuf};
 
     /// Every C0 control character and DEL, embedded between ordinary
     /// characters, must be rejected by both sanitizers.
@@ -185,6 +192,143 @@ mod control_character_tests {
         assert_eq!(sanitize_path_string("   "), None);
         assert_eq!(sanitize_name("Title\t"), Some("Title".to_string()));
         assert_eq!(sanitize_path_string("Title\t"), Some("Title".to_string()));
+    }
+
+    /// AC #1 and AC #4: the boundary scalars of C0, DEL, and C1 are rejected
+    /// by `sanitize_path_component` and by `sanitize_path`.
+    #[test]
+    fn rejects_control_boundaries_for_path_functions() {
+        for input in [
+            "a\u{0000}b",
+            "a\u{001F}b",
+            "a\u{007F}b",
+            "a\u{0080}b",
+            "a\u{009F}b",
+        ] {
+            assert_eq!(sanitize_path_component(input), None, "{input:?}");
+            assert_eq!(sanitize_path(Path::new(input)), None, "{input:?}");
+        }
+    }
+
+    /// AC #1 and AC #4: every C0 scalar, DEL, and every C1 scalar is rejected
+    /// when embedded between ordinary characters.
+    #[test]
+    fn rejects_every_c0_del_and_c1_scalar_for_path_functions() {
+        let mut scalars: Vec<char> = (0u32..=0x1F).filter_map(char::from_u32).collect();
+        scalars.push('\u{7F}');
+        scalars.extend((0x80u32..=0x9F).filter_map(char::from_u32));
+        for ch in scalars {
+            let input = format!("a{ch}b");
+            assert_eq!(sanitize_path_component(&input), None, "{ch:?}");
+            assert_eq!(sanitize_path(Path::new(&input)), None, "{ch:?}");
+        }
+    }
+
+    /// AC #1 and AC #4: the predicate runs before the trim, so a leading or
+    /// trailing control (including U+0085, which `trim` would strip) is
+    /// rejected instead of being silently cleaned.
+    #[test]
+    fn rejects_leading_and_trailing_controls_before_trim() {
+        for (leading, trailing) in [
+            ("\ta", "a\t"),
+            ("\na", "a\n"),
+            ("\u{85}a", "a\u{85}"),
+            ("\u{1F}a", "a\u{1F}"),
+            ("\u{9F}a", "a\u{9F}"),
+        ] {
+            assert_eq!(sanitize_path_component(leading), None, "{leading:?}");
+            assert_eq!(sanitize_path_component(trailing), None, "{trailing:?}");
+            assert_eq!(sanitize_path(Path::new(leading)), None, "{leading:?}");
+            assert_eq!(sanitize_path(Path::new(trailing)), None, "{trailing:?}");
+        }
+    }
+
+    /// AC #2 and AC #4: exactly one contaminated component poisons the whole
+    /// path and no partial prefix is returned.
+    #[test]
+    fn rejects_nested_path_with_one_contaminated_component() {
+        assert_eq!(sanitize_path(Path::new("docs/design\nnotes/api")), None);
+        assert_eq!(
+            sanitize_path(Path::new("docs/design/notes\u{7F}/api")),
+            None
+        );
+        assert_eq!(sanitize_path(Path::new("do\u{1}cs/design")), None);
+        assert_eq!(sanitize_path(Path::new("docs/\u{9F}/design")), None);
+    }
+
+    /// AC #2 and AC #4: an absolute path with a contaminated component is
+    /// rejected, whichever component carries the control character.
+    #[test]
+    fn rejects_absolute_path_with_contaminated_component() {
+        assert_eq!(sanitize_path(Path::new("/abs/pa\u{1F}th")), None);
+        assert_eq!(sanitize_path(Path::new("/\u{9F}abs/path")), None);
+        assert_eq!(sanitize_path(Path::new("/abs/path\u{7F}")), None);
+    }
+
+    /// AC #3: legitimate components and paths sanitize exactly as before.
+    #[test]
+    fn leaves_legitimate_paths_unchanged() {
+        for sample in [
+            "Résumé – v2",
+            "space name",
+            "a.b",
+            "a-b",
+            "a_b",
+            "x (y) 100%",
+        ] {
+            assert_eq!(
+                sanitize_path_component(sample),
+                Some(sample.to_string()),
+                "{sample:?}"
+            );
+            assert_eq!(
+                sanitize_path(Path::new(sample)),
+                Some(PathBuf::from(sample)),
+                "{sample:?}"
+            );
+        }
+        assert_eq!(
+            sanitize_path_component("  padded  "),
+            Some("padded".to_string())
+        );
+        assert_eq!(
+            sanitize_path(Path::new("/abs/path")),
+            Some(PathBuf::from("/abs/path"))
+        );
+        assert_eq!(
+            sanitize_path(Path::new("docs/./design.md")),
+            Some(PathBuf::from("docs/design.md"))
+        );
+        assert_eq!(
+            sanitize_path(Path::new("docs/design/notes")),
+            Some(PathBuf::from("docs/design/notes"))
+        );
+    }
+
+    /// AC #3: traversal guards are unchanged.
+    #[test]
+    fn keeps_traversal_guards_for_path_functions() {
+        for input in [".", "..", " ./ ", " ../ "] {
+            assert_eq!(sanitize_path_component(input), None, "{input:?}");
+        }
+        for input in ["a/b", "a\\b"] {
+            assert_eq!(sanitize_path_component(input), None, "{input:?}");
+        }
+        assert_eq!(sanitize_path(Path::new("..")), None);
+        assert_eq!(sanitize_path(Path::new("a/../b")), None);
+        assert_eq!(sanitize_path(Path::new(".")), Some(PathBuf::new()));
+        assert_eq!(sanitize_path(Path::new("./a")), Some(PathBuf::from("a")));
+    }
+
+    /// AC #5: `sanitize_name` and `sanitize_path_string` keep trimming a
+    /// trailing control character, which now deliberately differs from the
+    /// path functions.
+    #[test]
+    fn name_sanitizers_keep_trim_before_check_behavior() {
+        assert_eq!(sanitize_name("Title\t"), Some("Title".to_string()));
+        assert_eq!(sanitize_path_string("Title\t"), Some("Title".to_string()));
+        assert_eq!(sanitize_path_component("Title\t"), None);
+        assert_eq!(sanitize_path(Path::new("Title\t")), None);
     }
 
     #[test]
