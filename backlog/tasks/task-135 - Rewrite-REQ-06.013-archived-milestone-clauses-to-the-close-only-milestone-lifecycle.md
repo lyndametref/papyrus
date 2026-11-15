@@ -3,11 +3,11 @@ id: TASK-135
 title: >-
   Rewrite REQ-06.013 archived-milestone clauses to the close-only milestone
   lifecycle
-status: To Do
+status: Done
 assignee:
   - '@requirements-engineer'
 created_date: '2026-11-15T13:59:00Z'
-updated_date: '2026-11-15T13:59:00Z'
+updated_date: '2026-11-15T14:19:00Z'
 labels:
   - docs
   - requirements
@@ -46,10 +46,16 @@ ordinal: 41410
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 REQ-06.013 Description no longer says archived milestones are excluded and states that milestones have no archived lifecycle, that papyrus milestone close <id> moves open -> closed in place (REQ-03.001), and that a closed milestone remains visible.
-- [ ] #2 REQ-06.013 acceptance criterion 12 no longer says archived milestones are not shown; it states that archived tasks are excluded, that every milestone appears in its release or unassigned region including closed milestones, and that no archived milestone state exists.
-- [ ] #3 The new milestone-lifecycle wording cites REQ-03.001, and REQ-03.001 appears in REQ-06.013 Traceability while every existing reference is kept.
-- [ ] #4 No other requirement text, ID, criticality, user story, group, acceptance criterion, or traceability line changes.
-- [ ] #5 docs/requirements/business/index.html is regenerated with the requirements-index-visualization skill; the run reports its wrote ... line(s) and exits 0, and the index is not hand-edited.
-- [ ] #6 No code, specification, ADR, or business-rule file changes.
+- [x] #1 REQ-06.013 Description no longer says archived milestones are excluded and states that milestones have no archived lifecycle, that papyrus milestone close <id> moves open -> closed in place (REQ-03.001), and that a closed milestone remains visible.
+- [x] #2 REQ-06.013 acceptance criterion 12 no longer says archived milestones are not shown; it states that archived tasks are excluded, that every milestone appears in its release or unassigned region including closed milestones, and that no archived milestone state exists.
+- [x] #3 The new milestone-lifecycle wording cites REQ-03.001, and REQ-03.001 appears in REQ-06.013 Traceability while every existing reference is kept.
+- [x] #4 No other requirement text, ID, criticality, user story, group, acceptance criterion, or traceability line changes.
+- [x] #5 docs/requirements/business/index.html is regenerated with the requirements-index-visualization skill; the run reports its wrote ... line(s) and exits 0, and the index is not hand-edited.
+- [x] #6 No code, specification, ADR, or business-rule file changes.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+REQ-06.013 rewritten to the close-only milestone lifecycle: archived tasks remain excluded from the board, every milestone is shown in its release or unassigned region including a closed one, and no archived milestone state exists (no archive/restore command; papyrus milestone close writes open -> closed in place per REQ-03.001). Traceability adds REQ-03.001 and cites ADR-0022 decision 5 / ADR-0023 decision 2 / TASK-130; all prior references kept. Business and non-functional indexes regenerated (47/15, exit 0, byte-identical reproductions); no other requirement, code, spec, or business-rule change. Evidence: milestone_cli 4/4, browser board tests 6/6.
+<!-- SECTION:FINAL_SUMMARY:END -->
