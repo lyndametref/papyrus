@@ -826,6 +826,56 @@ mod tests {
         assert!(!output.contains("deploy"), "{}", output);
     }
 
+    #[test]
+    fn document_artifacts_match_config_default_document_types() {
+        let seeded = crate::config::DEFAULT_DOCUMENT_TYPES;
+        let seeded_slugs: Vec<&str> = seeded.iter().map(|entry| entry.0).collect();
+
+        // Position-by-position equality against the canonical seeding order,
+        // so an add, remove, reorder, or rename on either side fails.
+        assert_eq!(
+            DOCUMENT_ARTIFACTS.as_slice(),
+            seeded_slugs.as_slice(),
+            "init order must match the config seeding order"
+        );
+
+        // Set equality against the live default map, so a config-only add or
+        // loss fails even when the seeding constant stays aligned.
+        let defaults = Config::default();
+        let mut config_slugs: Vec<&str> =
+            defaults.document_types.keys().map(String::as_str).collect();
+        config_slugs.sort_unstable();
+        let mut init_slugs = DOCUMENT_ARTIFACTS.to_vec();
+        init_slugs.sort_unstable();
+        assert_eq!(
+            init_slugs, config_slugs,
+            "init default slugs must equal Config::default().document_types keys"
+        );
+
+        // Exactly eleven unique slugs on each side; no deploy.
+        assert_eq!(DOCUMENT_ARTIFACTS.len(), 11);
+        let unique: std::collections::BTreeSet<&str> = DOCUMENT_ARTIFACTS.iter().copied().collect();
+        assert_eq!(unique.len(), 11, "init slugs must be unique");
+        assert_eq!(defaults.document_types.len(), 11);
+        assert!(!DOCUMENT_ARTIFACTS.contains(&"deploy"));
+        assert!(!defaults.document_types.contains_key("deploy"));
+
+        // Seeded shape: ten front-matter types declare [active, archived],
+        // ui-mockup declares no status, and every default type is enabled.
+        for (slug, entry) in &defaults.document_types {
+            assert!(entry.enabled, "{slug} must be enabled by default");
+            if slug == "ui-mockup" {
+                assert!(entry.statuses.is_none(), "ui-mockup has no statuses");
+            } else {
+                assert_eq!(
+                    entry.statuses,
+                    Some(vec!["active".to_string(), "archived".to_string()]),
+                    "{slug} must seed [active, archived]"
+                );
+            }
+        }
+    }
+
     fn tmpdir(name: &str) -> PathBuf {
         let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join(".tmp")

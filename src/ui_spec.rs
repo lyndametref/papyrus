@@ -60,17 +60,17 @@ fn ensure_dirs(dir: &Path) -> Result<(), AppError> {
     fs::create_dir_all(dir).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
-fn active_or_deprecated(
+fn active_or_archived(
     ctx: &Context,
     active: &Path,
-    deprecated: &Path,
+    archived: &Path,
     id: &str,
     prefix: &str,
     dotted: bool,
 ) -> Result<crate::record::resolve::ResolvedRecord, AppError> {
     crate::record::resolve::resolve_in_dirs(
         ctx,
-        &[active.to_path_buf(), deprecated.to_path_buf()],
+        &[active.to_path_buf(), archived.to_path_buf()],
         id,
         &[prefix.to_string()],
         dotted,
@@ -287,11 +287,10 @@ fn view(
     let requested = sanitize_field(id_raw)?;
     let dotted = record.is_dotted_id();
     let active = scope.active.clone();
-    let deprecated = scope.archived.clone();
+    let archived = scope.archived.clone();
     let _ = ensure_dirs(&active);
-    let _ = ensure_dirs(&deprecated);
-    let record =
-        active_or_deprecated(ctx, &active, &deprecated, &requested, &scope.prefix, dotted)?;
+    let _ = ensure_dirs(&archived);
+    let record = active_or_archived(ctx, &active, &archived, &requested, &scope.prefix, dotted)?;
     let id = record.id.clone();
     let path = record.path;
 
@@ -340,11 +339,10 @@ fn edit(
     let requested = sanitize_field(id_raw)?;
     let dotted = record.is_dotted_id();
     let active = scope.active.clone();
-    let deprecated = scope.archived.clone();
+    let archived = scope.archived.clone();
     let _ = ensure_dirs(&active);
-    let _ = ensure_dirs(&deprecated);
-    let resolved =
-        active_or_deprecated(ctx, &active, &deprecated, &requested, &scope.prefix, dotted)?;
+    let _ = ensure_dirs(&archived);
+    let resolved = active_or_archived(ctx, &active, &archived, &requested, &scope.prefix, dotted)?;
     resolved.ensure_writable()?;
     let id = resolved.id.clone();
     let path = resolved.path.clone();

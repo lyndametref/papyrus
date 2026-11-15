@@ -558,7 +558,7 @@ fn handle_request(request: Request, state: &ServerState) -> Response {
         Ok(response) => response,
         Err(error) => {
             // A missing technical specification always renders the same
-            // technical-specifications 404 page, whether the ID is deprecated
+            // technical-specifications 404 page, whether the ID is archived
             // or unknown. JSON responses keep the baseline error object.
             if error.status == 404
                 && !api

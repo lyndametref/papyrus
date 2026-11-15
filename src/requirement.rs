@@ -255,24 +255,24 @@ pub fn create(
     }
 
     let active = scope.active.clone();
-    let deprecated = scope.archived.clone();
+    let archived = scope.archived.clone();
     ensure_dirs(&active)?;
-    ensure_dirs(&deprecated)?;
+    ensure_dirs(&archived)?;
 
     let group_active_path = active.join(format!("{}.md", group_id));
-    let group_deprecated_path = deprecated.join(format!("{}.md", group_id));
+    let group_archived_path = archived.join(format!("{}.md", group_id));
     let group_active_safe = Context::ensure_within(&ctx.project_dir, &group_active_path)?;
-    let group_deprecated_safe = Context::ensure_within(&ctx.project_dir, &group_deprecated_path)?;
-    let group_deprecated = if group_active_safe.exists() {
+    let group_archived_safe = Context::ensure_within(&ctx.project_dir, &group_archived_path)?;
+    let group_archived = if group_active_safe.exists() {
         false
-    } else if group_deprecated_safe.exists() {
+    } else if group_archived_safe.exists() {
         true
     } else {
         return Err(AppError::NotFound(format!("group not found: {}", group_id)));
     };
-    if group_deprecated {
+    if group_archived {
         return Err(AppError::Validation(format!(
-            "group is deprecated: {}",
+            "group is archived: {}",
             group_id
         )));
     }

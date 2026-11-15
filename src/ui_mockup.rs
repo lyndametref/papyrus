@@ -102,13 +102,13 @@ fn find_record(ctx: &Context, dir: &Path, id: &str) -> Result<Option<PathBuf>, A
 fn resolve_record(
     ctx: &Context,
     active: &Path,
-    deprecated: &Path,
+    archived: &Path,
     id: &str,
 ) -> Result<PathBuf, AppError> {
     if let Some(path) = find_record(ctx, active, id)? {
         return Ok(path);
     }
-    if let Some(path) = find_record(ctx, deprecated, id)? {
+    if let Some(path) = find_record(ctx, archived, id)? {
         return Ok(path);
     }
     Err(AppError::NotFound(format!("not found: {}", id)))
@@ -519,8 +519,8 @@ fn list(ctx: &Context, scope: &DocumentScope) -> Result<CommandOutput, AppError>
 fn view(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<CommandOutput, AppError> {
     let id = sanitize_field(id_raw)?;
     let active = scope.active.clone();
-    let deprecated = scope.archived.clone();
-    let path = resolve_record(ctx, &active, &deprecated, &id)?;
+    let archived = scope.archived.clone();
+    let path = resolve_record(ctx, &active, &archived, &id)?;
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let json = if ctx.json {
@@ -558,8 +558,8 @@ fn edit(
     let superseded_by = superseded_by_raw.map(sanitize_field).transpose()?;
 
     let active = scope.active.clone();
-    let deprecated = scope.archived.clone();
-    let path = resolve_record(ctx, &active, &deprecated, &id)?;
+    let archived = scope.archived.clone();
+    let path = resolve_record(ctx, &active, &archived, &id)?;
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let mut record = parse_record(&content, &id);
@@ -616,7 +616,7 @@ fn edit(
         record.status = st;
     }
 
-    let mut move_to_deprecated = false;
+    let mut move_to_archived = false;
     if let Some(sup) = superseded_by {
         if sup == id {
             return Err(AppError::Validation(format!(
@@ -624,21 +624,21 @@ fn edit(
                 id
             )));
         }
-        let _ = resolve_record(ctx, &active, &deprecated, &sup)?;
+        let _ = resolve_record(ctx, &active, &archived, &sup)?;
         record.status = "archived".to_string();
         record.superseded_by = Some(sup);
-        move_to_deprecated = true;
+        move_to_archived = true;
     }
 
-    let destination = if move_to_deprecated {
-        ensure_dirs(&deprecated)?;
-        deprecated.join(format!("{}.html", id))
+    let destination = if move_to_archived {
+        ensure_dirs(&archived)?;
+        archived.join(format!("{}.html", id))
     } else {
         path.clone()
     };
     let safe_dest = Context::ensure_within(&ctx.project_dir, &destination)?;
 
-    if move_to_deprecated && path != safe_dest {
+    if move_to_archived && path != safe_dest {
         crate::record::store::move_record(ctx, &path, &safe_dest)?;
     }
 
@@ -664,10 +664,10 @@ fn edit(
 fn archive(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<CommandOutput, AppError> {
     let id = sanitize_field(id_raw)?;
     let active = scope.active.clone();
-    let deprecated = scope.archived.clone();
+    let archived = scope.archived.clone();
 
     let Some(path) = find_record(ctx, &active, &id)? else {
-        if find_record(ctx, &deprecated, &id)?.is_some() {
+        if find_record(ctx, &archived, &id)?.is_some() {
             let json = if ctx.json {
                 Some(serde_json::json!({"status":"ok","id":id}))
             } else {
@@ -690,11 +690,11 @@ fn archive(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<Command
         )));
     }
 
-    ensure_dirs(&deprecated)?;
+    ensure_dirs(&archived)?;
     let file_name = path
         .file_name()
         .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?;
-    let destination = deprecated.join(file_name);
+    let destination = archived.join(file_name);
     let safe_dest = Context::ensure_within(&ctx.project_dir, &destination)?;
 
     crate::record::store::move_record(ctx, &path, &safe_dest)?;

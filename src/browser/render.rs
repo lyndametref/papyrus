@@ -776,7 +776,7 @@ fn backlog_list_section(
     if total == 0 {
         if empty_special {
             body.push_str(&format!(
-                "<div class=\"empty\"><p>No {} were found in the configured directory.</p><p class=\"help\">{} are created from the command line; this browser does not create records. Deprecated {} are hidden.</p></div></section>",
+                "<div class=\"empty\"><p>No {} were found in the configured directory.</p><p class=\"help\">{} are created from the command line; this browser does not create records. Archived {} are hidden.</p></div></section>",
                 category_short(slug),
                 category_name(slug),
                 category_short(slug)
@@ -3587,7 +3587,7 @@ pub fn error_page(status: u16, cfg: &Config, chrome: Chrome<'_>, actions: Option
 
 /// Render the technical-specifications `404` page.
 ///
-/// The same page is returned for a deprecated and an unknown technical
+/// The same page is returned for an archived and an unknown technical
 /// specification so the response never reveals whether a hidden record exists.
 pub fn tech_spec_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     let actions =
@@ -3603,7 +3603,7 @@ pub fn tech_spec_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
             ("message", "That record does not exist or is not available."),
             (
                 "hint",
-                "Deprecated technical specifications are not listed and cannot be opened. \
+                "Archived technical specifications are not listed and cannot be opened. \
 The same page is used for an unknown address.",
             ),
         ],
@@ -3635,7 +3635,7 @@ pub fn use_case_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
             ("message", "That record does not exist or is not available."),
             (
                 "hint",
-                "Deprecated use cases are not listed and cannot be opened. The same page is used for an unknown address.",
+                "Archived use cases are not listed and cannot be opened. The same page is used for an unknown address.",
             ),
         ],
         &[
@@ -3666,7 +3666,7 @@ pub fn test_case_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
             ("message", "That record does not exist or is not available."),
             (
                 "hint",
-                "Deprecated test cases are not listed and cannot be opened. The same page is used for an unknown address.",
+                "Archived test cases are not listed and cannot be opened. The same page is used for an unknown address.",
             ),
         ],
         &[
@@ -3697,7 +3697,7 @@ pub fn test_report_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
             ("message", "That record does not exist or is not available."),
             (
                 "hint",
-                "Deprecated test reports are not listed and cannot be opened. The same page is used for an unknown address.",
+                "Archived test reports are not listed and cannot be opened. The same page is used for an unknown address.",
             ),
         ],
         &[
@@ -4211,7 +4211,7 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
                 ),
                 (
                     "Business rules, glossary, specifications",
-                    "Rules, glossary terms, UI specs, technical specs, and mockups follow the same record lifecycle: active \u{2192} deprecated (restored via restore).",
+                    "Rules, glossary terms, UI specs, technical specs, and mockups follow the same record lifecycle: active \u{2192} archived.",
                     "papyrus rule create \"Title\"\npapyrus glossary create \"Term\"",
                 ),
             ],
