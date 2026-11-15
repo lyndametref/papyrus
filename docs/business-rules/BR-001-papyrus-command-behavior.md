@@ -2,15 +2,15 @@
 
 ## Description
 
-Papyrus exposes one command family per enabled `document_types` entry, named `papyrus <slug>`, whose baseline verbs are `create`, `list`, `view`, `edit`, `archive`, and `delete`, plus `status <id> <value>` for front-matter-backed types; the former static per-type document commands and the `nfreq` command name are removed.
+Papyrus exposes one command family per enabled `document_types` entry, named `papyrus <slug>`, whose baseline verbs are `create`, `list`, `view`, `edit`, `archive`, and `delete`, plus `status <id> <value>` for front-matter-backed types; the former static per-type document commands and the `nfreq` command name are removed. Alongside these config-defined families, Papyrus ships a fixed set of built-in commands documented in the man page; no document slug can shadow a built-in name (BR-016).
 
 ## Rationale
 
-Based on REQ-07.003 — Dispatch Config-Defined Document Commands, REQ-07.002 — Configure Document Types and Slugs, and REQ-07.001 — Organize Artifacts into Three Categories, this rule exists because the document command set is no longer compiled per type: the effective configuration is the single source of the available document commands, so adding a valid entry must add a working command and removing an entry must remove it, without a rebuild or per-type code. REQ-01.004 — Use Common CLI Controls and Outcomes supplies the exit codes and the global options that apply to those commands.
+Based on REQ-07.003 — Dispatch Config-Defined Document Commands, REQ-07.002 — Configure Document Types and Slugs, and REQ-07.001 — Organize Artifacts into Three Categories, this rule exists because the document command set is no longer compiled per type: the effective configuration is the single source of the available document commands, so adding a valid entry must add a working command and removing an entry must remove it, without a rebuild or per-type code. REQ-01.004 — Use Common CLI Controls and Outcomes supplies the exit codes and the global options that apply to those commands. REQ-01.008 — Run Project Diagnostics adds a `check` command to the fixed built-in set, outside that config-defined family, and makes its finding outcome exit code 4 under REQ-01.004, so the built-in set and that outcome must be readable here without weakening the configuration-only document model.
 
 ## Applicability
 
-Applies to every Papyrus invocation and to every document type declared under `document_types`.
+Applies to every Papyrus invocation — including the built-in `check` command, which sits outside the config-defined document-command family — and to every document type declared under `document_types`.
 
 ### Command model
 
@@ -20,6 +20,10 @@ Applies to every Papyrus invocation and to every document type declared under `d
 - `papyrus --help` lists every enabled document slug alongside the built-in commands, and `papyrus <slug> --help` lists that type's verbs.
 - An unknown slug, or the slug of a disabled entry, is a usage error (exit code 2) with no fallback to another command.
 - Global options (`--json`, `--dir`, `--config`, `--no-color`) apply as for every command; outcomes use exit codes 0, 1, 2, 3, and 4.
+- `check` is a built-in command outside the config-defined document-command family: it takes no subcommands, is never created from a `document_types` entry, and its `--fix` and `--force` flags are command-local, not global.
+- `papyrus check` is read-only by default: a run writes nothing unless `--fix` is given.
+- Exit code 4 is a findings outcome, not an error: `papyrus check` exits 4 when the run reports at least one finding, including a run whose `--fix` repairs all succeeded, and 0 only when it found nothing; this is distinct from exit code 1 for an I/O failure and exit code 2 for a usage error.
+- `papyrus check` loads the configuration tolerantly, like `papyrus config get|set|unset|list`: an invalid configuration is reported as `config-invalid` findings, the checks that need a valid `document_types` set are named as skipped, and the remaining checks still run (REQ-01.008).
 - The former static document command inventory is not compiled in, and `nfreq` is not retained as a command or alias: the non-functional family is `nfr`.
 
 ### Categories and lifecycles

@@ -6,7 +6,7 @@
 
 ## Rationale
 
-Based on REQ-01.002 — Read and Edit Project Configuration, REQ-01.003 — Select Project and Configuration Context, REQ-07.001 — Organize Artifacts into Three Categories, and REQ-07.002 — Configure Document Types and Slugs, this rule exists because configuration is the only place document types, their slugs, prefixes, directories, and status vocabularies are declared; the loader must therefore validate the whole map fail-closed and still leave a repair path, or one bad entry would make every command unusable and the project could not be fixed through Papyrus itself.
+Based on REQ-01.002 — Read and Edit Project Configuration, REQ-01.003 — Select Project and Configuration Context, REQ-07.001 — Organize Artifacts into Three Categories, REQ-07.002 — Configure Document Types and Slugs, and REQ-01.008 — Run Project Diagnostics, this rule exists because configuration is the only place document types, their slugs, prefixes, directories, and status vocabularies are declared; the loader must therefore validate the whole map fail-closed and still leave a repair path, or one bad entry would make every command unusable and the project could not be fixed through Papyrus itself.
 
 ## Applicability
 
@@ -39,10 +39,10 @@ This order is unchanged by the document-type model.
 
 ### Validation
 
-- Fail-closed: every command except the repair surfaces (`config get|set|unset|list`) and `init --force` refuses to run while the effective configuration is invalid, and no partially valid document-type set is used.
+- Fail-closed: every command except the repair surfaces (`config get|set|unset|list`), `init --force`, and `check` refuses to run while the effective configuration is invalid, and no partially valid document-type set is used.
 - A violation is a validation outcome (exit code 4) that names `document_types.<slug>` and the offending field.
 - Slug: non-empty, ASCII letters, digits, `-`, and `_`, not starting with `-`, with no whitespace, control character, or path separator; values are rejected, never trimmed or normalized.
-- Reserved names: a slug equal to `init`, `config`, `task`, `milestone`, `release`, `decision`, `search`, `browser`, `import`, `help`, or `version` is rejected. The comparison is case-insensitive, so `Config` and `SEARCH` are rejected too.
+- Reserved names: a slug equal to `init`, `config`, `check`, `task`, `milestone`, `release`, `decision`, `search`, `browser`, `import`, `help`, or `version` is rejected. The comparison is case-insensitive, so `Config` and `SEARCH` are rejected too.
 - `prefix` is non-empty and unique across all entries, including disabled ones.
 - `directory` is relative, stays inside the project directory, and is unique among enabled entries.
 - A repeated `document_types` slug key is invalid configuration; neither occurrence is preferred.
@@ -51,3 +51,4 @@ This order is unchanged by the document-type model.
 
 - `papyrus config get|set|unset|list` load tolerantly, validate the configuration that would result, and refuse an invalid write.
 - `papyrus init --force` replaces the file with the generated default set.
+- `papyrus check` loads tolerantly, reports each configuration diagnostic as a `config-invalid` finding, runs only the checks that do not depend on the effective `document_types` set, and repairs no configuration value (REQ-01.008).
