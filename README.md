@@ -517,9 +517,9 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        <b style="color: light-dark(#1a7f37, #3fb950);">--force</b>
        Skip the repair confirmation prompt; requires <b>--fix</b>.
 
-       Findings are reported one per line as &lt;kind&gt;: &lt;family&gt; &lt;subject&gt; — &lt;detail&gt; (&lt;locations&gt;), sorted by kind, family, subject, and location; the family and subject parts are omitted when a finding carries none. A clean run prints exactly <b>no findings</b>. When a check was skipped, one final <b>skipped: &lt;identifiers&gt;</b> line follows. <b>--json</b> emits the same report as one object with the keys <b>findings</b>, <b>skipped</b>, and <b>repaired</b>.
+       Findings are reported one per line as &lt;kind&gt;: &lt;family&gt; &lt;subject&gt; — &lt;detail&gt; (&lt;locations&gt;), sorted by kind, family, subject, and location; the family and subject parts are omitted when a finding carries none. A clean run prints exactly <b>no findings</b>. A repair run adds, on standard output after the finding lines and before any <b>skipped:</b> line, one <b>repaired: &lt;family&gt; &lt;old id&gt; -&gt; &lt;new id&gt; (&lt;old path&gt; -&gt; &lt;new path&gt;)</b> line per applied repair, followed by one <b>reference:</b> line per affected reference. When a check was skipped, one final <b>skipped: &lt;identifiers&gt;</b> line follows. <b>--json</b> emits the same report as one object with the keys <b>findings</b>, <b>skipped</b>, and <b>repaired</b>.
 
-       The seven finding kinds are:
+       The scanned finding kinds are:
 
           <b style="color: light-dark(#8250df, #d2a8ff);">duplicate-id</b>
           Two or more records of one family share a canonical ID. This is the only kind <b>--fix</b> repairs.
@@ -542,11 +542,15 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
           <b style="color: light-dark(#8250df, #d2a8ff);">config-invalid</b>
           One configuration diagnostic line. It carries no family and no subject, and its location is the configuration file.
 
+       These are the seven kinds a scan reports. A repair run may additionally report <b>repair-skipped</b> for a planned repair that cannot be applied; it is not a scan kind.
+
        Nothing is written unless <b>--fix</b> is given: a plain run renames, relocates, and rewrites nothing. A legacy <b>deprecated/</b> folder is inert - it is never read, never listed, and produces no finding (REQ-05.007).
 
-       A repair run changes identity and nothing else, and it repairs <b>duplicate-id</b> findings only; every other finding stays in the report and unresolved. Within a duplicate group the keeper is the record with the earliest valid <b>created_date</b>, records with a missing or unparsable date rank last, and a remaining tie goes to the smallest project-relative path. Every other record receives the next ID from the allocator and its file is renamed to the new stem. The plan and the single confirmation prompt for the whole run are written to standard error, so <b>--json</b> stays parseable. Affected references are listed and never rewritten. <b>--force</b> skips the prompt and requires <b>--fix</b>. A planned repair that cannot be applied is reported as <b>repair-skipped</b>. With repairs to apply, no terminal, and no <b>--force</b>, nothing is written and the run exits 2.
+       A repair run changes identity and nothing else, and it repairs <b>duplicate-id</b> findings only; every other finding stays in the report and unresolved. Within a duplicate group the keeper is the record with the earliest valid <b>created_date</b>, records with a missing or unparsable date rank last, and a remaining tie goes to the smallest project-relative path. Every other record receives the next ID from the allocator and its file is renamed to the new stem. The plan and the single confirmation prompt for the whole run are written to standard error, so <b>--json</b> stays parseable. Affected references are listed and never rewritten. <b>--force</b> skips the prompt and requires <b>--fix</b>. With repairs to apply, no terminal, and no <b>--force</b>, nothing is written and the run exits 2.
 
-       The configuration is loaded tolerantly, like <b>papyrus config get|set|unset|list</b>, so an invalid configuration does not block the run: each diagnostic line becomes one <b>config-invalid</b> finding, the checks that need a valid <b>document_types</b> set are named as skipped, and the remaining checks still run.
+       A duplicate group is refused and left untouched when a record's front-matter <b>id</b> disagrees with its file stem, when the member is a group record of a grouped requirement family (<b>REQ-XX</b> or <b>NFR-XX</b>), or when any member sits in a read-only legacy directory or the read/import archive directory. A refusal does not abort the run: the finding stays in the report, other groups are still repaired, and the exit status stays 4.
+
+       The configuration is loaded tolerantly, like <b>papyrus config get|set|unset|list</b>, so an invalid configuration does not block the run: each diagnostic line becomes one <b>config-invalid</b> finding, the checks that need a valid <b>document_types</b> set are named as skipped, and the remaining checks still run. <b>papyrus check --help</b> works even when the configuration is invalid, because the command is built without the registry, so its help surface is always reachable.
 
        Intended use: run <b>papyrus check</b> read-only, inspect the report, then repair with <b>papyrus check --fix</b> interactively or <b>papyrus check --fix --force</b> unattended, and re-run <b>papyrus check</b>. The second run reports <b>no findings</b> and exits 0, and a further <b>--fix</b> writes nothing.
 
