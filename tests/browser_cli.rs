@@ -2629,7 +2629,8 @@ fn t11f_conflict_backlog() {
 #[test]
 fn t11g_archived_backlog() {
     let dir = backlog_fixture("t11g");
-    // archive task and milestone
+    // archive the task; milestones have no archive verb, so move the record
+    // into the archive location out of band to exercise the legacy read path.
     run_ok(&[
         "--dir",
         dir.to_str().unwrap(),
@@ -2637,13 +2638,13 @@ fn t11g_archived_backlog() {
         "archive",
         "TASK-001",
     ]);
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "milestone",
-        "archive",
-        "MS-001",
-    ]);
+    let archived = dir.join("backlog/archive/milestones");
+    fs::create_dir_all(&archived).unwrap();
+    fs::rename(
+        dir.join("backlog/milestones/MS-001.md"),
+        archived.join("MS-001.md"),
+    )
+    .unwrap();
     let server = Server::start(&dir, &["--no-open"], &[]);
     let list = get(&server, "/?type=task").text();
     // The archived task has no list row (TASK-67: remaining rows may
@@ -2900,13 +2901,15 @@ fn board_fixture(name: &str) -> PathBuf {
         "MS-004",
         "--force",
     ]);
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "milestone",
-        "archive",
-        "MS-005",
-    ]);
+    // Milestones have no archive verb; keep a legacy archived record readable
+    // by moving it into the archive location out of band.
+    let archived = dir.join("backlog/archive/milestones");
+    fs::create_dir_all(&archived).unwrap();
+    fs::rename(
+        dir.join("backlog/milestones/MS-005.md"),
+        archived.join("MS-005.md"),
+    )
+    .unwrap();
     create_task(&dir, "Task Eight", "MS-001"); // TASK-008, archived below
     run_ok(&[
         "--dir",
@@ -6775,6 +6778,18 @@ fn t77a_skills_page_route_alias_and_method() {
     assert!(
         !body.contains("papyrus release status"),
         "skills page must not advertise a non-existent release status command"
+    );
+    assert!(
+        body.contains("papyrus milestone close MS-001"),
+        "skills page must name the implemented milestone close command"
+    );
+    assert!(
+        body.contains("open → closed"),
+        "skills page must state the open -> closed milestone lifecycle"
+    );
+    assert!(
+        !body.contains("papyrus milestone archive") && !body.contains("papyrus milestone restore"),
+        "skills page must not advertise removed milestone archive/restore commands"
     );
     assert!(body.contains("Agent skills &amp; workflows"));
     assert!(

@@ -1461,10 +1461,10 @@ fn cross_type_unified_search() {
     // Deprecation hiding for a document record.
     let out = run(&d, &["audit", "archive", "AUD-001"]);
     assert!(out.status.success(), "stderr={}", stderr(&out));
-    // Archival hiding for task and milestone records.
+    // Archival hiding for tasks; milestones are deleted, not archived.
     let out = run(&d, &["task", "archive", "TASK-001"]);
     assert!(out.status.success(), "stderr={}", stderr(&out));
-    let out = run(&d, &["milestone", "archive", "MS-001"]);
+    let out = run(&d, &["milestone", "delete", "MS-001", "--force"]);
     assert!(out.status.success(), "stderr={}", stderr(&out));
 
     let out = search(&d, &["quick brown fox"]);
@@ -1472,7 +1472,7 @@ fn cross_type_unified_search() {
     let s = stdout(&out);
     assert!(!s.contains("AUD-001"), "archived doc still present");
     assert!(!s.contains("TASK-001"), "archived task still present");
-    assert!(!s.contains("MS-001"), "archived milestone still present");
+    assert!(!s.contains("MS-001"), "deleted milestone still present");
 
     // Restored document record reappears.
     let out = run(&d, &["audit", "restore", "AUD-001"]);

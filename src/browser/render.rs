@@ -4196,8 +4196,8 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
                 ),
                 (
                     "Milestones and releases",
-                    "Milestone IDs use prefix {milestone_prefix} ({milestone_example}); release IDs use prefix {release_prefix} ({release_example}). Release lifecycle is separate from task workflow status.",
-                    "papyrus milestone create \"Title\"\npapyrus release create \"Title\"",
+                    "Milestone IDs use prefix {milestone_prefix} ({milestone_example}); release IDs use prefix {release_prefix} ({release_example}). Milestones move open \u{2192} closed; releases move planned \u{2192} released. Release lifecycle is separate from task workflow status.",
+                    "papyrus milestone create \"Title\"\npapyrus milestone close {milestone_example}\npapyrus release create \"Title\"",
                 ),
             ],
         ),

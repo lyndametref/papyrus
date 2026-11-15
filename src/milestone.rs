@@ -54,8 +54,11 @@ pub enum MilestoneCmd {
         #[arg(long = "reference")]
         reference: Vec<String>,
     },
-    /// Archive a milestone.
-    Archive { id: String },
+    /// Close a milestone (`open -> closed`).
+    Close {
+        /// Milestone ID.
+        id: String,
+    },
     /// Permanently delete a milestone.
     Delete {
         id: String,
@@ -110,7 +113,7 @@ pub fn run(ctx: &Context, cmd: MilestoneCmd) -> Result<crate::CommandOutput, App
             &label,
             &reference,
         ),
-        MilestoneCmd::Archive { id } => archive(ctx, &id),
+        MilestoneCmd::Close { id } => close(ctx, &id),
         MilestoneCmd::Delete { id, force } => delete(ctx, &id, force),
     }
 }
@@ -140,15 +143,6 @@ fn milestone_id_spec(cfg: &Config) -> crate::record::identity::IdSpec {
 
 fn active_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
     milestone_descriptor().resolve_directory(cfg, &ctx.project_dir)
-}
-
-fn archive_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
-    milestone_descriptor()
-        .resolve_archive_directory(cfg, &ctx.project_dir)
-        .transpose()?
-        .ok_or_else(|| {
-            AppError::Runtime("milestone archive directory is not configured".to_string())
-        })
 }
 
 fn read_dirs(ctx: &Context, cfg: &Config) -> Vec<PathBuf> {
@@ -428,6 +422,10 @@ pub fn create(
         crate::record::patch::PatchOp::SetFrontMatterValue("labels".to_string(), labels_value),
         crate::record::patch::PatchOp::SetFrontMatterValue("references".to_string(), refs_value),
         crate::record::patch::PatchOp::SetFrontMatterValue("release".to_string(), release_value),
+        crate::record::patch::PatchOp::SetFrontMatterValue(
+            "status".to_string(),
+            crate::record::frontmatter::FrontMatterValue::String("open".to_string()),
+        ),
     ];
     let file_content = crate::record::patch::apply_patch(&parsed, &ops)?;
     let file_path = active.join(format!("{}.md", id));
@@ -705,75 +703,53 @@ pub fn edit(
     })
 }
 
-fn same_directory(left: &std::path::Path, right: &std::path::Path) -> bool {
-    left == right
-        || left
-            .canonicalize()
-            .ok()
-            .is_some_and(|l| right.canonicalize().ok().is_some_and(|r| l == r))
-}
-
-fn path_in_directory(path: &std::path::Path, dir: &std::path::Path) -> bool {
-    path.parent()
-        .is_some_and(|parent| same_directory(parent, dir))
-}
-
-/// Retire legacy metadata sections and refresh `updated_date` before an
-/// archive move. The file is written once.
-fn retire_and_touch(ctx: &Context, path: &std::path::Path) -> Result<(), AppError> {
-    let content = fs::read_to_string(path).map_err(|e| AppError::Runtime(e.to_string()))?;
-    let doc = crate::record::document::parse(&content)?;
-    let desc = crate::record::descriptor::descriptor_for("milestone")
-        .ok_or_else(|| AppError::Runtime("milestone descriptor is unavailable".to_string()))?;
-    let mut ops = crate::record::migrate::retire_legacy_body_ops(&doc, desc, path);
-    ops.push(crate::record::patch::PatchOp::SetFrontMatter(
-        "updated_date".into(),
-        crate::record::frontmatter::utc_now(),
-    ));
-    let new_content = crate::record::patch::apply_patch(&doc, &ops)?;
-    if new_content != content {
-        crate::record::store::write_atomic(ctx, path, &new_content)?;
-    }
-    Ok(())
-}
-
-pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
-    let id = sanitize_text(id_raw)?;
+/// Close a milestone: the only `open -> closed` transition.
+///
+/// A missing or empty stored `status` is treated as `open` so imported and
+/// legacy records remain closable. Any other status is rejected with a
+/// validation outcome (exit 4) before any write, leaving the file untouched.
+pub fn close(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
+    let requested = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
-    let path = resolve_milestone_path(ctx, &cfg, &id)?;
-    let active = active_dir(ctx, &cfg)?;
-    if !path_in_directory(&path, &active) {
-        return Err(AppError::Validation(format!("already archived: {}", id)));
-    }
+    let path = resolve_milestone_path(ctx, &cfg, &requested)?;
     reject_milestone_write_conflict(ctx, &path)?;
-    let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
-    retire_and_touch(ctx, &path)?;
-    let archive = archive_dir(ctx, &cfg)?;
-    ensure_dir(&archive, &ctx.project_dir)?;
-
-    let archived_path = archive.join(
-        path.file_name()
-            .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?,
-    );
-    let archived_safe = Context::ensure_within(&ctx.project_dir, &archived_path)?;
-    if archived_safe == path {
-        return Err(AppError::Validation(format!("already archived: {}", id)));
+    let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let doc = crate::record::document::parse(&content)?;
+    let id = doc
+        .front_matter
+        .as_ref()
+        .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, "id"))
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or(requested);
+    let current = doc
+        .front_matter
+        .as_ref()
+        .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, "status"))
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "open".to_string());
+    if current != "open" {
+        return Err(AppError::Validation(format!(
+            "milestone {} is already {}; only open milestones can be closed",
+            id, current
+        )));
     }
-    if archived_safe.exists() {
-        return Err(AppError::Validation(format!("already archived: {}", id)));
-    }
 
-    crate::record::store::move_record(ctx, &path, &archived_safe)?;
+    let now = crate::record::frontmatter::utc_now();
+    let new_content = crate::record::patch::apply_patch(
+        &doc,
+        &[
+            crate::record::patch::PatchOp::SetFrontMatter("status".into(), "closed".into()),
+            crate::record::patch::PatchOp::SetFrontMatter("updated_date".into(), now),
+        ],
+    )?;
+    let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
+    crate::record::store::write_atomic(ctx, &safe_write, &new_content)?;
 
-    let json = if ctx.json {
-        Some(serde_json::json!({"status": "ok", "id": id}))
-    } else {
-        None
-    };
-    Ok(crate::CommandOutput {
-        text: String::new(),
-        json,
-    })
+    let json = ctx
+        .json
+        .then(|| serde_json::json!({"id": id, "status": "closed"}));
+    Ok(crate::CommandOutput { text: id, json })
 }
 
 pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<crate::CommandOutput, AppError> {
@@ -885,13 +861,13 @@ mod tests {
     }
 
     #[test]
-    fn archive_refuses_mismatch() {
-        let dir = tmpdir("mismatch-archive");
+    fn close_refuses_mismatch() {
+        let dir = tmpdir("mismatch-close");
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
         let content = "---\nid: MS-99\ntitle: MileTwo\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\n---\n\n## Description\n\nMile body\n";
         fs::write(dir.join("backlog/milestones/MS-2 - MileTwo.md"), content).unwrap();
-        let err = archive(&c, "MS-2").err().expect("expected error");
+        let err = close(&c, "MS-2").err().expect("expected error");
         assert!(
             err.to_string().contains("migration conflict"),
             "got: {}",
@@ -951,6 +927,7 @@ mod tests {
             "labels:",
             "references:",
             "release:",
+            "status:",
         ];
         let mut last = 0usize;
         for key in order {
@@ -1006,36 +983,62 @@ mod tests {
     }
 
     #[test]
-    fn archive_moves_to_canonical_milestone_archive() {
-        let dir = tmpdir("archive-canonical");
+    fn close_sets_status_in_place_and_refreshes_updated_date() {
+        let dir = tmpdir("close-canonical");
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
-        fs::write(
-            dir.join("backlog/milestones/MS-001.md"),
-            milestone_record("MS-001", "One"),
-        )
-        .unwrap();
-        archive(&c, "MS-001").unwrap();
-        assert!(!dir.join("backlog/milestones/MS-001.md").exists());
-        let archived_path = dir.join("backlog/archive/milestones/MS-001.md");
-        assert!(archived_path.exists());
-        assert!(!dir.join("backlog/milestones/archived/MS-001.md").exists());
-        let archived = fs::read_to_string(&archived_path).unwrap();
+        let path = dir.join("backlog/milestones/MS-001.md");
+        fs::write(&path, milestone_record("MS-001", "One")).unwrap();
+
+        let out = close(&c, "MS-001").unwrap();
+        assert_eq!(out.text, "MS-001");
+        assert!(path.exists(), "close must not move the record");
+        assert!(!dir.join("backlog/archive/milestones/MS-001.md").exists());
+        let closed = fs::read_to_string(&path).unwrap();
+        assert!(closed.contains("status: closed"), "{}", closed);
         assert!(
-            !archived.contains("updated_date: '2026-01-01T00:00:00Z'"),
-            "archive must refresh updated_date: {}",
-            archived
+            !closed.contains("updated_date: '2026-01-01T00:00:00Z'"),
+            "close must refresh updated_date: {}",
+            closed
         );
         assert!(
-            archived.contains("created_date: '2026-01-01T00:00:00Z'"),
-            "archive must not change created_date: {}",
-            archived
+            closed.contains("created_date: '2026-01-01T00:00:00Z'"),
+            "close must not change created_date: {}",
+            closed
         );
-        // No unarchive command exists: the lifecycle stays create, list,
-        // view, edit, archive, delete (REQ-03.001).
+    }
+
+    #[test]
+    fn close_of_closed_is_validation_without_a_write() {
+        let dir = tmpdir("close-closed");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
+        let path = dir.join("backlog/milestones/MS-001.md");
+        close_seed(&path, "MS-001", "closed");
+        let before = fs::read_to_string(&path).unwrap();
+
+        let err = close(&c, "MS-001").err().expect("closed close must fail");
         assert!(
-            matches!(resolve_milestone_entry(&c, &Config::default(), "MS-001"), Some(path) if path.ends_with("backlog/archive/milestones/MS-001.md"))
+            matches!(&err, AppError::Validation(message) if message.contains("closed")),
+            "unexpected error: {err:?}"
         );
+        assert_eq!(fs::read_to_string(&path).unwrap(), before);
+    }
+
+    fn close_seed(path: &std::path::Path, id: &str, status: &str) {
+        let content = milestone_record(id, "Seed").replace(
+            "release: null\n",
+            &format!("release: null\nstatus: {}\n", status),
+        );
+        fs::write(path, content).unwrap();
+    }
+
+    #[test]
+    fn close_unknown_id_is_not_found() {
+        let dir = tmpdir("close-unknown");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
+        assert!(matches!(close(&c, "MS-999"), Err(AppError::NotFound(_))));
     }
 
     #[test]
@@ -1089,23 +1092,17 @@ mod native_layout_tests {
     }
 
     #[test]
-    fn archive_from_legacy_alias_is_refused_without_changing_the_file() {
-        let dir = tmpdir("legacy-archive-refusal");
+    fn legacy_archived_milestone_remains_readable() {
+        let dir = tmpdir("legacy-archive-readable");
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/milestones/archived")).unwrap();
         let path = dir.join("backlog/milestones/archived/MS-005.md");
-        let before = record("MS-005", "Five");
-        fs::write(&path, &before).unwrap();
+        fs::write(&path, record("MS-005", "Five")).unwrap();
 
-        let err = match archive(&c, "MS-005") {
-            Err(err) => err,
-            Ok(_) => panic!("archive from a legacy alias must fail"),
-        };
+        let out = view(&c, "MS-005").unwrap();
+        assert!(out.text.contains("MS-005"), "got: {}", out.text);
         assert!(
-            matches!(&err, AppError::Validation(message) if message.contains("already archived")),
-            "unexpected error: {err:?}"
+            matches!(resolve_milestone_entry(&c, &Config::default(), "MS-005"), Some(found) if found == path)
         );
-        assert_eq!(fs::read_to_string(&path).unwrap(), before);
-        assert!(!dir.join("backlog/archive/milestones/MS-005.md").exists());
     }
 }

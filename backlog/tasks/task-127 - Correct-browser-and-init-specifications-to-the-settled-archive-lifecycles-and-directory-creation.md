@@ -3,16 +3,18 @@ id: TASK-127
 title: >-
   Correct browser and init specifications to the settled archive lifecycles and
   directory creation
-status: To Do
+status: Initiated
 assignee:
   - business-analyst
 created_date: '2026-11-15T11:28:00Z'
+updated_date: '2026-11-15T12:42:00Z'
 labels:
   - docs
   - specifications
 milestone: m-19
 dependencies:
-  - TASK-126
+  - TASK-130
+  - TASK-131
 references:
   - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md

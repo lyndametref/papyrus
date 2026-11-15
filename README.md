@@ -273,12 +273,14 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 <b style="color: light-dark(#0969da, #58a6ff);">milestone</b>
 
        Manage milestones (<b>MS-001</b>, ...). A milestone may be assigned to zero or one release.
+       The milestone lifecycle is fixed: <b>open</b> -&gt; <b>closed</b>, transitioned only by
+       <b>papyrus milestone close &lt;id&gt;</b>.
        <code style="font-weight: bold;">
        papyrus milestone create &lt;title&gt; [-d &lt;description&gt;] [--release &lt;id&gt;]
        papyrus milestone list
        papyrus milestone view &lt;id&gt;
         papyrus milestone edit &lt;id&gt; [--title &lt;title&gt;] [-d &lt;description&gt;] [--release &lt;id&gt;] [--no-release [&lt;id&gt;]]
-       papyrus milestone archive &lt;id&gt;
+       papyrus milestone close &lt;id&gt;
        papyrus milestone delete &lt;id&gt; [--force]
        </code>
        <b style="color: light-dark(#8250df, #d2a8ff);">create</b>
@@ -311,8 +313,9 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
           <b style="color: light-dark(#1a7f37, #3fb950);">--no-release [&lt;id&gt;]</b>
           Remove the specified release; without an ID, remove all release assignments.
 
-       <b style="color: light-dark(#8250df, #d2a8ff);">archive &lt;id&gt;</b>
-       Archive a milestone.
+       <b style="color: light-dark(#8250df, #d2a8ff);">close &lt;id&gt;</b>
+       Close a milestone. This is the only <b>open</b> -&gt; <b>closed</b> transition;
+       milestones in any other state are rejected.
 
        <b style="color: light-dark(#8250df, #d2a8ff);">delete &lt;id&gt; [--force]</b>
        Permanently delete a milestone.
@@ -526,9 +529,10 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
 <b style="color: light-dark(#0969da, #58a6ff);">Milestones</b>
 
-        <b>active</b> -&gt; <b>archived</b>
+        <b>open</b> -&gt; <b>closed</b>
 
-        Archiving a milestone is separate from task workflow status.
+        <b>papyrus milestone close &lt;id&gt;</b> is the only
+        <b>open</b> -&gt; <b>closed</b> transition. A milestone starts <b>open</b>.
 
 <b style="color: light-dark(#0969da, #58a6ff);">Releases</b>
 

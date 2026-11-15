@@ -104,31 +104,40 @@ fn milestone_and_release_basic_lifecycle() {
     assert!(!s.contains("## Release"), "got: {}", s);
     assert!(!s.contains("release: REL-001"), "got: {}", s);
 
-    // archive + view archived
+    // close open -> closed, in place
     let out = bin()
-        .args(["--dir", p, "milestone", "archive", "MS-001"])
+        .args(["--dir", p, "milestone", "close", "MS-001"])
         .output()
         .unwrap();
     assert!(out.status.success());
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "MS-001");
     let out = bin()
         .args(["--dir", p, "milestone", "view", "MS-001"])
         .output()
         .unwrap();
     assert!(out.status.success());
+    assert!(String::from_utf8_lossy(&out.stdout).contains("status: closed"));
 
-    // list hides archived
+    // a closed milestone stays listed
     let out = bin()
         .args(["--dir", p, "milestone", "list"])
         .output()
         .unwrap();
-    assert!(!String::from_utf8_lossy(&out.stdout).contains("MS-001"));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("MS-001"));
 
-    // delete archived with force
+    // delete closed with force
     let out = bin()
         .args(["--dir", p, "milestone", "delete", "MS-001", "--force"])
         .output()
         .unwrap();
     assert!(out.status.success());
+
+    // list hides the deleted milestone
+    let out = bin()
+        .args(["--dir", p, "milestone", "list"])
+        .output()
+        .unwrap();
+    assert!(!String::from_utf8_lossy(&out.stdout).contains("MS-001"));
 
     // release edit
     let out = bin()
@@ -196,15 +205,15 @@ fn milestone_exit_codes() {
         .unwrap();
     assert_eq!(out.status.code(), Some(4));
 
-    // 4: already archived
+    // 4: close of a closed milestone
     let _ = bin()
         .args(["--dir", p, "milestone", "create", "M2"])
         .output();
     let _ = bin()
-        .args(["--dir", p, "milestone", "archive", "MS-001"])
+        .args(["--dir", p, "milestone", "close", "MS-001"])
         .output();
     let out = bin()
-        .args(["--dir", p, "milestone", "archive", "MS-001"])
+        .args(["--dir", p, "milestone", "close", "MS-001"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(4));
@@ -231,6 +240,107 @@ fn release_unknown_and_json() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(3));
+
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn milestone_close_error_paths() {
+    let d = tmpdir("close-errors");
+    init(&d);
+    let p = d.to_str().unwrap();
+
+    let out = bin()
+        .args(["--dir", p, "milestone", "create", "M1"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "MS-001");
+
+    let path = d.join("backlog/milestones/MS-001.md");
+    let created = fs::read_to_string(&path).unwrap();
+    assert!(
+        created.contains("status: open"),
+        "create must seed status: open, got: {created}"
+    );
+    let date_line = created
+        .lines()
+        .find(|line| line.starts_with("updated_date:"))
+        .expect("updated_date line")
+        .to_string();
+    let aged = created.replacen(&date_line, "updated_date: '2020-01-01T00:00:00Z'", 1);
+    fs::write(&path, &aged).unwrap();
+
+    let out = bin()
+        .args(["--dir", p, "milestone", "close", "MS-001"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "MS-001");
+    let closed = fs::read_to_string(&path).unwrap();
+    assert!(closed.contains("status: closed"), "got: {closed}");
+    assert!(
+        !closed.contains("updated_date: '2020-01-01T00:00:00Z'"),
+        "close must refresh updated_date, got: {closed}"
+    );
+    assert!(closed.contains("created_date:"), "got: {closed}");
+
+    // JSON form for an open milestone.
+    let out = bin()
+        .args(["--dir", p, "milestone", "create", "M2"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let out = bin()
+        .args(["--dir", p, "--json", "milestone", "close", "MS-002"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let v: serde_json::Value = serde_json::from_str(&String::from_utf8_lossy(&out.stdout)).unwrap();
+    assert_eq!(v["id"], "MS-002");
+    assert_eq!(v["status"], "closed");
+
+    // Closing a closed milestone exits 4, names the status, writes nothing.
+    let before = fs::read(&path).unwrap();
+    let out = bin()
+        .args(["--dir", p, "milestone", "close", "MS-001"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(4));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("closed"), "stderr: {stderr}");
+    assert!(stderr.contains("MS-001"), "stderr: {stderr}");
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        before,
+        "closed close must not write"
+    );
+
+    // Unknown ID exits 3 with the standard not-found message.
+    let out = bin()
+        .args(["--dir", p, "milestone", "close", "MS-999"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("not found: MS-999"));
+
+    // Removed milestone verbs are unknown subcommands.
+    for verb in ["archive", "restore"] {
+        let out = bin()
+            .args(["--dir", p, "milestone", verb, "MS-001"])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(2), "milestone {verb} must exit 2");
+    }
+    let help =
+        String::from_utf8(bin().args(["milestone", "--help"]).output().unwrap().stdout).unwrap();
+    assert!(help.contains("close"), "help: {help}");
+    assert!(!help.contains("archive"), "help: {help}");
+    assert!(!help.contains("restore"), "help: {help}");
 
     let _ = fs::remove_dir_all(&d);
 }

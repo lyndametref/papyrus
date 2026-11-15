@@ -987,7 +987,7 @@ fn t98_03_no_backlog_shaped_write_anywhere() {
     fs::create_dir_all(&project).unwrap();
     init_project(&project);
 
-    // create / edit / archive / restore (task and milestone).
+    // create / edit / archive / restore for tasks; close for milestones.
     let task_id = run_ok(&project, &["task", "create", "Lifecycle Task"]);
     run_ok(
         &project,
@@ -996,7 +996,7 @@ fn t98_03_no_backlog_shaped_write_anywhere() {
     run_ok(&project, &["task", "archive", &task_id]);
     run_ok(&project, &["task", "restore", &task_id]);
     let ms_id = run_ok(&project, &["milestone", "create", "Lifecycle Milestone"]);
-    run_ok(&project, &["milestone", "archive", &ms_id]);
+    run_ok(&project, &["milestone", "close", &ms_id]);
 
     // archive a decision record.
     let decision_id = run_ok(&project, &["decision", "create", "Lifecycle Decision"]);

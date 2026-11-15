@@ -91,7 +91,7 @@ fn type_filters_restrict() {
 }
 
 #[test]
-fn archive_hides_task_and_milestone() {
+fn archive_hides_task_and_delete_hides_milestone() {
     let d = tmpdir("archive");
     init(&d);
     run(&d, &["task", "create", "Task title", "-d", "needle task"]);
@@ -105,7 +105,8 @@ fn archive_hides_task_and_milestone() {
     );
 
     run(&d, &["task", "archive", "TASK-001"]);
-    run(&d, &["milestone", "archive", "MS-001"]);
+    // Milestones have no archive verb; a deleted milestone is not searchable.
+    run(&d, &["milestone", "delete", "MS-001", "--force"]);
 
     let out = search(&d, &["needle"]);
     assert_eq!(out.status.code(), Some(0));
