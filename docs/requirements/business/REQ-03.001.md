@@ -29,4 +29,5 @@ The milestone lifecycle is fixed by the backlog category (REQ-07.001): `open -> 
 - Project-owner decision 2026-11-13: milestone lifecycle is `open -> closed`, transitioned by `papyrus milestone close <id>`, replacing the `archive` command; the state is stored in front matter.
 - REQ-05.010 — Record Metadata in YAML Front Matter (milestone `status`)
 - REQ-07.001 — Organize Artifacts into Three Categories
-- BR-006 — milestone Command Behavior (needs revision: archive becomes close)
+- BR-006 — milestone Command Behavior
+- TASK-130 delivered the close-only milestone lifecycle and TASK-127 corrected the specification pages; BR-006 now documents that lifecycle, so this trace needs no revision note.
