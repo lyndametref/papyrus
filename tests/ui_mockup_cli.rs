@@ -572,3 +572,456 @@ fn help() {
     }
     let _ = fs::remove_dir_all(&d);
 }
+
+fn archived_record(d: &std::path::Path, id: &str) -> PathBuf {
+    d.join("docs/specifications/ui/mockups/archived")
+        .join(format!("{}.html", id))
+}
+
+fn mockups_dir(d: &std::path::Path) -> PathBuf {
+    d.join("docs/specifications/ui/mockups")
+}
+
+fn assert_no_temp_files(dir: &std::path::Path) {
+    for entry in fs::read_dir(dir).unwrap() {
+        let name = entry.unwrap().file_name().to_string_lossy().to_string();
+        assert!(!name.contains(".tmp"), "leftover temp file: {}", name);
+    }
+}
+
+fn stderr(out: &std::process::Output) -> String {
+    String::from_utf8_lossy(&out.stderr).to_string()
+}
+
+#[test]
+fn archive_supersede_and_edit_with_move_write_then_unlink() {
+    // archive: only the archived copy remains, rendered with status archived.
+    let d = tmpdir("seq-archive");
+    init(&d);
+    create(&d, "Old", "TASK-A", &["UI-001"], &[]);
+    let out = run(&d, &["ui-mockup", "archive", "MOCK-001"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(!record(&d, "MOCK-001").exists());
+    let archived = fs::read_to_string(archived_record(&d, "MOCK-001")).unwrap();
+    assert!(archived.contains("<!-- status: archived -->"));
+    assert!(archived.contains("<!-- task: TASK-A -->"));
+    assert!(archived.contains("<!-- specs: UI-001 -->"));
+    let _ = fs::remove_dir_all(&d);
+
+    // supersede: back-reference is present in the archived destination.
+    let d = tmpdir("seq-supersede");
+    init(&d);
+    create(&d, "Old", "T", &["S"], &[]);
+    create(&d, "New", "T", &["S"], &[]);
+    let out = run(&d, &["ui-mockup", "supersede", "MOCK-001", "MOCK-002"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(!record(&d, "MOCK-001").exists());
+    assert!(record(&d, "MOCK-002").exists());
+    let archived = fs::read_to_string(archived_record(&d, "MOCK-001")).unwrap();
+    assert!(archived.contains("<!-- status: archived -->"));
+    assert!(archived.contains("<p>Superseded by: MOCK-002</p>"));
+    let _ = fs::remove_dir_all(&d);
+
+    // edit --superseded-by: same destination-write-then-unlink sequence.
+    let d = tmpdir("seq-edit-move");
+    init(&d);
+    create(&d, "Old", "T", &["S"], &[]);
+    create(&d, "New", "T", &["S"], &[]);
+    let out = run(
+        &d,
+        &[
+            "ui-mockup",
+            "edit",
+            "MOCK-001",
+            "--superseded-by",
+            "MOCK-002",
+        ],
+    );
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(!record(&d, "MOCK-001").exists());
+    let archived = fs::read_to_string(archived_record(&d, "MOCK-001")).unwrap();
+    assert!(archived.contains("<!-- status: archived -->"));
+    assert!(archived.contains("<p>Superseded by: MOCK-002</p>"));
+    let _ = fs::remove_dir_all(&d);
+
+    // plain edit: one in-place write, nothing moved or unlinked.
+    let d = tmpdir("seq-edit-plain");
+    init(&d);
+    create(&d, "Plain", "T", &["S"], &[]);
+    let before = fs::read_to_string(record(&d, "MOCK-001")).unwrap();
+    let out = run(&d, &["ui-mockup", "edit", "MOCK-001", "--task", "T2"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(record(&d, "MOCK-001").exists());
+    assert!(!archived_record(&d, "MOCK-001").exists());
+    let after = fs::read_to_string(record(&d, "MOCK-001")).unwrap();
+    assert_ne!(after, before);
+    assert!(after.contains("<!-- task: T2 -->"));
+    let _ = fs::remove_dir_all(&d);
+
+    // supersede of an already-archived record writes in place and unlinks nothing.
+    let d = tmpdir("seq-supersede-archived");
+    init(&d);
+    create(&d, "Old", "T", &["S"], &[]);
+    create(&d, "New", "T", &["S"], &[]);
+    assert!(
+        run(&d, &["ui-mockup", "archive", "MOCK-001"])
+            .status
+            .success()
+    );
+    let out = run(&d, &["ui-mockup", "supersede", "MOCK-001", "MOCK-002"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(archived_record(&d, "MOCK-001").exists());
+    let archived = fs::read_to_string(archived_record(&d, "MOCK-001")).unwrap();
+    assert!(archived.contains("<p>Superseded by: MOCK-002</p>"));
+    let _ = fs::remove_dir_all(&d);
+
+    // edit-with-move of an already-archived record writes in place.
+    let d = tmpdir("seq-edit-archived");
+    init(&d);
+    create(&d, "Old", "T", &["S"], &[]);
+    create(&d, "New", "T", &["S"], &[]);
+    assert!(
+        run(&d, &["ui-mockup", "archive", "MOCK-001"])
+            .status
+            .success()
+    );
+    let out = run(
+        &d,
+        &[
+            "ui-mockup",
+            "edit",
+            "MOCK-001",
+            "--superseded-by",
+            "MOCK-002",
+        ],
+    );
+    assert!(out.status.success(), "{}", stderr(&out));
+    let archived = fs::read_to_string(archived_record(&d, "MOCK-001")).unwrap();
+    assert!(archived.contains("<p>Superseded by: MOCK-002</p>"));
+    assert!(!record(&d, "MOCK-001").exists());
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn destination_write_failure_keeps_source_intact() {
+    // archive
+    let d = tmpdir("dw-archive");
+    init(&d);
+    create(&d, "Old", "T", &["S"], &[]);
+    let before = fs::read(record(&d, "MOCK-001")).unwrap();
+    fs::create_dir_all(archived_record(&d, "MOCK-001")).unwrap();
+    let out = run(&d, &["ui-mockup", "archive", "MOCK-001"]);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(fs::read(record(&d, "MOCK-001")).unwrap(), before);
+    assert!(archived_record(&d, "MOCK-001").is_dir());
+    assert_no_temp_files(&mockups_dir(&d).join("archived"));
+    let _ = fs::remove_dir_all(&d);
+
+    // supersede
+    let d = tmpdir("dw-supersede");
+    init(&d);
+    create(&d, "Old", "T", &["S"], &[]);
+    create(&d, "New", "T", &["S"], &[]);
+    let before = fs::read(record(&d, "MOCK-001")).unwrap();
+    fs::create_dir_all(archived_record(&d, "MOCK-001")).unwrap();
+    let out = run(&d, &["ui-mockup", "supersede", "MOCK-001", "MOCK-002"]);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(fs::read(record(&d, "MOCK-001")).unwrap(), before);
+    assert_no_temp_files(&mockups_dir(&d).join("archived"));
+    let _ = fs::remove_dir_all(&d);
+
+    // edit with --superseded-by
+    let d = tmpdir("dw-edit");
+    init(&d);
+    create(&d, "Old", "T", &["S"], &[]);
+    create(&d, "New", "T", &["S"], &[]);
+    let before = fs::read(record(&d, "MOCK-001")).unwrap();
+    fs::create_dir_all(archived_record(&d, "MOCK-001")).unwrap();
+    let out = run(
+        &d,
+        &[
+            "ui-mockup",
+            "edit",
+            "MOCK-001",
+            "--superseded-by",
+            "MOCK-002",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(fs::read(record(&d, "MOCK-001")).unwrap(), before);
+    assert_no_temp_files(&mockups_dir(&d).join("archived"));
+    let _ = fs::remove_dir_all(&d);
+
+    // delete (archive-first step fails, so nothing is removed)
+    let d = tmpdir("dw-delete");
+    init(&d);
+    create(&d, "Old", "T", &["S"], &[]);
+    let before = fs::read(record(&d, "MOCK-001")).unwrap();
+    fs::create_dir_all(archived_record(&d, "MOCK-001")).unwrap();
+    let out = run(&d, &["ui-mockup", "delete", "MOCK-001", "--force"]);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(fs::read(record(&d, "MOCK-001")).unwrap(), before);
+    assert_no_temp_files(&mockups_dir(&d).join("archived"));
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[cfg(unix)]
+fn permission_bits_are_enforced(probe: &std::path::Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = probe.join("ro-probe");
+    fs::create_dir_all(&dir).unwrap();
+    let mut perms = fs::metadata(&dir).unwrap().permissions();
+    perms.set_mode(0o555);
+    fs::set_permissions(&dir, perms).unwrap();
+    let enforced = fs::write(dir.join("blocked"), b"x").is_err();
+    let mut perms = fs::metadata(&dir).unwrap().permissions();
+    perms.set_mode(0o755);
+    fs::set_permissions(&dir, perms).unwrap();
+    let _ = fs::remove_dir_all(&dir);
+    enforced
+}
+
+#[cfg(unix)]
+fn set_mode(path: &std::path::Path, mode: u32) {
+    use std::os::unix::fs::PermissionsExt;
+    let mut perms = fs::metadata(path).unwrap().permissions();
+    perms.set_mode(mode);
+    fs::set_permissions(path, perms).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn unlink_failure_keeps_both_copies_and_names_both_paths() {
+    let probe = tmpdir("ul-probe");
+    if !permission_bits_are_enforced(&probe) {
+        println!(
+            "SKIP unlink-failure test: permission bits are not enforced (privileged/root run)"
+        );
+        let _ = fs::remove_dir_all(&probe);
+        return;
+    }
+    let _ = fs::remove_dir_all(&probe);
+
+    // archive
+    let d = tmpdir("ul-archive");
+    init(&d);
+    create(&d, "Old", "T", &["S"], &[]);
+    let source = record(&d, "MOCK-001");
+    let dest = archived_record(&d, "MOCK-001");
+    let before = fs::read(&source).unwrap();
+    let active_dir = mockups_dir(&d);
+    fs::create_dir_all(active_dir.join("archived")).unwrap();
+    set_mode(&active_dir, 0o555);
+    let out = run(&d, &["ui-mockup", "archive", "MOCK-001"]);
+    set_mode(&active_dir, 0o755);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    let err = stderr(&out);
+    assert!(
+        err.contains(&fs::canonicalize(&source).unwrap().display().to_string()),
+        "stderr must name the source: {}",
+        err
+    );
+    assert!(
+        err.contains(&fs::canonicalize(&dest).unwrap().display().to_string()),
+        "stderr must name the destination: {}",
+        err
+    );
+    assert_eq!(fs::read(&source).unwrap(), before);
+    assert!(
+        fs::read_to_string(&source)
+            .unwrap()
+            .contains("<!-- status: pending -->")
+    );
+    assert!(
+        fs::read_to_string(&dest)
+            .unwrap()
+            .contains("<!-- status: archived -->")
+    );
+    assert_no_temp_files(&active_dir.join("archived"));
+    let _ = fs::remove_dir_all(&d);
+
+    // supersede
+    let d = tmpdir("ul-supersede");
+    init(&d);
+    create(&d, "Old", "T", &["S"], &[]);
+    create(&d, "New", "T", &["S"], &[]);
+    let source = record(&d, "MOCK-001");
+    let dest = archived_record(&d, "MOCK-001");
+    let before = fs::read(&source).unwrap();
+    let active_dir = mockups_dir(&d);
+    fs::create_dir_all(active_dir.join("archived")).unwrap();
+    set_mode(&active_dir, 0o555);
+    let out = run(&d, &["ui-mockup", "supersede", "MOCK-001", "MOCK-002"]);
+    set_mode(&active_dir, 0o755);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    let err = stderr(&out);
+    assert!(
+        err.contains(&fs::canonicalize(&source).unwrap().display().to_string()),
+        "stderr must name the source: {}",
+        err
+    );
+    assert!(
+        err.contains(&fs::canonicalize(&dest).unwrap().display().to_string()),
+        "stderr must name the destination: {}",
+        err
+    );
+    assert_eq!(fs::read(&source).unwrap(), before);
+    let archived = fs::read_to_string(&dest).unwrap();
+    assert!(archived.contains("<!-- status: archived -->"));
+    assert!(archived.contains("<p>Superseded by: MOCK-002</p>"));
+    assert_no_temp_files(&active_dir.join("archived"));
+    let _ = fs::remove_dir_all(&d);
+
+    // edit with --superseded-by
+    let d = tmpdir("ul-edit");
+    init(&d);
+    create(&d, "Old", "T", &["S"], &[]);
+    create(&d, "New", "T", &["S"], &[]);
+    let source = record(&d, "MOCK-001");
+    let dest = archived_record(&d, "MOCK-001");
+    let before = fs::read(&source).unwrap();
+    let active_dir = mockups_dir(&d);
+    fs::create_dir_all(active_dir.join("archived")).unwrap();
+    set_mode(&active_dir, 0o555);
+    let out = run(
+        &d,
+        &[
+            "ui-mockup",
+            "edit",
+            "MOCK-001",
+            "--superseded-by",
+            "MOCK-002",
+        ],
+    );
+    set_mode(&active_dir, 0o755);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    let err = stderr(&out);
+    assert!(
+        err.contains(&fs::canonicalize(&source).unwrap().display().to_string()),
+        "stderr must name the source: {}",
+        err
+    );
+    assert!(
+        err.contains(&fs::canonicalize(&dest).unwrap().display().to_string()),
+        "stderr must name the destination: {}",
+        err
+    );
+    assert_eq!(fs::read(&source).unwrap(), before);
+    let archived = fs::read_to_string(&dest).unwrap();
+    assert!(archived.contains("<p>Superseded by: MOCK-002</p>"));
+    assert_no_temp_files(&active_dir.join("archived"));
+    let _ = fs::remove_dir_all(&d);
+
+    // delete --force (archive step fails, nothing is removed)
+    let d = tmpdir("ul-delete");
+    init(&d);
+    create(&d, "Old", "T", &["S"], &[]);
+    let source = record(&d, "MOCK-001");
+    let dest = archived_record(&d, "MOCK-001");
+    let before = fs::read(&source).unwrap();
+    let active_dir = mockups_dir(&d);
+    fs::create_dir_all(active_dir.join("archived")).unwrap();
+    set_mode(&active_dir, 0o555);
+    let out = run(&d, &["ui-mockup", "delete", "MOCK-001", "--force"]);
+    set_mode(&active_dir, 0o755);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    let err = stderr(&out);
+    assert!(
+        err.contains(&fs::canonicalize(&source).unwrap().display().to_string()),
+        "stderr must name the source: {}",
+        err
+    );
+    assert!(
+        err.contains(&fs::canonicalize(&dest).unwrap().display().to_string()),
+        "stderr must name the destination: {}",
+        err
+    );
+    assert_eq!(fs::read(&source).unwrap(), before);
+    assert!(dest.exists(), "archive wrote the destination before unlink");
+    assert_no_temp_files(&active_dir.join("archived"));
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn archive_of_archived_mockup_is_a_noop_success() {
+    let d = tmpdir("noop");
+    init(&d);
+    create(&d, "Already archived", "T", &["S"], &[]);
+    assert!(
+        run(&d, &["ui-mockup", "archive", "MOCK-001"])
+            .status
+            .success()
+    );
+
+    let path = archived_record(&d, "MOCK-001");
+    let before = fs::read(&path).unwrap();
+    let before_mtime = fs::metadata(&path).unwrap().modified().unwrap();
+
+    let out = run(&d, &["--json", "ui-mockup", "archive", "MOCK-001"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    let value: serde_json::Value = serde_json::from_str(stdout(&out).trim()).unwrap();
+    assert_eq!(value["status"], "ok");
+    assert_eq!(value["id"], "MOCK-001");
+
+    assert_eq!(fs::read(&path).unwrap(), before);
+    assert_eq!(
+        fs::metadata(&path).unwrap().modified().unwrap(),
+        before_mtime,
+        "no-op archive must not change the modification time"
+    );
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn delete_removes_only_the_archived_copy() {
+    // active delete: archive first, then remove the archived copy.
+    let d = tmpdir("del-active");
+    init(&d);
+    create(&d, "Active", "T", &["S"], &[]);
+    let out = run(&d, &["ui-mockup", "delete", "MOCK-001", "--force"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(!record(&d, "MOCK-001").exists());
+    assert!(!archived_record(&d, "MOCK-001").exists());
+    let _ = fs::remove_dir_all(&d);
+
+    // archived delete removes only the archived copy.
+    let d = tmpdir("del-archived");
+    init(&d);
+    create(&d, "Archived", "T", &["S"], &[]);
+    assert!(
+        run(&d, &["ui-mockup", "archive", "MOCK-001"])
+            .status
+            .success()
+    );
+    let out = run(&d, &["ui-mockup", "delete", "MOCK-001", "--force"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(!archived_record(&d, "MOCK-001").exists());
+    assert!(!record(&d, "MOCK-001").exists());
+    let _ = fs::remove_dir_all(&d);
+
+    // unknown id stays not-found.
+    let d = tmpdir("del-unknown");
+    init(&d);
+    let out = run(&d, &["ui-mockup", "delete", "MOCK-404", "--force"]);
+    assert_eq!(out.status.code(), Some(3), "{}", stderr(&out));
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn source_guard_uses_only_the_shared_archive_sequence() {
+    let source = include_str!("../src/ui_mockup.rs");
+    let forbidden_move = concat!("move_", "record");
+    let forbidden_rename = concat!("fs::", "rename");
+    assert!(
+        !source.contains(forbidden_move),
+        "src/ui_mockup.rs must not call the move-then-write helper"
+    );
+    assert!(
+        !source.contains(forbidden_rename),
+        "src/ui_mockup.rs must not rename record files directly"
+    );
+    assert!(
+        source.contains("archive_content"),
+        "src/ui_mockup.rs must route moves through the shared archive sequence"
+    );
+}

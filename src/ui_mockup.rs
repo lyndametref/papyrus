@@ -631,20 +631,12 @@ fn edit(
     }
 
     let destination = if move_to_archived {
-        ensure_dirs(&archived)?;
         archived.join(format!("{}.html", id))
     } else {
         path.clone()
     };
     let safe_dest = Context::ensure_within(&ctx.project_dir, &destination)?;
-
-    if move_to_archived && path != safe_dest {
-        crate::record::store::move_record(ctx, &path, &safe_dest)?;
-    }
-
-    let new_content = render_record(&record);
-    crate::record::store::write_atomic(ctx, &safe_dest, &new_content)
-        .map_err(|e| AppError::Runtime(e.to_string()))?;
+    write_archived(ctx, &path, &safe_dest, &record)?;
 
     if let Some(command) = editor_cmd {
         run_editor(&command, &safe_dest)?;
@@ -661,64 +653,74 @@ fn edit(
     })
 }
 
+fn ok_output(ctx: &Context, id: &str) -> CommandOutput {
+    let json = if ctx.json {
+        Some(serde_json::json!({"status": "ok", "id": id}))
+    } else {
+        None
+    };
+    CommandOutput {
+        text: String::new(),
+        json,
+    }
+}
+
+/// Render the archived form of a record, then write the destination and remove
+/// the source. The destination is written first (ADR-0022 decision 2), so a
+/// failed write leaves the source untouched and an interrupted run never loses
+/// content. When source and destination coincide (already archived), a single
+/// in-place write is used and nothing is unlinked.
+fn write_archived(
+    ctx: &Context,
+    source: &Path,
+    destination: &Path,
+    record: &Mockup,
+) -> Result<(), AppError> {
+    let rendered = render_record(record);
+    let safe_dest = Context::ensure_within(&ctx.project_dir, destination)?;
+    let source = Context::ensure_within(&ctx.project_dir, source)?;
+    if source == safe_dest {
+        crate::record::store::write_atomic(ctx, &safe_dest, &rendered)
+            .map_err(|e| AppError::Runtime(e.to_string()))?;
+    } else {
+        crate::record::store::archive_content(ctx, &source, &safe_dest, &rendered)?;
+    }
+    Ok(())
+}
+
 fn archive(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<CommandOutput, AppError> {
     let id = sanitize_field(id_raw)?;
     let active = scope.active.clone();
     let archived = scope.archived.clone();
 
     let Some(path) = find_record(ctx, &active, &id)? else {
+        // Already archived: no read, no write, no modification-time change.
         if find_record(ctx, &archived, &id)?.is_some() {
-            let json = if ctx.json {
-                Some(serde_json::json!({"status":"ok","id":id}))
-            } else {
-                None
-            };
-            return Ok(CommandOutput {
-                text: String::new(),
-                json,
-            });
+            return Ok(ok_output(ctx, &id));
         }
         return Err(AppError::NotFound(format!("not found: {}", id)));
     };
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
-    let record = parse_record(&content, &id);
+    let mut record = parse_record(&content, &id);
     if record.superseded_by.is_some() {
         return Err(AppError::Validation(format!(
             "status transitions blocked for superseded mockup: {}",
             id
         )));
     }
+    record.status = "archived".to_string();
 
-    ensure_dirs(&archived)?;
     let file_name = path
         .file_name()
+        .and_then(|name| name.to_str())
         .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?;
     let destination = archived.join(file_name);
-    let safe_dest = Context::ensure_within(&ctx.project_dir, &destination)?;
+    write_archived(ctx, &path, &destination, &record)?;
 
-    crate::record::store::move_record(ctx, &path, &safe_dest)?;
-
-    let content = fs::read_to_string(&safe_dest).map_err(|e| AppError::Runtime(e.to_string()))?;
-    let mut record = parse_record(&content, &id);
-    if record.id.is_empty() {
-        record.id = id.clone();
-    }
-    record.status = "archived".to_string();
-    let new_content = render_record(&record);
-    crate::record::store::write_atomic(ctx, &safe_dest, &new_content)
-        .map_err(|e| AppError::Runtime(e.to_string()))?;
-
-    let json = if ctx.json {
-        Some(serde_json::json!({"status": "ok", "id": id}))
-    } else {
-        None
-    };
-    Ok(CommandOutput {
-        text: String::new(),
-        json,
-    })
+    Ok(ok_output(ctx, &id))
 }
+
 pub fn delete(
     ctx: &Context,
     scope: &DocumentScope,
@@ -729,11 +731,15 @@ pub fn delete(
     let active = scope.active.clone();
     let archived = scope.archived.clone();
 
-    // if active, archive first
-    if find_record(ctx, &active, &id)?.is_some() {
-        archive(ctx, scope, &id)?;
-    } else if find_record(ctx, &archived, &id)?.is_none() {
+    let is_active = find_record(ctx, &active, &id)?.is_some();
+    if !is_active && find_record(ctx, &archived, &id)?.is_none() {
         return Err(AppError::NotFound(format!("not found: {}", id)));
+    }
+
+    // An active mockup is archived first; the active file is never unlinked
+    // directly. A failed archive step removes nothing.
+    if is_active {
+        archive(ctx, scope, &id)?;
     }
 
     if !force {
@@ -758,25 +764,12 @@ pub fn delete(
         }
     }
 
-    // remove file from whichever folder
-    let path = if find_record(ctx, &active, &id)?.is_some() {
-        active.join(format!("{}.html", id))
-    } else {
-        archived.join(format!("{}.html", id))
-    };
-    let safe = Context::ensure_within(&ctx.project_dir, &path)?;
-    if safe.exists() {
-        fs::remove_file(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
-    }
-    let json = if ctx.json {
-        Some(serde_json::json!({"status":"ok","id":id}))
-    } else {
-        None
-    };
-    Ok(CommandOutput {
-        text: String::new(),
-        json,
-    })
+    // Only a resolved archived path is ever removed.
+    let path = find_record(ctx, &archived, &id)?.ok_or_else(|| {
+        AppError::Runtime(format!("archived record not found after archive: {}", id))
+    })?;
+    fs::remove_file(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    Ok(ok_output(ctx, &id))
 }
 
 pub fn supersede(
@@ -796,7 +789,8 @@ pub fn supersede(
     let active = scope.active.clone();
     let archived = scope.archived.clone();
     let _ = resolve_record(ctx, &active, &archived, &new)?;
-    // archive old with superseded_by set
+    // Archive old with the superseded_by back-reference already present in the
+    // destination before the active source is unlinked.
     let old_path = resolve_record(ctx, &active, &archived, &old)?;
     let content = fs::read_to_string(&old_path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let mut record = parse_record(&content, &old);
@@ -811,24 +805,9 @@ pub fn supersede(
     }
     record.status = "archived".to_string();
     record.superseded_by = Some(new.clone());
-    ensure_dirs(&archived)?;
-    let dest = archived.join(format!("{}.html", old));
-    let safe_dest = Context::ensure_within(&ctx.project_dir, &dest)?;
-    if old_path != safe_dest {
-        crate::record::store::move_record(ctx, &old_path, &safe_dest)?;
-    }
-    let new_content = render_record(&record);
-    crate::record::store::write_atomic(ctx, &safe_dest, &new_content)
-        .map_err(|e| AppError::Runtime(e.to_string()))?;
-    let json = if ctx.json {
-        Some(serde_json::json!({"status":"ok","id":old}))
-    } else {
-        None
-    };
-    Ok(CommandOutput {
-        text: String::new(),
-        json,
-    })
+    let destination = archived.join(format!("{}.html", old));
+    write_archived(ctx, &old_path, &destination, &record)?;
+    Ok(ok_output(ctx, &old))
 }
 
 #[cfg(test)]
