@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-14 by owner decision (decision 3 revision note and decision 12) without status change.
+Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-14 by owner decision (decision 3 revision note and decision 12) without status change; amended 2026-11-15 by owner decision (milestone lifecycle) without status change.
 
 ## Date
 
@@ -53,7 +53,9 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
 
    Custom statuses therefore never enter the archive logic: an active record with a custom status is indistinguishable from an `active` record for storage, listing, archiving, and deletion.
 
-5. **There is no restore for documents.** `record::store` loses its document restore operation, every document descriptor loses the `restore` verb, and no CLI, browser, or API path can move an archived document back. Only tasks and milestones keep archive/restore, because REQ-01.005 still requires their IDs to survive an archive/restore cycle.
+5. **There is no restore for documents.** `record::store` loses its document restore operation, every document descriptor loses the `restore` verb, and no CLI, browser, or API path can move an archived document back. Only tasks keep archive/restore, because REQ-01.005 requires task IDs to survive that cycle.
+
+   *Revision (2026-11-15, owner decision): milestones no longer keep archive/restore. The milestone lifecycle is fixed to `open -> closed` by `papyrus milestone close <id>`; the archive and restore verbs and the milestone archive location are removed. Only tasks keep archive/restore, because REQ-01.005 requires task IDs to survive that cycle. `close` writes `status` and `updated_date` in place and does not move the record.*
 
 6. **`archived/` is the only recognized inactive location.** Directory resolution gains `resolve_archived_directory`; `resolve_deprecated_directory` and every read alias for `deprecated/` are deleted. A `deprecated/` folder is therefore invisible to listing, view, search, and the browser, exactly as REQ-05.007 states, and is never migrated, moved, or rewritten. Its files remain on disk until a human moves them. Orphaned `deprecated/` folders stay inert: no inventory, listing, or migration command is provided (decision 12).
 
