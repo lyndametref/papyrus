@@ -1105,4 +1105,27 @@ mod native_layout_tests {
             matches!(resolve_milestone_entry(&c, &Config::default(), "MS-005"), Some(found) if found == path)
         );
     }
+
+    #[test]
+    fn read_import_archive_milestone_is_readable_and_reserves_its_number() {
+        let dir = tmpdir("read-import-archive");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
+        fs::create_dir_all(dir.join("backlog/archive/milestones")).unwrap();
+        let path = dir.join("backlog/archive/milestones/MS-005.md");
+        fs::write(&path, record("MS-005", "Five")).unwrap();
+
+        let out = view(&c, "MS-005").unwrap();
+        assert!(out.text.contains("MS-005"), "got: {}", out.text);
+        assert!(
+            matches!(resolve_milestone_entry(&c, &Config::default(), "MS-005"), Some(found) if found == path),
+            "the read/import archive folder must stay resolvable"
+        );
+
+        let created = create(&c, "Six", None, None, &[], &[]).unwrap();
+        assert_eq!(
+            created, "MS-006",
+            "ID allocation must observe the read/import archive folder"
+        );
+    }
 }

@@ -495,6 +495,18 @@ pub fn relocate_if_archived(ctx: &Context, path: &Path) -> Result<PathBuf, Reloc
     let archived_dir = match desc.resolve_archived_directory(&cfg, &ctx.project_dir) {
         Some(Ok(dir)) => dir,
         Some(Err(e)) => return Err(RelocateError::Other(e)),
+        None if desc.record_type == "milestone" => {
+            // Milestones have no lifecycle archive location (ADR-0017
+            // constraint 3, ADR-0023 decisions 2 and 4). A stored `archived`
+            // value is outside the milestone vocabulary, so preserve the
+            // record in place and report the condition instead of moving it or
+            // creating a folder.
+            eprintln!(
+                "warning: milestone has legacy status 'archived'; leaving record in place: {}",
+                safe.display()
+            );
+            return Ok(safe);
+        }
         None => {
             return Err(RelocateError::Other(AppError::Validation(format!(
                 "record type {} has no archived location",
@@ -916,6 +928,40 @@ mod tests {
         let tok = version_token(&meta);
         let parts: Vec<&str> = tok.split('.').collect();
         assert_eq!(parts.len(), 3);
+    }
+
+    #[test]
+    fn archived_milestone_in_active_folder_is_preserved_by_read_paths() {
+        let dir = tmpdir("milestone-archived-preserved");
+        let c = ctx(&dir);
+        fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
+        let path = dir.join("backlog/milestones/MS-001.md");
+        let content = "---\nid: MS-001\ntitle: Legacy\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\nstatus: archived\n---\n\n## Description\n\nBody\n";
+        fs::write(&path, content).unwrap();
+
+        let desc = crate::record::descriptor::descriptor_for("milestone").expect("milestone");
+        let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir)
+            .unwrap_or_default();
+        let read_dirs = desc.resolve_read_directories(&cfg, &c.project_dir);
+        let prefixes = desc.configured_prefixes(&cfg);
+        let resolved =
+            crate::record::resolve::resolve_in_dirs(&c, &read_dirs, "MS-001", &prefixes, false)
+                .expect("read path succeeds")
+                .expect("milestone resolves");
+        assert_eq!(
+            resolved.path, path,
+            "the record must stay in the active folder"
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), content);
+        assert!(
+            !dir.join("backlog/archive/milestones").exists(),
+            "a read path must not create the milestone archive folder"
+        );
+
+        let after = relocate_if_archived(&c, &path).expect("read-path relocation is a no-op");
+        assert_eq!(after, path);
+        assert_eq!(fs::read_to_string(&path).unwrap(), content);
+        assert!(!dir.join("backlog/archive/milestones").exists());
     }
 
     #[test]

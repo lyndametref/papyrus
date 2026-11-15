@@ -3,7 +3,7 @@ id: doc-1
 title: Papyrus Feature Roadmap
 type: specification
 created_date: '2026-11-04T19:22:00Z'
-updated_date: '2026-11-15T11:30:00Z'
+updated_date: '2026-11-15T14:01:00Z'
 ---
 # Papyrus Feature Roadmap
 
@@ -30,6 +30,7 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 
 - m-18: Registry Consolidation and Release Close - follow-ups from the m-17 architecture checkpoint and TASK-117 verification; seven tasks TASK-118 to TASK-124, ordinals 41200-41260. Closes the release-blocking `papyrus release close` gap G-5, refactors the two ADR-0016/0017 deviations in code (descriptor-driven typed dispatch through `document::run`, registry-based record descriptor resolution) and removes the process-global descriptor cache and slug leaks, then clears G-4 and F-117-1 and adds init/registry and archive-terminology drift guards. Every dependency is inside m-18; no release milestone or release ticket is created.
 - m-19: Architecture Checkpoint Follow-ups: Mockup Archive and ADR Alignment - owner decisions of 2026-11-15 on the m-18 architecture checkpoint: fix the UI-mockup archive ordering in code, amend ADR-0016/0017/0018/0023 instead of refactoring built-ins, and plan every follow-up. Five tasks TASK-125 to TASK-129, ordinals 41300-41340: TASK-125 routes mockup archive, supersede, and edit-with-move through `record::store::archive_content`; TASK-126 amends the four ADRs and regenerates the ADR index; TASK-127 corrects the browser and init specifications; TASK-128 aligns the domain model and glossary and removes the empty legacy `deprecated/` folders; TASK-129 adds C0/DEL/C1 parity to the path sanitizers. Every dependency is inside m-19; no release milestone or release ticket is created.
+- m-20: Milestone Lifecycle Drift Follow-ups - follow-up to m-19 after the m-19 architecture checkpoint found residual milestone drift: ADR-0017 constraint 3 and ADR-0023 decision 2 already record the close-only lifecycle, but the descriptor/record layer and two documents still describe an archived milestone. Three tasks TASK-134 to TASK-136, ordinals 41400-41420: TASK-134 sets `ArchivePolicy::None` for the milestone template, removes the lifecycle archive location from `RecordDescriptor::resolve_archived_directory`, preserves legacy reads and the import write to `backlog/archive/milestones/`, and stops `relocate_if_archived` from moving an `archived` milestone; TASK-135 rewrites the REQ-06.013 archived-milestone clauses and regenerates the business requirement index; TASK-136 corrects `docs/specifications/milestone-and-release-management.md` to the close-only lifecycle and records the superseded wording. TASK-135 and TASK-136 follow TASK-134; every dependency is inside m-20; no release milestone or release ticket is created.
 
 ## Removed
 
@@ -62,6 +63,7 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 
 - m-18 all seven tasks depend only on tasks inside m-18; TASK-118, TASK-119, TASK-122, and TASK-123 have no dependency, TASK-120 follows TASK-119, TASK-121 and TASK-124 follow TASK-120. No m-18 task depends on m-14, m-16, m-17, or a later milestone.
 - m-19 TASK-125, TASK-126, and TASK-129 have no dependency; TASK-127 and TASK-128 follow TASK-126. All dependencies are inside m-19; no m-19 task depends on m-14, m-16, m-17, m-18, or a later milestone.
+- m-20 TASK-134 has no dependency; TASK-135 and TASK-136 follow TASK-134 so the corrected requirement and specification record the landed contract. All dependencies are inside m-20; no m-20 task depends on m-14, m-16, m-17, m-18, m-19, or a later milestone.
 
 ## Requirement coverage
 
@@ -353,3 +355,46 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 
 - Release vehicle: whether the m-17/m-18/m-19 work ships as Release 1.1 or folds into an open release remains an owner decision. No release ticket exists to record it.
 - ADR-0021 and the NFR-03.003 man-page gap remain deferred; no task in m-19 claims man-page compliance.
+
+## Planning update (2026-11-15) - m-19 architecture checkpoint follow-ups
+
+- Inputs: m-19 is Done. Its architecture checkpoint found residual milestone drift: the ADRs amended by TASK-132 are correct, but the descriptor/record layer and two documents still describe an archived milestone. No new requirement is introduced; this is a correction and planning update.
+- Roadmap entry: **Milestone Lifecycle Drift Follow-ups**, one correction increment after m-19. Source references: ADR-0017 constraint 3, ADR-0023 decision 2, ADR-0022 decision 5, REQ-03.001, REQ-06.013.
+- Milestone decision: new **m-20 Milestone Lifecycle Drift Follow-ups**. m-19 is Done and is not reopened; the work spans code, a requirement, and a specification page.
+- Release coupling: no release milestone and no release ticket are created. The release vehicle for the m-17/m-18/m-19/m-20 work remains an owner decision.
+
+### Task order
+
+| Ordinal | Task | Priority | Depends on | Assignee |
+|---|---|---|---|---|
+| 41400 | TASK-134 Align the milestone descriptor and record layer with the close-only milestone lifecycle | High | - | rust-dev |
+| 41410 | TASK-135 Rewrite REQ-06.013 archived-milestone clauses to the close-only milestone lifecycle | Medium | TASK-134 | requirements-engineer |
+| 41420 | TASK-136 Correct the milestone and release specification to the close-only milestone lifecycle | Medium | TASK-134 | business-analyst |
+
+### Ordering rationale
+
+- Dependencies first. TASK-135 and TASK-136 record the contract that TASK-134 makes true, following the m-19 pattern of documents after the authority they describe; no other dependency exists.
+- User priority among ready tasks. The owner set the code correction High and the two document corrections Medium, so TASK-134 runs first and the two Medium tasks follow it.
+- No unusable increment. TASK-134 alone prevents the invalid milestone auto-archive and keeps every legacy read path; the documents then describe the delivered contract rather than a pending one.
+- Reviewable split. Code, requirement text, and specification text are separate ownership areas and separate reviews; no task mixes them.
+
+### Parallel work
+
+- TASK-134 is the first and only initially eligible task.
+- TASK-135 and TASK-136 become eligible together after TASK-134 and touch disjoint documents, so they can run in parallel.
+
+### Coverage
+
+- ADR-0017 constraint 3, ADR-0023 decision 2, ADR-0022 decision 5, REQ-03.001 - TASK-134 (descriptor `ArchivePolicy::None`, no lifecycle archive location, legacy read/import preservation, relocation guard, regression test).
+- REQ-06.013 - TASK-135 (browser board wording and business requirement index); REQ-03.001 is added to its traceability.
+- REQ-03.001, REQ-03.002 - TASK-136 (milestone and release specification correction).
+
+### Accepted and deferred items
+
+- No new milestone feature, verb, configuration key, or record type is introduced; `archived` remains legacy data only.
+- No legacy archived milestone file is migrated or deleted; it stays readable, editable, and deletable in place.
+- The release vehicle for m-17 through m-20 remains an owner decision; no release ticket exists to record it.
+
+### Open questions
+
+- Release vehicle: whether m-17, m-18, m-19, and m-20 ship as Release 1.1 or fold into an open release remains an owner decision.

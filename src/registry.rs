@@ -2124,7 +2124,11 @@ const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
         content: ContentModel::Typed(&MILESTONE_SCHEMA),
         frontmatter_status: Some("status"),
         frontmatter_extra: &["release"],
-        archive: FRONTMATTER_ARCHIVE,
+        // The milestone lifecycle is `open -> closed` in place (ADR-0017
+        // constraint 3, ADR-0022 decision 5). The legacy milestone archive
+        // folder under the backlog directory is a read/import location only
+        // (ADR-0023 decisions 2 and 4).
+        archive: ArchivePolicy::None,
         create_options: NO_CREATE_OPTIONS,
         record: None,
     },
@@ -3503,7 +3507,8 @@ mod tests {
         );
         assert_eq!(
             registry.descriptor("milestone").unwrap().archive_policy,
-            FRONTMATTER_ARCHIVE
+            ArchivePolicy::None,
+            "milestones are closed in place; the legacy archive folder is read/import-only"
         );
         assert_eq!(
             registry.descriptor("release").unwrap().archive_policy,
