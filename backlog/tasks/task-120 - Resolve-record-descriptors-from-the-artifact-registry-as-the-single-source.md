@@ -1,11 +1,11 @@
 ---
 id: TASK-120
 title: Resolve record descriptors from the artifact registry as the single source
-status: Refined
+status: Done
 assignee:
   - rust-dev
 created_date: '2026-11-14T20:30:00Z'
-updated_date: '2026-11-14T22:14:00Z'
+updated_date: '2026-11-15T09:46:00Z'
 labels:
   - rust
   - refactor
@@ -67,24 +67,24 @@ ordinal: 41220
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No production call site uses `record::descriptor::descriptor_for_doc_type`; the function is removed. The nine typed modules (`requirement`/req+nfr, `glossary`, `rule`, `ui_spec`, `audit`, `tech_spec`, `use_case`, `test_case`, `test_report`), `src/document.rs`, `src/init.rs`, and `src/record/migrate.rs` obtain a document type record descriptor from `ArtifactRegistry::record_descriptor`; `rg descriptor_for_doc_type src/` returns no matches.
-- [ ] #2 `record_descriptor_for` is deleted from `src/document.rs`; `document::run` resolves the record once through the registry and passes it to generic and typed handlers. `generic_document_descriptor` remains only as the registry-backed constructor for config-defined types and is not called by a module that has a registry.
-- [ ] #3 Registry descriptors carry or derive every record-level field a typed module consumes: record name/type, type name, label, display ID pattern, directory, subpath, doc-type key, front-matter keys, and sections. The field-source matrix in the specification is implemented, and `src/record/descriptor.rs` keeps no document entry or per-slug literal parallel to the registry.
-- [ ] #4 `record::descriptor::DESCRIPTORS` contains only the four backlog families (task, milestone, release, decision); no entry has `doc_type_key.is_some()`. The registry test asserts totality (every document descriptor has a record), field agreement, and absence of a parallel document table, rather than comparing two independent tables.
-- [ ] #5 Existing behavior is preserved: native/archived reads, inert `deprecated/` folders (not read, scanned, or migrated), files without front matter, disabled types, migration outcomes, CLI text/JSON/exit codes, and search/browser results are unchanged. `tests/migrate_records_cli.rs`, `tests/release_native_layout_smoke.rs`, `tests/document_type_no_drift.rs`, `tests/no_drift.rs`, the typed CLI suites, and the search/browser suites pass.
-- [ ] #6 A test declares a config-defined generic type (for example `note`) and asserts that it and a built-in typed type (for example `glossary`) both resolve their own record fields through `ArtifactRegistry::record_descriptor`: doc-type key, prefix, directory, status front-matter key, and sections.
-- [ ] #7 `src/init.rs` creates document-type directories from enabled registry document descriptors, and `src/record/migrate.rs` iterates the four backlog descriptors plus registry document records in `managed_descriptor` and `migrate_corpus`. `src/ui_mockup.rs` is unchanged and keeps the `ContentModel::HtmlMockup` archive/delete exception.
-- [ ] #8 `cargo build`, the full `cargo test`, and `cargo clippy --all-targets -- -D warnings` pass. No dependency, configuration key, command, verb, status, record layout, or user-visible behavior is added or removed; ADR-0016/0017 and existing specifications are unedited.
+- [x] #1 No production call site uses `record::descriptor::descriptor_for_doc_type`; the function is removed. The nine typed modules (`requirement`/req+nfr, `glossary`, `rule`, `ui_spec`, `audit`, `tech_spec`, `use_case`, `test_case`, `test_report`), `src/document.rs`, `src/init.rs`, and `src/record/migrate.rs` obtain a document type record descriptor from `ArtifactRegistry::record_descriptor`; `rg descriptor_for_doc_type src/` returns no matches.
+- [x] #2 `record_descriptor_for` is deleted from `src/document.rs`; `document::run` resolves the record once through the registry and passes it to generic and typed handlers. `generic_document_descriptor` remains only as the registry-backed constructor for config-defined types and is not called by a module that has a registry.
+- [x] #3 Registry descriptors carry or derive every record-level field a typed module consumes: record name/type, type name, label, display ID pattern, directory, subpath, doc-type key, front-matter keys, and sections. The field-source matrix in the specification is implemented, and `src/record/descriptor.rs` keeps no document entry or per-slug literal parallel to the registry.
+- [x] #4 `record::descriptor::DESCRIPTORS` contains only the four backlog families (task, milestone, release, decision); no entry has `doc_type_key.is_some()`. The registry test asserts totality (every document descriptor has a record), field agreement, and absence of a parallel document table, rather than comparing two independent tables.
+- [x] #5 Existing behavior is preserved: native/archived reads, inert `deprecated/` folders (not read, scanned, or migrated), files without front matter, disabled types, migration outcomes, CLI text/JSON/exit codes, and search/browser results are unchanged. `tests/migrate_records_cli.rs`, `tests/release_native_layout_smoke.rs`, `tests/document_type_no_drift.rs`, `tests/no_drift.rs`, the typed CLI suites, and the search/browser suites pass.
+- [x] #6 A test declares a config-defined generic type (for example `note`) and asserts that it and a built-in typed type (for example `glossary`) both resolve their own record fields through `ArtifactRegistry::record_descriptor`: doc-type key, prefix, directory, status front-matter key, and sections.
+- [x] #7 `src/init.rs` creates document-type directories from enabled registry document descriptors, and `src/record/migrate.rs` iterates the four backlog descriptors plus registry document records in `managed_descriptor` and `migrate_corpus`. `src/ui_mockup.rs` is unchanged and keeps the `ContentModel::HtmlMockup` archive/delete exception.
+- [x] #8 `cargo build`, the full `cargo test`, and `cargo clippy --all-targets -- -D warnings` pass. No dependency, configuration key, command, verb, status, record layout, or user-visible behavior is added or removed; ADR-0016/0017 and existing specifications are unedited.
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 `cargo build`, the full `cargo test`, and `cargo clippy --all-targets -- -D warnings` are clean.
-- [ ] #2 No new dependency, configuration key, command, verb, status, record layout, or user-visible behavior is introduced; ADR-0016/0017 and existing specifications are not edited.
-- [ ] #3 The final summary lists every replaced call site (file + function), every new `DescriptorTemplate` record field, the removed static document entries, the new registry accessor, and states that only `generic_document_descriptor` remains as a non-registry constructor pending TASK-121.
-- [ ] #4 `tests/document_type_no_drift.rs`, `tests/migrate_records_cli.rs`, `tests/release_native_layout_smoke.rs`, `tests/no_drift.rs`, and the new single-source invariant tests pass.
-- [ ] #5 `rg descriptor_for_doc_type src/` returns no matches and `record::descriptor::DESCRIPTORS` has exactly four entries, all without `doc_type_key`.
-- [ ] #6 `docs/specifications/registry-sourced-record-descriptors.md` matches the implemented field-source matrix and call-site migration; no requirement, business rule, or ADR is edited.
+- [x] #1 `cargo build`, the full `cargo test`, and `cargo clippy --all-targets -- -D warnings` are clean.
+- [x] #2 No new dependency, configuration key, command, verb, status, record layout, or user-visible behavior is introduced; ADR-0016/0017 and existing specifications are not edited.
+- [x] #3 The final summary lists every replaced call site (file + function), every new `DescriptorTemplate` record field, the removed static document entries, the new registry accessor, and states that only `generic_document_descriptor` remains as a non-registry constructor pending TASK-121.
+- [x] #4 `tests/document_type_no_drift.rs`, `tests/migrate_records_cli.rs`, `tests/release_native_layout_smoke.rs`, `tests/no_drift.rs`, and the new single-source invariant tests pass.
+- [x] #5 `rg descriptor_for_doc_type src/` returns no matches and `record::descriptor::DESCRIPTORS` has exactly four entries, all without `doc_type_key`.
+- [x] #6 `docs/specifications/registry-sourced-record-descriptors.md` matches the implemented field-source matrix and call-site migration; no requirement, business rule, or ADR is edited.
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -172,3 +172,9 @@ Replace `registry_agrees_with_record_descriptor_for_default_documents` with:
 
 List every replaced call site (file + function), the five new template fields, the removed static entries, the new accessor, the invariant tests, and confirm that only `generic_document_descriptor` remains as a non-registry record constructor pending TASK-121.
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Registry is now the single source of document record descriptors. TypeDescriptor.record plus DescriptorTemplate/RecordFacts (record_name, record_type, type_name, display_id_pattern, frontmatter_keys) feed ArtifactRegistry::record_descriptor; generic/config-defined types use generic_document_descriptor only as the registry-backed constructor (cache/leak removal is TASK-121). Deleted descriptor_for_doc_type and the ten static document entries (DESCRIPTORS is now the four backlog families, all doc_type_key None); migrated all 26 call sites in the nine typed modules plus document.rs, init.rs and record/migrate.rs. Behavior preserved: full suite 815 passed / 0 failed / 22 ignored, legacy no-front-matter adoption, inert deprecated/, disabled types, ui-mockup untouched, golden help unchanged. Added totality, field-agreement, no-parallel-table and built-in-vs-config parity tests plus D-12 no-drift guard.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -6,7 +6,7 @@ use crate::error::AppError;
 
 use std::fmt;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RecordDescriptor {
     pub name: &'static str,
     pub record_type: &'static str,
@@ -220,20 +220,6 @@ const TASK_SECTIONS: &[&str] = &["## Description", "## Acceptance Criteria", "##
 const MILESTONE_SECTIONS: &[&str] = &["## Description"];
 const RELEASE_SECTIONS: &[&str] = &["## Description"];
 const DECISION_SECTIONS: &[&str] = &["## Status", "## Decision", "## Context", "## Consequences"];
-const REQUIREMENT_SECTIONS: &[&str] = &["## User Story", "## Group", "## Description"];
-const GLOSSARY_SECTIONS: &[&str] = &["## Definition"];
-const UI_SPEC_SECTIONS: &[&str] = &["## View", "## Description"];
-const TECH_SPEC_SECTIONS: &[&str] = &["## Description"];
-const RULE_SECTIONS: &[&str] = &[
-    "## Description",
-    "## Rationale",
-    "## Applicability",
-    "## Requirements",
-];
-const AUDIT_SECTIONS: &[&str] = &["## Audit Type", "## Content"];
-const USE_CASE_SECTIONS: &[&str] = &["## Description", "## Applicability"];
-const TEST_CASE_SECTIONS: &[&str] = &["## Description", "## Applicability"];
-const TEST_REPORT_SECTIONS: &[&str] = &["## Description", "## Applicability"];
 
 pub const DESCRIPTORS: &[RecordDescriptor] = &[
     RecordDescriptor {
@@ -292,126 +278,6 @@ pub const DESCRIPTORS: &[RecordDescriptor] = &[
         frontmatter_keys: &["superseded_by"],
         sections: DECISION_SECTIONS,
     },
-    RecordDescriptor {
-        name: "business requirement",
-        record_type: "requirement",
-        type_name: "requirement",
-        label: "Business requirement",
-        display_id_pattern: "REQ-###.###",
-        directory: "doc",
-        subpath: "",
-        doc_type_key: Some("req"),
-        frontmatter_keys: &["status"],
-        sections: REQUIREMENT_SECTIONS,
-    },
-    RecordDescriptor {
-        name: "non-functional requirement",
-        record_type: "nfr",
-        type_name: "nfr",
-        label: "Non-functional requirement",
-        display_id_pattern: "NFR-###.###",
-        directory: "doc",
-        subpath: "",
-        doc_type_key: Some("nfr"),
-        frontmatter_keys: &["status"],
-        sections: REQUIREMENT_SECTIONS,
-    },
-    RecordDescriptor {
-        name: "glossary term",
-        record_type: "glossary",
-        type_name: "glossary",
-        label: "Glossary term",
-        display_id_pattern: "GLO-###",
-        directory: "doc",
-        subpath: "",
-        doc_type_key: Some("glossary"),
-        frontmatter_keys: &["status"],
-        sections: GLOSSARY_SECTIONS,
-    },
-    RecordDescriptor {
-        name: "ui specification",
-        record_type: "ui-spec",
-        type_name: "ui_spec",
-        label: "UI specification",
-        display_id_pattern: "UI-###",
-        directory: "doc",
-        subpath: "",
-        doc_type_key: Some("ui-spec"),
-        frontmatter_keys: &["status"],
-        sections: UI_SPEC_SECTIONS,
-    },
-    RecordDescriptor {
-        name: "technical specification",
-        record_type: "tech-spec",
-        type_name: "tech_spec",
-        label: "Technical specification",
-        display_id_pattern: "TECH-###",
-        directory: "doc",
-        subpath: "",
-        doc_type_key: Some("tech-spec"),
-        frontmatter_keys: &["status"],
-        sections: TECH_SPEC_SECTIONS,
-    },
-    RecordDescriptor {
-        name: "business rule",
-        record_type: "rule",
-        type_name: "rule",
-        label: "Business rule",
-        display_id_pattern: "RUL-###",
-        directory: "doc",
-        subpath: "",
-        doc_type_key: Some("rule"),
-        frontmatter_keys: &["status"],
-        sections: RULE_SECTIONS,
-    },
-    RecordDescriptor {
-        name: "audit record",
-        record_type: "audit",
-        type_name: "audit",
-        label: "Audit record",
-        display_id_pattern: "AUD-###",
-        directory: "doc",
-        subpath: "",
-        doc_type_key: Some("audit"),
-        frontmatter_keys: &["status", "type"],
-        sections: AUDIT_SECTIONS,
-    },
-    RecordDescriptor {
-        name: "use case",
-        record_type: "use-case",
-        type_name: "use_case",
-        label: "Use case",
-        display_id_pattern: "UC-###",
-        directory: "doc",
-        subpath: "",
-        doc_type_key: Some("use-case"),
-        frontmatter_keys: &["status"],
-        sections: USE_CASE_SECTIONS,
-    },
-    RecordDescriptor {
-        name: "test case",
-        record_type: "test-case",
-        type_name: "test_case",
-        label: "Test case",
-        display_id_pattern: "TC-###",
-        directory: "doc",
-        subpath: "",
-        doc_type_key: Some("test-case"),
-        frontmatter_keys: &["status"],
-        sections: TEST_CASE_SECTIONS,
-    },
-    RecordDescriptor {
-        name: "test report",
-        record_type: "test-report",
-        type_name: "test_report",
-        label: "Test report",
-        display_id_pattern: "TR-###",
-        directory: "doc",
-        subpath: "",
-        doc_type_key: Some("test-report"),
-        frontmatter_keys: &["status"],
-        sections: TEST_REPORT_SECTIONS,
-    },
 ];
 
 pub fn descriptors() -> &'static [RecordDescriptor] {
@@ -434,12 +300,6 @@ pub fn descriptor_for(name: &str) -> Option<&'static RecordDescriptor> {
             || d.type_name.to_lowercase() == needle
             || d.label.to_lowercase() == needle
     })
-}
-
-pub fn descriptor_for_doc_type(key: &str) -> Option<&'static RecordDescriptor> {
-    DESCRIPTORS
-        .iter()
-        .find(|descriptor| descriptor.doc_type_key == Some(key))
 }
 
 use std::collections::BTreeMap;
@@ -484,8 +344,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn descriptor_count_excludes_ui_mockup() {
-        assert_eq!(DESCRIPTORS.len(), 14);
+    fn only_the_four_backlog_families_are_static() {
+        assert_eq!(DESCRIPTORS.len(), 4);
+        assert!(
+            DESCRIPTORS
+                .iter()
+                .all(|descriptor| descriptor.doc_type_key.is_none()),
+            "document records must come from the artifact registry"
+        );
         assert!(descriptor_for("ui mockup").is_none());
     }
 }

@@ -647,3 +647,42 @@ fn d11_document_tree_is_descriptor_driven() {
         "the second dispatcher must not return"
     );
 }
+
+// D-12 ---------------------------------------------------------------------
+#[test]
+fn d12_document_records_have_one_source() {
+    // The parallel static document table is gone: no production call site may
+    // mention the removed lookup.
+    scan_src("D-12 `descriptor_for_doc_type` in src/:", &[], |line| {
+        line.contains("descriptor_for_doc_type")
+    })
+    .unwrap();
+
+    // Only the four backlog families stay static, and none describes a
+    // document type; document records are projected from the artifact registry.
+    let records = papyrus::record::descriptor::DESCRIPTORS;
+    assert_eq!(
+        records.len(),
+        4,
+        "static record table must hold backlog only"
+    );
+    assert!(
+        records
+            .iter()
+            .all(|descriptor| descriptor.doc_type_key.is_none()),
+        "a static record must not describe a document type"
+    );
+    for (name, record_type) in [
+        ("task", "task"),
+        ("milestone", "milestone"),
+        ("release", "release"),
+        ("decision", "decision"),
+    ] {
+        assert!(
+            records
+                .iter()
+                .any(|descriptor| descriptor.name == name && descriptor.record_type == record_type),
+            "static descriptor missing: {name}"
+        );
+    }
+}
