@@ -1,6 +1,6 @@
 # Feature Specification — Project Initialization and Configuration Commands
 
-**Ticket:** TASK-2 / TASK-85 (spec revision); TASK-111 (list-valued configuration keys revision); TASK-112 (default document set and document-status seeding revision)
+**Ticket:** TASK-2 / TASK-85 (spec revision); TASK-111 (list-valued configuration keys revision); TASK-112 (default document set and document-status seeding revision); TASK-122 (config list default_status revision)
 **Milestone:** m-0 (Rust CLI Foundation and Requirements)
 **Status:** Refined (execution-ready)
 **UI mockups:** none
@@ -14,6 +14,8 @@ This specification was revised (TASK-85) so that initialization, missing-configu
 It was revised again (TASK-111) so that the list-valued keys `statuses` and `document_types.<slug>.statuses` can be written through `config set` using a comma-separated value stored as a YAML flow sequence, and read back by `config get` and `config list` (REQ-01.002, REQ-07.002, ADR-0024).
 
 It was revised again (TASK-112) so that the generated default configuration is the eleven-entry document-type set of REQ-07.002 without `deploy`, and so that every front-matter-backed default document type carries the seeded status list `[active, archived]` while `ui-mockup` carries none and no entry carries `default_status` (REQ-07.001, REQ-07.002, REQ-05.008, ADR-0019).
+
+It was revised again (TASK-122) so that `papyrus config list` also prints `document_types.<slug>.default_status` for each entry that declares one, closing G-4 of TASK-117: an invalid `default_status` is now visible on the inspection surface an operator uses before repairing it (REQ-01.002, BR-003, ADR-0019).
 
 ## Scope
 
@@ -101,6 +103,7 @@ It was revised again (TASK-112) so that the generated default configuration is t
 18. **Scalar keys unchanged.** For a non-list key a comma remains an ordinary character of the scalar value; no existing `config set` invocation changes meaning.
 19. **Unset unchanged.** `config unset` removes a list key; there is no clear-list operation and no empty list is written. The top-level key then falls back to the default task list. An absent `document_types.<slug>.statuses` declaration is reported by `config get` as a missing key (exit 3) and the effective document status model falls back to `active`/`archived`. Removing a declaration whose entry keeps a `default_status` that the fallback list would not contain is refused by the validator (exit 4) and the file is unchanged.
 20. **Documentation.** `papyrus(1)` (`config set`) and `papyrus-config(5)` (`statuses`, `document_types`) state the comma-separated form, flow-sequence storage, empty-value rejection, and no-escape limitation. No new flag is introduced.
+21. **Document-type default status in the flattened listing.** For each `document_types.<slug>` entry, `config list` emits the keys `prefix`, `directory`, `enabled`, then `statuses` if the entry declares a status list, then `default_status` if the entry declares a default status. The `default_status` line appears immediately after the same slug's `statuses` line when both exist, and immediately after `enabled` when the entry declares a default status but no status list. An entry that declares no `default_status` gets no such key and no empty or placeholder value. Slugs appear in ascending key order, as they already do. `--json` carries the same value at `document_types.<slug>.default_status` and omits the member when the entry declares none. Printing the key is a read-only listing concern: key parsing, validation, `config set`/`config unset`, `config get`, the tolerant repair load, and the browser configuration view's own logic are unchanged; because the browser view renders this same flattened listing, a declared `default_status` becomes a visible editable scalar row there with no browser code change.
 
 ### 4. Common CLI controls and outcomes
 
@@ -121,7 +124,7 @@ It was revised again (TASK-112) so that the generated default configuration is t
 ## Inputs and outputs
 
 - `init`: input project name and optional flags; output is the created/updated project structure and `papyrus.config.yml`. On success prints nothing or a short success message; errors to stderr.
-- `config list`: output effective keys and values.
+- `config list`: output effective keys and values, including `document_types.<slug>.default_status` for each entry that declares one and omitting it otherwise.
 - `config get <key>`: output one value. For a list key, output is the flow form `[a, b]`; with `--json`, a JSON array of strings.
 - `config set <key> <value>`: persists value; success output minimal. A list key takes a comma-separated value and is stored as a flow sequence. When the key is a folder key, performs the relocation described above before persisting.
 - `config unset <key>`: removes key; success output minimal.
@@ -162,6 +165,6 @@ It was revised again (TASK-112) so that the generated default configuration is t
 | Non-functional | NFR-02.001, NFR-02.002, NFR-04.001, NFR-04.002 |
 | Business rule | BR-002 (init), BR-003 (config), BR-016 (keys/precedence), BR-001 (command behavior) |
 | ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002), ADR-0010 decision 8 (whole-folder relocation), ADR-0013 stage 5 (relocation implementation), ADR-0019 (fail-closed validation and repair), ADR-0024 (list-valued keys) |
-| Ticket | TASK-2, TASK-85, TASK-111 |
+| Ticket | TASK-2, TASK-85, TASK-111, TASK-112, TASK-122 |
 | UI mockups | none |
 path: docs/specifications/project-initialization-and-configuration.md

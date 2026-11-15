@@ -312,6 +312,17 @@ gap.
   disposition: release-blocking only if an invalid `default_status` cannot be
   inspected or repaired through the documented surfaces; otherwise a
   follow-up for TASK-111's owner.
+- Resolution (TASK-122): closed. `config list` now prints
+  `document_types.<slug>.default_status` immediately after that slug's
+  `statuses` line (or after `enabled` when no status list is declared) and
+  omits the key when the entry declares none, so the value the validator
+  rejects is inspectable before repair. Verified on the G-4 reproduction in
+  `tests/release_document_types_smoke.rs`: `config list` prints
+  `document_types.note.default_status: archived`, `config get` returns
+  `archived`, and `config set document_types.note.default_status active` exits
+  `0` and restores a valid configuration. JSON carries the same value through
+  `DocTypeEntry::default_status`; validation, `config get`, and `config set`
+  semantics are unchanged.
 
 #### G-5 — Release `close` is documented but not implemented (TASK-115 note 4)
 

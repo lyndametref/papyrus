@@ -446,6 +446,12 @@ impl Config {
                     format!("[{}]", statuses.join(", ")),
                 ));
             }
+            if let Some(default_status) = &v.default_status {
+                out.push((
+                    format!("document_types.{}.default_status", k),
+                    default_status.clone(),
+                ));
+            }
         }
         out.push(("browser_host".to_string(), self.browser_host.clone()));
         out.push(("browser_port".to_string(), self.browser_port.to_string()));
@@ -1797,6 +1803,59 @@ mod tests {
         assert_eq!(
             flattened.get("statuses").map(String::as_str),
             Some("[ToDo, Initiated, Refined, Implemented, Validated, Done]")
+        );
+    }
+
+    #[test]
+    fn flattened_renders_document_default_status_after_statuses() {
+        let mut config = Config::default();
+        let audit = config.document_types.get_mut("audit").unwrap();
+        audit.statuses = Some(vec![
+            "active".to_string(),
+            "archived".to_string(),
+            "open".to_string(),
+        ]);
+        audit.default_status = Some("open".to_string());
+        config
+            .document_types
+            .get_mut("ui-mockup")
+            .unwrap()
+            .default_status = Some("draft".to_string());
+
+        let flattened = config.flattened(Path::new("/project"));
+        let keys: Vec<&str> = flattened.iter().map(|(key, _)| key.as_str()).collect();
+        let index = |key: &str| {
+            keys.iter()
+                .position(|candidate| *candidate == key)
+                .unwrap_or_else(|| panic!("missing key {key}: {keys:?}"))
+        };
+
+        let audit_default = index("document_types.audit.default_status");
+        assert_eq!(flattened[audit_default].1, "open");
+        assert_eq!(
+            audit_default,
+            index("document_types.audit.statuses") + 1,
+            "default_status follows the same slug's statuses"
+        );
+
+        let mockup_default = index("document_types.ui-mockup.default_status");
+        assert_eq!(flattened[mockup_default].1, "draft");
+        assert_eq!(
+            mockup_default,
+            index("document_types.ui-mockup.enabled") + 1,
+            "default_status follows enabled when no status list is declared"
+        );
+
+        assert!(
+            !keys.contains(&"document_types.req.default_status"),
+            "an entry without default_status gets no key: {:?}",
+            keys
+        );
+        assert!(
+            !flattened
+                .iter()
+                .any(|(key, value)| key.ends_with(".default_status") && value.is_empty()),
+            "no empty default_status values"
         );
     }
 }
