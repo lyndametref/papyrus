@@ -14,9 +14,9 @@ use std::time::Duration;
 
 const PHRASE: &str = "quick brown fox";
 const SECOND_PHRASE: &str = "hidden zebra fact";
-const NOT_FOUND_UC: &str = "Deprecated use cases are not listed and cannot be opened. The same page is used for an unknown address.";
-const NOT_FOUND_TC: &str = "Deprecated test cases are not listed and cannot be opened. The same page is used for an unknown address.";
-const NOT_FOUND_TR: &str = "Deprecated test reports are not listed and cannot be opened. The same page is used for an unknown address.";
+const NOT_FOUND_UC: &str = "Archived use cases are not listed and cannot be opened. The same page is used for an unknown address.";
+const NOT_FOUND_TC: &str = "Archived test cases are not listed and cannot be opened. The same page is used for an unknown address.";
+const NOT_FOUND_TR: &str = "Archived test reports are not listed and cannot be opened. The same page is used for an unknown address.";
 
 fn bin() -> Command {
     Command::new(env!("CARGO_BIN_EXE_papyrus"))

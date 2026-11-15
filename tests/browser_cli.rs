@@ -5897,7 +5897,7 @@ fn t57b_list_excludes_non_records_and_archived() {
     assert!(html.contains("0 technical specifications"));
     assert!(!html.contains("No records"));
     assert!(html.contains("No technical specifications were found in the configured directory."));
-    assert!(html.contains("Deprecated technical specifications are hidden."));
+    assert!(html.contains("Archived technical specifications are hidden."));
     drop(server);
     let _ = fs::remove_dir_all(&dir);
     let _ = fs::remove_dir_all(&empty_dir);
@@ -6220,7 +6220,7 @@ fn t57g_stale_and_malformed_versions() {
 // T-57h
 #[test]
 fn t57h_archived_hidden_and_404() {
-    const HELP: &str = "Deprecated technical specifications are not listed and cannot be opened. The same page is used for an unknown address.";
+    const HELP: &str = "Archived technical specifications are not listed and cannot be opened. The same page is used for an unknown address.";
     let dir = tech_spec_fixture("t57h");
     run_ok(&[
         "--dir",
@@ -7072,7 +7072,7 @@ fn t81c_list_excludes_non_records_and_archived() {
     let html = get(&server, "/?type=use-case").text();
     assert!(html.contains("0 use cases"));
     assert!(html.contains("No use cases were found in the configured directory."));
-    assert!(html.contains("Deprecated use cases are hidden."));
+    assert!(html.contains("Archived use cases are hidden."));
     drop(server);
     let _ = fs::remove_dir_all(&dir);
     let _ = fs::remove_dir_all(&empty_dir);
@@ -7368,7 +7368,7 @@ fn t81h_stale_and_malformed_versions() {
 // T-81i
 #[test]
 fn t81i_archived_hidden_and_404() {
-    const HELP: &str = "Deprecated use cases are not listed and cannot be opened. The same page is used for an unknown address.";
+    const HELP: &str = "Archived use cases are not listed and cannot be opened. The same page is used for an unknown address.";
     let dir = use_case_fixture("t81i");
     run_ok(&[
         "--dir",

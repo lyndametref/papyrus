@@ -101,6 +101,26 @@ impl Default for DocTypeEntry {
     }
 }
 
+/// Canonical ordered seeding table for the eleven default document types:
+/// `(slug, prefix, directory, has_front_matter_status)`.
+///
+/// The order is the schema declaration order and is asserted against the
+/// interactive `init` artifact list. `statuses` is seeded for every type with
+/// front-matter status; `ui-mockup` has none (REQ-05.008).
+pub(crate) const DEFAULT_DOCUMENT_TYPES: [(&str, &str, &str, bool); 11] = [
+    ("req", "REQ", "requirements/business/", true),
+    ("nfr", "NFR", "requirements/non-functional/", true),
+    ("glossary", "GLO", "glossary/", true),
+    ("rule", "RUL", "business-rules/", true),
+    ("ui-spec", "UI", "specifications/ui/", true),
+    ("ui-mockup", "MOCK", "specifications/ui/mockups/", false),
+    ("audit", "AUD", "audit-records/", true),
+    ("tech-spec", "TECH", "technical/", true),
+    ("use-case", "UC", "use-cases/", true),
+    ("test-case", "TC", "test-cases/", true),
+    ("test-report", "TR", "test-reports/", true),
+];
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
@@ -145,20 +165,7 @@ impl Default for Config {
         // `has_status` marks the front-matter-backed types that declare the
         // seeded status vocabulary. `ui-mockup` has no front-matter status, so
         // a `statuses` key on it is invalid configuration (REQ-05.008).
-        let docs = [
-            ("req", "REQ", "requirements/business/", true),
-            ("nfr", "NFR", "requirements/non-functional/", true),
-            ("glossary", "GLO", "glossary/", true),
-            ("rule", "RUL", "business-rules/", true),
-            ("ui-spec", "UI", "specifications/ui/", true),
-            ("ui-mockup", "MOCK", "specifications/ui/mockups/", false),
-            ("audit", "AUD", "audit-records/", true),
-            ("tech-spec", "TECH", "technical/", true),
-            ("use-case", "UC", "use-cases/", true),
-            ("test-case", "TC", "test-cases/", true),
-            ("test-report", "TR", "test-reports/", true),
-        ];
-        for (k, p, d, has_status) in docs {
+        for (k, p, d, has_status) in DEFAULT_DOCUMENT_TYPES {
             document_types.insert(
                 k.to_string(),
                 DocTypeEntry {
