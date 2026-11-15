@@ -3,11 +3,11 @@ id: TASK-136
 title: >-
   Correct the milestone and release specification to the close-only milestone
   lifecycle
-status: To Do
+status: Done
 assignee:
   - '@business-analyst'
 created_date: '2026-11-15T14:00:00Z'
-updated_date: '2026-11-15T14:00:00Z'
+updated_date: '2026-11-15T14:27:00Z'
 labels:
   - docs
   - specification
@@ -53,13 +53,19 @@ ordinal: 41420
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Purpose and Scope no longer list milestone archive; the milestone verbs are create, list, view, edit, close, and delete, and the milestone lifecycle is stated as open -> closed in place through papyrus milestone close <id> with no archive or restore.
-- [ ] #2 Behavior 1.4 states that active and closed milestones stay in <backlog_directory>/milestones/, that backlog/archive/milestones/ and milestones/archived/ are legacy read locations, that import is the only writer to backlog/archive/milestones/, and that no milestone command creates it.
-- [ ] #3 milestone list is specified as listing the active folder including closed milestones, with no archived milestone state and legacy archived files not listed.
-- [ ] #4 The archived-milestone view/edit lifecycle cases are removed and replaced with legacy-file wording: readable (and editable in place) as legacy data, never moved.
-- [ ] #5 The archive-and-delete section is replaced by a close-and-delete section that documents papyrus milestone close <id> and the open -> closed conflict behavior; papyrus milestone archive is gone.
-- [ ] #6 milestone archive is removed from Inputs and outputs and milestone close <id> is added; the validation example no longer mentions an already-archived milestone.
-- [ ] #7 The archive assumptions and OQ-3 are rewritten to the read/import-only folder and the close-only lifecycle, with no remaining claim that a milestone is archived or moved.
-- [ ] #8 The Revision line records the 2026-11-15 correction and explicitly notes the superseded active -> archived/papyrus milestone archive wording.
-- [ ] #9 The release lifecycle remains planned -> released through papyrus release close <id> with no archive, restore, or delete, and no code, ADR, requirement, or business-rule file changes.
+- [x] #1 Purpose and Scope no longer list milestone archive; the milestone verbs are create, list, view, edit, close, and delete, and the milestone lifecycle is stated as open -> closed in place through papyrus milestone close <id> with no archive or restore.
+- [x] #2 Behavior 1.4 states that active and closed milestones stay in <backlog_directory>/milestones/, that backlog/archive/milestones/ and milestones/archived/ are legacy read locations, that import is the only writer to backlog/archive/milestones/, and that no milestone command creates it.
+- [x] #3 milestone list is specified as listing the active folder including closed milestones, with no archived milestone state and legacy archived files not listed.
+- [x] #4 The archived-milestone view/edit lifecycle cases are removed and replaced with legacy-file wording: readable (and editable in place) as legacy data, never moved.
+- [x] #5 The archive-and-delete section is replaced by a close-and-delete section that documents papyrus milestone close <id> and the open -> closed conflict behavior; papyrus milestone archive is gone.
+- [x] #6 milestone archive is removed from Inputs and outputs and milestone close <id> is added; the validation example no longer mentions an already-archived milestone.
+- [x] #7 The archive assumptions and OQ-3 are rewritten to the read/import-only folder and the close-only lifecycle, with no remaining claim that a milestone is archived or moved.
+- [x] #8 The Revision line records the 2026-11-15 correction and explicitly notes the superseded active -> archived/papyrus milestone archive wording.
+- [x] #9 The release lifecycle remains planned -> released through papyrus release close <id> with no archive, restore, or delete, and no code, ADR, requirement, or business-rule file changes.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+milestone-and-release-management.md corrected to the delivered lifecycle: milestones use create/list/view/edit/close/delete; papyrus milestone close <id> is the only open -> closed transition, writing status + updated_date in place through the atomic writer (exit 4 naming status on a non-open close, exit 3 unknown, --json {id,status:closed}); no archive/restore, no archived milestone state, no archive-folder lifecycle; closed milestones stay in backlog/milestones and remain listed; backlog/archive/milestones and milestones/archived are legacy read locations with the one-way import as the only writer. Releases keep planned -> released via release close and are never archived. Revision note names the superseded active -> archived / milestone archive wording; traceability updated. Evidence: milestone_cli 4/4, release_close_cli 8/8, cli_help_golden 2/2, no_drift 10/10.
+<!-- SECTION:FINAL_SUMMARY:END -->
