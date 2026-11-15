@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13.
+Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-15 by owner decision (decision 1 derive/builder split, decision 2 `BUILTIN_COMMANDS` names only, decision 4 `clap` `string` feature, decision 10's consequence count, downstream constraint 2, and downstream constraint 6) without status change.
 
 ## Date
 
@@ -24,9 +24,13 @@ Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exact
 
 ## Decision
 
-1. **One command tree is built at startup from the artifact registry** (`cli::tree(&ArtifactRegistry) -> clap::Command`, builder API). It is the single source of parsing, usage, and help. The `clap` **derive** macros are replaced by explicit builder construction for `Cli`, its global arguments, and every built-in subcommand; `clap` remains the only parser and the only dependency.
+1. **One command tree is built at startup from the artifact registry** (`cli::tree(&ArtifactRegistry) -> clap::Command`, builder API). It is the single source of parsing, usage, and help. The builder and the derive macros are **split by surface**: `cli::tree` builds the root command and the global arguments (`--json`, `--dir`, `--config`, `--no-color`) with the builder API; `cli::tree::document_command` and `cli::tree::verb_command` build the entire document surface with the builder API; the built-in trees remain `clap` **derive** in `src/cli/builtin.rs` (`BuiltinCmd`, `ConfigCmd`, `InitArgs`) plus one `#[derive(Subcommand)]` enum per family in `src/task.rs`, `src/milestone.rs`, `src/release.rs`, `src/decision.rs`, `src/import.rs`, grafted onto the root with `BuiltinCmd::augment_subcommands(cmd)` and parsed with `BuiltinCmd::from_arg_matches`. `clap` remains the only parser and the only dependency.
 
-2. **Built-ins come from one static table.** `cli::BUILTIN_COMMANDS` lists, for every built-in, its name, its `clap::Command`, and its handler. The names in that table (`init`, `config`, `task`, `milestone`, `release`, `decision`, `search`, `browser`, `import`, `help`, `version`) are the reserved names consumed by ADR-0019's validation and the packaged man page (ADR-0021). `help` and `version` stay clap-provided subcommands/options and are listed as reserved.
+   *Revision (2026-11-15, owner decision): this decision previously stated that the derive macros were replaced by explicit builder construction for `Cli` and for *every* built-in subcommand. Converting the built-in trees to the builder API was considered and rejected by the owner, so the split above — builder for the root, the global arguments, and the whole document surface, derive for the built-in families — is the contract, not an interim state.*
+
+2. **Built-ins come from one static name list.** `cli::BUILTIN_COMMANDS` is a list of **names only** (`BuiltinEntry { name: &'static str }`), not of `clap::Command`s and handlers. The names in that table (`init`, `config`, `task`, `milestone`, `release`, `decision`, `search`, `browser`, `import`, `help`, `version`) are the reserved names. Its consumers are the reserved-name validation of ADR-0019 (`src/config.rs`) and the pre-build slug-collision guard in `src/cli/tree.rs`; it is the single reserved-name source and remains **reserved for** the packaged man page (ADR-0021, still `Proposed` and deferred — not a delivered consumer). `help` and `version` stay clap-provided subcommands/options and are listed as reserved.
+
+   *Revision (2026-11-15, owner decision): this decision previously stated that the table listed, for every built-in, its name, its `clap::Command`, and its handler, and it named the packaged man page as a consumer. The delivered table holds names only; the man page does not exist (`docs/man/` is absent and ADR-0021 selects no option), so the two real consumers are configuration validation and the tree's collision guard.*
 
 3. **Two-phase startup, in fixed order.**
 
@@ -38,6 +42,8 @@ Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exact
    `papyrus init` skips phases 2–3's configuration load, because REQ-01.001 requires it to run without a configuration file.
 
 4. **Document commands are built by one function, not one type.** `cli::document_command(descriptor)` produces a `clap::Command` whose about line is `Manage <slug> documents.` and whose subcommands are the baseline verbs of REQ-07.003 (`create`, `list`, `view`, `edit`, `archive`, `delete`), plus `status <id> <value>` when the descriptor is front-matter-backed, plus any verb the descriptor declares as an extension. Every verb parses into one `DocumentInvocation { slug, verb: DocumentVerb, args: DocumentArgs }` value; `document::run(ctx, registry, invocation)` is the only handler. Type-specific verbs (REQ-05.001 `create-group`, REQ-05.002 `--group`, REQ-05.008 `supersede`) and the `status` presence rule are descriptor data, not a second handler (ADR-0017).
+
+   *Revision (2026-11-15, owner decision): this decision previously left the runtime-name mechanism unstated. The `clap` `string` feature (enabled together with `derive` in `Cargo.toml`) is what lets a builder-built document command own a runtime slug — `Command::new(descriptor.slug.clone())` takes an owned `String`, so no `'static` leak is needed — while `derive` stays enabled for the built-in family trees of decision 1.*
 
 5. **No dynamic escape hatch.** `allow_external_subcommands`, `ignore_errors`, `infer_subcommands`, `allow_missing_positional`, and trailing-argument passthrough are **not** used. A name that is not in the tree is not a command: clap emits `unrecognized subcommand` with the enabled command list and exits 2. A disabled entry is absent from the tree, so its slug behaves exactly like an unknown slug. There is no alias, abbreviation, case folding, or fuzzy match, and no path in the code may map an unknown slug onto a different command.
 
@@ -61,24 +67,26 @@ Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exact
 **Positive:**
 
 - REQ-07.003 becomes structural: adding an entry adds a command, a help line, and `--help` output with no code change.
-- Parsing, usage text, help, and validation all read the same two tables (`BUILTIN_COMMANDS` and the registry), so the reserved-name list cannot drift from the real command set.
+- Parsing, usage text, help, and validation all read the same sources — the derive declarations for the built-ins, `BUILTIN_COMMANDS` for reserved names, and the registry for the document surface — so the reserved-name list cannot drift from the real command set.
 - The circular dependency between global options and the command tree is resolved once, in one documented place, instead of being worked around per command.
-- Deleting twelve static command enums removes a large block of near-duplicate code that REQ-07.003 makes obsolete anyway.
+- Deleting eleven static document-type variants (the ten per-type modules plus the `nfreq` alias) removes a large block of near-duplicate code that REQ-07.003 makes obsolete anyway; the built-in family trees of decision 1 are derive-built and stay unchanged.
 - A `status` verb that exists only for front-matter-backed types makes the descriptor's status model (ADR-0017) visible in help without a second command builder.
 
 **Negative:**
 
 - Every invocation now loads and validates the configuration before argument parsing completes. A usage error in a project with an invalid configuration reports the configuration error (exit 4) rather than the usage error (exit 2).
 - `papyrus --help` in a project directory with an invalid configuration fails closed (exit 4); the built-ins-only rendering applies only when no configuration file exists.
-- Help text is no longer a compile-time constant, so documentation tests and man-page generation cannot simply embed it.
-- The derive macros' compile-time argument checking is replaced by builder construction: a wrong argument name is a runtime help-text defect, not a compile error. Characterization tests are the mitigation.
+- Document help text is no longer a compile-time constant, so documentation tests and man-page generation for the document surface cannot simply embed it.
+- On the document surface, the derive macros' compile-time argument checking is replaced by builder construction: a wrong argument name is a runtime help-text defect, not a compile error. The built-in family trees keep derive's compile-time checking. Characterization tests are the mitigation.
 
 **Risks and mitigations:**
 
 - *Pre-scan diverges from clap*: the scan recognizes only the four documented forms and stops at `--`; a matrix test compares phase-1 resolution with the final parsed global values for `--dir`, `--dir=`, `--config`, `--config=`, env-only, and mixed forms.
 - *Behaviour change for existing scripts*: `papyrus nfreq …` now exits 2. This is required by REQ-07.002 and must appear in the release upgrade notes.
-- *Argument-name drift in builder code*: one table-driven test per built-in asserts that every documented option parses, and one test asserts the full help output per command.
+- *Argument-name drift in command construction*: one table-driven test per built-in asserts that every documented option parses, one run of each document verb covers the builder-built document surface, and one test asserts the full help output per command.
 - *Config-before-parse hides usage errors*: documented in `papyrus(1)`; `papyrus --help` remains available when no configuration file exists.
+
+*Revision (2026-11-15, owner decision): the consequence bullets were aligned with the delivered split — the removed static surface is eleven document-type variants (ten per-type modules plus the `nfreq` alias), the lost compile-time argument checking and the non-constant help text apply to the document surface only, the built-in family trees keep derive, and help for the built-ins is generated from their derive declarations rather than from `BUILTIN_COMMANDS`.*
 
 ## Alternatives Considered
 
@@ -99,12 +107,16 @@ Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exact
 
 ## Downstream constraints
 
-1. `src/lib.rs` must contain no `#[derive(Subcommand)]` command enum after this ADR; parsing lives in `src/cli/`.
-2. No module except `src/cli/` may construct or inspect a `clap::Command` or `ArgMatches`.
+1. `src/lib.rs` must contain no `#[derive(Subcommand)]` command enum after this ADR; command-tree construction and parse dispatch live in `src/cli/`.
+2. `src/cli/builtin.rs` and the five built-in family modules (`src/task.rs`, `src/milestone.rs`, `src/release.rs`, `src/decision.rs`, `src/import.rs`) may declare `clap` derive commands and are the **only** such declarations. No module may build or inspect a `clap::Command` for a document type outside `src/cli/`, and `document::run` receives a `DocumentInvocation`, never an `ArgMatches`.
+
+   *Revision (2026-11-15, owner decision): this constraint previously read "no module except `src/cli/` may construct or inspect a `clap::Command` or `ArgMatches`", which the delivered derive/builder split of decision 1 contradicts, because the built-in family trees are declared outside `src/cli/`. The permission is now enumerated — the named modules may declare derive commands, document-type command construction stays inside `src/cli/`, and the document handler boundary is the `DocumentInvocation` value. Constraint 1 is read the same way: the `src/lib.rs` prohibition stands, while `src/cli/` owns command-tree construction and parse dispatch.*
 3. Document dispatch enters only through `document::run`; no `match slug` on string literals is permitted outside the registry (grep check).
 4. Exit codes 0/1/2/3/4 and the `--json` error object are unchanged.
 5. `status <id> <value>` never archives and never moves a file; `archive` is the only verb that produces `archived`, and the command tree must not offer `status` on a type without front-matter status (UI mockups).
-6. `BUILTIN_COMMANDS` is the only list of built-in command names; ADR-0019 and ADR-0021 must consume it.
+6. `BUILTIN_COMMANDS` is the only list of built-in command names; ADR-0019 consumes it for reserved-name validation, and ADR-0021 is reserved to consume it once a man-page option is selected (that ADR is still `Proposed` and deferred, so the man-page consumer is not delivered).
+
+   *Revision (2026-11-15, owner decision): this constraint previously read "ADR-0019 and ADR-0021 must consume it", which implied a delivered man-page consumer. The table carries names only; ADR-0019 consumes it today and ADR-0021 remains reserved, consistent with decision 2.*
 
 ## References
 

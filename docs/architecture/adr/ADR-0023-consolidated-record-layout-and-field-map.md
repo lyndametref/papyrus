@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13.
+Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-15 by owner decision (decision 2 release archive location) without status change.
 
 ## Date
 
@@ -31,11 +31,15 @@ Forces: one identity, one file, one name (ADR-0010 decision 1); configuration-dr
    |---|---|---|
    | Task | `<backlog_directory>/tasks/` | `<backlog_directory>/archive/tasks/` |
    | Milestone | `<backlog_directory>/milestones/` | `<backlog_directory>/archive/milestones/` |
-   | Release | `<backlog_directory>/releases/` | `<backlog_directory>/archive/releases/` |
+   | Release | `<backlog_directory>/releases/` | none — the record is never moved; its state is the front-matter status |
    | Decision (ADR, BDR) | `<decision_directory>/` | none — the record is never moved; its state is the `## Status` line, which keeps it in the ADR index |
    | Document, any configured type (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`, and every user-added slug) | `<doc_directory>/<type directory>/` | `<doc_directory>/<type directory>/archived/` |
 
    `backlog_directory`, `decision_directory`, and `doc_directory` are relative to the project directory; a document type's `directory` is relative to `doc_directory`. Descriptors name configuration keys, never literal paths. Every resolved path passes `Context::ensure_within` before any read or write (NFR-04.002), including after symlink resolution. UI mockups are HTML records under their configured `ui-mockup` directory; they use the same active/`archived/` layout and keep their state in HTML metadata (decision 5).
+
+   A release has `ArchivePolicy::None`: `release close` rewrites `status` from `planned` to `released` in place through the single write path, and no `archive/releases/` path is resolved by any code path or descriptor.
+
+   *Revision (2026-11-15, owner decision): the Release row previously listed `<backlog_directory>/archive/releases/` as its archive location. Releases never move — the descriptor carries `ArchivePolicy::None` and the record's state is its front-matter `status`, so the row and the sentence above now record the delivered contract.*
 
 3. **`archived/` is the only inactive location for document records.**
    - A `deprecated/` folder is **not** read, listed, searched, indexed by the browser, migrated, moved, or renamed. Its files stay exactly where they are until a human acts outside Papyrus. No code path may resolve it, and no descriptor may name it.
