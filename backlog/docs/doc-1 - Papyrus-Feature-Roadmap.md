@@ -3,7 +3,7 @@ id: doc-1
 title: Papyrus Feature Roadmap
 type: specification
 created_date: '2026-11-04T19:22:00Z'
-updated_date: '2026-11-14T20:33:00Z'
+updated_date: '2026-11-15T11:30:00Z'
 ---
 # Papyrus Feature Roadmap
 
@@ -29,6 +29,7 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 - m-17: Config-Defined Document Types and Artifact Categories — REQ-07.001/002/003/004 plus REQ-06.014 and the REQ-01.002 list-valued keys; one feature milestone after Release 1.0, thirteen tasks TASK-105 to TASK-117, all High priority, ordinals 41000-41110. Delivers the runtime artifact registry and descriptors, the dynamic `papyrus <slug>` family with `status`, fail-closed `document_types` validation and repair, the generic content model, registry-derived search and browser views, init defaults without `deploy`, and the upgrade documentation. Man-page work is excluded: ADR-0021 is Proposed and NFR-03.003 remains a recorded release risk. No release gate is created; whether this ships as Release 1.1 or folds into an open release is an owner decision.
 
 - m-18: Registry Consolidation and Release Close - follow-ups from the m-17 architecture checkpoint and TASK-117 verification; seven tasks TASK-118 to TASK-124, ordinals 41200-41260. Closes the release-blocking `papyrus release close` gap G-5, refactors the two ADR-0016/0017 deviations in code (descriptor-driven typed dispatch through `document::run`, registry-based record descriptor resolution) and removes the process-global descriptor cache and slug leaks, then clears G-4 and F-117-1 and adds init/registry and archive-terminology drift guards. Every dependency is inside m-18; no release milestone or release ticket is created.
+- m-19: Architecture Checkpoint Follow-ups: Mockup Archive and ADR Alignment - owner decisions of 2026-11-15 on the m-18 architecture checkpoint: fix the UI-mockup archive ordering in code, amend ADR-0016/0017/0018/0023 instead of refactoring built-ins, and plan every follow-up. Five tasks TASK-125 to TASK-129, ordinals 41300-41340: TASK-125 routes mockup archive, supersede, and edit-with-move through `record::store::archive_content`; TASK-126 amends the four ADRs and regenerates the ADR index; TASK-127 corrects the browser and init specifications; TASK-128 aligns the domain model and glossary and removes the empty legacy `deprecated/` folders; TASK-129 adds C0/DEL/C1 parity to the path sanitizers. Every dependency is inside m-19; no release milestone or release ticket is created.
 
 ## Removed
 
@@ -60,6 +61,7 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 - New m-12 internal order: TASK-63 -> TASK-64 -> TASK-65 -> TASK-67; TASK-63/TASK-65 -> TASK-68 -> TASK-69; TASK-67/TASK-69 -> TASK-70 -> TASK-71; TASK-66 -> TASK-67, TASK-72, TASK-60, TASK-76; TASK-74 -> TASK-75; TASK-76 -> TASK-77; TASK-60/TASK-67/TASK-72/TASK-77 -> TASK-19; TASK-20 last.
 
 - m-18 all seven tasks depend only on tasks inside m-18; TASK-118, TASK-119, TASK-122, and TASK-123 have no dependency, TASK-120 follows TASK-119, TASK-121 and TASK-124 follow TASK-120. No m-18 task depends on m-14, m-16, m-17, or a later milestone.
+- m-19 TASK-125, TASK-126, and TASK-129 have no dependency; TASK-127 and TASK-128 follow TASK-126. All dependencies are inside m-19; no m-19 task depends on m-14, m-16, m-17, m-18, or a later milestone.
 
 ## Requirement coverage
 
@@ -302,3 +304,52 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 
 - Release vehicle: whether m-17 plus m-18 ship as Release 1.1 or fold into an open release, and therefore whether a release gate must depend on TASK-118. No release ticket exists to record that dependency.
 - Priority assumption: the owner gave a directive but no priority for the refactor and cache tasks. TASK-119 and TASK-120 are recorded as High to match the owner-directed ADR-0016/0017 conformance; TASK-121 is Medium because it has no user-visible effect; TASK-124 is Low as a drift guard. Adjust on request.
+
+## Planning update (2026-11-15) - m-18 architecture checkpoint follow-ups
+
+- Inputs: the m-18 architecture checkpoint and the owner decisions of 2026-11-15: **fix the ui-mockup code**, **amend ADR-0016 rather than refactor built-ins**, and **plan all follow-ups**. TASK-118..TASK-124 are Done. No requirement changed, so this is a planning update, not a requirement change.
+- Roadmap entry: **Architecture checkpoint follow-ups: mockup archive and ADR alignment**, one correction increment after m-18. Source references: ADR-0022 decisions 2 and 8, ADR-0018 decision 3, ADR-0016, ADR-0017, ADR-0023 decision 2, REQ-05.007, REQ-05.008, REQ-07.001, REQ-01.001, NFR-02.002.
+- Milestone decision: new **m-19 Architecture Checkpoint Follow-ups: Mockup Archive and ADR Alignment**. m-18 is Done and is not reopened; the work spans the mockup module, four ADRs, two specification pages, the domain model/glossary, and the sanitizers, so it does not belong in a completed milestone.
+- Release coupling: no release milestone and no release ticket are created. The release vehicle for the m-17/m-18 work is still an owner decision, and these are corrections, not a shippable feature increment.
+
+### Task order
+
+| Ordinal | Task | Priority | Depends on | Assignee |
+|---|---|---|---|---|
+| 41300 | TASK-125 Route UI-mockup archive, supersede, and edit-with-move through the shared archive write-then-unlink path | High | - | rust-dev |
+| 41310 | TASK-126 Amend ADR-0016, ADR-0017, ADR-0018, and ADR-0023 for the derive/builder split, cross-category verbs, and release archive policy | High | - | architect |
+| 41320 | TASK-127 Correct browser and init specifications to the settled archive lifecycles and directory creation | Medium | TASK-126 | business-analyst |
+| 41330 | TASK-128 Align the business object model and glossary lifecycles and remove the empty legacy deprecated folders | Medium | TASK-126 | domain-modeler |
+| 41340 | TASK-129 Reject C0, DEL, and C1 control characters in sanitize_path_component and sanitize_path | Low | - | rust-dev |
+
+### Ordering rationale
+
+- Dependencies first. TASK-127 and TASK-128 mirror the amended ADRs, so they follow TASK-126; no other dependency exists.
+- User priority among ready tasks. The owner listed the UI-mockup fix first and the ADR amendments second; both are High, so TASK-125 holds ordinal 41300 and TASK-126 ordinal 41310. The spec and domain-model corrections are Medium and follow their ADR dependency; the sanitizer parity is Low.
+- No unusable increment. Every task is runnable against the delivered m-18 code; the ADR amendment records the exception the code fix preserves rather than enabling it, so the two High tasks can run concurrently.
+- Reviewable split. Code, decision records, specifications, domain model, and sanitizer are separate ownership areas and separate reviews; no task mixes them.
+
+### Parallel work
+
+- TASK-125, TASK-126, and TASK-129 touch disjoint surfaces (`src/ui_mockup.rs` and its tests; `docs/architecture/adr`; `src/sanitize.rs`) and can run concurrently as the first eligible set.
+- TASK-127 and TASK-128 start after TASK-126 and can then run in parallel.
+- TASK-126 is a prerequisite, not a bottleneck: it changes only four ADR files and the ADR index.
+
+### Coverage
+
+- ADR-0022 decisions 2 and 8, ADR-0018 decision 3, REQ-05.007, REQ-05.008 - TASK-125 (mockup archive, supersede, edit-with-move, delete; HTML metadata and exit codes preserved). TASK-126 records the exception that TASK-125 keeps.
+- ADR-0016, ADR-0017, ADR-0023 decision 2 - TASK-126 (derive/builder split and constraint 2, verbs across all categories, `ArchivePolicy::None` for releases, regenerated index).
+- REQ-05.007, REQ-07.001, REQ-01.001 - TASK-127 (browser and init specifications, OQ-1 resolved).
+- REQ-05.007, REQ-07.001 - TASK-128 (business object model and glossary lifecycles, empty legacy folder removal).
+- NFR-02.001, NFR-02.002 - TASK-129 (path sanitizer control-character parity).
+
+### Accepted and deferred items
+
+- **NFR bounded-resource coverage stays with ADR-0017 decision 10.** The checkpoint recorded no new bounded-resource obligation and no new task is created; the registry remains plain in-process data with no cache, index file, background scan, or serialization format.
+- Built-in command refactor - rejected by the owner in favor of amending ADR-0016. TASK-126 records the derive/builder split; no code task reworks built-ins.
+- The `deprecated/` folders are removed only where empty; no record file is deleted and no migration or inventory command is introduced (ADR-0022 decision 12).
+
+### Open questions
+
+- Release vehicle: whether the m-17/m-18/m-19 work ships as Release 1.1 or folds into an open release remains an owner decision. No release ticket exists to record it.
+- ADR-0021 and the NFR-03.003 man-page gap remain deferred; no task in m-19 claims man-page compliance.
