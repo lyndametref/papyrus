@@ -520,13 +520,14 @@ Accepted consequence: on a diagram page the browser also honours the server-auth
 Promised and covered by fixtures: `flowchart` (including `graph`), `sequence`, `class`, `state`, `ER`, `gantt`, `pie`, `journey`, and `gitGraph`.
 
 - No allowlist is enforced. Another type that 11.17.2 parses is rendered best-effort and is not a promised capability.
-- A type the pinned bundle cannot detect or parse — including `flowchart-elk`, whose layout package is not vendored — takes the failure path of §16.6 and keeps its source.
+- `flowchart-elk` is not promised either; it is best-effort like every type outside the nine promised ones. A `flowchart-elk` fence was measured rendering successfully in Firefox 153.5.1esr with Mermaid 11.17.2 (that build appears to bundle ELK), so it is not a failure-path example and the spec asserts nothing about its output.
+- A type the pinned bundle cannot detect at all — for example `notARealDiagramType` — takes the failure path of §16.6 and keeps its source.
 - The server never inspects the type; classification happens entirely inside Mermaid.
 
 ## 19. Styling
 
 - `.diagram` is a block box with `margin: 12px 0`; the renderable figure also carries `bleed`, so it is 100 % of the `.app` content width while surrounding `.text` stays at the 780 px measure.
-- `.diagram-scroll` is `overflow-x: auto` and is the scroll container for a wide SVG. A rendered SVG is not capped by any `max-width` rule: it takes its natural size and scrolls inside `.diagram-scroll`, so the page gains no horizontal scrollbar at 320–1920 CSS px.
+- `.diagram-scroll` is `overflow-x: auto`, but only as a safety net. Mermaid 11.17.2 emits every SVG with `width="100%"` and an inline `style="max-width: <natural>px"`, so a rendered SVG is capped by Mermaid's own inline `max-width` and scales down to fit: a very wide diagram is shrunk rather than overflowing `.diagram-scroll`. The page therefore gains no horizontal scrollbar at 320–1920 CSS px. `.diagram-scroll` scrolls only content wider than its container that ignores the inline cap, such as a future type. The pinned options of §16.4 are unchanged; `useMaxWidth` is neither set nor overridden.
 - `.diagram--unsupported` and its `<pre>` inherit the existing `pre { max-width: 100%; overflow-x: auto; }` rule and stay in the text measure.
 - `.render-note` is small, muted, and block-level; its text is never hidden, because it is the only signal that a block was not rendered.
 - No rule in `app.css` targets a Mermaid-generated class, and no rule is added for the diagram SVG's internal styling; Mermaid's injected style owns that.
