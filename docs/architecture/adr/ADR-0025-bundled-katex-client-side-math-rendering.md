@@ -2,7 +2,7 @@
 id: ADR-0025
 title: "Bundled KaTeX Client-Side Math Rendering"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-15T15:58:31Z'
+updated_date: '2026-11-16T00:00:00Z'
 labels: []
 references: []
 ---
@@ -10,7 +10,7 @@ references: []
 
 ## Status
 
-Accepted (2026-11-15) — owner decision 2026-11-15: KaTeX is the accepted math renderer, with the `$$...$$` / `$...$` (`\$` escape) / fenced `math|tex|latex` delimiter set and curated-prose-only scope (no record-body view).
+Accepted (2026-11-15) — owner decision 2026-11-15: KaTeX is the accepted math renderer, with the `$$...$$` / `$...$` (`\$` escape) / fenced `math|tex|latex` delimiter set and curated-prose-only scope (no record-body view). Amended 2026-11-16 by architecture decision, status unchanged: decision 5 `output` value and decision 6 inline-style rule (revision notes below; owner acknowledgement requested through TASK-145).
 
 ## Date
 
@@ -50,13 +50,17 @@ REQ-06.017 states that rendering happens **in the browser only** and that CLI ou
    - The stylesheet and script are linked **only** on pages whose pre-pass found at least one math segment; other pages gain no bytes.
    - The script is a classic script with `defer`. No module loading, no `fetch`, no dynamic `import()`.
 
-5. **Rendering call.** One pass over `[data-tex]` elements using `katex.render(source, element, { throwOnError: false, displayMode, trust: false, strict: 'warn', output: 'html' })`. `throwOnError: false` renders the offending expression in `errorColor` rather than throwing; a thrown error or a missing global leaves the source text in place and marks the element `data-render-error="math"`.
+5. **Rendering call.** One pass over `[data-tex]` elements using `katex.render(source, element, { throwOnError: false, displayMode, trust: false, strict: 'warn', output: 'htmlAndMathml' })`. `throwOnError: false` renders the offending expression in `errorColor` rather than throwing; a thrown error or a missing global leaves the source text in place and marks the element `data-render-error="math"`.
 
-6. **CSP delta: `font-src 'self'` only.** KaTeX emits class-bearing spans and needs its woff2 files; it does not need inline styles, inline scripts, or `eval`. The served CSP becomes:
+   *Revision (2026-11-16, architecture decision): `output` changes from `'html'` to `'htmlAndMathml'`, the KaTeX default, and that exact string is pinned. KaTeX sets `aria-hidden="true"` on the `.katex-html` node it builds (verified in the vendored 0.16.11 bundle), and with `output: 'html'` that node is the only output: a successfully rendered formula would be invisible to assistive technology, while the source-text fallback has already been replaced by the render. `'htmlAndMathml'` additionally emits `.katex-mathml`, which `katex.min.css` clips visually and exposes to assistive technology, including `<annotation encoding="application/x-tex">` with the source. The cost is client-side only: the server still ships the placeholder, so the response payload is unchanged, and the DOM for a rendered formula roughly doubles. No asset, no CSP directive, and no `trust`/`strict` setting changes, and the no-JavaScript and rejected-input fallbacks behave as before.*
+
+6. **CSP delta: `font-src 'self'` only.** KaTeX emits class-bearing spans and needs its woff2 files; it needs no inline script, no `eval`, and no style mechanism it cannot render without — the few inline `style` attributes it does emit are cosmetic and are dropped (revision note below). The served CSP becomes:
 
    `default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`
 
    `script-src` is unchanged, so no script path other than the embedded assets can execute.
+
+   *Revision (2026-11-16, architecture decision): the `style-src 'self'` value is confirmed and the loss of KaTeX's inline `style` attributes is accepted, not repaired. KaTeX sets `style` attributes on generated nodes (`mspace` widths and rule geometry, hbox height/vertical-align, `\color` output, and the `errorColor` of a rejected formula); the browser drops each one under this policy. The visible cost is bounded — spacing can deviate by a fraction of an em and a rejected formula shows uncoloured — and no content, structure, or execution path changes. The alternatives are rejected on mechanism, not taste: a nonce matches `<style>`/`<link>` elements and never a `style` attribute, and KaTeX emits no style element for math; hashes cannot enumerate content-dependent widths and `style-src-attr`/`'unsafe-hashes'` are not available on all of NFR-05.001's browsers (Firefox 100 lacks them); `'unsafe-inline'` would relax every page for a cosmetic deviation, and its use by Mermaid (ADR-0026 decision 5) is a separate decision about an injected `<style>` element. TASK-146 therefore does not inherit this rule, and the math pass must render correctly without `'unsafe-inline'`.*
 
 7. **Sanitisation is structural.** `trust: false` disables `\href`, `\url`, `\includegraphics`, `\htmlClass`, and `\htmlData`; KaTeX output is built from its own text nodes; the TeX source reaches it as a string attribute, never as HTML. The attribute is escaped by the existing escaping rules. A record cannot make KaTeX emit a script or a remote reference.
 
@@ -95,7 +99,7 @@ REQ-06.017 states that rendering happens **in the browser only** and that CLI ou
 
 | Option | Outcome | Reason |
 |---|---|---|
-| KaTeX, vendored, client-side, `font-src 'self'` (this ADR) | Selected | Smallest bundle (≈560 KB), no `eval`, no inline style, permissive licences, synchronous DOM rendering that keeps the source-text fallback trivial. |
+| KaTeX, vendored, client-side, `font-src 'self'` (this ADR) | Selected | Smallest bundle (≈560 KB), no `eval`, permissive licences, synchronous DOM rendering that keeps the source-text fallback trivial. *Revision 2026-11-16: this row previously read "no inline style". KaTeX does emit inline `style` attributes, which `style-src 'self'` drops; the cosmetic deviation is accepted and the CSP is unchanged (decision 6 revision note).* |
 | MathJax 3, vendored, SVG output | Rejected for now | Apache-2.0 and no web fonts (no CSP delta), but ≈1.4–2 MB, slower startup, and its SVG pipeline adds DOM/style behaviour that needs its own review; kept as the licence fallback. |
 | Server-side TeX preprocessing in Rust | Rejected | Excluded by REQ-06.017 ("rendering happens in the browser only"), and no TeX engine exists among the four current crates. |
 | Server-side preprocessing in a helper process (TeX Live, `pandoc`) | Rejected | Breaks single-binary packaging (ADR-0002), offline guarantee, and adds an external runtime. |
@@ -114,10 +118,19 @@ REQ-06.017 states that rendering happens **in the browser only** and that CLI ou
 1. No Rust crate is added; math rendering has no server component beyond the delimiter pre-pass.
 2. The pre-pass may not interpret any Markdown construct other than math/diagram delimiters; a diff that adds bold, links, headings, or lists to it is out of contract.
 3. KaTeX receives only escaped attribute values; `trust` stays `false`; no KaTeX option may enable `\href`/`\includegraphics`.
-4. `script-src` stays `'self'`; the CSP may add `font-src 'self'` and nothing else on account of this ADR.
+4. `script-src` stays `'self'`; the CSP may add `font-src 'self'` and nothing else on account of this ADR. `style-src` stays `'self'` with no nonce, hash, `'unsafe-hashes'`, or `'unsafe-inline'`; the inline `style` attributes KaTeX emits are dropped and the resulting deviation is accepted (decision 6 revision note).
 5. Math assets are served only on pages that contain math; the binary must not grow by more than the ADR-0027 budget.
 6. The source text is never modified, never re-saved, and never sent to the CLI in rendered form.
 7. Existing packaging-specification wording that forbids web fonts (`docs/specifications/*.md`) must be revised; that update is owned by the business analyst / tech writer, not by this ADR.
+
+## Revision notes (2026-11-16, status unchanged)
+
+| Decision | Before | After | Reason |
+|---|---|---|---|
+| 5 — rendering call | `output: 'html'` | `output: 'htmlAndMathml'` | `output: 'html'` emits only `.katex-html`, which KaTeX marks `aria-hidden="true"`, so a rendered formula would be invisible to assistive technology after the source fallback is replaced. MathML costs client-side DOM only; the served payload is unchanged. |
+| 6 — CSP delta | `font-src 'self'` only, inline-style loss noted but not decided | `font-src 'self'` only, and the loss of KaTeX's inline `style` attributes is accepted as the contract | A nonce cannot target `style` attributes, hashes cannot enumerate content-dependent widths, and `'unsafe-inline'` weakens every page for a cosmetic deviation. TASK-146's Mermaid relaxation (ADR-0026 decision 5) addresses an injected `<style>` element and is not inherited here. |
+
+Consequences for downstream tickets: TASK-146 keeps ADR-0026 decision 5 and does not follow this style rule; TASK-148 ports both decisions into the browser requirement specifications and the README math wording; TASK-149/TASK-150 verify the accepted spacing/error-colour deviation in Firefox 100+, Edge 130+, and Safari 18+ and record it as expected, not as a defect.
 
 ## References
 
@@ -127,4 +140,5 @@ REQ-06.017 states that rendering happens **in the browser only** and that CLI ou
 - `docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md` — transport, templates, CSP baseline, no Markdown renderer.
 - `docs/architecture/adr/ADR-0027-vendored-embedded-browser-assets-and-packaging-notices.md` — how vendored assets are embedded, served, and licensed.
 - `docs/architecture/adr/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md` — width classes applied to rendered output.
+- `docs/specifications/browser-math-and-diagram-rendering.md` — canonical detail for the pre-pass, client pass (`output`), and CSP delta.
 - Implementation: `src/browser/render.rs` (pre-pass and placeholders), `src/browser/vendor/katex/0.16.11/`, `src/browser/assets.rs` (new), `src/browser/http.rs` (CSP, binary bodies), `src/browser/app.css`.

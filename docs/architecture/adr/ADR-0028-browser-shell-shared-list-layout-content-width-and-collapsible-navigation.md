@@ -2,7 +2,7 @@
 id: ADR-0028
 title: "Browser Shell: Shared List Layout, Content-Width Contract, and Collapsible Navigation"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-15T18:37:06Z'
+updated_date: '2026-11-16T07:32:50Z'
 labels: []
 references: []
 ---
@@ -10,7 +10,7 @@ references: []
 
 ## Status
 
-Accepted (2026-11-15) — owner decision 2026-11-15: one shared shell and list layout, server-side `PageWidth` width contract, `localStorage` navigation persistence (default expanded), and the mockup full-width class only (preview route out of scope); amended 2026-11-15 by architecture review at TASK-141 blocker resolution (decision 2 column order and slot table, new decision 9; no status change), explicit owner confirmation pending.
+Accepted (2026-11-15) — owner decision 2026-11-15: one shared shell and list layout, server-side `PageWidth` width contract, `localStorage` navigation persistence (default expanded), and the mockup full-width class only (preview route out of scope); amended 2026-11-15 by architecture review at TASK-141 blocker resolution (decision 2 column order and slot table, new decision 9; no status change), explicit owner confirmation pending; revised 2026-11-16 (decision 4 collapsed grid track corrected after measurement; no status change).
 
 ## Date
 
@@ -64,11 +64,13 @@ Forces: one layout for a type set that changes at runtime (ADR-0017, ADR-0020); 
 
 4. **Navigation collapse is a client-side, per-browser preference with no server state.**
    - Markup: one `<button class="nav-toggle" type="button" aria-expanded="true" aria-controls="site-nav">` in the shell header on **every** page, and `<nav id="site-nav">` for the existing sidebar.
-   - State: `localStorage` key `papyrus.nav` with values `"collapsed"`/`"expanded"`. Collapsed state sets `data-nav="collapsed"` on `<html>`; CSS then removes the sidebar from the grid (`grid-template-columns: 0 minmax(0, 1fr)`), hides it from the accessibility tree (`hidden` attribute set by script), and drops the `.main` left border, so the reclaimed width is real layout width, not a negative margin.
+   - State: `localStorage` key `papyrus.nav` with values `"collapsed"`/`"expanded"`. Collapsed state sets `data-nav="collapsed"` on `<html>`; CSS then removes the sidebar from the grid (`grid-template-columns: minmax(0, 1fr)`), hides it from the accessibility tree (`hidden` attribute set by script), and drops the `.main` left border and padding, so the reclaimed width is real layout width, not a negative margin. A retained zero-width first track must not be used: the sidebar is `display: none` while collapsed, so the remaining grid item auto-places into that zero-width track and the content column collapses to 0 px; the reclaim comes from removing the sidebar item, zeroing the gap, and removing the main column border and padding (210 + 30 + 30 = 270 px).
    - No flash of the wrong state: a new asset `/assets/nav-state.js` (≈15 lines) is loaded **synchronously in `<head>`**, reads the stored value, and sets `document.documentElement.dataset.nav` before first paint. `app.js` stays `defer` and only handles the toggle and the existing form guard.
    - Default: expanded. When no stored value exists, the state is expanded at every viewport width; the current "auto-collapse below 480 px" behaviour is removed, because it competes with a persisted user preference and REQ-06.015 makes the collapsed state the user's choice. `localStorage` is the only persistence mechanism (constraint 5): no cookie, no server state, no configuration key.
    - Degradation: with JavaScript disabled the button is not rendered (`<noscript>`-style server-side omission is not possible without JS detection, so the button carries `hidden` and a two-line asset removes `hidden`), the nav is expanded and fully usable, and any `localStorage` throw (private mode, quota, disabled storage) is caught and ignored, leaving in-memory state for the session.
    - Rejected alternatives: a cookie (ADR-0005 forbids cookies and sessions, and it would make the server stateful per client), server-side state in the project or user config (a write path, a concurrency surface, and per-user state in a project file), a query parameter on every link (breaks persistence across navigation and deep links), and a CSS-only checkbox (state cannot survive navigation).
+
+   *Revision (2026-11-16): the collapsed grid previously read `grid-template-columns: 0 minmax(0, 1fr)`. That mechanism is defective and was proven so by measurement: with the sidebar `display: none`, `.main` auto-places into the zero-width first track and its rendered width becomes 0 px at 600, 720 and 1440 px. The collapsed state now uses a single track, `grid-template-columns: minmax(0, 1fr)`, which is what the shipped implementation does. No other part of decision 4 changed.*
 
 5. **CSP is unchanged by this ADR.** The nav script is an external same-origin asset, so `script-src 'self'` covers it; the toggle uses class/attribute changes only, so `style-src 'self'` is untouched. Only ADR-0025 (`font-src`) and ADR-0026 (`style-src 'unsafe-inline'` for Mermaid's SVG `<style>`) relax the policy, and only for their stated reasons.
 
@@ -147,6 +149,15 @@ Resolved by architecture review while TASK-141 was blocked on two contract quest
 **Precedence while the feature specification is stale.** `docs/specifications/browser-shell-shared-list-layout-and-page-width.md` still states the pre-amendment column order and leaves OQ-1..OQ-3 open (this review had no write access to `docs/specifications/`). This ADR governs until that specification is updated; the required specification edits are listed in TASK-141.
 
 **Ticket text to apply (TASK-141).** The reference family is `milestone` (not `task`); AC2/DoD#4 use the header sequence `ID, Title, Status, family slot(s), Created, Updated, Actions`; the parity assertion is `created` **and** `updated` in the row cells plus `labels`/`references` in the title cell; the transitional dispatch is the `list_layout` presentation field. TASK-142 migrates requirements/NFRs first, then ui-mockup, then the flat document families, then config-defined types, and treats the task family as a board-regression check only.
+
+## Amendment (2026-11-16) — collapsed grid track correction
+
+The collapsed-layout mechanism in decision 4 was wrong and is corrected; the status stays `Accepted` because no shipped behaviour is changed and the defective detail was never released.
+
+- **Correction — the collapsed grid has one track, not two.** `grid-template-columns: 0 minmax(0, 1fr)` is replaced by `grid-template-columns: minmax(0, 1fr)`. Measurement disproved the two-track form: with the sidebar `display: none`, `.main` auto-places into the retained zero-width first track and renders 0 px wide at 600, 720 and 1440 px. A zero-width first track is therefore not a valid way to reclaim the sidebar's width.
+- **Width reclaim is unchanged as a contract.** The 270 px comes from removing the sidebar item (210 px), zeroing the gap, and removing the `.main` left border and padding (30 + 30 px); the reclaim is real layout width, not a negative margin.
+- **Not changed by this amendment:** decisions 1, 2, 3, 5, 6, 7, 8, 9; `PageWidth`; CSP; the navigation model; the archive-exclusion rule; the status.
+- **Precedence.** The shipped implementation already uses the single-track form; this amendment brings the ADR in line with it. `docs/specifications/browser-shell-shared-list-layout-and-page-width.md` is corrected separately by the tech writer.
 
 ## Downstream constraints
 
