@@ -737,16 +737,28 @@ impl BrowserRoutes {
         selected.is_some() && selected == self.decision_view.as_deref()
     }
 
+    /// The backlog board's slug, resolved from the Backlog nav group.
+    ///
+    /// The board is the only route whose descriptor handler is `Task`, so the
+    /// aggregate Backlog group names the only uncapped surface.
+    pub fn board_slug(&self) -> Option<&str> {
+        self.nav
+            .iter()
+            .find(|item| item.group == NavGroup::Backlog)
+            .map(|item| item.slug.as_str())
+    }
+
     /// Server-side content-width decision for a route (ADR-0028 decision 3).
     ///
-    /// Every route is `Capped` in this ticket. The backlog board is the only
-    /// future `Full` surface (TASK-144); no other route may return `Full`
-    /// without an ADR amendment.
-    pub fn page_width(&self, _slug: &str) -> PageWidth {
-        // TASK-144 owns the board's `Full` classification. No route is
-        // uncapped in this ticket, and a new `Full` route needs an ADR
-        // amendment.
-        PageWidth::Capped
+    /// `Full` is reserved for the backlog board, resolved from the route table.
+    /// Every other route, including the empty slug used by inventory,
+    /// lifecycle, config, skills, and error pages, is `Capped`.
+    pub fn page_width(&self, slug: &str) -> PageWidth {
+        if self.board_slug() == Some(slug) {
+            PageWidth::Full
+        } else {
+            PageWidth::Capped
+        }
     }
 
     /// Choose the not-found page for an ID, if an enabled type claims it.
@@ -852,12 +864,15 @@ mod tests {
     }
 
     #[test]
-    fn page_width_is_capped_for_every_enabled_slug() {
+    fn page_width_is_full_only_for_the_board_slug() {
         let cfg = Config::default();
         let registry = ArtifactRegistry::build(&cfg).expect("registry");
         let routes = BrowserRoutes::build(&registry);
+        let board = routes.board_slug().expect("board slug");
+        assert_eq!(board, "task");
+        assert_eq!(routes.page_width(board), PageWidth::Full);
         for descriptor in registry.descriptors() {
-            if !descriptor.enabled {
+            if !descriptor.enabled || descriptor.slug == board {
                 continue;
             }
             assert_eq!(
@@ -869,6 +884,7 @@ mod tests {
         }
         assert_eq!(routes.page_width(&routes.default_type), PageWidth::Capped);
         assert_eq!(routes.page_width(""), PageWidth::Capped);
+        assert_eq!(routes.page_width("task-list"), PageWidth::Capped);
     }
 
     #[test]

@@ -405,7 +405,7 @@ fn milestone_content_management_flow() {
         body.contains("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">")
     );
     assert!(body.contains("aria-expanded=\"true\""));
-    assert!(body.contains("aria-controls=\"type-list\""));
+    assert!(body.contains("aria-controls=\"site-nav\""));
 
     let lc = server.get("/lifecycle");
     assert_eq!(lc.status, 200);

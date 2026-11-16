@@ -416,9 +416,9 @@ fn milestone_search_and_browser_flow() {
                 "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
             )
         );
-        assert!(html.contains("sidebar-toggle"));
+        assert!(html.contains("nav-toggle"));
         assert!(html.contains("aria-expanded="));
-        assert!(html.contains("aria-controls=\"type-list\""));
+        assert!(html.contains("aria-controls=\"site-nav\""));
         assert!(html.contains("footer-long"));
         assert!(html.contains("footer-short"));
         assert_no_external_reference("served HTML", html);
@@ -482,7 +482,10 @@ fn installed_layout_has_no_runtime_asset_dependency() {
     assert!(css.text().contains("body"), "CSS body missing");
     let js = server.get("/assets/app.js");
     assert_eq!(js.status, 200);
-    assert!(js.text().contains("sidebar"), "JS sidebar hook missing");
+    assert!(
+        js.text().contains("nav-toggle"),
+        "JS navigation hook missing"
+    );
 
     drop(server);
     let _ = fs::remove_dir_all(&root);

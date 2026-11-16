@@ -417,7 +417,7 @@ fn milestone_ui_mockups_flow() {
         list.contains("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">")
     );
     assert!(list.contains("aria-expanded=\"true\""));
-    assert!(list.contains("aria-controls=\"type-list\""));
+    assert!(list.contains("aria-controls=\"site-nav\""));
     assert!(list.contains("footer-long"));
     assert!(list.contains("footer-short"));
     assert!(res.header("Content-Security-Policy").is_some());

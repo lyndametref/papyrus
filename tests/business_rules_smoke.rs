@@ -470,7 +470,7 @@ fn milestone_business_rules_flow() {
         list.contains("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">")
     );
     assert!(list.contains("aria-expanded=\"true\""));
-    assert!(list.contains("aria-controls=\"type-list\""));
+    assert!(list.contains("aria-controls=\"site-nav\""));
     assert!(res.header("Content-Security-Policy").is_some());
     assert_no_external_refs(&list, "list");
 

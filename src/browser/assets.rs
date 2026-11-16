@@ -33,6 +33,11 @@ pub static ASSETS: &[Asset] = &[
         bytes: include_bytes!("app.js"),
     },
     Asset {
+        path: "/assets/nav-state.js",
+        mime: JS,
+        bytes: include_bytes!("nav-state.js"),
+    },
+    Asset {
         path: "/assets/katex/katex.min.css",
         mime: CSS,
         bytes: include_bytes!("vendor/katex/0.16.11/katex.min.css"),

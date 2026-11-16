@@ -2213,9 +2213,9 @@ fn t28_accessibility_and_compatibility_basics() {
         assert!(list.contains(landmark), "missing {}", landmark);
     }
     assert!(list.contains("aria-current=\"page\""));
-    assert!(list.contains("aria-controls=\"type-list\""));
+    assert!(list.contains("aria-controls=\"site-nav\""));
     assert!(list.contains("aria-expanded="));
-    assert!(list.contains("sidebar-toggle"));
+    assert!(list.contains("nav-toggle"));
 
     let edit = get(&server, "/doc/REQ-001.001/edit").text();
     assert!(edit.contains("<label for=\"story\">"));

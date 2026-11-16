@@ -11,6 +11,13 @@ use crate::browser::routes::PageWidth;
 /// The shell template, embedded at compile time.
 pub const SHELL_TEMPLATE: &str = include_str!("templates/shell.html");
 
+/// The single navigation-toggle declaration (ADR-0028 decision 4).
+///
+/// The shell owns it, so every page carries the same control. `hidden` is in
+/// the server output: without JavaScript the control cannot act, so it is not
+/// offered. `/assets/nav-state.js` removes `hidden` for scripted clients.
+pub const NAV_TOGGLE: &str = "<button class=\"nav-toggle\" type=\"button\" aria-expanded=\"true\" aria-controls=\"site-nav\" hidden>Navigation</button>";
+
 /// One page wrapped in the shell.
 #[derive(Clone, Copy)]
 pub struct Page<'a> {
@@ -26,8 +33,6 @@ pub struct Page<'a> {
     pub main: &'a str,
     /// Server-side content-width decision for the route.
     pub width: PageWidth,
-    /// Navigation-toggle slot; empty until TASK-144 fills it.
-    pub nav_toggle: &'a str,
 }
 
 /// The `class` attribute value for a page width.
@@ -50,7 +55,7 @@ pub fn render(page: Page<'_>) -> String {
             ("app_class", app_class),
         ],
         &[
-            ("nav_toggle", page.nav_toggle),
+            ("nav_toggle", NAV_TOGGLE),
             ("sidebar", page.sidebar),
             ("main", page.main),
         ],
@@ -69,7 +74,6 @@ mod tests {
             sidebar: "<nav id=\"site-nav\">nav</nav>",
             main: "<h1 class=\"h1\">Milestones</h1>",
             width,
-            nav_toggle: "",
         })
     }
 
@@ -95,10 +99,25 @@ mod tests {
     }
 
     #[test]
-    fn full_width_emits_the_reserved_class_without_css() {
+    fn full_width_emits_the_reserved_class() {
         let html = page(PageWidth::Full);
         assert!(html.contains("<div class=\"app app--full\">"));
-        assert!(!include_str!("app.css").contains(".app--full"));
+        assert!(include_str!("app.css").contains(".app--full"));
+    }
+
+    #[test]
+    fn every_width_renders_one_hidden_nav_toggle() {
+        for width in [PageWidth::Capped, PageWidth::Full] {
+            let html = page(width);
+            assert_eq!(html.matches("<button class=\"nav-toggle\"").count(), 1);
+            assert_eq!(html.matches("</button>").count(), 1);
+            assert!(html.contains("type=\"button\""));
+            assert!(html.contains("aria-expanded=\"true\""));
+            assert!(html.contains("aria-controls=\"site-nav\""));
+            assert!(html.contains(">Navigation</button>"));
+            assert!(html.contains("aria-controls=\"site-nav\" hidden>"));
+            assert!(!html.contains("data-nav"));
+        }
     }
 
     #[test]
@@ -110,7 +129,6 @@ mod tests {
             sidebar: "",
             main: "",
             width: PageWidth::Capped,
-            nav_toggle: "",
         });
         assert!(html.contains("&lt;title&gt;"));
         assert!(html.contains("<span class=\"project\">&amp;</span>"));

@@ -88,7 +88,6 @@ fn page(
         sidebar,
         main: &body,
         width: chrome.routes.page_width(slug.unwrap_or_default()),
-        nav_toggle: "",
     })
 }
 
@@ -194,9 +193,7 @@ fn build_sidebar(
     }
     format!(
         "<aside class=\"sidebar\">\
-<button class=\"sidebar-toggle\" type=\"button\" aria-expanded=\"true\" aria-controls=\"type-list\">\
-<span>Document types</span> <span aria-hidden=\"true\">&#9662;</span></button>\
-<nav aria-label=\"Document types\">\
+<nav id=\"site-nav\" aria-label=\"Document types\">\
 <p class=\"sidebar-label\" aria-hidden=\"true\">Document types</p>\
 <ul id=\"type-list\">{}</ul>\
 </nav>\
@@ -845,6 +842,7 @@ pub fn board_page(
     cleanup: Option<&BoardCleanup<'_>>,
     chrome: Chrome<'_>,
 ) -> String {
+    let board_slug = chrome.routes.board_slug().unwrap_or_default();
     let mut section = String::new();
     if let Some(alert) = alert {
         section.push_str(&format!(
@@ -863,14 +861,7 @@ pub fn board_page(
     }
 
     if tasks.is_empty() && milestones.is_empty() {
-        let task_slug = chrome
-            .routes
-            .nav
-            .iter()
-            .find(|item| item.group == NavGroup::Backlog)
-            .map(|item| item.slug.as_str())
-            .unwrap_or_default();
-        section.push_str(&board_empty_section(task_slug));
+        section.push_str(&board_empty_section(board_slug));
     } else {
         // The no-release group comes first, then every active release in
         // ascending ID order. A dangling release reference belongs to the
@@ -974,18 +965,9 @@ pub fn board_page(
     );
     page(
         chrome,
-        None,
+        Some(board_slug),
         "Papyrus \u{2014} Backlog",
-        &sidebar(
-            chrome
-                .routes
-                .nav
-                .iter()
-                .find(|item| item.group == NavGroup::Backlog)
-                .map(|item| item.slug.as_str()),
-            cfg,
-            chrome.routes,
-        ),
+        &sidebar(Some(board_slug), cfg, chrome.routes),
         body,
     )
 }

@@ -350,7 +350,7 @@ fn assert_markup_hooks(page: &str, name: &str) {
         "{name} lacks aria-expanded"
     );
     assert!(
-        page.contains("aria-controls=\"type-list\""),
+        page.contains("aria-controls=\"site-nav\""),
         "{name} lacks the sidebar toggle target"
     );
 }

@@ -52,7 +52,7 @@ impl Server {
         panic!("server did not start");
     }
 
-    fn get(&self, path: &str) -> String {
+    fn get_raw(&self, path: &str) -> String {
         let mut stream = TcpStream::connect(("127.0.0.1", self.port)).unwrap();
         write!(
             stream,
@@ -62,11 +62,29 @@ impl Server {
         .unwrap();
         let mut raw = Vec::new();
         stream.read_to_end(&mut raw).unwrap();
-        let text = String::from_utf8_lossy(&raw).to_string();
-        text.split_once("\r\n\r\n")
+        String::from_utf8_lossy(&raw).to_string()
+    }
+
+    fn get(&self, path: &str) -> String {
+        Self::body(&self.get_raw(path))
+    }
+
+    fn body(raw: &str) -> String {
+        raw.split_once("\r\n\r\n")
             .map(|(_, body)| body.to_string())
             .unwrap_or_default()
     }
+}
+
+fn header_value(raw: &str, name: &str) -> Option<String> {
+    raw.split_once("\r\n\r\n")
+        .map(|(head, _)| head)?
+        .lines()
+        .find_map(|line| {
+            let (key, value) = line.split_once(':')?;
+            key.eq_ignore_ascii_case(name)
+                .then(|| value.trim().to_string())
+        })
 }
 
 impl Drop for Server {
@@ -126,17 +144,25 @@ fn every_page_renders_the_shell_exactly_once() {
         );
         assert_eq!(html.matches("<header").count(), 1, "{path} header");
         assert_eq!(
-            html.matches("<nav aria-label=\"Document types\">").count(),
+            html.matches("<nav id=\"site-nav\" aria-label=\"Document types\">")
+                .count(),
             1,
             "{path} shell navigation"
         );
         assert_eq!(html.matches("<main").count(), 1, "{path} main");
         assert_eq!(html.matches("<footer").count(), 1, "{path} footer");
         assert_eq!(html.matches("</html>").count(), 1, "{path} document end");
-        assert!(
-            !html.contains("app--full"),
-            "{path} must stay on the capped width class"
-        );
+        if path == "/?type=task" {
+            assert!(
+                html.contains("<div class=\"app app--full\">"),
+                "{path} is the board and must render full width"
+            );
+        } else {
+            assert!(
+                !html.contains("app--full"),
+                "{path} must stay on the capped width class"
+            );
+        }
         assert!(
             !html.contains("<div class=\"app\"><div class=\"app\""),
             "{path} must not nest shells"
@@ -145,18 +171,164 @@ fn every_page_renders_the_shell_exactly_once() {
 }
 
 #[test]
+fn every_page_carries_one_hidden_nav_toggle_and_no_preset_state() {
+    let server = Server::start(&fixture_root().join("project"));
+    for path in shell_pages() {
+        let html = server.get(path);
+        assert_eq!(
+            html.matches("<button class=\"nav-toggle\"").count(),
+            1,
+            "{path} has exactly one toggle"
+        );
+        assert!(
+            html.contains(
+                "type=\"button\" aria-expanded=\"true\" aria-controls=\"site-nav\" hidden>Navigation</button>"
+            ),
+            "{path} toggle contract"
+        );
+        assert!(
+            html.contains("<nav id=\"site-nav\" aria-label=\"Document types\">"),
+            "{path} controls the un-hidden navigation"
+        );
+        assert!(
+            !html.contains("data-nav"),
+            "{path} must not preselect a collapsed state"
+        );
+    }
+}
+
+#[test]
 fn width_class_is_server_side_only() {
     let css = include_str!("../src/browser/app.css");
-    let js = include_str!("../src/browser/app.js");
+    let app_js = include_str!("../src/browser/app.js");
+    let nav_js = include_str!("../src/browser/nav-state.js");
     assert!(
-        !css.contains(".app--full"),
-        "TASK-144 owns the full-width CSS"
+        css.contains(".app--full { max-width: none; }"),
+        "the full-width class lifts only the cap"
     );
     assert!(
-        !js.contains("app--full"),
+        css.contains(".app { max-width: 1040px; margin: 0 auto; padding: 0 24px 56px; }"),
+        "the capped width stays unchanged"
+    );
+    assert!(
+        !app_js.contains("app--full"),
         "no script may change the width class"
     );
-    assert!(!js.contains("PageWidth"), "no script decides the width");
+    assert!(!nav_js.contains("app--full"));
+    assert!(!app_js.contains("PageWidth"), "no script decides the width");
+}
+
+#[test]
+fn board_is_full_width_and_every_other_route_is_capped() {
+    let server = Server::start(&fixture_root().join("project"));
+    for path in shell_pages() {
+        let html = server.get(path);
+        if path == "/?type=task" {
+            assert!(
+                html.contains("<div class=\"app app--full\">"),
+                "{path} is the board"
+            );
+        } else {
+            assert!(html.contains("<div class=\"app\">"), "{path} is capped");
+            assert!(!html.contains("app--full"), "{path} is not the board");
+        }
+    }
+}
+
+#[test]
+fn pages_serve_the_unchanged_csp_and_only_external_scripts() {
+    let server = Server::start(&fixture_root().join("project"));
+    for path in ["/", "/?type=task", "/?type=req"] {
+        let raw = server.get_raw(path);
+        assert_eq!(
+            header_value(&raw, "Content-Security-Policy").as_deref(),
+            Some(papyrus::browser::http::CSP),
+            "{path} CSP"
+        );
+        let html = Server::body(&raw);
+        assert!(
+            html.contains("<script src=\"/assets/nav-state.js\"></script>"),
+            "{path} loads the pre-paint script synchronously"
+        );
+        assert!(
+            html.contains("<script src=\"/assets/app.js\" defer></script>"),
+            "{path} keeps the deferred app script"
+        );
+        for (index, _) in html.match_indices("<script") {
+            assert!(
+                html[index + "<script".len()..].starts_with(" src=\""),
+                "{path} has an inline script element"
+            );
+        }
+        assert!(!html.contains("<script>"), "{path} inline script body");
+    }
+}
+
+#[test]
+fn pages_have_no_inline_script_style_or_event_handler() {
+    let server = Server::start(&fixture_root().join("project"));
+    for path in shell_pages() {
+        let html = server.get(path);
+        for needle in ["onclick=", " onchange=", " style=", "<script>"] {
+            assert!(
+                !html.contains(needle),
+                "{path} contains inline markup: {needle}"
+            );
+        }
+    }
+}
+
+#[test]
+fn nav_state_asset_is_served_synchronously_and_stays_small() {
+    let server = Server::start(&fixture_root().join("project"));
+    let raw = server.get_raw("/assets/nav-state.js");
+    assert!(raw.starts_with("HTTP/1.1 200"), "status line: {raw:.80}");
+    assert_eq!(
+        header_value(&raw, "Content-Type").as_deref(),
+        Some("text/javascript; charset=utf-8")
+    );
+    let body = Server::body(&raw);
+    assert!(body.len() < 1024, "nav-state.js is {} bytes", body.len());
+    assert!(body.contains("localStorage.getItem(\"papyrus.nav\")"));
+    assert!(body.contains("\"collapsed\""));
+    assert!(body.contains("data-nav"));
+    assert!(body.contains("removeAttribute(\"hidden\")"));
+}
+
+#[test]
+fn toggle_width_and_bleed_contracts_are_in_the_assets() {
+    let css = include_str!("../src/browser/app.css");
+    let app_js = include_str!("../src/browser/app.js");
+    let nav_js = include_str!("../src/browser/nav-state.js");
+
+    assert!(css.contains(":root[data-nav=\"collapsed\"] .layout"));
+    assert!(css.contains("grid-template-columns: 0 minmax(0, 1fr); gap: 0;"));
+    assert!(css.contains(":root[data-nav=\"collapsed\"] .sidebar { display: none; }"));
+    assert!(
+        css.contains(":root[data-nav=\"collapsed\"] .main { border-left: 0; padding-left: 0; }")
+    );
+    assert!(css.contains(".nav-toggle[hidden] { display: none; }"));
+    assert!(css.contains(".bleed { width: 100%; overflow-x: auto; }"));
+    assert!(css.contains(".bleed:focus-visible"));
+    assert!(!css.contains("100vw"), "no viewport-unit breakout");
+    assert!(
+        css.contains("flex-wrap: wrap; align-items: baseline;"),
+        "section head wraps"
+    );
+    assert!(!css.contains("sidebar-toggle"));
+    assert!(!css.contains("data-collapsed"));
+
+    assert!(!app_js.contains("matchMedia"));
+    assert!(!app_js.contains("sidebar-toggle"));
+    assert!(
+        !app_js.contains("viewport"),
+        "no automatic viewport collapse"
+    );
+    assert!(app_js.contains("form[data-dirty-guard]"));
+    assert!(app_js.contains("localStorage.setItem(\"papyrus.nav\""));
+
+    assert!(nav_js.contains("try {"));
+    assert!(nav_js.contains("document.readyState === \"loading\""));
 }
 
 #[test]

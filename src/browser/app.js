@@ -3,45 +3,40 @@
 (function () {
   "use strict";
 
-  var toggle = document.querySelector(".sidebar-toggle");
-  var typeList = document.getElementById("type-list");
-  var narrow = window.matchMedia ? window.matchMedia("(max-width: 480px)") : null;
+  var navToggle = document.querySelector(".nav-toggle");
+  var siteNav = document.getElementById("site-nav");
 
-  function setCollapsed(collapsed) {
-    if (!typeList || !toggle) {
-      return;
-    }
+  function applyNav(collapsed) {
     if (collapsed) {
-      typeList.setAttribute("data-collapsed", "true");
-      toggle.setAttribute("aria-expanded", "false");
+      document.documentElement.setAttribute("data-nav", "collapsed");
     } else {
-      typeList.removeAttribute("data-collapsed");
-      toggle.setAttribute("aria-expanded", "true");
+      document.documentElement.removeAttribute("data-nav");
     }
-  }
-
-  function applyViewport() {
-    if (narrow && narrow.matches) {
-      if (typeList && !typeList.hasAttribute("data-collapsed")) {
-        setCollapsed(true);
+    if (navToggle) {
+      navToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    }
+    if (siteNav) {
+      if (collapsed) {
+        siteNav.setAttribute("hidden", "");
+      } else {
+        siteNav.removeAttribute("hidden");
       }
-    } else {
-      setCollapsed(false);
     }
   }
 
-  if (toggle && typeList) {
-    toggle.addEventListener("click", function () {
-      setCollapsed(typeList.getAttribute("data-collapsed") !== "true");
+  if (navToggle) {
+    applyNav(document.documentElement.getAttribute("data-nav") === "collapsed");
+    navToggle.addEventListener("click", function () {
+      var collapsed =
+        document.documentElement.getAttribute("data-nav") === "collapsed";
+      var next = collapsed ? "expanded" : "collapsed";
+      applyNav(next === "collapsed");
+      try {
+        localStorage.setItem("papyrus.nav", next);
+      } catch (e) {
+        /* Storage unavailable: the session keeps toggling in memory. */
+      }
     });
-    applyViewport();
-    if (narrow) {
-      if (narrow.addEventListener) {
-        narrow.addEventListener("change", applyViewport);
-      } else if (narrow.addListener) {
-        narrow.addListener(applyViewport);
-      }
-    }
   }
 
   var form = document.querySelector("form[data-dirty-guard]");
