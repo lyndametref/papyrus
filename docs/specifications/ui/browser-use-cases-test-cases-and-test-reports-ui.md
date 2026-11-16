@@ -14,7 +14,7 @@ All three types share the same field set: title (required) and description (requ
 
 ## 2. Shared shell
 
-Header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types" with entries (Business requirements, Business Rules, Audit Records, Technical Specifications, Use Cases, Test Cases, Test Reports, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications, UI Mockups, Managed artifacts &amp; lifecycles, Agent skills &amp; workflows), `main`, footer, one `h1` per page. Selected entry bold + underline + `aria-current="page"`. The 320 px sidebar collapses behind an accessible toggle.
+Header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types" with entries (Business requirements, Business Rules, Audit Records, Technical Specifications, Use Cases, Test Cases, Test Reports, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications, UI Mockups, Managed artifacts &amp; lifecycles, Agent skills &amp; workflows), `main`, footer, one `h1` per page. Selected entry bold + underline + `aria-current="page"`. The header navigation toggle collapses and expands the sidebar at every width; it defaults to expanded and the reader's choice persists in `papyrus.nav`.
 
 Prior entries (all except Use Cases, Test Cases, Test Reports) are non-clickable in this extension package; only the three new types have generated views.
 
@@ -42,7 +42,7 @@ The review file links the shared wireframe stylesheet (`wireframe.css`) and load
 - Each row's primary link text is `ID + title` and links to `/doc/{id}`.
 - The list uses the shared contract in `browser-shell-ui.md` §3: no family slot, the structural Status/Created/Updated columns, and Title-cell labels/references; there is no description preview.
 - The former row metadata is replaced by the Created/Updated columns and the Title-cell labels/references (front-matter projection).
-- Empty state: "No <type> were found in the configured directory. <Type> are created from the command line; this browser does not create records. Deprecated <type> are hidden." Long-title and unbreakable-token wrapping follow the baseline.
+- Empty state: the shared pair `No {noun} in this project.` and `Records are created from the command line; this browser does not create records.` (delivery record A6); there is no per-family copy, and archived records are never listed or counted. Long-title and unbreakable-token wrapping follow the baseline.
 - Deprecated records are never listed or counted.
 
 ## 5. Record view

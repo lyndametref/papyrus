@@ -7,7 +7,7 @@ status: Implemented
 assignee:
   - '@business-analyst'
 created_date: '2026-11-15T16:14:00Z'
-updated_date: '2026-11-16T09:27:00Z'
+updated_date: '2026-11-16T09:37:00Z'
 labels:
   - docs
   - specifications
@@ -399,6 +399,20 @@ Correction round after independent review (2026-11-16 UTC). Scope bookkeeping:
 (c) **`browser-ui-mockups.md` write contract.** Changed "metadata lines" to "metadata comment lines" (and the same in the insertion rule and T-40e) because the field-preserving write path only edits the `<!-- specs: -->` / `<!-- refs: -->` comments; the visible `<p>` lines are rewritten only when already present. The old wording overstated what is written and could imply whole-file regeneration.
 
 Conflict register: added C6 (diagram `.bleed`/scroll-container accessibility gap; owners TASK-146/TASK-150) and C7 (REQ-06.015 mockup full-width class gap).
+
+---
+
+author: @business-analyst
+created: 2026-11-16T09:37:00Z
+
+---
+
+Final consistency pass after re-review (2026-11-16 UTC).
+
+- **Additional in-scope page:** `docs/specifications/ui/browser-front-matter-and-lifecycle-ui.md` §2 (line 14) and §5 (line 42) carried the same 320 px auto-collapse claim; both now state expanded-by-default at every width with the persisted `papyrus.nav` toggle.
+- **Adjacent same-class page:** `docs/specifications/browser-spec-revisions-task-102.md` §Surfaces line 38 (`320 px sidebar toggle`) was corrected to the same rule so the corpus has no residual width-specific navigation claim.
+- **MOCK-0001 decision:** `docs/specifications/browser-requirements.md` §UI design handoff describes the approved 2026-11-03 package as built. Decision: leave that historical screen description intact (including the 320 px collapsed-sidebar line) and add a one-line historical note above the block stating that historical mockup descriptions are not updated to later contracts.
+- **Other residual lines:** `browser-complete-access.md` §6.1 now says templates are embedded and rendered server-side, with only `/assets/*` files from the static asset table; `ui/browser-technical-specifications-ui.md` §2 and `ui/browser-use-cases-test-cases-and-test-reports-ui.md` §2 use the every-width persisted toggle; `ui/browser-use-cases-test-cases-and-test-reports-ui.md` §4 now uses the shared empty-state pair (`No {noun} in this project.` plus the command-line help line; delivery record A6) instead of the legacy "were found in the configured directory"/"Deprecated … are hidden" copy.
 
 ---
 <!-- COMMENTS:END -->

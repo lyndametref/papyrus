@@ -79,7 +79,7 @@ Final integration increment of the offline, project-local web interface: one nav
 
 ### 6. Rendering, security, and accessibility
 
-1. All baseline rules from `docs/specifications/browser-requirements.md` sections 6, 9, and 10 apply unchanged: embedded templates and assets served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, the CSP response classes in §9.7, security headers, Host/Origin validation, request limits, timeouts, and no external resources.
+1. All baseline rules from `docs/specifications/browser-requirements.md` sections 6, 9, and 10 apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, the CSP response classes in §9.7, security headers, Host/Origin validation, request limits, timeouts, and no external resources.
 2. The interface renders and is usable without JavaScript: the inventory cards are plain links, the navigation is expanded and usable, and no toggle is offered.
 3. Focus order follows document order; every interactive control has a visible label or accessible name.
 4. The header navigation toggle collapses and expands the sidebar at every width, defaulting to expanded and persisting the choice in `papyrus.nav`; card content stacks at 320 CSS px and no page-level horizontal scrolling occurs.

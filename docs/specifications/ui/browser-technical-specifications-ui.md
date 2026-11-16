@@ -14,7 +14,7 @@ Technical specifications have two fields: title (required) and description (requ
 
 ## 2. Shared shell
 
-Header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types" with entries (Business requirements, Business Rules, Audit Records, Technical Specifications, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications, UI Mockups), `main`, footer, one `h1` per page. Selected entry bold + underline + `aria-current="page"`. The 320 px sidebar collapses behind an accessible toggle.
+Header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types" with entries (Business requirements, Business Rules, Audit Records, Technical Specifications, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications, UI Mockups), `main`, footer, one `h1` per page. Selected entry bold + underline + `aria-current="page"`. The header navigation toggle collapses and expands the sidebar at every width; it defaults to expanded and the reader's choice persists in `papyrus.nav`.
 
 Prior entries (Business requirements, Business Rules, Audit Records, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications, UI Mockups) are non-clickable in this extension package; only Technical Specifications has generated views.
 

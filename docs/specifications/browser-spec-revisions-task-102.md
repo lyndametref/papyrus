@@ -35,7 +35,7 @@ This ticket is UI design work only. It does not change requirements, business ru
 
 ## Surfaces the revised package must cover (MOCK-0002)
 
-1. **Shared shell** (reused from the approved baseline): header, sidebar with the Backlog entry, `main`, footer, one `h1` per page, 320 px sidebar toggle.
+1. **Shared shell** (reused from the approved baseline): header, sidebar with the Backlog entry, `main`, footer, one `h1` per page, header navigation toggle (expanded by default at every width, state persisted in `papyrus.nav`).
 2. **Backlog board** (`/?type=task`, Backlog entry): milestones as expandable/collapsible sections; expanded milestone renders its tasks as a kanban board (one column per configured status, configured order, empty columns visible); milestones grouped by release with a bold named separator (no-release group before the first release); a tasks-without-milestone section after all milestones; cards showing ID + title linking to the record view (`/doc/{id}`); drag-and-drop status change; equivalent non-drag (pointer-free) status control; failed-persistence state (card in original column, failure reported); 320 px layout.
 3. **Milestone list** (`/?type=milestone`): rows with ID + title link and release; empty state (unchanged).
 4. **Release list** (`/?type=release`): rows with ID + title link; empty state (unchanged).

@@ -464,6 +464,8 @@ The approved package is the authoritative layout reference for this increment. W
 
 ### Screens covered by the approved package
 
+**Historical note:** this block describes the approved MOCK-0001 package as built on 2026-11-03; historical mockup descriptions are not updated to later contracts. For example, its 320 px view draws the sidebar collapsed, while the delivered shell is expanded by default at every width with a persisted toggle.
+
 1. **Requirement list (home, `/`).**
    - Shared shell: header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types", `main`, `footer`.
    - Two category states: Business requirements (default, `/?type=req`) and Non-functional requirements (`/?type=nfr`), each rendering only its own `h2` section through the shared list contract in `browser-shell-ui.md` §3, with group rows and member rows in one table.
