@@ -3445,6 +3445,21 @@ fn t147b_cleanup_preview_and_cancel() {
     let first = region.find("TASK-001").expect("TASK-001 in preview");
     let second = region.find("TASK-002").expect("TASK-002 in preview");
     assert!(first < second, "ascending ID order");
+    // Each affected task is rendered as its ID plus its title (AC2), asserted
+    // as the exact pair text rather than the title alone, in the same order.
+    let pair_one = "<li><strong>TASK-001</strong> \u{2014} Task One</li>";
+    let pair_two = "<li><strong>TASK-002</strong> \u{2014} Task Two</li>";
+    assert!(
+        region.contains(pair_one),
+        "TASK-001 rendered as ID plus title"
+    );
+    assert!(
+        region.contains(pair_two),
+        "TASK-002 rendered as ID plus title"
+    );
+    let pair_one_at = region.find(pair_one).expect("TASK-001 pair");
+    let pair_two_at = region.find(pair_two).expect("TASK-002 pair");
+    assert!(pair_one_at < pair_two_at, "pairs in ascending ID order");
     for absent in ["TASK-003", "TASK-004", "TASK-005", "TASK-006"] {
         assert!(!region.contains(absent), "{} must not be previewed", absent);
     }
