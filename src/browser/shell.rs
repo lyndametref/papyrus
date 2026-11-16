@@ -48,8 +48,17 @@ pub fn width_class(width: PageWidth) -> &'static str {
 /// Render a page inside the shell, exactly once.
 pub fn render(page: Page<'_>) -> String {
     let app_class = width_class(page.width);
+    // A math-free page must stay byte-identical apart from the documented
+    // deltas, so the empty asset slot does not leave a blank line behind.
+    let without_slot;
+    let template = if page.assets.is_empty() {
+        without_slot = SHELL_TEMPLATE.replacen("{{asset_links}}\n", "", 1);
+        without_slot.as_str()
+    } else {
+        SHELL_TEMPLATE
+    };
     render_template(
-        SHELL_TEMPLATE,
+        template,
         &[
             ("title", page.title),
             ("project", page.project),
@@ -106,6 +115,10 @@ mod tests {
     fn math_assets_default_to_nothing_and_are_raw_when_present() {
         let html = page(PageWidth::Capped);
         assert!(!html.contains("/assets/katex/"));
+        assert!(
+            html.contains("app.css\">\n<script src=\"/assets/nav-state.js\">"),
+            "the empty asset slot leaves no blank line"
+        );
         let with_assets = render(Page {
             title: "Papyrus \u{2014} Math",
             project: "Demo",
