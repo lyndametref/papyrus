@@ -1,3 +1,12 @@
+---
+id: "BR-005:"
+title: "Papyrus task Command Behavior"
+created_date: '2026-11-15T18:43:14Z'
+updated_date: '2026-11-16T16:57:06Z'
+labels: []
+references: []
+status: active
+---
 # BR-005: Papyrus task Command Behavior
 
 ## Description

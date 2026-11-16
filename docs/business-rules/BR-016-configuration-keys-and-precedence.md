@@ -1,3 +1,12 @@
+---
+id: "BR-016:"
+title: "Papyrus Configuration Keys and Precedence"
+created_date: '2026-11-15T18:37:54Z'
+updated_date: '2026-11-16T16:57:06Z'
+labels: []
+references: []
+status: active
+---
 # BR-016: Papyrus Configuration Keys and Precedence
 
 ## Description

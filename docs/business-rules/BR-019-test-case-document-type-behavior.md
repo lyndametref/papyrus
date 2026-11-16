@@ -1,3 +1,12 @@
+---
+id: "BR-019:"
+title: "Test-Case Document Type Behavior"
+created_date: '2026-11-14T18:39:51Z'
+updated_date: '2026-11-16T16:57:06Z'
+labels: []
+references: []
+status: active
+---
 # BR-019: Test-Case Document Type Behavior
 
 ## Description

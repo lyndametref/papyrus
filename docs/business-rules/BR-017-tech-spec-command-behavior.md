@@ -1,3 +1,12 @@
+---
+id: "BR-017:"
+title: "Papyrus tech-spec Command Behavior"
+created_date: '2026-11-14T18:39:51Z'
+updated_date: '2026-11-16T16:57:07Z'
+labels: []
+references: []
+status: active
+---
 # BR-017: Papyrus tech-spec Command Behavior
 
 ## Description

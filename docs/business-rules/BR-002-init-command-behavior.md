@@ -1,3 +1,12 @@
+---
+id: "BR-002:"
+title: "Papyrus init Command Behavior"
+created_date: '2026-11-12T07:02:21Z'
+updated_date: '2026-11-16T16:57:07Z'
+labels: []
+references: []
+status: active
+---
 # BR-002: Papyrus init Command Behavior
 
 ## Description

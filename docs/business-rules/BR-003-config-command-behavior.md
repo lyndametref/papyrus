@@ -1,3 +1,12 @@
+---
+id: "BR-003:"
+title: "Papyrus config Command Behavior"
+created_date: '2026-11-01T20:26:25Z'
+updated_date: '2026-11-16T16:57:06Z'
+labels: []
+references: []
+status: active
+---
 # BR-003: Papyrus config Command Behavior
 
 ## Description

@@ -1,3 +1,12 @@
+---
+id: "BR-001:"
+title: "Papyrus Command Behavior"
+created_date: '2026-11-15T18:37:44Z'
+updated_date: '2026-11-16T16:57:06Z'
+labels: []
+references: []
+status: active
+---
 # BR-001: Papyrus Command Behavior
 
 ## Description

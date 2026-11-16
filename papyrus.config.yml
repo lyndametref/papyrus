@@ -6,15 +6,9 @@ id_padding: 3
 date_format: yyyy-mm-dd
 editor: null
 backlog_directory: backlog/
-decision_directory: docs/architecture/adr
+decision_directory: decisions/
 doc_directory: docs/
-statuses:
-- ToDo
-- Initiated
-- Refined
-- Implemented
-- Validated
-- Done
+statuses: [ToDo, In-Progress, Done]
 default_status: ToDo
 decision_types:
   adr:
@@ -26,40 +20,61 @@ decision_types:
 document_types:
   audit:
     prefix: AUD
-    directory: audit-records/
+    directory: audits/
     enabled: true
-  deploy:
-    prefix: DEP
-    directory: architecture/deployment/
-    enabled: false
+    statuses: [active, issued, approved, archived]
   glossary:
     prefix: GLO
-    directory: domain-model/business-glossary
+    directory: domain-model/glossary/
     enabled: true
+    statuses: [active, draft, verified, archived]
   nfr:
     prefix: NFR
     directory: requirements/non-functional/
     enabled: true
+    statuses: [active, draft, verified, archived]
   req:
     prefix: REQ
     directory: requirements/business/
     enabled: true
+    statuses: [active, draft, verified, archived]
   rule:
-    prefix: RUL
+    prefix: BR
     directory: business-rules/
     enabled: true
+    statuses: [active, draft, verified, archived]
   tech-spec:
     prefix: TECH
     directory: specifications/technical
     enabled: true
+    statuses: [active, draft, verified, archived]
+  test-case:
+    prefix: TC
+    directory: test-cases/
+    enabled: true
+    statuses: [active, draft, approved, archived]
   ui-mockup:
     prefix: MOCK
     directory: specifications/ui/mockups/
-    enabled: true
+    statuses: [draft, approved, archived]
+     enabled: true
   ui-spec:
     prefix: UI
     directory: specifications/ui/
     enabled: true
+    statuses: [active, draft, verified, archived]
+  release-reports:
+    prefix: RELR
+    directory: release-reports/
+    enabled: true
+    statuses: [active, draft, issued, archived]
+    default_status: draft
+  request:
+    prefix: RE
+    directory: requests/
+    enabled: true
+    statuses: [active, open, parked, in-progress, closed, rejected, archived]
+    default_status: open
 browser_host: 127.0.0.1
-browser_port: 6420
+browser_port: 5420
 browser_open: true
