@@ -83,6 +83,7 @@ pub fn prose(value: &str, attrs: &str) -> Prose {
     let mut run_has_content = false;
     let mut has_math = false;
     let mut has_diagram = false;
+    let mut diagram_index = 0usize;
     let mut index = 0;
 
     while index < value.len() {
@@ -101,7 +102,8 @@ pub fn prose(value: &str, attrs: &str) -> Prose {
                     renderable,
                 } => {
                     flush_paragraph(&mut out, attrs, &mut run, &mut run_has_content);
-                    out.push_str(&diagram_html(source, renderable));
+                    diagram_index += 1;
+                    out.push_str(&diagram_html(source, renderable, diagram_index));
                     has_diagram |= renderable;
                     index = next;
                     continue;
@@ -229,15 +231,20 @@ fn display_html(tex: &str) -> String {
 }
 
 /// A `mermaid` figure. The `<pre>` is the fallback and the client input.
-fn diagram_html(source: &str, renderable: bool) -> String {
+///
+/// `index` is the figure's 1-based position within its field. The scroll
+/// container is a focusable, labelled region, matching every other scroll
+/// region in the shell; the name is deterministic and server-rendered.
+fn diagram_html(source: &str, renderable: bool, index: usize) -> String {
     let source = escape(source);
+    let name = escape(&format!("Diagram {index}"));
     if renderable {
         return format!(
-            "<figure class=\"diagram bleed\" data-diagram=\"mermaid\"><div class=\"diagram-scroll\"><pre>{source}</pre></div></figure>"
+            "<figure class=\"diagram bleed\" data-diagram=\"mermaid\"><div class=\"diagram-scroll\" role=\"region\" aria-label=\"{name}\" tabindex=\"0\"><pre>{source}</pre></div></figure>"
         );
     }
     format!(
-        "<figure class=\"diagram bleed\" data-diagram=\"mermaid\" data-render-error=\"diagram\"><div class=\"diagram-scroll\"><pre>{source}</pre></div><figcaption class=\"render-note\">Diagram not rendered: source exceeds the 100,000-byte or 1,000-line limit.</figcaption></figure>"
+        "<figure class=\"diagram bleed\" data-diagram=\"mermaid\" data-render-error=\"diagram\"><div class=\"diagram-scroll\" role=\"region\" aria-label=\"{name}\" tabindex=\"0\"><pre>{source}</pre></div><figcaption class=\"render-note\">Diagram not rendered: source exceeds the 100,000-byte or 1,000-line limit.</figcaption></figure>"
     )
 }
 
@@ -726,12 +733,14 @@ mod tests {
         assert!(HEAD_ASSETS.find("katex.min.css") < HEAD_ASSETS.find("katex.min.js"));
     }
 
-    const MERMAID_FIGURE: &str = "<figure class=\"diagram bleed\" data-diagram=\"mermaid\"><div class=\"diagram-scroll\"><pre>{SOURCE}</pre></div></figure>";
-    const MERMAID_OVER_LIMIT_FIGURE: &str = "<figure class=\"diagram bleed\" data-diagram=\"mermaid\" data-render-error=\"diagram\"><div class=\"diagram-scroll\"><pre>{SOURCE}</pre></div><figcaption class=\"render-note\">Diagram not rendered: source exceeds the 100,000-byte or 1,000-line limit.</figcaption></figure>";
+    const MERMAID_FIGURE: &str = "<figure class=\"diagram bleed\" data-diagram=\"mermaid\"><div class=\"diagram-scroll\" role=\"region\" aria-label=\"Diagram {INDEX}\" tabindex=\"0\"><pre>{SOURCE}</pre></div></figure>";
+    const MERMAID_OVER_LIMIT_FIGURE: &str = "<figure class=\"diagram bleed\" data-diagram=\"mermaid\" data-render-error=\"diagram\"><div class=\"diagram-scroll\" role=\"region\" aria-label=\"Diagram {INDEX}\" tabindex=\"0\"><pre>{SOURCE}</pre></div><figcaption class=\"render-note\">Diagram not rendered: source exceeds the 100,000-byte or 1,000-line limit.</figcaption></figure>";
     const PLANTUML_FIGURE: &str = "<figure class=\"diagram diagram--unsupported\" data-diagram=\"plantuml\"><pre>{SOURCE}</pre><figcaption class=\"render-note\">PlantUML diagrams are not supported in this release; showing source.</figcaption></figure>";
 
-    fn figure(template: &str, source: &str) -> String {
-        template.replace("{SOURCE}", &escape(source))
+    fn figure(template: &str, index: usize, source: &str) -> String {
+        template
+            .replace("{SOURCE}", &escape(source))
+            .replace("{INDEX}", &index.to_string())
     }
 
     fn diagram_fence(source: &str) -> String {
@@ -744,12 +753,15 @@ mod tests {
         for fence in ["```", "~~~"] {
             let value = format!("{fence}mermaid\n{source}\n{fence}");
             let rendered = prose(&value, "");
-            assert_eq!(rendered.html, figure(MERMAID_FIGURE, source), "{fence}");
+            assert_eq!(rendered.html, figure(MERMAID_FIGURE, 1, source), "{fence}");
             assert!(rendered.has_diagram, "{fence}");
             assert!(!rendered.has_math, "{fence}");
         }
         let rendered = prose("  ```mermaid\ngraph TD\n  A --> B\n  `````", "");
-        assert_eq!(rendered.html, figure(MERMAID_FIGURE, "graph TD\n  A --> B"));
+        assert_eq!(
+            rendered.html,
+            figure(MERMAID_FIGURE, 1, "graph TD\n  A --> B")
+        );
         assert!(rendered.has_diagram);
     }
 
@@ -757,7 +769,11 @@ mod tests {
     fn plantuml_and_puml_fences_are_source_figures() {
         for info in ["plantuml", "puml"] {
             let rendered = prose(&format!("```{info}\nA -> B\n```"), "");
-            assert_eq!(rendered.html, figure(PLANTUML_FIGURE, "A -> B"), "{info}");
+            assert_eq!(
+                rendered.html,
+                figure(PLANTUML_FIGURE, 0, "A -> B"),
+                "{info}"
+            );
             assert!(!rendered.has_diagram, "{info}");
             assert!(!rendered.has_math, "{info}");
         }
@@ -809,7 +825,7 @@ mod tests {
     fn figure_source_is_escaped_once_and_keeps_newlines() {
         let source = "graph TD\n  A[<x & \"q\" 'z'>] --> B";
         let rendered = prose(&diagram_fence(source), "");
-        assert_eq!(rendered.html, figure(MERMAID_FIGURE, source));
+        assert_eq!(rendered.html, figure(MERMAID_FIGURE, 1, source));
         assert!(rendered.html.contains(
             "<pre>graph TD\n  A[&lt;x &amp; &quot;q&quot; &#39;z&#39;&gt;] --&gt; B</pre>"
         ));
@@ -828,7 +844,7 @@ mod tests {
             format!(
                 "{}{}{}",
                 paragraph("before\n\n"),
-                figure(MERMAID_FIGURE, source),
+                figure(MERMAID_FIGURE, 1, source),
                 paragraph("\n\nafter")
             )
         );
@@ -890,14 +906,14 @@ mod tests {
         let at_bytes = "a".repeat(MAX_DIAGRAM_BYTES);
         let rendered = prose(&diagram_fence(&at_bytes), "");
         assert!(rendered.has_diagram, "exactly MAX_DIAGRAM_BYTES");
-        assert_eq!(rendered.html, figure(MERMAID_FIGURE, &at_bytes));
+        assert_eq!(rendered.html, figure(MERMAID_FIGURE, 1, &at_bytes));
 
         let over_bytes = "a".repeat(MAX_DIAGRAM_BYTES + 1);
         let rendered = prose(&diagram_fence(&over_bytes), "");
         assert!(!rendered.has_diagram, "one byte over");
         assert_eq!(
             rendered.html,
-            figure(MERMAID_OVER_LIMIT_FIGURE, &over_bytes)
+            figure(MERMAID_OVER_LIMIT_FIGURE, 1, &over_bytes)
         );
         assert!(rendered.html.contains("data-render-error=\"diagram\""));
     }
@@ -911,7 +927,7 @@ mod tests {
         );
         let rendered = prose(&diagram_fence(&at_lines), "");
         assert!(rendered.has_diagram, "exactly MAX_DIAGRAM_LINES");
-        assert_eq!(rendered.html, figure(MERMAID_FIGURE, &at_lines));
+        assert_eq!(rendered.html, figure(MERMAID_FIGURE, 1, &at_lines));
 
         let over_lines = "l\n".repeat(MAX_DIAGRAM_LINES) + "l";
         assert_eq!(
@@ -922,7 +938,7 @@ mod tests {
         assert!(!rendered.has_diagram, "one line over");
         assert_eq!(
             rendered.html,
-            figure(MERMAID_OVER_LIMIT_FIGURE, &over_lines)
+            figure(MERMAID_OVER_LIMIT_FIGURE, 1, &over_lines)
         );
     }
 

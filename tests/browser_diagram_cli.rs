@@ -417,16 +417,16 @@ fn escape(value: &str) -> String {
     out
 }
 
-fn figure(source: &str) -> String {
+fn figure(index: usize, source: &str) -> String {
     format!(
-        "<figure class=\"diagram bleed\" data-diagram=\"mermaid\"><div class=\"diagram-scroll\"><pre>{}</pre></div></figure>",
+        "<figure class=\"diagram bleed\" data-diagram=\"mermaid\"><div class=\"diagram-scroll\" role=\"region\" aria-label=\"Diagram {index}\" tabindex=\"0\"><pre>{}</pre></div></figure>",
         escape(source)
     )
 }
 
-fn over_limit_figure(source: &str) -> String {
+fn over_limit_figure(index: usize, source: &str) -> String {
     format!(
-        "<figure class=\"diagram bleed\" data-diagram=\"mermaid\" data-render-error=\"diagram\"><div class=\"diagram-scroll\"><pre>{}</pre></div><figcaption class=\"render-note\">{LIMIT_NOTE}</figcaption></figure>",
+        "<figure class=\"diagram bleed\" data-diagram=\"mermaid\" data-render-error=\"diagram\"><div class=\"diagram-scroll\" role=\"region\" aria-label=\"Diagram {index}\" tabindex=\"0\"><pre>{}</pre></div><figcaption class=\"render-note\">{LIMIT_NOTE}</figcaption></figure>",
         escape(source)
     )
 }
@@ -458,11 +458,14 @@ fn promised_types_render_as_figures_with_source() {
     let server = Server::start(&project.path);
     let html = server.get("/doc/REQ-001.001");
 
-    for source in [
+    for (index, source) in [
         FLOWCHART, GRAPH, SEQUENCE, CLASS, STATE, ER, GANTT, PIE, JOURNEY, GIT_GRAPH,
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         assert!(
-            html.contains(&figure(source)),
+            html.contains(&figure(index + 1, source)),
             "missing exact figure for source: {source}"
         );
     }
@@ -481,6 +484,41 @@ fn promised_types_render_as_figures_with_source() {
         "the same page still renders math"
     );
     assert_external_scripts_only(&html);
+}
+
+#[test]
+fn renderable_figure_is_a_focusable_labelled_scroll_region() {
+    let project = project("a11y");
+    let server = Server::start(&project.path);
+    let html = server.get("/doc/REQ-001.001");
+
+    assert!(
+        html.contains(
+            "<div class=\"diagram-scroll\" role=\"region\" aria-label=\"Diagram 1\" tabindex=\"0\">"
+        ),
+        "the first scroll region is a labelled, focusable region"
+    );
+    assert_eq!(
+        html.matches("class=\"diagram-scroll\" role=\"region\"")
+            .count(),
+        10,
+        "every mermaid figure carries the region role"
+    );
+    assert_eq!(
+        html.matches("aria-label=\"Diagram ").count(),
+        10,
+        "every mermaid figure carries a deterministic name"
+    );
+    assert!(html.contains("aria-label=\"Diagram 10\""));
+    assert_eq!(
+        html.matches("tabindex=\"0\"").count(),
+        10,
+        "every mermaid figure is keyboard reachable"
+    );
+    assert!(
+        !html.contains("class=\"diagram-scroll\"><pre"),
+        "no unlabelled scroll container remains"
+    );
 }
 
 #[test]
@@ -544,14 +582,14 @@ fn unknown_type_and_malformed_sources_keep_the_client_failure_path() {
 
     let unknown = "notARealDiagramType\n  A --> B";
     assert!(
-        html.contains(&figure(unknown)),
+        html.contains(&figure(1, unknown)),
         "the unknown type keeps its full source"
     );
     assert!(
-        html.contains(&figure("flowchart-elk TD\n  C --> D")),
+        html.contains(&figure(2, "flowchart-elk TD\n  C --> D")),
         "flowchart-elk is served as a best-effort figure, not a failure"
     );
-    assert!(html.contains(&figure("flowchart TD\n  A --> B\n  A -->")));
+    assert!(html.contains(&figure(3, "flowchart TD\n  A --> B\n  A -->")));
     assert_eq!(
         html.matches("data-render-error=\"diagram\"").count(),
         0,
@@ -584,7 +622,7 @@ fn over_limit_fixtures_keep_source_and_take_the_limit_note() {
     let over_bytes = "a".repeat(100_001);
     let raw = server.get_raw("/doc/NOTE-013");
     let html = body(&raw);
-    assert!(html.contains(&over_limit_figure(&over_bytes)));
+    assert!(html.contains(&over_limit_figure(1, &over_bytes)));
     assert_eq!(html.matches(LIMIT_NOTE).count(), 1, "one limit note");
     assert!(!html.contains(BUNDLE), "over-limit page ships no bundle");
     assert_eq!(
@@ -596,7 +634,7 @@ fn over_limit_fixtures_keep_source_and_take_the_limit_note() {
     let over_lines = "l\n".repeat(1_000) + "l";
     let raw = server.get_raw("/doc/NOTE-014");
     let html = body(&raw);
-    assert!(html.contains(&over_limit_figure(&over_lines)));
+    assert!(html.contains(&over_limit_figure(1, &over_lines)));
     assert_eq!(html.matches("data-render-error=\"diagram\"").count(), 1);
     assert_eq!(html.matches(LIMIT_NOTE).count(), 1);
     assert!(!html.contains(BUNDLE));
@@ -614,8 +652,8 @@ fn per_figure_isolation_marks_only_the_bad_figure() {
     let html = body(&raw);
 
     let over_bytes = "a".repeat(100_001);
-    assert!(html.contains(&over_limit_figure(&over_bytes)));
-    assert!(html.contains(&figure("flowchart TD\n  Good --> Figure")));
+    assert!(html.contains(&over_limit_figure(1, &over_bytes)));
+    assert!(html.contains(&figure(2, "flowchart TD\n  Good --> Figure")));
     assert_eq!(html.matches("data-render-error=\"diagram\"").count(), 1);
     assert_eq!(html.matches("<figure class=\"diagram bleed\"").count(), 2);
     assert_eq!(
@@ -935,6 +973,7 @@ fn diagram_styling_supports_full_width_scroll() {
     for needle in [
         ".diagram { margin: 12px 0; }",
         ".diagram-scroll { overflow-x: auto; }",
+        ".diagram-scroll:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }",
         ".diagram--unsupported",
         ".render-note",
         ".bleed { width: 100%; overflow-x: auto; }",
