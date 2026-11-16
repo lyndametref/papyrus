@@ -780,6 +780,83 @@ fn client_block_pins_the_mermaid_contract() {
 }
 
 #[test]
+fn client_installs_a_scoped_cssstylesheet_substitute() {
+    let js = include_str!("../src/browser/app.js");
+    let start = js.find("Diagrams (TASK-146)").expect("diagram block");
+    let block = &js[start..];
+
+    let probe = block
+        .find("function ensureConstructibleStyleSheet()")
+        .expect("probe function");
+    let call = block
+        .find("ensureConstructibleStyleSheet();")
+        .expect("probe call");
+    let init = block
+        .find("window.mermaid.initialize")
+        .expect("mermaid initialise");
+    assert!(
+        probe < call && call < init,
+        "the probe runs once, before initialize"
+    );
+    assert_eq!(
+        block.matches("ensureConstructibleStyleSheet();").count(),
+        1,
+        "the probe is called exactly once"
+    );
+
+    for needle in [
+        "var Native = window.CSSStyleSheet;",
+        "if (!Native) {",
+        "new Native();",
+        "catch (missing)",
+        "function ConstructibleStyleSheet() {",
+        "document.implementation.createHTMLDocument(\"\")",
+        "inert.createElement(\"style\")",
+        "inert.head.appendChild(style)",
+        "return style.sheet;",
+        "ConstructibleStyleSheet.prototype = Native.prototype;",
+        "window.CSSStyleSheet = ConstructibleStyleSheet;",
+        "catch (unwritable)",
+    ] {
+        assert!(block.contains(needle), "shim missing {needle}");
+    }
+
+    assert_eq!(
+        block.matches("window.CSSStyleSheet =").count(),
+        1,
+        "only the sheet constructor is replaced"
+    );
+    assert!(!block.contains("globalThis."), "no globalThis override");
+    assert!(!block.contains("self.CSSStyleSheet"), "no self override");
+    assert!(
+        !block.contains("Object.defineProperty"),
+        "no property redefinition"
+    );
+    assert!(
+        !block.contains("window.CSSStyleSheetShim"),
+        "no extra global name"
+    );
+}
+
+#[test]
+fn compatibility_shim_keeps_the_vendored_pin_and_manifest() {
+    let manifest = include_str!("../src/browser/vendor/MANIFEST.md");
+    assert!(
+        manifest.contains(
+            "| `/assets/mermaid/mermaid.min.js` | mermaid | 11.17.2 | MIT | https://registry.npmjs.org/mermaid/-/mermaid-11.17.2.tgz | 3572661 | `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8` |"
+        ),
+        "the Mermaid pin, size, and digest are unchanged"
+    );
+    let bundle = include_bytes!("../src/browser/vendor/mermaid/11.17.2/mermaid.min.js");
+    assert_eq!(bundle.len(), 3_572_661);
+    let app = include_str!("../src/browser/app.js");
+    assert!(
+        manifest.contains(&format!("| `/assets/app.js` | {} |", app.len())),
+        "the app.js manifest row matches the shimmed file"
+    );
+}
+
+#[test]
 fn client_neutralises_rendered_diagram_links() {
     let js = include_str!("../src/browser/app.js");
     let start = js.find("Diagrams (TASK-146)").expect("diagram block");
