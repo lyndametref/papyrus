@@ -2,7 +2,7 @@
 id: ADR-0026
 title: "Mermaid-Only Offline Diagram Rendering, PlantUML Out of Scope"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-16T08:15:58Z'
+updated_date: '2026-11-16T09:46:42Z'
 labels: []
 references: []
 ---
@@ -62,10 +62,11 @@ The current release binary is 4,730,296 bytes (KaTeX and its fonts already embed
 
    ```html
    <figure class="diagram bleed" data-diagram="mermaid">
-     <div class="diagram-scroll"><pre>escaped source</pre></div>
+     <div class="diagram-scroll" role="region" aria-label="Diagram N" tabindex="0"><pre>escaped source</pre></div>
    </figure>
    ```
 
+   - The scroll container is a labelled, focusable scroll region: `role="region"` plus an accessible name `Diagram N`, where `N` is a 1-based figure number, page-continuous across prose fields and consumed by every `mermaid` figure, so the name is unique per rendered page and the block is keyboard reachable with a visible focus ring, as `docs/specifications/browser-shell-shared-list-layout-and-page-width.md` §4.4 requires for every scrollable block inside a `.bleed`. The `figure` itself carries no `role` and no `aria-*`.
    - The content between the fences is taken with one trailing line break removed and trimmed of leading and trailing whitespace, then escaped with `render::escape`; newlines are preserved. The `<pre>` is both the no-JavaScript fallback and the source of truth for the client. Mermaid receives `pre.textContent`, which restores the escaped characters exactly.
    - A diagram fence is a block segment, like display math: it is never nested inside a `<p>`; a surrounding paragraph is split around it. A field with no diagram keeps byte-identical output.
    - `Prose` gains `has_diagram`, true only when at least one `mermaid` figure is under the input caps and therefore renderable. `has_diagram` controls both the bundle link and the CSP variant; a page with only an over-limit or PlantUML block gets neither.
@@ -218,9 +219,15 @@ All resolved. No open question remains for this ADR.
 | 7 — caps | 100 KB / 1,000 lines / 500 edges enforced by "the pre-pass" | 100 KB / 1,000 lines server-side; 500 edges client-side via `maxEdges` | The server must not parse Mermaid syntax (decision 3, ADR-0025). |
 | 8 — iframe | recorded fallback if `unsafe-inline` refused | rejected | Opaque-origin/CORS and inline-bundle costs outweigh the scoped style grant. |
 
+## Revision notes (2026-11-16, figure container accessibility)
+
+| Decision | Before | After | Reason |
+|---|---|---|---|
+| 3 — scroll container markup | `<div class="diagram-scroll">` only | `<div class="diagram-scroll" role="region" aria-label="Diagram N" tabindex="0">` | The shipped markup and `docs/specifications/browser-math-and-diagram-rendering.md` §14.1–§14.4 put the accessibility contract on the scroll container: the shell requires every scrollable block inside a `.bleed` to be keyboard reachable and named, with a visible focus ring. `N` is page-continuous and unique per rendered page. Status stays `Accepted`; the client contract and the security model are unchanged. |
+
 ## Downstream constraints
 
-1. **TASK-146 (implementation).** Use `mermaid` only; no `mmd`. Emit the exact figure shapes of decisions 1–3; keep the `<pre>` until a successful render; enforce the 100,000-byte and 1,000-line caps server-side and `maxEdges: 500` client-side; do not parse Mermaid on the server; do not call `bindFunctions`; link the bundle only on `has_diagram` pages; use the two literal CSP strings of decision 6 and apply the diagram string only to `has_diagram` responses.
+1. **TASK-146 (implementation).** Use `mermaid` only; no `mmd`. Emit the exact figure shapes of decisions 1–3, including `role="region"`, the page-unique `aria-label="Diagram N"`, and `tabindex="0"` on every `.diagram-scroll`; keep the `<pre>` until a successful render; enforce the 100,000-byte and 1,000-line caps server-side and `maxEdges: 500` client-side; do not parse Mermaid on the server; do not call `bindFunctions`; link the bundle only on `has_diagram` pages; use the two literal CSP strings of decision 6 and apply the diagram string only to `has_diagram` responses.
 2. **TASK-148 (specifications).** Record the diagram fence set (`mermaid` only; `plantuml`/`puml` note; other fences literal), the supported type list, the two CSP strings and their response classes, the caps, the failure contract, and the 11.17.2 pin. Do not describe a site-wide `style-src` relaxation or an `mmd` alias.
 3. **TASK-149 (packaging and budget).** The 12 MiB ceiling is unchanged; no threshold adjustment. TASK-149 runs before TASK-146 and can only measure the KaTeX-only binary, so it records that measurement and the 4.0 MiB projected headroom; the final post-Mermaid binary size is measured by TASK-150. If a single final measurement is preferred, TASK-146 must be added as a dependency (planner decision, not this ADR).
 4. **TASK-150 (verification).** Verify the nine supported types, the `plantuml` note, the `mmd`/literal fence behaviour, an unknown-type fallback, per-figure isolation, the hostile fixtures, both CSP strings per response class, the absence of `unsafe-inline` in `script-src`, the bundle-only-on-diagram-pages rule, the final binary size, and the offline behaviour in Firefox 100+, Edge 130+, and Safari 18+.
