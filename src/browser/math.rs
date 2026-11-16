@@ -77,13 +77,23 @@ enum Fence<'a> {
 /// paragraph, byte-identical to `<p class="text"{attrs}>{escape(value)}</p>`
 /// apart from the `\$` collapse.
 pub fn prose(value: &str, attrs: &str) -> Prose {
+    let mut next_diagram = 1;
+    prose_with_diagrams(value, attrs, &mut next_diagram)
+}
+
+/// Run the delimiter pre-pass while continuing page-level diagram numbering.
+///
+/// `next_diagram` is the next 1-based label to use; every emitted `mermaid`
+/// figure consumes one number, so a page that renders several curated prose
+/// fields gets unique `Diagram N` names. Callers start it at `1` once per
+/// page.
+pub fn prose_with_diagrams(value: &str, attrs: &str, next_diagram: &mut u32) -> Prose {
     let bytes = value.as_bytes();
     let mut out = String::with_capacity(value.len() + 32);
     let mut run = String::with_capacity(value.len());
     let mut run_has_content = false;
     let mut has_math = false;
     let mut has_diagram = false;
-    let mut diagram_index = 0usize;
     let mut index = 0;
 
     while index < value.len() {
@@ -102,7 +112,8 @@ pub fn prose(value: &str, attrs: &str) -> Prose {
                     renderable,
                 } => {
                     flush_paragraph(&mut out, attrs, &mut run, &mut run_has_content);
-                    diagram_index += 1;
+                    let diagram_index = *next_diagram;
+                    *next_diagram = next_diagram.saturating_add(1);
                     out.push_str(&diagram_html(source, renderable, diagram_index));
                     has_diagram |= renderable;
                     index = next;
@@ -232,10 +243,10 @@ fn display_html(tex: &str) -> String {
 
 /// A `mermaid` figure. The `<pre>` is the fallback and the client input.
 ///
-/// `index` is the figure's 1-based position within its field. The scroll
-/// container is a focusable, labelled region, matching every other scroll
-/// region in the shell; the name is deterministic and server-rendered.
-fn diagram_html(source: &str, renderable: bool, index: usize) -> String {
+/// `index` is the figure's 1-based position on the page. The scroll container
+/// is a focusable, labelled region, matching every other scroll region in the
+/// shell; the name is deterministic and server-rendered.
+fn diagram_html(source: &str, renderable: bool, index: u32) -> String {
     let source = escape(source);
     let name = escape(&format!("Diagram {index}"));
     if renderable {
@@ -737,7 +748,7 @@ mod tests {
     const MERMAID_OVER_LIMIT_FIGURE: &str = "<figure class=\"diagram bleed\" data-diagram=\"mermaid\" data-render-error=\"diagram\"><div class=\"diagram-scroll\" role=\"region\" aria-label=\"Diagram {INDEX}\" tabindex=\"0\"><pre>{SOURCE}</pre></div><figcaption class=\"render-note\">Diagram not rendered: source exceeds the 100,000-byte or 1,000-line limit.</figcaption></figure>";
     const PLANTUML_FIGURE: &str = "<figure class=\"diagram diagram--unsupported\" data-diagram=\"plantuml\"><pre>{SOURCE}</pre><figcaption class=\"render-note\">PlantUML diagrams are not supported in this release; showing source.</figcaption></figure>";
 
-    fn figure(template: &str, index: usize, source: &str) -> String {
+    fn figure(template: &str, index: u32, source: &str) -> String {
         template
             .replace("{SOURCE}", &escape(source))
             .replace("{INDEX}", &index.to_string())
@@ -962,6 +973,42 @@ mod tests {
             1
         );
         assert_eq!(rendered.html.matches("class=\"diagram bleed\"").count(), 2);
+    }
+
+    #[test]
+    fn page_counter_continues_across_prose_fields() {
+        let mut next_diagram = 1u32;
+        let story = prose_with_diagrams(
+            &diagram_fence("flowchart TD\n  A --> B"),
+            "",
+            &mut next_diagram,
+        );
+        let description = prose_with_diagrams(
+            &format!(
+                "{}\n\n{}",
+                diagram_fence("graph LR\n  C --> D"),
+                diagram_fence("sequenceDiagram\n  A->>B: Hi")
+            ),
+            "",
+            &mut next_diagram,
+        );
+
+        assert!(story.html.contains("aria-label=\"Diagram 1\""));
+        assert!(description.html.contains("aria-label=\"Diagram 2\""));
+        assert!(description.html.contains("aria-label=\"Diagram 3\""));
+        assert_eq!(next_diagram, 4, "the page counter advances per figure");
+
+        // The single-field convenience entry point still starts at 1.
+        assert!(
+            prose(&diagram_fence("a"), "")
+                .html
+                .contains("aria-label=\"Diagram 1\"")
+        );
+        assert!(
+            prose(&diagram_fence("b"), "")
+                .html
+                .contains("aria-label=\"Diagram 1\"")
+        );
     }
 
     #[test]

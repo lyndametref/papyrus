@@ -1074,12 +1074,13 @@ pub fn view_page(
     let mut details = String::new();
     let mut has_math = false;
     let mut has_diagram = false;
+    let mut next_diagram = 1u32;
     match record.handler() {
         Some(TypedHandler::Requirement(_)) => {
             if record.supports_story()
                 && let Some(story) = &record.story
             {
-                let prose = math::prose(story, "");
+                let prose = math::prose_with_diagrams(story, "", &mut next_diagram);
                 has_math |= prose.has_math;
                 has_diagram |= prose.has_diagram;
                 content.push_str(&format!(
@@ -1090,7 +1091,7 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
                 Some(description) => {
-                    let prose = math::prose(description, "");
+                    let prose = math::prose_with_diagrams(description, "", &mut next_diagram);
                     has_math |= prose.has_math;
                     has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
@@ -1191,7 +1192,7 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
                 Some(description) => {
-                    let prose = math::prose(description, "");
+                    let prose = math::prose_with_diagrams(description, "", &mut next_diagram);
                     has_math |= prose.has_math;
                     has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
@@ -1218,7 +1219,7 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
                 Some(description) => {
-                    let prose = math::prose(description, "");
+                    let prose = math::prose_with_diagrams(description, "", &mut next_diagram);
                     has_math |= prose.has_math;
                     has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
@@ -1231,7 +1232,7 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
                 Some(description) => {
-                    let prose = math::prose(description, "");
+                    let prose = math::prose_with_diagrams(description, "", &mut next_diagram);
                     has_math |= prose.has_math;
                     has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
@@ -1245,7 +1246,7 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Decision</h2>");
             match &record.decision {
                 Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose(t, "");
+                    let prose = math::prose_with_diagrams(t, "", &mut next_diagram);
                     has_math |= prose.has_math;
                     has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
@@ -1257,7 +1258,7 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Context</h2>");
             match &record.context {
                 Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose(t, "");
+                    let prose = math::prose_with_diagrams(t, "", &mut next_diagram);
                     has_math |= prose.has_math;
                     has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
@@ -1269,7 +1270,7 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Consequences</h2>");
             match &record.consequences {
                 Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose(t, "");
+                    let prose = math::prose_with_diagrams(t, "", &mut next_diagram);
                     has_math |= prose.has_math;
                     has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
@@ -1302,7 +1303,11 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Definition</h2>");
             match &record.definition {
                 Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
+                    let prose = math::prose_with_diagrams(
+                        t,
+                        " style=\"white-space: pre-wrap\"",
+                        &mut next_diagram,
+                    );
                     has_math |= prose.has_math;
                     has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
@@ -1315,7 +1320,11 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>View</h2>");
             match &record.view {
                 Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
+                    let prose = math::prose_with_diagrams(
+                        t,
+                        " style=\"white-space: pre-wrap\"",
+                        &mut next_diagram,
+                    );
                     has_math |= prose.has_math;
                     has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
@@ -1326,7 +1335,11 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
                 Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
+                    let prose = math::prose_with_diagrams(
+                        t,
+                        " style=\"white-space: pre-wrap\"",
+                        &mut next_diagram,
+                    );
                     has_math |= prose.has_math;
                     has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
@@ -1366,7 +1379,11 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
                 Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
+                    let prose = math::prose_with_diagrams(
+                        t,
+                        " style=\"white-space: pre-wrap\"",
+                        &mut next_diagram,
+                    );
                     has_math |= prose.has_math;
                     has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
@@ -1378,7 +1395,11 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Rationale</h2>");
             match &record.rationale {
                 Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
+                    let prose = math::prose_with_diagrams(
+                        t,
+                        " style=\"white-space: pre-wrap\"",
+                        &mut next_diagram,
+                    );
                     has_math |= prose.has_math;
                     has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
@@ -1390,7 +1411,11 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Applicability</h2>");
             match &record.applicability {
                 Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
+                    let prose = math::prose_with_diagrams(
+                        t,
+                        " style=\"white-space: pre-wrap\"",
+                        &mut next_diagram,
+                    );
                     has_math |= prose.has_math;
                     has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
@@ -1427,7 +1452,11 @@ pub fn view_page(
             if content_text.trim().is_empty() {
                 content.push_str("<p class=\"text empty-text\">(none)</p>");
             } else {
-                let prose = math::prose(content_text, " style=\"white-space: pre-wrap\"");
+                let prose = math::prose_with_diagrams(
+                    content_text,
+                    " style=\"white-space: pre-wrap\"",
+                    &mut next_diagram,
+                );
                 has_math |= prose.has_math;
                 has_diagram |= prose.has_diagram;
                 content.push_str(&prose.html);
@@ -1440,7 +1469,7 @@ pub fn view_page(
             if content_text.trim().is_empty() {
                 content.push_str("<p class=\"text empty-text\">(none)</p>");
             } else {
-                let prose = math::prose(content_text, "");
+                let prose = math::prose_with_diagrams(content_text, "", &mut next_diagram);
                 has_math |= prose.has_math;
                 has_diagram |= prose.has_diagram;
                 content.push_str(&prose.html);
@@ -1453,7 +1482,11 @@ pub fn view_page(
             if content_text.trim().is_empty() {
                 content.push_str("<p class=\"text empty-text\">(none)</p>");
             } else {
-                let prose = math::prose(content_text, " style=\"white-space: pre-wrap\"");
+                let prose = math::prose_with_diagrams(
+                    content_text,
+                    " style=\"white-space: pre-wrap\"",
+                    &mut next_diagram,
+                );
                 has_math |= prose.has_math;
                 has_diagram |= prose.has_diagram;
                 content.push_str(&prose.html);
@@ -1461,7 +1494,11 @@ pub fn view_page(
             if let Some(app) = &record.applicability
                 && !app.trim().is_empty()
             {
-                let prose = math::prose(app, " style=\"white-space: pre-wrap\"");
+                let prose = math::prose_with_diagrams(
+                    app,
+                    " style=\"white-space: pre-wrap\"",
+                    &mut next_diagram,
+                );
                 has_math |= prose.has_math;
                 has_diagram |= prose.has_diagram;
                 content.push_str(&format!(
@@ -1474,7 +1511,7 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
                 Some(description) => {
-                    let prose = math::prose(description, "");
+                    let prose = math::prose_with_diagrams(description, "", &mut next_diagram);
                     has_math |= prose.has_math;
                     has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
@@ -4233,12 +4270,13 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
     );
     let mut has_math = false;
     let mut has_diagram = false;
+    let mut next_diagram = 1u32;
     let description = record
         .description
         .as_deref()
         .filter(|value| !value.trim().is_empty())
         .map(|value| {
-            let prose = math::prose(value, "");
+            let prose = math::prose_with_diagrams(value, "", &mut next_diagram);
             has_math |= prose.has_math;
             has_diagram |= prose.has_diagram;
             prose.html

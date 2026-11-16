@@ -184,6 +184,31 @@ fn project(name: &str) -> TempProject {
     let dir = &project.path;
 
     set_body(dir, "docs/requirements/business/REQ-001.001.md", REQ_BODY);
+    set_body(
+        dir,
+        "docs/requirements/business/REQ-001.002.md",
+        "## User Story
+As a reader I want a story diagram.
+
+```mermaid
+flowchart TD
+  Story --> First
+```
+
+## Group
+REQ-001 Requirement Group One
+
+## Description
+```mermaid
+graph LR
+  Desc --> One
+```
+
+```mermaid
+sequenceDiagram
+  A->>B: Hi
+```",
+    );
     note(
         dir,
         "NOTE-010",
@@ -438,6 +463,21 @@ fn plantuml_figure(source: &str) -> String {
     )
 }
 
+fn diagram_labels(html: &str) -> Vec<String> {
+    let needle = "class=\"diagram-scroll\" role=\"region\" aria-label=\"";
+    let mut labels = Vec::new();
+    let mut rest = html;
+    while let Some(start) = rest.find(needle) {
+        let after = &rest[start + needle.len()..];
+        let Some(end) = after.find('"') else {
+            panic!("unterminated aria-label");
+        };
+        labels.push(after[..end].to_string());
+        rest = &after[end..];
+    }
+    labels
+}
+
 fn assert_external_scripts_only(html: &str) {
     for (index, _) in html.match_indices("<script") {
         assert!(
@@ -518,6 +558,37 @@ fn renderable_figure_is_a_focusable_labelled_scroll_region() {
     assert!(
         !html.contains("class=\"diagram-scroll\"><pre"),
         "no unlabelled scroll container remains"
+    );
+}
+
+#[test]
+fn diagram_names_are_page_unique_across_prose_fields() {
+    let project = project("names");
+    let server = Server::start(&project.path);
+    let path = "/doc/REQ-001.002";
+
+    let first = server.get(path);
+    let labels = diagram_labels(&first);
+    assert_eq!(
+        labels,
+        vec!["Diagram 1", "Diagram 2", "Diagram 3"],
+        "numbering is continuous across the story and description fields"
+    );
+    let unique: std::collections::BTreeSet<&String> = labels.iter().collect();
+    assert_eq!(unique.len(), labels.len(), "every name is page-unique");
+    assert_eq!(
+        first
+            .matches("class=\"diagram-scroll\" role=\"region\"")
+            .count(),
+        3
+    );
+    assert_eq!(first.matches("tabindex=\"0\"").count(), 3);
+
+    let second = server.get(path);
+    assert_eq!(
+        diagram_labels(&second),
+        labels,
+        "the names are stable across renders"
     );
 }
 
