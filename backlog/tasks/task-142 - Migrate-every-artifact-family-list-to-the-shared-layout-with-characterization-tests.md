@@ -3,11 +3,11 @@ id: TASK-142
 title: >-
   Migrate every artifact family list to the shared layout with characterization
   tests
-status: Implemented
+status: Done
 assignee:
   - '@rust-dev'
 created_date: '2026-11-15T16:12:00Z'
-updated_date: '2026-11-16T06:34:00Z'
+updated_date: '2026-11-16T06:48:00Z'
 labels:
   - browser
   - shell
@@ -114,28 +114,28 @@ ordinal: 41550
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every enabled artifact family and every enabled config-defined document type renders its list view through the shared layout; a disabled type has no list route (404). The task family has no list view and keeps the REQ-06.013 board.
-- [ ] #2 Every such list view renders the same header sequence - ID, Title, Status, the declared family slot(s) in order, Created, Updated, Actions - with the same row, column, and action placement; View then Edit (then any existing family action) are the last cell, and family-specific values appear only in the declared slot cells and the Title cell labels/references.
-- [ ] #3 document_list.html, document_list_page, list_section, backlog_list_section, ListLayout, routes::list_layout, Presentation::list_layout, and with_layout are deleted; no slug or handler match selects a list builder, no per-family list template remains, and ListPlan is the only list path.
-- [ ] #4 Requirements and NFRs render one group row followed by its member rows in the same tbody, each member carrying data-child-of; a group with no members renders as a group row with no children; for every grouped family, a member whose group row is absent from the indexed set renders as a top-level row with no data-child-of and is never dropped, duplicated, or attached to a synthesised group; the grouped count note reflects the records actually shown.
-- [ ] #5 All 32 TASK-141 fixtures (16 populated, 16 empty) are replayed per family, the task fixture is replayed against the board, and every accepted difference is recorded in this ticket.
-- [ ] #6 A test enumerates every enabled descriptor, resolves its representative list route, and asserts data-list-layout="shared" plus the exact data-column sequence including its declared slots with scope="col" on every header; the task descriptor is asserted on the board instead.
-- [ ] #7 Archived records stay absent from every list view and from the board's data-task cards.
-- [ ] #8 An approved mockup or a recorded no-mockup waiver exists before merge; the waiver is recorded in this ticket and names MOCK-0016 and the characterization fixtures.
+- [x] #1 Every enabled artifact family and every enabled config-defined document type renders its list view through the shared layout; a disabled type has no list route (404). The task family has no list view and keeps the REQ-06.013 board.
+- [x] #2 Every such list view renders the same header sequence - ID, Title, Status, the declared family slot(s) in order, Created, Updated, Actions - with the same row, column, and action placement; View then Edit (then any existing family action) are the last cell, and family-specific values appear only in the declared slot cells and the Title cell labels/references.
+- [x] #3 document_list.html, document_list_page, list_section, backlog_list_section, ListLayout, routes::list_layout, Presentation::list_layout, and with_layout are deleted; no slug or handler match selects a list builder, no per-family list template remains, and ListPlan is the only list path.
+- [x] #4 Requirements and NFRs render one group row followed by its member rows in the same tbody, each member carrying data-child-of; a group with no members renders as a group row with no children; for every grouped family, a member whose group row is absent from the indexed set renders as a top-level row with no data-child-of and is never dropped, duplicated, or attached to a synthesised group; the grouped count note reflects the records actually shown.
+- [x] #5 All 32 TASK-141 fixtures (16 populated, 16 empty) are replayed per family, the task fixture is replayed against the board, and every accepted difference is recorded in this ticket.
+- [x] #6 A test enumerates every enabled descriptor, resolves its representative list route, and asserts data-list-layout="shared" plus the exact data-column sequence including its declared slots with scope="col" on every header; the task descriptor is asserted on the board instead.
+- [x] #7 Archived records stay absent from every list view and from the board's data-task cards.
+- [x] #8 An approved mockup or a recorded no-mockup waiver exists before merge; the waiver is recorded in this ticket and names MOCK-0016 and the characterization fixtures.
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 cargo test passes, including the extended replay loop, the new enumeration and archived-exclusion tests, and every updated legacy browser test.
-- [ ] #2 cargo fmt --check and cargo clippy --all-targets -- -D warnings are clean.
-- [ ] #3 No new dependency and no Cargo.toml change.
-- [ ] #4 document_list.html, document_list_page, list_section, backlog_list_section, DOCUMENT_LIST_TEMPLATE, ListLayout, routes::list_layout, Presentation::list_layout, and with_layout are deleted; no list code matches on a slug or handler; ListPlan is the only list path.
-- [ ] #5 The board empty-project fallback still renders its previous heading, count, message ("No tasks in this project."), and help, and the task board is otherwise unchanged.
-- [ ] #6 All 32 characterization fixtures are replayed per family; the task fixture is replayed against the board; the fixtures, seed projects, README, and capture test are unmodified.
-- [ ] #7 Every accepted visual difference (A1-A8, listed in the Description) is recorded in the Description and in the feature specification §6; no difference is left implicit.
-- [ ] #8 docs/specifications/browser-shell-shared-list-layout-and-page-width.md §3.2, §5.1, §5.3, §5.4, §5.6, §5.7, and §6 match the delivered code; docs/specifications/ui/** is untouched (TASK-148 owns the per-family UI reconciliation).
-- [ ] #9 The known legacy assertions listed in the Description are updated to the shared contract, and the generic per-family replay loop (which now covers the milestone reference family) plus the record_view_projection shared-list assertions pass.
-- [ ] #10 All eight acceptance criteria are checked with evidence before the task moves to a terminal status.
+- [x] #1 cargo test passes, including the extended replay loop, the new enumeration and archived-exclusion tests, and every updated legacy browser test.
+- [x] #2 cargo fmt --check and cargo clippy --all-targets -- -D warnings are clean.
+- [x] #3 No new dependency and no Cargo.toml change.
+- [x] #4 document_list.html, document_list_page, list_section, backlog_list_section, DOCUMENT_LIST_TEMPLATE, ListLayout, routes::list_layout, Presentation::list_layout, and with_layout are deleted; no list code matches on a slug or handler; ListPlan is the only list path.
+- [x] #5 The board empty-project fallback still renders its previous heading, count, message ("No tasks in this project."), and help, and the task board is otherwise unchanged.
+- [x] #6 All 32 characterization fixtures are replayed per family; the task fixture is replayed against the board; the fixtures, seed projects, README, and capture test are unmodified.
+- [x] #7 Every accepted visual difference (A1-A8, listed in the Description) is recorded in the Description and in the feature specification §6; no difference is left implicit.
+- [x] #8 docs/specifications/browser-shell-shared-list-layout-and-page-width.md §3.2, §5.1, §5.3, §5.4, §5.6, §5.7, and §6 match the delivered code; docs/specifications/ui/** is untouched (TASK-148 owns the per-family UI reconciliation).
+- [x] #9 The known legacy assertions listed in the Description are updated to the shared contract, and the generic per-family replay loop (which now covers the milestone reference family) plus the record_view_projection shared-list assertions pass.
+- [x] #10 All eight acceptance criteria are checked with evidence before the task moves to a terminal status.
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -204,6 +204,12 @@ Normalization: captured `""` or `"(none)"` status/date/slot values assert as `<s
 **7. Verify the specification.** Confirm `docs/specifications/browser-shell-shared-list-layout-and-page-width.md` §3.2, §5.1, §5.3, §5.4, §5.6, §5.7, and §6 match the delivered code; do not edit `docs/specifications/ui/**` (TASK-148).
 <!-- SECTION:PLAN:END -->
 
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Every family list now renders through ListPlan; the legacy path is deleted (document_list.html, document_list_page, list_section, backlog_list_section, ListLayout, list_layout, with_layout). Grouped req/NFR rows use one tbody with data-child-of, orphan members render top-level with no synthetic group, and grouped count notes count only emitted records. Decisions gained a declared Superseded by slot restoring CLI parity. 32 characterization fixtures replay, a descriptor-enumeration test asserts the shared marker plus exact data-column order and scope=col for every enabled family, and archived exclusion is asserted for all lists and the board. Accepted differences A1-A8 recorded in the ticket and spec section 6. Review fixes: 9f7afb3. Quality review: pass after fixes; 962 tests pass, clippy/fmt clean, every rendered link verified 200.
+<!-- SECTION:NOTES:END -->
+
 ## Comments
 
 <!-- COMMENTS:BEGIN -->
@@ -251,3 +257,9 @@ Quality-review text alignment (no code or test edits; the implementer fixed the 
 
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The shared list layout now covers every artifact family and every config-defined document type, so no bespoke list view remains: document_list.html and all per-family list builders are gone, family variation comes only from declared slot data, and the fixed column order (ID, Title, Status, family slot(s), Created, Updated, Actions) holds everywhere. Grouped requirement and NFR lists render group rows with their children, orphan members appear top-level rather than as invented groups, and decisions keep their supersession reference through a declared slot. All 32 characterization fixtures replay, an enumeration test asserts the marker and header sequence for every enabled family, and archived records stay out of every list and the board.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@rust-dev'
 created_date: '2026-11-15T16:13:00Z'
-updated_date: '2026-11-16T11:12:00Z'
+updated_date: '2026-11-16T12:22:00Z'
 labels:
   - browser
   - rendering
@@ -203,6 +203,24 @@ Command: `geckodriver --port <p>`; POST `/session` with `moz:firefoxOptions.bina
 Reproduction: 1) build the TASK-150 S3 corpus and serve the installed binary; 2) launch the Firefox 100 tarball under geckodriver; 3) open `/doc/REQ-001.001` at 1440 px; 4) inspect `figure[data-diagram]` and the render promise rejection.
 Evidence: `./.tmp/task150/evidence/def_ff100_diagram.json` during the run (scratch removed; excerpts above and in TASK-150 notes).
 Impact: the browser floor in NFR-05.001 (Firefox 100+) is not satisfied for diagram rendering. Possible causes are a Mermaid 11.17.2 API requiring a newer Gecko (the rejection is consistent with a missing/illegal platform constructor) or a floor/requirement mismatch; the owning task decides whether to raise the floor or change the bundle/fallback.
+
+---
+
+author: orchestrator
+created: 2026-11-16T11:39:00Z
+
+---
+
+Reopened for DEF-1 found by TASK-150: Mermaid 11.17.2 calls new CSSStyleSheet(), which Firefox 100 lacks, so 0/10 diagrams rendered there. ADR-0026 gained decision 13 (2026-11-16, delegated architecture authority): keep the vendored bundle byte-identical and install a feature-detected constructible-CSSStyleSheet substitute in app.js inside the diagram branch, before mermaid.initialize. Measured: Firefox 100 with the substitute renders 10/10 with a byte-identical 62,476-byte theme stylesheet to Firefox 102 native; Firefox 101/102/153 keep the native constructor and render 10/10. No manifest, digest, notice, CSP or cap change; app.js grows 1,238 B. Verification must re-run the diagram checks on Firefox 100 before this task closes again.
+
+---
+
+author: orchestrator
+created: 2026-11-16T12:21:00Z
+
+---
+
+DEF-1 fix review corrections applied. Shipped figures: app.js 12,953 to 13,757 B (+804 B); release binary 8,324,128 B with 4,258,784 B headroom under the 12,582,912 B ceiling (the earlier 1,238 B / 8,324,534 B figures in the DEF-1 reopen comment were pre-implementation projections and are superseded). ADR-0026 decision 13 now records the measured cost, the corpus-dependent CSS rule count (62,476 B/643 rules on the full nine-type corpus; 62,431 B/623 top-level rules on the minimal fixture, with identical cross-browser per-figure stylesheet SHA-256 and SVG node counts on Firefox 100/102/153), and the known limitation that the substitute covers only insertRule/cssRules and that replace/replaceSync/adoptedStyleSheets are absent on Firefox 100. Independent review confirmed: shim installed only on diagram pages, only window.CSSStyleSheet replaced, native prototype preserved, Firefox 100 renders 10/10 with the shim while 102 and 153 keep the native constructor and render 10/10, no inline script, CSP and vendored bytes unchanged, 1048 tests pass, binary within budget.
 
 ---
 <!-- COMMENTS:END -->

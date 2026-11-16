@@ -3,11 +3,11 @@ id: TASK-137
 title: >-
   Implement the read-only `check` diagnostic command with descriptor-driven
   scanners
-status: Refined
+status: Done
 assignee:
   - '@rust-dev'
 created_date: '2026-11-15T16:11:00Z'
-updated_date: '2026-11-15T16:40:00Z'
+updated_date: '2026-11-15T17:17:00Z'
 labels:
   - rust
   - cli
@@ -69,26 +69,26 @@ ordinal: 41500
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 `papyrus check` runs on a valid project and prints a plain findings report, exiting 0 when there are no findings.
-- [ ] #2 Scanners read every registry descriptor, including disabled document types, through the existing parsers and projection, and never relocate, migrate, or adopt a record.
-- [ ] #3 All seven finding kinds are detected: duplicate-id, self-dependency, dependency-cycle, dangling-milestone, dangling-release, frontmatter-conflict, and config-invalid.
-- [ ] #4 Duplicate IDs are compared per family, keeping grouped-family group and member spaces apart, across decisions and every configured document type.
-- [ ] #5 Front-matter conflicts cover the body heading and the retired task and milestone sections; agreement is not reported, an unreadable section is, and decision body sections are excluded.
-- [ ] #6 A broken configuration does not abort the run: configuration findings are reported, the checks that need document_types are skipped and named as skipped, and the independent checks still run.
-- [ ] #7 deprecated/ folders are neither read nor inventoried and produce no finding, and a task dependency that resolves to no task is not a finding.
-- [ ] #8 CommandOutput.exit_code is honoured by main: a run with findings exits 4, a clean run exits 0, and --json emits the findings object rather than the error envelope.
-- [ ] #9 Findings are deterministically ordered and both output forms match their golden fixtures.
-- [ ] #10 A read-only test asserts that every scanned file keeps its bytes and modification time.
+- [x] #1 `papyrus check` runs on a valid project and prints a plain findings report, exiting 0 when there are no findings.
+- [x] #2 Scanners read every registry descriptor, including disabled document types, through the existing parsers and projection, and never relocate, migrate, or adopt a record.
+- [x] #3 All seven finding kinds are detected: duplicate-id, self-dependency, dependency-cycle, dangling-milestone, dangling-release, frontmatter-conflict, and config-invalid.
+- [x] #4 Duplicate IDs are compared per family, keeping grouped-family group and member spaces apart, across decisions and every configured document type.
+- [x] #5 Front-matter conflicts cover the body heading and the retired task and milestone sections; agreement is not reported, an unreadable section is, and decision body sections are excluded.
+- [x] #6 A broken configuration does not abort the run: configuration findings are reported, the checks that need document_types are skipped and named as skipped, and the independent checks still run.
+- [x] #7 deprecated/ folders are neither read nor inventoried and produce no finding, and a task dependency that resolves to no task is not a finding.
+- [x] #8 CommandOutput.exit_code is honoured by main: a run with findings exits 4, a clean run exits 0, and --json emits the findings object rather than the error envelope.
+- [x] #9 Findings are deterministically ordered and both output forms match their golden fixtures.
+- [x] #10 A read-only test asserts that every scanned file keeps its bytes and modification time.
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 The new check integration tests, fixtures, and goldens pass, and the full cargo test suite passes.
-- [ ] #2 cargo clippy --all-targets -- -D warnings and cargo fmt --check are clean.
-- [ ] #3 src/check/ contains no fs::write, no record::store mutator, no record::migrate path, and no record::resolve::list_in_dir call; the read-only test asserts unchanged bytes and mtimes for every scanned file.
-- [ ] #4 Finding kinds, deterministic ordering, text and --json shapes, and exit codes 0/4 match docs/specifications/project-diagnostics-check.md exactly.
-- [ ] #5 Existing command behavior is unchanged apart from the mechanical CommandOutput field addition, and tests/golden/cli-help/top.json is regenerated for the new subcommand.
-- [ ] #6 No new crate or dependency is added; requirements, business rules, and ADRs are not edited.
+- [x] #1 The new check integration tests, fixtures, and goldens pass, and the full cargo test suite passes.
+- [x] #2 cargo clippy --all-targets -- -D warnings and cargo fmt --check are clean.
+- [x] #3 src/check/ contains no fs::write, no record::store mutator, no record::migrate path, and no record::resolve::list_in_dir call; the read-only test asserts unchanged bytes and mtimes for every scanned file.
+- [x] #4 Finding kinds, deterministic ordering, text and --json shapes, and exit codes 0/4 match docs/specifications/project-diagnostics-check.md exactly.
+- [x] #5 Existing command behavior is unchanged apart from the mechanical CommandOutput field addition, and tests/golden/cli-help/top.json is regenerated for the new subcommand.
+- [x] #6 No new crate or dependency is added; requirements, business rules, and ADRs are not edited.
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -167,3 +167,15 @@ Contract, in one place (full detail in `docs/specifications/project-diagnostics-
    - `rg "fs::write|store::(archive|set_status|delete|relocate)|list_in_dir" src/check/` returns nothing.
    - Keep `docs/specifications/project-diagnostics-check.md` in step with the implementation; requirements and ADRs are not edited.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented src/check/{mod,findings,scan}.rs, record::scan::family_files, CommandOutput.exit_code, and CLI dispatch wiring per docs/specifications/project-diagnostics-check.md. Quality review: pass, all 10 AC and 6 DoD verified independently (873 tests pass, clippy/fmt clean, read-only grep clean, manual exit-code matrix 0/4/1/2).
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Read-only 'papyrus check' shipped: descriptor-driven scanners detect all seven finding kinds over enabled and disabled document types without writing to disk; invalid configurations are reported instead of aborting the run, with document-type-dependent checks named as skipped. Deterministic ordering, text and --json output match goldens; exit 4 on findings, 0 when clean. Deferred by scope to TASK-138/139/140: --fix/--force, the reserved built-in slug and check --help golden, README and business rules.
+<!-- SECTION:FINAL_SUMMARY:END -->

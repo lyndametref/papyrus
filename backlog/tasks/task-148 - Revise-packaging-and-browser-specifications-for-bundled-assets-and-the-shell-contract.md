@@ -3,7 +3,7 @@ id: TASK-148
 title: >-
   Revise packaging and browser specifications for bundled assets and the shell
   contract
-status: Implemented
+status: Done
 assignee:
   - '@business-analyst'
 created_date: '2026-11-15T16:14:00Z'
@@ -112,7 +112,7 @@ Requirement text (`docs/requirements/`), ADR text (`docs/architecture/adr/`), im
 - [x] #2 All 26 page targets and the 12 UI descriptions are updated as listed in the implementation plan; no step is skipped or merged.
 - [x] #3 The verification sweep in plan step 10 returns the expected results, with only the documented exceptions.
 - [x] #4 The two CSP literals are byte-identical in browser-requirements.md section 9.7 and browser-math-and-diagram-rendering.md section 17.1 and equal src/browser/http.rs.
-- [ ] #5 git diff --name-only docs/requirements docs/architecture/adr is empty, and docs/architecture/adr/index.html is byte-identical after regeneration.
+- [x] #5 git diff --name-only docs/requirements docs/architecture/adr is empty, and docs/architecture/adr/index.html is byte-identical after regeneration.
 - [x] #6 The measured figures are recorded with their source: binary 4,730,296 B, KaTeX 558,541 B (the brief's 580,487 B corrected), Mermaid 3,572,661 B, projected 8,302,957 B / 7.92 MiB, headroom 4,279,955 B.
 - [x] #7 Conflicts C1-C5 are left unresolved in prose and reported in the final summary; any newly found conflict is added to the register rather than fixed.
 - [x] #8 Diagram clauses name their implementation status (TASK-146) and verification owner (TASK-150); no page claims the diagram CSP is already emitted.
@@ -373,13 +373,7 @@ Then report: files changed, the conflict register (C1–C5) untouched, the measu
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Published `docs/specifications/browser-shell-ui.md` (pinned §1–§9). Corrected 26 page targets + 12 UI descriptions to the landed shell/list/width/navigation contract. CSP literals are single-homed in `browser-requirements.md` §9.7 and are byte-identical to `browser-math-and-diagram-rendering.md` §7.1/§17.1 and `http.rs` (strict count 1/1/2, diagram 1/1/1 across the three files).
-
-Measured 2026-11-16: `stat -c %s target/release/papyrus` = 8,321,888 B (7.94 MiB) after Mermaid landed; the ticket's pre-Mermaid projection was 8,302,957 B (7.92 MiB); KaTeX 558,541 B (brief's 580,487 B corrected); Mermaid 3,572,661 B; ceiling 12,582,912 B; measured headroom 4,261,024 B (4.06 MiB). `cargo test --lib manifest_covers_every_asset` passed.
-
-No ADR, requirement, business-rule, or source file was edited. `docs/architecture/adr/index.html` was not touched; pre-existing working-tree modifications to ADRs/index remain unstaged and are not part of this commit. No generated index exists for `docs/specifications/`.
-
-Conflict register C1–C5 left unresolved in prose and reported to the caller. New deviation from the refined brief: TASK-146 has landed (`CSP_DIAGRAM` and the Mermaid asset are present), so pages state the diagram string is implemented by TASK-146 and verified by TASK-150 rather than describing it as future work.
+Published docs/specifications/browser-shell-ui.md (shell regions, shared seven-column list contract with the eight-family slot table, Title-cell labels/references, action order, grouped/orphan rows, shared empty state, hooks, Capped/Full/.bleed, navigation toggle with papyrus.nav and no-JS behaviour, accessibility, NFR-05.001 floor, CSP by response class). Corrected the browser baseline and 13 family pages, docs/packaging.md plus eight milestone packaging-and-verification pages, and 17 UI descriptions: replaced every falsified assertion (no web font, no url(, asset-free package, per-family list markup, document_list.html survival, missing font-src, Edge/Safari 100, no-inline-styles absolute, 320 px auto-collapse, legacy empty copy), and pointed per-family lists at the shared contract. Two CSP literals are recorded with browser-requirements.md section 9.7 as the single normative home and verified byte-identical to http::CSP and http::CSP_DIAGRAM. Measured figures recorded: binary 8,321,888 B, KaTeX served assets 558,541 B, Mermaid 3,572,661 B, ceiling 12,582,912 B, headroom 4,261,024 B. Conflicts C1-C7 recorded rather than resolved in prose. Three review rounds; residuals closed in 676128c and cc20dd0.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -420,5 +414,5 @@ Final consistency pass after re-review (2026-11-16 UTC).
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Documentation-only port to the landed contract. Created `browser-shell-ui.md` with the pinned outline and updated every browser and packaging page listed in the plan; removed every falsified assertion (no web font, no url(, asset-free package, per-family list markup, document_list.html, 100+ browser floor, CSP without font-src/unsafe-inline scoping). Verification: stale-string sweeps return only documented true statements; CSP literals match source; markdown links in touched pages resolve; manifest digest test passes; measured binary 8,321,888 B is under the 12,582,912 B ceiling. Conflicts C1–C5 reported, not resolved. DoD #5 cannot be marked because the pre-existing dirty tree already modifies ADRs; this task's commit excludes them.
+The specification corpus now describes the browser that exists: a new browser shell specification states the shell regions, the single shared list contract with its fixed columns and declared family slots, the width classes, and the collapsible navigation with its persisted default-expanded behaviour, while every packaging and per-family page that still claimed an asset-free package, per-family list markup, or a width-based auto-collapse has been corrected. Asset delivery, digest manifests, licence notices, the two content-security-policy classes and the binary budget are documented where verification runs, the browser support floor matches the non-functional requirement, and the requirement-versus-delivery gaps found along the way are recorded as an explicit conflict register rather than smoothed over in prose.
 <!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,11 +1,11 @@
 ---
 id: TASK-150
 title: Verify the diagnostics, shell, and rendering release end to end
-status: Refined
+status: Done
 assignee:
   - '@rust-dev'
 created_date: '2026-11-15T16:14:00Z'
-updated_date: '2026-11-16T15:29:00Z'
+updated_date: '2026-11-16T15:30:00Z'
 labels:
   - verification
   - cli
