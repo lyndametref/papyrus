@@ -249,13 +249,16 @@ fn board_is_full_width_and_every_other_route_is_capped() {
 }
 
 #[test]
-fn pages_serve_the_unchanged_csp_and_only_external_scripts() {
+fn pages_serve_the_math_csp_and_only_external_scripts() {
     let server = Server::start(&fixture_root().join("project"));
     for path in ["/", "/?type=task", "/?type=req"] {
         let raw = server.get_raw(path);
         assert_eq!(
             header_value(&raw, "Content-Security-Policy").as_deref(),
-            Some(papyrus::browser::http::CSP),
+            Some(
+                "default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; \
+                 font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+            ),
             "{path} CSP"
         );
         let html = Server::body(&raw);

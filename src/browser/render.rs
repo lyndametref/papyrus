@@ -5,6 +5,7 @@
 //! placeholders are internal fragments whose values are escaped as they are
 //! built.
 
+use crate::browser::math;
 use crate::browser::records::{Index, Record, filter_statuses};
 use crate::browser::routes::{self, BrowserRoutes, NavGroup, PageRoute};
 use crate::config::Config;
@@ -75,6 +76,22 @@ pub struct Chrome<'a> {
 
 /// Wrap a rendered page body in the page shell (ADR-0028 decision 1).
 fn page(chrome: Chrome<'_>, route: PageRoute, title: &str, sidebar: &str, body: String) -> String {
+    page_with_assets(chrome, route, title, sidebar, body, "")
+}
+
+/// Wrap a page body and add a raw head-asset fragment (TASK-145).
+///
+/// `assets` is internal markup from `math::HEAD_ASSETS` or `""`; it is never
+/// user data. The shell slot places it after `app.css` and before the deferred
+/// `app.js`, so `window.katex` exists when the client pass runs.
+fn page_with_assets(
+    chrome: Chrome<'_>,
+    route: PageRoute,
+    title: &str,
+    sidebar: &str,
+    body: String,
+    assets: &str,
+) -> String {
     crate::browser::shell::render(crate::browser::shell::Page {
         title,
         project: chrome.project,
@@ -82,6 +99,7 @@ fn page(chrome: Chrome<'_>, route: PageRoute, title: &str, sidebar: &str, body: 
         sidebar,
         main: &body,
         width: chrome.routes.page_width(route),
+        assets,
     })
 }
 
@@ -1030,20 +1048,25 @@ pub fn view_page(
 ) -> String {
     let mut content = String::new();
     let mut details = String::new();
+    let mut has_math = false;
     match record.handler() {
         Some(TypedHandler::Requirement(_)) => {
             if record.supports_story()
                 && let Some(story) = &record.story
             {
+                let prose = math::prose(story, "");
+                has_math |= prose.has_math;
                 content.push_str(&format!(
-                    "<section class=\"record-section\"><h2>User story</h2><p class=\"text\">{}</p></section>",
-                    escape(story)
+                    "<section class=\"record-section\"><h2>User story</h2>{}</section>",
+                    prose.html
                 ));
             }
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
                 Some(description) => {
-                    content.push_str(&format!("<p class=\"text\">{}</p>", escape(description)))
+                    let prose = math::prose(description, "");
+                    has_math |= prose.has_math;
+                    content.push_str(&prose.html);
                 }
                 None => content.push_str("<p class=\"text empty-text\">No description.</p>"),
             }
@@ -1141,7 +1164,9 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
                 Some(description) => {
-                    content.push_str(&format!("<p class=\"text\">{}</p>", escape(description)))
+                    let prose = math::prose(description, "");
+                    has_math |= prose.has_math;
+                    content.push_str(&prose.html);
                 }
                 None => content.push_str("<p class=\"text empty-text\">(none)</p>"),
             }
@@ -1165,7 +1190,9 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
                 Some(description) => {
-                    content.push_str(&format!("<p class=\"text\">{}</p>", escape(description)))
+                    let prose = math::prose(description, "");
+                    has_math |= prose.has_math;
+                    content.push_str(&prose.html);
                 }
                 None => content.push_str("<p class=\"text empty-text\">(none)</p>"),
             }
@@ -1175,7 +1202,9 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
                 Some(description) => {
-                    content.push_str(&format!("<p class=\"text\">{}</p>", escape(description)))
+                    let prose = math::prose(description, "");
+                    has_math |= prose.has_math;
+                    content.push_str(&prose.html);
                 }
                 None => content.push_str("<p class=\"text empty-text\">(none)</p>"),
             }
@@ -1186,7 +1215,9 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Decision</h2>");
             match &record.decision {
                 Some(t) if !t.trim().is_empty() => {
-                    content.push_str(&format!("<p class=\"text\">{}</p>", escape(t)))
+                    let prose = math::prose(t, "");
+                    has_math |= prose.has_math;
+                    content.push_str(&prose.html);
                 }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
             }
@@ -1195,7 +1226,9 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Context</h2>");
             match &record.context {
                 Some(t) if !t.trim().is_empty() => {
-                    content.push_str(&format!("<p class=\"text\">{}</p>", escape(t)))
+                    let prose = math::prose(t, "");
+                    has_math |= prose.has_math;
+                    content.push_str(&prose.html);
                 }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
             }
@@ -1204,7 +1237,9 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Consequences</h2>");
             match &record.consequences {
                 Some(t) if !t.trim().is_empty() => {
-                    content.push_str(&format!("<p class=\"text\">{}</p>", escape(t)))
+                    let prose = math::prose(t, "");
+                    has_math |= prose.has_math;
+                    content.push_str(&prose.html);
                 }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
             }
@@ -1233,10 +1268,11 @@ pub fn view_page(
         Some(TypedHandler::Glossary) => {
             content.push_str("<section class=\"record-section\"><h2>Definition</h2>");
             match &record.definition {
-                Some(t) if !t.trim().is_empty() => content.push_str(&format!(
-                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
-                    escape(t)
-                )),
+                Some(t) if !t.trim().is_empty() => {
+                    let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
+                    has_math |= prose.has_math;
+                    content.push_str(&prose.html);
+                }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
             }
             content.push_str("</section>");
@@ -1244,19 +1280,21 @@ pub fn view_page(
         Some(TypedHandler::UiSpec) => {
             content.push_str("<section class=\"record-section\"><h2>View</h2>");
             match &record.view {
-                Some(t) if !t.trim().is_empty() => content.push_str(&format!(
-                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
-                    escape(t)
-                )),
+                Some(t) if !t.trim().is_empty() => {
+                    let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
+                    has_math |= prose.has_math;
+                    content.push_str(&prose.html);
+                }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
             }
             content.push_str("</section>");
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
-                Some(t) if !t.trim().is_empty() => content.push_str(&format!(
-                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
-                    escape(t)
-                )),
+                Some(t) if !t.trim().is_empty() => {
+                    let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
+                    has_math |= prose.has_math;
+                    content.push_str(&prose.html);
+                }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
             }
             content.push_str("</section>");
@@ -1291,30 +1329,33 @@ pub fn view_page(
             // Description
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
-                Some(t) if !t.trim().is_empty() => content.push_str(&format!(
-                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
-                    escape(t)
-                )),
+                Some(t) if !t.trim().is_empty() => {
+                    let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
+                    has_math |= prose.has_math;
+                    content.push_str(&prose.html);
+                }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
             }
             content.push_str("</section>");
             // Rationale
             content.push_str("<section class=\"record-section\"><h2>Rationale</h2>");
             match &record.rationale {
-                Some(t) if !t.trim().is_empty() => content.push_str(&format!(
-                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
-                    escape(t)
-                )),
+                Some(t) if !t.trim().is_empty() => {
+                    let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
+                    has_math |= prose.has_math;
+                    content.push_str(&prose.html);
+                }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
             }
             content.push_str("</section>");
             // Applicability
             content.push_str("<section class=\"record-section\"><h2>Applicability</h2>");
             match &record.applicability {
-                Some(t) if !t.trim().is_empty() => content.push_str(&format!(
-                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
-                    escape(t)
-                )),
+                Some(t) if !t.trim().is_empty() => {
+                    let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
+                    has_math |= prose.has_math;
+                    content.push_str(&prose.html);
+                }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
             }
             content.push_str("</section>");
@@ -1347,10 +1388,9 @@ pub fn view_page(
             if content_text.trim().is_empty() {
                 content.push_str("<p class=\"text empty-text\">(none)</p>");
             } else {
-                content.push_str(&format!(
-                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
-                    escape(content_text)
-                ));
+                let prose = math::prose(content_text, " style=\"white-space: pre-wrap\"");
+                has_math |= prose.has_math;
+                content.push_str(&prose.html);
             }
         }
         Some(TypedHandler::TechSpec) => {
@@ -1360,7 +1400,9 @@ pub fn view_page(
             if content_text.trim().is_empty() {
                 content.push_str("<p class=\"text empty-text\">(none)</p>");
             } else {
-                content.push_str(&format!("<p class=\"text\">{}</p>", escape(content_text)));
+                let prose = math::prose(content_text, "");
+                has_math |= prose.has_math;
+                content.push_str(&prose.html);
             }
         }
         Some(TypedHandler::UseCase)
@@ -1370,17 +1412,18 @@ pub fn view_page(
             if content_text.trim().is_empty() {
                 content.push_str("<p class=\"text empty-text\">(none)</p>");
             } else {
-                content.push_str(&format!(
-                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
-                    escape(content_text)
-                ));
+                let prose = math::prose(content_text, " style=\"white-space: pre-wrap\"");
+                has_math |= prose.has_math;
+                content.push_str(&prose.html);
             }
             if let Some(app) = &record.applicability
                 && !app.trim().is_empty()
             {
+                let prose = math::prose(app, " style=\"white-space: pre-wrap\"");
+                has_math |= prose.has_math;
                 content.push_str(&format!(
-                    "<section class=\"record-section\"><h2>Applicability</h2><p class=\"text\" style=\"white-space: pre-wrap\">{}</p></section>",
-                    escape(app)
+                    "<section class=\"record-section\"><h2>Applicability</h2>{}</section>",
+                    prose.html
                 ));
             }
         }
@@ -1388,7 +1431,9 @@ pub fn view_page(
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
                 Some(description) => {
-                    content.push_str(&format!("<p class=\"text\">{}</p>", escape(description)))
+                    let prose = math::prose(description, "");
+                    has_math |= prose.has_math;
+                    content.push_str(&prose.html);
                 }
                 None => content.push_str("<p class=\"text empty-text\">No description.</p>"),
             }
@@ -1494,12 +1539,13 @@ pub fn view_page(
             ("content", &content),
         ],
     );
-    page(
+    page_with_assets(
         chrome,
         PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
+        if has_math { math::HEAD_ASSETS } else { "" },
     )
 }
 
@@ -4140,11 +4186,16 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
         escape(&created),
         escape(&updated)
     );
+    let mut has_math = false;
     let description = record
         .description
         .as_deref()
         .filter(|value| !value.trim().is_empty())
-        .map(|value| format!("<p>{}</p>", escape(value)))
+        .map(|value| {
+            let prose = math::prose(value, "");
+            has_math |= prose.has_math;
+            prose.html
+        })
         .unwrap_or_else(|| "<p>No description.</p>".to_string());
     let skip = [
         "id",
@@ -4184,12 +4235,13 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
             ("content", &content),
         ],
     );
-    page(
+    page_with_assets(
         chrome,
         PageRoute::Other,
         &format!("Papyrus \u{2014} {} {}", record.id, record.title),
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
+        if has_math { math::HEAD_ASSETS } else { "" },
     )
 }
 

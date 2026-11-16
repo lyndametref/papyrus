@@ -33,6 +33,8 @@ pub struct Page<'a> {
     pub main: &'a str,
     /// Server-side content-width decision for the route.
     pub width: PageWidth,
+    /// Raw internal head-asset fragment (math CSS and script), or `""`.
+    pub assets: &'a str,
 }
 
 /// The `class` attribute value for a page width.
@@ -56,6 +58,7 @@ pub fn render(page: Page<'_>) -> String {
         ],
         &[
             ("nav_toggle", NAV_TOGGLE),
+            ("asset_links", page.assets),
             ("sidebar", page.sidebar),
             ("main", page.main),
         ],
@@ -74,6 +77,7 @@ mod tests {
             sidebar: "<nav id=\"site-nav\">nav</nav>",
             main: "<h1 class=\"h1\">Milestones</h1>",
             width,
+            assets: "",
         })
     }
 
@@ -96,6 +100,23 @@ mod tests {
         assert_eq!(html.matches("Milestones</h1>").count(), 1);
         assert_eq!(html.matches("nav</nav>").count(), 1);
         assert!(html.contains("class=\"app\""));
+    }
+
+    #[test]
+    fn math_assets_default_to_nothing_and_are_raw_when_present() {
+        let html = page(PageWidth::Capped);
+        assert!(!html.contains("/assets/katex/"));
+        let with_assets = render(Page {
+            title: "Papyrus \u{2014} Math",
+            project: "Demo",
+            bind_note: "127.0.0.1:6420",
+            sidebar: "<nav id=\"site-nav\">nav</nav>",
+            main: "<main>math</main>",
+            width: PageWidth::Capped,
+            assets: "<link rel=\"stylesheet\" href=\"/assets/katex/katex.min.css\">",
+        });
+        assert!(with_assets.contains("/assets/katex/katex.min.css"));
+        assert!(with_assets.find("app.css") < with_assets.find("katex.min.css"));
     }
 
     #[test]
@@ -129,6 +150,7 @@ mod tests {
             sidebar: "",
             main: "",
             width: PageWidth::Capped,
+            assets: "",
         });
         assert!(html.contains("&lt;title&gt;"));
         assert!(html.contains("<span class=\"project\">&amp;</span>"));

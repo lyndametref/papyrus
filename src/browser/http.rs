@@ -13,7 +13,7 @@ pub const MAX_HEADER_BLOCK: usize = 16384;
 pub const MAX_HEADERS: usize = 64;
 pub const MAX_BODY: usize = 1024 * 1024;
 
-pub const CSP: &str = "default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
+pub const CSP: &str = "default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Method {

@@ -496,3 +496,9 @@ pre:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   .board-confirm-actions { flex-direction: column; align-items: stretch; }
   .board-confirm button { width: 100%; }
 }
+
+/* Math placeholders (TASK-145). A display block is its own scroll box so it
+   cannot widen the page, and a formula does not inherit `white-space:
+   pre-wrap` from `.text` and neighbours. The source text is the fallback. */
+.math { white-space: normal; }
+.math--display { display: block; margin: 12px 0; overflow-x: auto; }

@@ -6,6 +6,7 @@
 pub mod assets;
 pub mod http;
 pub mod list;
+pub mod math;
 pub mod records;
 pub mod render;
 pub mod routes;

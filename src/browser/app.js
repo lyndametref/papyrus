@@ -248,4 +248,34 @@
     }
   }
 
+  /* Math placeholders (TASK-145): render each data-tex element with the
+     vendored KaTeX. The element's own source is the no-script fallback, so a
+     missing global or a thrown error only marks the element. */
+  var mathElements = document.querySelectorAll("[data-tex]");
+  if (mathElements.length) {
+    if (!window.katex || typeof window.katex.render !== "function") {
+      for (var m = 0; m < mathElements.length; m++) {
+        mathElements[m].setAttribute("data-render-error", "math");
+      }
+    } else {
+      for (var k = 0; k < mathElements.length; k++) {
+        (function (element) {
+          var source = element.getAttribute("data-tex");
+          var displayMode = element.className.indexOf("math--display") !== -1;
+          try {
+            window.katex.render(source, element, {
+              throwOnError: false,
+              displayMode: displayMode,
+              trust: false,
+              strict: "warn",
+              output: "htmlAndMathml",
+            });
+          } catch (e) {
+            element.setAttribute("data-render-error", "math");
+          }
+        })(mathElements[k]);
+      }
+    }
+  }
+
 })();
