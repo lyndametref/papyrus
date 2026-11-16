@@ -3394,6 +3394,12 @@ fn t147a_cleanup_visibility() {
     assert!(column_containing(&html, "Done").contains("Clean up all"));
     assert!(!column_containing(&html, "").contains("Clean up all"));
 
+    // A single configured status that is `active` is also the final column and
+    // still offers no action.
+    set_statuses(&dir, &["active"], "active");
+    let html = get(&server, "/?type=task").text();
+    assert!(!html.contains("Clean up all"));
+
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -3454,7 +3460,26 @@ fn t147b_cleanup_preview_and_cancel() {
 #[test]
 fn t147c_cleanup_full_success() {
     let dir = cleanup_fixture("t147c");
+    // A closed milestone still renders its board, so it keeps the action.
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "milestone",
+        "close",
+        "MS-001",
+    ]);
+    assert!(
+        fs::read_to_string(dir.join("backlog/milestones/MS-001.md"))
+            .unwrap()
+            .contains("status: closed")
+    );
     let server = Server::start(&dir, &["--no-open"], &[]);
+    let initial = get(&server, "/?type=task").text();
+    let ms1_start = initial.find("<summary>MS-001").expect("MS-001 section");
+    let ms1_end = ms1_start + initial[ms1_start..].find("</details>").unwrap();
+    let ms1 = &initial[ms1_start..ms1_end];
+    assert!(ms1.contains("Clean up all</a>"));
+    assert!(ms1.contains("aria-label=\"Clean up all Done tasks in MS-001\""));
 
     let body = form_body(&[
         ("cleanup", "1"),
@@ -3498,11 +3523,13 @@ fn t147d_cleanup_partial_failure() {
     let dir = cleanup_fixture("t147d");
     let archived = dir.join("backlog/archive/tasks");
     fs::create_dir_all(&archived).unwrap();
-    // A destination that already exists makes `task::archive` refuse that one
+    // The failure must hit the first task in ascending order, otherwise an
+    // implementation that aborts on the first error would still pass. A
+    // destination that already exists makes `task::archive` refuse that one
     // task. A directory is used because an archived *file* with the same ID
     // would be dropped from the board index as a duplicate before the action
     // runs, so the failure would not be observable through the browser.
-    fs::create_dir_all(archived.join("TASK-002.md")).unwrap();
+    fs::create_dir_all(archived.join("TASK-001.md")).unwrap();
     let server = Server::start(&dir, &["--no-open"], &[]);
 
     let body = form_body(&[
@@ -3514,10 +3541,12 @@ fn t147d_cleanup_partial_failure() {
     assert_eq!(response.status, 200);
     let html = response.text();
 
-    // The first task was still archived although the second failed.
-    assert!(archived.join("TASK-001.md").exists());
-    assert!(!backlog_record_path(&dir, "tasks", "TASK-001").exists());
-    let failed = backlog_record_path(&dir, "tasks", "TASK-002");
+    // TASK-002 was still archived after TASK-001 failed: no abort.
+    assert!(archived.join("TASK-002.md").exists());
+    let archived_text = fs::read_to_string(archived.join("TASK-002.md")).unwrap();
+    assert!(archived_text.contains("status: Done"));
+    assert!(!backlog_record_path(&dir, "tasks", "TASK-002").exists());
+    let failed = backlog_record_path(&dir, "tasks", "TASK-001");
     assert!(failed.exists());
     assert!(
         fs::read_to_string(&failed)
@@ -3530,13 +3559,13 @@ fn t147d_cleanup_partial_failure() {
     assert!(alert.contains("Clean up all finished with failures"));
     assert!(alert.contains("Archived 1 of 2 tasks in MS-001."));
     assert!(html.contains("Some tasks could not be archived."));
-    assert!(alert.contains("TASK-002"));
-    assert!(alert.contains("already archived: TASK-002"));
-    assert!(!alert.contains("TASK-001"));
+    assert!(alert.contains("TASK-001"));
+    assert!(alert.contains("already archived: TASK-001"));
+    assert!(!alert.contains("TASK-002"));
 
     // The failed task stays in its column; no other milestone is touched.
-    assert!(column_containing(&html, "Done").contains("TASK-002"));
-    assert!(!html.contains("TASK-001"));
+    assert!(column_containing(&html, "Done").contains("TASK-001"));
+    assert!(!html.contains("TASK-002"));
     assert!(backlog_record_path(&dir, "tasks", "TASK-004").exists());
     assert!(backlog_record_path(&dir, "tasks", "TASK-005").exists());
 
