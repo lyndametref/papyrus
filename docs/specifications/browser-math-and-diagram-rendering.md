@@ -178,16 +178,19 @@ The `empty-text` placeholders (`No description.`, `(none)`, `No labels.`) and th
 New `src/browser/math.rs` (declared `pub mod math;` in `src/browser/mod.rs`), unit-tested in place:
 
 ```rust
-pub struct Prose { pub html: String, pub has_math: bool }
+pub struct Prose { pub html: String, pub has_math: bool, pub has_diagram: bool }
 
 /// Run the delimiter pre-pass over one curated prose value.
 pub fn prose(value: &str, attrs: &str) -> Prose;
+
+/// The same pre-pass, continuing page-level diagram numbering.
+pub fn prose_with_diagrams(value: &str, attrs: &str, next_diagram: &mut u32) -> Prose;
 
 /// The head fragment for pages that contain math; `""` otherwise.
 pub const HEAD_ASSETS: &str = "<link rel=\"stylesheet\" href=\"/assets/katex/katex.min.css\">\n<script src=\"/assets/katex/katex.min.js\" defer></script>";
 ```
 
-`has_math` is true when the field produced at least one inline or display segment. The module knows nothing about records, pages, or routes; it is a pure string function plus the asset constant, so TASK-146 extends it with diagram fences.
+`has_math` is true when the field produced at least one inline or display segment. `prose` delegates to `prose_with_diagrams` with a fresh counter, so single-field callers keep the old signature. A record view uses `prose_with_diagrams` with one counter initialised once per rendered page, and every `mermaid` figure consumes a number (§14.1); `Prose::has_diagram` is true when the field produced at least one renderable `mermaid` figure (§13.4). The module knows nothing about records, pages, or routes; it is a pure string function plus the asset constant, so TASK-146 extends it with diagram fences.
 
 ### 5.2 Render call sites
 
@@ -346,16 +349,18 @@ A record view ORs `has_diagram` across every curated prose field it renders, exa
 Exactly one block segment per fence, with no leading or trailing newline and no separator from the surrounding segments:
 
 ```
-<figure class="diagram bleed" data-diagram="mermaid"><div class="diagram-scroll"><pre>SRC</pre></div></figure>
+<figure class="diagram bleed" data-diagram="mermaid"><div class="diagram-scroll" role="region" aria-label="Diagram N" tabindex="0"><pre>SRC</pre></div></figure>
 ```
 
 `SRC` is the diagram source of §13.2 passed through `render::escape` once, with newlines preserved. The `<pre>` is simultaneously the no-JavaScript fallback, the failed-render fallback, and the client input: `pre.textContent` restores the source exactly.
+
+`N` is a 1-based figure number numbered continuously across the page's prose fields (`math::prose_with_diagrams` with one counter initialised once per page), and every `mermaid` figure consumes a number, so the accessible name is unique per page. The scroll container is a focusable, labelled scroll region because `browser-shell-shared-list-layout-and-page-width.md` §4.4 requires every scrollable block inside a `.bleed` to be keyboard reachable and named.
 
 A figure is a block segment like a display block (§4.2): it flushes the open paragraph, it is never nested inside `<p>`, and a surrounding paragraph is split around it. Insertion order is source order.
 
 ### 14.2 Explicitly not added
 
-No `id`, no `role`, no `aria-*`, no `style` attribute, no heading, and no caption on a renderable figure. A figure carries no record identifier: the client derives its render id from the page path (§16.4).
+No `id`, no `style` attribute, no heading, and no caption on a renderable figure. The scroll container `.diagram-scroll` carries `role="region"`, `aria-label="Diagram N"`, and `tabindex="0"`; the `figure` element itself carries no `role` and no `aria-*`. A figure carries no record identifier: the client derives its render id from the page path (§16.4).
 
 ### 14.3 `plantuml` / `puml`
 
@@ -368,10 +373,10 @@ No `bleed` class and no `.diagram-scroll`: this block is a source listing, not a
 ### 14.4 Over-limit `mermaid`
 
 ```
-<figure class="diagram bleed" data-diagram="mermaid" data-render-error="diagram"><div class="diagram-scroll"><pre>SRC</pre></div><figcaption class="render-note">Diagram not rendered: source exceeds the 100,000-byte or 1,000-line limit.</figcaption></figure>
+<figure class="diagram bleed" data-diagram="mermaid" data-render-error="diagram"><div class="diagram-scroll" role="region" aria-label="Diagram N" tabindex="0"><pre>SRC</pre></div><figcaption class="render-note">Diagram not rendered: source exceeds the 100,000-byte or 1,000-line limit.</figcaption></figure>
 ```
 
-The full source is kept, `data-render-error="diagram"` is server-set, and the client skips the figure (§16.5). A page whose only diagram is over-limit has `has_diagram == false` and therefore neither the bundle nor the relaxed CSP (§13.4).
+The full source is kept, `data-render-error="diagram"` is server-set, and the client skips the figure (§16.5). The scroll container keeps the region semantics and the page-continuous `Diagram N` name of §14.1; such a figure still consumes its number. A page whose only diagram is over-limit has `has_diagram == false` and therefore neither the bundle nor the relaxed CSP (§13.4).
 
 ## 15. Input caps
 
@@ -528,6 +533,7 @@ Promised and covered by fixtures: `flowchart` (including `graph`), `sequence`, `
 
 - `.diagram` is a block box with `margin: 12px 0`; the renderable figure also carries `bleed`, so it is 100 % of the `.app` content width while surrounding `.text` stays at the 780 px measure.
 - `.diagram-scroll` is `overflow-x: auto`, but only as a safety net. Mermaid 11.17.2 emits every SVG with `width="100%"` and an inline `style="max-width: <natural>px"`, so a rendered SVG is capped by Mermaid's own inline `max-width` and scales down to fit: a very wide diagram is shrunk rather than overflowing `.diagram-scroll`. The page therefore gains no horizontal scrollbar at 320–1920 CSS px. `.diagram-scroll` scrolls only content wider than its container that ignores the inline cap, such as a future type. The pinned options of §16.4 are unchanged; `useMaxWidth` is neither set nor overridden.
+- `.diagram-scroll:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }` gives the focusable region the same focus ring as the other scroll-region rules.
 - `.diagram--unsupported` and its `<pre>` inherit the existing `pre { max-width: 100%; overflow-x: auto; }` rule and stay in the text measure.
 - `.render-note` is small, muted, and block-level; its text is never hidden, because it is the only signal that a block was not rendered.
 - No rule in `app.css` targets a Mermaid-generated class, and no rule is added for the diagram SVG's internal styling; Mermaid's injected style owns that.
@@ -535,9 +541,9 @@ Promised and covered by fixtures: `flowchart` (including `graph`), `sequence`, `
 
 ## 20. Diagram tests
 
-Unit tests in `src/browser/math.rs` (extending the existing module) cover: each row of §13.1; `mmd`/`uml`/`dot`/`graphviz` opacity; `Mermaid`/`mermaid title` non-recognition; empty and unclosed fences; exact figure strings of §14.1/§14.3/§14.4; source escaping in the `<pre>`; `has_diagram` true only for a renderable figure; the cap boundaries at exactly 100,000 bytes and exactly 1,000 lines; one byte and one line over each cap; figures splitting a paragraph without nesting; byte-identity of a diagram-free field.
+Unit tests in `src/browser/math.rs` (extending the existing module) cover: each row of §13.1; `mmd`/`uml`/`dot`/`graphviz` opacity; `Mermaid`/`mermaid title` non-recognition; empty and unclosed fences; exact figure strings of §14.1/§14.3/§14.4, including `role="region"`, `aria-label="Diagram N"`, and `tabindex="0"` on the `.diagram-scroll` container; page-continuous `Diagram N` numbering across prose fields, with every figure consuming one number; source escaping in the `<pre>`; `has_diagram` true only for a renderable figure; the cap boundaries at exactly 100,000 bytes and exactly 1,000 lines; one byte and one line over each cap; figures splitting a paragraph without nesting; byte-identity of a diagram-free field.
 
-Integration tests (`tests/browser_diagram_cli.rs`, in the style of `tests/browser_math_cli.rs`) cover: one fixture per promised type; `plantuml` and `puml` figures with the note; `uml`/`dot`/`graphviz`/`mmd` literal fences; an unknown type reaching the failure path in a browser (TASK-150) and a malformed source left intact in the served HTML; over-byte and over-line fixtures; per-figure isolation (a fixture with one bad and one good figure still emits both, with only the bad one marked); the bundle link exactly once on diagram pages and absent everywhere else, including a math-only and an over-limit-only page; both CSP strings per response class and no CSP on the Mermaid asset; no `unsafe-inline` in any `script-src`; hostile fixtures (`<img src=x onerror=…>`, a `classDef` payload, a `javascript:` link) leaving no `<script` node, no `on…=` attribute, and no `javascript:` URL in served HTML; CLI `view`/`--json`, `search`, and the stored file bytes unchanged; a source scan proving no JVM or PlantUML invocation exists in the codebase or the dependency set.
+Integration tests (`tests/browser_diagram_cli.rs`, in the style of `tests/browser_math_cli.rs`) cover: one fixture per promised type; each renderable figure's scroll container is a labelled, focusable region (`role="region"`, `aria-label="Diagram N"`, `tabindex="0"`), the names are unique per page, and no unlabelled `.diagram-scroll` remains; `plantuml` and `puml` figures with the note; `uml`/`dot`/`graphviz`/`mmd` literal fences; an unknown type reaching the failure path in a browser (TASK-150) and a malformed source left intact in the served HTML; over-byte and over-line fixtures; per-figure isolation (a fixture with one bad and one good figure still emits both, with only the bad one marked); the bundle link exactly once on diagram pages and absent everywhere else, including a math-only and an over-limit-only page; both CSP strings per response class and no CSP on the Mermaid asset; no `unsafe-inline` in any `script-src`; hostile fixtures (`<img src=x onerror=…>`, a `classDef` payload, a `javascript:` link) leaving no `<script` node, no `on…=` attribute, and no `javascript:` URL in served HTML; CLI `view`/`--json`, `search`, and the stored file bytes unchanged; a source scan proving no JVM or PlantUML invocation exists in the codebase or the dependency set.
 
 Client assertions (same file, reading `src/browser/app.js`) pin every option of §16.4, the id derivation, the absence of `bindFunctions`, `fetch`, `import(`, and `MutationObserver`, and the skip rule for `data-render-error`.
 
@@ -545,7 +551,7 @@ Client assertions (same file, reading `src/browser/app.js`) pin every option of 
 
 Resolved here (implementation-level readings of ADR-0026 as amended):
 
-1. Figure markup is ADR-0026 decisions 2–3 verbatim, minus their illustrative indentation: exact strings are pinned in §14. Figure attributes beyond `class` and `data-diagram` are not added.
+1. Figure markup is ADR-0026 decisions 2–3 verbatim, minus their illustrative indentation: exact strings are pinned in §14. The `figure` element adds no attribute beyond `class`, `data-diagram`, and (over-limit) `data-render-error`; the inner `.diagram-scroll` carries `role`, `aria-label` and `tabindex` per §14.1.
 2. The client render id derives from `window.location.pathname` plus the figure index (§16.4), because the pinned figure markup carries no record id; the path contains the record id for `/doc/<ID>`.
 3. The caps are measured on the trimmed diagram source, byte-exactly and line-exactly, with equality allowed (§15.1).
 4. An empty `plantuml`/`puml` fence is literal text, matching the empty-`mermaid` rule (§13.3).
