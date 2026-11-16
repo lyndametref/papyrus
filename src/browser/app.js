@@ -249,8 +249,9 @@
   }
 
   /* Math placeholders (TASK-145): render each data-tex element with the
-     vendored KaTeX. The element's own source is the no-script fallback, so a
-     missing global or a thrown error only marks the element. */
+     vendored KaTeX. The element's own source is the no-script fallback.
+     KaTeX clears the element before parsing, so a thrown error restores that
+     source and marks the element; a missing global marks every element. */
   var mathElements = document.querySelectorAll("[data-tex]");
   if (mathElements.length) {
     if (!window.katex || typeof window.katex.render !== "function") {
@@ -271,6 +272,7 @@
               output: "htmlAndMathml",
             });
           } catch (e) {
+            element.textContent = source;
             element.setAttribute("data-render-error", "math");
           }
         })(mathElements[k]);

@@ -634,6 +634,16 @@ fn client_pass_pins_the_katex_options_and_error_marker() {
 }
 
 #[test]
+fn client_pass_restores_the_source_before_marking_a_thrown_error() {
+    let js = include_str!("../src/browser/app.js");
+    let catch_block = "} catch (e) {\n            element.textContent = source;\n            element.setAttribute(\"data-render-error\", \"math\");\n          }";
+    assert!(
+        js.contains(catch_block),
+        "a thrown render must restore the source, then mark the element"
+    );
+}
+
+#[test]
 fn markdown_stays_literal_beyond_the_math_delimiters() {
     let project = project("markdown");
     let server = Server::start(&project.path);
