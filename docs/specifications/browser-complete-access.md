@@ -22,7 +22,7 @@ Final integration increment of the offline, project-local web interface: one nav
 - Disabled or absent document types contribute no records and no error to the inventory or to any list; their sidebar entry is omitted.
 - Empty states for every category, including the inventory when no records exist.
 - Front-matter metadata projection (REQ-06.004) is reused on every per-type list/detail view and on the inventory cards where applicable; `created_date` and `updated_date` remain read-only in the browser.
-- Embedded assets from the static asset table, the CSP response classes fixed in `browser-requirements.md` §9.7, security headers, Host/Origin validation, request limits, timeouts, offline operation, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility, and the 320 CSS-pixel responsive layout, all reused unchanged.
+- Embedded assets from the static asset table, the CSP response classes fixed in `browser-requirements.md` §9.7, security headers, Host/Origin validation, request limits, timeouts, offline operation, browser baseline (Firefox 115+; NFR-05.001), accessibility, and the 320 CSS-pixel responsive layout, all reused unchanged.
 - Unit and integration tests extending `tests/browser_cli.rs` (and siblings) for the inventory hub and for cross-type consistency, including a cross-type test that creates one record of every supported type and verifies it is reachable through the inventory and its per-type view.
 
 ### Out of scope
@@ -113,7 +113,7 @@ Integration tests extend `tests/browser_cli.rs` (and siblings) with at least the
 ## Open questions
 
 - **OQ-1 (non-blocking, product)** — Whether the inventory hub should show counts only or also a one-line preview per type (for example the most recently updated record). MOCK-0012 uses illustrative counts only; this specification adopts counts only. If the product prefers previews, only the card template and its tests change.
-- **OQ-2 (non-blocking, follow-up)** — Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ is deferred, consistent with sibling tickets.
+- **OQ-2 (non-blocking, follow-up)** — Real-browser verification in Firefox 115+ is deferred, consistent with sibling tickets.
 - **OQ-3 (non-blocking, consistency)** — The approved MOCK-0012 prototype marks only four types as clickable because it fully prototypes only those; the implementation marks every type clickable because every type already has a per-type list view. If the product prefers a restricted clickable set, only the card link rendering changes.
 
 ## Traceability

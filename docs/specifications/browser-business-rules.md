@@ -190,7 +190,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-05.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
 2. Requirement references rendered as links in the view are the only exception to the baseline "requirement references inside any field are displayed as literal text" rule (section 4.19 of the baseline); the link target is derived from a resolved record ID, never from request input.
 3. Tag controls are keyboard operable, every input has a `<label>` or accessible name, remove controls are labelled `Remove <value>`, and the add input is labelled. Focus is not trapped.
 4. The sidebar's Business Rules entry and the business-rules list/view/edit templates are the only rendering additions; the shared shell and error pages are reused.
@@ -260,7 +260,7 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: Duplicate requirement references are collapsed on save, matching `rule edit`; this is looser than the CLI's input handling but produces the same stored result.
 - Assumption: The tag field's no-JavaScript fallback uses one text input per value plus a trailing empty input with the same field name; this preserves the approved chip layout with JavaScript and keeps the form usable without it.
 - Assumption: The JSON API exposes the five editable fields; business rules have no status, task, or supersession metadata, unlike decision records.
-- Assumption: Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24/TASK-40.
+- Assumption: Real-browser verification in Firefox 115+ (NFR-05.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24/TASK-40.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
 - Assumption: The canonical `BR-*.md` documents sharing the directory are not records and are never touched by the browser; only `<prefix>-<digits>.md` files are.
 
@@ -270,7 +270,7 @@ UI mockups are required before any UI implementation work and must be approved b
 - **OQ-2 (non-blocking, product)** — Whether duplicate requirement references should be rejected instead of collapsed. This specification collapses them to match `rule edit` and the UI description. If rejection is preferred, the tag interaction and validation messages change (a `Duplicate requirement reference: <value>.` message is added).
 - **OQ-3 (non-blocking, layout)** — Whether requirement references in the view should be rendered as links (adopted here per MOCK-0007 OQ-2) or as literal text (baseline section 4.19). This specification adopts links; the baseline text-display rule applies to all other requirement references in the browser.
 - **OQ-4 (non-blocking, naming)** — The JSON `kind`/`form` value is `business-rule` to match the category selector. If the implementation prefers the CLI type key `rule`, the value changes in one place and tests follow.
-- **OQ-5 (non-blocking, follow-up)** — Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ is deferred, consistent with sibling tickets.
+- **OQ-5 (non-blocking, follow-up)** — Real-browser verification in Firefox 115+ is deferred, consistent with sibling tickets.
 
 ## Traceability
 

@@ -1934,6 +1934,7 @@ passed. Binary growth over TASK-149: **+160 B**; `.deb` delta **−216 B**.
 | M4 | Safari 18.x | not installed | 18.x | **owner manual, pending** |
 | — | Firefox 100.0 (NFR-05.001 floor probe) | tarball `firefox/firefox-bin`, SHA-256 `7cabcabf4ae5092dd2ec802bacc8b9730b334835ea91718896a50f215ab932ee` | 100.0 | defect probe only; see DEF-1 |
 
+Note: as of the NFR-05.001 amendment (2026-11-16), the supported browser floor is Firefox 115+ only; the Edge 130, Safari 18.x, and Firefox 100 targets recorded in this matrix and in DEF-1 are historical and no longer in scope.
 The Firefox 100 and 102 tarballs were downloaded to `./.tmp/task150/m2/`, run
 headless, and deleted. Firefox 100 required an extracted `libdbus-glib-1-2` shared
 library on `LD_LIBRARY_PATH`; nothing was installed on the host.

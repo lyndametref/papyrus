@@ -1,23 +1,24 @@
 # UI Description — Browser Shell and Shared List Layout
 
-**Ticket:** TASK-141
-**Specification:** [`../browser-shell-shared-list-layout-and-page-width.md`](../browser-shell-shared-list-layout-and-page-width.md) §3–§5 (feature specification; superseded by TASK-148 when its clauses move into the browser specification corpus)
-**ADR:** [`../../architecture/adr/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md`](../../architecture/adr/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md) — Accepted 2026-11-15, amended 2026-11-15 (decisions 1, 2, 3, 6, 8; constraints 10–15)
-**Requirements:** REQ-06.016 (one shared list layout), REQ-06.015 (content width; width clause only), REQ-06.004 (browser/CLI front-matter parity), REQ-06.009, REQ-05.007
-**Mockup package:** [`mockups/MOCK-0016-browser-shell-and-shared-list-layout-review.html`](mockups/MOCK-0016-browser-shell-and-shared-list-layout-review.html) — one self-contained review file (review landing, web prototype); registry [`mockups/README.md`](mockups/README.md)
-**Status:** `draft` — awaiting explicit user approval of MOCK-0016.
+**Tickets:** TASK-141 (shell and shared list); TASK-144 (navigation toggle and content-width classes)
+**Specification:** [`../browser-shell-shared-list-layout-and-page-width.md`](../browser-shell-shared-list-layout-and-page-width.md) §3, §4, §7 (feature specification; superseded by TASK-148 when its clauses move into the browser specification corpus)
+**ADR:** [`../../architecture/adr/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md`](../../architecture/adr/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md) — Accepted 2026-11-15, amended 2026-11-15 (decisions 1–8; constraints 5–15)
+**Requirements:** REQ-06.016 (one shared list layout), REQ-06.015 (content width and navigation visibility), REQ-06.004 (browser/CLI front-matter parity), REQ-06.009, REQ-05.007, REQ-06.013 (board)
+**Mockup packages:** [`mockups/MOCK-0016-browser-shell-and-shared-list-layout-review.html`](mockups/MOCK-0016-browser-shell-and-shared-list-layout-review.html) (shell and shared list) and [`mockups/MOCK-0018-browser-navigation-toggle-and-collapsed-layout-review.html`](mockups/MOCK-0018-browser-navigation-toggle-and-collapsed-layout-review.html) (navigation toggle, collapsed body, full-width page, full-window band) — one self-contained review file each (review landing, web prototype); registry [`mockups/README.md`](mockups/README.md)
+**Status:** `draft` — awaiting explicit user approval of MOCK-0016 and MOCK-0018.
 
 ## 1. Purpose and scope
 
-Layout of three structural pieces, shown on the reference family (the milestone list at `/?type=milestone`):
+Layout of four structural pieces, shown on the reference family (the milestone list at `/?type=milestone`):
 
-1. **The page shell** — header, navigation, main region, footer, rendered once per page.
-2. **The page-width class** — decided by the server per route; `Capped` only in this ticket.
-3. **The shared list layout** — one table for every artifact family, with family variation limited to declared slot columns.
+1. **The page shell** — header (including the navigation toggle), navigation, main region, footer, rendered once per page.
+2. **The navigation toggle and the two page-body layouts** — expanded (the default) and collapsed, stored per browser.
+3. **The page-width class** — decided by the server per route: `Capped` on ordinary pages, `Full` on the backlog board; a full-window band inside a capped page for diagram and mockup surfaces.
+4. **The shared list layout** — one table for every artifact family, with family variation limited to declared slot columns.
 
 Layout only: no library, framework, component set, or technology is named or implied. Grayscale wireframe; the shared wireframe tokens stand.
 
-**Not in this document:** the navigation toggle and its persisted state (TASK-144), the `.app--full` CSS rule and the board route that uses it (TASK-144), the remaining family migrations (TASK-142), row grouping visuals beyond the declared hierarchical variant (first exercised in TASK-142), and the record view/edit field sets (unchanged).
+**Not in this document:** the remaining family migrations (TASK-142), row grouping visuals beyond the declared hierarchical variant (first exercised in TASK-142), the record view/edit field sets (unchanged), the board's own content and actions (REQ-06.013), and any mockup preview route (out of scope, ADR-0028 decision 7).
 
 ## 2. Shell regions
 
@@ -25,33 +26,43 @@ One shell per response; each region appears exactly once.
 
 | Region | Contents | Notes |
 | --- | --- | --- |
-| Header (`site-header`) | Product mark, product name, project name, static top-meta line (local browser, offline, bind address) | Copy and order unchanged from today; the navigation-toggle slot is empty in this ticket and nothing is drawn in its place |
-| Navigation (`site-nav`) | "Document types" sidebar: grouped entries (Backlog, Decisions, Documents, Project), selected entry marked and `aria-current="page"` | Same entries, order, and grouping as the approved MOCK-0015 shell |
+| Header (`site-header`) | Navigation toggle, product mark, product name, project name, static top-meta line (local browser, offline, bind address) | Copy and order unchanged from today; the toggle is the first control and sits left of the mark |
+| Navigation toggle (`nav-toggle`) | Plain text label `Navigation` plus a decorative chevron, 30 px tall (28–32 allowed), 1 px border, soft fill, visible focus ring | On every page, in both states; not drawn when JavaScript is disabled (section 6) |
+| Navigation (`site-nav`) | "Document types" sidebar: grouped entries (Backlog, Decisions, Documents, Project), selected entry marked and `aria-current="page"` | Same entries, order, and grouping as the approved MOCK-0015 shell; controlled by the toggle |
 | Main (`main`) | One `h1` per page, page sub-line, then page content | The list section is a child of main; no chrome inside main |
 | Footer (`site-footer`) | Long offline note; short offline note at narrow widths | Copy unchanged |
 
 Rules:
 
 - The shell is the only place chrome exists; list, view, edit, and error bodies are fragments inside it.
-- The shell does not render list actions, filters, or headings other than the project chrome; it only provides the four regions and the width class.
-- No shell region carries its own width rule; the width class is applied once, on the page wrapper (section 3).
-- The header carries no toggle in this ticket, so no button, icon, or placeholder occupies that space.
+- The shell does not render list actions, filters, or headings other than the project chrome; it only provides the four regions, the toggle, and the width class.
+- No shell region carries its own width rule; the width class is applied once, on the page wrapper (section 3), and the collapsed state is applied once, on the page root.
+- The header toggle is a button, not a link; its label never changes between states, because the expanded/collapsed state is carried by `aria-expanded` (section 7).
+- The chevron points left when the navigation is expanded and right when it is collapsed; it is decorative and carries no accessible name of its own.
 
-## 3. Page width classes
+## 3. Page width classes and page-body layouts
 
-| Route property | Rendered class | Layout effect |
+Width and layout are decided in two independent places: the server fixes the width class per route; the reader's stored navigation state fixes whether the navigation column is in the layout.
+
+| State / route property | Rendered marker | Layout effect |
 | --- | --- | --- |
-| `Capped` (default; every route in this ticket) | `class="app"` | Unchanged: content column capped at 1040 px, centred, with the existing horizontal and bottom padding |
-| `Full` (reserved: backlog board, mockup preview) | `class="app app--full"` | Named only; **not drawn** and not styled in this ticket |
+| `Capped` (default for every ordinary page) | `class="app"` | Page body capped at 1040 px, centred, 24 px horizontal padding; navigation column 210 px plus a 30 px gap, and the main column carries a 1 px left border and 30 px inner left padding. At a 1040 px body this leaves a 752 px main column |
+| Expanded navigation (default, no stored value) | no state attribute | As above; navigation present and readable |
+| Collapsed navigation | collapsed state marker on the page root; `hidden` on the navigation element | Navigation column and gap are gone and the main column loses its left border and inner left padding, so the reclaimed 240 px go to the page body: 992 px at the same 1040 px body. The cap and the centring do not change, so the extra width widens the body instead of pushing it towards the window edges |
+| `Full` (backlog board only) | `class="app app--full"` | Cap lifted: the body spans the window with the existing 24 px horizontal padding; the 210 px navigation column and 30 px gap still apply, so collapsing the navigation frees a further 240 px for the board |
+| Full-window band inside a capped page (diagram / mockup surface) | none; the band is a child of the capped page | Spans the window edge to edge and scrolls its own content; the page never gains a horizontal scrollbar |
 
-- The class string is produced by the server. No script reads or writes it; the layout is identical with JavaScript disabled.
-- Nothing in the list layout breaks out of the capped column in this ticket. Full-width inner regions (`.bleed`) belong to later tickets.
+- The class string is produced by the server. No script reads or writes it, so the width is identical with JavaScript disabled. The collapsed state changes the page-body layout only; it never changes the width class.
+- A no-JavaScript page always renders the expanded layout (section 6).
+- Nothing breaks out of the capped column except the full-window band, and the band carries its own scroll container.
+- Board columns keep their own minimum widths; when their sum exceeds the board area, the board region scrolls horizontally inside itself (ADR-0028 downstream constraint 7).
+- The capped 1040 px applies to the whole page body, navigation column included, so the colloquial "content width" is the remaining main column width.
 
 ## 4. Shared list layout
 
 ### 4.1 Section structure
 
-1. Section heading: `h2` with the family heading, followed by the count note on the same line (`4 milestones`, `0 milestones`).
+1. Section heading: `h2` with the family heading, followed by the count note (`4 milestones`, `0 milestones`). Both sit on one line when there is room; the row wraps onto two lines when there is not. Between 481 and 720 px the row previously stayed on one line and overflowed the page sideways, so the heading and the count note now wrap instead, at every list family and at every width (MOCK-0018). The count note is never clipped and never pushed outside the page body.
 2. One table with a header row and one body row per record.
 3. No filter controls, create controls, or page-level record actions are added by this layout; they stay with the page that owns them.
 
@@ -107,25 +118,37 @@ Requirements and NFRs keep their hierarchy: the group row appears first, its mem
 - No create control, no zero-value table header, and no disabled filter are shown.
 - Copy comes from the list's empty state, not from per-family list markup.
 
-## 6. Narrow treatment (320 CSS px)
+## 6. Narrow treatment (720, 480 and 320 CSS px)
 
 - The page height grows instead of the page width: no page-level horizontal scrolling at any width.
-- The navigation stays expanded above the main region. There is no automatic narrow-viewport collapse in this ticket; the collapse control is TASK-144.
+- Above 480 px the two-column layout is kept, so at 720 px the expanded navigation column still costs 240 px and the main column is about 432 px.
+- At and below 480 px the page-body padding drops to 12 px and the navigation becomes a full-width block above the main region, separated by a line; when collapsed it is removed and the main region moves up under the header.
+- The navigation is never collapsed automatically: there is no viewport-driven collapse, because it would compete with the stored preference. The default is expanded at every width, and the header toggle is the only way to collapse it.
+- The header toggle is drawn at every width, first in the header, left of the mark; the top-meta line is hidden at 480 px and below, as today, and the toggle keeps its 28–32 px height.
+- With JavaScript disabled the toggle is not drawn, the navigation is expanded and fully usable, and no stored preference is read (section 7).
+- The list heading row wraps instead of overflowing between 481 and 720 px (section 4.1); the heading and the count note each take their own line at 600 px and at 320 px.
 - The seven-column table keeps its header row and column semantics. At 320 px it scrolls horizontally inside its own container (the table region), so `Created`, `Updated`, and `Actions` are reached by scrolling that region, not the page.
+- A full-window band on a narrow page keeps the same rule: it spans the window and scrolls its own content, so the page still never scrolls sideways.
 - Table text drops one size step; cell content keeps its no-wrap columns so a scrolled view stays readable.
-- The header keeps the mark and product name and hides the top-meta line, as today. The footer switches to the short copy, as today.
+- The footer switches to the short copy, as today.
 - No column is hidden, merged, or relabelled at narrow widths; the stacked-row alternative was rejected because it would require per-cell label markup the row model does not carry.
 
 ## 7. Accessibility and interaction baseline
 
 - Semantic table: `scope="col"` on every header cell; header row visually distinct; no layout tables.
 - Heading order: one `h1` per page, the list section heading as `h2`.
-- Every interactive element is drawn: title links, action links, navigation links, breadcrumb links, form controls on the context views.
+- Every interactive element is drawn: the navigation toggle, title links, action links, navigation links, breadcrumb links, form controls on the context views.
 - Focus order follows document order; controls have visible labels; the page works with JavaScript disabled (the mockup's script is review navigation only).
+- **Navigation toggle:** a button, the first tab stop in the header, operable with Enter and Space, with a visible focus ring in both states.
+- **State, not label:** the accessible name is `Navigation` in both states and never becomes `Show`/`Hide`; the state is conveyed by `aria-expanded="true"` (expanded) or `"false"` (collapsed) and by `aria-controls="site-nav"`. The chevron is decorative and adds no second name.
+- **Collapsed navigation:** removed with `hidden`, so it leaves the layout, the accessibility tree and the tab order; it is never merely moved off-screen or made transparent.
+- **No JavaScript:** the toggle is emitted with `hidden` and the script removes the attribute when it runs, so a script-free page shows no toggle, an expanded and usable navigation, and no layout that depends on script.
 - Status is not conveyed by colour alone (tag with text).
 - Counts and empty copy are plain text, not images.
 
-## 8. Views in the review package (MOCK-0016, web)
+## 8. Views in the review packages (web)
+
+### 8.1 MOCK-0016 (TASK-141)
 
 | View id | Screen | Role |
 | --- | --- | --- |
@@ -135,18 +158,40 @@ Requirements and NFRs keep their hierarchy: the group row appears first, its mem
 | `list-milestones-empty` | Milestone list, no records | Empty state |
 | `narrow-320` | Milestone list at 320 CSS px | Narrow treatment |
 
+### 8.2 MOCK-0018 (TASK-144)
+
+| View id | Screen | Role |
+| --- | --- | --- |
+| `header-toggle` | Header toggle, expanded and collapsed | Placement, size, focus ring, accessibility contract |
+| `expanded` | Milestone list, expanded navigation | Default layout with the navigation column and gap |
+| `collapsed` | Milestone list, collapsed navigation | Collapsed page body; the toggle switches between this view and `expanded` |
+| `full-width-board` | Backlog board, full-width page | Cap lifted; board columns keep their own minimum widths |
+| `bleed` | Capped page with a full-window band | Band spans the window and scrolls inside itself |
+| `narrow-720` | 720 px, expanded and collapsed | Two-column layout retained at 720 px |
+| `narrow-480` | 480 px, expanded and collapsed | Stacked navigation above the main region |
+| `narrow-320` | 320 px, expanded and collapsed | Narrowest supported width |
+| `no-js` | JavaScript disabled | No toggle drawn, navigation expanded and usable |
+| `section-head-600` | List heading row at 600 px | Heading and count note wrap instead of overflowing |
+| `section-head-320` | List heading row at 320 px | Same wrap at the narrowest width |
+
 ## 9. MOCK register
 
 | MOCK | File | Platform | Views | Status |
 | --- | --- | --- | --- | --- |
 | MOCK-0016 | [`mockups/MOCK-0016-browser-shell-and-shared-list-layout-review.html`](mockups/MOCK-0016-browser-shell-and-shared-list-layout-review.html) | web | 5 (list, record, edit, empty, 320 px) | `draft` — pending user approval |
+| MOCK-0018 | [`mockups/MOCK-0018-browser-navigation-toggle-and-collapsed-layout-review.html`](mockups/MOCK-0018-browser-navigation-toggle-and-collapsed-layout-review.html) | web | 11 (toggle states, expanded, collapsed, full-width board, full-window band, 720/480/320 px expanded and collapsed, no JavaScript, heading row at 600 px and 320 px) | `draft` — pending user approval |
 
 MOCK-0016 reuses the approved MOCK-0015 shell (navigation grouping, header copy, footer copy) and supersedes the list-row treatment of MOCK-0001..MOCK-0015 for every family that migrates to the shared layout; it does not revise or renumber them. `browser-final-cross-type-ui.md` §5 is reconciled in this ticket; per-family UI documents are reconciled in TASK-142.
+
+MOCK-0018 supersedes the shell description of MOCK-0016 for the header (the toggle is no longer an empty slot), the page-width section (the full-width page and the full-window band are now drawn) and the narrow section (the heading row wrap). It reuses MOCK-0016's shell, navigation entries, shared list and board context without editing or renumbering it.
 
 ## 10. Assumptions
 
 - Example records are illustrative; widths assume a project name and IDs of realistic length.
-- The 1040 px cap, the sidebar column width, header copy, and footer copy are unchanged by this ticket.
+- The 1040 px cap, the 210 px navigation column, the 30 px gap, the 24 px horizontal padding, header copy, and footer copy are unchanged.
+- The toggle height is 30 px, chosen inside the allowed 28–32 px range so it optically matches the 28 px product mark.
+- The chevron points left when expanded (the direction the navigation will go) and right when collapsed; it carries no meaning for assistive technology.
+- The capped 1040 px applies to the whole page body including the navigation column, so collapsing the navigation widens the body by the reclaimed 240 px rather than adding an outer margin.
 - Dates are shown as stored; the wireframe's date-only form is a legibility choice, not a formatting rule.
 - The status tag uses the configured status text as stored.
 - A record without a slot value or date shows muted `(none)`, matching how dates are already shown today.
@@ -159,17 +204,22 @@ MOCK-0016 reuses the approved MOCK-0015 shell (navigation grouping, header copy,
 - **OQ-3 (release slot)** — resolved by the same amendment: the release family declares no slot.
 - **OQ-4 (narrow treatment)** — scroll container chosen (section 6). Reviewer confirmation requested.
 - **OQ-5 (empty copy)** — the family-neutral message plus the existing help line (section 5). Reviewer confirmation requested.
+- **OQ-6 (intermediate breakpoint)** — open, design decision. At 720 px the expanded two-column layout leaves about 432 px for the main column, which is narrower than the 480 px stacked layout. The mockup keeps the two-column layout until 480 px because that is the existing breakpoint; the alternative is to stack the navigation earlier (for example at 720 px). Not settled by the ticket.
+- **OQ-7 (collapsed width above the cap)** — open, design decision. The mockup shows the reclaimed width going to the page body under the unchanged 1040 px cap. If an owner later wants the collapsed page to use more than 1040 px on ordinary pages, that changes the width contract, not just the layout.
 
 ## 12. Approval status
 
 | Item | Status |
 | --- | --- |
 | MOCK-0016 | `draft` — awaiting explicit user approval |
+| MOCK-0018 | `draft` — awaiting explicit user approval |
 | This UI description | `draft` |
-| Registry row | `draft` |
+| Registry rows | `draft` for MOCK-0016 and MOCK-0018 |
 
 ## 13. Specification alignment
 
 `docs/specifications/browser-shell-shared-list-layout-and-page-width.md` was patched by a tech-writer while this package was produced. It now states the amended contract (seven columns including `Created`, release → no slot, per-record accessible names, OQ-1..OQ-3 resolved) and matches this document and MOCK-0016. Earlier in that concurrent patch the page still carried the pre-amendment order and the open questions; no discrepancy remains at handoff.
+
+For TASK-144 that specification's §3, §4 and §7 are being extended in parallel with the toggle, collapsed, full-width and band contract; this document and MOCK-0018 assume those clauses read as in sections 2, 3, 6 and 7 above. If the ported clauses differ, this document follows the specification.
 
 One detail the mockup follows from the specification's markup contract (§5.2): the Title cell holds the title link, a labels list, and a references list as separate elements, not one prefixed sentence.

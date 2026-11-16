@@ -121,7 +121,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 9. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-05.001), accessibility basics, no external resources, no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
 2. Templates may be extended with decision-specific placeholders; unknown placeholders are left untouched as in the baseline.
 3. The sidebar's Decisions entry and the decision list/view/edit templates are the only rendering additions.
 
@@ -162,7 +162,7 @@ UI mockups are required before any UI implementation work and must be approved b
 |---|---|
 | AC-1 | The browser displays and edits active decision records in addition to requirement and backlog content. |
 | AC-2 | Browser operations remain offline-capable, use project-local text-file persistence, sanitize input, and access no paths outside the project directory except during init. |
-| AC-3 | The expanded interface renders in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001). |
+| AC-3 | The expanded interface renders in Firefox 115+ (NFR-05.001). |
 | AC-4 | Archived decisions are not listed and return `404` by URL. |
 | AC-5 | Optimistic concurrency and atomic writes hold for the new record type. |
 
@@ -175,7 +175,7 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: The configured decision statuses and the documented transition graph govern the `status` field in the browser.
 - Assumption: A new MOCK id (MOCK-0003) is allocated for the extension rather than modifying the approved MOCK-0001/MOCK-0002 in place, per the global sequential-id rule.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
-- Assumption: AC #3 (real-browser verification in Firefox 100+, Edge 130+, and Safari 18+) and NFR-05.001 are deferred follow-ups, not blocking for this ticket; tracked as a follow-up rather than a release gate.
+- Assumption: AC #3 (real-browser verification in Firefox 115+) and NFR-05.001 are deferred follow-ups, not blocking for this ticket; tracked as a follow-up rather than a release gate.
 - Assumption: The decision type is read-only in the browser; creating decisions or changing their type remains CLI-only.
 - Assumption: Supersession in the browser follows the CLI rule: `--superseded-by` cannot be combined with `--status`; the browser enforces the same mutual exclusion as a validation error.
 

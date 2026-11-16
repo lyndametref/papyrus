@@ -165,7 +165,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-05.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
 2. The sidebar's Technical Specifications entry, the technical-specifications list/view/edit/conflict templates, and the technical-specifications `404` page are the only rendering additions; the shared shell and the remaining error pages are reused.
 3. Both fields are native `input`/`textarea` controls with a `<label>`; no tag, select, or custom widget is added. The form is keyboard operable and works with JavaScript disabled. Focus is not trapped.
 
@@ -237,14 +237,14 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: Deprecated technical specifications are excluded exactly like other document types: not listed, not counted, not reachable, not editable (REQ-05.007, BR-017).
 - Assumption: The `document_types.tech-spec.enabled` flag controls the sidebar entry and category, like the other document types; a missing directory is an empty category, not an error.
 - Assumption: Technical specifications expose no structured NFR/task reference fields in the browser; such IDs remain literal text in the title or description (BR-017 defines no reference fields).
-- Assumption: Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001) remains a deferred follow-up, consistent with sibling tickets.
+- Assumption: Real-browser verification in Firefox 115+ (NFR-05.001) remains a deferred follow-up, consistent with sibling tickets.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
 
 ## Open questions
 
 - **OQ-1 (non-blocking, product)** — Whether technical specifications should gain structured references to non-functional requirements or tasks in the browser. REQ-05.009 says they "may be referenced" but BR-017 defines no reference fields; this specification treats them as literal text.
 - **OQ-2 (non-blocking, validation)** — `technical-specifications-management.md` and BR-017 state no length limit, while the browser baseline applies title 1–200 and multi-line text 20000 limits. This specification adopts the baseline limits for consistency with the other browser document types; MOCK-0009 draws no length help text. If the product prefers no browser length limit, only the documented messages and tests for the two length rules change.
-- **OQ-3 (non-blocking, follow-up)** — Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ is deferred, consistent with sibling tickets.
+- **OQ-3 (non-blocking, follow-up)** — Real-browser verification in Firefox 115+ is deferred, consistent with sibling tickets.
 
 ## Traceability
 

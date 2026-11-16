@@ -210,7 +210,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-05.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
 2. The sidebar's three new entries, the three list/view/edit templates, the three `404` pages, and the front-matter metadata rows are the only rendering additions; the shared shell and the remaining error pages are reused.
 3. Labels and references are rendered as tags in the view and edited with the tag add/remove interaction (reusing the MOCK-0002 pattern). Both fields are keyboard operable; every input has a visible label or accessible name; remove controls are labelled `Remove <value>`; the add input is labelled. Focus is not trapped.
 4. Both body fields are native `input`/`textarea` controls with a `<label>`; no tag, select, or custom widget is added for them. The form is keyboard operable and works with JavaScript disabled. Focus is not trapped.
@@ -289,14 +289,14 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: The `document_types.<type>.enabled` flag controls the sidebar entry and category for each type, like the other document types; a missing directory is an empty category, not an error.
 - Assumption: Labels are collapsed on duplicate, matching the task-label handling; references reject duplicates, matching the UI-mockup reference handling.
 - Assumption: Front-matter metadata projection reuses the shared `RecordView` (TASK-67); `created_date` and `updated_date` are read-only in the browser and `updated_date` is refreshed only when a save changes at least one byte.
-- Assumption: Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001) remains a deferred follow-up, consistent with sibling tickets.
+- Assumption: Real-browser verification in Firefox 115+ (NFR-05.001) remains a deferred follow-up, consistent with sibling tickets.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
 
 ## Open questions
 
 - **OQ-1 (non-blocking, product)** — Whether use cases, test cases, and test reports should gain structured references to tasks or milestones in the browser. REQ-05.012/013/014 leave association to tasks/milestones undecided; this specification treats them as literal text in the general `references` list.
 - **OQ-2 (non-blocking, validation)** — The management specification and BR-018/019/020 state no length limit for title/description/applicability, while the browser baseline applies title 1–200 and multi-line text 20000 limits. This specification adopts the baseline limits for consistency with the other browser document types; MOCK-0013 draws no length help text. If the product prefers no browser length limit, only the documented messages and tests for the two length rules change.
-- **OQ-3 (resolved)** — The legacy list preview and row metadata are removed; list rows use the shared contract in `browser-shell-ui.md` §3. Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ remains a deferred follow-up (TASK-150).
+- **OQ-3 (resolved)** — The legacy list preview and row metadata are removed; list rows use the shared contract in `browser-shell-ui.md` §3. Real-browser verification in Firefox 115+ remains a deferred follow-up (TASK-150).
 
 ## Traceability
 

@@ -22,7 +22,7 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 - Embedded HTML/CSS/JS assets and templates compiled into the binary: embedded assets are served from one static table — first-party files, vendored KaTeX code and its 20 WOFF2 fonts, and the vendored Mermaid bundle are same-origin; there is no CDN, no remote font, no network fetch, and no new dependency.
 - New configuration keys `browser_host`, `browser_port`, `browser_open` with defaults, validation, `config list/get/set/unset` integration, and serialization (BR-016, REQ-01.002).
 - HTML escaping, JSON encoding, ID/record resolution that never joins user input into a path, project-directory boundary checks on every read and write, symlink-escape rejection, request-body caps, and Host/Origin validation as the CSRF and DNS-rebinding mitigation (NFR-02.002, NFR-04.002).
-- Support in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001) using only widely supported HTML/CSS/JS, with basic accessibility.
+- Support in Firefox 115+ (NFR-05.001) using only widely supported HTML/CSS/JS, with basic accessibility.
 - Unit and integration tests, including spawning the binary and speaking HTTP over `TcpStream`.
 
 ### Out of scope
@@ -368,7 +368,7 @@ Routes are exact. `{id}` is a record ID as defined in section 7.1.
 
 The shell, shared-list, width, and navigation contract is specified in `browser-shell-ui.md`.
 
-1. The interface uses only features available in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001): HTML5 forms, `<!doctype html>`, UTF-8, CSS flexbox and grid, CSS custom properties, `white-space: pre-wrap`, the system font stack plus the bundled KaTeX WOFF2 fonts, and ES2019 JavaScript (no optional chaining required, no top-level await, no private class fields).
+1. The interface uses only features available in Firefox 115+ (NFR-05.001): HTML5 forms, `<!doctype html>`, UTF-8, CSS flexbox and grid, CSS custom properties, `white-space: pre-wrap`, the system font stack plus the bundled KaTeX WOFF2 fonts, and ES2019 JavaScript (no optional chaining required, no top-level await, no private class fields).
 2. Forbidden: `:has()`, container queries, `color-mix()`, `@layer`, subgrid, `dialog`, popover, `inert`, and any feature that would require a newer engine than the stated baselines.
 3. No JavaScript module loading, no `fetch`, no dynamic import, and no framework. The stylesheet loads in `<head>`, followed by the synchronous `/assets/nav-state.js` and the deferred `/assets/app.js`; math pages additionally link the KaTeX stylesheet and deferred script, and diagram pages add the deferred Mermaid script before `app.js` (`browser-shell-ui.md` §5.5).
 4. Accessibility basics:
@@ -572,7 +572,7 @@ Each item has a specified default in this document, so none blocks implementatio
 - **OQ-6 (recommended default: include group editing)** — Group records are listed and their content is editable in this increment. Excluding them would leave group content view-only while requirement content is editable.
 - **OQ-7 (recommended default: 404 for deprecated records)** — The man page says deprecated documents are hidden from the web UI; returning `404` for a known deprecated ID matches "hidden" and avoids revealing that the ID exists.
 - **OQ-8 (recommended default: mtime+size version token, 409 on mismatch)** — No concurrency contract is documented. The token is dependency-free and detects the realistic single-user conflict; the residual check-then-rename race is documented.
-- **OQ-9 (recommended default: target the common feature subset)** — NFR-05.001's browser floor is Firefox 100+, Edge 130+, and Safari 18+. This specification targets only features supported well before those baselines, so the browser floor is fixed by the requirement and the feature subset does not change it.
+- **OQ-9 (recommended default: target the common feature subset)** — NFR-05.001's browser floor is Firefox 115+. This specification targets only features supported well before those baselines, so the browser floor is fixed by the requirement and the feature subset does not change it.
 - **OQ-10 (recommended default: include the JSON API)** — The man page describes a web UI only. The JSON endpoints are an internal contract used by tests and later increments; they add no user-visible navigation.
 - **OQ-11 (recommended default: Origin+Host validation, no CSRF token)** — There is no session or credential to protect. A token would add state and a second source of truth without improving the loopback threat model.
 - **OQ-12 (recommended default: wildcard hosts are allowed and the printed URL uses `127.0.0.1`)** — Binding `0.0.0.0` is a non-loopback bind and therefore allowed with a warning; a wildcard address cannot be navigated to, so the printed and opened URL substitutes `127.0.0.1`.

@@ -2,7 +2,7 @@
 
 **Tickets:** TASK-145 (Part I, §1–§12 — math, KaTeX) delivered here; TASK-146 (Part II, §13–§20 — diagrams, Mermaid) extends the same pre-pass and the same page-asset slot
 **Milestone:** m-21
-**Status:** Part I pinned 2026-11-16 from REQ-06.017 and ADR-0025 decisions 2–10, revised 2026-11-16 with the ADR-0025 decisions 5–6 revision notes (`output` pinned to `htmlAndMathml`, `style-src` inline-style deviation accepted). Part II pinned 2026-11-16 from ADR-0026 as amended (Accepted 2026-11-16, all open questions resolved: Mermaid 11.17.2 only, no `mmd`, PlantUML source block with a note, 100,000-byte/1,000-line server caps plus client `maxEdges: 500`, two literal CSP strings, scoped `style-src 'unsafe-inline'` on diagram pages). Part II was extended on 2026-11-16 with the Firefox 100 compatibility shim pinned by ADR-0026 decision 13, whose owner acknowledgement is recorded as pending in the ADR)
+**Status:** Part I pinned 2026-11-16 from REQ-06.017 and ADR-0025 decisions 2–10, revised 2026-11-16 with the ADR-0025 decisions 5–6 revision notes (`output` pinned to `htmlAndMathml`, `style-src` inline-style deviation accepted). Part II pinned 2026-11-16 from ADR-0026 as amended (Accepted 2026-11-16, all open questions resolved: Mermaid 11.17.2 only, no `mmd`, PlantUML source block with a note, 100,000-byte/1,000-line server caps plus client `maxEdges: 500`, two literal CSP strings, scoped `style-src 'unsafe-inline'` on diagram pages).
 **Requirements:** REQ-06.017 (math and diagrams), REQ-06.015 (content width), NFR-01.003 (offline), NFR-02.002 (sanitize input), NFR-03.001 (single binary), NFR-05.001 (supported browsers), NFR-06.002 (GPLv3-or-later linking), REQ-06.004 (browser/CLI parity)
 **ADRs:** ADR-0025 (Accepted — Part I), ADR-0026 (Accepted 2026-11-16 — Part II), ADR-0027 (vendored assets and notices), ADR-0005 (CSP baseline, no Markdown renderer), ADR-0028 (width classes; `.bleed` is used by Part II only)
 **UI:** no mockup. Neither ticket adds a control, page, or layout region: math and diagrams are content inside existing prose containers, and the DOM shapes are fixed by ADR-0025 decision 2 and ADR-0026 decisions 2–3. Visual verification is browser verification in TASK-149/TASK-150. Recorded in §11 and §20.
@@ -249,7 +249,7 @@ KaTeX sets inline `style` attributes on some generated nodes: `mspace` and rule 
 - The visual effect is bounded: spacing around operators and rules can deviate by a fraction of an em, and a rejected formula shows uncoloured instead of `errorColor`. Text, structure, line breaking, horizontal containment, and the source fallback are unaffected.
 - No execution path opens: an attribute the browser drops cannot restyle the page, run script, or fetch anything.
 - A nonce does not address it: CSP nonces match `<style>` and `<link>` elements, never a `style` attribute, and KaTeX emits no style element for math.
-- Hashes do not address it: the values are content-dependent (`mspace` widths derive from the formula), so the allowlist is unbounded, and `style-src-attr`/`'unsafe-hashes'` are unavailable on all of NFR-05.001's browsers (Firefox 100 lacks them).
+- Hashes do not address it: the values are content-dependent (`mspace` widths derive from the formula), so the allowlist is unbounded, and `style-src-attr`/`'unsafe-hashes'` are unavailable on the supported floor of Firefox 115 (Firefox 115 still lacks them), so KaTeX's inline style attributes are dropped by the CSP on every supported browser.
 - `'unsafe-inline'` in `style-src` is not taken: it relaxes every page for a cosmetic deviation. Mermaid's need for it (ADR-0026 decision 5) concerns an injected `<style>` element and is decided separately.
 
 TASK-146 does not inherit this rule: it follows ADR-0026 decision 6, and this ticket's diagram client pass must render correctly with `style-src 'self'` alone. TASK-149/TASK-150 record the observed deviation on a math page in all three supported browsers as expected behaviour, not as a failure.
@@ -470,22 +470,10 @@ One self-contained block appended after the math block, in the file's existing E
 - After the replacement, every anchor inside the rendered SVG loses `href`, `xlink:href` and `target`; the element and its text stay, so a diagram can never navigate away. Neutralisation is best-effort per figure: a failure of that step cannot abort the loop or any other figure.
 - On a thrown error **or** a rejected promise, keep the `<pre>`, set `data-render-error="diagram"`, and append the note `Diagram not rendered: Mermaid rejected the source.` (only if no `figcaption.render-note` exists). Each figure is rendered in its own `try`/`catch` and its own promise chain, so one failure neither aborts the loop nor the page.
 - No `fetch`, no dynamic `import()`, no `MutationObserver`, no second pass, no storage write, and no DOM state beyond `data-render-error` and the appended note.
-- On a platform whose `CSSStyleSheet` constructor is not constructible (Firefox 100), one feature-detected substitute is installed before `mermaid.initialize`. It changes none of the options above and is specified in §16.6.
 
 ### 16.5 Figures the client must skip
 
 Any figure already carrying `data-render-error` is skipped without reading its source: the server marked it for the over-limit case (§15.2) and may have marked it in an earlier branch of this block. A figure whose note was already appended never receives a second note.
-
-### 16.6 Firefox 100 compatibility shim (DEF-1)
-
-The client block of §16.4 contains one compatibility mechanism, pinned by ADR-0026 decision 13 and its measurement record. It is the only platform-API override in the browser client.
-
-- **Why it exists.** NFR-05.001 sets Firefox 100 as the supported floor, but Mermaid 11.17.2 builds theme and shape CSS with `new CSSStyleSheet()` (three sites; the first is `mermaid.min.js:3582:1657`), and that constructor is only constructible from Gecko 101 (Chromium 73, Safari 16.4). On Firefox 100 every `mermaid.render` call therefore rejects with `TypeError: Illegal constructor.` before an SVG exists, so every figure takes the failure contract of §16.7: measured 0/10 on the TASK-150 corpus.
-- **When it activates.** One runtime feature probe, once, immediately before `mermaid.initialize` and inside the same `if (diagramFigures.length)` branch as §16.4: `new window.CSSStyleSheet()`. If the probe succeeds nothing is installed, so Firefox 101+, Edge 130, and Safari 18 keep the native constructor object. Because the probe lives in that branch, it never runs on a math-only, diagram-free, list, board, edit, or error page, and a page with no `mermaid` figure installs nothing.
-- **What it substitutes.** If the probe throws, `window.CSSStyleSheet` is replaced by a function that returns the `sheet` of a `<style>` element created in an inert document (`document.implementation.createHTMLDocument("")`), with `.prototype` set to the native prototype, so `instanceof CSSStyleSheet` and every native instance are unaffected. Nothing else is overridden; if the global assignment itself fails, the block returns and the failure contract applies unchanged.
-- **Equivalence evidence.** ADR-0026's measurement record: on Firefox 100 with the shim the ten-figure corpus renders 10/10 with the same per-diagram SVG node counts as Firefox 102's native constructor, and Mermaid's serialised theme stylesheet is byte-identical to the native path — 62,476 bytes, 643 rules for the full nine-type corpus. That absolute count is corpus-dependent: a minimal fixture yields 62,431 B and 623 top-level rules while keeping identical cross-browser identity (same per-figure stylesheet SHA-256 and same SVG node counts on Firefox 100, 102, and 153). The equivalence rests on that cross-browser identity, not on the absolute byte or rule count. No `<style>` element reaches `document.head`, no `--mermaid-font-family` is set on `:root`, and the page keeps the diagram CSP.
-- **What stays unchanged.** The vendored bundle is byte-identical, with the same 3,572,661 bytes and SHA-256 (§16.1, §16.2); the `MANIFEST.md` row, `LICENSE`, `UPSTREAM.md`, the package `copyright` stanza, the two CSP literals of §17.1, and the caps of §15.1 are untouched. `script-src` stays `'self'`, because the shim is same-origin `app.js` code, not an inline script. The cost is 804 bytes of `app.js` (12,953 → 13,757 B), i.e. an 8,324,128-byte release binary against the unchanged 12,582,912-byte (12 MiB) ceiling — 4,258,784 B of headroom (ADR-0026 decision 12).
-- **Removal condition.** The block is deleted when NFR-05.001's Firefox floor becomes 101 or later. It is feature-detected, so leaving it in place after the floor rises is harmless dead code. Any change to the activation condition, or a second platform override on a diagram page, requires a new ADR.
 
 ### 16.7 Failure contract summary
 
@@ -558,7 +546,7 @@ Unit tests in `src/browser/math.rs` (extending the existing module) cover: each 
 
 Integration tests (`tests/browser_diagram_cli.rs`, in the style of `tests/browser_math_cli.rs`) cover: one fixture per promised type; each renderable figure's scroll container is a labelled, focusable region (`role="region"`, `aria-label="Diagram N"`, `tabindex="0"`), the names are unique per page, and no unlabelled `.diagram-scroll` remains; `plantuml` and `puml` figures with the note; `uml`/`dot`/`graphviz`/`mmd` literal fences; an unknown type reaching the failure path in a browser (TASK-150) and a malformed source left intact in the served HTML; over-byte and over-line fixtures; per-figure isolation (a fixture with one bad and one good figure still emits both, with only the bad one marked); the bundle link exactly once on diagram pages and absent everywhere else, including a math-only and an over-limit-only page; both CSP strings per response class and no CSP on the Mermaid asset; no `unsafe-inline` in any `script-src`; hostile fixtures (`<img src=x onerror=…>`, a `classDef` payload, a `javascript:` link) leaving no `<script` node, no `on…=` attribute, and no `javascript:` URL in served HTML; CLI `view`/`--json`, `search`, and the stored file bytes unchanged; a source scan proving no JVM or PlantUML invocation exists in the codebase or the dependency set.
 
-Client assertions (same file, reading `src/browser/app.js`) pin every option of §16.4, the id derivation, the absence of `bindFunctions`, `fetch`, `import(`, and `MutationObserver`, and the skip rule for `data-render-error`. They also pin the §16.6 shim: the `new window.CSSStyleSheet()` probe precedes `mermaid.initialize` and sits inside the diagram branch, the substitute sets `.prototype` to the native prototype, no other global is assigned, and the block is absent from every non-diagram path (ADR-0026 decision 13).
+Client assertions (same file, reading `src/browser/app.js`) pin every option of §16.4, the id derivation, the absence of `bindFunctions`, `fetch`, `import(`, and `MutationObserver`, and the skip rule for `data-render-error`.
 
 ## 21. Resolved questions and traceability for Part II
 
@@ -577,7 +565,7 @@ Open questions: none for TASK-146.
 |---|---|
 | REQ-06.017 AC 5, 6, 7, 9, 11–17 | §13, §14, §16, §17, §18 |
 | REQ-06.015 (full width for diagrams) | §14.1, §19 |
-| ADR-0026 decisions 1–13 | §13–§19, §16.6, §20 |
+| ADR-0026 decisions 1–12 | §13–§19, §20 |
 | ADR-0027 decisions 1–6 | §16.1, §16.2 |
 | ADR-0028 (width classes) | §19 |
 | NFR-01.003, NFR-03.001 | §16.1, §16.2, §20 |

@@ -403,7 +403,7 @@ All three open questions and the ticket's task-family premise are settled by the
 | Artifact | Reference |
 | --- | --- |
 | Requirements | REQ-06.016; REQ-06.015 (width **and** navigation visibility); REQ-06.004 (browser list parity); REQ-06.013 (board, now `Full`); REQ-05.007 (archive exclusion); REQ-06.003, REQ-06.009, REQ-06.012, REQ-06.014 (shell, header, list routes) |
-| NFRs | NFR-01.002; NFR-01.003; NFR-05.001 (Firefox 100+, Edge 130+, Safari 18+ at 320/480/720 px) |
+| NFRs | NFR-01.002; NFR-01.003; NFR-05.001 (Firefox 115+ at 320/480/720 px) |
 | ADRs | ADR-0028 (decisions 1, 2, 3, 4, 5, 6, 7, 8, 9; downstream constraints 4–9 and 15); ADR-0005 (templates, CSP, progressive enhancement, no cookies); ADR-0017; ADR-0020 (decision 5 amended by ADR-0028 constraint 9) |
 | Domain model | `docs/domain-model/` — requirement group and member requirement (grouped rows) |
 | Business rules | `docs/business-rules/` — archive and lifecycle rules cited by the existing list pages |

@@ -188,7 +188,7 @@ Math pages additionally link the KaTeX stylesheet and script; diagram pages add 
 
 ## 7. Supported browsers
 
-Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001), verified at 320, 480, and 720 CSS px. `:has()`, container queries, `color-mix()`, `@layer`, subgrid, `dialog`, popover, `inert`, optional chaining, top-level await, and private class fields are forbidden. TASK-150 owns the release verification evidence.
+Firefox 115+ (NFR-05.001), verified at 320, 480, and 720 CSS px. `:has()`, container queries, `color-mix()`, `@layer`, subgrid, `dialog`, popover, `inert`, optional chaining, top-level await, and private class fields are forbidden. TASK-150 owns the release verification evidence.
 
 ## 8. Response headers and assets
 

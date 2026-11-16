@@ -1,0 +1,1106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' file: 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>MOCK-0018 — Browser navigation toggle and collapsed layout review</title>
+<link rel="stylesheet" href="wireframe.css">
+<style>
+  /* Shell geometry reproduced as a wireframe. Wireframe tokens only. */
+  .mk-window { border: 1px solid var(--wf-border); border-radius: var(--wf-radius); background: var(--wf-bg); overflow: hidden; }
+  .mk-window-cap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 4px 8px; border-bottom: 1px solid var(--wf-border); background: var(--wf-fill-2); font-size: 11px; color: var(--wf-muted); }
+  .mk-window-cap code, .mk-code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 11px; }
+  .mk-app { max-width: 1040px; margin: 0 auto; padding: 0 24px 20px; }
+  .mk-app--full { max-width: none; }
+  .mk-app--narrow { padding: 0 12px 16px; }
+
+  .mk-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--wf-border); }
+  .mk-header-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
+  .mk-brand { display: flex; align-items: center; gap: 12px; }
+  .mk-mark { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--wf-border); border-radius: 5px; background: var(--wf-fill-2); font-weight: 700; font-size: 13px; }
+  .mk-brand-name { display: block; font-size: 11px; color: var(--wf-muted); line-height: 1.2; }
+  .mk-project { display: block; font-size: 18px; font-weight: 700; line-height: 1.2; }
+  .mk-meta { text-align: right; font-size: 11px; color: var(--wf-muted); line-height: 1.5; }
+
+  .mk-navtoggle { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--wf-border); border-radius: 5px; background: var(--wf-fill-2); color: var(--wf-fg); font: inherit; font-size: 12px; font-weight: 600; line-height: 1; cursor: pointer; white-space: nowrap; }
+  .mk-chev { font-size: 13px; line-height: 1; }
+  .mk-navtoggle.is-focus { outline: 2px solid var(--wf-fg); outline-offset: 2px; }
+
+  .mk-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 30px; align-items: start; padding-top: 18px; }
+  .mk-layout--collapsed { display: block; }
+  .mk-layout--stack { display: block; padding-top: 12px; }
+  .mk-side { padding: 2px 20px 2px 0; font-size: 12px; min-width: 0; }
+  .mk-side--stack { border-bottom: 1px solid var(--wf-border); margin: 0 0 10px; padding: 0 0 8px; }
+  .mk-side-label { margin: 0 0 6px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--wf-muted); }
+  .mk-side-group { margin: 8px 0 2px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--wf-muted); }
+  .mk-item { display: block; color: var(--wf-muted); }
+  .mk-main { border-left: 1px solid var(--wf-border); padding-left: 30px; min-width: 0; }
+  .mk-main--bare { border-left: 0; padding-left: 0; }
+
+  .mk-h1 { font-size: 21px; margin: 0 0 2px; }
+  .mk-sub { font-size: 12px; color: var(--wf-muted); margin: 0 0 10px; }
+  .mk-section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 16px; padding-bottom: 6px; border-bottom: 1px solid var(--wf-border); margin-bottom: 8px; }
+  .mk-section-head h2 { font-size: 15px; margin: 0; }
+  .mk-count { font-size: 12px; color: var(--wf-muted); margin: 0; }
+  .mk-section-head.is-highlighted { outline: 2px dashed var(--wf-accent); outline-offset: 4px; }
+  .mk-scroll { overflow-x: auto; }
+  .mk-table th, .mk-table td { padding: 6px 8px; font-size: 12px; }
+  .mk-footer { margin-top: 22px; padding-top: 8px; border-top: 1px solid var(--wf-border); font-size: 11px; color: var(--wf-muted); }
+
+  .mk-bleed-band { border-top: 2px dashed var(--wf-accent); border-bottom: 2px dashed var(--wf-accent); background: var(--wf-fill-2); padding: 8px 0; }
+  /* Escapes the 1040 px cap: 40 px centring margin + 24 px page padding on each side. */
+  .mk-bleed-band--escape { margin-left: -64px; margin-right: -64px; }
+  .mk-bleed-scroll { overflow-x: auto; padding: 0 24px; }
+  .mk-bleed-inner { display: flex; gap: 10px; width: 1500px; }
+  .mk-diagram-box { flex: 1 1 0; min-width: 0; border: 1px solid var(--wf-border); border-radius: var(--wf-radius); background: var(--wf-bg); padding: 10px; font-size: 11px; text-align: center; }
+
+  .mk-board { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 10px; }
+  .mk-col { border: 1px solid var(--wf-border); border-radius: var(--wf-radius); background: var(--wf-fill-2); padding: 8px; min-width: 0; }
+  .mk-col h3 { margin: 0 0 6px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+  .mk-card { border: 1px solid var(--wf-border); border-radius: 4px; background: var(--wf-bg); padding: 6px; margin: 0 0 6px; font-size: 11px; }
+  .mk-card p { margin: 0 0 4px; }
+  .mk-release-sep { margin: 12px 0 6px; padding-bottom: 4px; border-bottom: 2px solid var(--wf-border); font-weight: 700; font-size: 12px; }
+  .mk-milestone { border: 1px solid var(--wf-border); border-radius: var(--wf-radius); padding: 8px 10px; }
+  .mk-milestone-head { font-size: 12px; font-weight: 700; margin: 0 0 8px; }
+
+  .mk-pair { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .mk-frame { border: 1px solid var(--wf-border); border-radius: var(--wf-radius); background: var(--wf-bg); overflow: hidden; }
+  .mk-frame-caption { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-bottom: 1px solid var(--wf-border); background: var(--wf-fill-2); font-size: 11px; color: var(--wf-muted); }
+  .mk-notes { margin-top: 12px; }
+  .mk-notes ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+  .mk-dl { display: grid; grid-template-columns: 190px 1fr; gap: 6px 12px; margin: 0; font-size: 12px; }
+  .mk-dl dt { color: var(--wf-muted); margin: 0; }
+  .mk-dl dd { margin: 0; }
+</style>
+</head>
+<body data-mock-id="MOCK-0018">
+
+<header class="wf-chrome" role="navigation" aria-label="Review navigation (not part of the design)">
+  <span class="wf-chrome-label">Review</span>
+  <a class="wf-chrome-btn" href="#index">Overview</a>
+  <a class="wf-chrome-btn" href="#web">Web</a>
+  <span class="wf-chrome-note">Scaffolding for review only — not part of the mockup.</span>
+</header>
+
+<!-- 1. REVIEW LANDING -->
+<section class="wf-review wf-index is-active" data-review="index" data-screen="index">
+  <div class="wf-container">
+    <p class="wf-eyebrow">MOCK-0018 · Wireframe review · draft</p>
+    <h1 class="wf-title">Browser navigation toggle and collapsed layout</h1>
+    <p class="wf-subtitle">A persistent navigation toggle in the page header, the collapsed page-body layout, the uncapped full-width page, a full-window content band inside a capped page, the 320/480/720 px states, the JavaScript-disabled state, and the heading-row overflow fix. Grayscale wireframe only — no visual style, library, framework, or technology choice.</p>
+
+    <div class="wf-box wf-ticket">
+      <h2 class="wf-section-title">Ticket</h2>
+      <p><strong>TASK-144</strong> — Add collapsible navigation and content-width classes to the browser shell</p>
+      <p class="wf-note">Sources: <code>docs/requirements/business/REQ-06.015.md</code> (navigation visibility, content width); <code>docs/architecture/adr/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md</code> decisions 3–8 and downstream constraints 5–15; <code>docs/specifications/browser-shell-shared-list-layout-and-page-width.md</code> §3 and §4 (shell and page-width contract); <code>docs/specifications/ui/browser-shell-and-shared-list-ui.md</code>; existing browser layout source. Shell, navigation entries, shared list and footer are context from MOCK-0016.</p>
+      <p class="wf-note">Contract applied here: one toggle in the header on every page, left of the brand; 210 px navigation column and 30 px gap when expanded, both gone when collapsed; the 1040 px centred cap stays on ordinary pages and is lifted only for the full-width page; a full-window band inside a capped page scrolls inside itself, never the page.</p>
+    </div>
+
+    <h2 class="wf-section-title">Review contents</h2>
+    <div class="wf-cards">
+      <article class="wf-box wf-card">
+        <span class="wf-badge">Web · 11 views</span>
+        <h3>Web prototype</h3>
+        <p>Header toggle in both states with its accessibility contract; expanded and collapsed page body; full-width board page; full-window band inside a capped page; 720, 480 and 320 px states expanded and collapsed; JavaScript-disabled page; heading row at 600 and 320 px.</p>
+        <a class="wf-button" href="#web">Open web prototype</a>
+      </article>
+    </div>
+
+    <h2 class="wf-section-title">What to review</h2>
+    <div class="wf-box">
+      <ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;">
+        <li><strong>Toggle.</strong> Plain text plus a chevron, labelled <em>Navigation</em>, left of the Papyrus mark on every page, 30 px tall (28–32 allowed), 1 px border, soft fill, visible focus ring, aligned with the brand block.</li>
+        <li><strong>Expanded (default).</strong> 210 px navigation column, 30 px gap, main column with a left border and 30 px inner padding; page body capped at 1040 px and centred with 24 px padding.</li>
+        <li><strong>Collapsed.</strong> Navigation column and gap gone, main left border and padding gone; reclaimed 240 px go to the page body, which keeps the 1040 px cap and its centring. The freed width is never pushed to the window edges as a margin.</li>
+        <li><strong>Full-width page.</strong> Cap lifted, 24 px horizontal padding kept, navigation column still 210 px; board columns keep their own minimum widths and the board region scrolls if their sum exceeds the area.</li>
+        <li><strong>Full-window band.</strong> Inside a capped page, the band spans the window edge to edge and scrolls its own content; the page never gains a horizontal scrollbar.</li>
+        <li><strong>Narrow widths.</strong> At 720 px the two-column layout is kept; at 480 px and 320 px the navigation stacks above the main region and the toggle is the only way to remove it.</li>
+        <li><strong>No JavaScript.</strong> The toggle is not drawn, the navigation is expanded and usable.</li>
+        <li><strong>Heading row.</strong> At 481–720 px the list heading and count note wrap onto two lines instead of overflowing the page.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 2. WEB PROTOTYPE -->
+<div class="wf-proto" data-platform="web">
+  <nav class="wf-proto-nav" aria-label="Web views (review navigation)">
+    <span class="wf-chrome-label">Web views</span>
+    <a class="wf-chrome-btn wf-view-link" href="#web/header-toggle">Header toggle</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/expanded">Expanded</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/collapsed">Collapsed</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/full-width-board">Full width</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/bleed">Full-window band</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/narrow-720">720 px</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/narrow-480">480 px</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/narrow-320">320 px</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/no-js">No JavaScript</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/section-head-600">Heading 600</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/section-head-320">Heading 320</a>
+  </nav>
+  <div class="wf-frame wf-frame--desktop">
+
+    <!-- ============ HEADER TOGGLE: both states + accessibility contract ============ -->
+    <section class="wf-screen" data-platform="web" data-screen="header-toggle">
+      <div class="wf-container">
+        <h2 class="wf-title">Header toggle, both states</h2>
+        <p class="wf-subtitle">One persistent toggle in the page header, left of the Papyrus mark. Same label in both states; the state is carried by the expanded/collapsed indication for assistive technology, not by a changed label.</p>
+
+        <div class="wf-box" style="margin-bottom:12px">
+          <p class="wf-label" style="margin-bottom:6px">Expanded state (default) — toggle shown with the focus ring as it appears when reached by keyboard</p>
+          <div class="mk-window">
+            <div class="mk-app">
+              <header class="mk-header">
+                <div class="mk-header-left">
+                  <button class="mk-navtoggle is-focus" type="button" aria-expanded="true" aria-controls="site-nav"><span class="mk-chev" aria-hidden="true">«</span>Navigation</button>
+                  <div class="mk-brand">
+                    <span class="mk-mark" aria-hidden="true">P</span>
+                    <span><span class="mk-brand-name">Papyrus</span><span class="mk-project">papyrus</span></span>
+                  </div>
+                </div>
+                <p class="mk-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+              </header>
+            </div>
+          </div>
+        </div>
+
+        <div class="wf-box" style="margin-bottom:12px">
+          <p class="wf-label" style="margin-bottom:6px">Collapsed state — same label, same position; only the state indicator and the chevron direction change</p>
+          <div class="mk-window">
+            <div class="mk-app">
+              <header class="mk-header">
+                <div class="mk-header-left">
+                  <button class="mk-navtoggle" type="button" aria-expanded="false" aria-controls="site-nav"><span class="mk-chev" aria-hidden="true">»</span>Navigation</button>
+                  <div class="mk-brand">
+                    <span class="mk-mark" aria-hidden="true">P</span>
+                    <span><span class="mk-brand-name">Papyrus</span><span class="mk-project">papyrus</span></span>
+                  </div>
+                </div>
+                <p class="mk-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+              </header>
+            </div>
+          </div>
+        </div>
+
+        <div class="wf-row">
+          <div class="wf-box wf-col">
+            <h3 style="margin:0 0 8px;font-size:14px">Placement and size</h3>
+            <dl class="mk-dl">
+              <dt>Position</dt><dd>Header, immediately left of the Papyrus mark; first control in the header in document order.</dd>
+              <dt>Size</dt><dd>30 px tall (28–32 px allowed); width follows the label plus the chevron.</dd>
+              <dt>Outline</dt><dd>1 px border, soft fill, slightly rounded corners; plain text plus chevron, no icon artwork.</dd>
+              <dt>Focus ring</dt><dd>Visible ring around the whole control, offset from the border, drawn in both states.</dd>
+              <dt>Alignment</dt><dd>Vertically centred on the brand block, so the label and the project name share one optical line.</dd>
+              <dt>Persistence</dt><dd>Present on every page, including record, edit, error and board pages; it never scrolls away with the page content.</dd>
+            </dl>
+          </div>
+          <div class="wf-box wf-col">
+            <h3 style="margin:0 0 8px;font-size:14px">Accessibility annotations</h3>
+            <dl class="mk-dl">
+              <dt>Control</dt><dd><code class="mk-code">button type="button"</code>, not a link.</dd>
+              <dt>Expanded</dt><dd><code class="mk-code">aria-expanded="true"</code></dd>
+              <dt>Collapsed</dt><dd><code class="mk-code">aria-expanded="false"</code></dd>
+              <dt>Relationship</dt><dd><code class="mk-code">aria-controls="site-nav"</code> pointing at the navigation region.</dd>
+              <dt>Accessible name</dt><dd>“Navigation” in both states, unchanged. State is conveyed by the expanded/collapsed indication, never by renaming the control to “Show”/“Hide”.</dd>
+              <dt>Chevron</dt><dd>Decorative; hidden from assistive technology, so it adds no second name.</dd>
+              <dt>Keyboard</dt><dd>First tab stop in the header; Enter and Space activate it; the focus ring stays visible after activation.</dd>
+              <dt>Collapsed navigation</dt><dd>Removed with the hidden attribute, not merely moved off-screen: it leaves the layout and the accessibility tree and is not reachable by tab.</dd>
+              <dt>No script</dt><dd>The markup ships with the toggle hidden; see the No JavaScript view.</dd>
+            </dl>
+          </div>
+        </div>
+        <p class="wf-note">Annotation: the state is stored per browser and re-applied before the page paints, so a collapsed page never flashes expanded. The control is on every page because the page body differs while the header does not.</p>
+      </div>
+    </section>
+
+    <!-- ============ EXPANDED LAYOUT ============ -->
+    <section class="wf-screen" data-platform="web" data-screen="expanded">
+      <div class="wf-container">
+        <h2 class="wf-title">Expanded layout (default)</h2>
+        <p class="wf-subtitle">Navigation column 210 px, gap 30 px, main column with a left border and 30 px inner padding; page body capped at 1040 px, centred, 24 px horizontal padding. Click the toggle to see the collapsed layout.</p>
+
+        <div class="mk-window">
+          <div class="mk-window-cap"><span class="wf-badge">Window 1280 px — drawn reduced</span> <span>page body capped at 1040 px, centred</span></div>
+          <div class="mk-app">
+            <header class="mk-header">
+              <div class="mk-header-left">
+                <button class="mk-navtoggle" type="button" aria-expanded="true" aria-controls="site-nav" data-goto="collapsed"><span class="mk-chev" aria-hidden="true">«</span>Navigation</button>
+                <div class="mk-brand">
+                  <span class="mk-mark" aria-hidden="true">P</span>
+                  <span><span class="mk-brand-name">Papyrus</span><span class="mk-project">papyrus</span></span>
+                </div>
+              </div>
+              <p class="mk-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+            </header>
+
+            <div class="mk-layout">
+              <aside class="mk-side" aria-label="Document types (site-nav)">
+                <p class="mk-side-label">Document types</p>
+                <p class="mk-side-group">Backlog</p>
+                <a class="wf-link" href="#web/expanded" data-goto="expanded" aria-current="page" style="font-weight:700">Milestones</a>
+                <span class="mk-item">Board</span>
+                <p class="mk-side-group">Decisions</p>
+                <span class="mk-item">Decisions</span>
+                <p class="mk-side-group">Documents</p>
+                <span class="mk-item">Business requirements</span>
+                <span class="mk-item">Non-functional requirements</span>
+                <span class="mk-item">Technical specifications</span>
+                <span class="mk-item">Glossary</span>
+                <span class="mk-item">UI mockups</span>
+                <p class="mk-side-group">Project</p>
+                <span class="mk-item">Configuration</span>
+                <span class="mk-item">Agent skills &amp; workflows</span>
+              </aside>
+
+              <main class="mk-main">
+                <h1 class="mk-h1">Milestones</h1>
+                <p class="mk-sub">Backlog milestones with their release, status, and front-matter metadata.</p>
+                <div class="mk-section-head">
+                  <h2>Milestones</h2>
+                  <p class="mk-count">4 milestones</p>
+                </div>
+                <div class="mk-scroll" role="region" aria-label="Milestones table, scrolls horizontally if needed">
+                  <table class="wf-table mk-table" style="min-width:680px" aria-label="Milestones" data-list-layout="shared">
+                    <thead>
+                      <tr>
+                        <th scope="col" data-column="id">ID</th>
+                        <th scope="col" data-column="title">Title</th>
+                        <th scope="col" data-column="status">Status</th>
+                        <th scope="col" data-column="release">Release</th>
+                        <th scope="col" data-column="created">Created</th>
+                        <th scope="col" data-column="updated">Updated</th>
+                        <th scope="col" data-column="actions">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr data-row-id="MS-021">
+                        <td style="white-space:nowrap">MS-021</td>
+                        <td><a class="wf-link" href="#web/expanded" data-goto="expanded">Diagnostics, browser shell, and offline rendering</a><span class="wf-note" style="display:block;margin-top:2px">browser · shell</span><span class="wf-note" style="display:block;font-size:11px">ADR-0028, TASK-144</span></td>
+                        <td><span class="wf-badge">In Progress</span></td>
+                        <td style="white-space:nowrap">REL-004</td>
+                        <td style="white-space:nowrap">2026-11-15</td>
+                        <td style="white-space:nowrap">2026-11-15</td>
+                        <td style="white-space:nowrap"><a class="wf-link" href="#web/expanded" data-goto="expanded" aria-label="View MS-021">View</a> <a class="wf-link" href="#web/expanded" data-goto="expanded" aria-label="Edit MS-021">Edit</a></td>
+                      </tr>
+                      <tr data-row-id="MS-020">
+                        <td style="white-space:nowrap">MS-020</td>
+                        <td><a class="wf-link" href="#web/expanded" data-goto="expanded">Registry consolidation and release close</a><span class="wf-note" style="display:block;margin-top:2px">registry</span><span class="wf-note" style="display:block;font-size:11px">ADR-0020</span></td>
+                        <td><span class="wf-badge">Done</span></td>
+                        <td style="white-space:nowrap">REL-003</td>
+                        <td style="white-space:nowrap">2026-11-08</td>
+                        <td style="white-space:nowrap">2026-11-14</td>
+                        <td style="white-space:nowrap"><a class="wf-link" href="#web/expanded" data-goto="expanded" aria-label="View MS-020">View</a> <a class="wf-link" href="#web/expanded" data-goto="expanded" aria-label="Edit MS-020">Edit</a></td>
+                      </tr>
+                      <tr data-row-id="MS-019">
+                        <td style="white-space:nowrap">MS-019</td>
+                        <td><a class="wf-link" href="#web/expanded" data-goto="expanded">Architecture checkpoint follow-ups</a><span class="wf-note" style="display:block;margin-top:2px">architecture</span><span class="wf-note" style="display:block;font-size:11px">ADR-0024</span></td>
+                        <td><span class="wf-badge">In Progress</span></td>
+                        <td style="white-space:nowrap">REL-003</td>
+                        <td style="white-space:nowrap">2026-11-06</td>
+                        <td style="white-space:nowrap">2026-11-12</td>
+                        <td style="white-space:nowrap"><a class="wf-link" href="#web/expanded" data-goto="expanded" aria-label="View MS-019">View</a> <a class="wf-link" href="#web/expanded" data-goto="expanded" aria-label="Edit MS-019">Edit</a></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </main>
+            </div>
+
+            <footer class="mk-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+          </div>
+        </div>
+
+        <div class="mk-notes">
+          <p class="wf-note" style="margin:0 0 6px">Annotation (not part of the design): at a 1280 px window the 1040 px page body leaves 120 px margins on each side; inside it the 210 px column plus the 30 px gap leave a 752 px main column, 721 px of it inside the left border and padding. The table fits without horizontal scrolling. Measurements are for the shown window width; the cap and the column widths are fixed.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ COLLAPSED LAYOUT ============ -->
+    <section class="wf-screen" data-platform="web" data-screen="collapsed">
+      <div class="wf-container">
+        <h2 class="wf-title">Collapsed layout</h2>
+        <p class="wf-subtitle">The navigation column and the gap are gone, and the main column loses its left border and inner left padding. The reclaimed width goes to the page body, which keeps the 1040 px cap and its centring. Click the toggle to expand again.</p>
+
+        <div class="mk-window">
+          <div class="mk-window-cap"><span class="wf-badge">Window 1280 px — drawn reduced</span> <span>page body still capped at 1040 px, centred</span></div>
+          <div class="mk-app">
+            <header class="mk-header">
+              <div class="mk-header-left">
+                <button class="mk-navtoggle" type="button" aria-expanded="false" aria-controls="site-nav" data-goto="expanded"><span class="mk-chev" aria-hidden="true">»</span>Navigation</button>
+                <div class="mk-brand">
+                  <span class="mk-mark" aria-hidden="true">P</span>
+                  <span><span class="mk-brand-name">Papyrus</span><span class="mk-project">papyrus</span></span>
+                </div>
+              </div>
+              <p class="mk-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+            </header>
+
+            <div class="mk-layout mk-layout--collapsed">
+              <main class="mk-main mk-main--bare">
+                <h1 class="mk-h1">Milestones</h1>
+                <p class="mk-sub">Backlog milestones with their release, status, and front-matter metadata.</p>
+                <div class="mk-section-head">
+                  <h2>Milestones</h2>
+                  <p class="mk-count">4 milestones</p>
+                </div>
+                <div class="mk-scroll" role="region" aria-label="Milestones table">
+                  <table class="wf-table mk-table" style="min-width:680px" aria-label="Milestones" data-list-layout="shared">
+                    <thead>
+                      <tr>
+                        <th scope="col" data-column="id">ID</th>
+                        <th scope="col" data-column="title">Title</th>
+                        <th scope="col" data-column="status">Status</th>
+                        <th scope="col" data-column="release">Release</th>
+                        <th scope="col" data-column="created">Created</th>
+                        <th scope="col" data-column="updated">Updated</th>
+                        <th scope="col" data-column="actions">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr data-row-id="MS-021">
+                        <td style="white-space:nowrap">MS-021</td>
+                        <td><a class="wf-link" href="#web/collapsed" data-goto="collapsed">Diagnostics, browser shell, and offline rendering</a><span class="wf-note" style="display:block;margin-top:2px">browser · shell</span><span class="wf-note" style="display:block;font-size:11px">ADR-0028, TASK-144</span></td>
+                        <td><span class="wf-badge">In Progress</span></td>
+                        <td style="white-space:nowrap">REL-004</td>
+                        <td style="white-space:nowrap">2026-11-15</td>
+                        <td style="white-space:nowrap">2026-11-15</td>
+                        <td style="white-space:nowrap"><a class="wf-link" href="#web/collapsed" data-goto="collapsed" aria-label="View MS-021">View</a> <a class="wf-link" href="#web/collapsed" data-goto="collapsed" aria-label="Edit MS-021">Edit</a></td>
+                      </tr>
+                      <tr data-row-id="MS-020">
+                        <td style="white-space:nowrap">MS-020</td>
+                        <td><a class="wf-link" href="#web/collapsed" data-goto="collapsed">Registry consolidation and release close</a><span class="wf-note" style="display:block;margin-top:2px">registry</span><span class="wf-note" style="display:block;font-size:11px">ADR-0020</span></td>
+                        <td><span class="wf-badge">Done</span></td>
+                        <td style="white-space:nowrap">REL-003</td>
+                        <td style="white-space:nowrap">2026-11-08</td>
+                        <td style="white-space:nowrap">2026-11-14</td>
+                        <td style="white-space:nowrap"><a class="wf-link" href="#web/collapsed" data-goto="collapsed" aria-label="View MS-020">View</a> <a class="wf-link" href="#web/collapsed" data-goto="collapsed" aria-label="Edit MS-020">Edit</a></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </main>
+            </div>
+
+            <footer class="mk-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+          </div>
+        </div>
+
+        <div class="mk-notes">
+          <p class="wf-note" style="margin:0 0 6px">Annotation (not part of the design): the 240 px of navigation column plus gap become page body, so the main column grows from 752 px to 992 px at the same window width; the 1040 px cap and the centring do not change, so the extra width widens the page body rather than pushing it towards the window edges. The navigation element is absent from the layout and from the accessibility tree; no negative margin, no overlay, no push animation. Header, footer and page body padding are unchanged.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FULL-WIDTH PAGE (BOARD) ============ -->
+    <section class="wf-screen" data-platform="web" data-screen="full-width-board">
+      <div class="wf-container">
+        <h2 class="wf-title">Full-width page — backlog board</h2>
+        <p class="wf-subtitle">The only page type that lifts the cap: the backlog board. The page body spans the window with the existing 24 px horizontal padding; the navigation column stays 210 px and every board column keeps its own minimum width.</p>
+
+        <div class="mk-window">
+          <div class="mk-window-cap"><span class="wf-badge">Window 1440 px — drawn reduced</span> <span>full-width page class; cap lifted; 24 px padding kept; navigation column 210 px</span></div>
+          <div class="mk-app mk-app--full">
+            <header class="mk-header">
+              <div class="mk-header-left">
+                <button class="mk-navtoggle" type="button" aria-expanded="true" aria-controls="site-nav" data-goto="collapsed"><span class="mk-chev" aria-hidden="true">«</span>Navigation</button>
+                <div class="mk-brand">
+                  <span class="mk-mark" aria-hidden="true">P</span>
+                  <span><span class="mk-brand-name">Papyrus</span><span class="mk-project">papyrus</span></span>
+                </div>
+              </div>
+              <p class="mk-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+            </header>
+
+            <div class="mk-layout">
+              <aside class="mk-side" aria-label="Document types (site-nav)">
+                <p class="mk-side-label">Document types</p>
+                <p class="mk-side-group">Backlog</p>
+                <a class="wf-link" href="#web/full-width-board" data-goto="full-width-board" aria-current="page" style="font-weight:700">Board</a>
+                <span class="mk-item">Milestones</span>
+                <p class="mk-side-group">Documents</p>
+                <span class="mk-item">Business requirements</span>
+                <span class="mk-item">Technical specifications</span>
+                <span class="mk-item">Glossary</span>
+                <p class="mk-side-group">Project</p>
+                <span class="mk-item">Configuration</span>
+              </aside>
+
+              <main class="mk-main">
+                <h1 class="mk-h1">Backlog</h1>
+                <p class="mk-sub">Tasks per milestone, grouped by release. Drag a card to change its status.</p>
+
+                <p class="mk-release-sep">REL-004 — Browser shell and content width</p>
+
+                <section class="mk-milestone" aria-label="MS-021 Diagnostics, browser shell, and offline rendering">
+                  <p class="mk-milestone-head">MS-021 · Diagnostics, browser shell, and offline rendering</p>
+                  <div class="mk-board">
+                    <div class="mk-col">
+                      <h3>To Do</h3>
+                      <article class="mk-card"><p>TSK-311</p><p>Define page width per route</p></article>
+                      <article class="mk-card"><p>TSK-312</p><p>Render the shared shell on every page</p></article>
+                    </div>
+                    <div class="mk-col">
+                      <h3>In Progress</h3>
+                      <article class="mk-card"><p>TSK-313</p><p>Shared list layout for the milestone list</p></article>
+                    </div>
+                    <div class="mk-col">
+                      <h3>Review</h3>
+                      <article class="mk-card"><p>TSK-314</p><p>Navigation toggle in the header</p></article>
+                    </div>
+                    <div class="mk-col">
+                      <h3>Done</h3>
+                      <article class="mk-card"><p>TSK-310</p><p>Shell module and template set</p></article>
+                    </div>
+                  </div>
+                </section>
+
+                <p class="mk-release-sep">REL-003 — Registry consolidation</p>
+
+                <section class="mk-milestone" aria-label="MS-020 Registry consolidation and release close">
+                  <p class="mk-milestone-head">MS-020 · Registry consolidation and release close</p>
+                  <div class="mk-board">
+                    <div class="mk-col"><h3>To Do</h3><article class="mk-card"><p>TSK-305</p><p>Retire per-family list builders</p></article></div>
+                    <div class="mk-col"><h3>In Progress</h3><p class="wf-note" style="margin:0">No tasks</p></div>
+                    <div class="mk-col"><h3>Review</h3><p class="wf-note" style="margin:0">No tasks</p></div>
+                    <div class="mk-col"><h3>Done</h3><article class="mk-card"><p>TSK-301</p><p>Registry-derived navigation</p></article></div>
+                  </div>
+                </section>
+              </main>
+            </div>
+
+            <footer class="mk-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+          </div>
+        </div>
+
+        <div class="mk-notes">
+          <p class="wf-note" style="margin:0 0 6px">Annotation (not part of the design): at 1440 px the page body spans the window minus the 24 px padding on each side, and the 210 px navigation column plus 30 px gap are taken from it. If a milestone's columns at their own minimum widths no longer fit the remaining area, the board region scrolls horizontally inside itself; the page never gains a horizontal scrollbar. Collapsing the navigation gives the board another 240 px. Vertical minimum column widths shown here are illustrative; the ticket fixes no number. Ordinary pages never use this layout.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FULL-WINDOW BAND INSIDE A CAPPED PAGE ============ -->
+    <section class="wf-screen" data-platform="web" data-screen="bleed">
+      <div class="wf-container">
+        <h2 class="wf-title">Full-window band inside a capped page</h2>
+        <p class="wf-subtitle">A diagram or mockup surface that needs more width than the text column. The band spans the window edge to edge and scrolls its own content; the text above and below stays in the 1040 px cap.</p>
+
+        <div class="mk-window" style="width:1120px;max-width:100%">
+          <div class="mk-window-cap"><span class="wf-badge">Window 1120 px — drawn at scale 1</span> <span>page body capped at 1040 px (40 px margin each side); band spans the window</span></div>
+
+          <div class="mk-app">
+            <header class="mk-header">
+              <div class="mk-header-left">
+                <button class="mk-navtoggle" type="button" aria-expanded="true" aria-controls="site-nav" data-goto="collapsed"><span class="mk-chev" aria-hidden="true">«</span>Navigation</button>
+                <div class="mk-brand">
+                  <span class="mk-mark" aria-hidden="true">P</span>
+                  <span><span class="mk-brand-name">Papyrus</span><span class="mk-project">papyrus</span></span>
+                </div>
+              </div>
+              <p class="mk-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+            </header>
+
+            <div class="mk-layout">
+              <aside class="mk-side" aria-label="Document types (site-nav)">
+                <p class="mk-side-label">Document types</p>
+                <p class="mk-side-group">Documents</p>
+                <a class="wf-link" href="#web/bleed" data-goto="bleed" aria-current="page" style="font-weight:700">Technical specifications</a>
+                <span class="mk-item">Business requirements</span>
+                <span class="mk-item">Glossary</span>
+              </aside>
+
+              <main class="mk-main">
+                <h1 class="mk-h1">Browser shell and page width</h1>
+                <p class="mk-sub">Technical specification · SPEC-044</p>
+                <p style="margin:0 0 10px;font-size:12px">The page body stays capped so long-form text remains readable. A rendered diagram or a mockup surface may still use the whole window width; the text around it keeps the cap.</p>
+                <div class="mk-section-head">
+                  <h2>Shell layout diagram</h2>
+                  <p class="mk-count">1 diagram</p>
+                </div>
+              </main>
+            </div>
+
+            <div class="mk-bleed-band mk-bleed-band--escape">
+              <div class="mk-bleed-scroll" role="region" aria-label="Diagram band, scrolls horizontally inside itself">
+                <div class="mk-bleed-inner">
+                  <div class="mk-diagram-box">site header<br><span class="wf-note">toggle · brand · meta</span></div>
+                  <div class="mk-diagram-box">navigation column<br><span class="wf-note">210 px, collapsed on demand</span></div>
+                  <div class="mk-diagram-box">main column<br><span class="wf-note">capped content</span></div>
+                  <div class="mk-diagram-box">page body<br><span class="wf-note">1040 px cap</span></div>
+                  <div class="mk-diagram-box">full-width band<br><span class="wf-note">window width</span></div>
+                  <div class="mk-diagram-box">site footer<br><span class="wf-note">offline note</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mk-layout" style="padding-top:10px">
+              <div class="mk-side" aria-hidden="true"></div>
+              <main class="mk-main">
+                <p style="margin:0;font-size:12px">The band is wider than the text column, so it is scrolled on its own; the page itself stays free of horizontal scrolling. The rest of the specification continues in the capped column.</p>
+              </main>
+            </div>
+
+            <footer class="mk-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+          </div>
+        </div>
+
+        <div class="mk-notes">
+          <p class="wf-note" style="margin:0 0 6px">Annotation (not part of the design): the dashed edges mark the band. The page body is capped at 1040 px and centred, with 40 px margins in this 1120 px window; the band leaves that cap and spans the window edge to edge. It has its own horizontal scroll container — the scrollbar in the band is the only one, the diagram inside it is wider than the window, and the page body never moves sideways. With the navigation collapsed the band is unchanged; only the text column above and below widens.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 720 px: EXPANDED AND COLLAPSED ============ -->
+    <section class="wf-screen" data-platform="web" data-screen="narrow-720">
+      <div class="wf-container">
+        <h2 class="wf-title">720 px — expanded and collapsed</h2>
+        <p class="wf-subtitle">Above 480 px the two-column layout is kept, so the navigation column still costs 240 px of a 720 px window. The header keeps its meta line.</p>
+
+        <div class="wf-pair" style="flex-direction:column">
+          <div class="mk-frame" style="width:720px;max-width:100%">
+            <div class="mk-frame-caption"><span class="wf-badge">720 px</span> Expanded (default) — navigation column present</div>
+            <div class="mk-app">
+              <header class="mk-header">
+                <div class="mk-header-left">
+                  <button class="mk-navtoggle" type="button" aria-expanded="true" aria-controls="site-nav"><span class="mk-chev" aria-hidden="true">«</span>Navigation</button>
+                  <div class="mk-brand">
+                    <span class="mk-mark" aria-hidden="true">P</span>
+                    <span><span class="mk-brand-name">Papyrus</span><span class="mk-project">papyrus</span></span>
+                  </div>
+                </div>
+                <p class="mk-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+              </header>
+              <div class="mk-layout">
+                <aside class="mk-side" aria-label="Document types (site-nav)">
+                  <p class="mk-side-label">Document types</p>
+                  <p class="mk-side-group">Backlog</p>
+                  <a class="wf-link" href="#web/narrow-720" data-goto="narrow-720" aria-current="page" style="font-weight:700">Milestones</a>
+                  <span class="mk-item">Board</span>
+                  <p class="mk-side-group">Documents</p>
+                  <span class="mk-item">Business requirements</span>
+                  <span class="mk-item">Technical specifications</span>
+                  <span class="mk-item">Glossary</span>
+                  <p class="mk-side-group">Project</p>
+                  <span class="mk-item">Configuration</span>
+                </aside>
+                <main class="mk-main">
+                  <h1 class="mk-h1">Milestones</h1>
+                  <p class="mk-sub">Backlog milestones with their release, status, and metadata.</p>
+                  <div class="mk-section-head">
+                    <h2>Milestones</h2>
+                    <p class="mk-count">4 milestones</p>
+                  </div>
+                  <div class="mk-scroll">
+                    <table class="wf-table mk-table" style="min-width:680px" aria-label="Milestones">
+                      <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col">Release</th><th scope="col">Created</th><th scope="col">Updated</th><th scope="col">Actions</th></tr></thead>
+                      <tbody>
+                        <tr><td style="white-space:nowrap">MS-021</td><td>Diagnostics, browser shell, and offline rendering</td><td><span class="wf-badge">In Progress</span></td><td>REL-004</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">View Edit</td></tr>
+                        <tr><td style="white-space:nowrap">MS-020</td><td>Registry consolidation and release close</td><td><span class="wf-badge">Done</span></td><td>REL-003</td><td style="white-space:nowrap">2026-11-08</td><td style="white-space:nowrap">2026-11-14</td><td style="white-space:nowrap">View Edit</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </main>
+              </div>
+              <footer class="mk-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+            </div>
+          </div>
+
+          <div class="mk-frame" style="width:720px;max-width:100%">
+            <div class="mk-frame-caption"><span class="wf-badge">720 px</span> Collapsed — navigation column removed, main column widened</div>
+            <div class="mk-app">
+              <header class="mk-header">
+                <div class="mk-header-left">
+                  <button class="mk-navtoggle" type="button" aria-expanded="false" aria-controls="site-nav"><span class="mk-chev" aria-hidden="true">»</span>Navigation</button>
+                  <div class="mk-brand">
+                    <span class="mk-mark" aria-hidden="true">P</span>
+                    <span><span class="mk-brand-name">Papyrus</span><span class="mk-project">papyrus</span></span>
+                  </div>
+                </div>
+                <p class="mk-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+              </header>
+              <div class="mk-layout mk-layout--collapsed">
+                <main class="mk-main mk-main--bare">
+                  <h1 class="mk-h1">Milestones</h1>
+                  <p class="mk-sub">Backlog milestones with their release, status, and metadata.</p>
+                  <div class="mk-section-head">
+                    <h2>Milestones</h2>
+                    <p class="mk-count">4 milestones</p>
+                  </div>
+                  <div class="mk-scroll">
+                    <table class="wf-table mk-table" style="min-width:680px" aria-label="Milestones">
+                      <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col">Release</th><th scope="col">Created</th><th scope="col">Updated</th><th scope="col">Actions</th></tr></thead>
+                      <tbody>
+                        <tr><td style="white-space:nowrap">MS-021</td><td>Diagnostics, browser shell, and offline rendering</td><td><span class="wf-badge">In Progress</span></td><td>REL-004</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">View Edit</td></tr>
+                        <tr><td style="white-space:nowrap">MS-020</td><td>Registry consolidation and release close</td><td><span class="wf-badge">Done</span></td><td>REL-003</td><td style="white-space:nowrap">2026-11-08</td><td style="white-space:nowrap">2026-11-14</td><td style="white-space:nowrap">View Edit</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </main>
+              </div>
+              <footer class="mk-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+            </div>
+          </div>
+        </div>
+
+        <div class="mk-notes">
+          <p class="wf-note" style="margin:0">Annotation (not part of the design): at 720 px the expanded main column is only about 432 px, so the table scrolls inside its own region either way; collapsing gives it about 672 px and often removes the need to scroll at all. No automatic narrow collapse: the state is the user's and persists.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 480 px: EXPANDED AND COLLAPSED ============ -->
+    <section class="wf-screen" data-platform="web" data-screen="narrow-480">
+      <div class="wf-container">
+        <h2 class="wf-title">480 px — expanded and collapsed</h2>
+        <p class="wf-subtitle">At and below 480 px the page body drops to 12 px horizontal padding and the navigation stacks above the main region, full width, with a separating line. Two states side by side.</p>
+
+        <div class="mk-pair">
+          <div class="mk-frame" style="width:480px;max-width:100%">
+            <div class="mk-frame-caption"><span class="wf-badge">480 px</span> Expanded — navigation stacked above the main region</div>
+            <div class="mk-app mk-app--narrow">
+              <header class="mk-header">
+                <div class="mk-header-left">
+                  <button class="mk-navtoggle" type="button" aria-expanded="true" aria-controls="site-nav"><span class="mk-chev" aria-hidden="true">«</span>Navigation</button>
+                  <div class="mk-brand">
+                    <span class="mk-mark" aria-hidden="true">P</span>
+                    <span><span class="mk-brand-name">Papyrus</span><span class="mk-project">papyrus</span></span>
+                  </div>
+                </div>
+              </header>
+              <div class="mk-layout mk-layout--stack">
+                <nav class="mk-side mk-side--stack" aria-label="Document types (site-nav)">
+                  <p class="mk-side-label">Document types</p>
+                  <p class="mk-side-group">Backlog</p>
+                  <a class="wf-link" href="#web/narrow-480" data-goto="narrow-480" aria-current="page" style="font-weight:700">Milestones</a>
+                  <span class="mk-item">Board</span>
+                  <p class="mk-side-group">Documents</p>
+                  <span class="mk-item">Business requirements</span>
+                  <span class="mk-item">Technical specifications</span>
+                  <span class="mk-item">Glossary</span>
+                  <p class="mk-side-group">Project</p>
+                  <span class="mk-item">Configuration</span>
+                </nav>
+                <main class="mk-main mk-main--bare">
+                  <h1 class="mk-h1" style="font-size:17px">Milestones</h1>
+                  <p class="mk-sub">Backlog milestones with their release, status, and metadata.</p>
+                  <div class="mk-section-head">
+                    <h2 style="font-size:13px">Milestones</h2>
+                    <p class="mk-count" style="font-size:11px">4 milestones</p>
+                  </div>
+                  <div class="mk-scroll">
+                    <table class="wf-table mk-table" style="min-width:680px" aria-label="Milestones">
+                      <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col">Release</th><th scope="col">Created</th><th scope="col">Updated</th><th scope="col">Actions</th></tr></thead>
+                      <tbody>
+                        <tr><td style="white-space:nowrap">MS-021</td><td>Diagnostics, browser shell, and offline rendering</td><td><span class="wf-badge">In Progress</span></td><td>REL-004</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">View Edit</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </main>
+              </div>
+              <footer class="mk-footer">Papyrus local browser — served from this project only.</footer>
+            </div>
+          </div>
+
+          <div class="mk-frame" style="width:480px;max-width:100%">
+            <div class="mk-frame-caption"><span class="wf-badge">480 px</span> Collapsed — navigation gone, main region starts under the header</div>
+            <div class="mk-app mk-app--narrow">
+              <header class="mk-header">
+                <div class="mk-header-left">
+                  <button class="mk-navtoggle" type="button" aria-expanded="false" aria-controls="site-nav"><span class="mk-chev" aria-hidden="true">»</span>Navigation</button>
+                  <div class="mk-brand">
+                    <span class="mk-mark" aria-hidden="true">P</span>
+                    <span><span class="mk-brand-name">Papyrus</span><span class="mk-project">papyrus</span></span>
+                  </div>
+                </div>
+              </header>
+              <div class="mk-layout mk-layout--stack">
+                <main class="mk-main mk-main--bare">
+                  <h1 class="mk-h1" style="font-size:17px">Milestones</h1>
+                  <p class="mk-sub">Backlog milestones with their release, status, and metadata.</p>
+                  <div class="mk-section-head">
+                    <h2 style="font-size:13px">Milestones</h2>
+                    <p class="mk-count" style="font-size:11px">4 milestones</p>
+                  </div>
+                  <div class="mk-scroll">
+                    <table class="wf-table mk-table" style="min-width:680px" aria-label="Milestones">
+                      <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col">Release</th><th scope="col">Created</th><th scope="col">Updated</th><th scope="col">Actions</th></tr></thead>
+                      <tbody>
+                        <tr><td style="white-space:nowrap">MS-021</td><td>Diagnostics, browser shell, and offline rendering</td><td><span class="wf-badge">In Progress</span></td><td>REL-004</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">View Edit</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </main>
+              </div>
+              <footer class="mk-footer">Papyrus local browser — served from this project only.</footer>
+            </div>
+          </div>
+        </div>
+
+        <div class="mk-notes">
+          <p class="wf-note" style="margin:0">Annotation (not part of the design): the meta line leaves the header at this width; the toggle stays, with the same size, position and label. Collapsing removes the stacked navigation and its separating line, and the main region moves up under the header. The page still never scrolls sideways: the table scrolls in its own region.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 320 px: EXPANDED AND COLLAPSED ============ -->
+    <section class="wf-screen" data-platform="web" data-screen="narrow-320">
+      <div class="wf-container">
+        <h2 class="wf-title">320 px — expanded and collapsed</h2>
+        <p class="wf-subtitle">Same block layout as 480 px at the narrowest supported width. The toggle is the first thing in the header and the only control that changes the page body.</p>
+
+        <div class="mk-pair">
+          <div class="mk-frame" style="width:320px">
+            <div class="mk-frame-caption"><span class="wf-badge">320 px</span> Expanded</div>
+            <div class="mk-app mk-app--narrow">
+              <header class="mk-header" style="gap:8px">
+                <div class="mk-header-left" style="gap:8px">
+                  <button class="mk-navtoggle" type="button" aria-expanded="true" aria-controls="site-nav" style="padding:0 8px"><span class="mk-chev" aria-hidden="true">«</span>Navigation</button>
+                  <div class="mk-brand" style="gap:8px">
+                    <span class="mk-mark" aria-hidden="true">P</span>
+                    <span><span class="mk-brand-name">Papyrus</span><span class="mk-project" style="font-size:15px">papyrus</span></span>
+                  </div>
+                </div>
+              </header>
+              <div class="mk-layout mk-layout--stack">
+                <nav class="mk-side mk-side--stack" aria-label="Document types (site-nav)">
+                  <p class="mk-side-label">Document types</p>
+                  <p class="mk-side-group">Backlog</p>
+                  <a class="wf-link" href="#web/narrow-320" data-goto="narrow-320" aria-current="page" style="font-weight:700">Milestones</a>
+                  <span class="mk-item">Board</span>
+                  <p class="mk-side-group">Documents</p>
+                  <span class="mk-item">Business requirements</span>
+                  <span class="mk-item">Technical specifications</span>
+                  <p class="mk-side-group">Project</p>
+                  <span class="mk-item">Configuration</span>
+                </nav>
+                <main class="mk-main mk-main--bare">
+                  <h1 class="mk-h1" style="font-size:16px">Milestones</h1>
+                  <p class="mk-sub" style="font-size:11px">Backlog milestones with their release, status, and metadata.</p>
+                  <div class="mk-section-head">
+                    <h2 style="font-size:13px">Milestones</h2>
+                    <p class="mk-count" style="font-size:11px">4 milestones</p>
+                  </div>
+                  <div class="mk-scroll">
+                    <table class="wf-table mk-table" style="min-width:680px" aria-label="Milestones">
+                      <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col">Release</th><th scope="col">Created</th><th scope="col">Updated</th><th scope="col">Actions</th></tr></thead>
+                      <tbody>
+                        <tr><td style="white-space:nowrap">MS-021</td><td>Diagnostics, browser shell, and offline rendering</td><td><span class="wf-badge">In Progress</span></td><td>REL-004</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">View Edit</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </main>
+              </div>
+              <footer class="mk-footer" style="font-size:10px">Papyrus local browser — served from this project only.</footer>
+            </div>
+          </div>
+
+          <div class="mk-frame" style="width:320px">
+            <div class="mk-frame-caption"><span class="wf-badge">320 px</span> Collapsed</div>
+            <div class="mk-app mk-app--narrow">
+              <header class="mk-header" style="gap:8px">
+                <div class="mk-header-left" style="gap:8px">
+                  <button class="mk-navtoggle" type="button" aria-expanded="false" aria-controls="site-nav" style="padding:0 8px"><span class="mk-chev" aria-hidden="true">»</span>Navigation</button>
+                  <div class="mk-brand" style="gap:8px">
+                    <span class="mk-mark" aria-hidden="true">P</span>
+                    <span><span class="mk-brand-name">Papyrus</span><span class="mk-project" style="font-size:15px">papyrus</span></span>
+                  </div>
+                </div>
+              </header>
+              <div class="mk-layout mk-layout--stack">
+                <main class="mk-main mk-main--bare">
+                  <h1 class="mk-h1" style="font-size:16px">Milestones</h1>
+                  <p class="mk-sub" style="font-size:11px">Backlog milestones with their release, status, and metadata.</p>
+                  <div class="mk-section-head">
+                    <h2 style="font-size:13px">Milestones</h2>
+                    <p class="mk-count" style="font-size:11px">4 milestones</p>
+                  </div>
+                  <div class="mk-scroll">
+                    <table class="wf-table mk-table" style="min-width:680px" aria-label="Milestones">
+                      <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col">Release</th><th scope="col">Created</th><th scope="col">Updated</th><th scope="col">Actions</th></tr></thead>
+                      <tbody>
+                        <tr><td style="white-space:nowrap">MS-021</td><td>Diagnostics, browser shell, and offline rendering</td><td><span class="wf-badge">In Progress</span></td><td>REL-004</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">View Edit</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </main>
+              </div>
+              <footer class="mk-footer" style="font-size:10px">Papyrus local browser — served from this project only.</footer>
+            </div>
+          </div>
+        </div>
+
+        <div class="mk-notes">
+          <p class="wf-note" style="margin:0">Annotation (not part of the design): at 320 px the header fits the toggle, the mark and the project name on one line; the navigation is stacked until the user collapses it. Nothing is hidden automatically, and the state survives every page load, so the choice made here applies to the next page at every width.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ JAVASCRIPT DISABLED ============ -->
+    <section class="wf-screen" data-platform="web" data-screen="no-js">
+      <div class="wf-container">
+        <h2 class="wf-title">JavaScript disabled</h2>
+        <p class="wf-subtitle">The page is complete without script: no toggle is drawn, the navigation is expanded and usable, and no stored preference is read.</p>
+
+        <div class="mk-window">
+          <div class="mk-window-cap"><span class="wf-badge">Script disabled</span> <span>toggle absent; navigation expanded and usable</span></div>
+          <div class="mk-app">
+            <header class="mk-header">
+              <div class="mk-header-left">
+                <div class="mk-brand">
+                  <span class="mk-mark" aria-hidden="true">P</span>
+                  <span><span class="mk-brand-name">Papyrus</span><span class="mk-project">papyrus</span></span>
+                </div>
+              </div>
+              <p class="mk-meta">Local browser<br>offline · 127.0.0.1:6420</p>
+            </header>
+
+            <div class="mk-layout">
+              <aside class="mk-side" aria-label="Document types (site-nav)">
+                <p class="mk-side-label">Document types</p>
+                <p class="mk-side-group">Backlog</p>
+                <a class="wf-link" href="#web/no-js" data-goto="no-js" aria-current="page" style="font-weight:700">Milestones</a>
+                <span class="mk-item">Board</span>
+                <p class="mk-side-group">Decisions</p>
+                <span class="mk-item">Decisions</span>
+                <p class="mk-side-group">Documents</p>
+                <span class="mk-item">Business requirements</span>
+                <span class="mk-item">Non-functional requirements</span>
+                <span class="mk-item">Technical specifications</span>
+                <span class="mk-item">Glossary</span>
+                <span class="mk-item">UI mockups</span>
+                <p class="mk-side-group">Project</p>
+                <span class="mk-item">Configuration</span>
+                <span class="mk-item">Agent skills &amp; workflows</span>
+              </aside>
+
+              <main class="mk-main">
+                <h1 class="mk-h1">Milestones</h1>
+                <p class="mk-sub">Backlog milestones with their release, status, and front-matter metadata.</p>
+                <div class="mk-section-head">
+                  <h2>Milestones</h2>
+                  <p class="mk-count">4 milestones</p>
+                </div>
+                <div class="mk-scroll">
+                  <table class="wf-table mk-table" style="min-width:680px" aria-label="Milestones">
+                    <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col">Release</th><th scope="col">Created</th><th scope="col">Updated</th><th scope="col">Actions</th></tr></thead>
+                    <tbody>
+                      <tr><td style="white-space:nowrap">MS-021</td><td>Diagnostics, browser shell, and offline rendering</td><td><span class="wf-badge">In Progress</span></td><td>REL-004</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">View Edit</td></tr>
+                      <tr><td style="white-space:nowrap">MS-020</td><td>Registry consolidation and release close</td><td><span class="wf-badge">Done</span></td><td>REL-003</td><td style="white-space:nowrap">2026-11-08</td><td style="white-space:nowrap">2026-11-14</td><td style="white-space:nowrap">View Edit</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </main>
+            </div>
+
+            <footer class="mk-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+          </div>
+        </div>
+
+        <div class="mk-notes">
+          <p class="wf-note" style="margin:0 0 6px">Annotation (not part of the design): the server always emits the toggle together with the hidden attribute, and a small script removes the attribute when it runs. Without script the attribute stays, so nothing is drawn where the toggle would be, the brand keeps the header's left edge, and the navigation is expanded with every entry usable. No page depends on the toggle: reading, filtering and editing work unchanged. The stored preference is neither read nor written in this state.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SECTION HEADING ROW AT 600 px ============ -->
+    <section class="wf-screen" data-platform="web" data-screen="section-head-600">
+      <div class="wf-container">
+        <h2 class="wf-title">Heading row at 600 px — overflow fixed</h2>
+        <p class="wf-subtitle">Between 481 and 720 px the two-column layout leaves a narrow main column, and the list heading row (heading plus count note) used to overflow the page sideways. The fix: the row wraps, so the heading and the count note take two lines.</p>
+
+        <div class="mk-frame" style="width:600px;max-width:100%">
+          <div class="mk-frame-caption"><span class="wf-badge">600 px</span> Expanded — heading row on two lines, no horizontal overflow</div>
+          <div class="mk-app">
+            <header class="mk-header">
+              <div class="mk-header-left">
+                <button class="mk-navtoggle" type="button" aria-expanded="true" aria-controls="site-nav"><span class="mk-chev" aria-hidden="true">«</span>Navigation</button>
+                <div class="mk-brand">
+                  <span class="mk-mark" aria-hidden="true">P</span>
+                  <span><span class="mk-brand-name">Papyrus</span><span class="mk-project">papyrus</span></span>
+                </div>
+              </div>
+            </header>
+            <div class="mk-layout">
+              <aside class="mk-side" aria-label="Document types (site-nav)">
+                <p class="mk-side-label">Document types</p>
+                <p class="mk-side-group">Backlog</p>
+                <a class="wf-link" href="#web/section-head-600" data-goto="section-head-600" aria-current="page" style="font-weight:700">Milestones</a>
+                <span class="mk-item">Board</span>
+                <p class="mk-side-group">Documents</p>
+                <span class="mk-item">Business requirements</span>
+                <span class="mk-item">Technical specifications</span>
+                <p class="mk-side-group">Project</p>
+                <span class="mk-item">Configuration</span>
+              </aside>
+              <main class="mk-main">
+                <h1 class="mk-h1">Business requirements</h1>
+                <p class="mk-sub">Grouped requirements with their status and front-matter metadata.</p>
+                <div class="mk-section-head is-highlighted">
+                  <h2>Business requirements</h2>
+                  <p class="mk-count">1 group · 3 requirements</p>
+                </div>
+                <div class="mk-scroll">
+                  <table class="wf-table mk-table" style="min-width:680px" aria-label="Business requirements">
+                    <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col">Group</th><th scope="col">Created</th><th scope="col">Updated</th><th scope="col">Actions</th></tr></thead>
+                    <tbody>
+                      <tr><td style="white-space:nowrap">REQ-06</td><td>Search and local web interface (group row)</td><td><span class="wf-badge">Approved</span></td><td>—</td><td style="white-space:nowrap">2026-10-02</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">View Edit</td></tr>
+                      <tr><td style="white-space:nowrap">REQ-06.015</td><td style="padding-left:20px">Control browser content width and navigation visibility</td><td><span class="wf-badge">Active</span></td><td style="white-space:nowrap">REQ-06</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">View Edit</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </main>
+            </div>
+            <footer class="mk-footer">Papyrus local browser — every page is served from this project; no network access.</footer>
+          </div>
+        </div>
+
+        <div class="mk-notes">
+          <ul>
+            <li>The dashed outline marks the heading row: the heading and the count note are two elements in that order, on one line when they fit and on two lines when they do not.</li>
+            <li>At 600 px the count note drops under the heading. Both stay left-aligned inside the main column; nothing is clipped, nothing is pushed under the window edge.</li>
+            <li>The fix is wrapping only: the heading size, the count size, the separating line and the table below are unchanged, and the row wraps the same way in every list family.</li>
+            <li>The table keeps its own horizontal scrolling region; that is the list contract, not page overflow.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SECTION HEADING ROW AT 320 px ============ -->
+    <section class="wf-screen" data-platform="web" data-screen="section-head-320">
+      <div class="wf-container">
+        <h2 class="wf-title">Heading row at 320 px — overflow fixed</h2>
+        <p class="wf-subtitle">The same heading row at the narrowest width, in the stacked layout.</p>
+
+        <div class="mk-frame" style="width:320px">
+          <div class="mk-frame-caption"><span class="wf-badge">320 px</span> Expanded — heading row on two lines</div>
+          <div class="mk-app mk-app--narrow">
+            <header class="mk-header" style="gap:8px">
+              <div class="mk-header-left" style="gap:8px">
+                <button class="mk-navtoggle" type="button" aria-expanded="true" aria-controls="site-nav" style="padding:0 8px"><span class="mk-chev" aria-hidden="true">«</span>Navigation</button>
+                <div class="mk-brand" style="gap:8px">
+                  <span class="mk-mark" aria-hidden="true">P</span>
+                  <span><span class="mk-brand-name">Papyrus</span><span class="mk-project" style="font-size:15px">papyrus</span></span>
+                </div>
+              </div>
+            </header>
+            <div class="mk-layout mk-layout--stack">
+              <nav class="mk-side mk-side--stack" aria-label="Document types (site-nav)">
+                <p class="mk-side-label">Document types</p>
+                <p class="mk-side-group">Documents</p>
+                <a class="wf-link" href="#web/section-head-320" data-goto="section-head-320" aria-current="page" style="font-weight:700">Business requirements</a>
+                <span class="mk-item">Technical specifications</span>
+                <span class="mk-item">Glossary</span>
+              </nav>
+              <main class="mk-main mk-main--bare">
+                <h1 class="mk-h1" style="font-size:16px">Business requirements</h1>
+                <p class="mk-sub" style="font-size:11px">Grouped requirements with their status and metadata.</p>
+                <div class="mk-section-head is-highlighted">
+                  <h2 style="font-size:13px">Business requirements</h2>
+                  <p class="mk-count" style="font-size:11px">1 group · 3 requirements</p>
+                </div>
+                <div class="mk-scroll">
+                  <table class="wf-table mk-table" style="min-width:680px" aria-label="Business requirements">
+                    <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col">Group</th><th scope="col">Created</th><th scope="col">Updated</th><th scope="col">Actions</th></tr></thead>
+                    <tbody>
+                      <tr><td style="white-space:nowrap">REQ-06</td><td>Search and local web interface (group row)</td><td><span class="wf-badge">Approved</span></td><td>—</td><td style="white-space:nowrap">2026-10-02</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">View Edit</td></tr>
+                      <tr><td style="white-space:nowrap">REQ-06.015</td><td style="padding-left:20px">Control browser content width and navigation visibility</td><td><span class="wf-badge">Active</span></td><td style="white-space:nowrap">REQ-06</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">2026-11-15</td><td style="white-space:nowrap">View Edit</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </main>
+            </div>
+            <footer class="mk-footer" style="font-size:10px">Papyrus local browser — served from this project only.</footer>
+          </div>
+        </div>
+
+        <div class="mk-notes">
+          <ul>
+            <li>At 320 px the heading and the count note each take their own line; neither is truncated and neither is pushed outside the page body.</li>
+            <li>The wrapping is the same rule at 600 px and 320 px, so there is no separate narrow treatment for the heading row.</li>
+            <li>The collapsed state does not change the heading row, only the width available to it.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  function all(selector, scope) {
+    return Array.prototype.slice.call((scope || document).querySelectorAll(selector));
+  }
+  function byAttr(selector, attr, value) {
+    return all(selector).filter(function (el) { return el.getAttribute(attr) === value; })[0] || null;
+  }
+  function toggle(selector, active) {
+    all(selector).forEach(function (el) { el.classList.toggle('is-active', el === active); });
+  }
+  function go(hash) { location.hash = hash; }
+
+  function parse(rawHash) {
+    var raw = String(rawHash || '').replace(/^#\/?/, '');
+    var bits = raw.split('/');
+    if (!raw || bits[0] === 'index') return { mode: 'index' };
+    return { mode: 'proto', platform: bits[0], screen: bits[1] || '' };
+  }
+
+  function syncChrome(state) {
+    var key = state.mode === 'index' ? 'index' : state.platform;
+    all('.wf-chrome a').forEach(function (a) {
+      var target = String(a.getAttribute('href') || '').replace(/^#\/?/, '').split('/')[0];
+      var active = target === key;
+      a.classList.toggle('is-active', active);
+      if (active) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+    });
+  }
+
+  function render() {
+    var state = parse(location.hash);
+    var index = document.querySelector('[data-review="index"]');
+
+    syncChrome(state);
+
+    if (state.mode === 'proto') {
+      var proto = byAttr('.wf-proto', 'data-platform', state.platform);
+      if (!proto) { go('#index'); return; }
+      var screens = all('.wf-screen', proto);
+      var screen = state.screen ? byAttr('.wf-screen', 'data-screen', state.screen) : screens[0];
+      if (!screen || screens.indexOf(screen) === -1) screen = screens[0];
+      if (!screen) { go('#index'); return; }
+      var screenId = screen.getAttribute('data-screen');
+      if (state.screen !== screenId) { go('#' + state.platform + '/' + screenId); return; }
+
+      toggle('[data-review]', null);
+      toggle('.wf-proto', proto);
+      screens.forEach(function (s) { s.classList.toggle('is-active', s === screen); });
+      all('.wf-view-link', proto).forEach(function (link) {
+        var active = link.getAttribute('href') === '#' + state.platform + '/' + screenId;
+        link.classList.toggle('is-active', active);
+        if (active) link.setAttribute('aria-current', 'true'); else link.removeAttribute('aria-current');
+      });
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    toggle('.wf-proto', null);
+    toggle('[data-review]', index);
+  }
+
+  document.addEventListener('click', function (e) {
+    var target = e.target.closest('[data-goto]');
+    if (target) {
+      e.preventDefault();
+      var state = parse(location.hash);
+      if (state.mode === 'proto') go('#' + state.platform + '/' + target.getAttribute('data-goto'));
+    }
+  });
+
+  window.addEventListener('hashchange', render);
+  render();
+})();
+</script>
+</body>
+</html>
