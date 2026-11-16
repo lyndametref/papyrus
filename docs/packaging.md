@@ -1843,7 +1843,7 @@ Rust delta -> 8,323,136 B measured.
 
 | ID | Finding | Severity | Disposition |
 |---|---|---|---|
-| T149-1 | §3.6 item 4 says the build fails the budget check above 12,582,912 B, but no such automated check exists. | Low | Reported, not edited here: the live procedure belongs to the packaging specification owner. The release check above is the real behaviour. |
+| T149-1 | §3.6 item 4 said the build fails the budget check above 12,582,912 B, but no such automated check exists. Real when first observed; resolved in `676128c`, which reworded item 4 to a recorded release check: "This is a recorded release check; the executable size must remain within the budget, measured with `stat -c %s target/release/papyrus`." The only remaining "fails the build" sentence is item 1 (manifest row or byte/digest mismatch, enforced by the `cargo test` manifest test). | Low | Resolved by the §3.6 rewording; quoted text verified against the current file. |
 | T149-2 | The `.deb` grows 1.10 MB over the stale package, slightly above ADR-0026 decision 12's 0.75–0.98 MB estimate. | Informational | No package-size budget exists; recorded only. |
 
 No defect was found in the packaged artifact, the asset contract, the CSP literals, the
