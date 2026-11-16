@@ -3841,12 +3841,27 @@ fn decision_record_path(dir: &Path, id: &str) -> PathBuf {
 #[test]
 fn t15a_list_decision_category() {
     let dir = decision_fixture("t15a");
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "decision",
+        "edit",
+        "ADR-001",
+        "--superseded-by",
+        "ADR-002",
+    ]);
     let server = Server::start(&dir, &["--no-open"], &[]);
 
     let html = get(&server, "/?type=decision").text();
     assert!(html.contains("ADR-001"), "missing ADR-001");
     assert!(html.contains("ADR-002"), "missing ADR-002");
     assert!(html.contains("BDR-001"), "missing BDR-001");
+    // TASK-142 defect fix: REQ-06.004 parity needs the superseded_by slot.
+    assert!(html.contains("<th scope=\"col\" data-column=\"superseded_by\">Superseded by</th>"));
+    let start = html.find("data-row-id=\"ADR-001\"").expect("ADR-001 row");
+    let end = html[start..].find("</tr>").unwrap() + start;
+    let row = &html[start..end];
+    assert!(row.contains("<td class=\"slot-cell\">ADR-002</td>"));
     assert!(
         html.contains("aria-current=\"page\""),
         "sidebar aria-current"
@@ -8235,19 +8250,97 @@ fn t93_nfr_grouping_and_derivation() {
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/?type=nfr").text();
     // TASK-142: one group row then its data-child-of members; an empty group
-    // stays a group row; the derived NFR group is still a top-level row.
+    // stays a group row. The member's stored Group reference decides its
+    // parent (no synthetic prefix group).
     assert!(html.contains("data-list-layout=\"shared\""));
     assert!(html.contains("data-row-id=\"NFR-001\""));
     assert!(html.contains("Persist"));
+    assert!(html.contains("data-row-id=\"NFR-001.001\" data-child-of=\"NFR-001\""));
     assert!(html.contains("data-row-id=\"NFR-002\""));
     assert!(html.contains("Empty Group"));
-    assert!(html.contains("data-child-of=\"NFR-001\""));
-    assert!(html.contains("data-row-id=\"NFR-003\""));
+    assert!(html.contains("data-row-id=\"NFR-003.001\" data-child-of=\"NFR-002\""));
+    assert!(!html.contains("data-row-id=\"NFR-003\""));
+    assert!(!html.contains("href=\"/doc/NFR-003\""));
     assert!(!html.contains("No requirements in this group"));
     assert!(!html.contains("Other requirements"));
     let json_text = get(&server, "/api/requirements?type=nfr").text();
-    assert!(json_text.contains("\"id\":\"NFR-003\""));
-    assert!(json_text.contains("\"title\":null"));
+    let json: serde_json::Value = serde_json::from_str(&json_text).unwrap();
+    let groups = json["groups"].as_array().unwrap();
+    assert_eq!(groups.len(), 2);
+    assert!(!groups.iter().any(|group| group["id"] == "NFR-003"));
+    let requirements = json["requirements"].as_array().unwrap();
+    let orphan = requirements
+        .iter()
+        .find(|requirement| requirement["id"] == "NFR-003.001")
+        .expect("hand-written NFR record");
+    assert_eq!(orphan["group"], "NFR-002");
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn t93_nfr_orphan_member_renders_top_level_without_a_synthetic_group() {
+    let dir = test_root("t93-nfr-orphan");
+    init_project(&dir);
+    let group = create_nfr_group(&dir, "Missing Group");
+    create_nfr(&dir, "Restrict access", &group);
+    // Remove the group file so the member's stored reference cannot resolve.
+    fs::remove_file(record_path(&dir, "nfr", &group)).unwrap();
+    let member = format!("{group}.001");
+
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=nfr").text();
+    assert!(html.contains(&format!("data-row-id=\"{member}\"")));
+    assert!(
+        !html.contains(&format!("data-row-id=\"{member}\" data-child-of")),
+        "the orphan member is a top-level row"
+    );
+    assert!(
+        !html.contains(&format!("data-row-id=\"{group}\"")),
+        "no synthetic group row"
+    );
+    assert!(
+        !html.contains(&format!("href=\"/doc/{group}\"")),
+        "no dead view link"
+    );
+    assert!(
+        !html.contains(&format!("href=\"/doc/{group}/edit\"")),
+        "no dead edit link"
+    );
+    assert!(html.contains("<p class=\"count\">0 groups · 1 requirement</p>"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn t93_nfr_active_filter_excludes_the_group_and_keeps_the_member_top_level() {
+    let dir = test_root("t93-nfr-filtered-orphan");
+    init_project(&dir);
+    let group = create_nfr_group(&dir, "Filtered Group");
+    create_nfr(&dir, "Restrict access", &group);
+    // The group has no status, so `status=active` filters it out. Give the
+    // member an active status so it remains in the filtered index.
+    let member_path = record_path(&dir, "nfr", &format!("{group}.001"));
+    let content = fs::read_to_string(&member_path).unwrap();
+    fs::write(&member_path, format!("---\nstatus: active\n---\n{content}")).unwrap();
+    let member = format!("{group}.001");
+
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=nfr&status=active").text();
+    assert_eq!(get(&server, "/?type=nfr&status=active").status, 200);
+    assert!(html.contains(&format!("data-row-id=\"{member}\"")));
+    assert!(
+        !html.contains(&format!("data-row-id=\"{member}\" data-child-of")),
+        "the filtered-out group leaves the member top-level"
+    );
+    assert!(
+        !html.contains(&format!("data-row-id=\"{group}\"")),
+        "the filtered index holds no group row"
+    );
+    assert!(
+        html.contains("<p class=\"count\">0 groups · 1 requirement</p>"),
+        "the count note reflects the filtered set"
+    );
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }

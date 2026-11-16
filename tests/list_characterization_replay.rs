@@ -172,7 +172,14 @@ fn expected_columns(family: &str) -> &'static [&'static str] {
             "id", "title", "status", "release", "created", "updated", "actions",
         ],
         "decision" => &[
-            "id", "title", "status", "type", "created", "updated", "actions",
+            "id",
+            "title",
+            "status",
+            "type",
+            "superseded_by",
+            "created",
+            "updated",
+            "actions",
         ],
         "requirement" | "nfr" => &[
             "id", "title", "status", "group", "created", "updated", "actions",

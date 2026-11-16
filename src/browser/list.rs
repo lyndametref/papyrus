@@ -355,6 +355,7 @@ fn slot_cell(key: &str, record: &Record) -> String {
         "assignee" => record.assignee.clone(),
         "release" => record.release_id.clone(),
         "type" => record.decision_type.clone(),
+        "superseded_by" => record.superseded_by.clone(),
         "group" => record.group_id.clone(),
         "audit_type" => record.audit_type.clone(),
         "applicability" => record.applicability.clone(),
@@ -849,6 +850,51 @@ mod tests {
         let html = plan.render();
         assert!(html.contains("<p class=\"count\">0 notes</p>"));
         assert!(html.contains("No notes in this project."));
+    }
+
+    #[test]
+    fn decision_superseded_by_slot_renders_the_value_or_muted_text() {
+        let mut superseded = record("ADR-001", false, None);
+        superseded.decision_type = Some("adr".to_string());
+        superseded.superseded_by = Some("ADR-002".to_string());
+        let mut open = record("BDR-001", false, None);
+        open.decision_type = Some("bdr".to_string());
+        let index = Index {
+            records: vec![superseded, open],
+            ..Index::default()
+        };
+        let plan = ListPlan::for_descriptor(
+            &descriptor("adr"),
+            "decision",
+            &index,
+            "Decisions",
+            "2 decisions",
+        );
+        let keys: Vec<&str> = plan.columns.iter().map(|column| column.key).collect();
+        assert_eq!(
+            keys,
+            [
+                "id",
+                "title",
+                "status",
+                "type",
+                "superseded_by",
+                "created",
+                "updated",
+                "actions"
+            ]
+        );
+        let html = plan.render();
+        let start = html.find("data-row-id=\"ADR-001\"").unwrap();
+        let end = html[start..].find("</tr>").unwrap() + start;
+        let row = &html[start..end];
+        assert!(row.contains("<td class=\"slot-cell\">adr</td>"));
+        assert!(row.contains("<td class=\"slot-cell\">ADR-002</td>"));
+        let start = html.find("data-row-id=\"BDR-001\"").unwrap();
+        let end = html[start..].find("</tr>").unwrap() + start;
+        let row = &html[start..end];
+        assert!(row.contains("<td class=\"slot-cell\">bdr</td>"));
+        assert!(row.contains("<td class=\"slot-cell\"><span class=\"muted\">(none)</span></td>"));
     }
 
     #[test]

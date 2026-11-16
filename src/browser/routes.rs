@@ -200,7 +200,7 @@ pub const PRESENTATION: &[Presentation] = &[
                     None,
                     200,
                 ),
-                &[("type", "Type")],
+                &[("type", "Type"), ("superseded_by", "Superseded by")],
             ),
             &["/api/decisions"],
         ),
@@ -883,7 +883,10 @@ mod tests {
             &[("milestone", "Milestone"), ("assignee", "Assignee")]
         );
         assert_eq!(list_slots("release"), &[]);
-        assert_eq!(list_slots("decision"), &[("type", "Type")]);
+        assert_eq!(
+            list_slots("decision"),
+            &[("type", "Type"), ("superseded_by", "Superseded by")]
+        );
         assert_eq!(list_slots("req"), &[("group", "Group")]);
         assert_eq!(list_slots("nfr"), &[("group", "Group")]);
         assert_eq!(list_slots("audit"), &[("audit_type", "Audit type")]);

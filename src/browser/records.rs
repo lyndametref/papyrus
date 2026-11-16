@@ -244,13 +244,6 @@ pub fn matches_stem(descriptor: &TypeDescriptor, stem: &str) -> bool {
     identity::is_valid_id_component(stem) && canonical_id(descriptor, stem).is_some()
 }
 
-fn content_handler(descriptor: &TypeDescriptor) -> Option<TypedHandler> {
-    match &descriptor.content_model {
-        ContentModel::Generic => None,
-        ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => Some(schema.handler),
-    }
-}
-
 fn content_extension(descriptor: &TypeDescriptor) -> &'static str {
     match descriptor.content_model {
         ContentModel::HtmlMockup(_) => "html",
@@ -658,70 +651,13 @@ pub fn build_index(
         .enumerate()
         .map(|(position, group)| (group.id.clone(), position))
         .collect();
-    let is_nfr = matches!(
-        content_handler(descriptor),
-        Some(TypedHandler::Requirement(
-            crate::registry::RequirementKind::NonFunctional
-        ))
-    );
     for (position, requirement) in index.requirements.iter().enumerate() {
-        let derived_group = if is_nfr {
-            requirement
-                .id
-                .split('.')
-                .next()
-                .unwrap_or(&requirement.id)
-                .to_string()
-        } else {
-            requirement.group_id.clone().unwrap_or_default()
-        };
-        if derived_group.is_empty() {
+        let group_id = requirement.group_id.clone().unwrap_or_default();
+        if group_id.is_empty() || !group_ids.contains_key(&group_id) {
             index.other.push(position);
-            continue;
-        }
-        let resolved = is_nfr || group_ids.contains_key(&derived_group);
-        if resolved {
-            index
-                .members
-                .entry(derived_group)
-                .or_default()
-                .push(position);
         } else {
-            index.other.push(position);
+            index.members.entry(group_id).or_default().push(position);
         }
-    }
-    if is_nfr {
-        let prefixes: std::collections::BTreeSet<String> = index
-            .requirements
-            .iter()
-            .map(|r| r.id.split('.').next().unwrap_or(&r.id).to_string())
-            .collect();
-        let existing: std::collections::BTreeSet<String> =
-            index.groups.iter().map(|g| g.id.clone()).collect();
-        for prefix in &prefixes {
-            if !existing.contains(prefix) {
-                let doc = Document {
-                    source: String::new(),
-                    front_matter: None,
-                    frontmatter: None,
-                    heading: None,
-                    preamble: Vec::new(),
-                    sections: Vec::new(),
-                };
-                let mut rec = default_record(
-                    prefix.clone(),
-                    descriptor.clone(),
-                    true,
-                    doc,
-                    PathBuf::new(),
-                    String::new(),
-                    String::new(),
-                );
-                rec.title = String::new();
-                index.groups.push(rec);
-            }
-        }
-        index.groups.sort_by(|a, b| a.id.cmp(&b.id));
     }
     index
 }

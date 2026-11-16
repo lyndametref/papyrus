@@ -1066,10 +1066,14 @@ fn t117_08_browser_matrix_over_http() {
     let sidebar_start = html.find(">Documents</p>").expect("Documents group");
     let sidebar_end = html.find(">Configuration</a>").expect("utility");
     assert!(html[sidebar_start..sidebar_end].contains("Notes"));
+    assert!(html.contains("data-list-layout=\"shared\""));
     let mut position = 0usize;
-    for heading in ["Status", "ID", "Title", "Created", "Updated"] {
-        let found = html[position..].find(heading).expect("shared column");
-        position += found + heading.len();
+    for key in ["id", "title", "status", "created", "updated", "actions"] {
+        let marker = format!("data-column=\"{key}\"");
+        let found = html[position..]
+            .find(&marker)
+            .unwrap_or_else(|| panic!("shared column {key}"));
+        position += found + marker.len();
     }
     assert!(html.contains("NOTE-001") && html.contains("NOTE-002"));
 

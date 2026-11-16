@@ -210,8 +210,20 @@ fn decision_aliases_share_the_decisions_list() {
         let html = server.get(url);
         assert_shared_table(&html, "decision");
         assert!(html.contains("<h1 class=\"h1\">Decisions</h1>"), "{url}");
+        assert!(
+            html.contains("<th scope=\"col\" data-column=\"type\">Type</th>"),
+            "{url}"
+        );
+        assert!(
+            html.contains("<th scope=\"col\" data-column=\"superseded_by\">Superseded by</th>"),
+            "{url}"
+        );
         assert!(html.contains("<td class=\"slot-cell\">adr</td>"), "{url}");
         assert!(html.contains("<td class=\"slot-cell\">bdr</td>"), "{url}");
+        assert!(
+            html.contains("<td class=\"slot-cell\"><span class=\"muted\">(none)</span></td>"),
+            "{url} superseded slot is empty"
+        );
         let mut ids = Vec::new();
         let mut rest = html.as_str();
         while let Some(found) = rest.find("data-row-id=\"") {
