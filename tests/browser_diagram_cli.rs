@@ -232,8 +232,11 @@ fn main() {}
         "NOTE-012",
         "Unknown and Malformed",
         &format!(
-            "## Description\n\n{}\n\n{}",
-            mermaid("flowchart-elk TD\n  A --> B"),
+            "## Description\n\n{}\n\n{}\n\n{}",
+            // A type the pinned bundle cannot detect: the failure-path fixture.
+            mermaid("notARealDiagramType\n  A --> B"),
+            // Not promised either, but 11.17.2 renders it (spec §18).
+            mermaid("flowchart-elk TD\n  C --> D"),
             mermaid("flowchart TD\n  A --> B\n  A -->")
         ),
     );
@@ -532,14 +535,22 @@ fn other_fences_stay_literal() {
 }
 
 #[test]
-fn unknown_and_malformed_sources_are_served_without_server_rejection() {
+fn unknown_type_and_malformed_sources_keep_the_client_failure_path() {
     let project = project("unknown");
     let server = Server::start(&project.path);
     let raw = server.get_raw("/doc/NOTE-012");
     assert!(status(&raw).contains(" 200"), "{}", status(&raw));
     let html = body(&raw);
 
-    assert!(html.contains(&figure("flowchart-elk TD\n  A --> B")));
+    let unknown = "notARealDiagramType\n  A --> B";
+    assert!(
+        html.contains(&figure(unknown)),
+        "the unknown type keeps its full source"
+    );
+    assert!(
+        html.contains(&figure("flowchart-elk TD\n  C --> D")),
+        "flowchart-elk is served as a best-effort figure, not a failure"
+    );
     assert!(html.contains(&figure("flowchart TD\n  A --> B\n  A -->")));
     assert_eq!(
         html.matches("data-render-error=\"diagram\"").count(),
@@ -547,6 +558,22 @@ fn unknown_and_malformed_sources_are_served_without_server_rejection() {
         "the server never parses or pre-rejects a type"
     );
     assert!(html.contains(BUNDLE));
+
+    // `notARealDiagramType` reaches the failure path in the client, not on the
+    // server: the marker, the note, and the preserved source are client-side.
+    let js = include_str!("../src/browser/app.js");
+    assert!(
+        js.contains("figure.setAttribute(\"data-render-error\", \"diagram\")"),
+        "the client sets the failure marker"
+    );
+    assert!(
+        js.contains(REJECTED_NOTE),
+        "the client appends the rejection note"
+    );
+    assert!(
+        js.contains("var pre = figure.querySelector(\"pre\");"),
+        "the client reads the preserved pre source"
+    );
 }
 
 #[test]
@@ -644,6 +671,45 @@ fn client_block_pins_the_mermaid_contract() {
 }
 
 #[test]
+fn client_neutralises_rendered_diagram_links() {
+    let js = include_str!("../src/browser/app.js");
+    let start = js.find("Diagrams (TASK-146)").expect("diagram block");
+    let block = &js[start..];
+
+    for needle in [
+        "function neutraliseDiagramLinks(root)",
+        "root.querySelectorAll(\"a\")",
+        "removeAttribute(\"href\")",
+        "removeAttribute(\"xlink:href\")",
+        "removeAttribute(\"target\")",
+        "document.createRange()",
+        "range.createContextualFragment(svg)",
+        "neutraliseDiagramLinks(scroll);",
+    ] {
+        assert!(block.contains(needle), "diagram block missing {needle}");
+    }
+    assert!(
+        !block.contains("http://"),
+        "diagram block adds no external origin"
+    );
+    let mount = &block[block.find("function mountDiagram").unwrap()..];
+    let insert = mount.find("scroll.appendChild(fragment);").unwrap();
+    let neutralise = mount.find("neutraliseDiagramLinks(scroll);").unwrap();
+    assert!(
+        insert < neutralise,
+        "every rendered SVG is neutralised after insertion"
+    );
+    assert!(
+        !block.contains(".removeChild") && !block.contains(".remove()"),
+        "links and nodes stay in the DOM"
+    );
+    assert!(
+        !block.contains("innerHTML") && !block.contains("eval("),
+        "the success path uses DOM APIs only"
+    );
+}
+
+#[test]
 fn client_missing_script_branch_keeps_content() {
     let js = include_str!("../src/browser/app.js");
     let start = js.find("Diagrams (TASK-146)").expect("diagram block");
@@ -663,7 +729,8 @@ fn client_missing_script_branch_keeps_content() {
         "figures are marked"
     );
     assert!(
-        block.contains("scroll.innerHTML = svg"),
+        block.contains("scroll.textContent = \"\";")
+            && block.contains("scroll.appendChild(fragment);"),
         "only a successful render replaces the pre"
     );
 }

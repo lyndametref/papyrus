@@ -310,13 +310,41 @@
       appendDiagramNote(figure, "Diagram not rendered: Mermaid rejected the source.");
     }
 
+    function neutraliseDiagramLinks(root) {
+      var links = root.querySelectorAll("a");
+      for (var l = 0; l < links.length; l++) {
+        try {
+          links[l].removeAttribute("href");
+          links[l].removeAttribute("xlink:href");
+          links[l].removeAttribute("target");
+        } catch (err) {
+          /* A stubborn attribute must not abort the other figures. */
+        }
+      }
+    }
+
     function mountDiagram(figure, svg) {
       var scroll = figure.querySelector(".diagram-scroll");
       if (!scroll || typeof svg !== "string" || svg === "") {
         failDiagram(figure);
         return;
       }
-      scroll.innerHTML = svg;
+      var fragment;
+      try {
+        var range = document.createRange();
+        range.selectNodeContents(scroll);
+        fragment = range.createContextualFragment(svg);
+      } catch (e) {
+        failDiagram(figure);
+        return;
+      }
+      scroll.textContent = "";
+      scroll.appendChild(fragment);
+      try {
+        neutraliseDiagramLinks(scroll);
+      } catch (e) {
+        /* Neutralisation is best-effort per figure, never fatal. */
+      }
     }
 
     function renderDiagram(figure, source, id) {
