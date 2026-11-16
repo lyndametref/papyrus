@@ -44,7 +44,7 @@ Final integration increment of the offline, project-local web interface: one nav
 2. `GET /lifecycle` and `GET /?type=lifecycle` serve the managed-artifacts-and-lifecycles page (TASK-72); `GET /skills` and `GET /?type=skills` serve the agent-skills page (TASK-77). These aliases are unchanged.
 3. Any method other than `GET`/`HEAD` on a known path is `405` with an `Allow: GET, HEAD` header; an unknown path is `404`.
 4. The sidebar is rendered on every page, including the inventory hub, the lifecycle page, and the skills page, using the final order in Scope. The active entry carries `aria-current="page"` and the non-colour cue; on the inventory hub no document-type entry is active.
-5. The sidebar collapses behind the existing accessible toggle at 320 CSS pixels, matching the baseline.
+5. The navigation is expanded by default at every width; the header toggle collapses and expands it, and the reader's choice persists in `papyrus.nav`, matching the baseline.
 
 ### 2. Inventory hub
 

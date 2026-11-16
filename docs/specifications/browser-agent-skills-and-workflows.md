@@ -46,7 +46,7 @@ Add a read-only page to the offline, project-local web interface that lists the 
 ### 2. Page shell and sidebar
 
 1. The sidebar lists entries in this order: Business requirements, Business rules, Audit records, Technical specifications, Non-functional requirements, Backlog, Decisions, Glossary, UI specifications, UI mockups, Managed artifacts & lifecycles, Agent skills & workflows. Entries gated by `document_types` keep their existing gating; `Managed artifacts & lifecycles` and `Agent skills & workflows` are always present.
-2. At 320 CSS pixels the sidebar collapses behind the existing accessible toggle, matching the baseline.
+2. The navigation is expanded by default at every width; the header toggle collapses and expands it, and the reader's choice persists in `papyrus.nav`, matching the baseline.
 3. The page works with JavaScript disabled; the Copy affordance (section 6) is progressive enhancement only.
 4. The shared header branding follows section 4a of `docs/specifications/browser-requirements.md`: the project name renders large and bold, the "Papyrus" mention renders in smaller letters, and the "P" mark keeps its current size and styling. This specification references that rule rather than restating it.
 

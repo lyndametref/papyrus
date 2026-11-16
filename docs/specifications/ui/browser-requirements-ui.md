@@ -63,7 +63,7 @@ All pages share one shell:
 - The selected category renders its section (`h2`) through the shared list contract in `browser-shell-ui.md` §3; the other category is not rendered on that page.
 - Each section header shows the group count and requirement count on the right.
 - Each group is a row in the shared table (group row plus `data-child-of` member rows in one `<tbody>`); the Group slot carries the stored reference, the action cell carries `View`/`Edit`, and labels/references sit in the Title cell.
-- A member whose group row is absent (unresolved or missing reference) renders as a top-level row in ID order, with the stored value in the Group slot (`REQ-99 (not found)` or `(none)`); there is no catch-all subsection.
+- A member whose group row is absent (unresolved or missing reference) renders as a top-level row in ID order. The Group slot shows the stored reference verbatim; an absent reference shows the muted `(none)`. The legacy `(not found)` annotation is not carried over (delivery record A7); there is no catch-all subsection.
 - Empty states are dashed boxes with a sentence; the empty project and empty type states also state that records are created from the command line and that this browser does not create records.
 
 ### 5.2 States
@@ -72,9 +72,9 @@ All pages share one shell:
 | --- | --- | --- |
 | Default, Business requirements selected | `list-business` | Only the business section is rendered; the sidebar marks Business requirements current |
 | Non-functional requirements selected | `list-nonfunctional` | Only the non-functional section is rendered; the sidebar marks Non-functional requirements current |
-| Empty project | `list-empty-project` | The selected section renders its empty state and the count reads "No groups"; the copy states that no requirement records were found in the configured directories |
+| Empty project | `list-empty-project` | The selected section renders the shared empty state (`No <noun> in this project.` plus the command-line help line) and the count note reads `0 groups · 0 requirements` |
 | One document type empty | `list-empty-type` | Only the selected category renders; the empty state points at the other category in the sidebar |
-| Group with no members | `list-group-empty` | Group row shows "No requirements" and the in-row note "No requirements in this group" |
+| Group with no members | `list-group-empty` | The group row renders with no member rows; the section count note is computed from the rows actually emitted (for example `1 group · 0 requirements`) |
 | Many groups, long titles | `list-long` | Group titles wrap; an unbreakable requirement title wraps inside the row; no horizontal scroll |
 
 ### 5.3 Interactions
@@ -188,7 +188,7 @@ The two 404 variants share the layout. The message may be identical so a depreca
 
 - The header keeps the product and project names at the left; the right-aligned "Local browser / offline · 127.0.0.1:6420" note is omitted at this width. The footer shortens to "Papyrus local browser — served from this project only."
 - The header navigation toggle collapses and expands the sidebar at every width; the default is expanded and the choice persists in `papyrus.nav`. Without JavaScript the navigation is expanded, visible, and usable, and no toggle is offered. Type selection still works without JavaScript via the links.
-- Group rows stack: the group link (ID + title, wrapping), the member count on its own line, then the member links.
+- Group rows keep the shared table: the group link (ID + title, wrapping) in the Title cell, then its `data-child-of` member rows; the section count note wraps beneath the heading instead of widening the page.
 - Long titles and long unbreakable words wrap inside the row; there is no horizontal scrolling of text.
 - Edit form fields are full width; the action row stacks, only the Save button spans the column (full-width, centred label), and Cancel stays an inline link below it — it does not become a full-width button.
 - At 200% zoom the same rules apply.
@@ -200,7 +200,7 @@ The two 404 variants share the layout. The message may be identical so a depreca
 | 1 | Landmarks: `header`, `nav` (document types or breadcrumb), `main`, `footer`; the project name is text, not a link |
 | 2 | One `h1` per page; type sections are `h2`; groups are `h3`; no level is skipped |
 | 3 | Document-type sidebar is one `nav`/`aside` labelled "Document types" with vertical links; the active link uses `aria-current="page"` plus bold and underline; the header toggle collapses it on every page, defaults to expanded, and persists in `papyrus.nav` |
-| 4 | A group row is one link (ID + title) with the member count as adjacent text; deprecated members are not counted |
+| 4 | A group row is the ID + title link in the Title cell; its members follow as `data-child-of` rows; the section count note is `N group(s) · M requirement(s)`, computed from the rows actually emitted |
 | 5 | Member links read as ID + title, so they are descriptive out of context |
 | 6 | Focus order follows document order; focus ring 2 px with 2 px offset, visible on every control |
 | 7 | Every form control has a visible `label` associated by `for`/`id`; required fields say "required" in text and set the `required` attribute |
@@ -259,7 +259,7 @@ These are design decisions or specification gaps found while mocking up; each ne
 6. **Group title in the edit metadata.** The edit form shows the owning group ID only (space is tight at 320 px); the view shows ID plus title. Confirm that the ID alone is acceptable on the edit form.
 7. **Conflict value preservation.** The 409 page repeats the attempted values read-only. The specification requires only the message and a reload affordance; the block is an addition to avoid silent data loss. Confirm.
 8. **Document-type navigation.** The sidebar lists document types as links (not buttons), so category selection works without script and is bookmarkable. The query parameter `?type=req|nfr` is the only selection mechanism; there is no "all" view. Confirm the default category (Business requirements) is acceptable.
-9. **Counts.** Member counts exclude deprecated members (deprecated records are not counted). Confirm the wording "2 requirements" / "1 requirement" / "No requirements".
+9. **Counts.** The count note is `N group(s) · M requirement(s)` for the grouped requirement families, computed from the rows actually emitted (including orphan members), and `N <noun>` for flat families; archived records are never counted or listed. Confirm the wording.
 10. **Header note.** The mockups show the bind address in the header ("offline · 127.0.0.1:6420"). This is static text, not a link; confirm it is wanted, since a non-loopback bind would make the printed address misleading.
 
 ## 14. Approval status

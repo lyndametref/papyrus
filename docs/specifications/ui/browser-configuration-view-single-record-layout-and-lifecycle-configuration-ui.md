@@ -59,7 +59,7 @@ Sidebar entries include document types plus, in order: `Configuration` (after do
 - Non-functional atomic requirements listed under their owning group entry; no trailing catch-all subsection.
 - Owning group derived from the requirement ID prefix (`NFR-XX.YYY` → `NFR-XX`); no `Group` field added to files.
 - Group heading shows the group record's title; missing group record falls back to the group number (`NFR-04`).
-- A group with no atomic requirements renders as an entry with no children and member count "No requirements".
+- A group with no atomic requirements renders as a group row with no member rows; the section count note is computed from the rows actually emitted.
 - Every atomic requirement appears under exactly one group.
 
 ## 8. Glossary landing page
@@ -79,7 +79,7 @@ Sidebar entries include document types plus, in order: `Configuration` (after do
 
 ## 10. Error pages and responsive/a11y
 
-Reused from MOCK-0001: 404 unknown, 404 deprecated, 400, 405, 415, 500, each with a recovery link. 320 px variants collapse the sidebar behind an accessible toggle and stack content. Focus order follows document order; every control has a visible label; works without JavaScript; landmarks and `aria-current` as in approved packages.
+Reused from MOCK-0001: 404 unknown, 404 deprecated, 400, 405, 415, 500, each with a recovery link. At 320 px the navigation stays expanded above the content by default; the toggle is available and the reader's collapsed choice persists. Content stacks. Focus order follows document order; every control has a visible label; works without JavaScript; landmarks and `aria-current` as in approved packages.
 
 ## 11. Active elements
 

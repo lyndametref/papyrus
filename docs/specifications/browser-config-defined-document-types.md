@@ -525,7 +525,7 @@ Out of scope:
 
 | ID | Scenario | Assertion |
 |---|---|---|
-| T-114-01 | User-added type `note` (prefix `NOTE`, directory `notes/`, statuses `["active","review","approved"]`, default `active`), records created with the CLI | `GET /?type=note` 200 lists both records in the shared seven-column contract with no family slot; sidebar shows `Notes` under the `Documents` group; `Created` shows the front-matter `created_date`; detail 200; edit 200; `GET /api/docs/note` 200 array with `id/title/status/labels/references/version/path/metadata` |
+| T-114-01 | User-added type `note` (prefix `NOTE`, directory `notes/`, statuses `["active","review","approved"]`, default `active`), records created with the CLI | `GET /?type=note` 200 lists both records in the shared list contract with no family slot; sidebar shows `Notes` under the `Documents` group; `Created` shows the front-matter `created_date`; detail 200; edit 200; `GET /api/docs/note` 200 array with `id/title/status/labels/references/version/path/metadata` |
 | T-114-02 | Canonical vs legacy API | `/api/docs/glossary` body equals `/api/glossary`; `/api/docs/rule` equals `/api/business-rules`; `/api/docs/audit` equals `/api/audit-records`; `/api/docs/ui-mockup` equals `/api/mockups`; `/api/docs/req` equals `/api/requirements?type=req` |
 | T-114-03 | Status read-only | List shows the structural Status column in the fixed order and the detail shows `review`; `Created` equals the stored `created_date`; edit form contains no `name="status"`/`name="status_change"`; `POST /doc/NOTE-001` with `status=archived` and a valid version returns 422 and the file is byte-identical |
 | T-114-04 | Filter values and order | The filter select offers exactly `active`, `review`, `approved` in that order and no empty/`All records` option; `Show all` is the only reset and omits `status`; no `status=archived` option; `?status=review` lists only the review record; `?status=approved` shows the empty state; a type with no custom statuses offers only `active` |
@@ -594,8 +594,10 @@ Out of scope:
   ID, Title, Status, family slot(s), Created, Updated, Actions applies to
   every document list view (generic and typed built-in), with the family
   slots declared as data and no slot declared for a config-defined type
-  (`browser-shell-ui.md` §3). The task board and the milestone,
-  release, and decision list layouts are unchanged. `Created` and `Updated`
+  (`browser-shell-ui.md` §3). The task board is unchanged; the milestone,
+  release, and decision lists render through the shared list contract with
+  their declared slots (milestone `Release`, release none, decision `Type` and
+  `Superseded by`). `Created` and `Updated`
   are read-only front-matter values shown as stored (`(none)` if absent), never
   derived or rewritten; `created_date` is already part of the shared metadata
   projection (REQ-06.004).

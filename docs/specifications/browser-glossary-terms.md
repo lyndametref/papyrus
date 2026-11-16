@@ -125,7 +125,7 @@ Glossary records that render record references follow the shared reference-link 
 
 ### 9. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, no inline scripts/styles.
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
 2. Templates may be extended with glossary-specific placeholders; unknown placeholders are left untouched as in the baseline.
 3. The sidebar's Glossary entry and the glossary list/view/edit templates are the only rendering additions.
 

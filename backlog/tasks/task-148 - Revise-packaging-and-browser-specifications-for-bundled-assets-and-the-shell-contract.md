@@ -7,7 +7,7 @@ status: Implemented
 assignee:
   - '@business-analyst'
 created_date: '2026-11-15T16:14:00Z'
-updated_date: '2026-11-16T09:02:00Z'
+updated_date: '2026-11-16T09:27:00Z'
 labels:
   - docs
   - specifications
@@ -81,6 +81,8 @@ Requirement text (`docs/requirements/`), ADR text (`docs/architecture/adr/`), im
 - **C3 — specification vs requirement.** `browser-requirements.md` L25 and L348 and nine per-family pages say "Edge 100+ / Safari 100+", while NFR-05.001 (updated 2026-11-15) requires Edge 130+ and Safari 18+; OQ-9 even claims NFR-05.001 names "Safari version 100". The requirement wins: correct the specifications to NFR-05.001 and remove the stale "100" wording.
 - **C4 — stale ADR text, out of scope.** ADR-0020 decision 5 still names `document_list.html`, deleted by TASK-142 under ADR-0028 constraint 1. Not edited here.
 - **C5 — specification vs landed CSP.** `browser-requirements.md` §6.7 says the policy "needs no `'unsafe-inline'`", falsified by the accepted diagram class. Correct to: no server-authored inline `style` attribute; the only `'unsafe-inline'` is `style-src` on a diagram response.
+- **C6 — landed accessibility gap, out of prose scope.** The shell width contract gives the `/config` table, the board columns, and the `/skills` command `<pre>` `role="region"`, a label, `tabindex="0"`, and a visible focus ring. The diagram figure (`figure.diagram.bleed` with its `.diagram-scroll` child; `src/browser/app.js`, `src/browser/app.css`) scrolls horizontally but adds none of those hooks, so a keyboard reader cannot scroll a wide diagram. Owner: TASK-146 (implementation) and TASK-150 (release verification). Not changed by TASK-148, which edits no template or client code.
+- **C7 — requirement vs delivery.** REQ-06.015 requires a dedicated full-width layout class that lifts the 1040 px cap for UI mockup content. ADR-0028 decision 7 keeps the mockup preview route out of scope, so no surface exercises such a class; the landed `.app--full` is used only by the backlog board. The literal criterion remains unmet; closing it needs a requirement change or a new ADR, not prose.
 
 ## Assumptions
 
@@ -379,6 +381,27 @@ No ADR, requirement, business-rule, or source file was edited. `docs/architectur
 
 Conflict register C1–C5 left unresolved in prose and reported to the caller. New deviation from the refined brief: TASK-146 has landed (`CSP_DIAGRAM` and the Mermaid asset are present), so pages state the diagram string is implemented by TASK-146 and verified by TASK-150 rather than describing it as future work.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @business-analyst
+created: 2026-11-16T09:27:00Z
+
+---
+
+Correction round after independent review (2026-11-16 UTC). Scope bookkeeping:
+
+(a) **Delivery record changed beyond pointer-only.** `docs/specifications/browser-shell-shared-list-layout-and-page-width.md` also received §3.4 grid track (`minmax(0, 1fr)` instead of a retained zero-width first track, because `.main` auto-places into it and collapses to 0), §4.2 `page_width(PageRoute)` (route identity instead of a slug), §4.3 heading/pre/scroll-region bullets, A3, §7.2 and OQ-2 wording. These corrections were right because the pointer-only version would otherwise have contradicted the landed implementation and the accepted-difference record.
+
+(b) **Extra pages beyond the plan's 12 + 26.** Three UI descriptions (`browser-agent-skills-ui.md`, `browser-requirements-ui.md`, `browser-configuration-view-single-record-layout-and-lifecycle-configuration-ui.md`) and two specification pages (`browser-configuration-view-single-record-layout-and-lifecycle-configuration.md`, `browser-spec-revisions-task-86.md`) were touched because they retained per-group member counts, old empty-state copy, or the 320 px auto-collapse.
+
+(c) **`browser-ui-mockups.md` write contract.** Changed "metadata lines" to "metadata comment lines" (and the same in the insertion rule and T-40e) because the field-preserving write path only edits the `<!-- specs: -->` / `<!-- refs: -->` comments; the visible `<p>` lines are rewritten only when already present. The old wording overstated what is written and could imply whole-file regeneration.
+
+Conflict register: added C6 (diagram `.bleed`/scroll-container accessibility gap; owners TASK-146/TASK-150) and C7 (REQ-06.015 mockup full-width class gap).
+
+---
+<!-- COMMENTS:END -->
 
 ## Final Summary
 

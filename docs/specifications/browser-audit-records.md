@@ -167,7 +167,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, and no inline scripts/styles.
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
 2. The sidebar's Audit Records entry and the audit-records list/view/edit templates are the only rendering additions; the shared shell and error pages are reused.
 3. Tag controls are not applicable; the audit type is a `<select>` with three options and a default, keyboard operable by default. Every input has a `<label>` or accessible name. Focus is not trapped.
 

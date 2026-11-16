@@ -299,8 +299,9 @@ Asset verification:
    WOFF2 259,792, from `src/browser/vendor/MANIFEST.md`); Mermaid =
    3,572,661 B; the pre-Mermaid projection recorded by TASK-148 was 8,302,957 B
    (7.92 MiB). The ceiling is 12 MiB = 12,582,912 B, leaving 4,261,024 B
-   (4.06 MiB) of headroom on the measured binary. The build fails the budget
-   check when `stat -c %s target/release/papyrus` exceeds 12,582,912 B.
+   (4.06 MiB) of headroom on the measured binary. This is a recorded release
+   check; the executable size must remain within the budget, measured with
+   `stat -c %s target/release/papyrus`.
 
 ## Smoke test results (TASK-4 verification)
 

@@ -55,7 +55,7 @@ Recommended default: template snippets parameterized by effective config values 
 
 ## 8. Error pages and responsive/a11y
 
-Reused from MOCK-0001: 404, 400, 405, 415, 500, each with a recovery link to the skills page. 320 px: sidebar toggle first, collapsed type list, stacked content. Focus order follows document order; every control has a visible label; works without JavaScript; no horizontal scrolling of text.
+Reused from MOCK-0001: 404, 400, 405, 415, 500, each with a recovery link to the skills page. At 320 px the navigation is expanded above stacked content by default; the header toggle collapses it and the choice persists. Focus order follows document order; every control has a visible label; works without JavaScript; no horizontal scrolling of text.
 
 ## 9. Open questions (resolved 2026-11-10)
 

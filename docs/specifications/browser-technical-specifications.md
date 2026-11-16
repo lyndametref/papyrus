@@ -165,7 +165,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, and no inline scripts/styles.
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
 2. The sidebar's Technical Specifications entry, the technical-specifications list/view/edit/conflict templates, and the technical-specifications `404` page are the only rendering additions; the shared shell and the remaining error pages are reused.
 3. Both fields are native `input`/`textarea` controls with a `<label>`; no tag, select, or custom widget is added. The form is keyboard operable and works with JavaScript disabled. Focus is not trapped.
 
