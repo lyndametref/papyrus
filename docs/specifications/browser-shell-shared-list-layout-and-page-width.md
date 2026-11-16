@@ -1,12 +1,12 @@
-# Feature Specification — Browser Shell, PageWidth Contract, and Shared List Layout (TASK-141)
+# Feature Specification — Browser Shell, PageWidth Contract, Shared List Layout, and Collapsible Navigation (TASK-141, TASK-144)
 
-**Ticket:** TASK-141
+**Tickets:** TASK-141 (§3.1–§3.3, §4.1, §5, §6 — delivered), TASK-144 (§3.4, §4.2–§4.5 — refined 2026-11-16)
 **Milestone:** m-21
-**Status:** Contract settled 2026-11-15 (ADR-0028 amendment); MOCK-0016 registered 2026-11-15 (`draft`; approval waived for the implementation run, see §7.3). AC1–AC8 unblocked
-**Requirements:** REQ-06.016 (shared list layout), REQ-06.015 (content width and navigation visibility, width clause only), REQ-06.004 (browser list parity with the CLI)
-**ADR:** ADR-0028 (Accepted, amended 2026-11-15) — decisions 1, 2, 3, 6, and 9 are the contract for this ticket; decisions 4, 5, 7, and 8 belong to TASK-144/TASK-148/ADR-0029
-**UI:** mockup required — see §7. A no-mockup waiver is **not** available (see §7.1).
-**Downstream:** TASK-142 (remaining families, `document_list.html` deletion), TASK-144 (nav toggle, width CSS), TASK-148 (specification and UI-spec port)
+**Status:** Contract settled 2026-11-15 (ADR-0028 amendment) and extended 2026-11-16 for TASK-144 from ADR-0028 decisions 3–8. MOCK-0016 registered 2026-11-15 (`draft`); the TASK-144 MOCK id is recorded in §7.3
+**Requirements:** REQ-06.016 (shared list layout), REQ-06.015 (content width **and** navigation visibility), REQ-06.013 (uncapped board), REQ-06.004 (browser list parity with the CLI)
+**ADR:** ADR-0028 (Accepted, amended 2026-11-15) — decisions 1, 2, 3, 6, 9 govern TASK-141; decisions 3, 4, 5, 6, 7, 8 govern TASK-144; decision 7 (mockup preview route) remains out of scope under ADR-0029
+**UI:** mockup required for both tickets — see §7. A no-mockup waiver is **not** available for the shared list (§7.1); the TASK-144 header/collapsed-layout mockup follows §7.4.
+**Downstream:** TASK-142 (delivered), TASK-145/TASK-146 (consume `.bleed`), TASK-148 (specification and UI-spec port), TASK-149/TASK-150 (packaging and release verification)
 
 ## 1. Purpose and scope
 
@@ -20,12 +20,13 @@ This specification is the feature's canonical detail until TASK-148 ports the no
 
 ### Non-goals
 
-- Migrating the other families (releases, decisions, document types, requirements, NFRs) — the milestone list is the reference family (§5.6); the rest is TASK-142.
-- Deleting `document_list.html` or the per-family list builders (TASK-142).
-- The nav toggle, `/assets/nav-state.js`, `localStorage`, `data-nav`, `.bleed`, and the `.app--full` and collapsed-grid CSS rules (TASK-144).
-- Kanban board changes (REQ-06.013; TASK-147 owns the board action).
-- Math and diagram rendering (TASK-145, TASK-146).
+- Migrating the other families (releases, decisions, document types, requirements, NFRs) — the milestone list is the reference family (§5.6); the rest is TASK-142 (delivered).
+- Deleting `document_list.html` or the per-family list builders (TASK-142, delivered).
+- Kanban board changes (REQ-06.013; TASK-147 owns the board action). TASK-144 changes only the board's **width class**, not its card content.
+- Math and diagram rendering (TASK-145, TASK-146). TASK-144 ships the `.bleed` mechanism those tickets consume; it ships no rendering.
+- A mockup preview route or endpoint (ADR-0028 decision 7; needs its own ADR).
 - Detail, edit, and error page *content* changes (REQ-06.016 mandates a uniform list layout only).
+- Any change to `script-src`, `style-src`, or the CSP constant (ADR-0028 decision 5; §4.5).
 
 ## 2. Scope boundary against the ticket's premise
 
@@ -44,6 +45,7 @@ Resolved in §8: milestone is the reference family (§5.6); `created_date` stays
 
 ```rust
 pub const SHELL_TEMPLATE: &str = include_str!("templates/shell.html");
+pub const NAV_TOGGLE: &str = "<button class=\"nav-toggle\" type=\"button\" aria-expanded=\"true\" aria-controls=\"site-nav\" hidden>Navigation</button>";
 
 pub struct Page<'a> {
     pub title: &'a str,
@@ -52,27 +54,86 @@ pub struct Page<'a> {
     pub sidebar: &'a str,     // rendered nav fragment
     pub main: &'a str,        // rendered page body fragment
     pub width: PageWidth,
-    pub nav_toggle: &'a str,  // empty today; TASK-144 fills it
 }
 
 pub fn render(page: Page<'_>) -> String;
 pub fn width_class(width: PageWidth) -> &'static str; // "app" | "app app--full"
 ```
 
+TASK-144 replaces the TASK-141 `nav_toggle: &'a str` field with `shell::NAV_TOGGLE`: decision 1 makes the shell the owner of the toggle, so no page renderer supplies it and no path can omit it. `render` fills the `{{nav_toggle}}` slot from the constant, so the toggle is byte-identical on every page.
+
 `render::render_template` becomes `pub(crate)` so `shell` and `list` reuse the existing placeholder engine. No new engine is introduced (ADR-0028 decision 6).
 
 ### 3.2 Template set
 
-- New `src/browser/templates/shell.html`: doctype, `lang`, `head` (charset, viewport, title, stylesheet, deferred `app.js`), `<div class="{{app_class}}">`, `<header class="site-header">` with brand, top-meta, and a `{{nav_toggle}}` slot, `<div class="layout">`, `{{sidebar}}`, `<main class="main">{{main}}</main>`, `</div>`, `<footer class="site-footer">`, close.
+- New `src/browser/templates/shell.html`: doctype, `lang`, `head` (charset, viewport, title, stylesheet, synchronous `/assets/nav-state.js`, deferred `app.js`), `<div class="{{app_class}}">`, `<header class="site-header">` with a `.header-lead` group (toggle plus brand), top-meta, `<div class="layout">`, `{{sidebar}}`, `<main class="main">{{main}}</main>`, `</div>`, `<footer class="site-footer">`, close.
+- Header markup (TASK-144): `<header class="site-header"><div class="header-lead">{{nav_toggle}}<div class="brand">…</div></div><p class="top-meta">…</p></header>`. The lead group is what keeps the toggle left of the brand and both at the header start; `justify-content: space-between` on the header alone would centre the brand between them.
+- Sidebar markup: the existing `<aside class="sidebar">` keeps its groups and its `<ul id="type-list">`, and its `<nav>` gains the id used by the toggle: `<nav id="site-nav" aria-label="Document types">`. The sub-480 px `<button class="sidebar-toggle">` is deleted together with its CSS (ADR-0028 decision 4: one toggle, in the header).
 - `list.html`, `view.html`, `edit.html`, `error.html` become body fragments (their page-specific placeholders only, no chrome).
-- `document_list.html`, `document_detail.html`, `document_edit.html` also become body fragments in this ticket. They keep their current content model and their `Status, ID, Title, Created, Updated` table until each family migrates; only the duplicated chrome is removed. The milestone list leaves that table in this ticket (§5.6) and every remaining family leaves it in TASK-142. Deleting the templates is TASK-142.
-- Invariant: the string `<div class="app` occurs exactly once per response, and each of `<header`, `<nav`, `<main`, `<footer` occurs exactly once.
+- `document_list.html`, `document_detail.html`, `document_edit.html` also become body fragments in this ticket. They keep their current content model and their `Status, ID, Title, Created, Updated` table until each family migrates; only the duplicated chrome is removed. The milestone list leaves that table in this ticket (§5.6). `document_list.html` did **not** survive TASK-142: it was deleted in that change together with the legacy list builders once every family rendered through `ListPlan` (§5.6). `document_detail.html` and `document_edit.html` remain body fragments.
+- Invariant: the string `<div class="app` occurs exactly once per response, and each of `<header`, `<nav`, `<main`, `<footer` occurs exactly once. Exactly one `<button class="nav-toggle"` occurs per response, on every page, including error pages.
 
 The chrome strings (brand mark, top-meta copy, footer long/short copy, asset links) are byte-identical to today's `list.html`; this ticket moves them, it does not reword them.
 
 ### 3.3 Rendering
 
 Every page-rendering function in `render.rs` stops interpolating its own chrome and instead renders its body fragment, then wraps it with `shell::render`. `Chrome` keeps `project`, `bind_note`, and `routes`; the width is passed to `Page::width` from the route property in §4.
+
+### 3.4 Collapsible navigation and its assets (TASK-144)
+
+**Markup.** `shell::NAV_TOGGLE` (above) is the only declaration of the control:
+
+- `class="nav-toggle"`, `type="button"`, `aria-expanded="true"`, `aria-controls="site-nav"`.
+- Visible text `Navigation` is the accessible name and never changes; state is carried only by `aria-expanded`, so screen-reader users keep a stable name. No icon font, no `innerHTML`, no `aria-label` duplicating the text.
+- `hidden` is present in the server output on every page. Without JavaScript the control cannot do anything, so it must not be offered; `/assets/nav-state.js` removes `hidden` (contract below). With JavaScript the button is visible on every page including error pages.
+- The keyboard focus ring is the stylesheet's existing `button:focus-visible` rule; the toggle adds no focus handling of its own. It is a native `<button>`, so Enter and Space activate it.
+- MOCK-0018 draws a decorative chevron inside the button. It is optional: if implemented it carries `aria-hidden="true"`, is part of neither the accessible name nor the toggle logic, and any direction change is driven by CSS from `.nav-toggle[aria-expanded]` — no script writes the button's content.
+
+**State.** The collapsed state is one attribute on the document element: `<html lang="en" data-nav="collapsed">`. The expanded state is the **absence** of `data-nav`; `data-nav="expanded"` is never written. `localStorage` key `papyrus.nav` holds `"collapsed"` or `"expanded"`; only the exact value `"collapsed"` collapses (a missing key, any other value, or a storage error means expanded). No cookie, no server state, no config key (ADR-0028 constraint 5).
+
+**CSS.**
+
+```css
+.nav-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border: 1px solid var(--line); border-radius: 5px; background: var(--soft);
+  color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.nav-toggle[hidden] { display: none; }            /* the UA rule is lost once display is set */
+.header-lead { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand { min-width: 0; }
+.project { overflow-wrap: anywhere; }
+
+:root[data-nav="collapsed"] .layout { grid-template-columns: 0 minmax(0, 1fr); gap: 0; }
+:root[data-nav="collapsed"] .sidebar { display: none; }
+:root[data-nav="collapsed"] .main { border-left: 0; padding-left: 0; }
+```
+
+- The zero column, zero gap, and removed main border/padding are what reclaim the width: 210 px column + 30 px gap + 30 px main padding-left = 270 px returned to page content. MOCK-0018 annotates the 240 px column-and-gap band it draws; the extra 30 px is the removed main padding. Reclaimed width is real grid width, never a negative margin.
+- `.sidebar { display: none }` already hides the pre-`app.js` paint; `app.js` additionally sets `hidden` on `#site-nav` so the nav is removed from the accessibility tree by attribute, not by styling alone (ADR-0028 decision 4 and 8).
+- `.brand`/`.header-lead` `min-width: 0` and `.project { overflow-wrap: anywhere }` keep a long project name inside the header at 320 px now that the toggle shares the row.
+- The `@media (max-width: 480px)` block keeps `.layout { display: block }`, drops `.sidebar-toggle { display: block }` and `.sidebar ul[data-collapsed="true"] { display: none }`, and keeps `.app { padding: 0 12px 32px }`. The collapsed rules are media-query independent, so collapse works at every breakpoint; at ≤480 px `.sidebar { display: none }` is the whole reclamation.
+
+**Script split.** Two classic same-origin scripts, both covered by the existing `script-src 'self'`:
+
+| Asset | Loading | Owns |
+| --- | --- | --- |
+| `/assets/nav-state.js` (new, ≤ 1 KB, ≈ 15 lines) | synchronous in `<head>`, after the stylesheet and before the deferred `app.js` | reading `papyrus.nav`, setting `data-nav` before first paint, removing `hidden` from `.nav-toggle` |
+| `/assets/app.js` (existing) | `defer` | the click handler and `hidden`/`aria-expanded` synchronisation, plus the unchanged dirty-form guard, tag editing, and board drag-and-drop |
+
+`nav-state.js` contract:
+
+1. Read `localStorage.getItem("papyrus.nav")` inside `try`/`catch`; a throw means "no stored value" and the session continues in memory.
+2. If the value is `"collapsed"`, set `document.documentElement` `data-nav="collapsed"` immediately (before first paint), so no expanded frame is ever painted. Otherwise write nothing.
+3. Remove `hidden` from the first `.nav-toggle`: on `DOMContentLoaded` when `document.readyState === "loading"`, otherwise immediately. This is the only reveal path for the control.
+4. No dependency on `app.js`, `app.css`, or any global. No `innerHTML`, no `eval`, no storage of anything except the key above.
+
+`app.js` contract:
+
+- Delete the existing `.sidebar-toggle` / `#type-list` / `matchMedia("(max-width: 480px)")` block and its `applyViewport` change listener. The automatic sub-480 px collapse is removed: the persisted preference alone decides (ADR-0028 decision 4).
+- On load, synchronise the DOM with `documentElement.dataset.nav === "collapsed"`: set `aria-expanded` to `"false"`/`"true"` on `.nav-toggle` and add/remove `hidden` on `#site-nav`.
+- On click, flip the state, apply it by attribute only (never an inline style), write `"collapsed"`/`"expanded"` to `papyrus.nav` inside `try`/`catch`, and keep `aria-expanded` and `hidden` in sync. A storage throw must not stop the visual toggle.
+- Nothing else changes: the dirty-form guard, tag editing, and board drag-and-drop blocks stay byte-identical, and no script reads or writes the width class.
+
+**CSP.** `http::CSP` is unchanged: the new asset is same-origin and external, so `script-src 'self'` covers it, and the toggle changes classes and attributes only, so `style-src 'self'` is untouched (ADR-0028 decision 5). No inline `<script>`, no `onclick`, no `style=` attribute is added.
 
 ## 4. PageWidth contract (ADR-0028 decision 3)
 
@@ -86,10 +147,51 @@ pub enum PageWidth {
 }
 ```
 
-- `BrowserRoutes::page_width(&self, slug: &str) -> PageWidth` returns `Capped` for every enabled slug in this ticket. A single documented arm marks the future `Full` surface (the backlog board, TASK-144). No other route may return `Full` without an ADR-0028 amendment.
-- `Capped` renders `class="app"`; `Full` renders `class="app app--full"`. The class string is decided on the server; no script reads or writes it.
-- `.app--full` CSS is **not** added here (TASK-144). This ticket only guarantees the class is emitted and unit-tested.
+### 4.1 Route property (TASK-141, delivered)
+
+- `Capped` renders `class="app"`; `Full` renders `class="app app--full"`. The class string is decided on the server; no script reads or writes it, so the no-JS layout equals the scripted layout.
 - `.app` keeps `max-width: 1040px; margin: 0 auto; padding: 0 24px 56px` unchanged.
+
+### 4.2 Board classification (TASK-144)
+
+- `BrowserRoutes::page_width(&self, slug: &str) -> PageWidth` returns `Full` for the backlog board's task slug and `Capped` for every other input, including `""` (the value used by inventory, lifecycle, config, skills, and error pages) and every detail, edit, and list route.
+- The board slug is resolved from the route table (the Backlog nav group's slug), not hard-coded, so a disabled or renamed task family cannot leave a stale `Full` route. The board is the only route whose descriptor handler is `Task`, so `Full` cannot leak onto a list route.
+- `render::board_page` currently passes no slug to the shell (`page(chrome, None, …)`). It passes the resolved board slug so the width decision reaches the shell; the shell still takes the width from `Page::width`.
+- `Full` for any other route requires an ADR-0028 amendment (downstream constraint 4). The mockup preview route remains out of scope (decision 7) and no route or endpoint is added for it; `.app--full` is the named class that route will use.
+
+### 4.3 Width CSS
+
+```css
+.app--full { max-width: none; }
+```
+
+- `.app--full` lifts only the cap; `.app`'s centring and `0 24px 56px` padding are inherited, so no page content touches the window edge.
+- Client JavaScript cannot add or remove the class; a test asserts `app.js` and `nav-state.js` contain no `app--full`.
+
+### 4.4 `.bleed` regions inside a capped page (TASK-144 mechanism, TASK-145/TASK-146 consumers)
+
+A full-width-eligible region inside a `Capped` page is a `.bleed` block that takes the full width of the page's content column and owns its horizontal scrolling:
+
+```css
+.bleed { width: 100%; overflow-x: auto; }
+.bleed:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+```
+
+- Wide content scrolls inside the block, so the page never gains a horizontal scrollbar (ADR-0028 downstream constraint 7). The surrounding prose stays at its own narrower measure (`.text`, `.meta`, `.form` keep their existing `max-width`).
+- A scrollable `.bleed` block carries `role="region"`, an `aria-label`, and `tabindex="0"`, matching `.table-scroll`, so keyboard users can reach the scroller in every supported browser.
+- No `100vw`, no negative horizontal margins, and no `position: fixed` breakout: viewport units include the scrollbar width, which is the page-level overflow that constraint 7 forbids. A region that must reach the window edges is not expressible under this ADR and needs an amendment.
+- On a `Full` page the same block spans the full padded window width, because the ancestor cap is absent.
+
+### 4.5 Section heading overflow (TASK-144, deferred from TASK-141)
+
+The shared list section heading (`.section-head`: `h2` plus `.count`) overflows the page horizontally between roughly 481 and 720 CSS px on every list route, because `.count { flex: none }` cannot shrink and the `h2` cannot shrink below its longest word, so the row is wider than the main column. The fix is layout-only and applies to the shared list and the board's empty-project fallback:
+
+```css
+.section-head { flex-wrap: wrap; }
+```
+
+- When heading and count do not fit on one line, the count wraps beneath the heading instead of widening the page. No copy, order, or breakpoint changes.
+- The same defect class is closed at the header: `.header-lead`, `.brand`, and `.project` get the min-width/`overflow-wrap` rules in §3.4 so the toggle does not push the header past the viewport at 320 px.
 
 ## 5. Shared list contract (ADR-0028 decision 2)
 
@@ -133,7 +235,7 @@ Rules:
 - `title` is not duplicated inside `cells`; it is required because the ADR row sketch has no title field and the ID/Title cells are structural.
 - `labels` and `references` are general front-matter metadata, not family data. The shared list renders them in the Title cell below the link and escapes them in `list.rs`, because `Row` carries values, not markup. `href` is a route the builder computes, never a stored value, so a stored `href` key cannot reach the cell.
 - `empty` is `Some` when the filtered index has no records for the family; the table is then replaced by the empty block. TASK-142 pins one shared pair for every family: message `No {noun} in this project.` and help `Records are created from the command line; this browser does not create records.` `{noun}` is the same singular/plural noun the count note uses (`business requirements`; `notes` for a config-defined type). The legacy per-family variants (requirement group wording and the cross-family hint, the technical-specification/use-case/test-case/test-report "were found in the configured directory" wording, the "Archived … are hidden" sentence) are recorded as accepted differences in TASK-142 and reconciled by the specification port owned by TASK-148. Empty copy never lives behind per-family builder code (AC3).
-- `count_note` is supplied by the caller and is the only other variable string. Flat families use `list::count_note(slug, record count)` (`3 milestones`, `1 milestone`, `0 releases`); grouped families use the group/member note (`1 group · 3 requirements`, `0 groups · 0 requirements`). A config-defined type falls back to its lower-case slug (`2 notes`).
+- `count_note` is supplied by the caller and is the only other variable string. Flat families use `list::count_note(slug, record count)` (`3 milestones`, `1 milestone`, `0 releases`); grouped families use the group/member note (`1 group · 3 requirements`, `0 groups · 0 requirements`), counted from the rows actually emitted. A config-defined type falls back to its lower-case slug (`2 notes`).
 - Cell values are rendered HTML built from escaped values; `render` applies no further escaping to `cells`, `actions`, or `children`.
 
 ### 5.2 Markup contract
@@ -173,10 +275,10 @@ Stable test hooks, independent of styling: `data-list-layout="shared"`, `data-co
 
 ### 5.3 Family slots are declared data
 
-- Slot declarations live in the existing presentation table (`routes.rs::Presentation`) as an ordered `list_slots: &'static [(&'static str, &'static str)]` (key, label), added with a `const fn with_slots` constructor so the table stays `const`. Keys: `milestone`, `assignee`, `release`, `type`, `group`, `audit_type`, `applicability`, `task`, `specs`.
+- Slot declarations live in the existing presentation table (`routes.rs::Presentation`) as an ordered `list_slots: &'static [(&'static str, &'static str)]` (key, label), added with a `const fn with_slots` constructor so the table stays `const`. Keys: `milestone`, `assignee`, `release`, `type`, `superseded_by`, `group`, `audit_type`, `applicability`, `task`, `specs`.
 - `routes::list_slots(slug) -> &'static [(&'static str, &'static str)]` returns the declared slots; a slug with no presentation entry (every config-defined type) returns an empty slice.
 - `list::slot_cell(key, record) -> String` maps a slot key to its value. This is a `match` on the slot key, never on a slug, a handler, or a template.
-- Slot order per ADR-0028: task → `Milestone`, `Assignee`; milestone → `Release`; release → none; decision → `Type`; requirement and NFR → `Group`; audit → `Audit type`; rule → `Applicability`; ui-mockup → `Task`, `Specs`; generic document → none.
+- Slot order per ADR-0028: task → `Milestone`, `Assignee`; milestone → `Release`; release → none; decision → `Type`, `Superseded by`; requirement and NFR → `Group`; audit → `Audit type`; rule → `Applicability`; ui-mockup → `Task`, `Specs`; generic document → none.
 - `Status` is structural for every family; declaring `status` as a slot is invalid (reserved key, §5.1). A release therefore shows one status cell, read from `record.status` verbatim.
 - A list builder never branches on `descriptor.slug`. `TypeDescriptor` (already on hand) supplies id shape, category, and content model; the presentation table supplies slot keys and labels.
 
@@ -228,7 +330,7 @@ The following is the settled behaviour once every family renders through `ListPl
 - **One path.** `list_page` (route) resolves the descriptor, applies the optional status filter, builds the index, and calls the shared builder. `ContentModel::Generic` no longer selects a different page.
 - **Presentation slug.** The heading, subheading, count noun, and declared slots are resolved through the list's representative presentation slug (`BrowserRoutes::list_slug_for`: decision aliases share the aggregate presentation; every other family keeps its own), so decision descriptor aliases render the decisions presentation (heading and subheading `Decisions`, `Type` slot) rather than an empty slot set.
 - **Status filter (REQ-06.014).** Every enabled document type keeps the single status filter (`active` plus declared custom statuses, configured order, `archived` never offered) rendered above the shared section. Milestone, release, decision, and task views have no filter. The filter decides the index; `ListPlan` never filters. A filter value outside the offered set stays a 400. A filtered list with no matches shows the shared empty block; filter-specific empty copy is out of scope.
-- **Grouped rows.** As in §5.4; the group-aware count note is `N group(s) · M requirement(s)` computed from the filtered index.
+- **Grouped rows.** As in §5.4; the group-aware count note is `N group(s) · M requirement(s)` computed from the rows actually emitted — the group rows shown and the member rows shown, orphan members included — never from a synthesised group.
 - **Empty state.** One shared message and help pair (see §5.1), one muted `(none)` for an unset status, date, or slot value, and the count note for zero records.
 - **Actions.** `View` then `Edit` in the last cell, each with a record-specific accessible name; the title cell carries the record's labels and references.
 - **Task family.** `/?type=task` is still the REQ-06.013 board: no shared table, no `Actions` cell, no status filter, and the per-milestone grouping unchanged.
@@ -243,16 +345,18 @@ Fixtures guard TASK-142, so they must be produced from the **pre-change** binary
 - **Captured per fixture:** `schema`, `family`, `url`, `captured_from_commit`, `heading`, `count_note`, `row_order` (IDs in render order), `baseline_columns` (today's header labels in order), `baseline_row_shape` (`ul`, `table`, or `board`), `records` (per ID: `title`, `status`, `created`, `updated`, `labels`, `references`, declared slot values, `href`, and `actions` — empty today because no list renders action cells), `grouped` (group → child IDs, requirements and NFRs only), `excluded` (archived IDs that must stay absent), and `empty` (bool).
 - **What is a target and what is evidence:** `baseline_columns` and `baseline_row_shape` are recorded as evidence of the pre-change contract and are **not** replayed, because they are exactly what the shared layout changes; `baseline_columns` is the only place the old five-column order survives, and it is evidence only. Captured `actions` (`[]` today) are evidence only; the action cell is asserted from the contract instead.
 - **Replayed, normalized:** record set and relative row order, title, `href`, label and reference values in the Title cell, slot values, created and updated, group→child nesting, archived IDs absent, and the heading and count note where the family's presentation heading and count contract are unchanged. A captured `""` or `"(none)"` status, date, or slot value is the shared muted `(none)`; a non-empty status stays verbatim. This refines the README's "replayed targets" line, which predates the pinned differences below.
-- **Accepted differences (TASK-142, recorded in the ticket):**
-  - `requirement`/`nfr` heading changes from `Requirements` to the presentation heading (`Business requirements`, `Non-functional requirements`); the count note stays the group/member note.
-  - `note` count note changes from `2 records` to `2 notes` (a config-defined type uses its own noun).
-  - every empty fixture's count note (`No records`, `No groups`, `""`) becomes `0 <noun>` (or `0 groups · 0 requirements`); the empty block itself is the shared copy in §5.1, not the legacy per-family wording.
-  - the `requirement`/`nfr` `grouped` entry with the pseudo-group key `other` is replayed as top-level rows with no parent, because the legacy "Other requirements" section has no group row.
-  - the legacy per-group member count, the `<article class="group">` wrapper, the `(not found)` annotation on an unresolved group reference, and the "No requirements in this group" note are not carried into the table; the group row, the `data-child-of` children, and the stored Group value are.
-  - the task fixture is replayed against the board (no shared table or header): heading, count note, milestone grouping/card order, and archived exclusion are the regression assertion.
+- **Accepted differences (TASK-142, recorded in the ticket as A1–A8):**
+  - **A1 Shared layout.** Table instead of `<ul>`, the fixed header sequence, the `Created` column, the `View`/`Edit` action cell, the Title-cell labels/references, and the muted `(none)` for unset values; this is the intended change every populated fixture shares.
+  - **A2 First-paragraph preview removed.** The legacy list rows rendered the first paragraph of the record body — `definition` for glossary terms and `description` for UI specifications, business rules, audit records, technical specifications, use cases, test cases, and test reports. The shared row carries only the Title cell (link, labels, references) plus the fixed cells; no body preview is rendered for any family.
+  - **A3 Legacy row-metadata line removed.** The `row-meta` line (`created`, `updated`, `labels`, `references`, and every remaining front-matter key) is not carried over: `created`/`updated` are structural columns and `labels`/`references` are in the Title cell. Every other field it exposed already has a column or a declared slot; the one field with no other home, decision `superseded_by`, is now the declared `Superseded by` slot (§5.3), so CLI/browser parity is preserved.
+  - **A4 Requirement and NFR heading.** `Requirements` becomes the presentation heading (`Business requirements`, `Non-functional requirements`); the grouped count note keeps its group/member shape.
+  - **A5 Subheading copy.** The list subheading is now the presentation inventory note, so the legacy `<Family> records in this project.` sentence is replaced: `Milestone records…` → `Milestones in this project.`, `Release records…` → `Releases in this project.`, `Decision records…` → `Decisions in this project.`, `Business requirement records…` → `Business requirements in this project.`, `Non-functional requirement records…` → `Non-functional requirements in this project.` The other families' subheadings already matched their presentation note. Fixtures do not capture a subheading, so this difference is recorded here and in the ticket, not replayed.
+  - **A6 Shared empty state.** Every legacy per-family empty block (the requirement cross-family hint and group messages, the technical-specification/use-case/test-case/test-report "were found in the configured directory" wording, the "Archived … are hidden" sentence) is replaced by the one shared message/help pair in §5.1. The per-family UI description port is TASK-148.
+  - **A7 Grouped row structure.** The `grouped` entry with the pseudo-group key `other` replays as top-level rows; the per-group member count, the `<article class="group">` wrapper, the `(not found)` annotation on an unresolved group reference, and the "No requirements in this group" note are not carried into the table. A member whose group row is absent from the indexed set renders as a top-level row with no `data-child-of` for every grouped family, and the grouped count note is computed from the rows actually emitted.
+  - **A8 Config-defined count noun.** `note` count note changes from `2 records` to `2 notes` (a config-defined type uses its own noun), and every empty fixture's count note (`No records`, `No groups`, `""`) becomes `0 <noun>` (or `0 groups · 0 requirements`).
 - **Producer:** `tests/list_characterization_capture.rs`, an `#[ignore]`d test that boots the current browser against `project/`, parses the pre-change markup (document table rows, `req-list` rows, board cards), and writes `expected/*.json`. It is run once on the pre-change commit and then kept for audit only.
 - **Format decision:** JSON with `serde_json` (already a dev-dependency); no HTML golden files, because the header and cell markup is exactly what changes and byte-comparison would encode the old markup as the target.
-- **Replay (TASK-142):** `tests/list_characterization_replay.rs` gains one loop over every populated and empty fixture (`expected/*.json`, 32 files). For each fixture it asserts the shared layout shows the same record set, the same relative row order, `created` and `updated` as cells, `labels` and `references` in the Title cell, the same status/slot values, the same group→child nesting, the recorded archived IDs absent, the heading and count note where §6 keeps them, and — for the empty fixtures — no table plus the shared empty message, help, and zero count. It asserts the shared header sequence and the `View`/`Edit` actions separately, because those are the intended change. The milestone test already in the file stays.
+- **Replay (TASK-142):** `tests/list_characterization_replay.rs` gains one loop over every populated and empty fixture (`expected/*.json`, 32 files). For each fixture it asserts the shared layout shows the same record set, the same relative row order, `created` and `updated` as cells, `labels` and `references` in the Title cell, the same status/slot values, the same group→child nesting, the recorded archived IDs absent, the heading and count note where §6 keeps them, and — for the empty fixtures — no table plus the shared empty message, help, and zero count. It asserts the shared header sequence and the `View`/`Edit` actions separately, because those are the intended change. The task fixture is replayed against the board (heading, count note, milestone grouping/card order, archived exclusion; no shared table or header). The reference family is covered by this same loop: the dedicated `reference_family_replays_its_characterization_fixture` test was folded into it, so coverage is preserved and no milestone-specific test remains.
 - **New contract tests (TASK-142):** a new `tests/list_shared_layout.rs` asserts (a) every enabled descriptor, resolved through its representative navigation route, returns `data-list-layout="shared"` and exactly the fixed `data-column` sequence including its declared slots (the task descriptor is excluded and asserted on the board instead; a disabled type stays 404), and (b) every archived ID recorded in every fixture is absent from its list, or from the board's `data-task` cards for the task family. The grouped-row proof (one `<tbody>`, group row before its `data-child-of` children, unresolved member as a top-level row) lives in the replay file beside the requirement and NFR fixtures.
 
 ## 7. UI gate
@@ -272,6 +376,12 @@ TASK-141 updates the new shell document and `browser-final-cross-type-ui.md` §5
 
 `@ui-designer` produces one review package for the shell and shared list (MOCK id allocated, recorded in `docs/specifications/ui/mockups/README.md` and in this specification). **MOCK-0016** was produced and registered on 2026-11-15 with status `draft`; the implementation run proceeds in no-approval mode (orchestrator decision, TASK-141 comment 2026-11-15), so AC2/AC3 are implemented against the settled contract and the registry row stays `draft` for owner review. AC1, AC4, and AC5 (the fixture work in §6) were never gated. TASK-142 adds no visual contract of its own and records a no-mockup waiver naming MOCK-0016 and the 32 characterization fixtures; its accepted differences are listed in §6.
 
+### 7.4 TASK-144 gate: header toggle and collapsed layout
+
+TASK-144 changes chrome on every page (header control, reclaimed sidebar width, `.app--full` board, `.bleed`, the 481–720 px heading wrap), so a mockup is required and a no-mockup waiver is not available on visual grounds. The review package covers: the toggle left of the brand in expanded and collapsed states, the collapsed layout, the full-width board, a `.bleed` region, the 320/480/720 px states, the JavaScript-disabled state (no button, expanded nav), the accessibility annotations from §3.4, and the heading-wrap fix from §4.5.
+
+It updates `docs/specifications/ui/browser-shell-and-shared-list-ui.md` (its §1/§2 "no toggle in this ticket" statements are superseded) and registers a new MOCK id in `docs/specifications/ui/mockups/README.md`. **MOCK-0018** (`docs/specifications/ui/mockups/MOCK-0018-browser-navigation-toggle-and-collapsed-layout-review.html`, registry status `draft`) is that package; it draws the 11 views listed here and its layout questions OQ-6 (stacking breakpoint) and OQ-7 (collapsed width above the cap) are closed by this specification: the 480 px stacking breakpoint stays, and the 1040 px cap stays in the collapsed state (ADR-0028 downstream constraint 4). AC9 is satisfied by an approved mockup, or — when approvals are disabled for the run — by the registered `draft` MOCK id plus an explicit approval waiver recorded by the orchestrator in the ticket. The implementer may not record that waiver and may not mark AC9 complete on its own.
+
 ## 8. Resolved questions (2026-11-15)
 
 All three open questions and the ticket's task-family premise are settled by the ADR-0028 amendment (2026-11-15). Nothing on the contract remains open; only the MOCK id is pending (§7.3).
@@ -290,10 +400,11 @@ All three open questions and the ticket's task-family premise are settled by the
 
 | Artifact | Reference |
 | --- | --- |
-| Requirements | REQ-06.016; REQ-06.015 (width clause); REQ-06.004 (browser list parity); REQ-06.013 (board unchanged); REQ-05.007 (archive exclusion); REQ-06.003, REQ-06.009, REQ-06.012, REQ-06.014 (shell, header, list routes) |
-| NFRs | NFR-01.002; NFR-01.003; NFR-05.001 |
-| ADRs | ADR-0028 (decisions 1, 2, 3, 6, 9); ADR-0005 (templates, CSP, progressive enhancement); ADR-0017; ADR-0020 (registry-derived routes, decision 7) |
+| Requirements | REQ-06.016; REQ-06.015 (width **and** navigation visibility); REQ-06.004 (browser list parity); REQ-06.013 (board, now `Full`); REQ-05.007 (archive exclusion); REQ-06.003, REQ-06.009, REQ-06.012, REQ-06.014 (shell, header, list routes) |
+| NFRs | NFR-01.002; NFR-01.003; NFR-05.001 (Firefox 100+, Edge 130+, Safari 18+ at 320/480/720 px) |
+| ADRs | ADR-0028 (decisions 1, 2, 3, 4, 5, 6, 7, 8, 9; downstream constraints 4–9 and 15); ADR-0005 (templates, CSP, progressive enhancement, no cookies); ADR-0017; ADR-0020 (decision 5 amended by ADR-0028 constraint 9) |
 | Domain model | `docs/domain-model/` — requirement group and member requirement (grouped rows) |
 | Business rules | `docs/business-rules/` — archive and lifecycle rules cited by the existing list pages |
-| Tickets | TASK-141 (this); TASK-142; TASK-144; TASK-147; TASK-148 |
-| Implementation | `src/browser/shell.rs` (new), `src/browser/list.rs` (new), `src/browser/render.rs`, `src/browser/routes.rs`, `src/browser/templates/`, `src/browser/app.css`, tests |
+| UI | MOCK-0016 (shell and shared list); TASK-144 header/collapsed-layout MOCK id in §7.4; `docs/specifications/ui/browser-shell-and-shared-list-ui.md` |
+| Tickets | TASK-141; TASK-142; TASK-144; TASK-145; TASK-146; TASK-147; TASK-148; TASK-149; TASK-150 |
+| Implementation | `src/browser/shell.rs`, `src/browser/list.rs`, `src/browser/render.rs`, `src/browser/routes.rs`, `src/browser/templates/shell.html`, `src/browser/app.css`, `src/browser/app.js`, `src/browser/nav-state.js` (new), `src/browser/assets.rs`, `src/browser/vendor/MANIFEST.md`, `src/browser/http.rs`, tests |
