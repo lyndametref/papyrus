@@ -280,4 +280,101 @@
     }
   }
 
+  /* Diagrams (TASK-146): render each mermaid figure with the vendored bundle.
+     The server-rendered `<pre>` is the no-script fallback and the client
+     input. Every figure renders in isolation; a failure keeps the source. */
+  var diagramFigures = document.querySelectorAll('figure[data-diagram="mermaid"]');
+  if (diagramFigures.length) {
+    function sanitiseDiagramId(path) {
+      var out = "";
+      var limit = path.length < 64 ? path.length : 64;
+      for (var s = 0; s < limit; s++) {
+        var character = path.charAt(s);
+        out += /[A-Za-z0-9_-]/.test(character) ? character : "_";
+      }
+      return out;
+    }
+
+    function appendDiagramNote(figure, text) {
+      if (figure.querySelector("figcaption.render-note")) {
+        return;
+      }
+      var note = document.createElement("figcaption");
+      note.className = "render-note";
+      note.textContent = text;
+      figure.appendChild(note);
+    }
+
+    function failDiagram(figure) {
+      figure.setAttribute("data-render-error", "diagram");
+      appendDiagramNote(figure, "Diagram not rendered: Mermaid rejected the source.");
+    }
+
+    function mountDiagram(figure, svg) {
+      var scroll = figure.querySelector(".diagram-scroll");
+      if (!scroll || typeof svg !== "string" || svg === "") {
+        failDiagram(figure);
+        return;
+      }
+      scroll.innerHTML = svg;
+    }
+
+    function renderDiagram(figure, source, id) {
+      var result;
+      try {
+        result = window.mermaid.render(id, source);
+      } catch (e) {
+        failDiagram(figure);
+        return;
+      }
+      if (result && typeof result.then === "function") {
+        result.then(
+          function (rendered) {
+            mountDiagram(figure, rendered ? rendered.svg : "");
+          },
+          function () {
+            failDiagram(figure);
+          }
+        );
+      } else {
+        mountDiagram(figure, result ? result.svg : "");
+      }
+    }
+
+    if (!window.mermaid || typeof window.mermaid.render !== "function") {
+      for (var d = 0; d < diagramFigures.length; d++) {
+        diagramFigures[d].setAttribute("data-render-error", "diagram");
+        appendDiagramNote(
+          diagramFigures[d],
+          "Diagram not rendered: the diagram script did not load."
+        );
+      }
+    } else {
+      window.mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: "strict",
+        htmlLabels: false,
+        theme: "neutral",
+        fontFamily: "system-ui, sans-serif",
+        flowchart: { htmlLabels: false },
+        maxTextSize: 100000,
+        maxEdges: 500,
+      });
+      var diagramPrefix =
+        "papyrus-mmd-" + sanitiseDiagramId(window.location.pathname) + "-";
+      for (var f = 0; f < diagramFigures.length; f++) {
+        (function (figure, index) {
+          if (figure.getAttribute("data-render-error")) {
+            return;
+          }
+          var pre = figure.querySelector("pre");
+          if (!pre) {
+            return;
+          }
+          renderDiagram(figure, pre.textContent, diagramPrefix + index);
+        })(diagramFigures[f], f);
+      }
+    }
+  }
+
 })();

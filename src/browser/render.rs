@@ -103,6 +103,30 @@ fn page_with_assets(
     })
 }
 
+/// A record view plus the page flag the router needs for the CSP class.
+pub struct RecordPage {
+    /// The rendered page.
+    pub html: String,
+    /// True when a curated prose field produced a renderable diagram figure.
+    pub has_diagram: bool,
+}
+
+/// The head-asset fragment for one record view: KaTeX first, then Mermaid,
+/// joined by one newline; `""` when neither applies.
+fn page_assets(has_math: bool, has_diagram: bool) -> String {
+    let mut assets = String::new();
+    if has_math {
+        assets.push_str(math::HEAD_ASSETS);
+    }
+    if has_diagram {
+        if !assets.is_empty() {
+            assets.push('\n');
+        }
+        assets.push_str(math::MERMAID_ASSETS);
+    }
+    assets
+}
+
 fn category_name(slug: &str) -> String {
     routes::heading(slug)
 }
@@ -1045,10 +1069,11 @@ pub fn view_page(
     resolved_refs: &[Option<Record>],
     cfg: &Config,
     chrome: Chrome<'_>,
-) -> String {
+) -> RecordPage {
     let mut content = String::new();
     let mut details = String::new();
     let mut has_math = false;
+    let mut has_diagram = false;
     match record.handler() {
         Some(TypedHandler::Requirement(_)) => {
             if record.supports_story()
@@ -1056,6 +1081,7 @@ pub fn view_page(
             {
                 let prose = math::prose(story, "");
                 has_math |= prose.has_math;
+                has_diagram |= prose.has_diagram;
                 content.push_str(&format!(
                     "<section class=\"record-section\"><h2>User story</h2>{}</section>",
                     prose.html
@@ -1066,6 +1092,7 @@ pub fn view_page(
                 Some(description) => {
                     let prose = math::prose(description, "");
                     has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
                 }
                 None => content.push_str("<p class=\"text empty-text\">No description.</p>"),
@@ -1166,6 +1193,7 @@ pub fn view_page(
                 Some(description) => {
                     let prose = math::prose(description, "");
                     has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
                 }
                 None => content.push_str("<p class=\"text empty-text\">(none)</p>"),
@@ -1192,6 +1220,7 @@ pub fn view_page(
                 Some(description) => {
                     let prose = math::prose(description, "");
                     has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
                 }
                 None => content.push_str("<p class=\"text empty-text\">(none)</p>"),
@@ -1204,6 +1233,7 @@ pub fn view_page(
                 Some(description) => {
                     let prose = math::prose(description, "");
                     has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
                 }
                 None => content.push_str("<p class=\"text empty-text\">(none)</p>"),
@@ -1217,6 +1247,7 @@ pub fn view_page(
                 Some(t) if !t.trim().is_empty() => {
                     let prose = math::prose(t, "");
                     has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
                 }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
@@ -1228,6 +1259,7 @@ pub fn view_page(
                 Some(t) if !t.trim().is_empty() => {
                     let prose = math::prose(t, "");
                     has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
                 }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
@@ -1239,6 +1271,7 @@ pub fn view_page(
                 Some(t) if !t.trim().is_empty() => {
                     let prose = math::prose(t, "");
                     has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
                 }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
@@ -1271,6 +1304,7 @@ pub fn view_page(
                 Some(t) if !t.trim().is_empty() => {
                     let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
                     has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
                 }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
@@ -1283,6 +1317,7 @@ pub fn view_page(
                 Some(t) if !t.trim().is_empty() => {
                     let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
                     has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
                 }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
@@ -1293,6 +1328,7 @@ pub fn view_page(
                 Some(t) if !t.trim().is_empty() => {
                     let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
                     has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
                 }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
@@ -1332,6 +1368,7 @@ pub fn view_page(
                 Some(t) if !t.trim().is_empty() => {
                     let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
                     has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
                 }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
@@ -1343,6 +1380,7 @@ pub fn view_page(
                 Some(t) if !t.trim().is_empty() => {
                     let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
                     has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
                 }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
@@ -1354,6 +1392,7 @@ pub fn view_page(
                 Some(t) if !t.trim().is_empty() => {
                     let prose = math::prose(t, " style=\"white-space: pre-wrap\"");
                     has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
                 }
                 _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
@@ -1390,6 +1429,7 @@ pub fn view_page(
             } else {
                 let prose = math::prose(content_text, " style=\"white-space: pre-wrap\"");
                 has_math |= prose.has_math;
+                has_diagram |= prose.has_diagram;
                 content.push_str(&prose.html);
             }
         }
@@ -1402,6 +1442,7 @@ pub fn view_page(
             } else {
                 let prose = math::prose(content_text, "");
                 has_math |= prose.has_math;
+                has_diagram |= prose.has_diagram;
                 content.push_str(&prose.html);
             }
         }
@@ -1414,6 +1455,7 @@ pub fn view_page(
             } else {
                 let prose = math::prose(content_text, " style=\"white-space: pre-wrap\"");
                 has_math |= prose.has_math;
+                has_diagram |= prose.has_diagram;
                 content.push_str(&prose.html);
             }
             if let Some(app) = &record.applicability
@@ -1421,6 +1463,7 @@ pub fn view_page(
             {
                 let prose = math::prose(app, " style=\"white-space: pre-wrap\"");
                 has_math |= prose.has_math;
+                has_diagram |= prose.has_diagram;
                 content.push_str(&format!(
                     "<section class=\"record-section\"><h2>Applicability</h2>{}</section>",
                     prose.html
@@ -1433,6 +1476,7 @@ pub fn view_page(
                 Some(description) => {
                     let prose = math::prose(description, "");
                     has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
                     content.push_str(&prose.html);
                 }
                 None => content.push_str("<p class=\"text empty-text\">No description.</p>"),
@@ -1539,14 +1583,15 @@ pub fn view_page(
             ("content", &content),
         ],
     );
-    page_with_assets(
+    let html = page_with_assets(
         chrome,
         PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
-        if has_math { math::HEAD_ASSETS } else { "" },
-    )
+        &page_assets(has_math, has_diagram),
+    );
+    RecordPage { html, has_diagram }
 }
 
 fn metadata_block_backlog(
@@ -4139,7 +4184,7 @@ pub const DOCUMENT_DETAIL_TEMPLATE: &str = include_str!("templates/document_deta
 pub const DOCUMENT_EDIT_TEMPLATE: &str = include_str!("templates/document_edit.html");
 
 /// Generic document detail page (section 4.1).
-pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -> String {
+pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -> RecordPage {
     let view = record_view(record);
     let created = view
         .as_ref()
@@ -4187,6 +4232,7 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
         escape(&updated)
     );
     let mut has_math = false;
+    let mut has_diagram = false;
     let description = record
         .description
         .as_deref()
@@ -4194,6 +4240,7 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
         .map(|value| {
             let prose = math::prose(value, "");
             has_math |= prose.has_math;
+            has_diagram |= prose.has_diagram;
             prose.html
         })
         .unwrap_or_else(|| "<p>No description.</p>".to_string());
@@ -4235,14 +4282,15 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
             ("content", &content),
         ],
     );
-    page_with_assets(
+    let html = page_with_assets(
         chrome,
         PageRoute::Other,
         &format!("Papyrus \u{2014} {} {}", record.id, record.title),
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
-        if has_math { math::HEAD_ASSETS } else { "" },
-    )
+        &page_assets(has_math, has_diagram),
+    );
+    RecordPage { html, has_diagram }
 }
 
 /// Submitted values for the generic document edit form.

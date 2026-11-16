@@ -147,6 +147,11 @@ pub static ASSETS: &[Asset] = &[
         mime: WOFF2,
         bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Typewriter-Regular.woff2"),
     },
+    Asset {
+        path: "/assets/mermaid/mermaid.min.js",
+        mime: JS,
+        bytes: include_bytes!("vendor/mermaid/11.17.2/mermaid.min.js"),
+    },
 ];
 
 /// Resolve an exact asset request path.

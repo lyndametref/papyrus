@@ -15,6 +15,11 @@ pub const MAX_BODY: usize = 1024 * 1024;
 
 pub const CSP: &str = "default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
 
+/// The diagram response class: Mermaid injects an inline `<style>` into its
+/// SVG, so this one token is relaxed. Every other directive is identical, and
+/// `script-src` never changes.
+pub const CSP_DIAGRAM: &str = "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Method {
     Get,
@@ -408,6 +413,8 @@ pub struct Response {
     pub content_type: &'static str,
     pub body: Vec<u8>,
     pub extra_headers: Vec<(String, String)>,
+    /// The CSP value printed for `text/html` responses; unused for assets.
+    pub csp: &'static str,
 }
 
 impl Response {
@@ -417,6 +424,15 @@ impl Response {
             content_type: "text/html; charset=utf-8",
             body: body.into_bytes(),
             extra_headers: Vec::new(),
+            csp: CSP,
+        }
+    }
+
+    /// An HTML response whose page contains a renderable diagram.
+    pub fn html_diagram(status: u16, body: String) -> Self {
+        Self {
+            csp: CSP_DIAGRAM,
+            ..Self::html(status, body)
         }
     }
 
@@ -427,6 +443,7 @@ impl Response {
             content_type: "application/json; charset=utf-8",
             body,
             extra_headers: Vec::new(),
+            csp: CSP,
         }
     }
 
@@ -436,6 +453,7 @@ impl Response {
             content_type,
             body: body.as_bytes().to_vec(),
             extra_headers: Vec::new(),
+            csp: CSP,
         }
     }
 
@@ -445,6 +463,7 @@ impl Response {
             content_type,
             body: body.to_vec(),
             extra_headers: Vec::new(),
+            csp: CSP,
         }
     }
 
@@ -508,7 +527,7 @@ pub fn write_response(
     head.push_str("Referrer-Policy: no-referrer\r\n");
     head.push_str("X-Frame-Options: DENY\r\n");
     if response.content_type.starts_with("text/html") {
-        head.push_str(&format!("Content-Security-Policy: {}\r\n", CSP));
+        head.push_str(&format!("Content-Security-Policy: {}\r\n", response.csp));
     }
     for (name, value) in &response.extra_headers {
         head.push_str(&format!("{}: {}\r\n", name, value));
@@ -576,5 +595,48 @@ mod tests {
             Some("nfr".to_string())
         );
         assert_eq!(query_param(&None, "type").unwrap(), None);
+    }
+
+    #[test]
+    fn the_two_csp_literals_differ_in_exactly_one_token() {
+        let strict: Vec<&str> = CSP.split("; ").collect();
+        let diagram: Vec<&str> = CSP_DIAGRAM.split("; ").collect();
+        assert_eq!(strict.len(), diagram.len());
+        let differing: Vec<(&str, &str)> = strict
+            .iter()
+            .zip(diagram.iter())
+            .filter(|(left, right)| left != right)
+            .map(|(left, right)| (*left, *right))
+            .collect();
+        assert_eq!(
+            differing,
+            vec![("style-src 'self'", "style-src 'self' 'unsafe-inline'")]
+        );
+    }
+
+    #[test]
+    fn script_src_never_relaxes() {
+        for csp in [CSP, CSP_DIAGRAM] {
+            let script = csp
+                .split("; ")
+                .find(|directive| directive.starts_with("script-src "))
+                .expect("script-src directive");
+            assert_eq!(script, "script-src 'self'");
+            assert!(!script.contains("unsafe-inline"));
+            assert!(!script.contains("unsafe-eval"));
+            assert!(!script.contains("nonce"));
+            assert!(!script.contains("sha"));
+        }
+        assert!(!CSP.contains("unsafe"));
+    }
+
+    #[test]
+    fn response_constructors_select_the_matching_csp() {
+        assert_eq!(Response::html(200, String::new()).csp, CSP);
+        assert_eq!(Response::html_diagram(200, String::new()).csp, CSP_DIAGRAM);
+        assert_eq!(
+            Response::bytes(200, "text/javascript; charset=utf-8", b"x").csp,
+            CSP
+        );
     }
 }

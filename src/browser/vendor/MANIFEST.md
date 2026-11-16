@@ -30,11 +30,12 @@ Rows are sorted by request path; `bytes` are decimal and `sha256` is lowercase h
 | `/assets/katex/fonts/KaTeX_Typewriter-Regular.woff2` | KaTeX | 0.16.11 | OFL-1.1 | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 13568 | `71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b` |
 | `/assets/katex/katex.min.css` | KaTeX | 0.16.11 | MIT | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 23335 | `717bc9ae7853b61f0f76455dddf0ecd4f527a783f42de2ac24684899c1c46258` |
 | `/assets/katex/katex.min.js` | KaTeX | 0.16.11 | MIT | https://registry.npmjs.org/katex/-/katex-0.16.11.tgz | 275414 | `e6bfe5deebd4c7ccd272055bab63bd3ab2c73b907b6e6a22d352740a81381fd4` |
+| `/assets/mermaid/mermaid.min.js` | mermaid | 11.17.2 | MIT | https://registry.npmjs.org/mermaid/-/mermaid-11.17.2.tgz | 3572661 | `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8` |
 
 ## First-party assets
 
 | path | bytes | sha256 |
 |---|---|---|
-| `/assets/app.css` | 17595 | `e9ea6eff9ef17f451074f38df98d6a19ce4f17eccaa1a1d02f35b6a6dbd1fab8` |
-| `/assets/app.js` | 9011 | `475549544f9ee7bfb09be5103bbce6b2471a7a1298215e5ceb95701c46366a35` |
+| `/assets/app.css` | 17794 | `98a5cba007870a020365a67a1b6966cca2badc9d2044b261a89dd91dad994790` |
+| `/assets/app.js` | 12109 | `dd743fff22db130eb5ba17cd014c8ce55b60413214bb3ed39f04bc20b792e59e` |
 | `/assets/nav-state.js` | 679 | `c12c7fe53d844706c7c085f2c9ad6fc6aa784a3ba236895259b486d993bd961d` |

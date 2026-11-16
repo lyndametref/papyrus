@@ -150,6 +150,10 @@ h1, .h1, h2, h3 { overflow-wrap: anywhere; }
 .table-scroll { overflow-x: auto; }
 .table-scroll:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .bleed { width: 100%; overflow-x: auto; }
+.diagram { margin: 12px 0; }
+.diagram-scroll { overflow-x: auto; }
+.diagram--unsupported { max-width: 780px; }
+.render-note { display: block; font-size: 12px; color: var(--muted); margin: 6px 0 0; }
 .bleed:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 pre { max-width: 100%; overflow-x: auto; }
 pre:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }

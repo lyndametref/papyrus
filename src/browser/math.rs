@@ -1,45 +1,72 @@
 //! The non-Markdown math delimiter pre-pass (ADR-0025 decisions 2-5).
 //!
 //! `prose` turns one curated prose field into the HTML fragment its record
-//! view renders and reports whether any math segment was found. The module is
-//! a pure string function plus the head-asset constant: it knows nothing about
-//! records, pages, or routes.
+//! view renders and reports whether any math or diagram segment was found. The
+//! module is a pure string function plus the head-asset constants: it knows
+//! nothing about records, pages, or routes.
 //!
-//! Exactly three forms are recognised, in one left-to-right scan:
+//! Exactly the following forms are recognised, in one left-to-right scan:
 //!
 //! - `$$...$$` display math (may span lines, content trimmed),
 //! - `$...$` inline math (single line, no padding, content exact),
-//! - a fenced block whose info string is exactly `math`, `tex`, or `latex`.
+//! - a fenced block whose info string is exactly `math`, `tex`, or `latex`;
+//! - a fenced block whose info string is exactly `mermaid`, emitted as a
+//!   diagram figure (ADR-0026);
+//! - a fenced block whose info string is exactly `plantuml` or `puml`,
+//!   emitted as a static source figure with a note.
 //!
 //! Everything else, including a rejected candidate, stays literal text: no
 //! marker, no note, and no Markdown interpretation. `\$` is the documented
-//! escape for a literal dollar. The contract is
-//! `docs/specifications/browser-math-and-diagram-rendering.md` §3.
+//! escape for a literal dollar. The server never parses Mermaid; it counts
+//! bytes and lines only. The contract is
+//! `docs/specifications/browser-math-and-diagram-rendering.md` §3 and §13–§16.
 
 use crate::browser::render::escape;
 
 /// One rendered prose field.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Prose {
-    /// The rendered HTML fragment: paragraphs and display blocks in order.
+    /// The rendered HTML fragment: paragraphs, display blocks, and figures in
+    /// order.
     pub html: String,
     /// True when at least one inline or display math segment was found.
     pub has_math: bool,
+    /// True when at least one renderable `mermaid` figure was found. An
+    /// over-limit or PlantUML block does not set it.
+    pub has_diagram: bool,
 }
 
 /// The head fragment for a page that contains math; `""` otherwise.
 pub const HEAD_ASSETS: &str = "<link rel=\"stylesheet\" href=\"/assets/katex/katex.min.css\">\n<script src=\"/assets/katex/katex.min.js\" defer></script>";
 
+/// The head fragment for a page that contains a renderable diagram.
+pub const MERMAID_ASSETS: &str = "<script src=\"/assets/mermaid/mermaid.min.js\" defer></script>";
+
+/// Maximum diagram source size in UTF-8 bytes.
+pub const MAX_DIAGRAM_BYTES: usize = 100_000;
+
+/// Maximum diagram source line count.
+pub const MAX_DIAGRAM_LINES: usize = 1_000;
+
 /// What a fence-looking line turned out to be.
 enum Fence<'a> {
-    /// Not a recognised opener, an unclosed opener, or empty math content.
-    /// Scanning continues normally one character later.
+    /// Not a recognised opener, an unclosed opener, or empty math/diagram
+    /// content. Scanning continues normally one character later.
     Ordinary,
     /// A recognised math fence with trimmed content and the index just past
     /// the closer line (its trailing newline is not consumed).
     Math { tex: &'a str, next: usize },
-    /// A closed non-math fence: the whole block is opaque literal text that
-    /// ends at `end` (just past the closer line).
+    /// A closed `mermaid` fence with trimmed source. `renderable` is false
+    /// when the source exceeds either input cap.
+    Diagram {
+        source: &'a str,
+        next: usize,
+        renderable: bool,
+    },
+    /// A closed `plantuml` or `puml` fence with trimmed source.
+    UnsupportedSource { source: &'a str, next: usize },
+    /// A closed non-math, non-diagram fence: the whole block is opaque literal
+    /// text that ends at `end` (just past the closer line).
     Opaque { end: usize },
 }
 
@@ -55,6 +82,7 @@ pub fn prose(value: &str, attrs: &str) -> Prose {
     let mut run = String::with_capacity(value.len());
     let mut run_has_content = false;
     let mut has_math = false;
+    let mut has_diagram = false;
     let mut index = 0;
 
     while index < value.len() {
@@ -64,6 +92,23 @@ pub fn prose(value: &str, attrs: &str) -> Prose {
                     flush_paragraph(&mut out, attrs, &mut run, &mut run_has_content);
                     out.push_str(&display_html(tex));
                     has_math = true;
+                    index = next;
+                    continue;
+                }
+                Fence::Diagram {
+                    source,
+                    next,
+                    renderable,
+                } => {
+                    flush_paragraph(&mut out, attrs, &mut run, &mut run_has_content);
+                    out.push_str(&diagram_html(source, renderable));
+                    has_diagram |= renderable;
+                    index = next;
+                    continue;
+                }
+                Fence::UnsupportedSource { source, next } => {
+                    flush_paragraph(&mut out, attrs, &mut run, &mut run_has_content);
+                    out.push_str(&unsupported_source_html(source));
                     index = next;
                     continue;
                 }
@@ -156,6 +201,7 @@ pub fn prose(value: &str, attrs: &str) -> Prose {
     Prose {
         html: out,
         has_math,
+        has_diagram,
     }
 }
 
@@ -180,6 +226,35 @@ fn inline_html(tex: &str) -> String {
 fn display_html(tex: &str) -> String {
     let source = escape(tex);
     format!("<div class=\"math math--display\" data-tex=\"{source}\">{source}</div>")
+}
+
+/// A `mermaid` figure. The `<pre>` is the fallback and the client input.
+fn diagram_html(source: &str, renderable: bool) -> String {
+    let source = escape(source);
+    if renderable {
+        return format!(
+            "<figure class=\"diagram bleed\" data-diagram=\"mermaid\"><div class=\"diagram-scroll\"><pre>{source}</pre></div></figure>"
+        );
+    }
+    format!(
+        "<figure class=\"diagram bleed\" data-diagram=\"mermaid\" data-render-error=\"diagram\"><div class=\"diagram-scroll\"><pre>{source}</pre></div><figcaption class=\"render-note\">Diagram not rendered: source exceeds the 100,000-byte or 1,000-line limit.</figcaption></figure>"
+    )
+}
+
+/// A `plantuml`/`puml` source figure. It is not a visualization: no `bleed`
+/// and no `.diagram-scroll`.
+fn unsupported_source_html(source: &str) -> String {
+    let source = escape(source);
+    format!(
+        "<figure class=\"diagram diagram--unsupported\" data-diagram=\"plantuml\"><pre>{source}</pre><figcaption class=\"render-note\">PlantUML diagrams are not supported in this release; showing source.</figcaption></figure>"
+    )
+}
+
+/// True when the trimmed source exceeds the byte or line cap. Equality is
+/// allowed, and `source` is never empty here.
+fn diagram_over_limit(source: &str) -> bool {
+    let lines = source.bytes().filter(|byte| *byte == b'\n').count() + 1;
+    source.len() > MAX_DIAGRAM_BYTES || lines > MAX_DIAGRAM_LINES
 }
 
 fn backslash_run(bytes: &[u8], start: usize) -> usize {
@@ -320,6 +395,8 @@ fn fence_at(value: &str, start: usize) -> Fence<'_> {
     }
     let info = value[after..opener_end].trim_end();
     let math = matches!(info, "math" | "tex" | "latex");
+    let diagram = info == "mermaid";
+    let unsupported_source = matches!(info, "plantuml" | "puml");
 
     let content_start = opener_end + 1;
     let Some((closer_start, closer_end)) = find_fence_closer(value, fence, run, content_start)
@@ -328,7 +405,7 @@ fn fence_at(value: &str, start: usize) -> Fence<'_> {
         return Fence::Ordinary;
     };
 
-    if !math {
+    if !math && !diagram && !unsupported_source {
         // Opaque literal block: `$`, `$$`, and `\$` inside are never scanned.
         return Fence::Opaque { end: closer_end };
     }
@@ -338,13 +415,27 @@ fn fence_at(value: &str, start: usize) -> Fence<'_> {
         .strip_suffix("\r\n")
         .or_else(|| content.strip_suffix('\n'))
         .unwrap_or(content);
-    let tex = content.trim();
-    if tex.is_empty() {
-        // Empty content is not a math segment; the fence stays literal.
+    let source = content.trim();
+    if source.is_empty() {
+        // Empty content is not a math or diagram segment; the fence stays
+        // literal.
         return Fence::Ordinary;
     }
+    if diagram {
+        return Fence::Diagram {
+            source,
+            next: closer_end,
+            renderable: !diagram_over_limit(source),
+        };
+    }
+    if unsupported_source {
+        return Fence::UnsupportedSource {
+            source,
+            next: closer_end,
+        };
+    }
     Fence::Math {
-        tex,
+        tex: source,
         next: closer_end,
     }
 }
@@ -633,5 +724,241 @@ mod tests {
         assert!(HEAD_ASSETS.contains("href=\"/assets/katex/katex.min.css\""));
         assert!(HEAD_ASSETS.contains("src=\"/assets/katex/katex.min.js\" defer"));
         assert!(HEAD_ASSETS.find("katex.min.css") < HEAD_ASSETS.find("katex.min.js"));
+    }
+
+    const MERMAID_FIGURE: &str = "<figure class=\"diagram bleed\" data-diagram=\"mermaid\"><div class=\"diagram-scroll\"><pre>{SOURCE}</pre></div></figure>";
+    const MERMAID_OVER_LIMIT_FIGURE: &str = "<figure class=\"diagram bleed\" data-diagram=\"mermaid\" data-render-error=\"diagram\"><div class=\"diagram-scroll\"><pre>{SOURCE}</pre></div><figcaption class=\"render-note\">Diagram not rendered: source exceeds the 100,000-byte or 1,000-line limit.</figcaption></figure>";
+    const PLANTUML_FIGURE: &str = "<figure class=\"diagram diagram--unsupported\" data-diagram=\"plantuml\"><pre>{SOURCE}</pre><figcaption class=\"render-note\">PlantUML diagrams are not supported in this release; showing source.</figcaption></figure>";
+
+    fn figure(template: &str, source: &str) -> String {
+        template.replace("{SOURCE}", &escape(source))
+    }
+
+    fn diagram_fence(source: &str) -> String {
+        format!("```mermaid\n{source}\n```")
+    }
+
+    #[test]
+    fn mermaid_fence_is_a_renderable_figure() {
+        let source = "flowchart TD\n  A --> B";
+        for fence in ["```", "~~~"] {
+            let value = format!("{fence}mermaid\n{source}\n{fence}");
+            let rendered = prose(&value, "");
+            assert_eq!(rendered.html, figure(MERMAID_FIGURE, source), "{fence}");
+            assert!(rendered.has_diagram, "{fence}");
+            assert!(!rendered.has_math, "{fence}");
+        }
+        let rendered = prose("  ```mermaid\ngraph TD\n  A --> B\n  `````", "");
+        assert_eq!(rendered.html, figure(MERMAID_FIGURE, "graph TD\n  A --> B"));
+        assert!(rendered.has_diagram);
+    }
+
+    #[test]
+    fn plantuml_and_puml_fences_are_source_figures() {
+        for info in ["plantuml", "puml"] {
+            let rendered = prose(&format!("```{info}\nA -> B\n```"), "");
+            assert_eq!(rendered.html, figure(PLANTUML_FIGURE, "A -> B"), "{info}");
+            assert!(!rendered.has_diagram, "{info}");
+            assert!(!rendered.has_math, "{info}");
+        }
+    }
+
+    #[test]
+    fn other_fence_info_strings_stay_opaque() {
+        for info in [
+            "mmd",
+            "uml",
+            "dot",
+            "graphviz",
+            "rust",
+            "Mermaid",
+            "mermaid,",
+            "mermaid title",
+        ] {
+            let value = format!("```{info}\nflowchart TD\nA --> B\n```");
+            let rendered = prose(&value, "");
+            assert_eq!(rendered.html, paragraph(&escape(&value)), "{info}");
+            assert!(!rendered.has_diagram, "{info}");
+            assert!(!rendered.has_math, "{info}");
+        }
+    }
+
+    #[test]
+    fn empty_unclosed_and_indented_diagram_fences_stay_literal() {
+        for value in [
+            "```mermaid\n\n```",
+            "```mermaid\n   \n```",
+            "```mermaid\nA --> B",
+        ] {
+            let rendered = prose(value, "");
+            assert_eq!(rendered.html, paragraph(&escape(value)), "{value:?}");
+            assert!(!rendered.has_diagram, "{value:?}");
+        }
+        for value in ["```plantuml\n\n```", "```puml\n   \n```", "```puml\nA -> B"] {
+            let rendered = prose(value, "");
+            assert_eq!(rendered.html, paragraph(&escape(value)), "{value:?}");
+            assert!(!rendered.has_diagram, "{value:?}");
+        }
+        let value = "    ```mermaid\nA --> B\n    ```";
+        let rendered = prose(value, "");
+        assert_eq!(rendered.html, paragraph(&escape(value)));
+        assert!(!rendered.has_diagram);
+    }
+
+    #[test]
+    fn figure_source_is_escaped_once_and_keeps_newlines() {
+        let source = "graph TD\n  A[<x & \"q\" 'z'>] --> B";
+        let rendered = prose(&diagram_fence(source), "");
+        assert_eq!(rendered.html, figure(MERMAID_FIGURE, source));
+        assert!(rendered.html.contains(
+            "<pre>graph TD\n  A[&lt;x &amp; &quot;q&quot; &#39;z&#39;&gt;] --&gt; B</pre>"
+        ));
+        assert!(!rendered.html.contains("&amp;amp;"));
+
+        let once = prose(&diagram_fence("&amp;"), "");
+        assert!(once.html.contains("<pre>&amp;amp;</pre>"));
+    }
+
+    #[test]
+    fn a_figure_flushes_the_paragraph_and_never_nests() {
+        let source = "graph TD\n  A --> B";
+        let rendered = prose(&format!("before\n\n{}\n\nafter", diagram_fence(source)), "");
+        assert_eq!(
+            rendered.html,
+            format!(
+                "{}{}{}",
+                paragraph("before\n\n"),
+                figure(MERMAID_FIGURE, source),
+                paragraph("\n\nafter")
+            )
+        );
+        assert!(!rendered.html.contains("<p class=\"text\"><figure"));
+        assert!(!rendered.html.contains("<p class=\"text\"><pre"));
+        assert!(rendered.has_diagram);
+    }
+
+    #[test]
+    fn figures_and_display_math_keep_source_order() {
+        let rendered = prose(
+            "$$m$$\n```mermaid\ngraph TD\nA --> B\n```\n```plantuml\nA -> B\n```",
+            "",
+        );
+        let math_at = rendered
+            .html
+            .find("data-tex=\"m\"")
+            .expect("display math present");
+        let mermaid_at = rendered
+            .html
+            .find("data-diagram=\"mermaid\"")
+            .expect("mermaid figure present");
+        let plantuml_at = rendered
+            .html
+            .find("data-diagram=\"plantuml\"")
+            .expect("plantuml figure present");
+        assert!(math_at < mermaid_at, "math precedes the mermaid figure");
+        assert!(
+            mermaid_at < plantuml_at,
+            "mermaid figure precedes the plantuml figure"
+        );
+        assert!(rendered.has_math);
+        assert!(rendered.has_diagram);
+    }
+
+    #[test]
+    fn diagram_free_inputs_keep_the_page_flags_false() {
+        for value in [
+            "",
+            "Plain prose",
+            "$x$",
+            "```mmd\ngraph TD\nA --> B\n```",
+            "~~~uml\ngraph TD\nA --> B\n~~~",
+        ] {
+            let rendered = prose(value, PRE);
+            assert!(!rendered.has_diagram, "{value:?}");
+        }
+    }
+
+    #[test]
+    fn a_plantuml_only_field_never_sets_has_diagram() {
+        let rendered = prose("```plantuml\nA -> B\n```", "");
+        assert!(!rendered.has_diagram);
+        assert!(rendered.html.contains("diagram--unsupported"));
+    }
+
+    #[test]
+    fn caps_allow_equality_and_reject_one_over() {
+        let at_bytes = "a".repeat(MAX_DIAGRAM_BYTES);
+        let rendered = prose(&diagram_fence(&at_bytes), "");
+        assert!(rendered.has_diagram, "exactly MAX_DIAGRAM_BYTES");
+        assert_eq!(rendered.html, figure(MERMAID_FIGURE, &at_bytes));
+
+        let over_bytes = "a".repeat(MAX_DIAGRAM_BYTES + 1);
+        let rendered = prose(&diagram_fence(&over_bytes), "");
+        assert!(!rendered.has_diagram, "one byte over");
+        assert_eq!(
+            rendered.html,
+            figure(MERMAID_OVER_LIMIT_FIGURE, &over_bytes)
+        );
+        assert!(rendered.html.contains("data-render-error=\"diagram\""));
+    }
+
+    #[test]
+    fn line_cap_allows_equality_and_rejects_one_line_over() {
+        let at_lines = "l\n".repeat(MAX_DIAGRAM_LINES - 1) + "l";
+        assert_eq!(
+            at_lines.bytes().filter(|byte| *byte == b'\n').count() + 1,
+            MAX_DIAGRAM_LINES
+        );
+        let rendered = prose(&diagram_fence(&at_lines), "");
+        assert!(rendered.has_diagram, "exactly MAX_DIAGRAM_LINES");
+        assert_eq!(rendered.html, figure(MERMAID_FIGURE, &at_lines));
+
+        let over_lines = "l\n".repeat(MAX_DIAGRAM_LINES) + "l";
+        assert_eq!(
+            over_lines.bytes().filter(|byte| *byte == b'\n').count() + 1,
+            MAX_DIAGRAM_LINES + 1
+        );
+        let rendered = prose(&diagram_fence(&over_lines), "");
+        assert!(!rendered.has_diagram, "one line over");
+        assert_eq!(
+            rendered.html,
+            figure(MERMAID_OVER_LIMIT_FIGURE, &over_lines)
+        );
+    }
+
+    #[test]
+    fn a_renderable_figure_sets_the_page_flag_even_beside_an_over_limit_one() {
+        let over = "a".repeat(MAX_DIAGRAM_BYTES + 1);
+        let rendered = prose(
+            &format!(
+                "{}\n\n{}",
+                diagram_fence(&over),
+                diagram_fence("graph TD\nA --> B")
+            ),
+            "",
+        );
+        assert!(rendered.has_diagram);
+        assert_eq!(
+            rendered
+                .html
+                .matches("data-render-error=\"diagram\"")
+                .count(),
+            1
+        );
+        assert_eq!(rendered.html.matches("class=\"diagram bleed\"").count(), 2);
+    }
+
+    #[test]
+    fn mermaid_assets_reference_only_the_vendored_bundle() {
+        assert_eq!(
+            MERMAID_ASSETS,
+            "<script src=\"/assets/mermaid/mermaid.min.js\" defer></script>"
+        );
+        assert_eq!(MERMAID_ASSETS.matches("/assets/").count(), 1);
+        assert!(MERMAID_ASSETS.contains("defer"));
+        assert_eq!(
+            HEAD_ASSETS,
+            "<link rel=\"stylesheet\" href=\"/assets/katex/katex.min.css\">\n<script src=\"/assets/katex/katex.min.js\" defer></script>"
+        );
     }
 }

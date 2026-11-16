@@ -1508,7 +1508,7 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
         bind_note: &bind_note,
         routes: &state.routes,
     };
-    let html = if record.is_generic() {
+    let page = if record.is_generic() {
         render::document_detail_page(&record, &cfg, chrome)
     } else {
         render::view_page(
@@ -1523,7 +1523,11 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
             chrome,
         )
     };
-    Ok(Response::html(200, html))
+    if page.has_diagram {
+        Ok(Response::html_diagram(200, page.html))
+    } else {
+        Ok(Response::html(200, page.html))
+    }
 }
 
 fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
