@@ -1,12 +1,12 @@
 # Feature Specification — Browser Math and Diagram Rendering (TASK-145, TASK-146)
 
-**Tickets:** TASK-145 (§1–§11 — math, KaTeX) delivered here; TASK-146 extends §2 (scope enumeration) and adds the diagram sections on top of the same pre-pass
+**Tickets:** TASK-145 (Part I, §1–§12 — math, KaTeX) delivered here; TASK-146 (Part II, §13–§20 — diagrams, Mermaid) extends the same pre-pass and the same page-asset slot
 **Milestone:** m-21
-**Status:** Contract pinned 2026-11-16 for TASK-145 from REQ-06.017 and ADR-0025 decisions 2–10; revised 2026-11-16 with the ADR-0025 decisions 5–6 revision notes (`output` pinned to `htmlAndMathml`, `style-src` inline-style deviation accepted). TASK-146 remains gated by ADR-0026 acceptance
+**Status:** Part I pinned 2026-11-16 from REQ-06.017 and ADR-0025 decisions 2–10, revised 2026-11-16 with the ADR-0025 decisions 5–6 revision notes (`output` pinned to `htmlAndMathml`, `style-src` inline-style deviation accepted). Part II pinned 2026-11-16 from ADR-0026 as amended (Accepted 2026-11-16, all open questions resolved: Mermaid 11.17.2 only, no `mmd`, PlantUML source block with a note, 100,000-byte/1,000-line server caps plus client `maxEdges: 500`, two literal CSP strings, scoped `style-src 'unsafe-inline'` on diagram pages)
 **Requirements:** REQ-06.017 (math and diagrams), REQ-06.015 (content width), NFR-01.003 (offline), NFR-02.002 (sanitize input), NFR-03.001 (single binary), NFR-05.001 (supported browsers), NFR-06.002 (GPLv3-or-later linking), REQ-06.004 (browser/CLI parity)
-**ADRs:** ADR-0025 (Accepted — the contract for this page), ADR-0027 (vendored assets and notices), ADR-0005 (CSP baseline, no Markdown renderer), ADR-0028 (width classes; `.bleed` is a TASK-146 consumer only)
-**UI:** no mockup. TASK-145 adds no control, page, or layout region: math is content inside existing prose containers, and the DOM shape is fixed by ADR-0025 decision 2. Visual verification is browser verification in TASK-149/TASK-150. Recorded in §11.
-**Downstream:** TASK-146 (diagrams), TASK-148 (specification port into `docs/specifications/browser-requirements*.md` and packaging wording), TASK-149 (packaged assets, offline rendering, binary budget), TASK-150 (release verification)
+**ADRs:** ADR-0025 (Accepted — Part I), ADR-0026 (Accepted 2026-11-16 — Part II), ADR-0027 (vendored assets and notices), ADR-0005 (CSP baseline, no Markdown renderer), ADR-0028 (width classes; `.bleed` is used by Part II only)
+**UI:** no mockup. Neither ticket adds a control, page, or layout region: math and diagrams are content inside existing prose containers, and the DOM shapes are fixed by ADR-0025 decision 2 and ADR-0026 decisions 2–3. Visual verification is browser verification in TASK-149/TASK-150. Recorded in §11 and §20.
+**Downstream:** TASK-148 (specification port into `docs/specifications/browser-requirements*.md` and packaging wording), TASK-149 (packaged assets, offline rendering, binary budget), TASK-150 (release verification)
 
 ## 1. Purpose and scope
 
@@ -14,15 +14,17 @@ REQ-06.017 requires the local browser to render math formulas in the curated pro
 
 This page is the canonical detail for the pre-pass, the delimiter contract, the placeholder markup, the conditional asset emission, the client pass, and the CSP delta. It is deliberately separate from `browser-shell-shared-list-layout-and-page-width.md` (TASK-141/TASK-144 own the shell and width contract and are being edited concurrently); this page references the shell contract and records its own delta to it in §5.3. TASK-148 ports the normative clauses into the browser requirement specifications; this page must then be cited and superseded, not duplicated.
 
+Part II (§13–§20) is the diagram contract from ADR-0026 as amended: the `mermaid` fence is one more segment shape on the pre-pass of §3.1, its figure replaces the paragraph run exactly as a display block does, and it reuses the same page-asset slot, the same failure-as-source principle, and the same per-response-class CSP assertions described in Part I.
+
 ### Non-goals
 
-- Diagram fences (`mermaid`, `plantuml`, and the other unsupported languages) — TASK-146, on the same pre-pass.
+- Diagram fences? No — Part II (§13–§20) is normative for `mermaid`, `plantuml`, `puml`, and every other fence on this same pre-pass. This section lists only what neither part covers.
 - A record-body view. No page renders a raw record body; see §2.3 for the one body-text path that exists.
-- Server-side TeX, a Rust crate, a build step, or a network fetch of any kind.
+- Server-side TeX or server-side Mermaid parsing, a Rust crate, a build step, a JVM, or a network fetch of any kind.
 - Markdown interpretation of any kind (headings, lists, tables, emphasis, links, raw HTML) — ADR-0005, ADR-0025 decision 2.
 - Rendering in list cells, metadata rows, titles, IDs, labels, or form inputs.
-- Changes to `style-src`, `img-src`, `script-src`, or any CSP directive other than the single `font-src 'self'` addition.
-- Widening the `.text` 780 px measure, or introducing `.bleed` for math (REQ-06.015 full width is for diagrams/visualizations, TASK-146).
+- Changes to `img-src`, `script-src`, `form-action`, `base-uri`, or `frame-ancestors`. `style-src` changes only for the diagram response class of §17.
+- Widening the `.text` 780 px measure, or introducing `.bleed` for math (REQ-06.015 full width is for diagrams, Part II).
 
 ## 2. Rendered field set
 
@@ -247,7 +249,7 @@ KaTeX sets inline `style` attributes on some generated nodes: `mspace` and rule 
 - Hashes do not address it: the values are content-dependent (`mspace` widths derive from the formula), so the allowlist is unbounded, and `style-src-attr`/`'unsafe-hashes'` are unavailable on all of NFR-05.001's browsers (Firefox 100 lacks them).
 - `'unsafe-inline'` in `style-src` is not taken: it relaxes every page for a cosmetic deviation. Mermaid's need for it (ADR-0026 decision 5) concerns an injected `<style>` element and is decided separately.
 
-TASK-146 does not inherit this rule: it follows ADR-0026 decision 5, and this ticket's client pass must render correctly with `style-src 'self'` alone. TASK-149/TASK-150 record the observed deviation on a math page in all three supported browsers as expected behaviour, not as a failure.
+TASK-146 does not inherit this rule: it follows ADR-0026 decision 6, and this ticket's diagram client pass must render correctly with `style-src 'self'` alone. TASK-149/TASK-150 record the observed deviation on a math page in all three supported browsers as expected behaviour, not as a failure.
 
 ## 8. Security and the non-Markdown boundary
 
@@ -304,3 +306,261 @@ Recorded assumption: `docs/requirements/non-functional/` contains no accessibili
 | NFR-02.002 | §8 |
 | NFR-05.001 | §9, TASK-149/TASK-150 |
 | NFR-06.002 | TASK-143 notices, unchanged here |
+
+# Part II — Diagrams (TASK-146)
+
+## 13. Diagram fence set
+
+### 13.1 Recognition
+
+The fence grammar, indentation rule, closer rule, and opacity rule are exactly §3.4; only the info-string classification differs. The pre-pass of §3.1 recognises one diagram info string and one source-only info string, after the same `trim_end` and case-sensitive exact comparison:
+
+| Info string | Result |
+|---|---|
+| `mermaid` | Diagram figure (§14.1) if the content satisfies §15; otherwise the over-limit figure (§15.2). |
+| `plantuml`, `puml` | Static source figure with a visible note (§14.3). Never rendered, never links the diagram bundle, never relaxes the CSP. |
+| `mmd` | **Not recognised.** Opaque literal text, fence lines included (ADR-0026 decision 1). |
+| `uml`, `dot`, `graphviz` | Opaque literal text, fence lines included. No note, never an error. |
+| everything else (`rust`, `text`, ``, `Mermaid`, `mermaid,`, `mermaid title`) | Opaque literal text, as in §3.4. |
+
+### 13.2 Content extraction
+
+The content is taken exactly as for a math fence: from the newline after the opener line to the closer line, with one trailing `\r\n` or `\n` removed, then trimmed of leading and trailing whitespace. The trimmed content is called the **diagram source**; it is what the figure contains and what the client reads.
+
+### 13.3 Empty and unclosed fences
+
+- An empty or whitespace-only `mermaid` fence is literal text, fence lines included — not a figure, not an error (ADR-0026 decision 1).
+- An empty or whitespace-only `plantuml`/`puml` fence stays literal text for the same reason; a note on an empty block carries no information.
+- An unclosed fence of any info string stays literal text scanned normally (§3.4).
+
+### 13.4 Field and page flags
+
+`math::Prose` gains `has_diagram: bool`. It is true only when the field produced at least one **renderable** `mermaid` figure, meaning a figure under both caps of §15. It is false for an over-limit figure, a `plantuml`/`puml` block, and every literal fence.
+
+A record view ORs `has_diagram` across every curated prose field it renders, exactly as it already ORs `has_math`. `has_diagram` selects the diagram CSP string (§17) and the bundle link (§16.3), and nothing else.
+
+## 14. Figure markup
+
+### 14.1 `mermaid` under the caps
+
+Exactly one block segment per fence, with no leading or trailing newline and no separator from the surrounding segments:
+
+```
+<figure class="diagram bleed" data-diagram="mermaid"><div class="diagram-scroll"><pre>SRC</pre></div></figure>
+```
+
+`SRC` is the diagram source of §13.2 passed through `render::escape` once, with newlines preserved. The `<pre>` is simultaneously the no-JavaScript fallback, the failed-render fallback, and the client input: `pre.textContent` restores the source exactly.
+
+A figure is a block segment like a display block (§4.2): it flushes the open paragraph, it is never nested inside `<p>`, and a surrounding paragraph is split around it. Insertion order is source order.
+
+### 14.2 Explicitly not added
+
+No `id`, no `role`, no `aria-*`, no `style` attribute, no heading, and no caption on a renderable figure. A figure carries no record identifier: the client derives its render id from the page path (§16.4).
+
+### 14.3 `plantuml` / `puml`
+
+```
+<figure class="diagram diagram--unsupported" data-diagram="plantuml"><pre>SRC</pre><figcaption class="render-note">PlantUML diagrams are not supported in this release; showing source.</figcaption></figure>
+```
+
+No `bleed` class and no `.diagram-scroll`: this block is a source listing, not a visualization, so it stays inside the normal text measure (ADR-0026 decision 10). The note text is fixed and literal.
+
+### 14.4 Over-limit `mermaid`
+
+```
+<figure class="diagram bleed" data-diagram="mermaid" data-render-error="diagram"><div class="diagram-scroll"><pre>SRC</pre></div><figcaption class="render-note">Diagram not rendered: source exceeds the 100,000-byte or 1,000-line limit.</figcaption></figure>
+```
+
+The full source is kept, `data-render-error="diagram"` is server-set, and the client skips the figure (§16.5). A page whose only diagram is over-limit has `has_diagram == false` and therefore neither the bundle nor the relaxed CSP (§13.4).
+
+## 15. Input caps
+
+### 15.1 Constants and counting
+
+```rust
+pub const MAX_DIAGRAM_BYTES: usize = 100_000;
+pub const MAX_DIAGRAM_LINES: usize = 1_000;
+```
+
+Measured per fence on the trimmed diagram source of §13.2:
+
+- **bytes** = `source.len()` (UTF-8 bytes, not characters);
+- **lines** = `source.bytes().filter(|byte| *byte == b'\n').count() + 1` for a non-empty source.
+
+A fence is over-limit when `bytes > MAX_DIAGRAM_BYTES` or `lines > MAX_DIAGRAM_LINES`; equality is allowed. Counting may stop at the cap; only the verdict is observable. The caps are fixed constants — no configuration key, environment variable, or per-record override.
+
+### 15.2 Server behaviour beyond the caps
+
+The server emits §14.4 and nothing else: it does not truncate the source, does not reject the record, and does not parse Mermaid syntax. `maxEdges` is not counted server-side because counting edges would require parsing Mermaid (ADR-0026 decision 7); the edge cap is enforced by Mermaid in the client, and a rejection there takes the normal failure path (§16.6).
+
+## 16. Assets, head emission, and the client block
+
+### 16.1 Vendored tree
+
+`src/browser/vendor/mermaid/11.17.2/` contains exactly three files:
+
+| File | Purpose |
+|---|---|
+| `mermaid.min.js` | The served bundle. 3,572,661 bytes, SHA-256 `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8`, MIT, classic IIFE assigning `globalThis.mermaid`. |
+| `LICENSE` | Verbatim upstream MIT licence. Not served. |
+| `UPSTREAM.md` | Package, version, registry URL, publication date, retrieval date, licence. Not served. |
+
+`src/browser/vendor/MANIFEST.md` gains one row in the **Vendored assets** table, sorted by request path:
+
+```
+| `/assets/mermaid/mermaid.min.js` | mermaid | 11.17.2 | MIT | https://registry.npmjs.org/mermaid/-/mermaid-11.17.2.tgz | 3572661 | `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8` |
+```
+
+`packaging/deb/usr/share/doc/papyrus/copyright` gains one `Files:` stanza naming `src/browser/vendor/mermaid/11.17.2/mermaid.min.js` with the Mermaid copyright line and a standalone MIT licence paragraph. The existing `License: MIT` paragraph belongs to KaTeX and embeds the Khan Academy copyright, so the Mermaid section uses its own short name and text rather than reusing it.
+
+### 16.2 Asset table
+
+One entry in `assets::ASSETS`:
+
+```
+path:  "/assets/mermaid/mermaid.min.js"
+mime:  "text/javascript; charset=utf-8"
+bytes: include_bytes!("vendor/mermaid/11.17.2/mermaid.min.js")
+```
+
+No `.map`, no CSS, no icon pack, no second file. The existing digest test recomputes size and SHA-256 from the manifest row and fails on any drift; no new test is needed for that assertion.
+
+### 16.3 Head emission
+
+A new constant sits beside `HEAD_ASSETS` in `math.rs`:
+
+```rust
+pub const MERMAID_ASSETS: &str = "<script src=\"/assets/mermaid/mermaid.min.js\" defer></script>";
+```
+
+A record view builds its asset fragment as: `math::HEAD_ASSETS` when `has_math`, then `MERMAID_ASSETS` when `has_diagram`, joined by one `\n`, and `""` when neither is set. Document order is therefore KaTeX stylesheet, KaTeX script, Mermaid script, then the shell's `nav-state.js` and deferred `app.js`; both `defer` scripts execute after parsing and in order, so `window.mermaid` exists before the client block runs.
+
+The bundle and the KaTeX lines are emitted at most once per page. No list page, board, lifecycle, configuration, skills, cleanup, error page, or edit page gains a byte. A math-only page gets KaTeX only and the strict CSP.
+
+### 16.4 Client block (`src/browser/app.js`)
+
+One self-contained block appended after the math block, in the file's existing ES5 style, adding no global:
+
+- Select `figure[data-diagram="mermaid"]`; do nothing when the set is empty.
+- If `window.mermaid` or `window.mermaid.render` is absent, set `data-render-error="diagram"` on every figure, append the note `Diagram not rendered: the diagram script did not load.` to each figure that has no `figcaption.render-note` yet, and remove nothing.
+- Otherwise call `mermaid.initialize` exactly once, with exactly this object:
+
+  ```js
+  {
+    startOnLoad: false,
+    securityLevel: "strict",
+    htmlLabels: false,
+    theme: "neutral",
+    fontFamily: "system-ui, sans-serif",
+    flowchart: { htmlLabels: false },
+    maxTextSize: 100000,
+    maxEdges: 500
+  }
+  ```
+
+  No other option is added or changed (`layout`, `markdownAutoWrap`, and `startOnLoad: true` are forbidden).
+- For each figure **without** `data-render-error`: read the source from its `<pre>` with `textContent`, compute a render id, and call `mermaid.render(id, source)`.
+- **Render id.** Deterministic and page-unique: `"papyrus-mmd-" + sanitise(window.location.pathname) + "-" + index`, where `sanitise` replaces every character outside `[A-Za-z0-9_-]` with `_` and truncates to 64 characters, and `index` is the figure's position in document order. The page path supplies the record identifier (`/doc/<ID>`), because the figure markup of §14.1 carries none; the result is stable for the same URL and unique within the page.
+- On success, replace the `<pre>` with the returned SVG inside the existing `.diagram-scroll` element. Never call the returned `bindFunctions`.
+- On a thrown error **or** a rejected promise, keep the `<pre>`, set `data-render-error="diagram"`, and append the note `Diagram not rendered: Mermaid rejected the source.` (only if no `figcaption.render-note` exists). Each figure is rendered in its own `try`/`catch` and its own promise chain, so one failure neither aborts the loop nor the page.
+- No `fetch`, no dynamic `import()`, no `MutationObserver`, no second pass, no storage write, and no DOM state beyond `data-render-error` and the appended note.
+
+### 16.5 Figures the client must skip
+
+Any figure already carrying `data-render-error` is skipped without reading its source: the server marked it for the over-limit case (§15.2) and may have marked it in an earlier branch of this block. A figure whose note was already appended never receives a second note.
+
+### 16.6 Failure contract summary
+
+| Condition | `<pre>` | figure attribute | note |
+|---|---|---|---|
+| `mermaid` rejected source (parse error, edge limit, internal error) | kept | `data-render-error="diagram"` | `Diagram not rendered: Mermaid rejected the source.` |
+| `window.mermaid` missing | kept | `data-render-error="diagram"` | `Diagram not rendered: the diagram script did not load.` |
+| source over the byte or line cap | kept | `data-render-error="diagram"` (server-set) | `Diagram not rendered: source exceeds the 100,000-byte or 1,000-line limit.` |
+| `plantuml`/`puml` fence | kept | none | `PlantUML diagrams are not supported in this release; showing source.` |
+
+No condition removes record content, and no condition throws out of the client block.
+
+## 17. CSP: two literal strings
+
+### 17.1 The two values
+
+`http::CSP` (strict, unchanged in content):
+
+```
+default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'
+```
+
+`http::CSP_DIAGRAM` (new):
+
+```
+default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'
+```
+
+They differ in exactly one token. `script-src` contains `'self'` in both; `'unsafe-inline'`, `'unsafe-eval'`, a nonce, or a hash never appears there.
+
+### 17.2 Response classes
+
+| Response | CSP string |
+|---|---|
+| Record view or generic document detail with `has_diagram == true` | `CSP_DIAGRAM` |
+| Record view with math only, record view with neither, generic document detail without a renderable figure | `CSP` |
+| List page, board, inventory, lifecycle, configuration, skills, cleanup, edit page, 405/404/422/500 error page | `CSP` |
+| Every `/assets/` response (including `/assets/mermaid/mermaid.min.js`) | none |
+
+The header is emitted only for `text/html` responses, as today. The response carries its own string: `http::Response` gains a `csp: &'static str` field defaulting to `CSP`, and the record-view route sets the diagram value when the renderer reported `has_diagram` (a constructor such as `Response::html_diagram`). `write_response` prints `response.csp` instead of the module constant.
+
+### 17.3 Why the relaxation is scoped
+
+Mermaid injects a `<style>` element into the SVG it returns; without `'unsafe-inline'` in `style-src` the diagram renders as an unreadable black box. A nonce cannot help (Mermaid sets none) and hashes cannot enumerate dynamic theme CSS. `default-src 'none'` still blocks every fetch, so a CSS-only injection on a diagram page can restyle or occlude that page and nothing more; `script-src 'self'` still blocks inline, `eval`, and remote script.
+
+Accepted consequence: on a diagram page the browser also honours the server-authored `style="white-space: pre-wrap"` paragraph attributes of `render.rs` (§4.2), which the strict class drops. Those attributes are server constants, never record data; no record-controlled `style` attribute exists anywhere in the served markup.
+
+## 18. Supported diagram types
+
+Promised and covered by fixtures: `flowchart` (including `graph`), `sequence`, `class`, `state`, `ER`, `gantt`, `pie`, `journey`, and `gitGraph`.
+
+- No allowlist is enforced. Another type that 11.17.2 parses is rendered best-effort and is not a promised capability.
+- A type the pinned bundle cannot detect or parse — including `flowchart-elk`, whose layout package is not vendored — takes the failure path of §16.6 and keeps its source.
+- The server never inspects the type; classification happens entirely inside Mermaid.
+
+## 19. Styling
+
+- `.diagram` is a block box with `margin: 12px 0`; the renderable figure also carries `bleed`, so it is 100 % of the `.app` content width while surrounding `.text` stays at the 780 px measure.
+- `.diagram-scroll` is `overflow-x: auto` and is the scroll container for a wide SVG. A rendered SVG is not capped by any `max-width` rule: it takes its natural size and scrolls inside `.diagram-scroll`, so the page gains no horizontal scrollbar at 320–1920 CSS px.
+- `.diagram--unsupported` and its `<pre>` inherit the existing `pre { max-width: 100%; overflow-x: auto; }` rule and stay in the text measure.
+- `.render-note` is small, muted, and block-level; its text is never hidden, because it is the only signal that a block was not rendered.
+- No rule in `app.css` targets a Mermaid-generated class, and no rule is added for the diagram SVG's internal styling; Mermaid's injected style owns that.
+- `.bleed` already exists for the shared list layout (ADR-0028) and is reused, not redefined.
+
+## 20. Diagram tests
+
+Unit tests in `src/browser/math.rs` (extending the existing module) cover: each row of §13.1; `mmd`/`uml`/`dot`/`graphviz` opacity; `Mermaid`/`mermaid title` non-recognition; empty and unclosed fences; exact figure strings of §14.1/§14.3/§14.4; source escaping in the `<pre>`; `has_diagram` true only for a renderable figure; the cap boundaries at exactly 100,000 bytes and exactly 1,000 lines; one byte and one line over each cap; figures splitting a paragraph without nesting; byte-identity of a diagram-free field.
+
+Integration tests (`tests/browser_diagram_cli.rs`, in the style of `tests/browser_math_cli.rs`) cover: one fixture per promised type; `plantuml` and `puml` figures with the note; `uml`/`dot`/`graphviz`/`mmd` literal fences; an unknown type reaching the failure path in a browser (TASK-150) and a malformed source left intact in the served HTML; over-byte and over-line fixtures; per-figure isolation (a fixture with one bad and one good figure still emits both, with only the bad one marked); the bundle link exactly once on diagram pages and absent everywhere else, including a math-only and an over-limit-only page; both CSP strings per response class and no CSP on the Mermaid asset; no `unsafe-inline` in any `script-src`; hostile fixtures (`<img src=x onerror=…>`, a `classDef` payload, a `javascript:` link) leaving no `<script` node, no `on…=` attribute, and no `javascript:` URL in served HTML; CLI `view`/`--json`, `search`, and the stored file bytes unchanged; a source scan proving no JVM or PlantUML invocation exists in the codebase or the dependency set.
+
+Client assertions (same file, reading `src/browser/app.js`) pin every option of §16.4, the id derivation, the absence of `bindFunctions`, `fetch`, `import(`, and `MutationObserver`, and the skip rule for `data-render-error`.
+
+## 21. Resolved questions and traceability for Part II
+
+Resolved here (implementation-level readings of ADR-0026 as amended):
+
+1. Figure markup is ADR-0026 decisions 2–3 verbatim, minus their illustrative indentation: exact strings are pinned in §14. Figure attributes beyond `class` and `data-diagram` are not added.
+2. The client render id derives from `window.location.pathname` plus the figure index (§16.4), because the pinned figure markup carries no record id; the path contains the record id for `/doc/<ID>`.
+3. The caps are measured on the trimmed diagram source, byte-exactly and line-exactly, with equality allowed (§15.1).
+4. An empty `plantuml`/`puml` fence is literal text, matching the empty-`mermaid` rule (§13.3).
+5. The Mermaid licence paragraph uses its own short name rather than the existing `MIT` paragraph, which carries the KaTeX copyright (§16.1).
+6. Notes are appended at most once per figure (§16.5).
+
+Open questions: none for TASK-146.
+
+| Source | Clause |
+|---|---|
+| REQ-06.017 AC 5, 6, 7, 9, 11–17 | §13, §14, §16, §17, §18 |
+| REQ-06.015 (full width for diagrams) | §14.1, §19 |
+| ADR-0026 decisions 1–12 | §13–§19 |
+| ADR-0027 decisions 1–6 | §16.1, §16.2 |
+| ADR-0028 (width classes) | §19 |
+| NFR-01.003, NFR-03.001 | §16.1, §16.2, §20 |
+| NFR-02.002 | §16.4, §17.3, §20 |
+| NFR-05.001 | §18, §19, TASK-150 |
+| NFR-06.002 | §16.1 |
