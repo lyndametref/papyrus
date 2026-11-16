@@ -118,6 +118,13 @@ fn project(name: &str) -> TempProject {
     let dir = &project.path;
 
     set_title(dir, "docs/requirements/business/REQ-001.001.md", REQ_TITLE);
+    let req_path = dir.join("docs/requirements/business/REQ-001.001.md");
+    let req_text = fs::read_to_string(&req_path).unwrap();
+    fs::write(
+        &req_path,
+        req_text.replace("labels:\n  - core", "labels:\n  - core\n  - $lab$"),
+    )
+    .unwrap();
     set_body(dir, "docs/requirements/business/REQ-001.001.md", REQ_BODY);
     set_title(dir, "backlog/tasks/TASK-001.md", TASK_TITLE);
     set_body(
@@ -433,6 +440,11 @@ fn prose_fields_render_all_forms_and_nothing_else() {
     assert!(req.contains("<div class=\"math math--display\" data-tex=\"E = mc^2\">"));
     assert!(req.contains(REQ_TITLE), "title stays literal text");
     assert!(!req.contains("data-tex=\"title\""), "title is not math");
+    assert!(
+        req.contains("<span class=\"tag\">$lab$</span>"),
+        "labels stay literal text"
+    );
+    assert!(!req.contains("data-tex=\"lab\""), "labels are not math");
 
     let req_list = server.get("/?type=req");
     assert!(
