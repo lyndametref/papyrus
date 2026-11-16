@@ -335,7 +335,7 @@ fn toggle_width_and_bleed_contracts_are_in_the_assets() {
     );
     assert!(css.contains("pre { max-width: 100%; overflow-x: auto; }"));
     assert!(
-        css.contains("h2, h3 { overflow-wrap: anywhere; }"),
+        css.contains("h1, .h1, h2, h3 { overflow-wrap: anywhere; }"),
         "plain section headings wrap inside the narrow content column"
     );
     assert!(

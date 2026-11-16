@@ -112,7 +112,7 @@ textarea:focus-visible {
 
 .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; overflow-wrap: anywhere; }
-h2, h3 { overflow-wrap: anywhere; }
+h1, .h1, h2, h3 { overflow-wrap: anywhere; }
 .id { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 13px; color: var(--muted); margin: 0 0 4px; }
 .sub { color: var(--muted); font-size: 14px; margin: 0 0 4px; }
 .status { font-size: 13px; font-weight: 700; margin: 0; }
