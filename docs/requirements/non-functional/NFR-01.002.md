@@ -2,11 +2,16 @@
 id: NFR-01.002
 title: "Display, View, and Edit All Papyrus Content in a Local Browser"
 created_date: '2026-10-31T22:23:11Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T20:31:51Z'
 labels: []
 references: []
+status: verified
 ---
 # NFR-01.002 Display, View, and Edit All Papyrus Content in a Local Browser
+
+## Group
+NFR-01 Product Form
+
 
 ## Description
 The local browser interface opened by the `browser` command shall display all Papyrus content and allow users to view and edit that content.

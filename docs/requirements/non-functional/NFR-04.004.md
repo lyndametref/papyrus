@@ -2,11 +2,16 @@
 id: NFR-04.004
 title: "Renounce Backlog.md Compatibility and Provide Import"
 created_date: '2026-11-11T20:17:13Z'
-updated_date: '2026-11-15T15:47:29Z'
+updated_date: '2026-11-16T20:31:52Z'
 labels: []
 references: []
+status: verified
 ---
 # NFR-04.004 Renounce Backlog.md Compatibility and Provide Import
+
+## Group
+NFR-04 Persistence
+
 
 ## Description
 Papyrus shall no longer maintain file-level interoperability with Backlog.md. Instead, Papyrus shall provide a one-way script that imports Backlog.md backlog records into Papyrus records. The one-way import covers Backlog.md task and milestone records; Backlog.md `docs`, `drafts`, and `decisions` are out of scope. Imported records receive Papyrus IDs (REQ-01.005) and are written in the Papyrus record format with the front matter of REQ-05.010.

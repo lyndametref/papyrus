@@ -2,11 +2,16 @@
 id: NFR-03.002
 title: "Distribute Papyrus as a Debian Package"
 created_date: '2026-11-02T19:22:10Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T20:31:52Z'
 labels: []
 references: []
+status: verified
 ---
 # NFR-03.002 Distribute Papyrus as a Debian Package
+
+## Group
+NFR-03 Implementation and Distribution
+
 
 ## Description
 Papyrus shall be distributed as `.deb` packages for the amd64 architecture on Debian Forky only.

@@ -2,11 +2,16 @@
 id: NFR-02.001
 title: "Treat Security as a Project Priority"
 created_date: '2026-10-31T22:22:31Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T20:31:52Z'
 labels: []
 references: []
+status: verified
 ---
 # NFR-02.001 Treat Security as a Project Priority
+
+## Group
+NFR-02 Security
+
 
 ## Description
 Security shall be treated as a priority when making Papyrus design and review decisions.

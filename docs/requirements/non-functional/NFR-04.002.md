@@ -2,11 +2,16 @@
 id: NFR-04.002
 title: "Restrict File Access to the Project Directory"
 created_date: '2026-11-08T15:55:57Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T20:31:52Z'
 labels: []
 references: []
+status: verified
 ---
 # NFR-04.002 Restrict File Access to the Project Directory
+
+## Group
+NFR-04 Persistence
+
 
 ## Description
 Papyrus shall not read from or write to paths outside the project directory, except during `init`. The project directory boundary shall be enforced by canonicalizing paths and resolving symbolic links, rejecting any path that escapes the canonical project root. The `init` exception permits writing outside the project directory only to create the project directory itself.

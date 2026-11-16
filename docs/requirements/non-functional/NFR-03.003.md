@@ -2,11 +2,16 @@
 id: NFR-03.003
 title: "Provide Command Man Pages in the Debian Package"
 created_date: '2026-11-08T15:55:51Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T20:31:52Z'
 labels: []
 references: []
+status: verified
 ---
 # NFR-03.003 Provide Command Man Pages in the Debian Package
+
+## Group
+NFR-03 Implementation and Distribution
+
 
 ## Description
 Papyrus shall provide a man page for every command, and these man pages shall be included in the Debian package. Man page sources shall be Markdown files under `docs/man/`, generated to roff at build time, and installed to the standard man paths in the `.deb`.

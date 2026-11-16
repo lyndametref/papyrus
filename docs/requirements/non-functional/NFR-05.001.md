@@ -2,11 +2,16 @@
 id: NFR-05.001
 title: "Display the Browser Interface in Named Browsers"
 created_date: '2026-11-08T15:56:02Z'
-updated_date: '2026-11-16T12:00:00Z'
+updated_date: '2026-11-16T20:31:52Z'
 labels: []
 references: []
+status: verified
 ---
 # NFR-05.001 Display the Browser Interface in Named Browsers
+
+## Group
+NFR-05 Browser Compatibility
+
 
 ## Description
 The Papyrus browser interface shall be supported in Firefox version 115 and later. "Supported" means the interface renders and is usable with no layout breakage in Firefox 115 and later.

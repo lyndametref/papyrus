@@ -2,11 +2,16 @@
 id: NFR-06.002
 title: "Use Open-Source Dependencies That Permit GPLv3-or-Later Linking"
 created_date: '2026-11-08T15:56:07Z'
-updated_date: '2026-11-15T15:47:29Z'
+updated_date: '2026-11-16T20:31:53Z'
 labels: []
 references: []
+status: verified
 ---
 # NFR-06.002 Use Open-Source Dependencies That Permit GPLv3-or-Later Linking
+
+## Group
+NFR-06 Licensing
+
 
 ## Description
 Papyrus shall use only open-source runtime dependencies with licenses that do not prevent linking those dependencies in a GPLv3-or-later application. "Open-source" means OSI-approved licenses; "linking" means dynamic or static linking under GPLv3-or-later.

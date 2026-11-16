@@ -2,11 +2,16 @@
 id: NFR-02.002
 title: "Sanitize Input"
 created_date: '2026-11-08T15:55:47Z'
-updated_date: '2026-11-15T15:47:29Z'
+updated_date: '2026-11-16T20:31:52Z'
 labels: []
 references: []
+status: verified
 ---
 # NFR-02.002 Sanitize Input
+
+## Group
+NFR-02 Security
+
 
 ## Description
 Papyrus shall sanitize every user-supplied value (IDs, paths, titles, free text) from all CLI and browser inputs before using it, covering all command types. Input that fails the per-command-type sanitization criteria shall be rejected rather than silently cleaned.
