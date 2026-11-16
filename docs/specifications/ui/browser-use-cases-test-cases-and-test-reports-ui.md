@@ -40,8 +40,8 @@ The review file links the shared wireframe stylesheet (`wireframe.css`) and load
 
 - One section (`h2`) titled with the type label, showing the record count, followed by one row per record in ascending ID order.
 - Each row's primary link text is `ID + title` and links to `/doc/{id}`.
-- Each row also shows the first paragraph of the description beneath the primary link; records with an empty description show no preview. The preview is plain text (first paragraph only).
-- Each row shows a metadata line: created date, updated date, labels, references (front-matter projection).
+- The list uses the shared contract in `browser-shell-ui.md` §3: no family slot, the structural Status/Created/Updated columns, and Title-cell labels/references; there is no description preview.
+- The former row metadata is replaced by the Created/Updated columns and the Title-cell labels/references (front-matter projection).
 - Empty state: "No <type> were found in the configured directory. <Type> are created from the command line; this browser does not create records. Deprecated <type> are hidden." Long-title and unbreakable-token wrapping follow the baseline.
 - Deprecated records are never listed or counted.
 
@@ -82,7 +82,7 @@ List: sidebar entries (Use Cases, Test Cases, Test Reports), row links. View: br
 
 - OQ-1 (sidebar ordering): Use Cases, Test Cases, Test Reports are placed immediately after Technical Specifications; all other entries keep their order.
 - OQ-2 (category values): `type=use-case`, `type=test-case`, `type=test-report` select the corresponding category; any other unknown value remains a 400 per the baseline.
-- OQ-3 (list preview): list rows show the first paragraph of the description beneath ID + title, consistent with MOCK-0009.
+- OQ-3 (list preview): resolved as removed. List rows use the shared contract in `browser-shell-ui.md` §3.
 - OQ-4 (field rules): only rules stated in `use-cases-test-cases-and-test-reports-management.md` and BR-018/BR-019/BR-020 are drawn; title and description are trimmed, required, and reject control characters; applicability is optional multi-line.
 - OQ-5 (metadata projection): all three types demonstrate front-matter metadata projection (id, title, created_date, updated_date, labels, references) in list/detail/edit, since this ticket is specifically about them.
 

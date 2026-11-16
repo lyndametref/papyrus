@@ -55,9 +55,9 @@ Extend the offline, project-local, read-and-edit web interface delivered by TASK
 
 ### 3. List page
 
-1. For the `glossary` category the list page renders one section (`h2`) titled "Glossary", showing the record count, followed by one row per term in ascending ID order.
-2. Each row's primary link text is `ID + term` and links to `/doc/{id}`.
-3. Each row also shows the first paragraph of the term's definition beneath the primary link; terms with an empty definition show no preview. The preview is plain text (first paragraph only, not the full definition).
+1. For the `glossary` category the list page renders one section (`h2`) titled "Glossary", showing the record count, followed by the shared list table (`browser-shell-ui.md` §3) with one row per term in ascending ID order.
+2. Each row's Title cell links `ID + term` to `/doc/{id}` and carries the record's labels and references below the link; the glossary family declares no extra slot.
+3. The list has no definition preview and no separate row metadata: the definition appears only on the record view.
 4. Empty state and long-title wrapping as in the baseline (section 10.4).
 5. Deprecated terms are never listed.
 
@@ -125,7 +125,7 @@ Glossary records that render record references follow the shared reference-link 
 
 ### 9. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox/Edge/Safari 100+), accessibility basics, no external resources, no inline scripts/styles.
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, no inline scripts/styles.
 2. Templates may be extended with glossary-specific placeholders; unknown placeholders are left untouched as in the baseline.
 3. The sidebar's Glossary entry and the glossary list/view/edit templates are the only rendering additions.
 
@@ -155,7 +155,7 @@ UI mockups are required before any UI implementation work and must be approved b
 ### Screens to be covered by the extension package
 
 1. **Shared shell** (reused): header, sidebar with five entries (Business requirements, Non-functional requirements, Backlog, Decisions, Glossary), `main`, footer, one `h1`.
-2. **Glossary list** (`/?type=glossary`): rows with ID + term link and definition preview; empty state; long titles.
+2. **Glossary list** (`/?type=glossary`): the shared table with ID + term link, Title-cell labels/references, and no definition preview; empty state; long titles.
 3. **Glossary view** (`/doc/{id}`): metadata block (ID, form, category), term as `h1`, definition with `white-space: pre-wrap`, breadcrumb `Glossary › ID`, single `Edit` action.
 4. **Edit form**: term, definition, version annotation; pristine, dirty, validation-error, conflict, and 320 px states.
 5. **Error pages**: reused from MOCK-0001 (404 unknown/deprecated, 400, 405, 415, 500).
@@ -200,7 +200,7 @@ The following records where glossary terms appear in the browser, the route shap
 | AC-7 | A stale version token returns `409` and does not write. |
 | AC-8 | Writes are atomic, project-local, leave no temporary file, and symlink escapes return `404`. |
 | AC-9 | Browser operations remain offline-capable and use no paths outside the project directory except during init. |
-| AC-10 | The expanded interface renders in Firefox, Microsoft Edge, and Safari version 100 or later. |
+| AC-10 | The expanded interface renders in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001). |
 
 ## Assumptions
 
@@ -210,10 +210,10 @@ The following records where glossary terms appear in the browser, the route shap
 - Assumption: `term` and `definition` are edited as free-text fields; empty definition clears the section.
 - Assumption: A new MOCK id (MOCK-0004) is allocated for the extension rather than modifying the approved MOCK-0001/MOCK-0002/MOCK-0003 in place, per the global sequential-id rule. MOCK-0004 is already approved (TASK-32).
 - Assumption: No new dependencies, crates, or ADRs are introduced.
-- Assumption: AC #10 (real-browser verification in Firefox, Microsoft Edge, and Safari 100+) and NFR-05.001 are deferred follow-ups, not blocking for this ticket; tracked as a follow-up rather than a release gate, consistent with TASK-15.
+- Assumption: AC #10 (real-browser verification in Firefox 100+, Edge 130+, and Safari 18+) and NFR-05.001 are deferred follow-ups, not blocking for this ticket; tracked as a follow-up rather than a release gate, consistent with TASK-15.
 - Assumption: The glossary document type is read-only in the browser for deprecation/restoration; creating or deprecating terms remains CLI-only.
 - Assumption: The glossary record's `term` maps to the record `title` field, consistent with `glossary list` (which reports ID and term) and the search spec (which uses the term as title).
-- Assumption: The definition preview on the list row is the first paragraph (first blank-line-delimited block) of the definition, plain text, truncated by the template/CSS; full definition is shown on the view page.
+- Assumption: The list row carries no definition preview; the full definition is shown only on the view page, and the row uses the shared Title cell plus the fixed columns.
 
 ## Open questions
 

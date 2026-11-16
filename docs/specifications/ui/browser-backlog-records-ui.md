@@ -12,7 +12,7 @@ Layout, states, elements, and interactions for extending the local browser to ac
 
 ## 2. Shared shell
 
-Header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types" with entries (Business requirements, Non-functional requirements, Backlog), `main`, footer, one `h1` per page. Selected entry bold + underline + `aria-current="page"`. 320 px sidebar collapses behind an accessible toggle.
+Header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types" with entries (Business requirements, Non-functional requirements, Backlog), `main`, footer, one `h1` per page. Selected entry bold + underline + `aria-current="page"`. The header navigation toggle collapses and expands the sidebar on every page; the default is expanded and the choice persists in `papyrus.nav`, with the navigation expanded and usable without JavaScript.
 
 ## 3. Screen map
 

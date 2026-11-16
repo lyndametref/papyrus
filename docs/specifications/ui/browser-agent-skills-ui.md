@@ -11,7 +11,7 @@ Layout, states, elements, and interactions for a new read-only browser page list
 
 ## 2. Shared shell
 
-Header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types", `main`, footer, one `h1` per page. Selected entry bold + underline + `aria-current="page"`. The 320 CSS px sidebar collapses behind an accessible toggle. CSP/escaping/accessibility baseline as in MOCK-0001.
+Header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types", `main`, footer, one `h1` per page. Selected entry bold + underline + `aria-current="page"`. The header navigation toggle collapses and expands the sidebar on every page; the default is expanded and the choice persists in `papyrus.nav`, with the navigation expanded and usable without JavaScript. CSP/escaping/accessibility baseline as in MOCK-0001.
 
 Sidebar entries (in order): Business requirements, Business rules, Audit records, Technical specifications, Non-functional requirements, Backlog, Decisions, Glossary, UI specifications, UI mockups, Managed artifacts &amp; lifecycles, Agent skills &amp; workflows. The new entry is placed after "Managed artifacts &amp; lifecycles" (end of the list) and is always present (not gated by `document_types`).
 

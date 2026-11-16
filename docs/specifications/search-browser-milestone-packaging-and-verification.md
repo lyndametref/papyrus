@@ -17,9 +17,9 @@ This is a packaging and verification task: no new product behavior is added. Wor
 
 - Rebuild `target/release/papyrus` and `papyrus_<version>_amd64.deb` from the current source with the pinned Rust 1.99.1 toolchain, using `scripts/build-deb.sh` unchanged.
 - Verify package metadata: `Package: papyrus`, `Architecture: amd64`, `Version` equal to the Cargo package version, `Depends: libc6 (>= 2.34)`, GPL-3.0-or-later copyright.
-- Verify package contents contain only the binary and the copyright file — in particular, no runtime asset files (`src/browser/app.css`, `app.js`, templates) are packaged, because they are compiled into the binary.
+- Verify package contents contain only the binary and the copyright file — no runtime asset files (`src/browser/app.css`, `app.js`, templates) are packaged, because they are embedded through the static asset table. First-party and vendored browser assets are embedded through the static asset table, and the single copyright file carries one notice section per bundled asset family (KaTeX code MIT, KaTeX fonts OFL-1.1, Mermaid MIT).
 - Install and uninstall the package in an isolated Debian Forky environment without modifying the host.
-- Smoke-test the installed binary: `--help`, `--version`, `init`, the req/nfreq lifecycle (regression), `search` (quoted phrase, `--type doc`, `--limit`, `--json`, deprecation visibility), and `browser` (start with `--no-open` on a free port, both categories, view, edit round-trip, JSON API, embedded assets, 320 px markup, no external references).
+- Smoke-test the installed binary: `--help`, `--version`, `init`, the req/nfreq lifecycle (regression), `search` (quoted phrase, `--type doc`, `--limit`, `--json`, deprecation visibility), and `browser` (start with `--no-open` on a free port, both categories, view, edit round-trip, JSON API, embedded assets from the static table, the shared shell/list layout, the CSP response classes, and the 12 MiB asset budget).
 - Verify offline operation: search and browser work with no internet access, using only loopback and locally served assets.
 - Verify the browser configuration keys (`browser_host`, `browser_port`, `browser_open`) behave as documented in the installed binary.
 - Re-run the Rust quality gates: `cargo build --release`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check` with Rust 1.99.1.
@@ -100,9 +100,11 @@ All commands run against the installed binary with `--dir <project>` pointing at
 5. Edit round-trip: `GET /doc/<id>/edit` yields the form with its hidden `version` token; `POST /doc/<id>` with the documented form fields returns `303` with `Location: /doc/<id>`; the follow-up `GET` shows the new title, and `papyrus req view <id>` shows the same persisted file.
 6. `GET /api/requirements?type=req` and `?type=nfr` return the documented JSON index for one category; `GET /api/doc/<id>` returns the documented record object.
 7. `GET /assets/app.css` returns `200 text/css` and `GET /assets/app.js` returns `200 text/javascript`, both with `Cache-Control: no-store`; the bodies are non-empty.
-8. 320 px markup: every page carries `<meta name="viewport" content="width=device-width, initial-scale=1">`, the document-type sidebar toggle is present with `aria-expanded` and `aria-controls`, and the served CSS/JS use no forbidden features from the TASK-6 browser baseline.
-9. No external references: served HTML, CSS, and JS contain no `http://`, `https://`, protocol-relative `//` remote reference, remote `@import`, remote `url(...)`, `<img>`, web font, or CDN reference; HTML responses carry the documented Content-Security-Policy.
-10. A missing or empty document type directory renders its empty state instead of failing (no server error).
+8. 320 px markup: every page carries `<meta name="viewport" content="width=device-width, initial-scale=1">`; the header `.nav-toggle` is present on every page with `aria-expanded` and `aria-controls="site-nav"`, defaults to expanded, and persists in `papyrus.nav`; the shared list and page layouts introduce no page-level horizontal scrolling at 320, 480, and 720 CSS px; the served CSS/JS use no forbidden features from the TASK-6 browser baseline.
+9. Served HTML, CSS, and JS contain no `http://`, `https://`, protocol-relative `//`, remote `@import`, remote `url(...)`, `<img>`, or CDN reference. Every `url(...)` in every served stylesheet resolves to an entry of the asset table, and the only such values are KaTeX's 60 `url(fonts/…)` entries. A math page renders offline with its WOFF2 fonts served from `/assets/katex/fonts/…` under `Cache-Control: no-store`; a diagram page does the same; TASK-150 verifies it.
+10. Every `text/html` response carries exactly one of the two CSP strings fixed in `browser-requirements.md` §9.7: the strict string when the pre-pass did not set `has_diagram`, and the diagram string only when it did. `/assets/` and non-HTML responses carry no CSP; `script-src` never gains `'unsafe-inline'`, `'unsafe-eval'`, a nonce, or a hash.
+11. Asset verification: `cargo test` runs the manifest test and asserts the manifest row set equals `ASSETS[].path` with no duplicate or missing row and recomputes SHA-256 and byte length for every entry; `dpkg-deb --fsys-tarfile papyrus_<version>_amd64.deb | tar -xO ./usr/share/doc/papyrus/copyright` shows the GPL-3.0-or-later block plus one section per bundled family; `dpkg-deb -c` still lists exactly the binary and the copyright file; `stat -c %s` on the built binary is at most 12,582,912 B (12 MiB), with the measured budget recorded in `docs/packaging.md`.
+12. A missing or empty document type directory renders its empty state instead of failing (no server error).
 
 #### 3.4 Offline operation
 
@@ -182,6 +184,7 @@ All commands run against the installed binary with `--dir <project>` pointing at
 | T-02 | Quality gates pass | `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`; recorded test counts |
 | T-03 | `.deb` builds with the Cargo version and amd64 architecture | `./scripts/build-deb.sh`; `dpkg-deb -I` |
 | T-04 | Metadata: `Package: papyrus`, `Version`, `Architecture: amd64`, `Depends: libc6 (>= 2.34)`, GPL-3.0-or-later copyright | `dpkg-deb -I`; copyright file inspection |
+| T-04b | Bundled asset digests, notices, offline rendering, and the 12 MiB budget | Manifest digest test; package copyright inspection; served-stylesheet `url(` scan; `stat -c %s` on the binary |
 | T-05 | Package contains only the binary and copyright; assets are embedded | `dpkg-deb -c`; asset requests from the installed binary |
 | T-06 | Installs and uninstalls in an isolated Debian Forky environment, host untouched | `fakeroot dpkg --instdir/--admindir -i`, `-r`, `--purge`; host `dpkg -l` before/after |
 | T-07 | Installed binary is on `PATH` at `/usr/bin/papyrus` and runs | `PATH`-prefixed `papyrus --version` |
@@ -189,7 +192,7 @@ All commands run against the installed binary with `--dir <project>` pointing at
 | T-09 | Search: quoted phrase, `--type doc`, `--limit`, `--json`, deprecation visibility | Installed-binary search commands |
 | T-10 | Browser: startup with `--no-open`, both categories, view, edit round-trip | Installed-binary browser commands plus HTTP requests |
 | T-11 | Browser: JSON API and embedded assets served from the binary | `GET /api/*`, `GET /assets/*` |
-| T-12 | 320 px markup and no external references | Markup/asset assertions on served content |
+| T-12 | Shell/list layout, CSP classes, asset digests, and the 12 MiB budget | Markup/asset assertions on served content; manifest test; `stat -c %s` |
 | T-13 | Offline operation with no internet access | `unshare -rn` run with a failing outbound connection, then search + browser smoke |
 | T-14 | Browser configuration keys work in the installed binary | `config list/get/set/unset` and startup-line assertions |
 | T-15 | Milestone-level integration test added without duplicating browser contract tests | `tests/search_browser_smoke.rs`; `cargo test` |
@@ -213,7 +216,7 @@ All commands run against the installed binary with `--dir <project>` pointing at
 
 None of these blocks implementation; each has a specified default. OQ-1 is recommended for user confirmation before release.
 
-- **OQ-1 (recommended default: markup/asset-level verification only)** — NFR-05.001's verification method asks for checks in Firefox/Edge/Safari 100+. This headless packaging task verifies the served markup, asset set, viewport hooks, and absence of forbidden features, but does not drive a real GUI browser. Default: record the limitation in `docs/packaging.md` and rely on TASK-6's markup-level verification plus the approved MOCK-0001; schedule a manual browser pass outside this ticket if the user requires one. Non-blocking.
+- **OQ-1 (recommended default: markup/asset-level verification only)** — NFR-05.001's verification method asks for checks in Firefox 100+, Edge 130+, and Safari 18+. This headless packaging task verifies the served markup, asset set, viewport hooks, and absence of forbidden features, but does not drive a real GUI browser. Default: record the limitation in `docs/packaging.md` and rely on TASK-6's markup-level verification plus the approved MOCK-0001; schedule a manual browser pass outside this ticket if the user requires one. Non-blocking.
 - **OQ-2 (recommended default: fakeroot `dpkg --instdir/--admindir` on the Forky build host)** — Whether a full Forky container/VM is mandatory. Default: use the fakeroot isolated install, which exercises Forky's glibc and dpkg and never touches the host; if the user requires container-level isolation, the same checklist applies unchanged. Non-blocking.
 - **OQ-3 (recommended default: a new `tests/search_browser_smoke.rs`)** — Whether the milestone test belongs in the existing `tests/milestone_smoke.rs` or a new file. Default: a new file keeps each milestone's smoke coverage separate and avoids growing an already consolidated TASK-4 file. Non-blocking.
 - **OQ-4 (recommended default: keep version 0.1.0)** — No m-1 release version is defined in the requirements. Default: package the current Cargo version unchanged; a bump belongs to release orchestration. Non-blocking.

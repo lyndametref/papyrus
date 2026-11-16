@@ -95,8 +95,11 @@ Expected metadata and contents:
 - Only `/usr/bin/papyrus` (mode `0755`) and
   `/usr/share/doc/papyrus/copyright` (mode `0644`), plus their directories. No
   `.css`, `.js`, `.html`, template, configuration, or man page is packaged: the
-  browser assets are compiled into the binary with `include_str!` and served from
-  memory (`/assets/app.css`, `/assets/app.js`).
+  browser assets are embedded at compile time and served from the static asset
+  table (`/assets/app.css`, `/assets/app.js`, `/assets/nav-state.js`, the KaTeX
+  stylesheet/script and WOFF2 fonts, and `/assets/mermaid/mermaid.min.js`). The
+  copyright file carries the Papyrus GPL-3.0-or-later block plus one section per
+  bundled asset family: KaTeX code MIT, KaTeX fonts OFL-1.1, and Mermaid MIT.
 
 ## Install
 
@@ -216,16 +219,28 @@ Then check, over loopback:
   persisted change.
 - `GET /api/requirements?type=req|nfr` and `GET /api/doc/<id>` return the documented
   JSON objects.
-- `GET /assets/app.css` (`text/css`) and `GET /assets/app.js`
-  (`text/javascript`) return `200` with `Cache-Control: no-store` and non-empty
-  bodies.
-- 320 px markup hooks: viewport meta, sidebar toggle with `aria-expanded` and
-  `aria-controls="type-list"`, responsive footer hooks, and the narrow-viewport
-  rules in the served CSS.
-- No external references: served HTML/CSS/JS contain no `http://`, `https://`,
-  protocol-relative remote reference, remote `@import`, `url(...)`, `<img>`, web
-  font, or CDN reference; HTML responses carry the documented
-  `Content-Security-Policy`.
+- Representative assets return `200` with `Cache-Control: no-store`, non-empty
+  bodies, and no CSP header: `/assets/app.css` (`text/css`), `/assets/app.js`
+  (`text/javascript`), `/assets/nav-state.js` (`text/javascript`),
+  `/assets/katex/katex.min.css` (`text/css`), `/assets/katex/katex.min.js`
+  (`text/javascript`), one `/assets/katex/fonts/KaTeX_Main-Regular.woff2`
+  (`font/woff2`), and `/assets/mermaid/mermaid.min.js` (`text/javascript`). A
+  miss is `404`; a `POST` is `405`.
+- 320 px markup hooks: viewport meta; the header `.nav-toggle` present on every
+  page with `aria-expanded` and `aria-controls="site-nav"`, defaulting to
+  expanded and persisting in `papyrus.nav`; the shared list and page layouts
+  introduce no page-level horizontal scrolling at 320, 480, and 720 CSS px.
+- Offline rendering and CSP: served HTML/CSS/JS contain no `http://`, `https://`,
+  protocol-relative `//`, remote `@import`, remote `url(...)`, `<img>`, or CDN
+  reference. Every `url(...)` in every served stylesheet resolves to an entry of
+  the asset table, and the only such values are KaTeX's 60 `url(fonts/…)`
+  entries; a math page renders offline with its WOFF2 fonts served from
+  `/assets/katex/fonts/…` under `Cache-Control: no-store`. Every `text/html`
+  response carries exactly one of the two CSP strings fixed in
+  `browser-requirements.md` §9.7: strict when `has_diagram` is false, the diagram
+  string (only `style-src 'self' 'unsafe-inline'`) when it is true. `/assets/` and
+  non-HTML responses carry no CSP; `script-src` never gains `'unsafe-inline'`,
+  `'unsafe-eval'`, a nonce, or a hash.
 - A missing or empty document type directory renders its empty state (no server
   error).
 
@@ -258,13 +273,34 @@ papyrus config unset browser_port       # restores 6420
 # -> exit 4 and the configuration file is unchanged
 ```
 
-### 3.6 Embedded assets and no runtime file dependency
+### 3.6 Embedded assets, digests, notices, and the runtime file dependency
 
 Run the installed binary with its working directory set to an empty directory and a
 project directory that contains no asset files. `search` and `browser` must still
-work, and `/assets/app.css` and `/assets/app.js` must be non-empty. The package
-contains no asset, template, or documentation files beyond the copyright file, so
-the installed binary needs only `/usr/bin/papyrus` and the project directory.
+work, and the representative `/assets/` paths in §3.3 must be non-empty. The
+package contains no asset, template, or documentation files beyond the copyright
+file, so the installed binary needs only `/usr/bin/papyrus` and the project
+directory.
+
+Asset verification:
+
+1. **Digests.** `cargo test` includes the manifest test, which asserts that the
+   manifest row set equals `ASSETS[].path` with no duplicate or missing row and
+   recomputes SHA-256 and byte length for every entry. A missing row, an extra
+   row, or a byte/digest mismatch fails the build.
+2. **Notices.** `dpkg-deb --fsys-tarfile papyrus_<version>_amd64.deb | tar -xO
+   ./usr/share/doc/papyrus/copyright` shows the GPL-3.0-or-later block plus one
+   section per bundled family (KaTeX MIT, KaTeX fonts OFL-1.1, Mermaid MIT), and
+   `dpkg-deb -c` still lists exactly the binary and the copyright file.
+3. **Offline rendering.** The §3.3 offline/CSP check passes for a page with math
+   and for a page with a Mermaid figure.
+4. **Budget.** Measured on 2026-11-16: binary `stat -c %s` = 8,321,888 B
+   (7.94 MiB); served KaTeX assets = 558,541 B (CSS 23,335 + JS 275,414 + 20
+   WOFF2 259,792, from `src/browser/vendor/MANIFEST.md`); Mermaid =
+   3,572,661 B; the pre-Mermaid projection recorded by TASK-148 was 8,302,957 B
+   (7.92 MiB). The ceiling is 12 MiB = 12,582,912 B, leaving 4,261,024 B
+   (4.06 MiB) of headroom on the measured binary. The build fails the budget
+   check when `stat -c %s target/release/papyrus` exceeds 12,582,912 B.
 
 ## Smoke test results (TASK-4 verification)
 
@@ -466,6 +502,11 @@ Build-time/proc-macro dependencies are excluded by NFR-06.002 scope.
 All runtime dependencies are permissively licensed (MIT / Apache-2.0 / Unlicense /
 BSL-1.0) and permit linking in a GPL-3.0-or-later application. No incompatible
 runtime dependency remains.
+
+Browser assets are not crates: their licences are recorded in
+`src/browser/vendor/MANIFEST.md` and in the package `copyright` file, are
+compatible with GPL-3.0-or-later (MIT, OFL-1.1), and the NFR-06.002 release gate
+is unchanged.
 
 Build-time/proc-macro dependencies (excluded from audit scope): clap_derive, heck,
 proc-macro2, quote, syn, unicode-ident.

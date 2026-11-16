@@ -18,7 +18,7 @@ Technical specifications are Markdown text records with a fixed template (`# <ID
 ### In scope
 
 - Extending the persistent sidebar with a "Technical Specifications" entry (immediately after "Audit Records") and the `?type=` category selector to `tech-spec`, without changing the list-page structure (baseline spec section 4.6).
-- Listing active technical specifications, rendering only the technical-specifications section, with the first paragraph of the description as a row preview.
+- Listing active technical specifications, rendering only the technical-specifications section, through the shared list layout in `browser-shell-ui.md` §3 (no family slot; Title-cell labels and references).
 - Viewing a technical specification's title and description, with the description rendered as body text without a "Description" heading.
 - Editing `title` (required, single-line) and `description` (required, multi-line textarea) through a form matching MOCK-0009, with the baseline optimistic-concurrency and atomic-write contract (ADR-0006).
 - A field-preserving write contract that changes only the title heading and the `## Description` section and leaves every other section, line, and byte of the file content-identical.
@@ -69,10 +69,10 @@ Technical specifications are Markdown text records with a fixed template (`# <ID
 
 ### 4. List page
 
-1. For the `tech-spec` category the list page renders one section (`h2`) titled "Technical Specifications", showing the record count, followed by one row per record in ascending ID order.
-2. Each row's primary link text is `ID + title` and links to `/doc/{id}`.
-3. Each row also shows the first paragraph of the record's description beneath the primary link; records with empty description show no preview. The preview is plain text (first paragraph only, not the full description).
-4. Empty state: "No technical specifications were found in the configured directory. Technical specifications are created from the command line; this browser does not create records. Deprecated technical specifications are hidden." Long-title and unbreakable-token wrapping follow the baseline (section 10.4).
+1. For the `tech-spec` category the list page renders one section (`h2`) titled "Technical Specifications", showing the record count, followed by the shared list table (`browser-shell-ui.md` §3) with one row per record in ascending ID order.
+2. Each row's Title cell links `ID + title` to `/doc/{id}` and carries the record's labels and references below the link; the technical-specification family declares no extra slot.
+3. The list has no description preview and no separate row metadata: the description appears only on the record view.
+4. Empty state follows the shared rule in `browser-shell-ui.md` §3.6. Long-title and unbreakable-token wrapping follow the baseline (section 10.4).
 5. Deprecated technical specifications are never listed or counted.
 
 ### 5. Record view
@@ -165,7 +165,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox/Edge/Safari 100+), accessibility basics, no external resources, and no inline scripts/styles.
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, and no inline scripts/styles.
 2. The sidebar's Technical Specifications entry, the technical-specifications list/view/edit/conflict templates, and the technical-specifications `404` page are the only rendering additions; the shared shell and the remaining error pages are reused.
 3. Both fields are native `input`/`textarea` controls with a `<label>`; no tag, select, or custom widget is added. The form is keyboard operable and works with JavaScript disabled. Focus is not trapped.
 
@@ -196,7 +196,7 @@ UI mockups are required before any UI implementation work and must be approved b
 ### Screens covered by the approved package
 
 1. **Shared shell** (reused): header, sidebar with ten entries, `main`, footer, one `h1` per page.
-2. **Technical specifications list** (`/?type=tech-spec`): one section with record count, rows of `ID + title` plus description preview; empty and long-title states.
+2. **Technical specifications list** (`/?type=tech-spec`): one section with record count, the shared table with Title-cell labels/references and no description preview; empty and long-title states.
 3. **Technical specification view** (`/doc/{id}`): metadata block, title `h1`, description body with `pre-wrap` (no "Description" heading), breadcrumb `Technical Specifications › ID`, single `Edit`.
 4. **Edit form** (`/doc/{id}/edit`): title input, description textarea, version annotation, Save changes/Cancel; pristine, dirty, 422, 409 conflict, and 320 px states.
 5. **Error pages**: technical-specifications `404` page for deprecated and unknown IDs (identical page, technical-specifications help text, single "Back to technical specifications" recovery link), and the reused `400`, `405`, `415`, `500` pages from MOCK-0001.
@@ -213,7 +213,7 @@ UI mockups are required before any UI implementation work and must be approved b
 | Check | Verifies |
 |---|---|
 | AC-1 | `?type=tech-spec` renders the category, the default stays `req`, other values are `400`, and the sidebar entry is ordered after Audit Records with `aria-current="page"` and omitted when the type is disabled. |
-| AC-2 | The list shows active records only, ascending by ID, with `ID + title` links, description preview, count, empty state, and no non-record or deprecated files. |
+| AC-2 | The list shows active records only, ascending by ID, through the shared list layout with Title-cell labels/references, the action cell, count, and empty state, and no non-record or deprecated files. |
 | AC-3 | The view shows ID, form, category, title, description (no "Description" heading), breadcrumb, and one Edit action; an empty description shows `(none)`. |
 | AC-4 | The edit form matches MOCK-0009: title input, description textarea, hidden version plus annotation, Save changes/Cancel, pristine/dirty/422/409/320 px, and operates without JavaScript. |
 | AC-5 | An edit round-trip persists title and description and is visible in the browser and through `papyrus tech-spec view`. |
@@ -237,14 +237,14 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: Deprecated technical specifications are excluded exactly like other document types: not listed, not counted, not reachable, not editable (REQ-05.007, BR-017).
 - Assumption: The `document_types.tech-spec.enabled` flag controls the sidebar entry and category, like the other document types; a missing directory is an empty category, not an error.
 - Assumption: Technical specifications expose no structured NFR/task reference fields in the browser; such IDs remain literal text in the title or description (BR-017 defines no reference fields).
-- Assumption: Real-browser verification in Firefox, Edge, and Safari 100+ (NFR-05.001) remains a deferred follow-up, consistent with sibling tickets.
+- Assumption: Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001) remains a deferred follow-up, consistent with sibling tickets.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
 
 ## Open questions
 
 - **OQ-1 (non-blocking, product)** — Whether technical specifications should gain structured references to non-functional requirements or tasks in the browser. REQ-05.009 says they "may be referenced" but BR-017 defines no reference fields; this specification treats them as literal text.
 - **OQ-2 (non-blocking, validation)** — `technical-specifications-management.md` and BR-017 state no length limit, while the browser baseline applies title 1–200 and multi-line text 20000 limits. This specification adopts the baseline limits for consistency with the other browser document types; MOCK-0009 draws no length help text. If the product prefers no browser length limit, only the documented messages and tests for the two length rules change.
-- **OQ-3 (non-blocking, follow-up)** — Real-browser verification in Firefox, Edge, and Safari 100+ is deferred, consistent with sibling tickets.
+- **OQ-3 (non-blocking, follow-up)** — Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ is deferred, consistent with sibling tickets.
 
 ## Traceability
 

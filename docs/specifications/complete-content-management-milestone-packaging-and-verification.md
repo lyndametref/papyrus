@@ -17,7 +17,7 @@ This is a packaging and verification task: no new product behavior is added. Wor
 
 - Rebuild `target/release/papyrus` and `papyrus_<version>_amd64.deb` from the current source with the pinned Rust 1.99.1 toolchain, using `scripts/build-deb.sh` unchanged.
 - Verify package metadata: `Package: papyrus`, `Architecture: amd64`, `Version` equal to the Cargo package version, `Depends: libc6 (>= 2.34)`, GPL-3.0-or-later copyright.
-- Verify package contents contain only the binary and the copyright file — in particular, no runtime asset, template, configuration, or man files are packaged, because assets are compiled into the binary.
+- Verify package contents contain only the binary and the copyright file — no runtime asset, template, configuration, or man files are packaged, because assets are embedded through the static asset table. First-party and vendored browser assets are embedded through the static asset table, and the single copyright file carries one notice section per bundled asset family (KaTeX code MIT, KaTeX fonts OFL-1.1, Mermaid MIT).
 - Install and uninstall the package in an isolated Debian Forky environment without modifying the host.
 - Smoke-test the installed binary across every supported record family: business requirements, non-functional requirements, tasks, milestones, releases, decisions, glossary terms, UI specifications, UI mockups, business rules, audit records, and technical specifications — create, list, view, edit (and deprecate/restore or archive/restore where documented), search, and browser view/edit.
 - Smoke-test the cross-type capabilities delivered by m-12: unified search across all record types, the browser inventory hub, the final sidebar order, cross-type ID resolution, deprecated-record hiding, disabled-type gating, front-matter metadata projection, the managed artifacts and lifecycles page, the agent skills and workflows page, the interactive init walkthrough, ID padding validation (1–6), lazy front-matter migration on first read/write, and the native layout and one-way import.
@@ -103,9 +103,9 @@ For each family the installed binary exercises at least create → list → view
 | Audit records | `audit create` | create/list/view/edit/deprecate/restore | `AUD-001` |
 | Technical specifications | `tech-spec create` | create/list/view/edit/deprecate/restore | `TECH-001` |
 
-6. Edit changes only the supplied fields and preserves IDs; unknown IDs exit 3; validation failures exit 4; missing required arguments exit 2.
-7. ID padding is constrained to 1–6: `config set id_padding 0` and `config set id_padding 7` exit 4 and leave the configuration file unchanged; valid values 1–6 are accepted and reflected in subsequent IDs.
-8. The native layout and one-way import are verified in the installed binary: imported records use Papyrus IDs and no legacy serializer is invoked.
+1. Edit changes only the supplied fields and preserves IDs; unknown IDs exit 3; validation failures exit 4; missing required arguments exit 2.
+2. ID padding is constrained to 1–6: `config set id_padding 0` and `config set id_padding 7` exit 4 and leave the configuration file unchanged; valid values 1–6 are accepted and reflected in subsequent IDs.
+3. The native layout and one-way import are verified in the installed binary: imported records use Papyrus IDs and no legacy serializer is invoked.
 
 #### 3.3 Unified search (all record types)
 
@@ -132,11 +132,13 @@ For each family the installed binary exercises at least create → list → view
 9. Edit round-trip: `GET /doc/<id>/edit` yields the form with its hidden `version` token; `POST /doc/<id>` with the documented form fields returns `303` with `Location: /doc/<id>`; the follow-up `GET` shows the new title, and the CLI `view` shows the same persisted file.
 10. `GET /api/<category>` (and the documented aliases) returns the documented JSON index for one category; `GET /api/doc/<id>` returns the documented record object.
 11. `GET /assets/app.css` returns `200 text/css` and `GET /assets/app.js` returns `200 text/javascript`, both with `Cache-Control: no-store`; the bodies are non-empty.
-12. 320 px markup: every page carries `<meta name="viewport" content="width=device-width, initial-scale=1">`, the document-type sidebar toggle is present with `aria-expanded` and `aria-controls`, and the served CSS/JS use no forbidden features from the TASK-6 browser baseline.
-13. No external references: served HTML, CSS, and JS contain no `http://`, `https://`, protocol-relative remote reference, remote `@import`, remote `url(...)`, `<img>`, web font, or CDN reference; HTML responses carry the documented Content-Security-Policy.
-14. A missing or empty store directory renders its empty state instead of failing (no server error).
-15. `GET /lifecycle` (and `/?type=lifecycle`) renders the managed artifacts and lifecycles page; `GET /skills` (and `/?type=skills`) renders the agent skills and workflows page. Both render the shared shell and the sidebar in final order.
-16. Front-matter metadata projection (REQ-06.004): list and detail views read `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, and type-specific keys from the YAML front matter; `created_date` and `updated_date` are read-only in the browser; a save writes changed values to the front matter, refreshes `updated_date`, preserves every other front-matter key and the rest of the file, and never copies metadata into the body.
+12. 320 px markup: every page carries `<meta name="viewport" content="width=device-width, initial-scale=1">`; the header `.nav-toggle` is present on every page with `aria-expanded` and `aria-controls="site-nav"`, defaults to expanded, and persists in `papyrus.nav`; the shared list and page layouts introduce no page-level horizontal scrolling at 320, 480, and 720 CSS px; the served CSS/JS use no forbidden features from the TASK-6 browser baseline.
+13. Served HTML, CSS, and JS contain no `http://`, `https://`, protocol-relative `//`, remote `@import`, remote `url(...)`, `<img>`, or CDN reference. Every `url(...)` in every served stylesheet resolves to an entry of the asset table, and the only such values are KaTeX's 60 `url(fonts/…)` entries. A math page renders offline with its WOFF2 fonts served from `/assets/katex/fonts/…` under `Cache-Control: no-store`; a diagram page does the same; TASK-150 verifies it.
+14. Every `text/html` response carries exactly one of the two CSP strings fixed in `browser-requirements.md` §9.7: the strict string when the pre-pass did not set `has_diagram`, and the diagram string only when it did. `/assets/` and non-HTML responses carry no CSP; `script-src` never gains `'unsafe-inline'`, `'unsafe-eval'`, a nonce, or a hash.
+15. Asset verification: `cargo test` runs the manifest test and asserts the manifest row set equals `ASSETS[].path` with no duplicate or missing row and recomputes SHA-256 and byte length for every entry; `dpkg-deb --fsys-tarfile papyrus_<version>_amd64.deb | tar -xO ./usr/share/doc/papyrus/copyright` shows the GPL-3.0-or-later block plus one section per bundled family; `dpkg-deb -c` still lists exactly the binary and the copyright file; `stat -c %s` on the built binary is at most 12,582,912 B (12 MiB), with the measured budget recorded in `docs/packaging.md`.
+16. A missing or empty store directory renders its empty state instead of failing (no server error).
+17. `GET /lifecycle` (and `/?type=lifecycle`) renders the managed artifacts and lifecycles page; `GET /skills` (and `/?type=skills`) renders the agent skills and workflows page. Both render the shared shell and the sidebar in final order.
+18. Front-matter metadata projection (REQ-06.004): list and detail views read `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, and type-specific keys from the YAML front matter; `created_date` and `updated_date` are read-only in the browser; a save writes changed values to the front matter, refreshes `updated_date`, preserves every other front-matter key and the rest of the file, and never copies metadata into the body.
 
 #### 3.5 Offline operation
 
@@ -221,6 +223,7 @@ For each family the installed binary exercises at least create → list → view
 | T-20-02 | Quality gates pass | `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`; recorded test counts |
 | T-20-03 | `.deb` builds with the Cargo version and amd64 architecture | `./scripts/build-deb.sh`; `dpkg-deb -I` |
 | T-20-04 | Metadata: `Package: papyrus`, `Version`, `Architecture: amd64`, `Depends: libc6 (>= 2.34)`, GPL-3.0-or-later copyright | `dpkg-deb -I`; copyright file inspection |
+| T-20-04b | Bundled asset digests, notices, offline rendering, and the 12 MiB budget | Manifest digest test; package copyright inspection; served-stylesheet `url(` scan; `stat -c %s` on the binary |
 | T-20-05 | Package contains only the binary and copyright; assets are embedded | `dpkg-deb -c`; asset requests from the installed binary |
 | T-20-06 | Installs and uninstalls in an isolated Debian Forky environment, host untouched | `fakeroot dpkg --instdir/--admindir -i`, `-r`, `--purge`; host `dpkg -l` before/after |
 | T-20-07 | Installed binary is on `PATH` at `/usr/bin/papyrus` and runs | `PATH`-prefixed `papyrus --version` |
@@ -230,7 +233,7 @@ For each family the installed binary exercises at least create → list → view
 | T-20-11 | Browser: startup with `--no-open`, inventory hub, sidebar final order, `aria-current`, per-type lists, record views, edit round-trip | Installed-binary browser commands plus HTTP requests |
 | T-20-12 | Browser: cross-type ID resolution (single, multi → 500, deprecated/unknown → 404), disabled types, empty states | Installed-binary browser commands plus HTTP requests |
 | T-20-13 | Browser: JSON API and embedded assets served from the binary | `GET /api/*`, `GET /assets/*` |
-| T-20-14 | 320 px markup and no external references | Markup/asset assertions on served content |
+| T-20-14 | Shell/list layout, CSP classes, asset digests, and the 12 MiB budget | Markup/asset assertions on served content; manifest test; `stat -c %s` |
 | T-20-15 | Front-matter metadata projection in CLI and browser | Installed-binary view/edit assertions |
 | T-20-16 | Managed artifacts and lifecycles page and agent skills and workflows page render | Installed-binary browser assertions |
 | T-20-17 | Lazy migration and native layout in the installed binary | Installed-binary read/write assertions |
@@ -259,7 +262,7 @@ For each family the installed binary exercises at least create → list → view
 
 None of these blocks implementation; each has a specified default. OQ-1 is recommended for user confirmation before release.
 
-- **OQ-1 (recommended default: markup/asset-level verification only)** — NFR-05.001's verification method asks for checks in Firefox/Edge/Safari 100+. This headless packaging task verifies the served markup, asset set, viewport hooks, and absence of forbidden features, but does not drive a real GUI browser. Default: record the limitation in `docs/packaging.md` and rely on the per-type increments' markup-level verification plus the approved MOCK-0012; schedule a manual browser pass outside this ticket if the user requires one. Non-blocking.
+- **OQ-1 (recommended default: markup/asset-level verification only)** — NFR-05.001's verification method asks for checks in Firefox 100+, Edge 130+, and Safari 18+. This headless packaging task verifies the served markup, asset set, viewport hooks, and absence of forbidden features, but does not drive a real GUI browser. Default: record the limitation in `docs/packaging.md` and rely on the per-type increments' markup-level verification plus the approved MOCK-0012; schedule a manual browser pass outside this ticket if the user requires one. Non-blocking.
 - **OQ-2 (recommended default: fakeroot `dpkg --instdir/--admindir` on the Forky build host)** — Whether a full Forky container/VM is mandatory. Default: use the fakeroot isolated install, which exercises Forky's glibc and dpkg and never touches the host; if the user requires container-level isolation, the same checklist applies unchanged. Non-blocking.
 - **OQ-3 (recommended default: a new `tests/content_management_smoke.rs`)** — Whether the milestone test belongs in an existing smoke file or a new one. Default: a new file keeps each milestone's smoke coverage separate. Non-blocking.
 - **OQ-4 (recommended default: keep version 0.1.0)** — No m-12 release version is defined in the requirements. Default: package the current Cargo version unchanged; a bump belongs to release orchestration (TASK-73). Non-blocking.

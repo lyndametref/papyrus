@@ -9,7 +9,7 @@
 
 Layout, elements, states, and interactions for the generic browser views of a document type that exists only in configuration. The example type is slug `note`, label **Notes**, prefix `NOTE`, folder `docs/notes/`, with configured statuses `active`, `review`, `approved` in that order.
 
-The package covers the list view with its status filter (default, filtered, empty), the detail view, the edit view with validation and stale-version states, the lifecycle page delta for a config-defined enabled type and a disabled type, and the grouped sidebar treatment. Built-in typed pages are unchanged and appear only as navigation context.
+The package covers the list view with its status filter (default, filtered, empty), the detail view, the edit view with validation and stale-version states, the lifecycle page delta for a config-defined enabled type and a disabled type, and the grouped sidebar treatment. Built-in typed pages use the shared list contract (`browser-shell-ui.md` §3) and appear only as navigation context.
 
 ## 2. Shared shell
 
@@ -53,10 +53,10 @@ The sidebar is grouped by artifact category, in this order. Group labels are sma
 - With no `status` parameter the list shows every record in the active directory, including records whose stored status is a custom status. The absence of `status` is the no-filter state; there is no sentinel status value.
 - A filtered request (`status=<value>`) lists only records whose stored front-matter value equals the selected value exactly. The active filter is shown as a badge; the count becomes the filtered count (`2 of 4 records`).
 - A value outside the offered set (including `archived`) is rejected, not applied as an unfiltered or guessed match. An explicit empty `status=` is rejected with `400`.
-- Table columns, in order: `Status`, `ID`, `Title`, `Created`, `Updated`. Status sits immediately left of ID and its header carries no qualifier; the column is read-only, as the note below the list states. The title links to the detail view. Status is rendered as stored, including custom statuses.
+- Table columns, in order: `ID`, `Title`, `Status`, family slot(s) (none for a config-defined type), `Created`, `Updated`, `Actions`. Status is the structural Status column, carries no qualifier, and is read-only, as the note below the list states. The Title cell links to the detail view and carries labels/references. Status is rendered as stored, including custom statuses.
 - `Created` and `Updated` render the record's front-matter `created_date` and `updated_date` in the shared `YYYY-MM-DD` format.
 - A note states that status is never editable in the browser, that archived records are never listed, and that an archived address and an unknown address return the same 404 page.
-- Empty state: the filter remains visible with the disabled `Status` placeholder selected; a status message says no records were found in the configured folder, notes are created from the command line, and archived notes are never listed. Count is `0 notes`.
+- Empty state: the filter remains visible with the disabled `Status` placeholder selected; the shared empty message and help line from `browser-shell-ui.md` §3.6 render, and the count is `0 notes`.
 
 ## 5. Note detail
 

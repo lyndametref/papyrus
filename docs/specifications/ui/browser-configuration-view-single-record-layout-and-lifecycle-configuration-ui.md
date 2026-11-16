@@ -13,7 +13,7 @@ Layout, states, elements, and interactions for (A) the configuration view, (B) t
 
 Every page shares one shell: header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types", `main`, footer, one `h1`. Shared header branding (§4a): project name renders large and bold; "Papyrus" renders in smaller letters; the "P" mark keeps its current size and styling; project name is the configured project name. The rule applies to every page and is not restated per type.
 
-Sidebar entries include document types plus, in order: `Configuration` (after document types), `Managed artifacts &amp; lifecycles`, `Agent skills &amp; workflows`. Selected entry carries `aria-current="page"` plus bold+underline (non-colour cue). At 320 px the sidebar collapses behind an accessible toggle labelled "Document types" with `aria-expanded`/`aria-controls`.
+Sidebar entries include document types plus, in order: `Configuration` (after document types), `Managed artifacts &amp; lifecycles`, `Agent skills &amp; workflows`. Selected entry carries `aria-current="page"` plus bold+underline (non-colour cue). The header navigation toggle sits left of the brand on every page with `aria-expanded`/`aria-controls="site-nav"`; the default is expanded and the choice persists in `papyrus.nav`, with the navigation expanded and usable without JavaScript.
 
 ## 3. Screen map
 
@@ -56,7 +56,7 @@ Sidebar entries include document types plus, in order: `Configuration` (after do
 
 ## 7. NFR grouping
 
-- Non-functional atomic requirements listed under their owning group entry; no trailing "Other requirements" subsection and no catch-all section.
+- Non-functional atomic requirements listed under their owning group entry; no trailing catch-all subsection.
 - Owning group derived from the requirement ID prefix (`NFR-XX.YYY` → `NFR-XX`); no `Group` field added to files.
 - Group heading shows the group record's title; missing group record falls back to the group number (`NFR-04`).
 - A group with no atomic requirements renders as an entry with no children and member count "No requirements".

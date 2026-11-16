@@ -36,7 +36,7 @@ This ticket is documentation/specification work only. It does not change require
 
 The revised `browser-requirements.md` must state all of the following:
 
-1. Non-functional atomic requirements are listed under their owning group entry, matching the grouping used for business requirements. There is no trailing "Other requirements" subsection and no catch-all section.
+1. Non-functional atomic requirements are listed under their owning group entry, matching the grouping used for business requirements. There is no trailing catch-all subsection.
 2. The owning group is derived in the browser from the requirement ID prefix: `REQ-XX.YYY` -> `REQ-XX`, `NFR-XX.YYY` -> `NFR-XX`. No `Group` field is added to non-functional atomic requirement files and the requirement file format is unchanged.
 3. A group heading shows the group record's title (for example `NFR-04 Persistence`). When the group record is missing, the group number is used (`NFR-04`).
 4. A group with no atomic requirements still renders as an entry with no children (an explicit empty state and a member count of "No requirements").

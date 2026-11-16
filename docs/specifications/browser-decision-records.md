@@ -53,9 +53,9 @@ Extend the offline, project-local, read-and-edit web interface delivered by TASK
 
 ### 3. List page
 
-1. For the `decision` category the list page renders one section (`h2`) titled with the category name, showing the record count, followed by one row per record in ascending ID order.
-2. Each row's primary link text is `ID + title` and links to `/doc/{id}`.
-3. Decision rows additionally show, as read-only text in the row: status and decision type.
+1. For the `decision` category the list page renders one section (`h2`) titled with the category name, showing the record count, followed by the shared list table (`browser-shell-ui.md` §3) with one row per record in ascending ID order.
+2. Each row's Title cell links `ID + title` to `/doc/{id}` and carries the record's labels and references below the link; `Type` and `Superseded by` occupy the declared family slots and `Status` is the structural Status column.
+3. The list has no bespoke decision row shape and no separate row metadata.
 4. Empty state and long-title wrapping as in the baseline (section 10.4).
 
 ### 4. Record view
@@ -121,7 +121,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 9. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox/Edge/Safari 100+), accessibility basics, no external resources, no inline scripts/styles.
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, no inline scripts/styles.
 2. Templates may be extended with decision-specific placeholders; unknown placeholders are left untouched as in the baseline.
 3. The sidebar's Decisions entry and the decision list/view/edit templates are the only rendering additions.
 
@@ -162,7 +162,7 @@ UI mockups are required before any UI implementation work and must be approved b
 |---|---|
 | AC-1 | The browser displays and edits active decision records in addition to requirement and backlog content. |
 | AC-2 | Browser operations remain offline-capable, use project-local text-file persistence, sanitize input, and access no paths outside the project directory except during init. |
-| AC-3 | The expanded interface renders in Firefox, Microsoft Edge, and Safari version 100 or later. |
+| AC-3 | The expanded interface renders in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001). |
 | AC-4 | Archived decisions are not listed and return `404` by URL. |
 | AC-5 | Optimistic concurrency and atomic writes hold for the new record type. |
 
@@ -175,7 +175,7 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: The configured decision statuses and the documented transition graph govern the `status` field in the browser.
 - Assumption: A new MOCK id (MOCK-0003) is allocated for the extension rather than modifying the approved MOCK-0001/MOCK-0002 in place, per the global sequential-id rule.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
-- Assumption: AC #3 (real-browser verification in Firefox, Microsoft Edge, and Safari 100+) and NFR-05.001 are deferred follow-ups, not blocking for this ticket; tracked as a follow-up rather than a release gate.
+- Assumption: AC #3 (real-browser verification in Firefox 100+, Edge 130+, and Safari 18+) and NFR-05.001 are deferred follow-ups, not blocking for this ticket; tracked as a follow-up rather than a release gate.
 - Assumption: The decision type is read-only in the browser; creating decisions or changing their type remains CLI-only.
 - Assumption: Supersession in the browser follows the CLI rule: `--superseded-by` cannot be combined with `--status`; the browser enforces the same mutual exclusion as a validation error.
 

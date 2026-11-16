@@ -31,7 +31,7 @@ The review file inlines the complete wireframe stylesheet and loads no external 
 
 ## 4. Metadata display
 
-- List rows show at least id, title, created_date, updated_date, labels, references, and type-specific keys (e.g. task status, milestone release) in a metadata line beneath the primary link.
+- List rows use the shared contract in `browser-shell-ui.md` §3: ID, Title, Status, declared family slot(s), Created, Updated, Actions, with labels and references in the Title cell. There is no separate row metadata.
 - Detail view shows a metadata block (`dl`) with: Record ID, Title, Created date, Updated date, Labels, References, plus type-specific keys (Status, Assignee, Milestone, Dependencies, Documentation, Type, Ordinal for tasks; Release for milestones; none extra for releases/technical specifications except general keys).
 - Created date and updated date are rendered read-only in detail and edit (clearly marked "(read-only)"); timestamps are ISO-8601 UTC strings as stored.
 - Labels and references are shown as tags in view and as a tag add/remove interaction in edit (reusing MOCK-0002).

@@ -2,11 +2,11 @@
 
 **Tickets:** TASK-141 (§3.1–§3.3, §4.1, §5, §6 — delivered), TASK-144 (§3.4, §4.2–§4.5 — refined 2026-11-16)
 **Milestone:** m-21
-**Status:** Contract settled 2026-11-15 (ADR-0028 amendment) and extended 2026-11-16 for TASK-144 from ADR-0028 decisions 3–8. MOCK-0016 registered 2026-11-15 (`draft`); the TASK-144 MOCK id is recorded in §7.3
+**Status:** Delivery record for TASK-141/142/144. The normative shell, shared-list, width, and navigation clauses now live in [`browser-shell-ui.md`](browser-shell-ui.md) (published by TASK-148 from the landed contract); this page remains the implementation detail and accepted-difference record. Contract settled 2026-11-15 (ADR-0028 amendment) and extended 2026-11-16 for TASK-144 from ADR-0028 decisions 3–8. MOCK-0016 registered 2026-11-15 (`draft`); the TASK-144 MOCK id is recorded in §7.3
 **Requirements:** REQ-06.016 (shared list layout), REQ-06.015 (content width **and** navigation visibility), REQ-06.013 (uncapped board), REQ-06.004 (browser list parity with the CLI)
 **ADR:** ADR-0028 (Accepted, amended 2026-11-15) — decisions 1, 2, 3, 6, 9 govern TASK-141; decisions 3, 4, 5, 6, 7, 8 govern TASK-144; decision 7 (mockup preview route) remains out of scope under ADR-0029
 **UI:** mockup required for both tickets — see §7. A no-mockup waiver is **not** available for the shared list (§7.1); the TASK-144 header/collapsed-layout mockup follows §7.4.
-**Downstream:** TASK-142 (delivered), TASK-145/TASK-146 (consume `.bleed`), TASK-148 (specification and UI-spec port), TASK-149/TASK-150 (packaging and release verification)
+**Downstream:** TASK-142 (delivered), TASK-145/TASK-146 (consume `.bleed`), TASK-148 (published the normative clauses in `browser-shell-ui.md`), TASK-149/TASK-150 (packaging and release verification)
 
 ## 1. Purpose and scope
 
@@ -16,7 +16,7 @@ Introduce the three structural pieces ADR-0028 fixes, and prove the shared list 
 2. `PageWidth { Capped, Full }` — a server-side, per-route content-width decision rendered as a class on the `.app` wrapper.
 3. `browser::list` — one server-built list model (`ListPlan`) and one template path for list pages, with family variation expressed only as declared column data.
 
-This specification is the feature's canonical detail until TASK-148 ports the normative clauses into `docs/specifications/browser-requirements.md` (§3.6 navigation model, §4a shared header) and publishes the shell UI specification page. TASK-148 owns that port; this page must not be duplicated there, only cited and superseded.
+This specification is the delivery record and implementation detail for the shell, the `PageWidth` contract, and the shared list. The normative behaviour is published in `docs/specifications/browser-shell-ui.md` (TASK-148), which cites this page for implementation detail and accepted differences; this page must not be duplicated there, only cited and superseded.
 
 ### Non-goals
 
@@ -102,12 +102,12 @@ Every page-rendering function in `render.rs` stops interpolating its own chrome 
 .brand { min-width: 0; }
 .project { overflow-wrap: anywhere; }
 
-:root[data-nav="collapsed"] .layout { grid-template-columns: 0 minmax(0, 1fr); gap: 0; }
+:root[data-nav="collapsed"] .layout { grid-template-columns: minmax(0, 1fr); gap: 0; }
 :root[data-nav="collapsed"] .sidebar { display: none; }
 :root[data-nav="collapsed"] .main { border-left: 0; padding-left: 0; }
 ```
 
-- The zero column, zero gap, and removed main border/padding are what reclaim the width: 210 px column + 30 px gap + 30 px main padding-left = 270 px returned to page content. MOCK-0018 annotates the 240 px column-and-gap band it draws; the extra 30 px is the removed main padding. Reclaimed width is real grid width, never a negative margin.
+- The sidebar item leaves the grid and the template collapses to one `minmax(0, 1fr)` track with `gap: 0`; with the main border and padding removed that returns 210 + 30 + 30 = 270 px to page content. MOCK-0018 annotates the 240 px column-and-gap band it draws; the extra 30 px is the removed main padding. Reclaimed width is real grid width, never a negative margin. A retained zero-width first track must not be used: with the sidebar `display: none`, `.main` auto-places into that track and its width becomes 0.
 - `.sidebar { display: none }` already hides the pre-`app.js` paint; `app.js` additionally sets `hidden` on `#site-nav` so the nav is removed from the accessibility tree by attribute, not by styling alone (ADR-0028 decision 4 and 8).
 - `.brand`/`.header-lead` `min-width: 0` and `.project { overflow-wrap: anywhere }` keep a long project name inside the header at 320 px now that the toggle shares the row.
 - The `@media (max-width: 480px)` block keeps `.layout { display: block }`, drops `.sidebar-toggle { display: block }` and `.sidebar ul[data-collapsed="true"] { display: none }`, and keeps `.app { padding: 0 12px 32px }`. The collapsed rules are media-query independent, so collapse works at every breakpoint; at ≤480 px `.sidebar { display: none }` is the whole reclamation.
@@ -154,9 +154,8 @@ pub enum PageWidth {
 
 ### 4.2 Board classification (TASK-144)
 
-- `BrowserRoutes::page_width(&self, slug: &str) -> PageWidth` returns `Full` for the backlog board's task slug and `Capped` for every other input, including `""` (the value used by inventory, lifecycle, config, skills, and error pages) and every detail, edit, and list route.
-- The board slug is resolved from the route table (the Backlog nav group's slug), not hard-coded, so a disabled or renamed task family cannot leave a stale `Full` route. The board is the only route whose descriptor handler is `Task`, so `Full` cannot leak onto a list route.
-- `render::board_page` currently passes no slug to the shell (`page(chrome, None, …)`). It passes the resolved board slug so the width decision reaches the shell; the shell still takes the width from `Page::width`.
+- `BrowserRoutes::page_width(&self, route: PageRoute) -> PageWidth` returns `Full` for `PageRoute::Board` and `Capped` for `PageRoute::Other`; width is decided by route identity, never by a slug or record type.
+- `render::board_page` passes `PageRoute::Board`; every other renderer (lists, detail, edit, inventory, config, skills, errors) passes `PageRoute::Other`; the board renderer is reached only for a descriptor with the `Task` handler, so a disabled task family leaves no route that can render `Full`.
 - `Full` for any other route requires an ADR-0028 amendment (downstream constraint 4). The mockup preview route remains out of scope (decision 7) and no route or endpoint is added for it; `.app--full` is the named class that route will use.
 
 ### 4.3 Width CSS
@@ -192,6 +191,9 @@ The shared list section heading (`.section-head`: `h2` plus `.count`) overflows 
 
 - When heading and count do not fit on one line, the count wraps beneath the heading instead of widening the page. No copy, order, or breakpoint changes.
 - The same defect class is closed at the header: `.header-lead`, `.brand`, and `.project` get the min-width/`overflow-wrap` rules in §3.4 so the toggle does not push the header past the viewport at 320 px.
+- The heading elements break inside long tokens instead of widening the page: `h1, .h1, h2, h3 { overflow-wrap: anywhere }` (the `.h1` class is carried by `<h1 class="h1">` on list, detail, edit, and board heads).
+- Preformatted blocks scroll inside themselves: `pre { max-width: 100%; overflow-x: auto }`, with `pre:focus-visible` drawing the same 2 px ring as the other scrollers. A long command line therefore never widens the page.
+- The board columns (`.board-columns`) and the `/config` effective-configuration table (`.table-scroll`) are focusable labelled scroll regions: `role="region"`, an `aria-label`, `tabindex="0"`, and a visible `:focus-visible` ring on the scroller itself. The `/skills` command scroller (a `<pre>` with `role="region"`, `aria-label` naming the command, and `tabindex="0"`) carries the same semantics.
 
 ## 5. Shared list contract (ADR-0028 decision 2)
 
@@ -348,7 +350,7 @@ Fixtures guard TASK-142, so they must be produced from the **pre-change** binary
 - **Accepted differences (TASK-142, recorded in the ticket as A1–A8):**
   - **A1 Shared layout.** Table instead of `<ul>`, the fixed header sequence, the `Created` column, the `View`/`Edit` action cell, the Title-cell labels/references, and the muted `(none)` for unset values; this is the intended change every populated fixture shares.
   - **A2 First-paragraph preview removed.** The legacy list rows rendered the first paragraph of the record body — `definition` for glossary terms and `description` for UI specifications, business rules, audit records, technical specifications, use cases, test cases, and test reports. The shared row carries only the Title cell (link, labels, references) plus the fixed cells; no body preview is rendered for any family.
-  - **A3 Legacy row-metadata line removed.** The `row-meta` line (`created`, `updated`, `labels`, `references`, and every remaining front-matter key) is not carried over: `created`/`updated` are structural columns and `labels`/`references` are in the Title cell. Every other field it exposed already has a column or a declared slot; the one field with no other home, decision `superseded_by`, is now the declared `Superseded by` slot (§5.3), so CLI/browser parity is preserved.
+  - **A3 Legacy row metadata removed.** The `row-meta` line (`created`, `updated`, `labels`, `references`, and every remaining front-matter key) is not carried over: `created`/`updated` are structural columns and `labels`/`references` are in the Title cell. Every other field it exposed already has a column or a declared slot; the one field with no other home, decision `superseded_by`, is now the declared `Superseded by` slot (§5.3), so CLI/browser parity is preserved.
   - **A4 Requirement and NFR heading.** `Requirements` becomes the presentation heading (`Business requirements`, `Non-functional requirements`); the grouped count note keeps its group/member shape.
   - **A5 Subheading copy.** The list subheading is now the presentation inventory note, so the legacy `<Family> records in this project.` sentence is replaced: `Milestone records…` → `Milestones in this project.`, `Release records…` → `Releases in this project.`, `Decision records…` → `Decisions in this project.`, `Business requirement records…` → `Business requirements in this project.`, `Non-functional requirement records…` → `Non-functional requirements in this project.` The other families' subheadings already matched their presentation note. Fixtures do not capture a subheading, so this difference is recorded here and in the ticket, not replayed.
   - **A6 Shared empty state.** Every legacy per-family empty block (the requirement cross-family hint and group messages, the technical-specification/use-case/test-case/test-report "were found in the configured directory" wording, the "Archived … are hidden" sentence) is replaced by the one shared message/help pair in §5.1. The per-family UI description port is TASK-148.
@@ -368,7 +370,7 @@ The shared list is a visible change on every migrated list: column reorder (`Sta
 ### 7.2 UI description documents to update
 
 - New: `docs/specifications/ui/browser-shell-and-shared-list-ui.md` — shell regions, list layout, column set, action cell, grouped rows, empty states, 320 px behaviour, and the anchor for the new MOCK.
-- Existing, must be reconciled rather than restated: `docs/specifications/ui/browser-final-cross-type-ui.md` §5 (list rows currently described as a metadata line with `created_date`/`updated_date`), `docs/specifications/ui/browser-config-defined-document-types-ui.md` §2 and its generic list section, and the per-family list sections of `browser-backlog-records-ui.md`, `browser-decision-records-ui.md`, `browser-requirements-ui.md`, `browser-business-rules-ui.md`, `browser-audit-records-ui.md`, `browser-technical-specifications-ui.md`, `browser-glossary-terms-ui.md`, `browser-ui-specifications-ui.md`, `browser-ui-mockups-ui.md`, `browser-use-cases-test-cases-and-test-reports-ui.md`.
+- Existing, must be reconciled rather than restated: `docs/specifications/ui/browser-final-cross-type-ui.md` §5 (list rows currently described as a row metadata with `created_date`/`updated_date`), `docs/specifications/ui/browser-config-defined-document-types-ui.md` §2 and its generic list section, and the per-family list sections of `browser-backlog-records-ui.md`, `browser-decision-records-ui.md`, `browser-requirements-ui.md`, `browser-business-rules-ui.md`, `browser-audit-records-ui.md`, `browser-technical-specifications-ui.md`, `browser-glossary-terms-ui.md`, `browser-ui-specifications-ui.md`, `browser-ui-mockups-ui.md`, `browser-use-cases-test-cases-and-test-reports-ui.md`.
 
 TASK-141 updates the new shell document and `browser-final-cross-type-ui.md` §5, and registers the MOCK. The per-family UI description sections are reconciled by TASK-148's specification port; TASK-142 changes no `docs/specifications/ui/**` file.
 
@@ -388,7 +390,7 @@ All three open questions and the ticket's task-family premise are settled by the
 
 **OQ-1 — Which family is the reference implementation? Resolved: the milestone list.** `/?type=milestone` is the only family that is simultaneously a real list route with a populated and an empty state, a family slot carrier (`Release`), a `<ul>` → `<table>` migration, and the browser side of the REQ-06.004 parity surface (§5.6). The task family is not eligible: `GET /?type=task` is the REQ-06.013 board and no task list route exists (§2).
 
-**OQ-2 — Does `created_date` survive in the shared list? Resolved: yes, as a structural column.** The fixed order is `ID, Title, Status, family slot(s), Created, Updated, Actions`, so the parity rule from ADR-0028 resolved question 3 is satisfied structurally instead of by ad-hoc per-family slots. `labels` and `references`, which today survive only in an ad-hoc metadata line, move into the Title cell. Dropping `created_date` would have relaxed REQ-06.004, a must-have requirement, which is a business-requirement change rather than an architecture decision (§5.5).
+**OQ-2 — Does `created_date` survive in the shared list? Resolved: yes, as a structural column.** The fixed order is `ID, Title, Status, family slot(s), Created, Updated, Actions`, so the parity rule from ADR-0028 resolved question 3 is satisfied structurally instead of by ad-hoc per-family slots. `labels` and `references`, which today survive only in an ad-hoc row metadata, move into the Title cell. Dropping `created_date` would have relaxed REQ-06.004, a must-have requirement, which is a business-requirement change rather than an architecture decision (§5.5).
 
 **OQ-3 — Release family slot `Status`. Resolved: release declares no family slot.** `Status` is structural for every family and the slot table now reads release → none (§5.3), so the release list shows one status cell. Reserved-key validation prevents the class of error, not just this instance.
 

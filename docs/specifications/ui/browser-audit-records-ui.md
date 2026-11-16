@@ -12,7 +12,7 @@ Layout, states, elements, and interactions for extending the local browser to au
 
 ## 2. Shared shell
 
-Header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types" with entries (Business requirements, Business Rules, Audit Records, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications, UI Mockups), `main`, footer, one `h1` per page. Selected entry bold + underline + `aria-current="page"`. 320 px sidebar collapses behind an accessible toggle. Prior entries (Business requirements, Business Rules, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications, UI Mockups) are non-clickable in this extension package; only Audit Records has generated views.
+Header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types" with entries (Business requirements, Business Rules, Audit Records, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications, UI Mockups), `main`, footer, one `h1` per page. Selected entry bold + underline + `aria-current="page"`. The header navigation toggle collapses and expands the sidebar on every page; the default is expanded and the choice persists in `papyrus.nav`, with the navigation expanded and usable without JavaScript. Prior entries (Business requirements, Business Rules, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications, UI Mockups) are non-clickable in this extension package; only Audit Records has generated views.
 
 ## 3. Screen map
 
@@ -28,7 +28,7 @@ Header (product name, project name, static offline/bind note), persistent left s
 
 - One section (`h2`) titled "Audit Records", showing the record count, followed by one row per record in ascending ID order.
 - Each row's primary link text is `ID + title` and links to `/doc/{id}`.
-- Each row also shows the first paragraph of the record's content beneath the primary link; records with empty content show no preview. The preview is plain text (first paragraph only, not the full content).
+- The list uses the shared contract in `browser-shell-ui.md` §3: the `Audit type` slot, the structural Status/Created/Updated columns, and Title-cell labels/references; there is no content preview and no separate row metadata.
 - Empty state and long-title wrapping as in MOCK-0001.
 - Deprecated audit records are never listed.
 

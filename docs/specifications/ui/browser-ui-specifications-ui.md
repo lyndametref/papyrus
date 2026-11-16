@@ -11,7 +11,7 @@ Layout, states, elements, and interactions for extending the local browser to UI
 
 ## 2. Shared shell
 
-Header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types" with entries (Business requirements, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications), `main`, footer, one `h1` per page. Selected entry bold + underline + `aria-current="page"`. 320 px sidebar collapses behind an accessible toggle. Prior entries (Business requirements, Non-functional requirements, Backlog, Decisions, Glossary) are non-clickable in this extension package; only UI Specifications has generated views.
+Header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types" with entries (Business requirements, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications), `main`, footer, one `h1` per page. Selected entry bold + underline + `aria-current="page"`. The header navigation toggle collapses and expands the sidebar on every page; the default is expanded and the choice persists in `papyrus.nav`, with the navigation expanded and usable without JavaScript. Prior entries (Business requirements, Non-functional requirements, Backlog, Decisions, Glossary) are non-clickable in this extension package; only UI Specifications has generated views.
 
 ## 3. Screen map
 
@@ -27,7 +27,7 @@ Header (product name, project name, static offline/bind note), persistent left s
 
 - One section (`h2`) titled "UI Specifications", showing the record count, followed by one row per specification in ascending ID order.
 - Each row's primary link text is `ID + title` and links to `/doc/{id}`.
-- Each row also shows the first paragraph of the specification's description beneath the primary link; specifications with an empty description show no preview. The preview is plain text (first paragraph only, not the full description).
+- The list uses the shared contract in `browser-shell-ui.md` §3: no family slot, the structural Status/Created/Updated columns, and Title-cell labels/references; there is no description preview and no separate row metadata.
 - Empty state and long-title wrapping as in MOCK-0001.
 - Deprecated specifications are never listed.
 

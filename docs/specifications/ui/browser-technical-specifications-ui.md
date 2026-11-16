@@ -34,7 +34,7 @@ The review file inlines the complete wireframe stylesheet and loads no external 
 
 - One section (`h2`) titled "Technical Specifications", showing the record count, followed by one row per record in ascending ID order.
 - Each row's primary link text is `ID + title` and links to `/doc/{id}`.
-- Each row also shows the first paragraph of the description beneath the primary link; records with an empty description show no preview. The preview is plain text (first paragraph only, not the full description).
+- The list uses the shared contract in `browser-shell-ui.md` §3: no family slot, the structural Status/Created/Updated columns, and Title-cell labels/references; there is no description preview and no separate row metadata.
 - Empty state and long-token wrapping as in MOCK-0001/MOCK-0008: an unbreakable title token wraps inside the row without horizontal scrolling.
 - Deprecated technical specifications are never listed or counted.
 
@@ -72,7 +72,7 @@ List: sidebar entry, row links. View: breadcrumb links, Edit. Edit: title input,
 
 - OQ-1 (sidebar ordering): Technical Specifications is placed immediately after Audit Records; all other entries keep their MOCK-0008 order.
 - OQ-2 (category value): `type=tech-spec` selects the technical specifications category; any other unknown value remains a 400 per the baseline.
-- OQ-3 (list preview): list rows show the first paragraph of the description beneath ID + title, consistent with MOCK-0008.
+- OQ-3 (list preview): resolved as removed. List rows use the shared contract in `browser-shell-ui.md` §3.
 - OQ-4 (field rules): only rules stated in `technical-specifications-management.md` and BR-017 are drawn; no length limits are invented. Title and description are trimmed, required, and reject control characters.
 - OQ-5 (references): technical specifications may mention NFR or task IDs as literal text in title or description; the browser exposes no structured reference fields.
 

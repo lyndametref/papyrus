@@ -17,7 +17,7 @@ In scope: sidebar entry?type=ui-spec, list/view/edit, JSON API, validation, atom
 
 1. Category `?type=ui-spec`; default req; other values 400. Sidebar: Business requirements, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications. Missing dir renders empty state.
 2. Records in `<doc_directory>/<document_types.ui-spec.directory>/` (default `docs/specifications/ui/`), prefix `UI`, only `<prefix>-<digits>.md` files. `deprecated/` never listed. Disabled type contributes no records.
-3. List: h2 "UI Specifications", rows `ID + title` link `/doc/{id}` plus first paragraph of description preview.
+3. List: h2 "UI Specifications", through the shared list layout in `browser-shell-ui.md` §3: `ID + title` link in the Title cell with the record labels/references below it, no family slot, and no description preview.
 4. View: ID, form UI specification, category UI Specifications, title h1, View and Description sections pre-wrap, breadcrumb UI Specifications › ID, single Edit.
 5. Edit: title (required), view (required single-line), description (optional multiline). Hidden version token, 422/409 per baseline.
 6. Validation: title/view 1-200 no control, description max 20000, ## line rejected.

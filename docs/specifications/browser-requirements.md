@@ -19,10 +19,10 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 - Listing, viewing, and editing active business-requirement and non-functional-requirement groups and requirements in the browser, with save-then-reread persistence (REQ-05.001, REQ-05.002, NFR-01.002).
 - Deprecation visibility in the browser: deprecated records are not listed and are not reachable (REQ-05.001, REQ-05.002, REQ-05.007).
 - A minimal read/write JSON API over the same records, used by the tests and by later increments.
-- Embedded HTML/CSS/JS assets and templates compiled into the binary; no CDN, no external fonts, no network fetch, no new dependencies.
+- Embedded HTML/CSS/JS assets and templates compiled into the binary: embedded assets are served from one static table — first-party files, vendored KaTeX code and its 20 WOFF2 fonts, and the vendored Mermaid bundle are same-origin; there is no CDN, no remote font, no network fetch, and no new dependency.
 - New configuration keys `browser_host`, `browser_port`, `browser_open` with defaults, validation, `config list/get/set/unset` integration, and serialization (BR-016, REQ-01.002).
 - HTML escaping, JSON encoding, ID/record resolution that never joins user input into a path, project-directory boundary checks on every read and write, symlink-escape rejection, request-body caps, and Host/Origin validation as the CSRF and DNS-rebinding mitigation (NFR-02.002, NFR-04.002).
-- Support in Firefox 100+, Edge 100+, Safari 100+ using only widely supported HTML/CSS/JS, with basic accessibility (NFR-05.001).
+- Support in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001) using only widely supported HTML/CSS/JS, with basic accessibility.
 - Unit and integration tests, including spawning the binary and speaking HTTP over `TcpStream`.
 
 ### Out of scope
@@ -125,14 +125,14 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 3. Only files directly inside those directories whose `.md` file stem matches the form in section 4.1 are records. Subdirectories (including `deprecated/`), `index.html`, and files whose stem does not match are ignored. There is no recursive traversal.
 4. A document type that is absent from the configuration or has `enabled: false` contributes no records and no error. Its sidebar entry is omitted, and requesting it directly with `?type=` renders that category's empty state rather than an error (OQ-13).
 5. Deprecated records are not listed, not counted, not reachable by URL, and not editable through the interface (REQ-05.001, REQ-05.002, REQ-05.007). A request for a deprecated record's ID returns `404`, exactly as for an unknown ID.
-6. **Navigation model — persistent document-type sidebar.** Every page shares one shell: a `header` (product name, project name, and a static "Local browser / offline · `<host>:<port>`" note), a persistent left sidebar `nav` labelled "Document types", `main`, and a `footer`. The sidebar lists the document types as vertical links, business requirements first, then non-functional requirements, and is extensible: a later increment adds a document type by adding one sidebar entry and one category route value, without changing the list page structure.
+6. **Navigation model — persistent document-type sidebar.** Every page shares one shell: a `header` (product name, project name, and a static "Local browser / offline · `<host>:<port>`" note), a persistent left sidebar `nav` labelled "Document types", `main`, and a `footer`. The sidebar lists the document types as vertical links, business requirements first, then non-functional requirements, and is extensible: a later increment adds a document type by adding one sidebar entry and one category route value, without changing the list page structure. The header carries the navigation toggle that collapses and expands the sidebar; the expanded state is the default and the choice persists in `localStorage` under `papyrus.nav` (see `browser-shell-ui.md` §5).
 7. The sidebar selects exactly one document category at a time. The list page renders only the selected category; the other category is not rendered at all (not as an empty section, and not as a second section). The two document types are separate categories, not a filter over one combined list.
 8. The default category is business requirements: `GET /` and `GET /?type=req` render the same page.
-9. The selected category renders one section (`h2`) titled with the category name, showing the category's group count and requirement count. Each group is a row containing the group ID and title as one link to the group record, the group's member count, and its member requirements as nested links in ascending ID order; the group row links and the member links use link text "ID + title".
-10. For business requirements, a requirement whose `## Group` reference does not match an active group of the same type, and a requirement with no `## Group` section, is listed in a trailing "Other requirements" subsection (`h3`) of its category, with the group reference shown as text: an unresolved reference as `Group: REQ-99 (not found)`, and a missing reference as `Group: (none)`.
+9. The selected category renders one section (`h2`) titled with the category name, showing the category's group count and requirement count. The list renders through the shared list contract in `browser-shell-ui.md` §3: group rows and member rows in one table, the Group slot carrying the stored reference, and the shared count note. The legacy nested-link rows and the per-group member count are not carried over.
+10. For business requirements, a requirement whose `## Group` reference does not match an active group of the same type, and a requirement with no `## Group` section, renders as a top-level row in ID order (`browser-shell-ui.md` §3.5), with the stored value shown in the Group slot: an unresolved reference as `REQ-99 (not found)` and a missing reference as `(none)`. There is no trailing catch-all section.
 
-10a. **Non-functional requirement grouping.** Non-functional atomic requirements are listed under their owning group entry, matching the grouping used for business requirements. There is no trailing "Other requirements" subsection and no catch-all section for the non-functional category. The owning group is derived in the browser from the requirement ID prefix: `REQ-XX.YYY` -> `REQ-XX`, `NFR-XX.YYY` -> `NFR-XX`. No `Group` field is added to non-functional atomic requirement files and the requirement file format is unchanged. A group heading shows the group record's title (for example `NFR-04 Persistence`); when the group record is missing, the group number is used (`NFR-04`). A group with no atomic requirements still renders as an entry with no children (an explicit empty state and a member count of "No requirements"). Every atomic requirement appears under exactly one group; none is dropped. The JSON index (`/api/requirements`, `type=nfr`) is ordered by group and then by requirement ID, consistent with the list page, and carries the resolved group title or `null` when the group record is missing (falling back to the group number in the rendered HTML).
-11. A group with no member requirements shows an explicit empty state in its row (for example "No requirements in this group") and a member count of "No requirements".
+10a. **Non-functional requirement grouping.** Non-functional atomic requirements are listed under their owning group row in the shared list, matching the grouping used for business requirements. There is no trailing catch-all section for the non-functional category. The owning group is derived in the browser from the requirement ID prefix: `REQ-XX.YYY` -> `REQ-XX`, `NFR-XX.YYY` -> `NFR-XX`. No `Group` field is added to non-functional atomic requirement files and the requirement file format is unchanged. A group row shows the group record's title (for example `NFR-04 Persistence`); when the group record is missing, the group number is used (`NFR-04`). A group with no atomic requirements still renders as a group row with no children. Every atomic requirement appears under exactly one group; none is dropped. The JSON index (`/api/requirements`, `type=nfr`) is ordered by group and then by requirement ID, consistent with the list page, and carries the resolved group title or `null` when the group record is missing (falling back to the group number in the rendered HTML).
+11. A group with no member requirements still renders its group row with no children; the shared empty state and count rules in `browser-shell-ui.md` §3.6 apply.
 12. The category selection is a query parameter on the list page: `type=req` (default) or `type=nfr`. `GET /` and `?type=req` select business requirements, `?type=nfr` selects non-functional requirements. There is no combined "all" view: any other value, including `all`, is `400`.
 13. Viewing a requirement shows: ID (read-only), record form (group or requirement), document type (business or non-functional), title, owning group ID and title (as a link to the group record when the group is active), user story for business-requirement records only, and description.
 14. Viewing a group shows the group's own fields — ID, record form, document type, title, user story for business-requirement groups only, and description — followed by a "Requirements in this group" section (`h2`) listing the group's member requirements in ascending ID order as links whose text is "ID + title". A group with no members shows the empty state from section 4.11 in that section.
@@ -252,15 +252,15 @@ Routes are exact. `{id}` is a record ID as defined in section 7.1.
 
 ### 6. Assets and rendering
 
-1. HTML templates are text files `src/browser/templates/list.html`, `view.html`, `edit.html`, and `error.html`, embedded at compile time with `include_str!`. CSS and JS are `src/browser/app.css` and `src/browser/app.js`, embedded with `include_str!`.
+1. HTML templates are text files `src/browser/templates/shell.html`, `list.html`, `view.html`, `edit.html`, `error.html`, plus the `document_detail.html` and `document_edit.html` body fragments; all are embedded with `include_str!` and served through the static asset table, which also serves `/assets/nav-state.js`, the KaTeX stylesheet/script, and the built-in WOFF2 fonts.
 2. Substitution uses a single documented placeholder syntax `{{name}}` with a fixed, per-template allowlist of names. There is no template engine dependency, no expression evaluation, and no placeholder expansion inside substituted values (a value containing `{{...}}` is emitted literally).
 3. Every substituted value is HTML-escaped in text and attribute context: `&` → `&amp;`, `<` → `&lt;`, `>` → `&gt;`, `"` → `&quot;`, `'` → `&#39;`. Attribute values are always double-quoted. Escaping happens at render time only; stored content is never pre-escaped.
 4. JSON is produced only with `serde_json`, never by string concatenation or format strings.
-5. The stylesheet uses a system font stack (`system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`); no web fonts, icon fonts, images, or external URLs. There is no `<img>` element, no `@import`, no `url(...)` reference to a remote resource, and no `srcset`.
-6. The script is optional progressive enhancement: a dirty-form guard that warns before navigating away from a modified edit form, and the narrow-viewport document-type sidebar toggle. With JavaScript disabled, every page, link, form, and error state still works; the type links stay visible because the collapse is script-driven.
-7. There is no inline `<script>`, no inline event handler attribute, and no inline `style` attribute; therefore the CSP needs no `'unsafe-inline'`.
+5. Bundled, same-origin fonts replace the earlier system-font-only rule (ADR-0027 decision 7). The first-party stylesheet `/assets/app.css` still uses the system font stack (`system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`) and contains no `url()` reference. Two stylesheets ship: `/assets/app.css` and the byte-identical vendored `/assets/katex/katex.min.css`, whose 60 relative `url(fonts/…)` values resolve to `/assets/katex/fonts/*.woff2` entries of the static asset table. Only the WOFF2 form is served. No served CSS contains `@import`; no reference is remote; there is no `<img>` element, no `srcset`, no icon font, and no CDN reference. The page-level font stack stays the system stack; KaTeX fonts apply only inside rendered math.
+6. The scripts are optional progressive enhancement. `nav-state.js` is synchronous, applies the stored navigation state, and reveals the toggle; `app.js` is deferred and owns the toggle behaviour, the dirty-form guard, tag editing, the board status change, and the math and diagram render passes (`browser-shell-ui.md` §5.5; `browser-math-and-diagram-rendering.md` §6 and §16). With JavaScript disabled, every page, link, form, and error state still works, and the expanded navigation stays visible and usable.
+7. No server-rendered page emits an inline `<script>`, an inline event-handler attribute, or an inline `style` attribute. KaTeX's own `style` attributes are dropped under `style-src 'self'`, and that cosmetic deviation is accepted (ADR-0025 decision 6 revision). The only `'unsafe-inline'` in the policy is `style-src` on a diagram response, and it is scoped exactly as `browser-requirements.md` §9.7 records.
 8. All pages declare `<!doctype html>`, `<html lang="en">`, a unique `<title>`, and `<meta charset="utf-8">`; the `<meta name="viewport" content="width=device-width, initial-scale=1">` tag is present.
-9. Pages contain no absolute URLs to other origins. The only URLs are root-relative paths on the serving origin.
+9. Pages contain no absolute URLs to other origins. The only URLs are root-relative paths on the serving origin, and every asset URL is a root-relative `/assets/` path from the static table.
 
 ### 7. Editing contract
 
@@ -331,27 +331,51 @@ Routes are exact. `{id}` is a record ID as defined in section 7.1.
 4. **Boundary checks.** Every filesystem read and write — active directory, record file, temporary file, configuration file — passes `Context::ensure_within` against the canonicalized project directory (NFR-04.002). Symlink escapes are rejected before any content is read or written.
 5. **No traversal or symlink escape.** A symlinked record pointing outside the project is not listed, returns `404` when requested, and cannot be written through.
 6. **Request-size caps.** Request line 8192 bytes, target 2048 bytes, header block 16384 bytes and 64 fields, body 1 MiB, 16 concurrent connections, 5-second read and write timeouts.
-7. **Headers and content policy.** HTML responses send `Content-Security-Policy: default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`, plus `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and `Cache-Control: no-store`. All responses send `Connection: close`.
+7. **Headers and content policy.** Every `text/html` response carries exactly one of the two CSP strings below: the strict string on every HTML response whose pre-pass did not set `has_diagram`, and the diagram string only when the rendering pre-pass set `has_diagram`. `/assets/` responses and non-HTML responses carry no CSP. `script-src 'self'` never gains `'unsafe-inline'`, `'unsafe-eval'`, a nonce, or a hash.
+
+   Strict (`http::CSP`):
+
+   ```
+   default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'
+   ```
+
+   Diagram (`http::CSP_DIAGRAM`, accepted under ADR-0026 decision 6):
+
+   ```
+   default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'
+   ```
+
+   | Response | String |
+   |---|---|
+   | `text/html` whose pre-pass did not set `has_diagram`: lists, board, record/document views without a figure, edit, inventory, lifecycle, configuration, skills, and every 400/404/405/415/422/500 page | strict |
+   | `text/html` record or document view whose pre-pass set `has_diagram` | diagram |
+   | Every `/assets/*` response, including the Mermaid bundle and the WOFF2 fonts | none |
+   | JSON, text, and every non-HTML response | none |
+
+   Status: the strict string is live. The diagram string is implemented in `http::CSP_DIAGRAM` (TASK-146) and verified by TASK-150. The response classes are summarized in `browser-shell-ui.md` §8. All HTML responses also send `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and `Cache-Control: no-store`. All responses send `Connection: close`.
 8. **DNS rebinding and CSRF mitigation (chosen mitigation).** There is no authentication, no cookie, and no session, so the chosen mitigation is strict origin validation:
    1. the `Host` header must be present and must equal one of `<effective-host>:<port>`, `localhost:<port>`, `127.0.0.1:<port>`, or `[::1]:<port>` (case-insensitive host, exact port); when the effective port is `80`, the `:<port>` suffix may be omitted, as browsers do for the default HTTP port; a mismatch receives `400`;
    2. on `POST`, if `Origin` is present it must equal `http://<matching-host>:<port>` with the same host value that passed the `Host` check (again allowing an omitted `:80`), otherwise `403`;
    3. on `POST`, `Content-Type` must be `application/x-www-form-urlencoded` or `application/json` as appropriate, otherwise `415`, which prevents cross-origin `text/plain` and `multipart/form-data` simple requests from being useful;
    4. no CSRF token is used, because there is no session or credential to protect and the origin checks above reject cross-origin form submissions in all supported browsers.
 9. **No secret leakage.** Error responses and pages never include absolute filesystem paths, environment variable values, OS error chains beyond a short reason, stack traces, or request bodies. JSON `path` values are relative to the project directory. Log lines contain only method, truncated decoded path, and status.
-10. **No external access.** The server performs no outbound connections and serves no external resource. There is no telemetry, no update check, no remote font, and no CDN.
+10. **No external access.** The server performs no outbound connections and serves no external resource. There is no telemetry, no update check, no remote font, and no CDN. Bundled fonts are same-origin entries of the static asset table.
 11. **Transport.** There is no TLS. The default bind address is loopback. A non-loopback bind prints the warning in section 1.11 and exposes an unauthenticated read/write interface to the network; this is documented behavior, not a defect (REQ-06.002, BR-004).
 12. **Response integrity.** Request-derived data is never written into response headers; `Location` values are fixed, root-relative paths derived from a validated ID.
 13. **Input sanitization.** All request input is normalized and validated before use (NFR-02.002): IDs per section 7.1, paths per section 3.10–3.11, form values per section 7.3–7.4, JSON per section 5.7.
 
 ### 10. Browser support and accessibility
 
-1. The interface uses only features available in Firefox 100, Edge 100, and Safari 100: HTML5 forms, `<!doctype html>`, UTF-8, CSS flexbox and grid, CSS custom properties, `white-space: pre-wrap`, `system-ui` font stack, and ES2019 JavaScript (no optional chaining required, no top-level await, no private class fields).
+The shell, shared-list, width, and navigation contract is specified in `browser-shell-ui.md`.
+
+1. The interface uses only features available in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001): HTML5 forms, `<!doctype html>`, UTF-8, CSS flexbox and grid, CSS custom properties, `white-space: pre-wrap`, the system font stack plus the bundled KaTeX WOFF2 fonts, and ES2019 JavaScript (no optional chaining required, no top-level await, no private class fields).
 2. Forbidden: `:has()`, container queries, `color-mix()`, `@layer`, subgrid, `dialog`, popover, `inert`, and any feature that would require a newer engine than the stated baselines.
-3. No JavaScript module loading, no `fetch`, no dynamic import, and no framework. The single script is a classic script loaded with `<script src="/assets/app.js" defer></script>`.
+3. No JavaScript module loading, no `fetch`, no dynamic import, and no framework. The stylesheet loads in `<head>`, followed by the synchronous `/assets/nav-state.js` and the deferred `/assets/app.js`; math pages additionally link the KaTeX stylesheet and deferred script, and diagram pages add the deferred Mermaid script before `app.js` (`browser-shell-ui.md` §5.5).
 4. Accessibility basics:
    - semantic landmarks `header`, `nav`, `main`, `footer`; exactly one `h1` per page and no skipped heading levels;
    - the document-type sidebar is one `nav` (or `aside` containing a `nav`) labelled "Document types"; the entry for the selected category carries `aria-current="page"` and a non-colour cue (bold weight plus underline), so selection is never conveyed by colour alone; on record view and edit pages the entry for the record's document type carries `aria-current="page"`;
-   - at narrow widths (320 CSS px) the sidebar collapses behind a toggle button labelled "Document types" with `aria-expanded` reflecting state and `aria-controls` referencing the type list; the collapse is progressive enhancement, so with JavaScript disabled the type links remain visible and usable;
+   - one `<button class="nav-toggle" type="button" aria-expanded="true" aria-controls="site-nav">` with the stable accessible name `Navigation` sits in the header on every page at every width, left of the brand; the server emits it with `hidden` and the synchronous `/assets/nav-state.js` reveals it. It collapses and expands `<nav id="site-nav">`, persists the choice in `localStorage` under `papyrus.nav`, and defaults to expanded at every viewport width. With JavaScript disabled the navigation is expanded, visible, and usable, and no toggle is offered; the collapsed navigation is removed with `hidden`;
+   - on record view and edit pages the entry for the record's document type keeps `aria-current="page"`;
    - every form control has a `<label for>`; required fields are marked in text and with the `required` attribute;
    - error messages are associated with their fields via `aria-describedby`, and the form error summary uses `role="alert"`;
    - visible focus indicators; all controls reachable and operable by keyboard; no keyboard trap;
@@ -443,7 +467,7 @@ The approved package is the authoritative layout reference for this increment. W
 
 1. **Requirement list (home, `/`).**
    - Shared shell: header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types", `main`, `footer`.
-   - Two category states: Business requirements (default, `/?type=req`) and Non-functional requirements (`/?type=nfr`), each rendering only its own `h2` section with group rows (ID + title link, member count, nested member links) and the "Other requirements" `h3` subsection.
+   - Two category states: Business requirements (default, `/?type=req`) and Non-functional requirements (`/?type=nfr`), each rendering only its own `h2` section through the shared list contract in `browser-shell-ui.md` §3, with group rows and member rows in one table.
    - Empty states: project has no records, the selected category is empty, a group has no members.
    - Long-content state: many groups, long titles that wrap, and a long unbreakable title.
 2. **Record view (`/doc/{id}`).**
@@ -511,11 +535,11 @@ The approved package is the authoritative layout reference for this increment. W
 | T-21 | JSON API returns the documented shapes and rejects bad bodies | `GET /api/requirements`, `GET /api/doc/{id}`, `POST /api/doc/{id}`, malformed JSON, wrong types |
 | T-22 | Request limits and status codes | 405, 400, 413, 414, 431, 415, 501, 411, 403, 408, 503 fixtures over raw `TcpStream`; the over-capacity fixture holds 16 connections open, sends nothing on the 17th, and asserts `503`, `Connection: close`, EOF, and the `- - 503` log line |
 | T-23 | One request per connection and `Connection: close` | Second request on the same socket sees EOF |
-| T-24 | Offline operation | Served HTML/CSS/JS contain no external URL; no outbound socket code path; server works with an unroutable default route |
+| T-24 | Offline operation | Served HTML/CSS/JS contain no external URL; every `url(` in a served stylesheet resolves to an asset-table entry (KaTeX's 60 font paths); no outbound socket code path; server works with an unroutable default route |
 | T-25 | Non-UTF-8 record files are skipped and never rewritten | Fixture with invalid bytes |
 | T-26 | `browser_host`/`browser_port`/`browser_open` are in `config list/get/set/unset` and validated | Config CLI assertions, including `0`, `70000`, `maybe`, invalid host |
-| T-27 | Assets are embedded and served without external references | `GET /assets/app.css` and `/assets/app.js`; no `http://`, `https://`, `//`, `@import`, or `url(` remote reference |
-| T-28 | Accessibility and browser-compatibility basics | Landmarks, labels, single `h1`, `aria-describedby`, the document-type sidebar `nav` with `aria-current="page"` plus a non-colour cue, the 320 px toggle's `aria-expanded`/`aria-controls`, no forbidden CSS/JS features in a source scan |
+| T-27 | Assets are embedded and served from one exact-match table | Representative `/assets/` `GET`/`HEAD` returns 200 with the documented MIME, `Content-Length`, `Cache-Control: no-store`, and no CSP; a miss is 404 and a non-GET/HEAD is 405; the manifest digest test passes; no served CSS has a remote `url(` or `@import` |
+| T-28 | Accessibility and browser-compatibility basics | Landmarks, labels, single `h1`, `aria-describedby`, the document-type sidebar `nav` with `aria-current="page"` plus a non-colour cue, the `.nav-toggle` with `aria-expanded`/`aria-controls="site-nav"`, expanded default, `papyrus.nav` persistence, collapsed navigation carrying `hidden`, no forbidden CSS/JS features in a source scan |
 | T-29 | Build, tests, clippy, and formatting pass with existing dependencies only | `cargo build`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`; `Cargo.toml` dependency list unchanged |
 | T-30 | No reads or writes outside the project directory | Boundary assertions on every handler path; configuration path checked as for existing commands |
 
@@ -547,7 +571,7 @@ Each item has a specified default in this document, so none blocks implementatio
 - **OQ-6 (recommended default: include group editing)** — Group records are listed and their content is editable in this increment. Excluding them would leave group content view-only while requirement content is editable.
 - **OQ-7 (recommended default: 404 for deprecated records)** — The man page says deprecated documents are hidden from the web UI; returning `404` for a known deprecated ID matches "hidden" and avoids revealing that the ID exists.
 - **OQ-8 (recommended default: mtime+size version token, 409 on mismatch)** — No concurrency contract is documented. The token is dependency-free and detects the realistic single-user conflict; the residual check-then-rename race is documented.
-- **OQ-9 (recommended default: target the common feature subset)** — NFR-05.001 names "Safari version 100", whose meaning its own open question flags as unclear. This specification targets only features supported well before all three stated baselines, so the interpretation does not change the result.
+- **OQ-9 (recommended default: target the common feature subset)** — NFR-05.001's browser floor is Firefox 100+, Edge 130+, and Safari 18+. This specification targets only features supported well before those baselines, so the browser floor is fixed by the requirement and the feature subset does not change it.
 - **OQ-10 (recommended default: include the JSON API)** — The man page describes a web UI only. The JSON endpoints are an internal contract used by tests and later increments; they add no user-visible navigation.
 - **OQ-11 (recommended default: Origin+Host validation, no CSRF token)** — There is no session or credential to protect. A token would add state and a second source of truth without improving the loopback threat model.
 - **OQ-12 (recommended default: wildcard hosts are allowed and the printed URL uses `127.0.0.1`)** — Binding `0.0.0.0` is a non-loopback bind and therefore allowed with a warning; a wildcard address cannot be navigated to, so the printed and opened URL substitutes `127.0.0.1`.
@@ -560,7 +584,8 @@ Each item has a specified default in this document, so none blocks implementatio
 | Requirement | REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012, REQ-05.001, REQ-05.002, REQ-05.007, REQ-01.002, REQ-01.003, REQ-01.005 |
 | Non-functional | NFR-01.002, NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001 |
 | Business rule | BR-004 (browser command behavior), BR-016 (configuration keys and precedence) |
-| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky), ADR-0004 (repository-root single crate), ADR-0010, ADR-0012, ADR-0013 |
+| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky), ADR-0004 (repository-root single crate), ADR-0010, ADR-0012, ADR-0013, ADR-0025, ADR-0026, ADR-0027, ADR-0028 |
+| Related specification | `docs/specifications/browser-shell-ui.md` (shell, shared list, width classes, navigation) |
 | Ticket | TASK-6, TASK-86 |
 | Increment boundary | REQ-06.002 covers both stores; this increment serves the documentation store only. Backlog-store browsing (tasks, milestones, releases) is delivered by TASK-11 under REQ-06.002, so the increment is not a requirement gap. |
 | UI mockups | MOCK-0001 — approved 2026-11-03 (UTC): [`docs/specifications/ui/mockups/MOCK-0001-browser-requirements-review.html`](ui/mockups/MOCK-0001-browser-requirements-review.html) (single self-contained review package: landing, design deck, 25-view web prototype) |

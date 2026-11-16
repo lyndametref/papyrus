@@ -11,7 +11,7 @@ Layout, states, elements, and interactions for extending the local browser to de
 
 ## 2. Shared shell
 
-Header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types" with entries (Business requirements, Non-functional requirements, Backlog, Decisions), `main`, footer, one `h1` per page. Selected entry bold + underline + `aria-current="page"`. 320 px sidebar collapses behind an accessible toggle.
+Header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types" with entries (Business requirements, Non-functional requirements, Backlog, Decisions), `main`, footer, one `h1` per page. Selected entry bold + underline + `aria-current="page"`. The header navigation toggle collapses and expands the sidebar on every page; the default is expanded and the choice persists in `papyrus.nav`, with the navigation expanded and usable without JavaScript.
 
 ## 3. Screen map
 
@@ -27,7 +27,7 @@ Header (product name, project name, static offline/bind note), persistent left s
 
 - One section (`h2`) titled with the category name, showing the record count, followed by one row per record in ascending ID order.
 - Each row's primary link text is `ID + title` and links to `/doc/{id}`.
-- Decision rows additionally show, as read-only text in the row: status and decision type.
+- Rows use the shared contract in `browser-shell-ui.md` §3: `Type` and `Superseded by` slots, the structural Status column, and Title-cell labels/references.
 - Empty state and long-title wrapping as in MOCK-0001.
 - Archived decisions are not listed.
 

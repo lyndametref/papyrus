@@ -116,7 +116,7 @@ Each group contains the skill articles listed below. Each article is an element 
    - `{date_format}` — configured date format (shown in the config block; not required in snippets).
 2. Static prose and static snippets (those without placeholders) are not derived from configuration and are rendered verbatim.
 3. All substituted values are HTML-escaped before rendering. Status names, type keys, prefixes, directories, and date formats are rendered as text, never as markup.
-4. The page makes no outbound network requests and embeds no external resources; all styles come from `/assets/app.css` and scripts from `/assets/app.js`.
+4. The page makes no outbound network requests and embeds no external resources; all styles come from `/assets/app.css`, and the scripts are `/assets/nav-state.js` and `/assets/app.js` from the static asset table.
 
 ### 6. Copy affordance
 
@@ -127,11 +127,11 @@ Each group contains the skill articles listed below. Each article is an element 
 ### 7. Rendering, security, and accessibility
 
 1. All dynamic values (project name, bind note, configured prefixes, padding, statuses, type keys, directories, date format) are HTML-escaped before rendering.
-2. The page sets the same CSP and security headers as every other page (`default-src 'none'; style-src 'self'; script-src 'self'; ...`).
-3. The page loads no external stylesheet, script, font, image, or network resource; styles come from `/assets/app.css`.
+2. The page carries the strict response class fixed in `browser-requirements.md` §9.7 (the same CSP and security headers as every other HTML response).
+3. Bundled, same-origin fonts apply only inside rendered math; the page-level font stack stays the system stack, and styles come from `/assets/app.css`. The page loads no external stylesheet, script, font, image, or network resource.
 4. The page works with JavaScript disabled.
-5. Focus order follows document order; every interactive control (sidebar toggle at 320 px, sidebar links, Copy buttons) has a visible label or accessible name.
-6. The 320 CSS-pixel responsive layout collapses the sidebar behind the existing accessible toggle, matching the baseline.
+5. Focus order follows document order; every interactive control (the header navigation toggle on every page, sidebar links, Copy buttons) has a visible label or accessible name.
+6. The header navigation toggle collapses and expands the sidebar at every width; the default is expanded, the choice persists in `papyrus.nav`, and without JavaScript the navigation stays expanded and usable (`browser-shell-ui.md` §5).
 
 ### 8. Tests
 
@@ -143,7 +143,7 @@ Each group contains the skill articles listed below. Each article is an element 
    - the response body contains the config-block values for the default fixture (task prefix `TASK`, milestone prefix `MS`, release prefix `REL`, padding `3 (e.g. TASK-001)`, enabled document types `req, nfr, glossary, rule, ui-spec, ui-mockup, audit, deploy, tech-spec`, enabled decision types `adr, bdr`);
    - the response body contains the sidebar entry `Agent skills &amp; workflows`;
    - the response body contains `<a href="/skills" aria-current="page">Agent skills &amp; workflows</a>`;
-   - the response contains no `http://` or `https://` reference and no external resource reference.
+   - the response contains no `http://`, `https://`, or protocol-relative reference, and every `url(` in a served stylesheet resolves to an asset-table entry.
 2. The same test asserts `GET /?type=skills` returns the same page (alias).
 3. The same test asserts `POST /skills` returns `405` with an `Allow` header.
 4. A second test (or parameterised case) initialises a project with a custom configuration (for example custom prefixes, a custom status list such as `["Backlog", "Doing", "Done"]`, custom padding, and a disabled document type) and asserts:

@@ -22,7 +22,7 @@ Final integration increment of the offline, project-local web interface: one nav
 - Disabled or absent document types contribute no records and no error to the inventory or to any list; their sidebar entry is omitted.
 - Empty states for every category, including the inventory when no records exist.
 - Front-matter metadata projection (REQ-06.004) is reused on every per-type list/detail view and on the inventory cards where applicable; `created_date` and `updated_date` remain read-only in the browser.
-- Embedded assets, CSP, security headers, Host/Origin validation, request limits, timeouts, offline operation, browser baseline (Firefox/Edge/Safari per NFR-05.001), accessibility, and the 320 CSS-pixel responsive layout, all reused unchanged.
+- Embedded assets from the static asset table, the CSP response classes fixed in `browser-requirements.md` §9.7, security headers, Host/Origin validation, request limits, timeouts, offline operation, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility, and the 320 CSS-pixel responsive layout, all reused unchanged.
 - Unit and integration tests extending `tests/browser_cli.rs` (and siblings) for the inventory hub and for cross-type consistency, including a cross-type test that creates one record of every supported type and verifies it is reachable through the inventory and its per-type view.
 
 ### Out of scope
@@ -79,10 +79,10 @@ Final integration increment of the offline, project-local web interface: one nav
 
 ### 6. Rendering, security, and accessibility
 
-1. All baseline rules from `docs/specifications/browser-requirements.md` sections 6, 9, and 10 apply unchanged: embedded templates and assets, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, no external resources, no inline scripts/styles.
-2. The interface renders and is usable without JavaScript, including the inventory cards (plain links) and the sidebar toggle.
+1. All baseline rules from `docs/specifications/browser-requirements.md` sections 6, 9, and 10 apply unchanged: embedded templates and assets served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, the CSP response classes in §9.7, security headers, Host/Origin validation, request limits, timeouts, and no external resources.
+2. The interface renders and is usable without JavaScript: the inventory cards are plain links, the navigation is expanded and usable, and no toggle is offered.
 3. Focus order follows document order; every interactive control has a visible label or accessible name.
-4. The 320 CSS-pixel responsive layout collapses the sidebar behind the existing accessible toggle and stacks card content; no horizontal scrolling occurs.
+4. The header navigation toggle collapses and expands the sidebar at every width, defaulting to expanded and persisting the choice in `papyrus.nav`; card content stacks at 320 CSS px and no page-level horizontal scrolling occurs.
 
 ## Tests
 
@@ -98,7 +98,7 @@ Integration tests extend `tests/browser_cli.rs` (and siblings) with at least the
 - T-19h: deprecated records of at least three document types are absent from the inventory counts and return `404` on view, edit, POST, and API, with identical HTML `404` bodies for deprecated and unknown IDs.
 - T-19i: a project with a disabled document type (for example `tech-spec.enabled: false`) shows no card for it and no error on the inventory; `?type=tech-spec` renders the empty state.
 - T-19j: the inventory and every per-type list/edit view render without JavaScript, keep controls labelled and stacked at 320 CSS pixels, and contain no `http://` or `https://` reference.
-- T-19k: an offline asset scan finds no external origin in inventory, list, view, edit, lifecycle, skills, and error responses.
+- T-19k: an offline asset scan finds no external origin in inventory, list, view, edit, lifecycle, skills, and error responses; representative asset responses carry the documented MIME and no CSP, and the manifest digest test passes.
 - T-19l: build, tests, clippy, and formatting pass with existing dependencies only.
 
 ## Assumptions
@@ -113,7 +113,7 @@ Integration tests extend `tests/browser_cli.rs` (and siblings) with at least the
 ## Open questions
 
 - **OQ-1 (non-blocking, product)** — Whether the inventory hub should show counts only or also a one-line preview per type (for example the most recently updated record). MOCK-0012 uses illustrative counts only; this specification adopts counts only. If the product prefers previews, only the card template and its tests change.
-- **OQ-2 (non-blocking, follow-up)** — Real-browser verification in Firefox, Edge, and Safari 100+ is deferred, consistent with sibling tickets.
+- **OQ-2 (non-blocking, follow-up)** — Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ is deferred, consistent with sibling tickets.
 - **OQ-3 (non-blocking, consistency)** — The approved MOCK-0012 prototype marks only four types as clickable because it fully prototypes only those; the implementation marks every type clickable because every type already has a per-type list view. If the product prefers a restricted clickable set, only the card link rendering changes.
 
 ## Traceability
@@ -142,7 +142,7 @@ Integration tests extend `tests/browser_cli.rs` (and siblings) with at least the
 | AC-6 | Disabled/absent document types contribute no card, no records, and no error. |
 | AC-7 | Empty states render for every category and for the inventory. |
 | AC-8 | Metadata projection (REQ-06.004) is reused unchanged on every list/detail view. |
-| AC-9 | The interface remains offline-capable with no external resources, escaped content, unchanged security headers, and keyboard-operable controls. |
+| AC-9 | The interface remains offline-capable with embedded same-origin assets, escaped content, the documented CSP response classes and security headers, and keyboard-operable controls. |
 | AC-10 | The interface works without JavaScript and keeps controls labelled and stacked at 320 CSS pixels. |
 | AC-11 | Build, tests, clippy, and formatting pass with existing dependencies only. |
 

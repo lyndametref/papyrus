@@ -49,7 +49,7 @@ Out of scope by specification: creating, deprecating, restoring, deleting, or mo
 All pages share one shell:
 
 1. `header` — product name "Papyrus", project name (the project directory name), and a right-aligned "Local browser / offline · 127.0.0.1:6420" note. No top navigation menu: the list is the only top-level page.
-2. `aside`/`nav` (persistent left sidebar) — document types as vertical choices (Business requirements, Non-functional requirements), extensible for future types. The selected type is bold, underlined, and marked `aria-current="page"`. On narrow viewports the sidebar collapses behind an accessible toggle button.
+2. `aside`/`nav` (persistent left sidebar) — document types as vertical choices (Business requirements, Non-functional requirements), extensible for future types. The selected type is bold, underlined, and marked `aria-current="page"`. The header navigation toggle collapses and expands the sidebar at every width; the default is expanded and the choice persists in `papyrus.nav`.
 3. `main` — page-specific content.
 4. `footer` — one line stating that every page is served from this project with no network access.
 5. Exactly one `h1` per page.
@@ -60,10 +60,10 @@ All pages share one shell:
 
 - `h1` "Requirements" and one muted sentence describing the page.
 - Type navigation: a persistent left sidebar `nav` (labelled "Document types") listing the document types as vertical links — Business requirements, Non-functional requirements — extensible for future types. The selected type is bold, underlined, and marked `aria-current="page"`; colour is never the only cue. Selecting a type shows only that category in the main panel; business and non-functional requirements are separate document categories, not a filter on one set.
-- The selected category renders its section (`h2`) with its groups and "Other requirements" subsection; the other category is not rendered on that page.
+- The selected category renders its section (`h2`) through the shared list contract in `browser-shell-ui.md` §3; the other category is not rendered on that page.
 - Each section header shows the group count and requirement count on the right.
-- Each group is a bordered row containing the group ID and title (one link), a member count, and the member requirements as a nested list of links. Requirement link text is "ID + title".
-- "Other requirements" is an `h3` subsection at the end of its type section. Each row shows the requirement link and, right-aligned, the stored group reference as plain text: `Group: REQ-99 (not found)`.
+- Each group is a row in the shared table (group row plus `data-child-of` member rows in one `<tbody>`); the Group slot carries the stored reference, the action cell carries `View`/`Edit`, and labels/references sit in the Title cell.
+- A member whose group row is absent (unresolved or missing reference) renders as a top-level row in ID order, with the stored value in the Group slot (`REQ-99 (not found)` or `(none)`); there is no catch-all subsection.
 - Empty states are dashed boxes with a sentence; the empty project and empty type states also state that records are created from the command line and that this browser does not create records.
 
 ### 5.2 States
@@ -187,7 +187,7 @@ The two 404 variants share the layout. The message may be identical so a depreca
 ### 9.1 Narrow viewport (320 CSS px)
 
 - The header keeps the product and project names at the left; the right-aligned "Local browser / offline · 127.0.0.1:6420" note is omitted at this width. The footer shortens to "Papyrus local browser — served from this project only."
-- The document-type sidebar collapses to a single accessible toggle button (labelled "Document types", `aria-expanded` reflecting state, `aria-controls` pointing at the type list). When expanded the type choices stack vertically; when collapsed they are hidden. Type selection still works without JavaScript via the links.
+- The header navigation toggle collapses and expands the sidebar at every width; the default is expanded and the choice persists in `papyrus.nav`. Without JavaScript the navigation is expanded, visible, and usable, and no toggle is offered. Type selection still works without JavaScript via the links.
 - Group rows stack: the group link (ID + title, wrapping), the member count on its own line, then the member links.
 - Long titles and long unbreakable words wrap inside the row; there is no horizontal scrolling of text.
 - Edit form fields are full width; the action row stacks, only the Save button spans the column (full-width, centred label), and Cancel stays an inline link below it — it does not become a full-width button.
@@ -199,7 +199,7 @@ The two 404 variants share the layout. The message may be identical so a depreca
 | --- | --- |
 | 1 | Landmarks: `header`, `nav` (document types or breadcrumb), `main`, `footer`; the project name is text, not a link |
 | 2 | One `h1` per page; type sections are `h2`; groups are `h3`; no level is skipped |
-| 3 | Document-type sidebar is one `nav`/`aside` labelled "Document types" with vertical links; the active link uses `aria-current="page"` plus bold and underline; on narrow viewports it collapses behind an accessible toggle |
+| 3 | Document-type sidebar is one `nav`/`aside` labelled "Document types" with vertical links; the active link uses `aria-current="page"` plus bold and underline; the header toggle collapses it on every page, defaults to expanded, and persists in `papyrus.nav` |
 | 4 | A group row is one link (ID + title) with the member count as adjacent text; deprecated members are not counted |
 | 5 | Member links read as ID + title, so they are descriptive out of context |
 | 6 | Focus order follows document order; focus ring 2 px with 2 px offset, visible on every control |
@@ -212,7 +212,7 @@ The two 404 variants share the layout. The message may be identical so a depreca
 
 ### 9.3 Keyboard-only operation
 
-- Sidebar: Tab to the toggle (narrow viewports) or the type links; Enter/Space activates; the current type is announced.
+- Sidebar: Tab to the header toggle or the type links; Enter/Space activates; the current type is announced.
 - List: Tab moves group link → its member links → next group; Enter opens the record.
 - View: Tab order is breadcrumb links, Edit, owning-group link. There is no "Back to requirements" action; the breadcrumb and the sidebar are the way back to the list.
 - Edit: Tab order is breadcrumb, read-only link, title, story (business only), description, Save, Cancel; Enter submits, Space activates buttons.
@@ -222,7 +222,7 @@ The two 404 variants share the layout. The message may be identical so a depreca
 
 | Screen | Elements |
 | --- | --- |
-| List | 2 document-type sidebar links; 1 group link per group (ID + title in a single link); 1 link per member requirement; 1 link per "Other requirements" row |
+| List | 2 document-type sidebar links; the shared list table with a group link per group, a member link per requirement, Title-cell labels/references, and View/Edit actions |
 | View | Breadcrumb links (Requirements, owning group); Edit; owning-group link in metadata |
 | Edit | Title input; user story textarea (business only); description textarea; read-only version note (static text); hidden version input; Save changes; Cancel |
 | Error | Back to requirements |
@@ -233,7 +233,7 @@ No other control exists in this increment: no create, deprecate, restore, delete
 ## 11. Interaction flows
 
 1. **List → group → requirement → edit → save → view.** All → group `REQ-06` → requirement `REQ-06.002` → Edit → change title/description → Save changes → 303 → view shows the new content read from disk. The view has no "Back to requirements" action: the breadcrumb or the sidebar returns to the list.
-2. **Category change keeps section structure.** Selecting "Business requirements" in the sidebar shows only the business `h2` with its groups and "Other requirements"; the non-functional section is absent, not empty. Selecting "Non-functional requirements" shows only that section. The two categories are independent document sets, not a filter on one set.
+2. **Category change keeps section structure.** Selecting "Business requirements" in the sidebar shows only the business `h2` with its shared group/member rows; the non-functional section is absent, not empty. Selecting "Non-functional requirements" shows only that section. The two categories are independent document sets, not a filter on one set.
 3. **Validation recovery without losing input.** Submit with an empty title and a `## ` line in the description → 422 re-renders the form with the summary, field messages, and all typed values → correct the two fields → Save succeeds.
 4. **Conflict recovery.** Open the edit form, modify the file outside the browser, submit → 409 page → copy unsaved values if needed → Reload the form → new content and token → edit and save again.
 5. **Error recovery.** Any error page offers exactly one way back to the list; no partial write or lost content is implied.

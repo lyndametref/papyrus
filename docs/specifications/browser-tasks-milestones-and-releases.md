@@ -55,7 +55,7 @@ Extend the first browser increment (TASK-6, `docs/specifications/browser-require
 
 ### 3. List page
 
-The combined Backlog view (`/?type=task`, sidebar entry "Backlog") is the per-milestone kanban board required by REQ-06.013. The milestone (`?type=milestone`) and release (`?type=release`) category pages are unchanged by this revision and continue to render one section per category with one row per record in ascending ID order (milestone rows show the release ID; release rows show no extra metadata), with the empty states and long-title wrapping of the baseline.
+The combined Backlog view (`/?type=task`, sidebar entry "Backlog") is the per-milestone kanban board required by REQ-06.013 and keeps its card content; only its width class is `Full`. The milestone (`?type=milestone`) and release (`?type=release`) category pages render through the shared list layout in `browser-shell-ui.md` §3: one section per category, one row per record in ascending ID order, the milestone `Release` family slot, and no extra slot for release. The empty states and long-title wrapping follow the shared contract.
 
 **Board layout**
 
@@ -223,7 +223,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 9. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox/Edge/Safari 100+), accessibility basics, no external resources, no inline scripts/styles.
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, no inline scripts/styles.
 2. Templates may be extended with backlog-specific placeholders; unknown placeholders are left untouched as in the baseline.
 3. The sidebar's Backlog entry and the backlog list/view/edit templates are the only rendering additions.
 
@@ -231,7 +231,7 @@ Record views in this specification follow the shared single record view layout d
 
 1. Unit tests cover: ID validation for the new ID shapes, record parsing/serialization for task/milestone/release, field validation for the new fields, version token, JSON shapes.
 2. Integration tests extend `tests/browser_cli.rs` with scenarios for the new categories, including at least:
-   - T-11a: list renders one backlog category at a time, ordered by ID, with the selected sidebar entry marked `aria-current="page"`.
+   - T-11a: milestone and release lists render through the shared layout (`data-list-layout="shared"`) with the milestone `Release` slot, ordered by ID, with the selected sidebar entry marked `aria-current="page"`; the task route still renders the board.
    - T-11b: `?type=task|milestone|release` works, default remains `req`, and any other value is `400`.
    - T-11c: view shows all backlog-specific fields; milestone/dependency links resolve.
    - T-11d: edit round-trip persists and is visible through both the UI and the CLI.
@@ -274,7 +274,7 @@ UI mockups are required before any UI implementation work and must be approved b
 |---|---|
 | AC-1 | The browser displays and edits active task, milestone, and release records in addition to requirement content. |
 | AC-2 | Browser operations remain offline-capable, use project-local text-file persistence, sanitize input, and access no paths outside the project directory except during init. |
-| AC-3 | The expanded interface renders in Firefox, Microsoft Edge, and Safari version 100 or later. |
+| AC-3 | The expanded interface renders in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001). |
 | AC-4 | Archived tasks/milestones are not listed and return `404` by URL. |
 | AC-5 | Optimistic concurrency and atomic writes hold for the new record types. |
 
@@ -289,7 +289,7 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: The configured statuses are the allowed values for a task's `status` field in the browser.
 - Assumption: A new MOCK id (MOCK-0002) is allocated for the extension rather than modifying the approved MOCK-0001 in place, per the global sequential-id rule.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
-- Assumption: AC #10 (real-browser verification in Firefox, Microsoft Edge, and Safari 100+) and NFR-05.001 are deferred follow-ups, not blocking for this ticket; tracked as a follow-up rather than a release gate.
+- Assumption: AC #10 (real-browser verification in Firefox 100+, Edge 130+, and Safari 18+) and NFR-05.001 are deferred follow-ups, not blocking for this ticket; tracked as a follow-up rather than a release gate.
 
 ## Open questions
 

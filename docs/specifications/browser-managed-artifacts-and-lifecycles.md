@@ -101,11 +101,11 @@ Each section's lifecycle paragraph uses the documented lifecycle for that type:
 ### 6. Rendering, security, and accessibility
 
 1. All dynamic values (project name, bind note, configured status names) are HTML-escaped before rendering. Status names are rendered as text, never as markup.
-2. The page sets the same CSP and security headers as every other page (`default-src 'none'; style-src 'self'; script-src 'self'; ...`).
-3. The page loads no external stylesheet, script, font, image, or network resource; styles come from `/assets/app.css`.
+2. The page carries the strict response class fixed in `browser-requirements.md` §9.7 (the same CSP and security headers as every other HTML response).
+3. Bundled, same-origin fonts apply only inside rendered math; the page-level font stack stays the system stack, and styles come from `/assets/app.css`. The page loads no external stylesheet, script, font, image, or network resource.
 4. The page works with JavaScript disabled.
-5. Focus order follows document order; every interactive control (sidebar toggle at 320 px, sidebar links) has a visible label or accessible name.
-6. The 320 CSS-pixel responsive layout collapses the sidebar behind the existing accessible toggle, matching the baseline.
+5. Focus order follows document order; every interactive control (the header navigation toggle on every page, sidebar links) has a visible label or accessible name.
+6. The header navigation toggle collapses and expands the sidebar at every width; the default is expanded, the choice persists in `papyrus.nav`, and without JavaScript the navigation stays expanded and usable (`browser-shell-ui.md` §5).
 
 ### 7. Tests
 
@@ -116,7 +116,7 @@ Each section's lifecycle paragraph uses the documented lifecycle for that type:
    - the response body contains the configured default status chain `ToDo → Initiated → Refined → Implemented → Validated → Done`;
    - the response body contains the exclusion statement;
    - the response body contains the sidebar entry `Managed artifacts &amp; lifecycles`;
-   - the response contains no `http://` or `https://` reference and no external resource reference.
+   - the response contains no `http://`, `https://`, or protocol-relative reference, and every `url(` in a served stylesheet resolves to an asset-table entry.
 2. The same test asserts `GET /?type=lifecycle` returns the same page (alias).
 3. The same test asserts `POST /lifecycle` returns `405` with an `Allow` header.
 4. A second test (or a parameterised case) initialises a project with a custom status list (for example `["Backlog", "Doing", "Done"]`) and asserts the task section renders that exact chain and does not render the default chain.

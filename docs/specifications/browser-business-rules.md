@@ -16,7 +16,7 @@ Business rules are Markdown text records with a fixed section template (`## Desc
 ### In scope
 
 - Extending the persistent sidebar with a "Business Rules" entry (immediately after "Business requirements") and the `?type=` category selector to `business-rule`, without changing the list-page structure (baseline spec section 4.6).
-- Listing active business rules, rendering only the business-rules section, with the first paragraph of the description as a row preview.
+- Listing active business rules, rendering only the business-rules section, through the shared list layout in `browser-shell-ui.md` §3 (`Applicability` slot; Title-cell labels and references).
 - Viewing a business rule's title, description, rationale, applicability, and referenced requirement IDs, with requirement references rendered as links to the corresponding requirement browser view where they resolve.
 - Editing `title`, `description`, `rationale`, `applicability`, and `requirements` (business requirement IDs) through a form matching MOCK-0007, with the baseline optimistic-concurrency and atomic-write contract (ADR-0006).
 - A field-preserving write contract that changes only the edited sections and leaves every other section, line, and byte of the file content-identical.
@@ -67,9 +67,9 @@ Business rules are Markdown text records with a fixed section template (`## Desc
 
 ### 4. List page
 
-1. For the `business-rule` category the list page renders one section (`h2`) titled "Business Rules", showing the record count, followed by one row per rule in ascending ID order.
-2. Each row's primary link text is `ID + title` and links to `/doc/{id}`.
-3. Each row also shows the first paragraph of the rule's description beneath the primary link; rules with an empty description show no preview. The preview is plain text (first paragraph only, not the full description).
+1. For the `business-rule` category the list page renders one section (`h2`) titled "Business Rules", showing the record count, followed by the shared list table (`browser-shell-ui.md` §3) with one row per rule in ascending ID order.
+2. Each row's Title cell links `ID + title` to `/doc/{id}` and carries the record's labels and references below the link; the `Applicability` family slot occupies its declared column.
+3. The list has no description preview and no separate row metadata: description, rationale, applicability, and requirements appear only on the record view.
 4. Empty state and long-title wrapping follow the baseline (section 10.4).
 5. Deprecated business rules are never listed or counted.
 
@@ -190,7 +190,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox/Edge/Safari 100+), accessibility basics, no external resources, and no inline scripts/styles.
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, and no inline scripts/styles.
 2. Requirement references rendered as links in the view are the only exception to the baseline "requirement references inside any field are displayed as literal text" rule (section 4.19 of the baseline); the link target is derived from a resolved record ID, never from request input.
 3. Tag controls are keyboard operable, every input has a `<label>` or accessible name, remove controls are labelled `Remove <value>`, and the add input is labelled. Focus is not trapped.
 4. The sidebar's Business Rules entry and the business-rules list/view/edit templates are the only rendering additions; the shared shell and error pages are reused.
@@ -210,7 +210,7 @@ Record views in this specification follow the shared single record view layout d
    - T-25i: deprecated business rules are not listed and return `404` on view, edit, POST, and API.
    - T-25j: JSON API returns the documented summary and full shapes, applies the documented POST semantics, and rejects wrong types with `400`/`422`.
    - T-25k: writes are atomic, leave no temporary file, and a symlink escape returns `404`.
-   - T-25l: an offline asset scan finds no external origin in list, view, or edit responses.
+   - T-25l: an offline asset scan finds no external origin in list, view, or edit responses, and every served stylesheet `url(` resolves to a static-table entry.
    - T-25m: build, tests, clippy, and formatting pass with existing dependencies only.
 
 ## UI design handoff
@@ -222,7 +222,7 @@ UI mockups are required before any UI implementation work and must be approved b
 ### Screens covered by the approved package
 
 1. **Shared shell** (reused): header, sidebar with eight entries, `main`, footer, one `h1` per page.
-2. **Business rules list** (`/?type=business-rule`): one section with record count, rows of `ID + title` plus description preview; empty and long-title states.
+2. **Business rules list** (`/?type=business-rule`): one section with record count, the shared table with `Applicability` slot and Title-cell labels/references; empty and long-title states.
 3. **Business rule view** (`/doc/{id}`): metadata block, title `h1`, Description/Rationale/Applicability/Requirements sections with `pre-wrap`, breadcrumb `Business Rules › ID`, single `Edit`.
 4. **Edit form** (`/doc/{id}/edit`): title input, description/rationale/applicability textareas, requirements tag box (add/remove), version annotation, Save/Cancel; pristine, dirty, 422, 409, and 320 px states.
 5. **Error pages**: 404 unknown, 404 deprecated, 400, 405, 415, 500 (reused from MOCK-0001).
@@ -237,7 +237,7 @@ UI mockups are required before any UI implementation work and must be approved b
 | Check | Verifies |
 |---|---|
 | AC-1 | `?type=business-rule` renders the category, the default stays `req`, other values are `400`, and the sidebar entry is ordered after Business requirements with `aria-current="page"` and omitted when the type is disabled. |
-| AC-2 | The list shows active rules only, ascending by ID, with `ID + title` links, description preview, count, empty state, and no non-record or deprecated files. |
+| AC-2 | The list shows active rules only, ascending by ID, through the shared list layout with Title-cell labels/references, the `Applicability` slot, the action cell, count, and empty state, and no non-record or deprecated files. |
 | AC-3 | The view shows ID, form, category, title, description, rationale, applicability, requirements, breadcrumb, and one Edit action, and renders requirement references as links where they resolve. |
 | AC-4 | The edit form matches MOCK-0007: title, description, rationale, applicability, requirements tag add/remove, hidden version plus annotation, Save/Cancel, pristine/dirty/422/409/320 px, and operates without JavaScript. |
 | AC-5 | An edit round-trip persists all five fields and is visible in the browser and through `papyrus rule view`. |
@@ -260,7 +260,7 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: Duplicate requirement references are collapsed on save, matching `rule edit`; this is looser than the CLI's input handling but produces the same stored result.
 - Assumption: The tag field's no-JavaScript fallback uses one text input per value plus a trailing empty input with the same field name; this preserves the approved chip layout with JavaScript and keeps the form usable without it.
 - Assumption: The JSON API exposes the five editable fields; business rules have no status, task, or supersession metadata, unlike decision records.
-- Assumption: Real-browser verification in Firefox, Edge, and Safari 100+ (NFR-05.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24/TASK-40.
+- Assumption: Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24/TASK-40.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
 - Assumption: The canonical `BR-*.md` documents sharing the directory are not records and are never touched by the browser; only `<prefix>-<digits>.md` files are.
 
@@ -270,7 +270,7 @@ UI mockups are required before any UI implementation work and must be approved b
 - **OQ-2 (non-blocking, product)** — Whether duplicate requirement references should be rejected instead of collapsed. This specification collapses them to match `rule edit` and the UI description. If rejection is preferred, the tag interaction and validation messages change (a `Duplicate requirement reference: <value>.` message is added).
 - **OQ-3 (non-blocking, layout)** — Whether requirement references in the view should be rendered as links (adopted here per MOCK-0007 OQ-2) or as literal text (baseline section 4.19). This specification adopts links; the baseline text-display rule applies to all other requirement references in the browser.
 - **OQ-4 (non-blocking, naming)** — The JSON `kind`/`form` value is `business-rule` to match the category selector. If the implementation prefers the CLI type key `rule`, the value changes in one place and tests follow.
-- **OQ-5 (non-blocking, follow-up)** — Real-browser verification in Firefox, Edge, and Safari 100+ is deferred, consistent with sibling tickets.
+- **OQ-5 (non-blocking, follow-up)** — Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ is deferred, consistent with sibling tickets.
 
 ## Traceability
 

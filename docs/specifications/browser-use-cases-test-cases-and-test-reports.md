@@ -16,7 +16,7 @@ Use cases, test cases, and test reports are Markdown text records with the fixed
 ### In scope
 
 - Extending the persistent sidebar with three entries — "Use Cases", "Test Cases", and "Test Reports" — placed immediately after "Technical Specifications", and the `?type=` category selector to `use-case`, `test-case`, and `test-report`, without changing the list-page structure (baseline spec section 4.6).
-- Listing active records of each type, rendering only the selected category, with the first paragraph of the description as a row preview and a metadata line (created date, updated date, labels, references).
+- Listing active records of each type, rendering only the selected category, through the shared list layout in `browser-shell-ui.md` §3 (no family slot; Created/Updated columns and Title-cell labels/references replace the row metadata).
 - Viewing a record's title, description, applicability, and front-matter metadata, with the description and applicability rendered as body text.
 - Editing `title` (required, single-line), `description` (required, multi-line textarea), `applicability` (optional, multi-line textarea), and the front-matter `labels` and `references` lists (tags with add/remove) through forms matching MOCK-0013, with the baseline optimistic-concurrency and atomic-write contract (ADR-0006).
 - A field-preserving write contract that changes only the title heading, the `## Description` and `## Applicability` sections, and the front-matter `title`/`labels`/`references` keys, and leaves every other section, line, and byte of the file content-identical.
@@ -70,11 +70,10 @@ Use cases, test cases, and test reports are Markdown text records with the fixed
 
 ### 4. List page
 
-1. For each of the three categories the list page renders one section (`h2`) titled with the type label, showing the record count, followed by one row per record in ascending ID order.
-2. Each row's primary link text is `ID + title` and links to `/doc/{id}`.
-3. Each row also shows the first paragraph of the record's description beneath the primary link; records with an empty description show no preview. The preview is plain text (first paragraph only, not the full description).
-4. Each row shows a metadata line: created date, updated date, labels, references (front-matter projection).
-5. Empty state: "No <type> were found in the configured directory. <Type> are created from the command line; this browser does not create records. Deprecated <type> are hidden." (with `<type>` as `use cases` / `test cases` / `test reports`).
+1. For each of the three categories the list page renders one section (`h2`) titled with the type label, showing the record count, followed by the shared list table (`browser-shell-ui.md` §3) with one row per record in ascending ID order.
+2. Each row's Title cell links `ID + title` to `/doc/{id}` and carries the record's labels and references below the link; the family declares no extra slot.
+3. The list has no description preview and no separate row metadata: `Created` and `Updated` are structural columns, and labels/references are in the Title cell (front-matter projection).
+4. Empty state follows the shared rule in `browser-shell-ui.md` §3.6.
 6. Long-title and unbreakable-token wrapping follow the baseline (section 10.4).
 7. Deprecated records of all three types are never listed or counted.
 
@@ -211,7 +210,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox/Edge/Safari 100+), accessibility basics, no external resources, and no inline scripts/styles.
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, and no inline scripts/styles.
 2. The sidebar's three new entries, the three list/view/edit templates, the three `404` pages, and the front-matter metadata rows are the only rendering additions; the shared shell and the remaining error pages are reused.
 3. Labels and references are rendered as tags in the view and edited with the tag add/remove interaction (reusing the MOCK-0002 pattern). Both fields are keyboard operable; every input has a visible label or accessible name; remove controls are labelled `Remove <value>`; the add input is labelled. Focus is not trapped.
 4. Both body fields are native `input`/`textarea` controls with a `<label>`; no tag, select, or custom widget is added for them. The form is keyboard operable and works with JavaScript disabled. Focus is not trapped.
@@ -245,7 +244,7 @@ UI mockups are required before any UI implementation work and must be approved b
 ### Screens covered by the approved package
 
 1. **Shared shell** (reused): header, sidebar with fifteen entries, `main`, footer, one `h1` per page.
-2. **Use cases list** (`/?type=use-case`): one section with record count, rows of `ID + title` plus description preview and metadata line; empty and long-title states.
+2. **Use cases list** (`/?type=use-case`): one section with record count, the shared table with Created/Updated columns and Title-cell labels/references; empty and long-title states.
 3. **Use case view** (`/doc/{id}`): metadata block, title `h1`, description body with `pre-wrap`, applicability section, breadcrumb `Use Cases › ID`, single `Edit`.
 4. **Use case edit form** (`/doc/{id}/edit`): title input, description textarea, applicability textarea, front-matter metadata block (ID, created date, updated date read-only; labels and references tags), hidden version plus annotation; pristine, dirty, 422, 409, and 320 px states.
 5. **Test cases list/view/edit** and **Test reports list/view/edit**: same structure as use cases, with their respective labels.
@@ -255,7 +254,7 @@ UI mockups are required before any UI implementation work and must be approved b
 
 1. The sidebar places Use Cases, Test Cases, and Test Reports immediately after Technical Specifications, per the approved MOCK-0013 and its UI description (OQ-1).
 2. The category values are `use-case`, `test-case`, and `test-report`; any other value is `400` (OQ-2).
-3. List rows show the first paragraph of the description as a preview, consistent with MOCK-0009 (OQ-3).
+3. List rows use the shared contract; the legacy description preview and row metadata are removed (OQ-3 resolved as removed).
 4. Field rules are limited to those stated in the management specification and BR-018/BR-019/BR-020: title and description are trimmed, required, and reject control characters; applicability is optional multi-line (OQ-4).
 5. All three types demonstrate front-matter metadata projection (id, title, created_date, updated_date, labels, references) in list, detail, and edit, because this ticket is specifically about them (OQ-5).
 
@@ -264,7 +263,7 @@ UI mockups are required before any UI implementation work and must be approved b
 | Check | Verifies |
 |---|---|
 | AC-1 | `?type=use-case`, `?type=test-case`, and `?type=test-report` render their categories, the default stays `req`, other values are `400`, and the three sidebar entries are ordered after Technical Specifications with `aria-current="page"` and omitted when their type is disabled. |
-| AC-2 | Each list shows active records only, ascending by ID, with `ID + title` links, description preview, metadata line, count, empty state, and no non-record or deprecated files. |
+| AC-2 | Each list shows active records only, ascending by ID, through the shared layout with `ID + title` links, Created/Updated columns, Title-cell labels/references, action cell, count, empty state, and no non-record or deprecated files. |
 | AC-3 | Each view shows ID, Title, Created date, Updated date, Labels, References, title `h1`, description (no "Description" heading), applicability section when present, breadcrumb, and one Edit action; an empty description shows `(none)`. |
 | AC-4 | Each edit form matches MOCK-0013: title input, description textarea, applicability textarea, front-matter metadata block (ID, created date, updated date read-only; labels and references tags), hidden version plus annotation, Save/Cancel, pristine/dirty/422/409/320 px, and operates without JavaScript. |
 | AC-5 | An edit round-trip persists title, description, applicability, labels, and references and is visible in the browser and through `papyrus use-case view` / `papyrus test-case view` / `papyrus test-report view`. |
@@ -290,14 +289,14 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: The `document_types.<type>.enabled` flag controls the sidebar entry and category for each type, like the other document types; a missing directory is an empty category, not an error.
 - Assumption: Labels are collapsed on duplicate, matching the task-label handling; references reject duplicates, matching the UI-mockup reference handling.
 - Assumption: Front-matter metadata projection reuses the shared `RecordView` (TASK-67); `created_date` and `updated_date` are read-only in the browser and `updated_date` is refreshed only when a save changes at least one byte.
-- Assumption: Real-browser verification in Firefox, Edge, and Safari 100+ (NFR-05.001) remains a deferred follow-up, consistent with sibling tickets.
+- Assumption: Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001) remains a deferred follow-up, consistent with sibling tickets.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
 
 ## Open questions
 
 - **OQ-1 (non-blocking, product)** — Whether use cases, test cases, and test reports should gain structured references to tasks or milestones in the browser. REQ-05.012/013/014 leave association to tasks/milestones undecided; this specification treats them as literal text in the general `references` list.
 - **OQ-2 (non-blocking, validation)** — The management specification and BR-018/019/020 state no length limit for title/description/applicability, while the browser baseline applies title 1–200 and multi-line text 20000 limits. This specification adopts the baseline limits for consistency with the other browser document types; MOCK-0013 draws no length help text. If the product prefers no browser length limit, only the documented messages and tests for the two length rules change.
-- **OQ-3 (non-blocking, follow-up)** — Real-browser verification in Firefox, Edge, and Safari 100+ is deferred, consistent with sibling tickets.
+- **OQ-3 (resolved)** — The legacy list preview and row metadata are removed; list rows use the shared contract in `browser-shell-ui.md` §3. Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ remains a deferred follow-up (TASK-150).
 
 ## Traceability
 

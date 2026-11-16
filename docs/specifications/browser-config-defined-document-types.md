@@ -28,8 +28,7 @@ In scope:
 - Registry-derived navigation grouped by the three artifact categories,
   inventory cards, list pages, detail routing, edit forms, not-found selection,
   JSON API endpoints, and lifecycle page.
-- A shared document list layout (Status, ID, Title, Created, Updated columns)
-  and read-only front-matter `created_date` display.
+- The shared list layout from `browser-shell-ui.md` §3 (ID, Title, Status, family slots, Created, Updated, Actions), with no family slot for a config-defined type, and read-only front-matter `created_date` display.
 - Two generic view families (ADR-0020 decision 5): generic config-defined
   document pages and unchanged typed built-in pages selected by descriptor.
 - Read-only status display and a validated status filter on document list
@@ -155,28 +154,25 @@ Out of scope:
 
 1. Every document list view renders the enabled records of exactly one type,
    read from that descriptor's active directory only (section 6).
-2. Every document list view shows the same row fields in this order:
-   **Status**, **ID**, **Title**, **Created**, **Updated**, with Status
-   immediately left of ID. The generic document list renders them as table
-   columns; a typed built-in list keeps its existing list markup and places
-   the same fields in the same order on each row (grouped requirement lists
-   keep their group/member structure and show the fields on each member row).
+2. Every document list view uses the shared list contract in
+   `browser-shell-ui.md` §3: the fixed order **ID**, **Title**, **Status**,
+   family slot(s), **Created**, **Updated**, **Actions**. A generic
+   config-defined type declares no family slot; a typed built-in family
+   declares its slots as data. Grouped requirement lists keep their
+   group/member structure inside the shared table.
    - `Status` renders the stored status read-only, exactly as stored.
    - `ID` renders the record ID as text.
    - `Title` links to `/doc/<ID>`.
    - `Created` renders the front-matter `created_date` as stored, or `(none)`
      when the key is absent; it is never derived or rewritten by the browser.
    - `Updated` renders the stored `updated_date`, or `(none)`.
-3. Rows are ordered by ID ascending. A row may retain the existing
-   type-specific metadata line below the columns.
+3. Rows are ordered by ID ascending. The Title cell carries the record labels and references; the legacy type-specific row metadata is not carried over by the shared contract.
 4. The page shows a count of the records displayed (after filtering) and the
    existing empty state when there are none.
-5. Built-in typed list pages keep their current sections, grouping, and
-   empty-state copy and adopt only the shared row-field order of (2); the
-   status filter (3.2) is added to them. Requirement lists keep their
-   group/member structure (req/nfr), the task route keeps the board page, and
-   the milestone/release/decision list layouts are unchanged apart from the
-   status behavior already scoped.
+5. Built-in typed list pages render through the shared contract of (2) and
+   the shared empty state of `browser-shell-ui.md` §3.6; the status filter
+   (3.2) is added to them. Requirement lists keep their group/member
+   structure (req/nfr), and the task route keeps the board page.
 
 #### 3.2 Status filter
 
@@ -203,7 +199,7 @@ Out of scope:
 5. For grouped requirement lists, filtering is applied to records before
    grouping: only matching requirement records are listed; a group heading is
    shown when the group record matches or when at least one of its members
-   matches; a group with neither is omitted. `Other requirements` is recomputed
+   matches; a group with neither is omitted. Orphan-member rows are recomputed
    from the filtered set. Synthesised NFR group headings are display-only and
    are shown only when they retain at least one matching member.
 6. The selected option is rendered selected in the select and is also a
@@ -482,13 +478,14 @@ Out of scope:
      table grouped by artifact category; remove the hard-coded enabled checks
      and `category_name` matches; derive labels from the presentation table or
      title-case the slug.
-   - Add `document_list_page`, `document_detail_page`, `document_edit_page`,
-     and `document_conflict_page` for `ContentModel::Generic`; the generic list
-     uses the shared Status, ID, Title, Created, Updated column order.
-   - Add one shared `document_list_rows`/field-order helper (also used by the
-     typed built-in list pages) so every document list renders the same
-     Status, ID, Title, Created, Updated fields in order, plus
-     one shared `status_filter_html(descriptor, selected)` helper and a shared
+   - Add `list_page`, the `document_detail_page`, `document_edit_page`,
+     and `document_conflict_page` renderers for `ContentModel::Generic`; every
+     list route builds a `ListPlan` and renders the shared `list.html` body
+     fragment.
+   - Add one shared list builder (`ListPlan`) and the declared presentation
+     slots for every family, so every list renders the same seven-column order
+     with its declared slots, plus one shared
+     `status_filter_html(descriptor, selected)` helper and a shared
      `status_text(record)` helper.
    - Reduce the not-found pages to: the four existing built-in pages selected
      by handler, one generic document not-found page, and the existing generic
@@ -510,10 +507,10 @@ Out of scope:
    - `handle_request` 404 mapping: use `routes.id_rules` to choose the
      built-in not-found page or the generic document page; no ID echo.
 6. **Templates**
-   - Add `src/browser/templates/document_list.html`,
-     `document_detail.html`, `document_edit.html`, embedded with
-     `include_str!`, reusing the `list`/`view`/`edit` placeholder shapes and
-     `render_template` escaping. Keep the existing four templates unchanged.
+   - The legacy generic list template is superseded by the shared `list.html`
+     body fragment; `document_detail.html` and `document_edit.html` remain body
+     fragments, embedded with `include_str!` and using `render_template`
+     escaping.
 7. **Tests**
    - New `tests/browser_config_types_cli.rs` for T-114-01..13.
    - Update `tests/browser_cli.rs` only where this specification deliberately
@@ -528,9 +525,9 @@ Out of scope:
 
 | ID | Scenario | Assertion |
 |---|---|---|
-| T-114-01 | User-added type `note` (prefix `NOTE`, directory `notes/`, statuses `["active","review","approved"]`, default `active`), records created with the CLI | `GET /?type=note` 200 lists both records in the shared Status/ID/Title/Created/Updated columns; sidebar shows `Notes` under the `Documents` group; `Created` shows the front-matter `created_date`; detail 200; edit 200; `GET /api/docs/note` 200 array with `id/title/status/labels/references/version/path/metadata` |
+| T-114-01 | User-added type `note` (prefix `NOTE`, directory `notes/`, statuses `["active","review","approved"]`, default `active`), records created with the CLI | `GET /?type=note` 200 lists both records in the shared seven-column contract with no family slot; sidebar shows `Notes` under the `Documents` group; `Created` shows the front-matter `created_date`; detail 200; edit 200; `GET /api/docs/note` 200 array with `id/title/status/labels/references/version/path/metadata` |
 | T-114-02 | Canonical vs legacy API | `/api/docs/glossary` body equals `/api/glossary`; `/api/docs/rule` equals `/api/business-rules`; `/api/docs/audit` equals `/api/audit-records`; `/api/docs/ui-mockup` equals `/api/mockups`; `/api/docs/req` equals `/api/requirements?type=req` |
-| T-114-03 | Status read-only | List shows the Status column immediately left of ID and the detail shows `review`; `Created` equals the stored `created_date`; edit form contains no `name="status"`/`name="status_change"`; `POST /doc/NOTE-001` with `status=archived` and a valid version returns 422 and the file is byte-identical |
+| T-114-03 | Status read-only | List shows the structural Status column in the fixed order and the detail shows `review`; `Created` equals the stored `created_date`; edit form contains no `name="status"`/`name="status_change"`; `POST /doc/NOTE-001` with `status=archived` and a valid version returns 422 and the file is byte-identical |
 | T-114-04 | Filter values and order | The filter select offers exactly `active`, `review`, `approved` in that order and no empty/`All records` option; `Show all` is the only reset and omits `status`; no `status=archived` option; `?status=review` lists only the review record; `?status=approved` shows the empty state; a type with no custom statuses offers only `active` |
 | T-114-05 | Filter rejection | `?status=archived`, `?status=bogus`, `?status=Review`, `?status=` and duplicate `status` parameters return 400 with no record list |
 | T-114-06 | Default listing keeps custom statuses | No `status` parameter (including the `Show all` link) lists active-, review-, and approved-status records together; `All records` is not an offered status value |
@@ -538,7 +535,7 @@ Out of scope:
 | T-114-08 | Archived-in-active auto-relocation | Hand-edit `notes/NOTE-002.md` to `status: archived`; browser list moves it to `notes/archived/`, omits it, and detail, edit, and API requests 404 |
 | T-114-09 | Disabled type invisibility | Start with `document_types.note.enabled false`: no sidebar entry under `Documents`, no inventory card, `/?type=note` 404, `/api/docs/note` 404, `/doc/NOTE-001` 404; lifecycle still shows `Notes` with `enabled: false` |
 | T-114-10 | Generic edit round trip | POST title/description/labels/references: front matter and heading updated, description section updated, labels/references replace the edited lists, unknown `## Notes` section and unknown key preserved, status unchanged, updated_date refreshed, second identical save writes nothing; stale version returns 409 |
-| T-114-11 | Built-in characterization | Glossary list/detail/edit fixture matches the recorded baseline apart from the shared Status/ID/Title/Created/Updated row fields and the additive status filter; tech-spec, rule, ui-mockup, req/nfr list/detail/edit keep their existing sections and field sets with the shared row fields |
+| T-114-11 | Built-in characterization | Glossary list/detail/edit fixture matches the recorded baseline apart from the shared seven-column list contract and the additive status filter; tech-spec, rule, ui-mockup, req/nfr list/detail/edit keep their existing sections and field sets with the shared row fields |
 | T-114-12 | Lifecycle page | Default config renders `Backlog`, `Decisions`, `Documents` groups, one section per registry descriptor (16 by default), custom statuses and prefix/folder/enabled per document, shared description for `note`, and no fixed `12` count |
 | T-114-13 | Route/table invariants | Unit test: sidebar document entries across the three groups = inventory slugs = canonical API slugs = `type` canonical values = `registry.enabled(Document)`; the sidebar renders exactly the `Backlog`, `Decisions`, `Documents` groups; grep test: no `enum Category`, no `Category::`, no second document-type registry, and no per-slug list/detail/edit/dispatch branch in `src/browser/`; slug literals occur only in the static presentation table |
 | T-114-14 | Method and safety | `POST /api/docs/note` 405 + `Allow: GET, HEAD`; unknown API slug 404; coded directory escaping the project yields no page and no traversal; `?type=business-rule` and `?type=rule` render the same list |
@@ -593,10 +590,11 @@ Out of scope:
   including typed built-ins, because ADR-0020 decision 5 says list and detail
   render status read-only "for every document type"; typed pages keep their
   field sets and sections, and the filter is additive.
-- **A9 — List columns are a document-list contract.** The row-field order
-  Status, ID, Title, Created, Updated applies to every document list view
-  (generic and typed built-in); the generic list uses table columns and typed
-  lists order the same fields on each row. The task board and the milestone,
+- **A9 — List columns are a document-list contract.** The fixed order
+  ID, Title, Status, family slot(s), Created, Updated, Actions applies to
+  every document list view (generic and typed built-in), with the family
+  slots declared as data and no slot declared for a config-defined type
+  (`browser-shell-ui.md` §3). The task board and the milestone,
   release, and decision list layouts are unchanged. `Created` and `Updated`
   are read-only front-matter values shown as stored (`(none)` if absent), never
   derived or rewritten; `created_date` is already part of the shared metadata
@@ -616,8 +614,8 @@ Out of scope:
   an empty `status=` for that option and an explicit empty `status=` is
   rejected (3.2.8), this specification removes the option: the select lists
   only the allowed values and `Show all` is the no-filter reset (3.2.2).
-- The list is a table whose columns are exactly Status, ID, Title, Created,
-  Updated; Status is immediately left of ID. Status is read-only in list and
+- The list is the shared seven-column table; Status is a structural column and
+  is read-only in list and
   detail; the edit view has no status control.
 - The sidebar is grouped under `Backlog`, `Decisions`, and `Documents`
   headings. Every built-in entry keeps its approved label and relative order
@@ -672,6 +670,6 @@ Out of scope:
 - TASK-105 (registry), TASK-107 (record layer), TASK-110 (generic handler),
   TASK-113 (search) — completed dependencies.
 - Project-owner decision 2026-11-14 — sidebar grouped by the three artifact
-  categories; document list columns Status, ID, Title, Created, Updated;
+  categories; document list columns ID, Title, Status, family slot(s), Created, Updated, Actions;
   archived records never listed, reachable, or returned by the API. Withdraws
   the earlier flat-sidebar assumption and resolves OQ-1.

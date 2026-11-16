@@ -19,7 +19,7 @@ UI mockups differ from the sibling document types in one material way: the persi
 - Listing active UI mockups, rendering only the UI-mockup section.
 - Viewing a UI mockup's metadata (ID, title, UI specifications, references) through the browser's own templates; the stored HTML package is never served or embedded.
 - Editing `title`, `specs`, and `refs` through a tag add/remove form matching MOCK-0006, with the baseline optimistic-concurrency and atomic-write contract (ADR-0006).
-- A field-preserving write contract that changes only the mockup metadata lines and leaves the rest of the HTML package byte-identical.
+- A field-preserving write contract that changes only the mockup metadata comment lines and leaves the rest of the HTML package byte-identical.
 - A read/write JSON API over the same mockup records.
 - HTML escaping, ID resolution, boundary checks, Host/Origin validation, request limits, and browser-support/a11y rules reused from the baseline.
 - Deprecated UI mockups are not listed and are not reachable (active only).
@@ -74,9 +74,9 @@ UI mockups differ from the sibling document types in one material way: the persi
 
 ### 4. List page
 
-1. For the `ui-mockup` category the list page renders one section (`h2`) titled "UI Mockups", showing the record count, followed by one row per mockup in ascending ID order.
-2. Each row's primary link text is `ID + title` and links to `/doc/{id}`.
-3. Rows show no status, task, supersession, or metadata preview (MOCK-0006 OQ-3).
+1. For the `ui-mockup` category the list page renders one section (`h2`) titled "UI Mockups", showing the record count, followed by the shared list table (`browser-shell-ui.md` §3) with one row per mockup in ascending ID order.
+2. Each row's Title cell links `ID + title` to `/doc/{id}` and carries the record's labels and references below the link; `Task` and `Specs` occupy the declared family slots and `Status` is the structural Status column.
+3. The list has no body preview; the stored HTML package is never rendered.
 4. Empty state and long-title wrapping follow the baseline (section 10.4).
 5. Deprecated mockups are never listed or counted.
 
@@ -146,7 +146,7 @@ Record views in this specification follow the shared single record view layout d
    2. an `<h1>` element whose text starts with `<ID>` followed by whitespace is rewritten as `<ID> <title>`, preserving the element's attributes; every other `<h1>` (for example the review package's landing heading) is left untouched;
    3. the `<!-- specs: ... -->` and `<!-- refs: ... -->` comment lines are replaced with the new space-separated values;
    4. a visible `<p>UI specifications: ...</p>` or `<p>References: ...</p>` line is rewritten only when that line already exists;
-   5. when the `specs` or `refs` comment line is absent, a comment block containing both lines is inserted immediately after the opening `<body>` tag (or appended at the end of the file when no `<body>` tag exists). Visible metadata lines are never inserted into a record that does not already have them.
+   5. when the `specs` or `refs` comment line is absent, a comment block containing both lines is inserted immediately after the opening `<body>` tag (or appended at the end of the file when no `<body>` tag exists). Visible metadata comment lines are never inserted into a record that does not already have them.
 2. Every other byte of the file is preserved content-identically, in its original order and position: doctype, `<head>` children, inline `<style>`, scripts, the review package's slides, prototypes, and body markup. The browser never regenerates the file from a parsed record and never reuses the CLI's stub serializer (`render_record`).
 3. The `<!-- mockup-id -->`, `<!-- status -->`, `<!-- task -->`, and `<!-- superseded-by -->` comments and their visible lines are never written or moved by the browser.
 4. The ID, file name, directory, deprecation state, and status never change on a browser save.
@@ -196,7 +196,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox/Edge/Safari 100+), accessibility basics, no external resources, and no inline scripts/styles.
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, and no inline scripts/styles.
 2. The stored mockup HTML is untrusted data. It is never served as a page, never inlined into a response, never parsed as HTML for rendering, and never used to build a path. Only the extracted metadata values are escaped and rendered.
 3. Tag controls are keyboard operable, every input has a `<label>` or accessible name, remove controls are labelled `Remove <value>`, and the add input is labelled. Focus is not trapped.
 4. The sidebar's UI Mockups entry and the mockup list/view/edit templates are the only rendering additions; the shared shell and error pages are reused.
@@ -209,7 +209,7 @@ Record views in this specification follow the shared single record view layout d
    - T-40b: `README.md`, `wireframe.css`, non-matching `.html` files, and `deprecated/` are not listed.
    - T-40c: view shows ID, form, category, title, UI specifications, references, breadcrumb, and a single Edit action; the stored package's markup and scripts do not appear in the response.
    - T-40d: edit round-trip persists title, specs, and refs, visible through the browser and through `papyrus ui-mockup view`.
-   - T-40e: editing a real review package (a fixture with inline `<style>`, `<script>`, and body markup) changes only the metadata lines; a byte comparison shows every other byte unchanged.
+   - T-40e: editing a real review package (a fixture with inline `<style>`, `<script>`, and body markup) changes only the metadata comment lines; a byte comparison shows every other byte unchanged.
    - T-40f: repeated `specs`/`refs` form fields are all collected in order (not last-value-wins).
    - T-40g: validation returns `422` and writes nothing for empty title, over-long title, control characters, zero specs, invalid spec id, duplicate spec id, over-long ref, duplicate ref.
    - T-40h: stale version token returns `409` and does not write; missing/malformed version returns `400`.
@@ -261,12 +261,12 @@ UI mockups are required before any UI implementation work and must be approved b
 
 - Assumption: The transport, asset, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 is reused without change; this ticket adds one category and record type only.
 - Assumption: A mockup record's persisted file is a design artifact authored by `@ui-designer`; therefore browser edits must be field-preserving and must never regenerate the file from a parsed model. This is the main reason the CLI's stub serializer is not reused.
-- Assumption: The comment block (`<!-- specs: ... -->`, `<!-- refs: ... -->`) is the machine-readable metadata source. Review packages created before this metadata existed are displayed with empty specs/refs and receive the comment block on first save; visible metadata lines are added only to records that already have them.
+- Assumption: The comment block (`<!-- specs: ... -->`, `<!-- refs: ... -->`) is the machine-readable metadata source. Review packages created before this metadata existed are displayed with empty specs/refs and receive the comment block on first save; visible metadata comment lines are added only to records that already have them.
 - Assumption: Spec id format is validated but existence is not required, matching `ui-mockup create`/`edit`; dangling ids are allowed so a mockup can be written before its specification is registered.
 - Assumption: Duplicate `specs`/`refs` values are rejected because the tag fields model a set; this is stricter than the CLI, which stores whatever it is given.
 - Assumption: The tag field's no-JavaScript fallback uses one text input per value plus a trailing empty input with the same field name; this preserves the approved chip layout with JavaScript and keeps the form usable without it.
 - Assumption: The JSON API exposes `task`, `status`, and `superseded_by` read-only, consistent with sibling record shapes, even though the browser pages do not display them.
-- Assumption: Real-browser verification in Firefox, Edge, and Safari 100+ (NFR-05.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24.
+- Assumption: Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
 
 ## Open questions

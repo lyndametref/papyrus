@@ -16,7 +16,7 @@ Audit records are Markdown text records with a fixed section template (`# <ID> <
 ### In scope
 
 - Extending the persistent sidebar with an "Audit Records" entry (immediately after "Business Rules") and the `?type=` category selector to `audit-record`, without changing the list-page structure (baseline spec section 4.6).
-- Listing active audit records, rendering only the audit-records section, with the first paragraph of the content as a row preview.
+- Listing active audit records, rendering only the audit-records section, through the shared list layout in `browser-shell-ui.md` §3 (Audit type slot; Title-cell labels and references).
 - Viewing an audit record's title, audit type, and content, with the audit type shown at the beginning of the view (badge next to the title/ID plus an "Audit type" row in the metadata block) and the content rendered as body text without a "Content" heading.
 - Editing `title`, `audit_type` (select: security/licence/architecture, default security), and `content` (optional, multi-line textarea) through a form matching MOCK-0008, with the baseline optimistic-concurrency and atomic-write contract (ADR-0006).
 - A field-preserving write contract that changes only the title heading and the `## Audit Type` and `## Content` sections and leaves every other section, line, and byte of the file content-identical.
@@ -67,9 +67,9 @@ Audit records are Markdown text records with a fixed section template (`# <ID> <
 
 ### 4. List page
 
-1. For the `audit-record` category the list page renders one section (`h2`) titled "Audit Records", showing the record count, followed by one row per record in ascending ID order.
-2. Each row's primary link text is `ID + title` and links to `/doc/{id}`.
-3. Each row also shows the first paragraph of the record's content beneath the primary link; records with empty content show no preview. The preview is plain text (first paragraph only, not the full content).
+1. For the `audit-record` category the list page renders one section (`h2`) titled "Audit Records", showing the record count, followed by the shared list table (`browser-shell-ui.md` §3) with one row per record in ascending ID order.
+2. Each row's Title cell links `ID + title` to `/doc/{id}` and carries the record's labels and references below the link; the `Audit type` family slot occupies its declared column.
+3. The list has no content preview and no separate row metadata: content appears only on the record view.
 4. Empty state and long-title wrapping follow the baseline (section 10.4).
 5. Deprecated audit records are never listed or counted.
 
@@ -167,7 +167,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox/Edge/Safari 100+), accessibility basics, no external resources, and no inline scripts/styles.
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates/assets served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 100+, Edge 130+, Safari 18+; NFR-05.001), accessibility basics, no external resources, and no inline scripts/styles.
 2. The sidebar's Audit Records entry and the audit-records list/view/edit templates are the only rendering additions; the shared shell and error pages are reused.
 3. Tag controls are not applicable; the audit type is a `<select>` with three options and a default, keyboard operable by default. Every input has a `<label>` or accessible name. Focus is not trapped.
 
@@ -185,7 +185,7 @@ Record views in this specification follow the shared single record view layout d
    - T-26h: deprecated audit records are not listed and return `404` on view, edit, POST, and API.
    - T-26i: JSON API returns the documented summary and full shapes, applies the documented POST semantics, and rejects wrong types with `400`/`422`.
    - T-26j: writes are atomic, leave no temporary file, and a symlink escape returns `404`.
-   - T-26k: an offline asset scan finds no external origin in list, view, or edit responses.
+   - T-26k: an offline asset scan finds no external origin in list, view, or edit responses, and every served stylesheet `url(` resolves to a static-table entry.
    - T-26l: build, tests, clippy, and formatting pass with existing dependencies only.
 
 ## UI design handoff
@@ -197,7 +197,7 @@ UI mockups are required before any UI implementation work and must be approved b
 ### Screens covered by the approved package
 
 1. **Shared shell** (reused): header, sidebar with nine entries, `main`, footer, one `h1` per page.
-2. **Audit records list** (`/?type=audit-record`): one section with record count, rows of `ID + title` plus content preview; empty and long-title states.
+2. **Audit records list** (`/?type=audit-record`): one section with record count, the shared table with `Audit type` slot and Title-cell labels/references; empty and long-title states.
 3. **Audit record view** (`/doc/{id}`): metadata block, title `h1`, audit type badge plus "Audit type" row, content body with `pre-wrap` (no "Content" heading), breadcrumb `Audit Records › ID`, single `Edit`.
 4. **Edit form** (`/doc/{id}/edit`): title input, audit type select, content textarea, version annotation, Save/Cancel; pristine, dirty, 422, 409, and 320 px states.
 5. **Error pages**: 404 unknown, 404 deprecated, 400, 405, 415, 500 (reused from MOCK-0001).
@@ -212,7 +212,7 @@ UI mockups are required before any UI implementation work and must be approved b
 | Check | Verifies |
 |---|---|
 | AC-1 | `?type=audit-record` renders the category, the default stays `req`, other values are `400`, and the sidebar entry is ordered after Business Rules with `aria-current="page"` and omitted when the type is disabled. |
-| AC-2 | The list shows active records only, ascending by ID, with `ID + title` links, content preview, count, empty state, and no non-record or deprecated files. |
+| AC-2 | The list shows active records only, ascending by ID, through the shared list layout with Title-cell labels/references, the `Audit type` slot, the action cell, count, and empty state, and no non-record or deprecated files. |
 | AC-3 | The view shows ID, form, category, title, audit type (badge and metadata row), content (no "Content" heading), breadcrumb, and one Edit action. |
 | AC-4 | The edit form matches MOCK-0008: title, audit type select, content textarea, hidden version plus annotation, Save/Cancel, pristine/dirty/422/409/320 px, and operates without JavaScript. |
 | AC-5 | An edit round-trip persists all three fields and is visible in the browser and through `papyrus audit view`. |
@@ -236,7 +236,7 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: Content may be cleared on edit, removing the `## Content` section, consistent with the UI description and sibling browser increments.
 - Assumption: The tag-field progressive-enhancement pattern is not applicable; the audit type uses a native `<select>`, which is operable without JavaScript.
 - Assumption: The JSON API exposes the three editable fields; audit records have no status, task, or supersession metadata, unlike decision records, and no requirement references, unlike business rules.
-- Assumption: Real-browser verification in Firefox, Edge, and Safari 100+ (NFR-05.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24/TASK-40/TASK-25.
+- Assumption: Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ (NFR-05.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24/TASK-40/TASK-25.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
 - Assumption: The canonical business-rule-style `BR-*.md` documents are not applicable; only `<prefix>-<digits>.md` files are records.
 
@@ -244,7 +244,7 @@ UI mockups are required before any UI implementation work and must be approved b
 
 - **OQ-1 (non-blocking, product)** — Whether the browser should support editing non-built-in (custom) audit types created via the CLI. This specification restricts the edit select to the three built-in values per MOCK-0008. Supporting custom types would change the edit control (a text input or an extended select) and validation.
 - **OQ-2 (non-blocking, layout)** — Whether the audit type badge should use a distinct visual treatment. This specification follows MOCK-0008; the mockup is the layout authority.
-- **OQ-3 (non-blocking, follow-up)** — Real-browser verification in Firefox, Edge, and Safari 100+ is deferred, consistent with sibling tickets.
+- **OQ-3 (non-blocking, follow-up)** — Real-browser verification in Firefox 100+, Edge 130+, and Safari 18+ is deferred, consistent with sibling tickets.
 
 ## Traceability
 

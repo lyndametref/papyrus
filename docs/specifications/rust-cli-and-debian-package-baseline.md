@@ -104,10 +104,11 @@ Contract source: ADR-0027 (Accepted) for the asset model and the notices, ADR-00
 | `/assets/katex/katex.min.css` | 23,335 | `text/css; charset=utf-8` |
 | `/assets/katex/katex.min.js` | 275,414 | `text/javascript; charset=utf-8` |
 | `/assets/katex/fonts/<name>.woff2` (20 files) | 259,792 total | `font/woff2` |
+| `/assets/mermaid/mermaid.min.js` | 3,572,661 | `text/javascript; charset=utf-8` |
 
 The 20 WOFF2 files are `KaTeX_AMS-Regular`, `KaTeX_Caligraphic-Bold`, `KaTeX_Caligraphic-Regular`, `KaTeX_Fraktur-Bold`, `KaTeX_Fraktur-Regular`, `KaTeX_Main-Bold`, `KaTeX_Main-BoldItalic`, `KaTeX_Main-Italic`, `KaTeX_Main-Regular`, `KaTeX_Math-BoldItalic`, `KaTeX_Math-Italic`, `KaTeX_SansSerif-Bold`, `KaTeX_SansSerif-Italic`, `KaTeX_SansSerif-Regular`, `KaTeX_Script-Regular`, `KaTeX_Size1-Regular`, `KaTeX_Size2-Regular`, `KaTeX_Size3-Regular`, `KaTeX_Size4-Regular`, `KaTeX_Typewriter-Regular`, each with the `.woff2` extension. The `.woff` and `.ttf` forms of the same families are not vendored and are not served: the supported browsers (NFR-05.001) always select the `woff2` source, so the other two sources in each `@font-face` block are inert.
 
-Mermaid paths are added by its own task; this section does not describe them.
+The Mermaid row is Mermaid 11.17.2, MIT, SHA-256 `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8`, landed by TASK-146. The served KaTeX total is 558,541 B (CSS 23,335 + JS 275,414 + 20 WOFF2 259,792).
 
 ### 3. Vendor layout
 
@@ -138,14 +139,17 @@ A digest mismatch, a missing row, an extra row, or a stale byte count fails the 
 
 - **KaTeX code** (`katex.min.js`, `katex.min.css`) — `License: MIT`, the upstream copyright line, and the full MIT text verbatim from `src/browser/vendor/katex/0.16.11/LICENSE`.
 - **KaTeX fonts** (`fonts/*.woff2`) — `License: OFL-1.1`, the font attribution recorded by the licence review, and the full SIL Open Font License 1.1 text verbatim.
+- **Mermaid** (`mermaid.min.js`) — a standalone `License: MIT-Mermaid` section with its own short name, the Knut Sveidqvist copyright line, and the full MIT text verbatim from `src/browser/vendor/mermaid/11.17.2/LICENSE`. It does not reuse the KaTeX `MIT` paragraph, which embeds the Khan Academy copyright.
+
+The copyright file stays the only documentation file in the package.
 
 First-party assets (`app.css`, `app.js`, templates) stay covered by the existing `Files: *` GPL-3.0-or-later block and get no extra section. A later bundled package adds its own section when it lands. `scripts/build-deb.sh` is not modified: it still copies exactly one copyright file, so its shape and the two-entry package content are preserved.
 
 The licence inventory is a release gate (NFR-06.002): an asset whose licence cannot be shown compatible with GPL-3.0-or-later does not ship, and an incomplete notice blocks the release rather than being deferred.
 
-### 6. Deferred to the specification-revision task
+### 6. Specification port (TASK-148)
 
-This section deliberately does not touch the browser-UI and packaging-verification pages that still assert "no web font", "no `url(` in served CSS", or an asset-free package. Those pages, the CSP-per-response-class wording, and the packaging verification checklist are revised by the specification-revision task (TASK-148), which should treat this section as the source for the asset, vendor, digest, and notice clauses.
+The browser-UI and packaging-verification pages that once described an asset-free package and a system-font-only UI are revised to the landed contract. `docs/specifications/browser-shell-ui.md` is the normative shell/list/width/navigation page; `docs/specifications/browser-requirements.md` §9.7 is the single normative home of the two CSP strings; `docs/specifications/browser-math-and-diagram-rendering.md` records the math and diagram rendering contract. This section remains the source for the asset-table, vendor-layout, digest, and notice clauses.
 
 ### Contract traceability
 
