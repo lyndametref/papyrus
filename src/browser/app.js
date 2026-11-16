@@ -369,31 +369,6 @@
       }
     }
 
-    function ensureConstructibleStyleSheet() {
-      var Native = window.CSSStyleSheet;
-      if (!Native) {
-        return;
-      }
-      try {
-        new Native();
-        return;
-      } catch (missing) {
-        /* Not constructible here: install the substitute below. */
-      }
-      function ConstructibleStyleSheet() {
-        var inert = document.implementation.createHTMLDocument("");
-        var style = inert.createElement("style");
-        inert.head.appendChild(style);
-        return style.sheet;
-      }
-      ConstructibleStyleSheet.prototype = Native.prototype;
-      try {
-        window.CSSStyleSheet = ConstructibleStyleSheet;
-      } catch (unwritable) {
-        /* An unwritable global keeps the existing failure contract. */
-      }
-    }
-
     if (!window.mermaid || typeof window.mermaid.render !== "function") {
       for (var d = 0; d < diagramFigures.length; d++) {
         diagramFigures[d].setAttribute("data-render-error", "diagram");
@@ -403,7 +378,6 @@
         );
       }
     } else {
-      ensureConstructibleStyleSheet();
       window.mermaid.initialize({
         startOnLoad: false,
         securityLevel: "strict",

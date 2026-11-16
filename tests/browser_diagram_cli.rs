@@ -780,28 +780,23 @@ fn client_block_pins_the_mermaid_contract() {
 }
 
 #[test]
-fn client_installs_a_scoped_cssstylesheet_substitute() {
+fn client_does_not_install_a_cssstylesheet_substitute() {
     let js = include_str!("../src/browser/app.js");
     let start = js.find("Diagrams (TASK-146)").expect("diagram block");
     let block = &js[start..];
 
-    let probe = block
-        .find("function ensureConstructibleStyleSheet()")
-        .expect("probe function");
-    let call = block
-        .find("ensureConstructibleStyleSheet();")
-        .expect("probe call");
-    let init = block
-        .find("window.mermaid.initialize")
-        .expect("mermaid initialise");
     assert!(
-        probe < call && call < init,
-        "the probe runs once, before initialize"
+        !block.contains("function ensureConstructibleStyleSheet()"),
+        "the shim function must be absent"
+    );
+    assert!(
+        !block.contains("ensureConstructibleStyleSheet();"),
+        "the shim call must be absent"
     );
     assert_eq!(
-        block.matches("ensureConstructibleStyleSheet();").count(),
-        1,
-        "the probe is called exactly once"
+        block.matches("ensureConstructibleStyleSheet").count(),
+        0,
+        "no shim reference remains"
     );
 
     for needle in [
@@ -818,13 +813,13 @@ fn client_installs_a_scoped_cssstylesheet_substitute() {
         "window.CSSStyleSheet = ConstructibleStyleSheet;",
         "catch (unwritable)",
     ] {
-        assert!(block.contains(needle), "shim missing {needle}");
+        assert!(!block.contains(needle), "shim residue: {needle}");
     }
 
     assert_eq!(
         block.matches("window.CSSStyleSheet =").count(),
-        1,
-        "only the sheet constructor is replaced"
+        0,
+        "the sheet constructor is not replaced"
     );
     assert!(!block.contains("globalThis."), "no globalThis override");
     assert!(!block.contains("self.CSSStyleSheet"), "no self override");
@@ -839,7 +834,7 @@ fn client_installs_a_scoped_cssstylesheet_substitute() {
 }
 
 #[test]
-fn compatibility_shim_keeps_the_vendored_pin_and_manifest() {
+fn vendored_pin_and_manifest_match_app_js() {
     let manifest = include_str!("../src/browser/vendor/MANIFEST.md");
     assert!(
         manifest.contains(
@@ -852,7 +847,7 @@ fn compatibility_shim_keeps_the_vendored_pin_and_manifest() {
     let app = include_str!("../src/browser/app.js");
     assert!(
         manifest.contains(&format!("| `/assets/app.js` | {} |", app.len())),
-        "the app.js manifest row matches the shimmed file"
+        "the app.js manifest row matches the file"
     );
 }
 
