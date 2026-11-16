@@ -1229,7 +1229,7 @@ fn config_page(state: &ServerState) -> Result<Response, HttpError> {
     let flattened = cfg.flattened(&ctx.project_dir);
     let mut section = String::new();
     section.push_str(
-        "<table class=\"table\"><thead><tr><th>Key</th><th>Effective value</th><th>Source</th><th></th></tr></thead><tbody>",
+        "<div class=\"table-scroll\" role=\"region\" aria-label=\"Effective configuration\" tabindex=\"0\"><table class=\"table\"><thead><tr><th>Key</th><th>Effective value</th><th>Source</th><th></th></tr></thead><tbody>",
     );
     for (key, value) in &flattened {
         let explicit = crate::config::yaml_get(&raw_value, key).is_some();
@@ -1253,7 +1253,7 @@ fn config_page(state: &ServerState) -> Result<Response, HttpError> {
             action
         ));
     }
-    section.push_str("</tbody></table>");
+    section.push_str("</tbody></table></div>");
     section.push_str(
         "<p>Editable keys are exactly those <code>papyrus config set</code> accepts; the view applies the same validation and precedence. No key is secret; environment values are never shown as editable config.</p>",
     );

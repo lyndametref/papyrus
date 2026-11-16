@@ -119,6 +119,8 @@ fn shell_pages() -> Vec<&'static str> {
         "/?type=note",
         "/doc/MS-001",
         "/doc/MS-001/edit",
+        "/doc/TASK-001",
+        "/doc/TASK-001/edit",
         "/doc/NOTE-001",
         "/doc/NOTE-001/edit",
         "/lifecycle",
@@ -233,6 +235,17 @@ fn board_is_full_width_and_every_other_route_is_capped() {
             assert!(!html.contains("app--full"), "{path} is not the board");
         }
     }
+
+    // The board is a route, not a record type: task detail and edit share the
+    // `task` slug and must stay capped (REQ-06.015, AC6).
+    for path in ["/doc/TASK-001", "/doc/TASK-001/edit"] {
+        let html = server.get(path);
+        assert!(
+            html.contains("<div class=\"app\">"),
+            "{path} must be capped"
+        );
+        assert!(!html.contains("app--full"), "{path} must not be full width");
+    }
 }
 
 #[test]
@@ -302,10 +315,32 @@ fn toggle_width_and_bleed_contracts_are_in_the_assets() {
     let nav_js = include_str!("../src/browser/nav-state.js");
 
     assert!(css.contains(":root[data-nav=\"collapsed\"] .layout"));
-    assert!(css.contains("grid-template-columns: 0 minmax(0, 1fr); gap: 0;"));
+    assert!(
+        css.contains("grid-template-columns: minmax(0, 1fr); gap: 0;"),
+        "the collapsed layout keeps one real content track"
+    );
+    assert!(
+        !css.contains("grid-template-columns: 0 "),
+        "a zero track would take the removed sidebar's place and zero the main column"
+    );
     assert!(css.contains(":root[data-nav=\"collapsed\"] .sidebar { display: none; }"));
     assert!(
         css.contains(":root[data-nav=\"collapsed\"] .main { border-left: 0; padding-left: 0; }")
+    );
+    assert!(
+        css.contains(
+            ".h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; overflow-wrap: anywhere; }"
+        ),
+        "the page heading must break inside a narrow content column"
+    );
+    assert!(css.contains("pre { max-width: 100%; overflow-x: auto; }"));
+    assert!(
+        css.contains("h2, h3 { overflow-wrap: anywhere; }"),
+        "plain section headings wrap inside the narrow content column"
+    );
+    assert!(
+        css.contains(".board-columns:focus-visible"),
+        "the scrollable board region is keyboard reachable"
     );
     assert!(css.contains(".nav-toggle[hidden] { display: none; }"));
     assert!(css.contains(".bleed { width: 100%; overflow-x: auto; }"));
@@ -329,6 +364,34 @@ fn toggle_width_and_bleed_contracts_are_in_the_assets() {
 
     assert!(nav_js.contains("try {"));
     assert!(nav_js.contains("document.readyState === \"loading\""));
+}
+
+#[test]
+fn config_and_skills_own_their_horizontal_scrolling() {
+    let server = Server::start(&fixture_root().join("project"));
+
+    let config = server.get("/config");
+    assert!(
+        config.contains(
+            "<div class=\"table-scroll\" role=\"region\" aria-label=\"Effective configuration\" tabindex=\"0\">"
+        ),
+        "the configuration table scrolls inside its own region"
+    );
+
+    let skills = server.get("/skills");
+    assert!(skills.contains("<pre>"));
+    assert!(
+        include_str!("../src/browser/app.css")
+            .contains("pre { max-width: 100%; overflow-x: auto; }")
+    );
+
+    let board = server.get("/?type=task");
+    assert!(
+        board.contains(
+            "<div class=\"board-columns\" role=\"region\" aria-label=\"Task board columns\" tabindex=\"0\">"
+        ),
+        "the board columns own their horizontal scrolling"
+    );
 }
 
 #[test]

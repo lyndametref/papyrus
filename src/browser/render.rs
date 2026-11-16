@@ -6,7 +6,7 @@
 //! built.
 
 use crate::browser::records::{Index, Record, filter_statuses};
-use crate::browser::routes::{self, BrowserRoutes, NavGroup};
+use crate::browser::routes::{self, BrowserRoutes, NavGroup, PageRoute};
 use crate::config::Config;
 use crate::record::edit::FieldChange;
 use crate::registry::{
@@ -74,20 +74,14 @@ pub struct Chrome<'a> {
 }
 
 /// Wrap a rendered page body in the page shell (ADR-0028 decision 1).
-fn page(
-    chrome: Chrome<'_>,
-    slug: Option<&str>,
-    title: &str,
-    sidebar: &str,
-    body: String,
-) -> String {
+fn page(chrome: Chrome<'_>, route: PageRoute, title: &str, sidebar: &str, body: String) -> String {
     crate::browser::shell::render(crate::browser::shell::Page {
         title,
         project: chrome.project,
         bind_note: chrome.bind_note,
         sidebar,
         main: &body,
-        width: chrome.routes.page_width(slug.unwrap_or_default()),
+        width: chrome.routes.page_width(route),
     })
 }
 
@@ -746,7 +740,9 @@ fn board_columns(
     cleanup: Option<&BoardCleanup<'_>>,
 ) -> String {
     let final_status = cfg.statuses.last().map(String::as_str);
-    let mut html = String::from("<div class=\"board-columns\">");
+    let mut html = String::from(
+        "<div class=\"board-columns\" role=\"region\" aria-label=\"Task board columns\" tabindex=\"0\">",
+    );
     for status in &cfg.statuses {
         let matching: Vec<&Record> = tasks
             .iter()
@@ -965,7 +961,7 @@ pub fn board_page(
     );
     page(
         chrome,
-        Some(board_slug),
+        PageRoute::Board,
         "Papyrus \u{2014} Backlog",
         &sidebar(Some(board_slug), cfg, chrome.routes),
         body,
@@ -1013,7 +1009,7 @@ pub fn list_page(
     );
     page(
         chrome,
-        Some(slug),
+        PageRoute::Other,
         &title,
         &sidebar(Some(slug), cfg, chrome.routes),
         body,
@@ -1500,7 +1496,7 @@ pub fn view_page(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -1792,7 +1788,7 @@ pub fn edit_page(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -1907,7 +1903,7 @@ pub fn edit_page_task(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -1989,7 +1985,7 @@ pub fn edit_page_milestone(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -2064,7 +2060,7 @@ pub fn edit_page_release(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -2168,7 +2164,7 @@ pub fn edit_page_decision(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -2292,7 +2288,7 @@ pub fn edit_page_glossary(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -2375,7 +2371,7 @@ pub fn edit_page_ui_spec(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -2511,7 +2507,7 @@ pub fn edit_page_ui_mockup(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -2612,7 +2608,7 @@ pub fn edit_page_business_rule(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -2744,7 +2740,7 @@ pub fn edit_page_audit_record(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -2793,7 +2789,7 @@ pub fn conflict_page_audit_record(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title_page,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -2919,7 +2915,7 @@ pub fn edit_page_tech_spec(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -3024,7 +3020,7 @@ pub fn edit_page_use_case(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -3106,7 +3102,7 @@ pub fn conflict_page_use_case(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title_page,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -3196,7 +3192,7 @@ pub fn conflict_page_tech_spec(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title_page,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -3304,7 +3300,7 @@ pub fn error_page(status: u16, cfg: &Config, chrome: Chrome<'_>, actions: Option
     );
     page(
         chrome,
-        None,
+        PageRoute::Other,
         &title,
         &sidebar(None, cfg, chrome.routes),
         body,
@@ -3334,7 +3330,7 @@ The same page is used for an unknown address.",
     );
     page(
         chrome,
-        None,
+        PageRoute::Other,
         "Papyrus \u{2014} Record not found",
         &sidebar(
             routes::not_found_slug(routes::NotFoundPage::TechSpec),
@@ -3363,7 +3359,7 @@ pub fn use_case_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     );
     page(
         chrome,
-        None,
+        PageRoute::Other,
         "Papyrus \u{2014} Record not found",
         &sidebar(
             routes::not_found_slug(routes::NotFoundPage::UseCase),
@@ -3392,7 +3388,7 @@ pub fn test_case_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     );
     page(
         chrome,
-        None,
+        PageRoute::Other,
         "Papyrus \u{2014} Record not found",
         &sidebar(
             routes::not_found_slug(routes::NotFoundPage::TestCase),
@@ -3421,7 +3417,7 @@ pub fn test_report_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     );
     page(
         chrome,
-        None,
+        PageRoute::Other,
         "Papyrus \u{2014} Record not found",
         &sidebar(
             routes::not_found_slug(routes::NotFoundPage::TestReport),
@@ -3489,7 +3485,7 @@ pub fn conflict_page(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -3545,7 +3541,7 @@ pub fn conflict_page_ui_mockup(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title_text,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -3616,7 +3612,7 @@ pub fn conflict_page_business_rule(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &title_text,
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -3742,7 +3738,7 @@ pub fn lifecycle_page(
     );
     page(
         chrome,
-        None,
+        PageRoute::Other,
         "Papyrus \u{2014} Managed artifacts & lifecycles",
         &sidebar_with_lifecycle(None, cfg, true, chrome.routes),
         body,
@@ -4010,7 +4006,7 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     );
     page(
         chrome,
-        None,
+        PageRoute::Other,
         &title,
         &sidebar_with_skills(None, cfg, true, chrome.routes),
         body,
@@ -4036,7 +4032,7 @@ pub fn config_page(chrome: Chrome<'_>, section_html: &str, sidebar_html: &str) -
         &[("heading", "Configuration"), ("subheading", subheading)],
         &[("section", section_html)],
     );
-    page(chrome, None, &title, sidebar_html, body)
+    page(chrome, PageRoute::Other, &title, sidebar_html, body)
 }
 
 /// Render the single-key configuration edit page.
@@ -4051,7 +4047,7 @@ pub fn config_edit_page(chrome: Chrome<'_>, sidebar_html: &str, section_html: &s
         ],
         &[("section", section_html)],
     );
-    page(chrome, None, &title, sidebar_html, body)
+    page(chrome, PageRoute::Other, &title, sidebar_html, body)
 }
 
 pub fn inventory_page(cfg: &Config, chrome: Chrome<'_>, cards: &[InventoryCard]) -> String {
@@ -4085,7 +4081,7 @@ pub fn inventory_page(cfg: &Config, chrome: Chrome<'_>, cards: &[InventoryCard])
     );
     page(
         chrome,
-        None,
+        PageRoute::Other,
         &title,
         &sidebar(None, cfg, chrome.routes),
         body,
@@ -4189,7 +4185,7 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &format!("Papyrus \u{2014} {} {}", record.id, record.title),
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -4314,7 +4310,7 @@ pub fn document_edit_page(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &format!("Papyrus \u{2014} Edit {}", record.id),
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -4361,7 +4357,7 @@ pub fn document_conflict_page(
     );
     page(
         chrome,
-        Some(record.slug()),
+        PageRoute::Other,
         &format!("Papyrus \u{2014} Edit {}", record.id),
         &sidebar(Some(record.slug()), cfg, chrome.routes),
         body,
@@ -4383,7 +4379,7 @@ pub fn document_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
     );
     page(
         chrome,
-        None,
+        PageRoute::Other,
         "Papyrus \u{2014} Not found",
         &sidebar(None, cfg, chrome.routes),
         body,

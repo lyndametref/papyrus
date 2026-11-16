@@ -45,6 +45,18 @@ pub enum NotFoundPage {
     GenericDocument,
 }
 
+/// The route kind that owns a rendered page, for the width decision.
+///
+/// Width belongs to the route, not to a record type: a task detail or edit
+/// page shares the `task` slug with the board but must stay `Capped`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PageRoute {
+    /// The backlog kanban board (`/?type=task` with its query variants).
+    Board,
+    /// Every other route: lists, detail, edit, inventory, config, skills, errors.
+    Other,
+}
+
 /// Server-side content-width decision for a route (ADR-0028 decision 3).
 ///
 /// `Capped` is the default for every route. `Full` is reserved for the backlog
@@ -750,14 +762,13 @@ impl BrowserRoutes {
 
     /// Server-side content-width decision for a route (ADR-0028 decision 3).
     ///
-    /// `Full` is reserved for the backlog board, resolved from the route table.
-    /// Every other route, including the empty slug used by inventory,
-    /// lifecycle, config, skills, and error pages, is `Capped`.
-    pub fn page_width(&self, slug: &str) -> PageWidth {
-        if self.board_slug() == Some(slug) {
-            PageWidth::Full
-        } else {
-            PageWidth::Capped
+    /// `Full` is reserved for the backlog board route. Every other route,
+    /// including task detail and edit pages that share the `task` slug, is
+    /// `Capped`.
+    pub fn page_width(&self, route: PageRoute) -> PageWidth {
+        match route {
+            PageRoute::Board => PageWidth::Full,
+            PageRoute::Other => PageWidth::Capped,
         }
     }
 
@@ -864,27 +875,18 @@ mod tests {
     }
 
     #[test]
-    fn page_width_is_full_only_for_the_board_slug() {
+    fn page_width_is_full_only_for_the_board_route() {
         let cfg = Config::default();
         let registry = ArtifactRegistry::build(&cfg).expect("registry");
         let routes = BrowserRoutes::build(&registry);
-        let board = routes.board_slug().expect("board slug");
-        assert_eq!(board, "task");
-        assert_eq!(routes.page_width(board), PageWidth::Full);
-        for descriptor in registry.descriptors() {
-            if !descriptor.enabled || descriptor.slug == board {
-                continue;
-            }
-            assert_eq!(
-                routes.page_width(&descriptor.slug),
-                PageWidth::Capped,
-                "slug {}",
-                descriptor.slug
-            );
-        }
-        assert_eq!(routes.page_width(&routes.default_type), PageWidth::Capped);
-        assert_eq!(routes.page_width(""), PageWidth::Capped);
-        assert_eq!(routes.page_width("task-list"), PageWidth::Capped);
+        assert_eq!(routes.board_slug(), Some("task"));
+        assert_eq!(routes.page_width(PageRoute::Board), PageWidth::Full);
+        assert_eq!(routes.page_width(PageRoute::Other), PageWidth::Capped);
+
+        // The route identity cannot collide with a record type: a task detail
+        // or edit page shares the `task` slug with the board and stays capped.
+        assert_eq!(routes.board_slug(), Some("task"));
+        assert_eq!(routes.page_width(PageRoute::Other), PageWidth::Capped);
     }
 
     #[test]

@@ -74,7 +74,7 @@ textarea:focus-visible {
   align-items: stretch;
   padding-top: 26px;
 }
-:root[data-nav="collapsed"] .layout { grid-template-columns: 0 minmax(0, 1fr); gap: 0; }
+:root[data-nav="collapsed"] .layout { grid-template-columns: minmax(0, 1fr); gap: 0; }
 :root[data-nav="collapsed"] .sidebar { display: none; }
 :root[data-nav="collapsed"] .main { border-left: 0; padding-left: 0; }
 .sidebar {
@@ -111,7 +111,8 @@ textarea:focus-visible {
 .breadcrumb [aria-current="page"] { color: var(--muted); }
 
 .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
-.h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; }
+.h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; overflow-wrap: anywhere; }
+h2, h3 { overflow-wrap: anywhere; }
 .id { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 13px; color: var(--muted); margin: 0 0 4px; }
 .sub { color: var(--muted); font-size: 14px; margin: 0 0 4px; }
 .status { font-size: 13px; font-weight: 700; margin: 0; }
@@ -141,7 +142,7 @@ textarea:focus-visible {
   display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 16px;
   padding-bottom: 8px; border-bottom: 1px solid var(--line);
 }
-.h2 { font-size: 21px; margin: 0; }
+.h2 { font-size: 21px; margin: 0; overflow-wrap: anywhere; }
 .h3 { font-size: 17px; margin: 0; }
 .count { font-size: 13px; color: var(--muted); flex: none; }
 
@@ -150,6 +151,7 @@ textarea:focus-visible {
 .table-scroll:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .bleed { width: 100%; overflow-x: auto; }
 .bleed:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+pre { max-width: 100%; overflow-x: auto; }
 .muted { color: var(--muted); }
 .list--shared {
   width: 100%;
@@ -385,10 +387,13 @@ textarea:focus-visible {
   gap: 12px;
   align-items: stretch;
   padding: 12px;
+  overflow-x: auto;
 }
+.board-columns:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .board-column {
   flex: 1 1 0;
   min-width: 0;
+  overflow-wrap: anywhere;
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
