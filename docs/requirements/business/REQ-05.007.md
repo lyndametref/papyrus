@@ -69,7 +69,6 @@ The same rules apply to every document type, including technical specifications,
 - REQ-05.008 — Manage UI Mockups (HTML metadata exception)
 - REQ-05.010 — Record Metadata in YAML Front Matter (`status` field)
 - REQ-05.011 — Maintain Record Metadata Through All Commands
-- REQ-06.003 — Describe Managed Artifacts and Their Lifecycles in the Browser
 - REQ-07.001 — Organize Artifacts into Three Categories
 - REQ-07.002 — Configure Document Types and Slugs
 - REQ-07.003 — Dispatch Config-Defined Document Commands

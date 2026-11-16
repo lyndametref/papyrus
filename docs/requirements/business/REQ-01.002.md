@@ -57,7 +57,6 @@ The effective configuration is validated at load (REQ-07.002), including each do
 - REQ-01.004 — Use Common CLI Controls and Outcomes (conflict and validation outcomes)
 - REQ-01.001 — Initialize a Papyrus Project (`init --force` repair path)
 - REQ-01.008 — Run Project Diagnostics (`check` as a tolerant configuration-reading surface)
-- REQ-06.008 — Provide a Browser Configuration View (folder moves must be performed by `config set`)
 - REQ-07.001 — Organize Artifacts into Three Categories (document statuses)
 - REQ-07.002 — Configure Document Types and Slugs (status-list validation, fail-closed repair surface)
 - Maintainer decision 2026-11-11: a folder change moves all files of the original folder (not only managed records), synchronously, as an atomic move with conflict failure and no partial move.

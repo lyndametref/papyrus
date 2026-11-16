@@ -38,7 +38,7 @@ Applies to every Papyrus invocation — including the built-in `check` command, 
 ### Categories and lifecycles
 
 - Exactly three artifact categories exist: backlog (tasks, milestones, releases), decision, and document; each record type belongs to one category.
-- Task statuses are configurable through `statuses` and `default_status`; the milestone (`open -> closed`) and release (`planned -> released`) lifecycles are fixed and configuration cannot change them.
+- Task statuses are configurable through `statuses` and `default_status`; the milestone (`open -> closed -> archived`) and release (`planned -> released`) lifecycles are fixed and configuration cannot change them.
 - Decisions use only the Nygard statuses `proposed`, `accepted`, `rejected`, `deprecated`, and `superseded`; a decision is never archived.
 - Documents have the main statuses `active` and `archived` plus optional configured custom statuses; only `archive` produces `archived`, archiving does not retain a previous custom status value, and documents have no inverse command.
 - Archived records live in the `archived/` subfolder of the type's configured directory, which is the only document inactive location.

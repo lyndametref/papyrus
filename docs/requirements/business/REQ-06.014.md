@@ -40,7 +40,6 @@ A config-defined type uses the generic content model (REQ-07.004), so its edit v
 - The views require no network access (NFR-01.003).
 
 ## Open Questions
-- Whether the browser navigation is grouped by the three artifact categories or lists document types flat; the page route and navigation entry remain design decisions, as in REQ-06.003.
 - Whether a config-defined type can declare an icon or display name; current requirement defines none.
 
 ## Traceability
@@ -51,7 +50,6 @@ A config-defined type uses the generic content model (REQ-07.004), so its edit v
 - REQ-05.007 — Manage Document Archive State and Deletion
 - REQ-05.011 — Maintain Record Metadata Through All Commands (`status` not editable)
 - REQ-06.002 — Serve the Local Web Interface
-- REQ-06.003 — Describe Managed Artifacts and Their Lifecycles in the Browser
 - REQ-06.004 — Use Front-Matter Metadata in CLI and Browser Views
 - REQ-06.012 — Define Single Record View Layout
 - REQ-06.016 — Present a Uniform List View Across Artifact Families (shared list layout used by every document-type list view)

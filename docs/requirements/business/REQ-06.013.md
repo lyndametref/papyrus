@@ -2,9 +2,10 @@
 id: REQ-06.013
 title: "Present the Backlog as a Per-Milestone Kanban Board"
 created_date: '2026-11-15T15:46:30Z'
-updated_date: '2026-11-15T15:57:53Z'
+updated_date: '2026-11-16T20:59:19Z'
 labels: []
-references: []
+references:
+  - RE-002
 ---
 # REQ-06.013 Present the Backlog as a Per-Milestone Kanban Board
 
@@ -20,7 +21,7 @@ Should have
 ## Description
 The browser Backlog view keeps milestones as expandable and collapsible sections. Inside an expanded milestone, that milestone's tasks are presented as a kanban board: one column per task status, laid out horizontally, with the columns therefore grouped horizontally within the milestone. Columns follow the configured task status list exactly, in configured order, and statuses with no tasks keep their column visible. Milestones that belong to a release appear under that release; milestones that belong to no release are grouped before the first release. Each release boundary is marked by a bold separator that names the release, so the boundary does not depend on colour. Tasks that belong to no milestone appear in their own expandable section after all milestone sections. Cards are ordered by ascending task ID within a column, consistent with the existing browser list ordering, and each card links to the task record view.
 
-A task's status is changed by dragging its card into another status column, or with an equivalent status control on the card that does not require dragging. Either action persists the status immediately to the task record; the board is not a staging area with a separate save step. A change that cannot be persisted leaves the card in its original column and reports the failure to the user. Changing status from the board changes only the status value and preserves every other field of the task. Archived tasks remain excluded from the board, as in the rest of the browser backlog views. Milestones have no archived lifecycle: their lifecycle is fixed to `open -> closed`, and `papyrus milestone close <id>` writes the status in place without moving the record (REQ-03.001), so a closed milestone stays in `backlog/milestones/` and remains shown in its release or unassigned region. There is therefore no milestone archive state, no milestone archive or restore command, and no guide or board archive treatment for milestones.
+A task's status is changed by dragging its card into another status column, or with an equivalent status control on the card that does not require dragging. Either action persists the status immediately to the task record; the board is not a staging area with a separate save step. A change that cannot be persisted leaves the card in its original column and reports the failure to the user. Changing status from the board changes only the status value and preserves every other field of the task. Archived tasks remain excluded from the board, as in the rest of the browser backlog views. Milestones have an archived lifecycle: their lifecycle is fixed to `open -> closed -> archived`; `papyrus milestone close <id>` writes the status in place, and `papyrus milestone archive <id>` closes the milestone if needed and moves the record to `backlog/archive/milestones/` (REQ-03.001). Archived milestones are hidden from active listings and from the board.
 
 The final configured task status column of each milestone board offers a "Clean up all" action that archives every task currently in that column for that milestone. The final configured task status is the last entry of the configured task `statuses` list (REQ-01.002, REQ-02.003), and it is the board's last column. The action appears only when that final status differs from `active`; when the final configured task status is `active`, the board offers no "Clean up all" action. Activating the action shows a warning that lists the IDs of the affected tasks and requires confirmation; on cancel, no task is archived. On confirmation, each task is archived independently per REQ-02.004 and REQ-05.007: an archive failure for one task is reported for that task and does not abort the remaining archives, and successfully archived tasks are removed from the board. The action archives only tasks in the current milestone's board; it does not act project-wide. The action is available in the browser only and has no CLI equivalent in this release. Button placement and the warning dialog layout are design decisions.
 
@@ -65,8 +66,8 @@ Presentation details not fixed here — card contents beyond the task link, colu
 - REQ-02.003 — List and Filter Tasks (final configured task status; last entry of the configured status list)
 - REQ-02.004 — Archive, Restore, and Delete Tasks (archive semantics used by "Clean up all")
 - REQ-06.002 — Serve the Local Web Interface
-- REQ-03.001 — Manage Milestones (fixed `open -> closed` lifecycle written in place by `papyrus milestone close <id>`)
+- REQ-03.001 — Manage Milestones (fixed `open -> closed -> archived` lifecycle; `papyrus milestone archive <id>` moves to `backlog/archive/milestones/`)
 - REQ-05.007 — Manage Document Archive State and Deletion (archive storage rules; archived tasks excluded)
-- ADR-0022 decision 5 and ADR-0023 decision 2 — milestones have no archive location and no archive or restore verb, so no archived milestone state exists; TASK-130 delivered that close-only lifecycle
+- RE-002 — Milestone command must support archiving milestones; ADR-0022/ADR-0023 wording on milestones is superseded by REQ-03.001.
 - NFR-01.002 — Display, View, and Edit All Papyrus Content in a Local Browser
 - NFR-05.001 — Display the Browser Interface in Named Browsers

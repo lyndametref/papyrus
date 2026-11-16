@@ -5,6 +5,7 @@ created_date: '2026-11-11T19:58:50Z'
 updated_date: '2026-11-15T15:47:29Z'
 labels: []
 references: []
+status: archived
 ---
 # REQ-06.005 Browser Skills Page for Agent Workflow Configuration
 

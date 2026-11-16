@@ -2,9 +2,10 @@
 id: REQ-07.001
 title: "Organize Artifacts into Three Categories"
 created_date: '2026-11-13T20:59:51Z'
-updated_date: '2026-11-15T15:47:29Z'
+updated_date: '2026-11-16T20:59:19Z'
 labels: []
-references: []
+references:
+  - RE-002
 ---
 # REQ-07.001 Organize Artifacts into Three Categories
 
@@ -26,7 +27,7 @@ Papyrus manages exactly three artifact categories:
 
 Each record type belongs to exactly one category.
 
-Status models differ by category. Task statuses are configurable through `statuses` and `default_status` (REQ-01.002). Within the backlog category, the milestone and release lifecycles are fixed: a milestone is `open` then `closed`, and a release is `planned` then `released`. Decision records use the fixed Nygard statuses `proposed`, `accepted`, `rejected`, `deprecated`, and `superseded` (REQ-04.001). Document types have a **main status** plus optional **custom statuses**, described below.
+Status models differ by category. Task statuses are configurable through `statuses` and `default_status` (REQ-01.002). Within the backlog category, the milestone and release lifecycles are fixed: a milestone is `open`, then `closed`, then `archived`, and a release is `planned` then `released`. Decision records use the fixed Nygard statuses `proposed`, `accepted`, `rejected`, `deprecated`, and `superseded` (REQ-04.001). Document types have a **main status** plus optional **custom statuses**, described below.
 
 **Main status.** Every document type has the main status `active` or `archived`, and these are the only statuses that affect storage location. An `active` record is stored in the document type's configured folder; an `archived` record is stored in the `archived/` subfolder of that folder and carries `status: archived` (REQ-05.007). For a front-matter-backed record, `archive` is the only operation that produces the `archived` state; UI mockups set the equivalent HTML state through their own lifecycle (REQ-05.008).
 
@@ -47,7 +48,7 @@ The decision status `deprecated` and the document state `archived` are different
 - Tasks, milestones, and releases belong to the backlog category; decision records belong to the decision category; every document type declared under `document_types` belongs to the document category.
 - Each record type belongs to exactly one category.
 - Task statuses are configurable through `statuses` and `default_status` (REQ-01.002); document types may additionally declare custom statuses through `document_types.<slug>.statuses` and an optional `document_types.<slug>.default_status`.
-- The milestone lifecycle is fixed to `open -> closed` and the release lifecycle is fixed to `planned -> released`; neither is affected by any `statuses` or `default_status` configuration.
+- The milestone lifecycle is fixed to `open -> closed -> archived` and the release lifecycle is fixed to `planned -> released`; neither is affected by any `statuses` or `default_status` configuration.
 - Decision records use only `proposed`, `accepted`, `rejected`, `deprecated`, and `superseded`.
 - Every document type has the main status `active` or `archived`; an active record is stored in the type folder and an archived record is stored in that folder's `archived/` subfolder with `status: archived` (REQ-05.007).
 - A document type's declared statuses always include `active` and `archived`; configuration cannot remove, rename, or redefine them, and a custom status cannot reuse either value.
@@ -65,7 +66,7 @@ The decision status `deprecated` and the document state `archived` are different
 ## Traceability
 - Source: customer-feedback handoff — in-session user feedback, Item 10 (needs clarification), raw quote:
   - "papyrus must have 3 categories of artifact: backlog (task. milestone and relsease), decision and documents. the first category has configurable status for tasks but milestone and releases have a fixed lifecycle. the decision follow the Nygard adr template and have all the same lifecycle (proposed, accepted, refused, deprecated, superseded) the document are active or archived."
-- Project-owner decisions 2026-11-13 (refinement): categories are backlog, decision, and document; decisions keep the Nygard status `rejected` (not `refused`); documents use `archived` instead of `deprecated`; milestone lifecycle is `open -> closed` and release lifecycle is `planned -> released`.
+- Project-owner decisions 2026-11-13 (refinement): categories are backlog, decision, and document; decisions keep the Nygard status `rejected` (not `refused`); documents use `archived` instead of `deprecated`; milestone lifecycle is `open -> closed -> archived` and release lifecycle is `planned -> released`.
 - Project-owner decision 2026-11-13 (document status model): every document type has the main status `active` or `archived`, which alone governs storage location; additional custom statuses are declared per document type in configuration and are front-matter values only; `papyrus <document-slug> status <id> <value>` sets a custom status or `active` but never archives; archiving discards the custom value; `status` on an archived record is rejected. This supersedes the earlier statement that document types have the fixed lifecycle `active -> archived` with no configurable statuses.
 - REQ-01.002 — Read and Edit Project Configuration (task statuses, document custom statuses)
 - REQ-01.004 — Use Common CLI Controls and Outcomes (validation and not-found outcomes)
