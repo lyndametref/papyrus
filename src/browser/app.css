@@ -152,6 +152,7 @@ h2, h3 { overflow-wrap: anywhere; }
 .bleed { width: 100%; overflow-x: auto; }
 .bleed:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 pre { max-width: 100%; overflow-x: auto; }
+pre:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .muted { color: var(--muted); }
 .list--shared {
   width: 100%;

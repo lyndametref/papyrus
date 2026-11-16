@@ -379,10 +379,18 @@ fn config_and_skills_own_their_horizontal_scrolling() {
     );
 
     let skills = server.get("/skills");
-    assert!(skills.contains("<pre>"));
+    assert!(skills.contains(
+        "<pre role=\"region\" aria-label=\"Initialize a new project command\" tabindex=\"0\">"
+    ));
     assert!(
-        include_str!("../src/browser/app.css")
-            .contains("pre { max-width: 100%; overflow-x: auto; }")
+        skills.matches("<pre role=\"region\" aria-label=\"").count() > 1,
+        "every command block is a named, focusable region"
+    );
+    let css = include_str!("../src/browser/app.css");
+    assert!(css.contains("pre { max-width: 100%; overflow-x: auto; }"));
+    assert!(
+        css.contains("pre:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }"),
+        "the command scroller shows a visible focus ring"
     );
 
     let board = server.get("/?type=task");

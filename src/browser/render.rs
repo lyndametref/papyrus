@@ -3985,9 +3985,10 @@ pub fn skills_page(cfg: &Config, chrome: Chrome<'_>) -> String {
             let desc = substitute(desc_tpl, &vars);
             let snippet = substitute(snippet_tpl, &vars);
             sections.push_str(&format!(
-                "<article><h3>{}</h3><p>{}</p><pre>{}</pre><button type=\"button\">Copy</button></article>",
+                "<article><h3>{}</h3><p>{}</p><pre role=\"region\" aria-label=\"{} command\" tabindex=\"0\">{}</pre><button type=\"button\">Copy</button></article>",
                 escape(title),
                 escape(&desc),
+                escape(title),
                 escape(&snippet)
             ));
         }

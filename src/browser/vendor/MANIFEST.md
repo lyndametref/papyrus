@@ -35,6 +35,6 @@ Rows are sorted by request path; `bytes` are decimal and `sha256` is lowercase h
 
 | path | bytes | sha256 |
 |---|---|---|
-| `/assets/app.css` | 17185 | `31e110255ac62d91b80a670ef501780123e04be768b5fc1f30d2655bd3e6d030` |
+| `/assets/app.css` | 17259 | `7eafc7d1da8aa58583070a5b811ed6c2c10ff4bcb62291ddfd5c8adf25e37933` |
 | `/assets/app.js` | 7744 | `c9681ce12bd27d021fe4f7711c4f2c97d6de9bb7c4d6b21e9ef09f511052b968` |
 | `/assets/nav-state.js` | 679 | `c12c7fe53d844706c7c085f2c9ad6fc6aa784a3ba236895259b486d993bd961d` |
