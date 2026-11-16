@@ -1684,3 +1684,203 @@ folder note.
 `release-ready: no` — G-5 is open and release-blocking. G-1, G-2, G-3, G-4, and
 F-117-1 are recorded follow-ups or accepted limitations. The quality gates, CLI,
 browser, upgrade, package, offline, and no-drift checks pass.
+
+## TASK-149 — Browser assets, offline rendering, and binary budget
+
+**Supported platform statement.** Debian **Forky amd64** is the supported and verified
+release target for this package (ADR-0003, NFR-03.002). Debian Trixie and every other
+release, and every other architecture, remain **not claimed or verified**.
+
+This section records the m-21 packaging gate for the vendored browser assets
+(ADR-0025, ADR-0026, ADR-0027) and the 12 MiB binary budget. It is a verification and
+packaging record: no product source, test, packaging, requirement, business rule, ADR,
+or README file was changed. Browser-observed rendering is TASK-150.
+
+### Environment
+
+| Item | Value |
+|---|---|
+| Host | Debian GNU/Linux forky/sid, amd64 |
+| Date and timezone | 2026-11-16 10:28 CET (UTC+01:00) |
+| glibc | 2.43-7 |
+| rustc / cargo | 1.99.1 (pinned by `rust-toolchain.toml`) |
+| clippy / rustfmt | 0.1.99 / 1.10.0-stable |
+| dpkg / dpkg-deb | 1.23.11 |
+| fakeroot | 2.1.4 |
+| Tooling | `unshare -rn`, `ip`, `curl` available |
+| Package toolchain | `./scripts/build-deb.sh` unchanged |
+
+### Isolation method
+
+- Every fixture, the extracted packaged binary, and the isolated dpkg root lived under
+  `./.tmp/task149/`; the directory was removed after the run.
+- The stale `papyrus_0.1.0_amd64.deb` present at the start (1,284,160 B, 2026-11-14,
+  4,197,544 B binary, 865 B copyright) was deleted before packaging and is not evidence
+  for this gate.
+- The package was installed with `fakeroot dpkg --instdir=./.tmp/task149/inst
+  --admindir=./.tmp/task149/adm --force-depends -i`. The first attempt aborted with
+  `2 expected programs not found in PATH`; exporting
+  `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin` fixed it, as the
+  Install section already requires.
+- The host package database was identical before and after: `dpkg-query -W
+  -f='${Status}' papyrus` reported `install ok installed` both times (the host already
+  carried the packaged `0.1.0` from earlier work).
+
+### Package artifact
+
+- File: `papyrus_0.1.0_amd64.deb`
+- Size: **2,379,712 bytes** (2.27 MiB)
+- SHA-256: `b3bc9b729b2b3097a8939a12586896950fab8d738a79f762acb7f56ccf565ead`
+- Growth over the stale 1,284,160 B package: **+1,095,552 B (1.04 MiB / 1.10 MB)**,
+  slightly above ADR-0026 decision 12's 0.75–0.98 MB estimate. No package-size budget
+  exists; recorded only.
+- `dpkg-deb -I`: `Package: papyrus`, `Version: 0.1.0` (equal to `Cargo.toml`),
+  `Architecture: amd64`, `Depends: libc6 (>= 2.34)`, `Section: utils`,
+  `Priority: optional`, `Maintainer: Papyrus Maintainers
+  <maintainers@papyrus.example>`, `Homepage`, and a four-line `Description`.
+- Packaged binary equals the built binary:
+  `dpkg-deb --fsys-tarfile ... | tar -xO ./usr/bin/papyrus | sha256sum` ->
+  `2a71c1af6a1afc581540d51043145b731ce81621114f9a1a248d148ac2d5031e`, size
+  **8,323,136 bytes** — both equal to `target/release/papyrus`.
+
+### Package contents
+
+| Entry | Mode | Bytes |
+|---|---|---|
+| `./usr/bin/papyrus` | `0755` | 8,323,136 |
+| `./usr/share/doc/papyrus/copyright` | `0644` | 8,000 |
+
+Directories only otherwise. A `grep -Ei '\.(css|js|html|map|woff2?|ttf)$|/etc/|/usr/share/man|/usr/share/papyrus|config'`
+over `dpkg-deb -c` printed nothing and `grep -c '^-'` printed `2`. The isolated install
+contained exactly the same two files, and `/usr/share/papyrus`, `/etc`, and
+`/usr/share/man` were absent.
+
+### Notices
+
+- Packaged copyright: **8,000 bytes**, byte-identical to
+  `packaging/deb/usr/share/doc/papyrus/copyright` (`cmp` exit 0, SHA-256
+  `4610a7abd140648d1e2c136a38cc150c58904396fbbcf7f60348c02a0ca4fc3c`). Explicitly not
+  the stale 865 B file.
+- `Format:` Debian copyright header, then exactly **four** `Files:` paragraphs:
+  `*` (GPL-3.0-or-later), `katex.min.js` + `katex.min.css` (MIT),
+  `mermaid.min.js` (MIT-Mermaid), and `fonts/*.woff2` (OFL-1.1). Each identifier
+  carries its full licence text; the Mermaid holder (`2014-2022 Knut Sveidqvist`) and
+  the KaTeX font holders (Design Science, Inc., Khan Academy) are present.
+- Every family in `src/browser/vendor/MANIFEST.md` — KaTeX code MIT, KaTeX fonts
+  OFL-1.1, Mermaid MIT — has a paragraph.
+
+### Assets and digests
+
+| Check | Result |
+|---|---|
+| `cargo test --lib browser::assets` | PASS — 2 tests (`manifest_covers_every_asset_with_matching_bytes_and_digest`, `sha256_matches_standard_vectors`) |
+| Manifest rows vs table entries | 26 = 26 (3 first-party, 22 KaTeX, 1 Mermaid) |
+| Digests recomputed on disk (independent of Rust) | **26/26** byte count and SHA-256 match |
+| Digests recomputed over HTTP from the packaged binary | **26/26** status, bytes, digest, `Content-Type`, `Content-Length`, `Cache-Control: no-store` |
+| `HEAD` on every asset | **26/26** `200` with headers and an empty body |
+| Routing edges | `GET`/`HEAD` `/assets/nope`, `/assets/`, `/assets/app.css/` -> `404` (6/6); `PUT`/`DELETE`/`OPTIONS`/`POST` on an asset -> `405`; `?x=1` query -> `200`, identical bytes |
+| Offline reference scans (`t143_`, `t24_`, `t40l_`, `t25l_`, `t26k_`, `t57k_`, `t81l_`) | PASS — no `.map`, no `@import`, every `url(` a bare relative `fonts/...` resolving to a served WOFF2 sibling, no `sourceMappingURL` |
+| `katex.min.css` font references | 60 `url(` over 20 `@font-face`: 20 `.woff2` (served), 20 `.woff` and 20 `.ttf` (expected `404`, ADR-0025 decision 4) |
+| Asset module filesystem-free | PASS — `t143_asset_module_is_filesystem_free`; `grep -nE 'std::fs\|File::open\|PathBuf\|Path' src/browser/assets.rs` prints nothing |
+
+### CSP, width, and navigation (HTTP level)
+
+- Both literals were compared byte-for-byte with `pub const CSP` / `pub const
+  CSP_DIAGRAM`. Strict was observed on `/`, `/?type=req`, `/?type=task`,
+  `/doc/<no-math>`, `/doc/<no-math>/edit`, `/doc/<math-only>`, `/lifecycle`, `/config`,
+  `/skills`, `/nope`, a PlantUML-only page, and an over-cap fence page (12/12).
+  Diagram was observed only on pages with a renderable `mermaid` figure (3/3).
+- No `Content-Security-Policy` on any `/assets/...` response or any
+  `application/json` response. In both literals `script-src` is exactly `'self'` with no
+  `'unsafe-inline'`, `'unsafe-eval'`, nonce, or hash; `'unsafe-inline'` occurs once, in
+  the diagram literal's `style-src`; the literals differ in exactly one token.
+- Width: `/?type=task` alone serves `<div class="app app--full">`; every other shell
+  page serves `<div class="app">` and no `app--full`. `app.css` contains
+  `.app { max-width: 1040px; ... }` and `.app--full { max-width: none; }`; `app.js` and
+  `nav-state.js` never mention `app--full`.
+- Navigation: every page carries one toggle and one `<nav id="site-nav"
+  aria-label="Document types">`, no `data-nav` and no preset collapsed state, and loads
+  `/assets/nav-state.js` synchronously (679 B, manifest digest
+  `c12c7fe53d844706c7c085f2c9ad6fc6aa784a3ba236895259b486d993bd961d`). `nav-state.js`
+  reads `papyrus.nav` before first paint; `app.js` writes it.
+- `papyrus check` from the installed binary: clean corpus exit **0** (`no findings`,
+  `{"findings":[],"skipped":[],"repaired":[]}`); duplicate-ID corpus exit **4** with one
+  `duplicate-id` finding and both sorted locations. The project hash was identical
+  before and after both runs — nothing was written.
+
+### Budget arithmetic
+
+| Quantity | Value |
+|---|---|
+| Binary (`stat -c %s target/release/papyrus`, equal to the packaged binary) | **8,323,136 B** = 7.94 MiB |
+| Ceiling (ADR-0027 decision 6) | 12,582,912 B = 12 MiB |
+| Headroom | **4,259,776 B** = 4.06 MiB |
+| KaTeX weight | 558,541 B (CSS 23,335 + JS 275,414 + 20 WOFF2 259,792) |
+| Mermaid weight | 3,572,661 B |
+| First-party assets | `app.css` 17,880 B, `app.js` 12,953 B, `nav-state.js` 679 B |
+| Vendor weight | 4,131,202 B; all 26 assets 4,162,714 B |
+| `.deb` | 2,379,712 B, SHA-256 `b3bc9b729b2b3097a8939a12586896950fab8d738a79f762acb7f56ccf565ead` |
+
+The relationship holds: pre-Mermaid 4,730,296 B + Mermaid 3,572,661 B + the client and
+Rust delta -> 8,323,136 B measured.
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| `cargo build --release` (Rust 1.99.1) | PASS — `target/release/papyrus` |
+| `cargo build --release --offline` | PASS — no network needed |
+| `target/release/papyrus --help` lists `check`, `browser`, `search`, `task`, `milestone`, `release`, `import` before packaging | PASS |
+| `cargo test` | PASS — 1,044 passed, 0 failed, 23 ignored |
+| `cargo clippy --all-targets -- -D warnings` | PASS — 0 warnings |
+| `cargo fmt --check` | PASS |
+| Offline `unshare -rn` (loopback up) | PASS — outbound TCP failed (exit 7); list, board, math page, diagram page, 26/26 assets, and `check` succeeded over loopback |
+| Installed-binary run from an empty working directory with an asset-free project (`env -i`) | PASS — 26/26 assets |
+| No new crate or build step | PASS — `Cargo.lock` 36 packages, no `build.rs`, no `npm`/`node` reference in `scripts/` or `packaging/`, 29 committed vendor files |
+| Man page | Absent, as expected (NFR-03.003 unclaimed, ADR-0021 `Proposed`) |
+
+### Findings
+
+| ID | Finding | Severity | Disposition |
+|---|---|---|---|
+| T149-1 | §3.6 item 4 says the build fails the budget check above 12,582,912 B, but no such automated check exists. | Low | Reported, not edited here: the live procedure belongs to the packaging specification owner. The release check above is the real behaviour. |
+| T149-2 | The `.deb` grows 1.10 MB over the stale package, slightly above ADR-0026 decision 12's 0.75–0.98 MB estimate. | Informational | No package-size budget exists; recorded only. |
+
+No defect was found in the packaged artifact, the asset contract, the CSP literals, the
+width or navigation markup, or `papyrus check`, so no code, test, or packaging change
+was required by this gate.
+
+### Recorded limitations
+
+- **Browser-observed behaviour is TASK-150.** This gate asserts packaging and HTTP-level
+  facts only. KaTeX and Mermaid rendering with the bundled fonts, the diagram type
+  matrix, hostile fixtures, navigation collapse and persistence in a real browser,
+  JavaScript-disabled operation, `document.scrollWidth == clientWidth`, and the
+  `check --fix` loop are verified there.
+- Debian Forky amd64 only (ADR-0003, NFR-03.002); no other release or architecture is
+  claimed.
+- `git ls-files src/browser/vendor` was not run because the verification session
+  permitted only `git add`/`git commit`. The committed-assets claim is supported by
+  `git status --porcelain` (no untracked or modified path under `src/browser/vendor`),
+  the on-disk listing of 29 vendor files, and a `.gitignore` that covers only `target/`
+  and `.tmp/`.
+- `scripts/build-deb.sh` still reuses an existing `target/release/papyrus`; the
+  mitigation remains `cargo build --release` first, asserting `--help`, and proving the
+  packaged SHA-256 equals the built one before recording the package.
+
+### Measurement provenance
+
+- The artifact was built and packaged at 2026-11-16 10:29–10:30 CET from the working
+  tree holding commits up to `cc20dd0` plus the then-uncommitted
+  `src/browser/app.css`, `src/browser/math.rs`, and `src/browser/vendor/MANIFEST.md`
+  changes; `git rev-parse HEAD` reported `676128cf23a612ed4e06723554a35ce21275ad8a`
+  when the run started (checklist item 3).
+- A concurrent session advanced `HEAD` to `cc20dd0` during the run and, at 10:43 CET,
+  started uncommitted page-level diagram-numbering work in `src/browser/math.rs`,
+  `src/browser/render.rs`, and `tests/browser_diagram_cli.rs`. Those files belong to
+  another ticket and are outside this gate's scope. The binary and `.deb` SHA-256
+  values above describe the measured artifact, not a rebuild of that later tree.
+- Re-running `cargo test` on the later tree at 10:46 CET passed: **1,046 passed,
+  0 failed, 23 ignored**. Any rebuild after further source changes will change the
+  binary SHA-256 by design; the measured headroom (about 4.06 MiB) is unaffected by
+  small client-side changes.
