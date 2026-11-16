@@ -1147,41 +1147,13 @@ fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpErr
     } else {
         records::build_index(&ctx, &cfg, &state.registry, descriptor, status.as_deref())
     };
-    let other_has_records = if descriptor.id_shape == crate::registry::IdShape::Grouped {
-        let other_handler = match handler_of(descriptor) {
-            Some(TypedHandler::Requirement(crate::registry::RequirementKind::Business)) => {
-                TypedHandler::Requirement(crate::registry::RequirementKind::NonFunctional)
-            }
-            _ => TypedHandler::Requirement(crate::registry::RequirementKind::Business),
-        };
-        state
-            .registry
-            .enabled(CategoryKind::Document)
-            .find(|other| handler_of(other) == Some(other_handler))
-            .is_some_and(|other| {
-                !records::build_index(&ctx, &cfg, &state.registry, other, None).is_empty()
-            })
-    } else {
-        false
-    };
     let (project, bind_note) = chrome_for(&cfg, state);
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
         routes: &state.routes,
     };
-    let html = if matches!(descriptor.content_model, ContentModel::Generic) {
-        render::document_list_page(descriptor, &index, status.as_deref(), &cfg, chrome)
-    } else {
-        render::list_page(
-            descriptor,
-            &index,
-            other_has_records,
-            status.as_deref(),
-            &cfg,
-            chrome,
-        )
-    };
+    let html = render::list_page(descriptor, &index, status.as_deref(), &cfg, chrome);
     Ok(Response::html(200, html))
 }
 

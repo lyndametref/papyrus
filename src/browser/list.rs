@@ -9,7 +9,7 @@ use crate::browser::records::{Index, Record};
 use crate::browser::render::escape;
 use crate::browser::render::render_template;
 use crate::browser::routes;
-use crate::registry::TypeDescriptor;
+use crate::registry::{IdShape, TypeDescriptor};
 
 /// The list section template: heading, count note, then the table or empty state.
 const LIST_TEMPLATE: &str = "<section class=\"section\" aria-label=\"{{heading}}\">\
@@ -59,7 +59,7 @@ pub struct Row {
     pub children: Vec<Row>,
 }
 
-/// The per-family empty state; copy is supplied by the caller, not by markup.
+/// The one shared empty state; copy is assembled from the presentation noun.
 #[derive(Clone, Debug)]
 pub struct EmptyState {
     pub message: String,
@@ -67,19 +67,20 @@ pub struct EmptyState {
 }
 
 impl ListPlan {
-    /// Build the reference-family plan from the index and declared slots.
+    /// Build one family's plan from the index and declared slots.
     ///
-    /// Rows keep `Index.records` order. Family variation comes only from
-    /// `routes::list_slots(slug)` and the empty copy; there is no slug or
-    /// handler match in this module.
+    /// Flat rows keep `Index.records` order; grouped families emit one group
+    /// row, its members, then orphan members. Family variation comes only from
+    /// the representative presentation slug and the empty copy; there is no
+    /// slug or handler match in this module.
     pub fn for_descriptor(
         descriptor: &TypeDescriptor,
+        presentation_slug: &str,
         index: &Index,
         heading: &str,
         count_note: &str,
     ) -> ListPlan {
-        let slug = descriptor.slug.as_str();
-        let slots = routes::list_slots(slug);
+        let slots = routes::list_slots(presentation_slug);
         validate_slots(slots);
         let mut columns = vec![
             Column {
@@ -121,14 +122,21 @@ impl ListPlan {
             class: "actions-cell",
         });
 
-        let rows = index
-            .records
-            .iter()
-            .map(|record| row_for(record, slots))
-            .collect();
+        let rows = if descriptor.id_shape == IdShape::Grouped {
+            grouped_rows(index, slots)
+        } else {
+            index
+                .records
+                .iter()
+                .map(|record| row_for(record, slots))
+                .collect()
+        };
         let empty = if index.records.is_empty() {
             Some(EmptyState {
-                message: format!("No {} in this project.", routes::short(slug)),
+                message: format!(
+                    "No {} in this project.",
+                    routes::noun(presentation_slug, 0)
+                ),
                 help: Some(
                     "Records are created from the command line; this browser does not create records."
                         .to_string(),
@@ -274,9 +282,41 @@ pub fn validate_slots(slots: &[(&'static str, &'static str)]) {
     }
 }
 
+/// Grouped rows: the group row first, its members as children, then every
+/// member whose group row is absent from the filtered index as a top-level row.
+fn grouped_rows(index: &Index, slots: &[(&'static str, &'static str)]) -> Vec<Row> {
+    let mut rows = Vec::new();
+    for group in &index.groups {
+        let mut row = row_for(group, slots);
+        if let Some(positions) = index.members.get(&group.id) {
+            for position in positions {
+                if let Some(member) = index.requirements.get(*position) {
+                    row.children.push(row_for(member, slots));
+                }
+            }
+        }
+        rows.push(row);
+    }
+    let mut other: Vec<&Record> = index
+        .other
+        .iter()
+        .filter_map(|position| index.requirements.get(*position))
+        .collect();
+    other.sort_by(|left, right| left.id.cmp(&right.id));
+    for record in other {
+        rows.push(row_for(record, slots));
+    }
+    rows
+}
+
 fn row_for(record: &Record, slots: &[(&'static str, &'static str)]) -> Row {
     let id = record.id.clone();
     let href = format!("/doc/{id}");
+    let title = if record.title.trim().is_empty() {
+        id.clone()
+    } else {
+        record.title.clone()
+    };
     let mut cells = vec![status_cell(record.status.as_deref())];
     for (key, _) in slots {
         cells.push(slot_cell(key, record));
@@ -285,7 +325,7 @@ fn row_for(record: &Record, slots: &[(&'static str, &'static str)]) -> Row {
     cells.push(date_cell(record, "updated_date"));
     Row {
         id: id.clone(),
-        title: record.title.clone(),
+        title,
         href: href.clone(),
         cells,
         labels: record.labels.clone(),
@@ -344,27 +384,28 @@ fn date_cell(record: &Record, field: &str) -> String {
     }
 }
 
-/// Count note for a shared list (`3 milestones`, `1 milestone`, `0 milestones`).
+/// Count note for a flat shared list (`3 milestones`, `1 milestone`, `0 milestones`).
 ///
-/// The plural noun is declared in the presentation table (`routes::short`);
+/// The noun is declared in the presentation table (`routes::noun`);
 /// config-defined types fall back to their lower-case slug.
 pub fn count_note(slug: &str, count: usize) -> String {
-    let plural = routes::short(slug);
-    let noun = if count == 1 {
-        singular(&plural)
-    } else if plural.ends_with('s') {
-        plural
-    } else {
-        format!("{plural}s")
-    };
-    format!("{count} {noun}")
+    format!("{count} {}", routes::noun(slug, count))
 }
 
-fn singular(plural: &str) -> String {
-    if plural.ends_with('s') && !plural.ends_with("ss") {
-        plural[..plural.len() - 1].to_string()
+/// Count note for a grouped family (`1 group · 3 requirements`).
+pub fn grouped_count_note(index: &Index) -> String {
+    format!(
+        "{} \u{b7} {}",
+        count_phrase(index.groups.len(), "group", "groups"),
+        count_phrase(index.requirements.len(), "requirement", "requirements")
+    )
+}
+
+fn count_phrase(count: usize, singular: &str, plural: &str) -> String {
+    if count == 1 {
+        format!("1 {singular}")
     } else {
-        plural.to_string()
+        format!("{count} {plural}")
     }
 }
 
@@ -469,6 +510,7 @@ mod tests {
     fn milestone_plan() -> ListPlan {
         ListPlan::for_descriptor(
             &descriptor("milestone"),
+            "milestone",
             &Index::default(),
             "Milestones",
             "0 milestones",
@@ -499,6 +541,7 @@ mod tests {
         assert_eq!(routes::list_slots("note"), &[]);
         let plan = ListPlan::for_descriptor(
             &descriptor("release"),
+            "release",
             &Index::default(),
             "Releases",
             "0 releases",
@@ -668,6 +711,144 @@ mod tests {
         );
         assert_eq!(status_cell(None), "<span class=\"muted\">(none)</span>");
         assert_eq!(status_cell(Some("")), "<span class=\"muted\">(none)</span>");
+    }
+
+    fn record(id: &str, is_group: bool, group_id: Option<&str>) -> Record {
+        Record {
+            id: id.to_string(),
+            descriptor: descriptor("req"),
+            is_group,
+            title: format!("{id} title"),
+            story: None,
+            group_id: group_id.map(str::to_string),
+            group_title: None,
+            description: None,
+            rationale: None,
+            applicability: None,
+            requirements: Vec::new(),
+            audit_type: None,
+            definition: None,
+            view: None,
+            status: None,
+            milestone_id: None,
+            milestone_title: None,
+            assignee: None,
+            labels: Vec::new(),
+            dependencies: Vec::new(),
+            acceptance_criteria: Vec::new(),
+            comments: Vec::new(),
+            release_id: None,
+            release_title: None,
+            decision: None,
+            context: None,
+            consequences: None,
+            decision_type: None,
+            superseded_by: None,
+            superseded_title: None,
+            specs: Vec::new(),
+            refs: Vec::new(),
+            mockup_task: String::new(),
+            doc: crate::record::document::Document {
+                source: String::new(),
+                front_matter: None,
+                frontmatter: None,
+                heading: None,
+                preamble: Vec::new(),
+                sections: Vec::new(),
+            },
+            stored_source: String::new(),
+            path: std::path::PathBuf::new(),
+            rel_path: String::new(),
+            version: String::new(),
+        }
+    }
+
+    fn grouped_index() -> Index {
+        let first = record("REQ-001", true, None);
+        let empty = record("REQ-002", true, None);
+        let child_one = record("REQ-001.001", false, Some("REQ-001"));
+        let child_two = record("REQ-001.002", false, Some("REQ-001"));
+        let orphan = record("REQ-001.009", false, Some("REQ-999"));
+        let mut index = Index {
+            records: vec![
+                first.clone(),
+                empty.clone(),
+                child_one.clone(),
+                child_two.clone(),
+                orphan.clone(),
+            ],
+            groups: vec![first, empty],
+            requirements: vec![child_one, child_two, orphan],
+            ..Index::default()
+        };
+        index.members.insert("REQ-001".to_string(), vec![0, 1]);
+        index.other = vec![2];
+        index
+    }
+
+    #[test]
+    fn grouped_rows_are_one_body_with_children_and_a_top_level_orphan() {
+        let index = grouped_index();
+        let plan = ListPlan::for_descriptor(
+            &descriptor("req"),
+            "req",
+            &index,
+            "Business requirements",
+            &grouped_count_note(&index),
+        );
+        let html = plan.render();
+        assert_eq!(html.matches("<tbody>").count(), 1);
+        let order = [
+            "REQ-001",
+            "REQ-001.001",
+            "REQ-001.002",
+            "REQ-002",
+            "REQ-001.009",
+        ];
+        let mut cursor = 0;
+        for id in order {
+            let marker = format!("data-row-id=\"{id}\"");
+            let position = html[cursor..]
+                .find(&marker)
+                .unwrap_or_else(|| panic!("row {id} missing"));
+            cursor += position + marker.len();
+        }
+        assert!(html.contains("<tr data-row-id=\"REQ-001.001\" data-child-of=\"REQ-001\">"));
+        assert!(html.contains("<tr data-row-id=\"REQ-001.002\" data-child-of=\"REQ-001\">"));
+        assert!(html.contains("<tr data-row-id=\"REQ-002\">"));
+        assert!(
+            !html.contains("data-row-id=\"REQ-001.009\" data-child-of"),
+            "an unresolved member is a top-level row"
+        );
+        assert!(html.contains("<p class=\"count\">2 groups · 3 requirements</p>"));
+    }
+
+    #[test]
+    fn grouped_count_note_handles_empty_and_singular_counts() {
+        assert_eq!(
+            grouped_count_note(&Index::default()),
+            "0 groups · 0 requirements"
+        );
+        let index = Index {
+            groups: vec![record("REQ-001", true, None)],
+            requirements: vec![record("REQ-001.001", false, Some("REQ-001"))],
+            ..Index::default()
+        };
+        assert_eq!(grouped_count_note(&index), "1 group · 1 requirement");
+    }
+
+    #[test]
+    fn empty_message_uses_the_count_note_noun() {
+        let plan = ListPlan::for_descriptor(
+            &descriptor("milestone"),
+            "note",
+            &Index::default(),
+            "Notes",
+            &count_note("note", 0),
+        );
+        let html = plan.render();
+        assert!(html.contains("<p class=\"count\">0 notes</p>"));
+        assert!(html.contains("No notes in this project."));
     }
 
     #[test]

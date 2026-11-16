@@ -132,7 +132,8 @@ Rules:
 - `Row.cells.len() == columns.len() - 3` (ID, Title, and Actions are structural). `ListPlan::render` asserts this and the column-shape rules; a violation is a programming error, not a 500.
 - `title` is not duplicated inside `cells`; it is required because the ADR row sketch has no title field and the ID/Title cells are structural.
 - `labels` and `references` are general front-matter metadata, not family data. The shared list renders them in the Title cell below the link and escapes them in `list.rs`, because `Row` carries values, not markup. `href` is a route the builder computes, never a stored value, so a stored `href` key cannot reach the cell.
-- `empty` carries the per-family empty copy, because today's copy varies by family (requirement group messages, the technical-specification/use-case/test-case/test-report wording, the generic "Records are created from the command line" help line). Empty copy must not stay behind per-family builder code (AC3). When `empty` is `Some`, the table is not rendered.
+- `empty` is `Some` when the filtered index has no records for the family; the table is then replaced by the empty block. TASK-142 pins one shared pair for every family: message `No {noun} in this project.` and help `Records are created from the command line; this browser does not create records.` `{noun}` is the same singular/plural noun the count note uses (`business requirements`; `notes` for a config-defined type). The legacy per-family variants (requirement group wording and the cross-family hint, the technical-specification/use-case/test-case/test-report "were found in the configured directory" wording, the "Archived … are hidden" sentence) are recorded as accepted differences in TASK-142 and reconciled by the specification port owned by TASK-148. Empty copy never lives behind per-family builder code (AC3).
+- `count_note` is supplied by the caller and is the only other variable string. Flat families use `list::count_note(slug, record count)` (`3 milestones`, `1 milestone`, `0 releases`); grouped families use the group/member note (`1 group · 3 requirements`, `0 groups · 0 requirements`). A config-defined type falls back to its lower-case slug (`2 notes`).
 - Cell values are rendered HTML built from escaped values; `render` applies no further escaping to `cells`, `actions`, or `children`.
 
 ### 5.2 Markup contract
@@ -181,8 +182,8 @@ Stable test hooks, independent of styling: `data-list-layout="shared"`, `data-co
 
 ### 5.4 Rows, actions, archive exclusion
 
-- Row order is the order `Index.records` already yields (ascending ID as indexed). Migrating a family must not reorder rows.
-- Grouped families: the group row first, then one child row per member, all in the same `<tbody>`, each child carrying `data-child-of="{group id}"`. Members whose group reference is unresolved render as children of a synthetic trailing row only if the current family already shows them; the migrated family's current grouping behaviour is preserved, not redesigned.
+- Flat families keep the order `Index.records` already yields (ascending ID as indexed). Migrating a family must not reorder rows.
+- Grouped families: the group row first, then one child row per member, all in the same `<tbody>`, each child carrying `data-child-of="{group id}"`. Rows are emitted one group at a time in ascending group ID order, children in ascending ID order; a group with no members renders as a group row with no children. A member whose group row is absent from the filtered index (unresolved reference, or a status filter removed the group row) renders as a top-level row in ID order and is never dropped, duplicated, or attached to a synthetic group. The Group slot shows the stored reference verbatim; the legacy "Other requirements" section, the per-group member count, and the `(not found)` annotation are not carried over.
 - Actions are always the last cell, in the order `View`, `Edit`, then the family action if one exists today. `View` links to `/doc/{id}` and `Edit` to `/doc/{id}/edit`; both exist for every record today through the detail and edit routes, so no new route is implied. Each action link carries a record-specific accessible name (`aria-label="View {id}"`, `aria-label="Edit {id}"`), because repeated `View`/`Edit` labels are ambiguous to screen-reader and voice users (ADR-0028 decision 8 and downstream constraint 14).
 - Archived records never reach `ListPlan`: the index is built enabled-only and active-only (ADR-0020 decision 7). No list code filters archive state, and no list code may add an archive filter.
 
@@ -208,31 +209,29 @@ The reference family is the milestone list (`/?type=milestone`, ADR-0028 decisio
 
 The task family cannot be the reference: `GET /?type=task` is the REQ-06.013 kanban board and the task family has no list route to migrate (§2).
 
-While both list paths exist, `list_page` selects the builder from a declared presentation field:
+TASK-141 introduced the transitional dispatch `list_layout: ListLayout { Shared, Legacy }` in the presentation table. TASK-142 retired it: every family is `Shared`, and `ListLayout`, `routes::list_layout`, `Presentation::list_layout`, `with_layout`, the `Legacy` builders (`list_section`, `backlog_list_section`, `document_list_page`), and `document_list.html` are deleted in the same change, so no transitional branch, slug match, or per-family list template survives (ADR-0028 downstream constraints 1, 2, and 12). `list_page` always builds a `ListPlan`. The board's empty-project fallback keeps its own markup and copy inside `board_page`, because `/?type=task` is not a list route.
 
-```rust
-// src/browser/routes.rs
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum ListLayout {
-    Shared,
-    #[default]
-    Legacy,
-}
-
-// Presentation gains: pub list_layout: ListLayout
-```
-
-No `match` on a slug or handler is added for the migration, even temporarily (ADR-0028 downstream constraint 12). TASK-142 sets every family to `Shared` and deletes `ListLayout` together with the legacy builders in the same change, so no transitional branch can survive.
-
-TASK-142's migration order is fixed by ADR-0028:
+TASK-142's migration order is fixed by ADR-0028 (each step keeps the build green and replays its fixtures before the next):
 
 1. Requirements and NFRs first — the only grouped families; the grouped row variant and the status filter are unit-tested in this ticket and first exercised end-to-end there.
 2. UI mockups next — `Task` and `Specs` slots, the widest row.
-3. The remaining flat document families.
-4. Decisions.
-5. Config-defined types last — no presentation entry, therefore no slots.
+3. The remaining flat document families, plus the release family (flat, no slot, no filter). Release and milestone stay in the Backlog category and render no status filter.
+4. Decisions — the aggregate list, and its `?type=adr`/`?type=bdr` aliases resolve to the same presentation (heading and `Type` slot) as `?type=decision`.
+5. Config-defined types last — they have no presentation entry and never had a `list_layout` value; they migrate when the dispatch and the generic `document_list_page` branch are deleted.
 
 The task family is a board-regression check, not a list migration: its fixtures prove the REQ-06.013 board is unchanged.
+
+### 5.7 Post-migration list contract (TASK-142)
+
+The following is the settled behaviour once every family renders through `ListPlan`:
+
+- **One path.** `list_page` (route) resolves the descriptor, applies the optional status filter, builds the index, and calls the shared builder. `ContentModel::Generic` no longer selects a different page.
+- **Presentation slug.** The heading, subheading, count noun, and declared slots are resolved through the list's representative presentation slug (`BrowserRoutes::list_slug_for`: decision aliases share the aggregate presentation; every other family keeps its own), so decision descriptor aliases render the decisions presentation (heading and subheading `Decisions`, `Type` slot) rather than an empty slot set.
+- **Status filter (REQ-06.014).** Every enabled document type keeps the single status filter (`active` plus declared custom statuses, configured order, `archived` never offered) rendered above the shared section. Milestone, release, decision, and task views have no filter. The filter decides the index; `ListPlan` never filters. A filter value outside the offered set stays a 400. A filtered list with no matches shows the shared empty block; filter-specific empty copy is out of scope.
+- **Grouped rows.** As in §5.4; the group-aware count note is `N group(s) · M requirement(s)` computed from the filtered index.
+- **Empty state.** One shared message and help pair (see §5.1), one muted `(none)` for an unset status, date, or slot value, and the count note for zero records.
+- **Actions.** `View` then `Edit` in the last cell, each with a record-specific accessible name; the title cell carries the record's labels and references.
+- **Task family.** `/?type=task` is still the REQ-06.013 board: no shared table, no `Actions` cell, no status filter, and the per-milestone grouping unchanged.
 
 ## 6. Characterization fixtures (AC5)
 
@@ -242,10 +241,19 @@ Fixtures guard TASK-142, so they must be produced from the **pre-change** binary
 - **Seed project:** a committed minimal project tree, not CLI-built at test time: `papyrus.conf.yaml` with the default types enabled plus one config-defined type (`note`), and record files covering every family, including at least one archived record per archivable family, one requirement group with two members, one NFR group with two members, one requirement whose group reference is unresolved, and one family with no records (for the empty state).
 - **Families covered:** tasks (board inventory, since no task list exists), milestones, releases, decisions, business requirements (grouped), NFRs (grouped), glossary terms, business rules, audit records, technical specifications, UI specifications, UI mockups, use cases, test cases, test reports, and the config-defined `note` type. Plus one empty-state fixture per family.
 - **Captured per fixture:** `schema`, `family`, `url`, `captured_from_commit`, `heading`, `count_note`, `row_order` (IDs in render order), `baseline_columns` (today's header labels in order), `baseline_row_shape` (`ul`, `table`, or `board`), `records` (per ID: `title`, `status`, `created`, `updated`, `labels`, `references`, declared slot values, `href`, and `actions` — empty today because no list renders action cells), `grouped` (group → child IDs, requirements and NFRs only), `excluded` (archived IDs that must stay absent), and `empty` (bool).
-- **What is a target and what is evidence:** `baseline_columns` and `baseline_row_shape` are recorded as evidence of the pre-change contract and are **not** replayed, because they are exactly what the shared layout changes; `baseline_columns` is the only place the old five-column order survives, and it is evidence only. Everything decoded from records (set, order, values, grouping, exclusions, heading, count note) is replayed.
+- **What is a target and what is evidence:** `baseline_columns` and `baseline_row_shape` are recorded as evidence of the pre-change contract and are **not** replayed, because they are exactly what the shared layout changes; `baseline_columns` is the only place the old five-column order survives, and it is evidence only. Captured `actions` (`[]` today) are evidence only; the action cell is asserted from the contract instead.
+- **Replayed, normalized:** record set and relative row order, title, `href`, label and reference values in the Title cell, slot values, created and updated, group→child nesting, archived IDs absent, and the heading and count note where the family's presentation heading and count contract are unchanged. A captured `""` or `"(none)"` status, date, or slot value is the shared muted `(none)`; a non-empty status stays verbatim. This refines the README's "replayed targets" line, which predates the pinned differences below.
+- **Accepted differences (TASK-142, recorded in the ticket):**
+  - `requirement`/`nfr` heading changes from `Requirements` to the presentation heading (`Business requirements`, `Non-functional requirements`); the count note stays the group/member note.
+  - `note` count note changes from `2 records` to `2 notes` (a config-defined type uses its own noun).
+  - every empty fixture's count note (`No records`, `No groups`, `""`) becomes `0 <noun>` (or `0 groups · 0 requirements`); the empty block itself is the shared copy in §5.1, not the legacy per-family wording.
+  - the `requirement`/`nfr` `grouped` entry with the pseudo-group key `other` is replayed as top-level rows with no parent, because the legacy "Other requirements" section has no group row.
+  - the legacy per-group member count, the `<article class="group">` wrapper, the `(not found)` annotation on an unresolved group reference, and the "No requirements in this group" note are not carried into the table; the group row, the `data-child-of` children, and the stored Group value are.
+  - the task fixture is replayed against the board (no shared table or header): heading, count note, milestone grouping/card order, and archived exclusion are the regression assertion.
 - **Producer:** `tests/list_characterization_capture.rs`, an `#[ignore]`d test that boots the current browser against `project/`, parses the pre-change markup (document table rows, `req-list` rows, board cards), and writes `expected/*.json`. It is run once on the pre-change commit and then kept for audit only.
 - **Format decision:** JSON with `serde_json` (already a dev-dependency); no HTML golden files, because the header and cell markup is exactly what changes and byte-comparison would encode the old markup as the target.
-- **Replay (TASK-142):** `tests/list_characterization_replay.rs` reads each fixture and asserts the shared layout shows the same record set, the same relative row order, `created` and `updated` as cells, `labels` and `references` in the Title cell, the same status/slot values, the same group→child nesting, the same heading/count note, and the recorded archived IDs absent; it asserts the shared header sequence and the `View`/`Edit` actions separately, because those are the intended change.
+- **Replay (TASK-142):** `tests/list_characterization_replay.rs` gains one loop over every populated and empty fixture (`expected/*.json`, 32 files). For each fixture it asserts the shared layout shows the same record set, the same relative row order, `created` and `updated` as cells, `labels` and `references` in the Title cell, the same status/slot values, the same group→child nesting, the recorded archived IDs absent, the heading and count note where §6 keeps them, and — for the empty fixtures — no table plus the shared empty message, help, and zero count. It asserts the shared header sequence and the `View`/`Edit` actions separately, because those are the intended change. The milestone test already in the file stays.
+- **New contract tests (TASK-142):** a new `tests/list_shared_layout.rs` asserts (a) every enabled descriptor, resolved through its representative navigation route, returns `data-list-layout="shared"` and exactly the fixed `data-column` sequence including its declared slots (the task descriptor is excluded and asserted on the board instead; a disabled type stays 404), and (b) every archived ID recorded in every fixture is absent from its list, or from the board's `data-task` cards for the task family. The grouped-row proof (one `<tbody>`, group row before its `data-child-of` children, unresolved member as a top-level row) lives in the replay file beside the requirement and NFR fixtures.
 
 ## 7. UI gate
 
@@ -258,11 +266,11 @@ The shared list is a visible change on every migrated list: column reorder (`Sta
 - New: `docs/specifications/ui/browser-shell-and-shared-list-ui.md` — shell regions, list layout, column set, action cell, grouped rows, empty states, 320 px behaviour, and the anchor for the new MOCK.
 - Existing, must be reconciled rather than restated: `docs/specifications/ui/browser-final-cross-type-ui.md` §5 (list rows currently described as a metadata line with `created_date`/`updated_date`), `docs/specifications/ui/browser-config-defined-document-types-ui.md` §2 and its generic list section, and the per-family list sections of `browser-backlog-records-ui.md`, `browser-decision-records-ui.md`, `browser-requirements-ui.md`, `browser-business-rules-ui.md`, `browser-audit-records-ui.md`, `browser-technical-specifications-ui.md`, `browser-glossary-terms-ui.md`, `browser-ui-specifications-ui.md`, `browser-ui-mockups-ui.md`, `browser-use-cases-test-cases-and-test-reports-ui.md`.
 
-Per-family sections are reconciled in TASK-142; TASK-141 updates the new shell document and `browser-final-cross-type-ui.md` §5, and registers the MOCK.
+TASK-141 updates the new shell document and `browser-final-cross-type-ui.md` §5, and registers the MOCK. The per-family UI description sections are reconciled by TASK-148's specification port; TASK-142 changes no `docs/specifications/ui/**` file.
 
 ### 7.3 Gate
 
-`@ui-designer` produces one review package for the shell and shared list (MOCK id allocated, recorded in `docs/specifications/ui/mockups/README.md` and in this specification). **MOCK-0016** was produced and registered on 2026-11-15 with status `draft`; the implementation run proceeds in no-approval mode (orchestrator decision, TASK-141 comment 2026-11-15), so AC2/AC3 are implemented against the settled contract and the registry row stays `draft` for owner review. AC1, AC4, and AC5 (the fixture work in §6) were never gated.
+`@ui-designer` produces one review package for the shell and shared list (MOCK id allocated, recorded in `docs/specifications/ui/mockups/README.md` and in this specification). **MOCK-0016** was produced and registered on 2026-11-15 with status `draft`; the implementation run proceeds in no-approval mode (orchestrator decision, TASK-141 comment 2026-11-15), so AC2/AC3 are implemented against the settled contract and the registry row stays `draft` for owner review. AC1, AC4, and AC5 (the fixture work in §6) were never gated. TASK-142 adds no visual contract of its own and records a no-mockup waiver naming MOCK-0016 and the 32 characterization fixtures; its accepted differences are listed in §6.
 
 ## 8. Resolved questions (2026-11-15)
 

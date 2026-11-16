@@ -160,7 +160,7 @@ fn width_class_is_server_side_only() {
 }
 
 #[test]
-fn milestone_list_uses_the_shared_layout_and_other_families_stay_legacy() {
+fn every_family_list_uses_the_shared_layout() {
     let server = Server::start(&fixture_root().join("project"));
     let milestone = server.get("/?type=milestone");
     assert!(milestone.contains("data-list-layout=\"shared\""));
@@ -175,19 +175,17 @@ fn milestone_list_uses_the_shared_layout_and_other_families_stay_legacy() {
         "the narrow-width scroll container is focusable and labelled from the list heading"
     );
 
+    // TASK-142: the config-defined note list and the release list joined the
+    // shared layout; the legacy document table and ul row list are gone.
     let note = server.get("/?type=note");
-    assert!(
-        !note.contains("data-list-layout=\"shared\""),
-        "note is legacy until TASK-142"
-    );
-    assert!(
-        note.contains("<table class=\"table\">"),
-        "legacy document table"
-    );
+    assert!(note.contains("data-list-layout=\"shared\""));
+    assert!(note.contains("<table class=\"table list list--shared\""));
+    assert!(!note.contains("<table class=\"table\">"));
 
     let release = server.get("/?type=release");
-    assert!(!release.contains("data-list-layout=\"shared\""));
-    assert!(release.contains("<ul class=\"req-list\">"));
+    assert!(release.contains("data-list-layout=\"shared\""));
+    assert!(!release.contains("<ul class=\"req-list\">"));
+    assert!(release.contains("<th scope=\"col\" data-column=\"status\">Status</th>"));
 }
 
 #[test]

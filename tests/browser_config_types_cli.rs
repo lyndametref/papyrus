@@ -278,11 +278,14 @@ fn t114_01_user_added_type_end_to_end() {
     let server = Server::start(&d);
     let html = get(&server, "/?type=note").text();
     assert_eq!(get(&server, "/?type=note").status, 200);
-    assert!(html.contains("Status"));
-    assert!(has_order(
-        &html,
-        &["Status", "ID", "Title", "Created", "Updated"]
-    ));
+    // TASK-142: config-defined types render the shared six-column layout.
+    assert!(html.contains("data-list-layout=\"shared\""));
+    for key in ["id", "title", "status", "created", "updated", "actions"] {
+        assert!(
+            html.contains(&format!("<th scope=\"col\" data-column=\"{key}\">")),
+            "note header {key}"
+        );
+    }
     assert!(html.contains("NOTE-001"));
     assert!(html.contains("NOTE-002"));
     assert!(html.contains("First note"));
@@ -676,14 +679,20 @@ fn t114_11_builtin_list_uses_shared_columns_and_keeps_sections() {
     );
     let server = Server::start(&d);
     let glossary = get(&server, "/?type=glossary").text();
-    assert!(has_order(
-        &glossary,
-        &["row-status", "req-id", "row-created", "row-updated"]
-    ));
+    // TASK-142: the glossary list is the shared table, not the legacy ul row.
+    assert!(glossary.contains("data-list-layout=\"shared\""));
+    for key in ["id", "title", "status", "created", "updated", "actions"] {
+        assert!(
+            glossary.contains(&format!("<th scope=\"col\" data-column=\"{key}\">")),
+            "glossary header {key}"
+        );
+    }
     assert!(glossary.contains("class=\"filter\""));
     let tech = get(&server, "/?type=tech-spec").text();
     assert!(tech.contains("Technical Specifications"));
-    assert!(tech.contains("Description"));
+    // TASK-142: the shared list no longer renders the description preview.
+    assert!(tech.contains("data-list-layout=\"shared\""));
+    assert!(!tech.contains("Description"));
     let rule = get(&server, "/?type=business-rule").text();
     assert!(rule.contains("Business Rules"));
     let spec = get(&server, "/doc/TECH-001").text();
@@ -824,12 +833,11 @@ fn t114_15_generic_labels_and_references_round_trip() {
     let _ = fs::remove_dir_all(&d);
 }
 
-// Regression: release and decision lists keep their previous layout and do not
-// gain the document status filter or shared row fields. The milestone list is
-// the TASK-141 reference family and intentionally moved to the shared layout
-// (ADR-0028 decision 9), so it is asserted separately.
+// TASK-142: release, milestone, and decision lists all use the shared table
+// and still render no document status filter. The obsolete "keep previous
+// layout" contract is replaced by this shared-layout assertion.
 #[test]
-fn t114_16_non_document_lists_keep_previous_layout() {
+fn t114_16_non_document_lists_use_the_shared_layout_without_a_filter() {
     let d = init("16");
     run_ok(
         &d,
@@ -855,34 +863,26 @@ fn t114_16_non_document_lists_keep_previous_layout() {
     );
     run_ok(&d, &["decision", "create", "Decision One"]);
     let server = Server::start(&d);
-    for slug in ["release", "decision"] {
+    for slug in ["release", "milestone", "decision"] {
         let html = get(&server, &format!("/?type={}", slug)).text();
+        assert!(
+            html.contains("data-list-layout=\"shared\""),
+            "{slug} uses the shared layout"
+        );
+        assert!(
+            html.contains("class=\"table list list--shared\""),
+            "{slug} renders the shared table"
+        );
         assert!(
             !html.contains("class=\"filter\""),
             "{slug} must not render the document status filter"
         );
-        for class in ["row-status", "row-created", "row-updated"] {
-            assert!(
-                !html.contains(class),
-                "{slug} must not render the shared document row field {class}"
-            );
-        }
+        assert!(
+            !html.contains("<ul class=\"req-list\">"),
+            "{slug} is no longer a ul row list"
+        );
     }
-    // Contract change (TASK-141): the milestone list renders the shared layout.
-    let milestone = get(&server, "/?type=milestone").text();
-    assert!(milestone.contains("data-list-layout=\"shared\""));
-    assert!(milestone.contains("class=\"table list list--shared\""));
-    assert!(milestone.contains("data-row-id=\"MS-001\""));
-    assert!(
-        !milestone.contains("class=\"filter\""),
-        "milestone must not render the document status filter"
-    );
-    assert!(
-        !milestone.contains("<ul class=\"req-list\">"),
-        "the milestone list is no longer a ul row list"
-    );
-    // A stray status parameter is ignored by non-document lists, as before.
-    assert_eq!(get(&server, "/?type=milestone&status=bogus").status, 200);
+    assert!(get(&server, "/?type=milestone&status=bogus").status == 200);
     drop(server);
     let _ = fs::remove_dir_all(&d);
 }

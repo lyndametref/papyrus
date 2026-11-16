@@ -10,7 +10,7 @@ use crate::browser::routes::{self, BrowserRoutes, NavGroup};
 use crate::config::Config;
 use crate::record::edit::FieldChange;
 use crate::registry::{
-    ArtifactCategory as CategoryKind, ContentModel, StatusModel, TypeDescriptor, TypedHandler,
+    ArtifactCategory as CategoryKind, StatusModel, TypeDescriptor, TypedHandler,
 };
 
 pub const LIST_TEMPLATE: &str = include_str!("templates/list.html");
@@ -92,33 +92,8 @@ fn page(
     })
 }
 
-fn content_handler(descriptor: &TypeDescriptor) -> Option<TypedHandler> {
-    match &descriptor.content_model {
-        ContentModel::Generic => None,
-        ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => Some(schema.handler),
-    }
-}
-
 fn category_name(slug: &str) -> String {
     routes::heading(slug)
-}
-
-fn category_short(slug: &str) -> String {
-    routes::short(slug)
-}
-
-fn first_paragraph(text: &str) -> String {
-    let mut buf = Vec::new();
-    for line in text.lines() {
-        if line.trim().is_empty() {
-            if !buf.is_empty() {
-                break;
-            }
-        } else {
-            buf.push(line);
-        }
-    }
-    buf.join("\n").trim().to_string()
 }
 
 fn plural(count: usize, singular: &str, plural: &str) -> String {
@@ -508,151 +483,6 @@ fn member_list(members: &[Record]) -> String {
     format!("<ul class=\"req-list\">{}</ul>", items)
 }
 
-fn list_section(descriptor: &TypeDescriptor, index: &Index, other_has_records: bool) -> String {
-    let slug = descriptor.slug.as_str();
-    let is_business_requirement = matches!(
-        content_handler(descriptor),
-        Some(TypedHandler::Requirement(
-            crate::registry::RequirementKind::Business
-        ))
-    );
-    let total = index.records.len();
-    let count = if total == 0 {
-        "No groups".to_string()
-    } else {
-        format!(
-            "{} \u{b7} {}",
-            plural(index.groups.len(), "group", "groups"),
-            plural(index.requirements.len(), "requirement", "requirements")
-        )
-    };
-
-    let mut body = String::new();
-    body.push_str(&format!(
-        "<section class=\"section\" aria-label=\"{}\">\
-<div class=\"section-head\"><h2 class=\"h2\">{}</h2><p class=\"count\">{}</p></div>",
-        escape(&category_name(slug)),
-        escape(&category_name(slug)),
-        escape(&count)
-    ));
-
-    if total == 0 {
-        let message = if other_has_records {
-            format!("No {} in this project.", category_short(slug))
-        } else {
-            "No requirement records were found in the configured document directories.".to_string()
-        };
-        let other_name = if is_business_requirement {
-            "Non-functional requirements"
-        } else {
-            "Business requirements"
-        };
-        let help = if other_has_records {
-            format!(
-                "{} are available in Document types. Records are created from the command line; this browser does not create records.",
-                other_name
-            )
-        } else {
-            "Records are created from the command line; this browser does not create records."
-                .to_string()
-        };
-        body.push_str(&format!(
-            "<div class=\"empty\"><p>{}</p><p class=\"help\">{}</p></div>",
-            escape(&message),
-            escape(&help)
-        ));
-        body.push_str("</section>");
-        return body;
-    }
-
-    for group in &index.groups {
-        let members: Vec<Record> = index
-            .members
-            .get(&group.id)
-            .map(|positions| {
-                positions
-                    .iter()
-                    .filter_map(|position| index.requirements.get(*position).cloned())
-                    .collect()
-            })
-            .unwrap_or_default();
-        let member_count = if members.is_empty() {
-            "No requirements".to_string()
-        } else {
-            plural(members.len(), "requirement", "requirements")
-        };
-        let title = if group.title.trim().is_empty() {
-            group.id.clone()
-        } else {
-            group.title.clone()
-        };
-        let group_head = if group.path.as_os_str().is_empty() {
-            format!(
-                "<span class=\"group-id\">{}</span> {}",
-                escape(&group.id),
-                escape(&title)
-            )
-        } else {
-            format!(
-                "<a href=\"/doc/{}\"><span class=\"group-id\">{}</span> {}</a>",
-                escape(&group.id),
-                escape(&group.id),
-                escape(&title)
-            )
-        };
-        body.push_str(&format!(
-            "<article class=\"group\">\
-<div class=\"group-head\"><h3 class=\"group-title\">{}</h3>\
-<span class=\"group-count\">{}</span></div>",
-            group_head,
-            escape(&member_count)
-        ));
-        if members.is_empty() {
-            body.push_str("<p class=\"empty-group\">No requirements in this group</p>");
-        } else {
-            let mut items = String::new();
-            for member in &members {
-                items.push_str(&requirement_link(member));
-            }
-            body.push_str(&format!("<ul class=\"req-list\">{}</ul>", items));
-        }
-        body.push_str("</article>");
-    }
-
-    if is_business_requirement && !index.other.is_empty() {
-        body.push_str(&format!(
-            "<section class=\"other\" aria-label=\"Other {}\">\
-<h3 class=\"h3\">Other requirements</h3>\
-<p class=\"other-note\">Group reference does not match an active group</p>\
-<ul class=\"other-list\">",
-            escape(&category_name(slug))
-        ));
-        for position in &index.other {
-            if let Some(requirement) = index.requirements.get(*position) {
-                let reference = requirement
-                    .group_id
-                    .as_deref()
-                    .map(|id| format!("Group: {} (not found)", id))
-                    .unwrap_or_else(|| "Group: (none)".to_string());
-                body.push_str(&format!(
-                    "<li>{}<a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>{}\
-<span class=\"other-ref\">{}</span></li>",
-                    row_status(requirement),
-                    escape(&requirement.id),
-                    escape(&requirement.id),
-                    escape(&requirement.title),
-                    row_dates(requirement),
-                    escape(&reference)
-                ));
-            }
-        }
-        body.push_str("</ul></section>");
-    }
-
-    body.push_str("</section>");
-    body
-}
-
 fn form_label(record: &Record) -> String {
     if record.is_group {
         return "Group".to_string();
@@ -750,205 +580,6 @@ fn status_filter_html(descriptor: &TypeDescriptor, selected: Option<&str>) -> St
         options,
         escape(routes::legacy_url_key(&descriptor.slug))
     )
-}
-
-/// The category list page for a typed built-in document type.
-fn backlog_list_section(
-    slug: &str,
-    handler: Option<TypedHandler>,
-    index: &Index,
-    document_fields: bool,
-) -> String {
-    let total = index.records.len();
-    let empty_special = matches!(
-        handler,
-        Some(TypedHandler::TechSpec)
-            | Some(TypedHandler::UseCase)
-            | Some(TypedHandler::TestCase)
-            | Some(TypedHandler::TestReport)
-    );
-    let count = if total == 0 && !empty_special {
-        "No records".to_string()
-    } else {
-        let singular = match handler {
-            Some(TypedHandler::Task) => "task",
-            Some(TypedHandler::Release) => "release",
-            Some(TypedHandler::Decision) => "decision",
-            Some(TypedHandler::Glossary) => "glossary term",
-            Some(TypedHandler::UiSpec) => "UI specification",
-            Some(TypedHandler::UiMockup) => "UI mockup",
-            Some(TypedHandler::Rule) => "business rule",
-            Some(TypedHandler::Audit) => "audit record",
-            Some(TypedHandler::TechSpec) => "technical specification",
-            Some(TypedHandler::UseCase) => "use case",
-            Some(TypedHandler::TestCase) => "test case",
-            Some(TypedHandler::TestReport) => "test report",
-            _ => "record",
-        };
-        let plural_word = format!("{}s", singular);
-        plural(total, singular, &plural_word)
-    };
-    let mut body = String::new();
-    body.push_str(&format!(
-        "<section class=\"section\" aria-label=\"{}\"><div class=\"section-head\"><h2 class=\"h2\">{}</h2><p class=\"count\">{}</p></div>",
-        escape(&category_name(slug)),
-        escape(&category_name(slug)),
-        escape(&count)
-    ));
-    if total == 0 {
-        if empty_special {
-            body.push_str(&format!(
-                "<div class=\"empty\"><p>No {} were found in the configured directory.</p><p class=\"help\">{} are created from the command line; this browser does not create records. Archived {} are hidden.</p></div></section>",
-                category_short(slug),
-                category_name(slug),
-                category_short(slug)
-            ));
-            return body;
-        }
-        let message = format!("No {} in this project.", category_short(slug));
-        body.push_str(&format!(
-            "<div class=\"empty\"><p>{}</p><p class=\"help\">Records are created from the command line; this browser does not create records.</p></div>",
-            escape(&message)
-        ));
-        body.push_str("</section>");
-        return body;
-    }
-    body.push_str("<ul class=\"req-list\">");
-    for record in &index.records {
-        let status_cell = if document_fields {
-            row_status(record)
-        } else {
-            String::new()
-        };
-        let dates = if document_fields {
-            row_dates(record)
-        } else {
-            String::new()
-        };
-        let meta = match record.handler() {
-            Some(TypedHandler::Task) => {
-                let mut parts = Vec::new();
-                if let Some(s) = &record.status {
-                    parts.push(s.clone());
-                }
-                if let Some(m) = &record.milestone_id {
-                    parts.push(m.clone());
-                }
-                if let Some(a) = &record.assignee {
-                    parts.push(a.clone());
-                }
-                parts.join(" \u{b7} ")
-            }
-            Some(TypedHandler::Decision) => {
-                let mut parts = Vec::new();
-                if let Some(s) = &record.status {
-                    parts.push(s.clone());
-                }
-                if let Some(t) = &record.decision_type {
-                    parts.push(t.clone());
-                }
-                parts.join(" \u{b7} ")
-            }
-            _ => String::new(),
-        };
-        let preview_handler = matches!(
-            record.handler(),
-            Some(TypedHandler::Glossary)
-                | Some(TypedHandler::UiSpec)
-                | Some(TypedHandler::Rule)
-                | Some(TypedHandler::Audit)
-                | Some(TypedHandler::TechSpec)
-                | Some(TypedHandler::UseCase)
-                | Some(TypedHandler::TestCase)
-                | Some(TypedHandler::TestReport)
-        );
-        if preview_handler {
-            let preview = if record.handler() == Some(TypedHandler::Glossary) {
-                record
-                    .definition
-                    .as_deref()
-                    .map(first_paragraph)
-                    .unwrap_or_default()
-            } else {
-                record
-                    .description
-                    .as_deref()
-                    .map(first_paragraph)
-                    .unwrap_or_default()
-            };
-            if preview.is_empty() {
-                body.push_str(&format!(
-                    "<li>{}<a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>{}</li>",
-                    status_cell,
-                    escape(&record.id),
-                    escape(&record.id),
-                    escape(&record.title),
-                    dates
-                ));
-            } else {
-                body.push_str(&format!(
-                    "<li>{}<a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>{}<p class=\"text\">{}</p></li>",
-                    status_cell,
-                    escape(&record.id),
-                    escape(&record.id),
-                    escape(&record.title),
-                    dates,
-                    escape(&preview)
-                ));
-            }
-        } else if meta.is_empty() {
-            body.push_str(&format!(
-                "<li>{}<a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>{}</li>",
-                status_cell,
-                escape(&record.id),
-                escape(&record.id),
-                escape(&record.title),
-                dates
-            ));
-        } else {
-            body.push_str(&format!(
-                "<li>{}<a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>{} <span class=\"row-meta\">{}</span></li>",
-                status_cell,
-                escape(&record.id),
-                escape(&record.id),
-                escape(&record.title),
-                dates,
-                escape(&meta)
-            ));
-        }
-        if record.handler() != Some(TypedHandler::Glossary) {
-            let record_meta = record_view_backlog_row_meta(record);
-            if !record_meta.is_empty()
-                && let Some(li_end) = body.rfind("</li>")
-            {
-                body.insert_str(li_end, &record_meta);
-            }
-        }
-        if record.handler() == Some(TypedHandler::Glossary) && !record.labels.is_empty() {
-            let tags: String = record
-                .labels
-                .iter()
-                .map(|l| format!("<span class=\"tag\">{}</span>", escape(l)))
-                .collect::<Vec<_>>()
-                .join("");
-            let tag_html = format!("<span class=\"taglist\">{}</span>", tags);
-            if let Some(li_end) = body.rfind("</li>") {
-                body.insert_str(li_end, &tag_html);
-            }
-        }
-    }
-    body.push_str("</ul></section>");
-    body
-}
-
-/// Backlog list-row metadata line from the shared `RecordView` (TASK-67).
-fn record_view_backlog_row_meta(record: &Record) -> String {
-    let skip: &[&str] = match record.handler() {
-        Some(TypedHandler::Task) => &["status", "milestone", "assignee"],
-        Some(TypedHandler::Decision) => &["status"],
-        _ => &[],
-    };
-    record_view_list_meta(record, skip)
 }
 
 /// One failure message shown above the backlog board groups.
@@ -1189,6 +820,19 @@ fn board_milestone_section(
     )
 }
 
+/// The board's empty-project fallback. It is board copy, not a list: no table,
+/// no Actions cell, and no status filter.
+fn board_empty_section(slug: &str) -> String {
+    format!(
+        "<section class=\"section\" aria-label=\"{0}\">\
+<div class=\"section-head\"><h2 class=\"h2\">{0}</h2><p class=\"count\">No records</p></div>\
+<div class=\"empty\"><p>No {1} in this project.</p><p class=\"help\">\
+Records are created from the command line; this browser does not create records.</p></div></section>",
+        escape(&category_name(slug)),
+        escape(&routes::short(slug)),
+    )
+}
+
 /// Render the combined Backlog board at `GET /?type=task`.
 #[allow(clippy::too_many_arguments)]
 pub fn board_page(
@@ -1226,12 +870,7 @@ pub fn board_page(
             .find(|item| item.group == NavGroup::Backlog)
             .map(|item| item.slug.as_str())
             .unwrap_or_default();
-        section.push_str(&backlog_list_section(
-            task_slug,
-            Some(TypedHandler::Task),
-            tasks,
-            false,
-        ));
+        section.push_str(&board_empty_section(task_slug));
     } else {
         // The no-release group comes first, then every active release in
         // ascending ID order. A dangling release reference belongs to the
@@ -1354,31 +993,28 @@ pub fn board_page(
 pub fn list_page(
     descriptor: &TypeDescriptor,
     index: &Index,
-    other_has_records: bool,
     status: Option<&str>,
     cfg: &Config,
     chrome: Chrome<'_>,
 ) -> String {
     let slug = descriptor.slug.as_str();
-    let handler = match &descriptor.content_model {
-        ContentModel::Generic => None,
-        ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => Some(schema.handler),
-    };
-    let document_fields = descriptor.category == CategoryKind::Document;
-    let section_body = if routes::list_layout(slug) == routes::ListLayout::Shared {
-        crate::browser::list::ListPlan::for_descriptor(
-            descriptor,
-            index,
-            &category_name(slug),
-            &crate::browser::list::count_note(slug, index.records.len()),
-        )
-        .render()
-    } else if descriptor.id_shape == crate::registry::IdShape::Grouped {
-        list_section(descriptor, index, other_has_records)
+    let presentation_slug = chrome.routes.list_slug_for(slug);
+    let heading = routes::heading(&presentation_slug);
+    let subheading = routes::inventory_note(&presentation_slug);
+    let count_note = if descriptor.id_shape == crate::registry::IdShape::Grouped {
+        crate::browser::list::grouped_count_note(index)
     } else {
-        backlog_list_section(slug, handler, index, document_fields)
+        crate::browser::list::count_note(&presentation_slug, index.records.len())
     };
-    let section = if document_fields {
+    let section_body = crate::browser::list::ListPlan::for_descriptor(
+        descriptor,
+        &presentation_slug,
+        index,
+        &heading,
+        &count_note,
+    )
+    .render();
+    let section = if descriptor.category == CategoryKind::Document {
         format!(
             "<div class=\"filter-wrap\">{}</div>{}",
             status_filter_html(descriptor, status),
@@ -1387,57 +1023,7 @@ pub fn list_page(
     } else {
         section_body
     };
-    let heading = match handler {
-        Some(TypedHandler::Requirement(_)) => "Requirements",
-        Some(TypedHandler::Task) => "Tasks",
-        Some(TypedHandler::Milestone) => "Milestones",
-        Some(TypedHandler::Release) => "Releases",
-        Some(TypedHandler::Decision) => "Decisions",
-        Some(TypedHandler::Glossary) => "Glossary",
-        Some(TypedHandler::UiSpec) => "UI Specifications",
-        Some(TypedHandler::UiMockup) => "UI Mockups",
-        Some(TypedHandler::Rule) => "Business Rules",
-        Some(TypedHandler::Audit) => "Audit Records",
-        Some(TypedHandler::TechSpec) => "Technical Specifications",
-        Some(TypedHandler::UseCase) => "Use Cases",
-        Some(TypedHandler::TestCase) => "Test Cases",
-        Some(TypedHandler::TestReport) => "Test Reports",
-        None => "",
-    };
-    let subheading = match handler {
-        Some(TypedHandler::Requirement(kind)) => {
-            if kind == crate::registry::RequirementKind::Business {
-                "Business requirement records in this project."
-            } else {
-                "Non-functional requirement records in this project."
-            }
-        }
-        Some(TypedHandler::Task) => "Task records in this project.",
-        Some(TypedHandler::Milestone) => "Milestone records in this project.",
-        Some(TypedHandler::Release) => "Release records in this project.",
-        Some(TypedHandler::Decision) => "Decision records in this project.",
-        Some(TypedHandler::Glossary) => "Glossary terms in this project.",
-        Some(TypedHandler::UiSpec) => "UI specifications in this project.",
-        Some(TypedHandler::UiMockup) => "UI mockups in this project.",
-        Some(TypedHandler::Rule) => "Business rules in this project.",
-        Some(TypedHandler::Audit) => "Audit records in this project.",
-        Some(TypedHandler::TechSpec) => "Technical specifications in this project.",
-        Some(TypedHandler::UseCase) => "Use cases in this project.",
-        Some(TypedHandler::TestCase) => "Test cases in this project.",
-        Some(TypedHandler::TestReport) => "Test reports in this project.",
-        None => "",
-    };
-    let heading = if heading.is_empty() {
-        category_name(slug)
-    } else {
-        heading.to_string()
-    };
-    let subheading = if subheading.is_empty() {
-        routes::inventory_note(slug)
-    } else {
-        subheading.to_string()
-    };
-    let title = format!("Papyrus \u{2014} {}", category_name(slug));
+    let title = format!("Papyrus \u{2014} {heading}");
     let body = render_template(
         LIST_TEMPLATE,
         &[("heading", &heading), ("subheading", &subheading)],
@@ -4524,84 +4110,8 @@ pub fn inventory_page(cfg: &Config, chrome: Chrome<'_>, cards: &[InventoryCard])
     )
 }
 
-pub const DOCUMENT_LIST_TEMPLATE: &str = include_str!("templates/document_list.html");
 pub const DOCUMENT_DETAIL_TEMPLATE: &str = include_str!("templates/document_detail.html");
 pub const DOCUMENT_EDIT_TEMPLATE: &str = include_str!("templates/document_edit.html");
-
-/// Generic document list with the shared Status, ID, Title, Created, Updated
-/// table columns (section 3.1).
-pub fn document_list_page(
-    descriptor: &TypeDescriptor,
-    index: &Index,
-    status: Option<&str>,
-    cfg: &Config,
-    chrome: Chrome<'_>,
-) -> String {
-    let slug = descriptor.slug.as_str();
-    let title = format!("Papyrus \u{2014} {}", category_name(slug));
-    let count = plural(index.records.len(), "record", "records");
-    let mut rows = String::new();
-    for record in &index.records {
-        let view = record_view(record);
-        let created = view
-            .as_ref()
-            .map(|v| v.value_text("created_date"))
-            .unwrap_or_default();
-        let created = if created.is_empty() {
-            "(none)".to_string()
-        } else {
-            created
-        };
-        let updated = view
-            .as_ref()
-            .map(|v| v.value_text("updated_date"))
-            .unwrap_or_default();
-        let updated = if updated.is_empty() {
-            "(none)".to_string()
-        } else {
-            updated
-        };
-        rows.push_str(&format!(
-            "<tr><td>{}</td><td class=\"mono\">{}</td><td><a href=\"/doc/{}\">{}</a></td><td>{}</td><td>{}</td></tr>",
-            escape(&record.status_text()),
-            escape(&record.id),
-            escape(&record.id),
-            escape(&record.title),
-            escape(&created),
-            escape(&updated)
-        ));
-    }
-    let section = if index.records.is_empty() {
-        format!(
-            "<div class=\"empty\"><p>No {} in this project.</p><p class=\"help\">Records are created from the command line; this browser does not create records.</p></div>",
-            escape(&category_short(slug))
-        )
-    } else {
-        format!(
-            "<p class=\"count\">{}</p><table class=\"table\"><thead><tr><th scope=\"col\">Status</th><th scope=\"col\">ID</th><th scope=\"col\">Title</th><th scope=\"col\">Created</th><th scope=\"col\">Updated</th></tr></thead><tbody>{}</tbody></table>",
-            escape(&count),
-            rows
-        )
-    };
-    let body = render_template(
-        DOCUMENT_LIST_TEMPLATE,
-        &[
-            ("heading", &category_name(slug)),
-            ("subheading", &routes::inventory_note(slug)),
-        ],
-        &[
-            ("filter", &status_filter_html(descriptor, status)),
-            ("section", &section),
-        ],
-    );
-    page(
-        chrome,
-        Some(slug),
-        &title,
-        &sidebar(Some(slug), cfg, chrome.routes),
-        body,
-    )
-}
 
 /// Generic document detail page (section 4.1).
 pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -> String {

@@ -57,17 +57,6 @@ pub enum PageWidth {
     Full,
 }
 
-/// Which list layout a family renders while both list paths exist (TASK-141).
-///
-/// `Legacy` is the default; TASK-142 sets every family to `Shared` and deletes
-/// this enum together with the legacy builders.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum ListLayout {
-    Shared,
-    #[default]
-    Legacy,
-}
-
 /// Static presentation data for a built-in slug. It never decides existence.
 #[derive(Clone, Copy, Debug)]
 pub struct Presentation {
@@ -96,8 +85,6 @@ pub struct Presentation {
     /// Declared family slot columns `(key, label)` for the shared list layout,
     /// in order. Empty for families with no declared slot.
     pub list_slots: &'static [(&'static str, &'static str)],
-    /// Which list layout this family renders.
-    pub list_layout: ListLayout,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -124,7 +111,6 @@ const fn builtin(
         not_found: NotFoundPage::GenericDocument,
         aggregate_group: None,
         list_slots: &[],
-        list_layout: ListLayout::Legacy,
     }
 }
 
@@ -151,11 +137,6 @@ const fn with_slots(
     entry
 }
 
-const fn with_layout(mut entry: Presentation, layout: ListLayout) -> Presentation {
-    entry.list_layout = layout;
-    entry
-}
-
 /// The built-in presentation table, in navigation order.
 pub const PRESENTATION: &[Presentation] = &[
     as_aggregate(
@@ -178,21 +159,18 @@ pub const PRESENTATION: &[Presentation] = &[
         NavGroup::Backlog,
     ),
     with_api(
-        with_layout(
-            with_slots(
-                builtin(
-                    "milestone",
-                    "Milestones",
-                    "Milestones",
-                    "milestones",
-                    "Milestones move from open to closed.",
-                    "Milestones in this project.",
-                    None,
-                    110,
-                ),
-                &[("release", "Release")],
+        with_slots(
+            builtin(
+                "milestone",
+                "Milestones",
+                "Milestones",
+                "milestones",
+                "Milestones move from open to closed.",
+                "Milestones in this project.",
+                None,
+                110,
             ),
-            ListLayout::Shared,
+            &[("release", "Release")],
         ),
         &["/api/milestones"],
     ),
@@ -408,13 +386,6 @@ pub fn list_slots(slug: &str) -> &'static [(&'static str, &'static str)] {
         .unwrap_or(&[])
 }
 
-/// Which list layout a family renders (TASK-141 transitional dispatch).
-pub fn list_layout(slug: &str) -> ListLayout {
-    presentation(slug)
-        .map(|entry| entry.list_layout)
-        .unwrap_or(ListLayout::Legacy)
-}
-
 /// The presentation slug that represents a category's aggregate list.
 fn aggregate_slug(group: NavGroup) -> Option<&'static str> {
     PRESENTATION
@@ -493,6 +464,25 @@ pub fn short(slug: &str) -> String {
     presentation(slug)
         .map(|entry| entry.short.to_string())
         .unwrap_or_else(|| title_case(slug).to_lowercase())
+}
+
+/// Singular or plural noun for a count and empty-state copy.
+///
+/// The presentation table already declares the plural noun; a config-defined
+/// type falls back to its lower-case slug (`notes` for `note`).
+pub fn noun(slug: &str, count: usize) -> String {
+    let plural = short(slug);
+    if count == 1 {
+        if plural.ends_with('s') && !plural.ends_with("ss") {
+            plural[..plural.len() - 1].to_string()
+        } else {
+            plural
+        }
+    } else if plural.ends_with('s') {
+        plural
+    } else {
+        format!("{plural}s")
+    }
 }
 
 /// Curated or shared lifecycle description.
@@ -727,6 +717,20 @@ impl BrowserRoutes {
         self.nav_selection.get(slug).map(String::as_str)
     }
 
+    /// The presentation slug that supplies a list's heading, count noun, and
+    /// declared slots. Decision type aliases share the aggregate decisions
+    /// presentation; every other family uses its own slug.
+    pub fn list_slug_for(&self, slug: &str) -> String {
+        if self.is_decision_view(slug) {
+            self.nav_selection
+                .get(slug)
+                .cloned()
+                .unwrap_or_else(|| slug.to_string())
+        } else {
+            slug.to_string()
+        }
+    }
+
     /// The aggregate decision view (every enabled decision descriptor).
     pub fn is_decision_view(&self, slug: &str) -> bool {
         let selected = self.nav_selection.get(slug).map(String::as_str);
@@ -868,29 +872,8 @@ mod tests {
     }
 
     #[test]
-    fn reference_family_uses_the_shared_layout_and_declares_one_slot() {
-        assert_eq!(list_layout("milestone"), ListLayout::Shared);
+    fn reference_family_declares_one_slot() {
         assert_eq!(list_slots("milestone"), &[("release", "Release")]);
-    }
-
-    #[test]
-    fn every_other_family_stays_on_the_legacy_layout() {
-        let cfg = Config::default();
-        let registry = ArtifactRegistry::build(&cfg).expect("registry");
-        for descriptor in registry.enabled(CategoryKind::Document) {
-            if descriptor.slug == "milestone" {
-                continue;
-            }
-            assert_eq!(
-                list_layout(&descriptor.slug),
-                ListLayout::Legacy,
-                "slug {}",
-                descriptor.slug
-            );
-        }
-        assert_eq!(list_layout("release"), ListLayout::Legacy);
-        assert_eq!(list_layout("decision"), ListLayout::Legacy);
-        assert_eq!(list_layout("note"), ListLayout::Legacy);
     }
 
     #[test]

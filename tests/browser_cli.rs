@@ -787,16 +787,23 @@ fn t09_list_empty_project_and_empty_type() {
     let empty = test_root("empty-project");
     init_project(&empty);
     let server = Server::start(&empty, &["--no-open"], &[]);
-    for path in ["/?type=req", "/?type=nfr"] {
+    // TASK-142: req/nfr now share the one empty message/help pair and the
+    // presentation headings (Business requirements / Non-functional requirements).
+    for (path, message) in [
+        ("/?type=req", "No business requirements in this project."),
+        (
+            "/?type=nfr",
+            "No non-functional requirements in this project.",
+        ),
+    ] {
         let html = get(&server, path).text();
+        assert!(html.contains(message), "path={path}");
         assert!(
             html.contains(
-                "No requirement records were found in the configured document directories."
+                "Records are created from the command line; this browser does not create records."
             ),
-            "path={}",
-            path
+            "path={path}"
         );
-        assert!(html.contains("Records are created from the command line"));
     }
     drop(server);
     let _ = fs::remove_dir_all(&empty);
@@ -808,8 +815,13 @@ fn t09_list_empty_project_and_empty_type() {
     create_req(&req_only, "Business record", "REQ-001");
     let server = Server::start(&req_only, &["--no-open"], &[]);
     let html = get(&server, "/?type=nfr").text();
+    // TASK-142: the cross-family hint is an accepted difference; one shared
+    // empty message/help pair is used for every family.
     assert!(html.contains("No non-functional requirements in this project."));
-    assert!(html.contains("Business requirements are available in Document types."));
+    assert!(html.contains(
+        "Records are created from the command line; this browser does not create records."
+    ));
+    assert!(!html.contains("Business requirements are available in Document types."));
     assert!(!html.contains("REQ-001.001"));
     drop(server);
     let _ = fs::remove_dir_all(&req_only);
@@ -827,11 +839,18 @@ fn t09_group_without_members_and_other_requirements() {
 
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/?type=req").text();
-    assert!(html.contains("No requirements in this group"));
-    assert!(html.contains("No requirements"));
-    assert!(html.contains("Other requirements"));
-    assert!(html.contains(&format!("Group: {} (not found)", orphan_group)));
-    assert!(html.contains(&format!("/doc/{}.001", orphan_group)));
+    // TASK-142: an empty group is one group row with no children; a member
+    // whose group row is absent from the filtered index is a top-level row.
+    assert!(html.contains("data-list-layout=\"shared\""));
+    assert!(html.contains(&format!("data-row-id=\"{empty_group}\"")));
+    assert!(html.contains(&format!("data-row-id=\"{orphan_group}.001\"")));
+    assert!(
+        !html.contains(&format!("data-row-id=\"{orphan_group}.001\" data-child-of")),
+        "the unresolved member is top-level"
+    );
+    assert!(!html.contains("Other requirements"));
+    assert!(!html.contains("(not found)"));
+    assert!(!html.contains("No requirements in this group"));
     assert!(!html.contains(&format!("href=\"/doc/{}\"", orphan_group)));
 
     let group = get(&server, &format!("/doc/{}", empty_group)).text();
@@ -4330,7 +4349,15 @@ fn t40b_non_records_are_not_listed() {
     let html = get(&server, "/?type=ui-mockup").text();
     assert!(html.contains("MOCK-001"));
     assert!(html.contains("MOCK-002"));
-    for hidden in ["MOCK-999", "README", "wireframe", "index", "other.html"] {
+    // TASK-142: `index` alone also appears in `tabindex`; assert the file
+    // names/record hooks instead of a bare substring.
+    for hidden in [
+        "MOCK-999",
+        "README",
+        "wireframe",
+        "index.html",
+        "other.html",
+    ] {
         assert!(!html.contains(hidden), "listed {}", hidden);
     }
     assert!(html.contains("2 UI mockups"));
@@ -5076,8 +5103,9 @@ fn t25a_list_business_rules_category() {
     assert!(first < second, "ascending ID order");
     assert!(html.contains("href=\"/doc/RUL-001\""));
     assert!(html.contains("href=\"/doc/RUL-002\""));
-    // preview first paragraph
-    assert!(html.contains("First description paragraph."));
+    // TASK-142: the shared list carries values in the declared slot cells and
+    // the Title cell labels/references; the legacy description preview is gone.
+    assert!(!html.contains("First description paragraph."));
     // default stays req; unknown values are 400.
     assert_eq!(get(&server, "/?type=req").status, 200);
     assert_eq!(get(&server, "/?type=req").status, 200);
@@ -5690,7 +5718,8 @@ fn t26a_list_audit_records_category() {
     let second = html.find("AUD-002").unwrap();
     assert!(first < second);
     assert!(html.contains("href=\"/doc/AUD-001\""));
-    assert!(html.contains("First content paragraph."));
+    // TASK-142: the shared list no longer renders a description preview.
+    assert!(!html.contains("First content paragraph."));
     assert_eq!(get(&server, "/?type=req").status, 200);
     assert_eq!(get(&server, "/?type=req").status, 200);
     assert_eq!(get(&server, "/?type=audit").status, 200);
@@ -6267,7 +6296,8 @@ fn t57a_list_category_and_sidebar() {
     assert!(html.contains("Storage model"));
     assert!(html.find("TECH-001").unwrap() < html.find("TECH-002").unwrap());
     assert!(html.contains("href=\"/doc/TECH-001\""));
-    assert!(html.contains("Defines the local browser."));
+    // TASK-142: the shared list no longer renders a description preview.
+    assert!(!html.contains("Defines the local browser."));
     assert_eq!(get(&server, "/?type=req").status, 200);
     assert_eq!(get(&server, "/?type=req").status, 200);
     for ty in ["all", "x", "tech-specs", "tech_spec"] {
@@ -6340,8 +6370,12 @@ fn t57b_list_excludes_non_records_and_archived() {
     let html = get(&server, "/?type=tech-spec").text();
     assert!(html.contains("0 technical specifications"));
     assert!(!html.contains("No records"));
-    assert!(html.contains("No technical specifications were found in the configured directory."));
-    assert!(html.contains("Archived technical specifications are hidden."));
+    // TASK-142: one shared empty message/help pair for every family.
+    assert!(html.contains("No technical specifications in this project."));
+    assert!(html.contains(
+        "Records are created from the command line; this browser does not create records."
+    ));
+    assert!(!html.contains("Archived technical specifications are hidden."));
     drop(server);
     let _ = fs::remove_dir_all(&dir);
     let _ = fs::remove_dir_all(&empty_dir);
@@ -7456,7 +7490,8 @@ fn t81a_sidebar_placement_and_type_values() {
     assert!(html.contains("Storage model"));
     assert!(html.find("UC-001").unwrap() < html.find("UC-002").unwrap());
     assert!(html.contains("href=\"/doc/UC-001\""));
-    assert!(html.contains("Defines the local browser."));
+    // TASK-142: the shared list no longer renders a description preview.
+    assert!(!html.contains("Defines the local browser."));
     // default req
     assert_eq!(get(&server, "/").status, 200);
     assert_eq!(get(&server, "/?type=req").status, 200);
@@ -7516,7 +7551,8 @@ fn t81c_list_excludes_non_records_and_archived() {
     assert!(!html.contains("UC-999"));
     assert!(!html.contains("REQ-001"));
     assert!(html.contains("2 use cases"));
-    assert!(html.contains("Defines the local browser."));
+    // TASK-142: the shared list no longer renders a description preview.
+    assert!(!html.contains("Defines the local browser."));
     let api: serde_json::Value =
         serde_json::from_str(&get(&server, "/api/use-cases").text()).unwrap();
     assert_eq!(api.as_array().unwrap().len(), 2);
@@ -7527,8 +7563,12 @@ fn t81c_list_excludes_non_records_and_archived() {
     let server = Server::start(&empty_dir, &["--no-open"], &[]);
     let html = get(&server, "/?type=use-case").text();
     assert!(html.contains("0 use cases"));
-    assert!(html.contains("No use cases were found in the configured directory."));
-    assert!(html.contains("Archived use cases are hidden."));
+    // TASK-142: one shared empty message/help pair for every family.
+    assert!(html.contains("No use cases in this project."));
+    assert!(html.contains(
+        "Records are created from the command line; this browser does not create records."
+    ));
+    assert!(!html.contains("Archived use cases are hidden."));
     drop(server);
     let _ = fs::remove_dir_all(&dir);
     let _ = fs::remove_dir_all(&empty_dir);
@@ -8153,7 +8193,8 @@ fn t93_glossary_landing() {
     assert!(html.contains("GLO-001"));
     assert!(html.contains("tag1"));
     assert!(!html.contains("row-meta"));
-    assert!(!html.contains("REF-1"));
+    // TASK-142: references render in the Title cell of the shared list.
+    assert!(html.contains("<li>REF-1</li>"));
     let detail = get(&server, "/doc/GLO-001").text();
     assert!(detail.contains("Record ID"));
     assert!(detail.contains("tag1"));
@@ -8178,11 +8219,16 @@ fn t93_nfr_grouping_and_derivation() {
     .unwrap();
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/?type=nfr").text();
-    assert!(html.contains("NFR-001"));
+    // TASK-142: one group row then its data-child-of members; an empty group
+    // stays a group row; the derived NFR group is still a top-level row.
+    assert!(html.contains("data-list-layout=\"shared\""));
+    assert!(html.contains("data-row-id=\"NFR-001\""));
     assert!(html.contains("Persist"));
+    assert!(html.contains("data-row-id=\"NFR-002\""));
     assert!(html.contains("Empty Group"));
-    assert!(html.contains("No requirements in this group"));
-    assert!(html.contains("NFR-003"));
+    assert!(html.contains("data-child-of=\"NFR-001\""));
+    assert!(html.contains("data-row-id=\"NFR-003\""));
+    assert!(!html.contains("No requirements in this group"));
     assert!(!html.contains("Other requirements"));
     let json_text = get(&server, "/api/requirements?type=nfr").text();
     assert!(json_text.contains("\"id\":\"NFR-003\""));
