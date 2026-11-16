@@ -56,8 +56,7 @@ document_types:
   ui-mockup:
     prefix: MOCK
     directory: specifications/ui/mockups/
-    statuses: [draft, approved, archived]
-     enabled: true
+    enabled: true
   ui-spec:
     prefix: UI
     directory: specifications/ui/
