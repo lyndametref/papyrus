@@ -2,16 +2,14 @@
 id: ADR-0008
 title: "Adopt the Backlog.md On-Disk Layout for Task and Milestone Records"
 created_date: '2026-11-08T00:00:00Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T21:08:35Z'
 labels: []
 references: []
 ---
 # Adopt the Backlog.md On-Disk Layout for Task and Milestone Records
 
 ## Status
-
-Superseded by ADR-0010 on 2026-11-11 — NFR-04.004 (adopted 2026-11-11) renounces Backlog.md compatibility and REQ-01.005 now defines a single Papyrus ID space, so the Backlog.md on-disk layout, the storage IDs, and the display/storage translation this ADR decided no longer apply. Body frozen; see ADR-0010 for the native layout, ADR-0011 for the one-way import, and ADR-0012/ADR-0013 for the metadata and write-path restatement.
-
+superseded
 ## Date
 
 2026-11-08 (status: Superseded, 2026-11-11)

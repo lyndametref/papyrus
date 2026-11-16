@@ -2,16 +2,14 @@
 id: ADR-0015
 title: "Cursor-Driven Init Artifact List via `stty` Cbreak Mode and a KeySource Seam"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T21:08:36Z'
 labels: []
 references: []
 ---
 # Cursor-Driven Init Artifact List via `stty` Cbreak Mode and a KeySource Seam
 
 ## Status
-
-Accepted (2026-11-13). Acceptance follows the user's explicit instruction of 2026-11-13 to implement REQ-01.006 (TASK-104) along this route. This decision supersedes ADR-0014, the competing in-process `termios` FFI proposal, which is recorded as `Superseded` and must not be implemented.
-
+accepted
 ## Date
 
 2026-11-13 (status: Proposed, 2026-11-13; status: Accepted, 2026-11-13)

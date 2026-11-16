@@ -2,18 +2,14 @@
 id: ADR-0014
 title: "Dependency-Free TTY Key Input for the Cursor-Driven Init Artifact List"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T21:08:36Z'
 labels: []
 references: []
 ---
 # Dependency-Free TTY Key Input for the Cursor-Driven Init Artifact List
 
 ## Status
-
-Superseded by ADR-0015 (2026-11-13). Body frozen.
-
-**Resolution note (2026-11-13):** this proposal was superseded before it was ever validated. It never reached `Accepted` at any point, it was never implemented, and it must not be implemented. The in-process `tcgetattr`/`tcsetattr` FFI route described below is refused; the `stty` cbreak route in `docs/architecture/adr/ADR-0015-cursor-driven-init-list-via-stty-raw-mode.md` is the accepted decision for REQ-01.006 / TASK-104. Read this ADR as the record of a rejected alternative only: no decision item, downstream constraint, or implementation instruction in its body is in force.
-
+superseded
 ## Date
 
 2026-11-13 (status: Superseded, 2026-11-13)

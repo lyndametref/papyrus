@@ -2,16 +2,14 @@
 id: ADR-0020
 title: "Registry-Derived Browser Views for Config-Defined Document Types"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T21:08:36Z'
 labels: []
 references: []
 ---
 # Registry-Derived Browser Views for Config-Defined Document Types
 
 ## Status
-
-Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13.
-
+accepted
 ## Date
 
 2026-11-13 (status: Proposed, 2026-11-13; status: Accepted, 2026-11-13)

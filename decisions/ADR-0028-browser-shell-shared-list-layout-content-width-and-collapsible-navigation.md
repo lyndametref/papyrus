@@ -2,16 +2,14 @@
 id: ADR-0028
 title: "Browser Shell: Shared List Layout, Content-Width Contract, and Collapsible Navigation"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-16T07:32:50Z'
+updated_date: '2026-11-16T21:08:36Z'
 labels: []
 references: []
 ---
 # Browser Shell: Shared List Layout, Content-Width Contract, and Collapsible Navigation
 
 ## Status
-
-Accepted (2026-11-15) — owner decision 2026-11-15: one shared shell and list layout, server-side `PageWidth` width contract, `localStorage` navigation persistence (default expanded), and the mockup full-width class only (preview route out of scope); amended 2026-11-15 by architecture review at TASK-141 blocker resolution (decision 2 column order and slot table, new decision 9; no status change), explicit owner confirmation pending; revised 2026-11-16 (decision 4 collapsed grid track corrected after measurement; no status change).
-
+accepted
 ## Date
 
 2026-11-15

@@ -2,16 +2,14 @@
 id: ADR-0017
 title: "Artifact Category Registry and Per-Type Behavior Descriptors"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T21:08:36Z'
 labels: []
 references: []
 ---
 # Artifact Category Registry and Per-Type Behavior Descriptors
 
 ## Status
-
-Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-15 by owner decision (decision 2 `verbs` row, decision 3, decision 4 CLI bullet, and downstream constraint 3) without status change; amended again 2026-11-15 by owner decision (decision 2 milestone verb set: `close` replaces `archive`, no `restore`; downstream constraint 3 milestone archive policy) without status change.
-
+accepted
 ## Date
 
 2026-11-13 (status: Proposed, 2026-11-13; status: Accepted, 2026-11-13)

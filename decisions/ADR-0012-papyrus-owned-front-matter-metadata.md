@@ -2,16 +2,14 @@
 id: ADR-0012
 title: "Papyrus-Owned Front Matter as the Single Record Metadata Source"
 created_date: '2026-11-11T00:00:00Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T21:08:35Z'
 labels: []
 references: []
 ---
 # Papyrus-Owned Front Matter as the Single Record Metadata Source
 
 ## Status
-
-Superseded by ADR-0023 on 2026-11-13 — ADR-0023 restates the front-matter field map with `status` for milestone, release, and front-matter document types and the document `status` exemption from the create/update-option rule, which this ADR's field map and option rule do not carry. Body frozen; the metadata, patch, adoption, serialization, heading, and scoping decisions are restated in ADR-0023.
-
+superseded
 ## Date
 
 2026-11-11 (status: Accepted, 2026-11-11; status: Superseded, 2026-11-13)

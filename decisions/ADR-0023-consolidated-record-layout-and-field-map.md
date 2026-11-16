@@ -2,16 +2,14 @@
 id: ADR-0023
 title: "Consolidated Record Layout and Front-Matter Field Map"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T21:08:36Z'
 labels: []
 references: []
 ---
 # Consolidated Record Layout and Front-Matter Field Map
 
 ## Status
-
-Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-15 by owner decision (decision 2 release archive location) without status change; amended again 2026-11-15 by owner decision (decision 2 milestone archive location, decision 3, decision 4 legacy alias qualification, downstream constraint 2, and the decision 9 supersession bullet) without status change.
-
+accepted
 ## Date
 
 2026-11-13 (status: Proposed, 2026-11-13; status: Accepted, 2026-11-13)

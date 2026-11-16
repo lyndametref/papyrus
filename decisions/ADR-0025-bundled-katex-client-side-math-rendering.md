@@ -2,16 +2,14 @@
 id: ADR-0025
 title: "Bundled KaTeX Client-Side Math Rendering"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-16T00:00:00Z'
+updated_date: '2026-11-16T21:08:36Z'
 labels: []
 references: []
 ---
 # Bundled KaTeX Client-Side Math Rendering
 
 ## Status
-
-Accepted (2026-11-15) — owner decision 2026-11-15: KaTeX is the accepted math renderer, with the `$$...$$` / `$...$` (`\$` escape) / fenced `math|tex|latex` delimiter set and curated-prose-only scope (no record-body view). Amended 2026-11-16 by architecture decision, status unchanged: decision 5 `output` value and decision 6 inline-style rule (revision notes below; owner acknowledgement requested through TASK-145).
-
+accepted
 ## Date
 
 2026-11-15

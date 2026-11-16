@@ -2,16 +2,14 @@
 id: ADR-0016
 title: "Runtime Config-Derived Command Dispatch for Document Slugs"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T21:08:36Z'
 labels: []
 references: []
 ---
 # Runtime Config-Derived Command Dispatch for Document Slugs
 
 ## Status
-
-Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-15 by owner decision (decision 1 derive/builder split, decision 2 `BUILTIN_COMMANDS` names only, decision 4 `clap` `string` feature, decision 10's consequence count, downstream constraint 2, and downstream constraint 6) without status change.
-
+accepted
 ## Date
 
 2026-11-13 (status: Proposed, 2026-11-13; status: Accepted, 2026-11-13)

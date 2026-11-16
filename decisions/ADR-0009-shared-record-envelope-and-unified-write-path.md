@@ -2,16 +2,14 @@
 id: ADR-0009
 title: "Shared Record Envelope and Unified Write Path for CLI and Browser"
 created_date: '2026-11-08T00:00:00Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T21:08:35Z'
 labels: []
 references: []
 ---
 # Shared Record Envelope and Unified Write Path for CLI and Browser
 
 ## Status
-
-Superseded by ADR-0013 on 2026-11-11 — the shared-envelope, single-writer, projection, and staged-delivery decisions carry over, but this ADR's storage-identity translation, storage ID pattern, Stage 2 (storage identity), and Stage 4 (migration to the Backlog.md layout) contradict NFR-04.004 (adopted 2026-11-11) and REQ-01.005. Body frozen; ADR-0013 restates the structure without the storage layer and fixes the revised stage plan.
-
+superseded
 ## Date
 
 2026-11-08 (status: Superseded, 2026-11-11)

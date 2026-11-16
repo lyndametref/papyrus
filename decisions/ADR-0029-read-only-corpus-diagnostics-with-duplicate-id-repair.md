@@ -2,16 +2,14 @@
 id: ADR-0029
 title: "Read-Only Corpus Diagnostics (`papyrus check`) with Duplicate-ID Repair"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-15T15:58:31Z'
+updated_date: '2026-11-16T21:08:37Z'
 labels: []
 references: []
 ---
 # Read-Only Corpus Diagnostics (`papyrus check`) with Duplicate-ID Repair
 
 ## Status
-
-Accepted (2026-11-15) — owner decision 2026-11-15: `--force` bypasses the repair prompt, `check` self-loads tolerantly, the duplicate keeper is the oldest `created_date` then lowest path, inbound references are listed but never rewritten, and exit 4 stands even after successful repair.
-
+accepted
 ## Date
 
 2026-11-15

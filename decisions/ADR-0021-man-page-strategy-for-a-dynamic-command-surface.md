@@ -2,16 +2,14 @@
 id: ADR-0021
 title: "Man Page Strategy for a Dynamic Command Surface"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T21:08:36Z'
 labels: []
 references: []
 ---
 # Man Page Strategy for a Dynamic Command Surface
 
 ## Status
-
-Proposed — **deferred by the project owner on 2026-11-13; remains an open release risk for NFR-03.003.** No option is selected. NFR-03.003 as written cannot be satisfied by a command surface whose command names are project configuration, and the requirement owners have recorded that gap in REQ-07.003 rather than amending the NFR.
-
+proposed
 ## Date
 
 2026-11-13

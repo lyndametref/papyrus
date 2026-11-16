@@ -2,16 +2,14 @@
 id: ADR-0002
 title: "Distribution Format — amd64 `.deb` Packages for Debian Trixie, Forky, and Later Releases"
 created_date: '2026-11-01T00:00:00Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T21:08:35Z'
 labels: []
 references: []
 ---
 # Distribution Format — amd64 `.deb` Packages for Debian Trixie, Forky, and Later Releases
 
 ## Status
-
-Superseded by ADR-0003
-
+superseded
 ## Date
 
 2026-11-01

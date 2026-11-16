@@ -2,16 +2,14 @@
 id: ADR-0011
 title: "One-Way Backlog.md Import as the Only Bridge"
 created_date: '2026-11-11T00:00:00Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T21:08:35Z'
 labels: []
 references: []
 ---
 # One-Way Backlog.md Import as the Only Bridge
 
 ## Status
-
-Accepted — approved by explicit user confirmation on 2026-11-11
-
+accepted
 ## Date
 
 2026-11-11 (status: Accepted, 2026-11-11)

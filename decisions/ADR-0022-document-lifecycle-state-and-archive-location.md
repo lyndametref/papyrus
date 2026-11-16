@@ -2,16 +2,14 @@
 id: ADR-0022
 title: "Document Lifecycle State and Archive Location"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T21:08:36Z'
 labels: []
 references: []
 ---
 # Document Lifecycle State and Archive Location
 
 ## Status
-
-Accepted (2026-11-13) — accepted by explicit user decision of 2026-11-13; amended 2026-11-14 by owner decision (decision 3 revision note and decision 12) without status change; amended 2026-11-15 by owner decision (milestone lifecycle) without status change.
-
+accepted
 ## Date
 
 2026-11-13 (status: Proposed, 2026-11-13; status: Accepted, 2026-11-13)

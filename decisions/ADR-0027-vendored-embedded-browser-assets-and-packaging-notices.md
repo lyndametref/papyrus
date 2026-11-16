@@ -2,16 +2,14 @@
 id: ADR-0027
 title: "Vendored Embedded Browser Assets and Packaging Notices"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-15T15:58:31Z'
+updated_date: '2026-11-16T21:08:36Z'
 labels: []
 references: []
 ---
 # Vendored Embedded Browser Assets and Packaging Notices
 
 ## Status
-
-Accepted (2026-11-15) — owner decision 2026-11-15: vendored, digest-verified browser assets ship embedded in the single binary with a consolidated `copyright` notice file.
-
+accepted
 ## Date
 
 2026-11-15

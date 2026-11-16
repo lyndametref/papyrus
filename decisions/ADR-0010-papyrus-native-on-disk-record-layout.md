@@ -2,16 +2,14 @@
 id: ADR-0010
 title: "Papyrus-Native On-Disk Record Layout and Path Convention"
 created_date: '2026-11-11T00:00:00Z'
-updated_date: '2026-11-15T15:47:30Z'
+updated_date: '2026-11-16T21:08:35Z'
 labels: []
 references: []
 ---
 # Papyrus-Native On-Disk Record Layout and Path Convention
 
 ## Status
-
-Superseded by ADR-0023 on 2026-11-13 — ADR-0023 restates the native layout and identity contract with `archived/` as the only inactive document location (no `deprecated/` read or migration, no document restore) and the current front-matter field map, so this ADR's deprecate/restore clauses and its allocation scope are no longer in force. Body frozen; the still-valid path, identity, naming, resolution, relocation, import, and atomic-move decisions are restated in ADR-0023.
-
+superseded
 ## Date
 
 2026-11-11 (status: Accepted, 2026-11-11; status: Superseded, 2026-11-13)
