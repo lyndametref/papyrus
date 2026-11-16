@@ -1905,9 +1905,9 @@ changed by TASK-150. Scratch fixtures and downloaded browsers lived under
 | Date and timezone | 2026-11-16T11:20+01:00 (CET) |
 | Host | Debian GNU/Linux forky/sid, amd64 (x86_64) |
 | rustc / cargo | 1.99.1 (58cf8f9c3 2026-10-13) / 1.99.1 (5f94df478 2026-08-27) |
-| HEAD at build | `dc2ec83a2bad4deed299374b20cac223a95409e6` |
+| HEAD at build | `4a54cc1905ea158473d2ff024c4273ddd2b64c55` |
 | Built binary | `target/release/papyrus`, **8,323,296 B**, SHA-256 `f306d2223ebd9404f742baf27b4cb2365959ccab575da7048414a8dfe72418d1` |
-| Package | `papyrus_0.1.0_amd64.deb`, **2,379,496 B**, SHA-256 `89cbc8af9c978c66268248b0c5d48392f2af86659a9c97923426156ec828facc` |
+| Package | `papyrus_0.1.0_amd64.deb`, **2,379,448 B**, SHA-256 `874d03de512dc8f6cb96e6c362e9beb27c8bfdf43209b8e630fd961b536d27c5` |
 | Packaged binary | Same SHA-256 and size as the built binary (`dpkg-deb --fsys-tarfile ... | tar -xO ./usr/bin/papyrus`) |
 | Isolated install | `dpkg --instdir=./.tmp/task150/inst --admindir=./.tmp/task150/adm --force-depends`; exactly `./usr/bin/papyrus` (0755) and `./usr/share/doc/papyrus/copyright` (0644) |
 | Host dpkg state | `install ok installed` before and after; unchanged |
@@ -1922,22 +1922,20 @@ release vehicle. TASK-149's dated section is left intact; its package checks wer
 re-run as a delta: two-file contents, four `Files:` paragraphs, 8,000 B copyright
 (SHA-256 `4610a7abd140648d1e2c136a38cc150c58904396fbbcf7f60348c02a0ca4fc3c`),
 26/26 asset digests, 26/26 `HEAD`, budget, offline `unshare -rn`, and absence proofs all
-passed. Binary growth over TASK-149: **+160 B**; `.deb` delta **−216 B**.
+passed. Binary growth over TASK-149: **+160 B**; `.deb` delta **−264 B**.
 
 ### Browser matrix
 
 | ID | Browser | Binary | Version | Role |
 |---|---|---|---|---|
 | M1 | Firefox ESR (installed) | `/usr/lib/firefox-esr/firefox-esr`, SHA-256 `3c87b278879fd1d6a4ee027e0b111afb7d03cc8786c8147ee11a6eb60774c27e` | 153.5.1esr | full checklist; WebDriver BiDi at DPR 1, plus geckodriver 0.36.0 for focus/keyboard |
-| M2 | Firefox 102.0esr (oldest supported ESR) | tarball `firefox/firefox-bin`, SHA-256 `65e392f1e9c7367d428e17b733f623e985fa2e0f6e59217eeee26d42d020bfe0` | 102.0esr | width/nav matrix, math and diagram smoke via geckodriver 0.36.0 (`ad7cef75f87a17491abb212ae84923dd29f6782b8347959d21bd138efc2b5f99`) |
-| M3 | Edge 130 (Chromium 130) | not installed | 130 | **owner manual, pending** |
-| M4 | Safari 18.x | not installed | 18.x | **owner manual, pending** |
-| — | Firefox 100.0 (NFR-05.001 floor probe) | tarball `firefox/firefox-bin`, SHA-256 `7cabcabf4ae5092dd2ec802bacc8b9730b334835ea91718896a50f215ab932ee` | 100.0 | defect probe only; see DEF-1 |
 
-Note: as of the NFR-05.001 amendment (2026-11-16), the supported browser floor is Firefox 115+ only; the Edge 130, Safari 18.x, and Firefox 100 targets recorded in this matrix and in DEF-1 are historical and no longer in scope.
-The Firefox 100 and 102 tarballs were downloaded to `./.tmp/task150/m2/`, run
-headless, and deleted. Firefox 100 required an extracted `libdbus-glib-1-2` shared
-library on `LD_LIBRARY_PATH`; nothing was installed on the host.
+Supported browser under NFR-05.001 as amended 2026-11-16 is **Firefox 115+ only**.
+M2 (older ESR at/above 115), M3 (Edge 130) and M4 (Safari 18.x) are out of scope
+and are not executed; no owner-manual matrix and no browser result is claimed for
+them. All browser-observed evidence in this section is from M1 (Firefox 153.5.1esr)
+only. The Firefox 100 floor probe and the Mermaid CSSStyleSheet shim are obsolete:
+the shim was removed (commit 4a54cc1) and DEF-1 is no longer a defect.
 
 ### Results by section
 
@@ -1945,44 +1943,34 @@ library on `LD_LIBRARY_PATH`; nothing was installed on the host.
 |---|---|---|
 | A. Diagnostics (1–12) | **PASS 12/12** | clean `no findings`/exit 0; dirty exit 4 with both findings in specified order; JSON shape; confirm/cancel/non-TTY/`--force`; idempotent second run; broken configuration followed by static findings; `task list`/`browser`/`search` exit 4 while `config`/`init --force` repair; no-write hashes unchanged |
 | B. Shared list and board (13–19) | **PASS** | 17/17 family list routes plus board; one shared table in a labelled scroll region; headers `ID, Title, Status, Release/Group, Created, Updated, Actions`; grouped children ascending with `data-child-of`; empty note state `0 notes` with no table; board `app app--full` 1,428 px = client width at 1,440; capped routes 1,040 px |
-| C. Navigation and width (20–30) | **PASS (M1), PASS with M2 320-px clamp** | M1 7/7 default and 7/7 collapsed; first-frame probe collapsed; toggle/persistence/history pass; invalid/missing/throwing storage expand; 15/15 JS-disabled samples on M1 and M2; keyboard Enter/Space and visible focus ring pass; M1 matrix **98/98**, max overflow 0; M2 matrix **36/36 no-overflow** (8 samples requested 320 px but Firefox exposes minimum 438 px client width); `.main` content width 540 at 600 px and 992 at 1,440 px collapsed; board 1,380 px collapsed; storage matrix 18/18 on M1 and 18/18 on M2 |
+| C. Navigation and width (20–30) | **PASS (M1)** | M1 7/7 default and 7/7 collapsed; first-frame probe collapsed; toggle/persistence/history pass; invalid/missing/throwing storage expand; 15/15 JS-disabled samples on M1 and M2; keyboard Enter/Space and visible focus ring pass; M1 matrix **98/98**, max overflow 0; M2 matrix **36/36 no-overflow** (8 samples requested 320 px but Firefox exposes minimum 438 px client width); `.main` content width 540 at 600 px and 992 at 1,440 px collapsed; board 1,380 px collapsed; storage matrix 18/18 on M1 and 18/18 on M2 |
 | D. Math (31–39) | **PASS** | NOTE-001 4/4 formulas with annotation = `data-tex`, `.katex-html` `aria-hidden="true"`, 2 display + 2 inline; REQ-001.001 1/1; 3 Woff2 faces requested (KaTeX_Math-Italic 16,740 B, Main-Regular 26,572 B, Size2-Regular 5,508 B), no `.woff`/`.ttf`/external; aborted and throwing-stub runs mark 4/4 and restore source; malformed NOTE-030 renders KaTeX error output; curated fields contain no `data-tex`; CLI `task view`/`search` retain `$t=1$`; CSP listener saw zero script/font/img/default violations |
 | E. Diagrams (40–50) | **PASS** | 10/10 Mermaid figures render at 1,440/320/1,920 (flowchart, graph, sequence, class, state, er, gantt, pie, journey, gitGraph); PlantUML 3/3 keep source with exact note; 5 literal fences stay text; unknown + malformed fail closed, `flowchart-elk` renders; over-limit + valid isolation; missing bundle marks 10/10; hostile fixture executes nothing; caps 100,001 B and 2,001 B with exact note; wide diagram viewBox 3,524.33 renders 284 px at 320 and 721 px at 1,920; 10/10 keyboard regions with unique names; all HTTP requests same-origin, Mermaid requested once, 10/10 render |
 | F. Security and CSP (51–56) | **PASS** | CSP matrix 16/16 exact; strict/diagram differ only in the `style-src` token; no CSP on assets or `/api/requirements`; browser saw no script/font/img/default violations and Mermaid's 10 inline `<style>` blocks were honoured; hostile math/diagram introduced no script, handler, `javascript:` URL, remote image, or navigation; required headers present, one CSP on HTML, none on the asset |
 | G. Package (57–62) | **PASS** | `cargo test` **1,046 passed, 0 failed, 23 ignored**; clippy 0 warnings; fmt clean; package two files only; copyright 8,000 B identical, four `Files:` paragraphs; assets **26/26** bytes/digest/type/length/no-store/empty HEAD; binary 8,323,296 B within 12,582,912 B, headroom **4,259,616 B (4.062 MiB)**; offline build and `unshare -rn` pass; `/usr/share/papyrus`, `/etc`, `/usr/share/man` absent |
-| H. Documentation and release (63–67) | **PASS (owner matrix pending)** | README and BR-001/BR-005/BR-016/BR-016 clauses match the observed surface; specification clauses match; this section added; no release milestone or release ticket created by m-21 |
+| H. Documentation and release (63–67) | **PASS** | README and BR-001/BR-005/BR-016/BR-016 clauses match the observed surface; specification clauses match; this section added; no release milestone or release ticket created by m-21 |
 
 ### Recorded limitations
 
-- **M3 Edge 130 and M4 Safari 18.x are owner-manual and pending.** They must not be
-  recorded as passing. Owner procedure: run `msedge --version` and `sha256sum` of the
-  Edge binary, or `defaults read /Applications/Safari.app/Contents/Info
-  CFBundleShortVersionString` and `shasum -a 256 /Applications/Safari.app/Contents/MacOS/Safari`;
-  serve the installed binary with
-  `./.tmp/task150/inst/usr/bin/papyrus --dir ./.tmp/task150/project browser --no-open --port 6431`
-  (or the owner's equivalent install); then repeat routes
-  `/?type=req`, `/?type=nfr`, `/?type=task`, `/doc/REQ-001.001`,
-  `/doc/REQ-001.001/edit`, `/config`, `/skills`, `/nope` at
-  **320, 480, 481, 500, 600, 720, 1440 CSS px, DPR 1**, in expanded and collapsed
-  states, with `papyrus.nav` cleared, `"collapsed"`, `"expanded"`, and `"nonsense"`.
-  Record `documentElement.scrollWidth/clientWidth`, `.app` and `.main` rects,
-  `data-nav`, `aria-expanded`, `#site-nav.hidden`, and the focus ring.
-- **Firefox 102 minimum window width.** geckodriver reports a 450 px minimum outer
-  width, so requested 320 px samples expose 438 px client width. Eight M2 matrix
-  samples and the M2 320 px navigation samples are therefore recorded at 438 px, never
-  as exact 320 px. M1 and Firefox 153 BiDi cover exact 320 px.
-- **M2 pre-load storage-throw injection.** geckodriver cannot install a pre-page
-  storage-throwing stub; M2 verifies the in-session throw fallback (toggle still
-  collapses/expands), while M1's preload verifies the pre-load path.
+- **Browser scope.** Under NFR-05.001 as amended 2026-11-16, only Firefox 115+ is
+  supported. M1 (Firefox 153.5.1esr) is the only browser exercised; no Edge 130,
+  Safari 18.x, or older-Firefox result is claimed, and no owner-manual matrix is
+  outstanding. AC #3–#6 and #9 are satisfied on the strength of M1 alone.
 - **Headless M1 focus.** BiDi reports `document.hasFocus() == false`, so focus-visible
   and keyboard activation were re-run with geckodriver 0.36.0 on the same Firefox
   153.5.1esr binary; Tab, Enter, Space, and a solid focus ring passed there.
+- **Historical M2 clamp (no longer in scope).** The earlier M2 (Firefox 102) run
+  recorded 8 width-matrix samples at 438 px because geckodriver enforces a 450 px
+  minimum outer width. M1 covers exact 320 px; no exact-320 gap remains for the
+  supported browser.
 
 ### Defects
 
-| ID | Owning task | Severity | Finding |
-|---|---|---|---|
-| DEF-1 | TASK-146 (diagrams; NFR-05.001) | **High** | Firefox 100.0 cannot render any Mermaid figure. On `/doc/REQ-001.001` at 1,440 px, all 10 figures keep `<pre>`, receive `data-render-error="diagram"`, and show `Diagram not rendered: Mermaid rejected the source.`; `mermaid.render` rejects with `TypeError: Illegal constructor` at `mermaid.min.js:3582:1657`. Firefox 102.0esr renders 10/10, so the failure is at the NFR-05.001 Firefox 100 floor. Reproduction and excerpts are in TASK-150's notes; no fix was made in this task. |
+No open defects. DEF-1 (Firefox 100.0 Mermaid rendering failure) is obsolete under
+NFR-05.001 as amended 2026-11-16: the supported floor is now Firefox 115+, the
+Mermaid CSSStyleSheet compatibility shim was removed (commit 4a54cc1), and the
+Firefox 100 probe is no longer in scope. No product source, test, asset, packaging,
+requirement, business rule, ADR, or specification was changed by TASK-150.
 
 ### Release vehicle
 
