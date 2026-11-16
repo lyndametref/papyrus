@@ -194,7 +194,7 @@ pub const HEAD_ASSETS: &str = "<link rel=\"stylesheet\" href=\"/assets/katex/kat
 
 ### 5.2 Render call sites
 
-Each row of §2.1 replaces `escape(value)` with `math::prose(value, attrs)` and `format!`-style `<p class="text"{attrs}>{}</p>` with the returned `html`. `view_page` and `document_detail_page` accumulate `has_math` across every field they render, then pass `math::HEAD_ASSETS` or `""` to the page wrapper.
+Each row of §2.1 replaces `escape(value)` with `math::prose(value, attrs)` for single-field callers and with `math::prose_with_diagrams(value, attrs, &mut next_diagram)` in a record view, where one counter is initialised once per rendered page (§5.1, §14.1), and `format!`-style `<p class="text"{attrs}>{}</p>` with the returned `html`. `view_page` and `document_detail_page` accumulate `has_math` across every field they render, then pass `math::HEAD_ASSETS` or `""` to the page wrapper.
 
 `render::page` keeps its signature and forwards `""`; a sibling `page_with_assets(..., assets: &str)` carries the fragment so the ~40 non-prose pages are untouched.
 
