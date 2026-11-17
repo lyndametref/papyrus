@@ -2,12 +2,12 @@
 id: TASK-163
 title: "Verify MS-025 milestone archive command"
 created_date: '2026-11-16T21:03:08Z'
-updated_date: '2026-11-16T21:03:08Z'
+updated_date: '2026-11-17T21:02:58Z'
 labels: []
 references:
   - REQ-03.001
   - RE-002
-status: ToDo
+status: In-Progress
 assignee:
   - quality-gatekeeper
 milestone: MS-025
