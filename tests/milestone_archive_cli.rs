@@ -196,6 +196,71 @@ fn archived_milestone_remains_viewable_and_editable_in_place() {
     assert!(!d.join("backlog/milestones/MS-001.md").exists());
 }
 
+/// Restores a directory's permissions when dropped so a failed assertion can
+/// never leave the scratch project unwritable for cleanup.
+#[cfg(unix)]
+struct PermissionGuard {
+    path: std::path::PathBuf,
+    mode: u32,
+}
+
+#[cfg(unix)]
+impl Drop for PermissionGuard {
+    fn drop(&mut self) {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&self.path, fs::Permissions::from_mode(self.mode));
+    }
+}
+
+#[test]
+#[cfg(unix)]
+fn archive_rolls_back_destination_when_source_unlink_fails() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let d = tmpdir("unlink-rollback");
+    init(&d);
+    let id = create_milestone(&d, "Rollback M");
+    let active_dir = d.join("backlog/milestones");
+    let active = active_dir.join("MS-001.md");
+    let archived = d.join("backlog/archive/milestones/MS-001.md");
+    let source_before = fs::read(&active).unwrap();
+
+    fs::set_permissions(&active_dir, fs::Permissions::from_mode(0o555)).unwrap();
+    let guard = PermissionGuard {
+        path: active_dir.clone(),
+        mode: 0o755,
+    };
+
+    // Root (or a filesystem without Unix permission checks) bypasses the
+    // read-only directory; skip rather than assert on an unenforced failure.
+    let probe = active_dir.join(".permission-probe");
+    if fs::write(&probe, "probe").is_ok() {
+        let _ = fs::remove_file(&probe);
+        eprintln!("skipping: Unix directory permissions are not enforced here");
+        return;
+    }
+
+    let out = run(&d, &["milestone", "archive", &id]);
+    drop(guard);
+
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert!(
+        !archived.exists(),
+        "failed archive must remove the destination it wrote"
+    );
+    assert_eq!(
+        fs::read(&active).unwrap(),
+        source_before,
+        "failed archive must leave the source intact"
+    );
+
+    // No duplicate remains: a retry now succeeds and yields exactly one copy.
+    let retry = run(&d, &["milestone", "archive", &id]);
+    assert!(retry.status.success(), "retry failed: {}", stderr(&retry));
+    assert!(!active.exists(), "retry must move the source");
+    assert!(archived.exists(), "retry must write the destination");
+}
+
 #[test]
 fn archive_preserves_release_assignment_and_leaves_release_untouched() {
     let d = tmpdir("release");

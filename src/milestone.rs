@@ -777,13 +777,16 @@ pub fn close(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErr
 
 /// Archive a milestone: the only transition to `archived`.
 ///
-/// An open milestone is closed first and then archived in a single write; a
-/// closed milestone is archived directly. An already archived milestone is a
-/// no-op success. Any other stored status is rejected with a validation
-/// outcome (exit 4) before any write, leaving the file untouched. The record is
-/// moved to the milestone lifecycle archive folder with the shared atomic
-/// writer, preserving title, description, labels, references, and release
-/// assignment.
+/// An open milestone is archived in a single write that sets its status to
+/// `archived`; a closed milestone is archived directly. An already archived
+/// milestone is a no-op success. Any other stored status is rejected with a
+/// validation outcome (exit 4) before any write, leaving the file untouched.
+/// The record is archived by writing the updated content to the milestone
+/// lifecycle archive folder with the shared atomic writer and then unlinking
+/// the active-folder source. If that unlink fails, the written destination is
+/// removed again before returning an error, so only the source copy remains.
+/// Title, description, labels, references, and release assignment are
+/// preserved.
 pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
     let cfg = load_config(ctx)?;
@@ -855,7 +858,12 @@ pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
             return Err(AppError::Validation(format!("already archived: {}", id)));
         }
         crate::record::store::write_atomic(ctx, &dest, &new_content)?;
-        fs::remove_file(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+        if let Err(err) = fs::remove_file(&path) {
+            // Roll back the destination so a failed archive leaves exactly one
+            // copy of the record: the still-valid source.
+            let _ = fs::remove_file(&dest);
+            return Err(AppError::Runtime(err.to_string()));
+        }
     }
 
     let json = ctx
