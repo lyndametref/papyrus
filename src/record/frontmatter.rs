@@ -263,6 +263,10 @@ fn format_scalar(v: &str) -> String {
     if t.is_empty() {
         return "\"\"".to_string();
     }
+    // @-prefixed scalars must be quoted (YAML forbids unquoted leading @).
+    if t.starts_with('@') {
+        return format!("'{}'", t.replace('\'', "''"));
+    }
     // timestamp quoting
     if is_timestamp(t) {
         return format!("'{}'", t);

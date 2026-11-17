@@ -3,7 +3,7 @@ id: TASK-145
 title: Verify the diagnostics, shell, and rendering release end to end
 status: Done
 assignee:
-  - @rust-dev
+  - '@rust-dev'
 created_date: '2026-11-15T16:14:00Z'
 updated_date: '2026-11-16T15:30:00Z'
 labels:

@@ -3,7 +3,7 @@ id: TASK-144
 title: Verify packaged assets, offline rendering, and the binary budget
 status: Done
 assignee:
-  - @rust-dev
+  - '@rust-dev'
 created_date: '2026-11-15T16:14:00Z'
 updated_date: '2026-11-16T09:48:00Z'
 labels:
