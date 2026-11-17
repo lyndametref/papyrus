@@ -1,20 +1,21 @@
 ---
-id: TASK-150
+id: TASK-145
 title: Verify the diagnostics, shell, and rendering release end to end
 status: Done
 assignee:
   - '@rust-dev'
 created_date: '2026-11-15T16:14:00Z'
-updated_date: '2026-11-16T15:30:00Z'
+updated_date: '2026-11-17T18:43:05Z'
 labels:
   - verification
   - cli
   - browser
 milestone: MS-022
 dependencies:
-  - TASK-140
-  - TASK-148
-  - TASK-149
+  - TASK-135
+  - TASK-141
+  - TASK-143
+  - TASK-144
 references:
   - docs/requirements/business/REQ-01.008.md
   - docs/requirements/business/REQ-06.015.md
@@ -40,12 +41,12 @@ references:
   - docs/business-rules/BR-001-papyrus-command-behavior.md
   - docs/business-rules/BR-005-task-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
+priority: high
 ordinal: 41620
 ---
 
-## Description
 
-<!-- SECTION:DESCRIPTION:BEGIN -->
+## Description
 **Gate — cleared 2026-11-16.** ADR-0026 is `Accepted` (TASK-146/148 landed); TASK-137–149 are `Done`; m-21 is 13/14. This is the final verification gate, not a feature ticket, and it must not re-open any accepted decision.
 
 **Why.** The increment spans the CLI, the browser shell, the packaged assets, and two offline renderers. Each delivering ticket has its own tests, but the release claim is cross-surface: one corpus must be diagnosable and repairable, uniformly browsable at every supported width, readable with math and diagrams while offline, and served from the installed package inside the binary budget.
@@ -110,23 +111,19 @@ Fixes or features beyond reporting a defect; release notes; a formal security au
 - Who executes M3/M4 and when? AC #3–#6 and #9 stay unchecked until the owner returns the Edge 130 and Safari 18 results; the executor cannot self-certify them.
 - Can a Firefox 100 (or oldest supported ESR) binary be obtained on the verification host? If not, M2 becomes an owner-manual result or a recorded limitation.
 - Does “release-vehicle decision” mean the absence of a backlog milestone/release task plus a product `papyrus release` record, or only the backlog board? Item 67 records both and reports the decision; confirm if the owner expects a different vehicle.
-<!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
-<!-- AC:BEGIN -->
-- [x] #1 The diagnostics loop passes end to end: a fresh project prints no findings and exits 0; after a duplicate-ID copy and a dangling milestone are introduced, check exits 4 and names both findings with sorted locations; check --fix in a terminal repairs only the duplicate, lists every affected reference, leaves the referring file byte-identical, and exits 4; after the dangling reference is corrected the next check exits 0; a deliberately broken configuration is reported as config-invalid while the static-family findings still run; and check --fix with piped stdin and no --force exits 2 with the documented refusal.
-- [x] #2 While the configuration is invalid, other commands fail closed (task list, browser, and search exit non-zero without writing), while config set and init --force remain the repair paths and check --help exits 0.
-- [x] #3 Every family list route renders exactly one shared list table with ID and Title first and Actions last, and a count note matching the rendered rows; the board alone renders app--full and reaches the viewport width at 1440 px; both are verified from the installed package in Firefox 115 and later (the only supported browser under NFR-05.001 as amended 2026-11-16).
-- [x] #4 The navigation collapses and expands at every width in its matrix row, persists across navigation and reload through papyrus.nav, defaults to expanded when the key is cleared, invalid, or storage throws, and is expanded and usable with JavaScript disabled; verified in Firefox 115 and later. Edge 130 and Safari 18 are no longer in scope.
-- [x] #5 Math renders offline with the bundled fonts, a MathML annotation equal to data-tex, and an aria-hidden .katex-html tree; display and inline forms differ; an aborted or throwing KaTeX asset keeps the source and sets data-render-error=math; malformed math shows KaTeX error output; all nine promised Mermaid types render, while PlantUML, literal, unknown, and over-limit input keep the source with the specified note; per-figure isolation and the missing-bundle branch pass; verified in Firefox 115 and later.
-- [x] #6 The final CSP matches the accepted literals per response class, with script-src 'self' and font-src 'self' and the accepted style-src; browser enforcement blocks no required asset, and the hostile math and diagram fixtures produce no script, handler, or remote reference and execute nothing; verified in Firefox 115 and later.
-- [x] #7 The rebuilt package contains exactly the binary and the copyright file, the four notices and 26/26 asset digests hold (or TASK-149 is cited for an identical binary), the binary is within 12,582,912 B, the installed package renders offline, and no runtime asset directory, config file, or man page exists.
-- [x] #8 README and BR-001/BR-005/BR-016 describe the shipped check surface, the shell/width, math/diagram, shell-UI, and requirements section 9.7 specifications match the observed contract, and a dated TASK-150 evidence section exists in docs/packaging.md without rewriting earlier sections.
-- [x] #9 Browser versions and binary SHA-256 values, binary and .deb sizes, and headroom are recorded; no release milestone or release ticket was created by m-21; the release-vehicle decision is reported to the owner through @orchestrator; and the DEF-1 Mermaid-on-Firefox-100 finding is recorded as obsolete under the amended NFR-05.001 (Firefox 115 floor) rather than as an open defect.
-<!-- AC:END -->
+- [x] The diagnostics loop passes end to end: a fresh project prints no findings and exits 0; after a duplicate-ID copy and a dangling milestone are introduced, check exits 4 and names both findings with sorted locations; check --fix in a terminal repairs only the duplicate, lists every affected reference, leaves the referring file byte-identical, and exits 4; after the dangling reference is corrected the next check exits 0; a deliberately broken configuration is reported as config-invalid while the static-family findings still run; and check --fix with piped stdin and no --force exits 2 with the documented refusal.
+- [x] While the configuration is invalid, other commands fail closed (task list, browser, and search exit non-zero without writing), while config set and init --force remain the repair paths and check --help exits 0.
+- [x] Every family list route renders exactly one shared list table with ID and Title first and Actions last, and a count note matching the rendered rows; the board alone renders app--full and reaches the viewport width at 1440 px; both are verified from the installed package in Firefox 115 and later (the only supported browser under NFR-05.001 as amended 2026-11-16).
+- [x] The navigation collapses and expands at every width in its matrix row, persists across navigation and reload through papyrus.nav, defaults to expanded when the key is cleared, invalid, or storage throws, and is expanded and usable with JavaScript disabled; verified in Firefox 115 and later. Edge 130 and Safari 18 are no longer in scope.
+- [x] Math renders offline with the bundled fonts, a MathML annotation equal to data-tex, and an aria-hidden .katex-html tree; display and inline forms differ; an aborted or throwing KaTeX asset keeps the source and sets data-render-error=math; malformed math shows KaTeX error output; all nine promised Mermaid types render, while PlantUML, literal, unknown, and over-limit input keep the source with the specified note; per-figure isolation and the missing-bundle branch pass; verified in Firefox 115 and later.
+- [x] The final CSP matches the accepted literals per response class, with script-src 'self' and font-src 'self' and the accepted style-src; browser enforcement blocks no required asset, and the hostile math and diagram fixtures produce no script, handler, or remote reference and execute nothing; verified in Firefox 115 and later.
+- [x] The rebuilt package contains exactly the binary and the copyright file, the four notices and 26/26 asset digests hold (or TASK-149 is cited for an identical binary), the binary is within 12,582,912 B, the installed package renders offline, and no runtime asset directory, config file, or man page exists.
+- [x] README and BR-001/BR-005/BR-016 describe the shipped check surface, the shell/width, math/diagram, shell-UI, and requirements section 9.7 specifications match the observed contract, and a dated TASK-150 evidence section exists in docs/packaging.md without rewriting earlier sections.
+- [x] Browser versions and binary SHA-256 values, binary and .deb sizes, and headroom are recorded; no release milestone or release ticket was created by m-21; the release-vehicle decision is reported to the owner through @orchestrator; and the DEF-1 Mermaid-on-Firefox-100 finding is recorded as obsolete under the amended NFR-05.001 (Firefox 115 floor) rather than as an open defect.
 
 ## Definition of Done
-<!-- DOD:BEGIN -->
 - [x] #1 Every numbered checklist item (1–67) is executed, and each has its fixture/route, browser+version and viewport/state where applicable, command, expected result, observed result, pass/fail/limitation, and evidence recorded in the ticket notes.
 - [x] #2 The browser matrix is complete for M1 and M2, and the owner-manual results for M3 (Edge 130) and M4 (Safari 18.x) are recorded with version and browser binary SHA-256; every width 320/480/481/500/600/720/1440 and both expanded/collapsed states are covered, with cleared and preset papyrus.nav; any unavailable browser is recorded as a limitation with the named fallback, never as a pass.
 - [x] #3 The artifact identity is recorded: current HEAD, built and packaged binary sizes and SHA-256 values, .deb size and SHA-256, isolated install path, and the packaged-binary-equals-built proof; a rebuilt artifact has its TASK-149 package checks re-run as a delta, and a SHA-identical artifact cites TASK-149.
@@ -135,11 +132,9 @@ Fixes or features beyond reporting a defect; release notes; a formal security au
 - [x] #6 The dated TASK-150 evidence section exists in docs/packaging.md, the TASK-149 browser limitation now points to it, and no live procedure, §3.6 text, or earlier dated section was rewritten.
 - [x] #7 The release-vehicle decision is recorded and reported to @orchestrator, and no release milestone or release ticket was created by m-21.
 - [x] #8 All nine acceptance criteria are checked only after the evidence above exists; otherwise the ticket remains Refined/blocked with the unresolved items named.
-<!-- DOD:END -->
 
-## Implementation Plan
 
-<!-- SECTION:PLAN:BEGIN -->
+## Implementation Notes
 Execute S1–S7 once, then items 1–67 in order. Record every scored item as specified in the Evidence section of the description. Do not edit product source, tests, assets, packaging, requirements, business rules, ADRs, or specifications.
 
 **Setup (prerequisites, not scored)**
@@ -418,11 +413,9 @@ Wait for `figure[data-diagram="mermaid"] svg` or a 5-second timeout before judgi
 **66.** Dated packaging evidence. Add a `## TASK-150 — Browser runtime verification (2026-…)` section to `docs/packaging.md` after the last dated section: environment, browser matrix with versions and binary SHA-256 values, artifact SHAs and sizes, the rebuilt-artifact supersession note, results by section, recorded limitations, and defects. Change only the single TASK-149 limitation bullet that points browser-observed behaviour at TASK-150 so it names this evidence; leave every other line of earlier dated sections untouched. Do not rewrite the live `## Packaging` procedure or §3.6.
 
 **67.** Release vehicle. Record `backlog milestone list --plain`, `backlog task list --plain`, and `"$PB" --dir "$TMP/project" release list`; confirm no release milestone or release ticket was created by m-21 and that m-21 remains the only active milestone with TASK-150 as its last open task. Record the release-vehicle decision (release notes and a release ticket remain out of scope; the owner decides the vehicle) and report it to `@orchestrator` in a ticket comment and the final summary.
-<!-- SECTION:PLAN:END -->
 
-## Implementation Notes
 
-<!-- SECTION:NOTES:BEGIN -->
+## Notes
 ## TASK-150 execution record (2026-11-16)
 
 ### Setup S1–S7
@@ -561,11 +554,9 @@ Wait for `figure[data-diagram="mermaid"] svg` or a 5-second timeout before judgi
 All 67 items were executed; sections A–H pass apart from the recorded limitations and DEF-1. AC #3–#6 and #9 remain unchecked pending M3/M4 owner results.
 
 Amendment re-run 2026-11-16: NFR-05.001 now Firefox 115+ only. Packaging.md TASK-150 section updated: deb 2,379,448 B / SHA 874d03de...; HEAD 4a54cc1; DEF-1 obsolete; M3/M4 and Firefox 100 probe out of scope. AC #3-#6,#9 and DoD #2,#8 checked. cargo test 1048 passed, clippy 0, fmt clean.
-<!-- SECTION:NOTES:END -->
+
 
 ## Comments
-
-<!-- COMMENTS:BEGIN -->
 author: @task-refiner
 created: 2026-11-16T10:13:00Z
 
@@ -654,4 +645,3 @@ created: 2026-11-16T15:29:00Z
 Amendment (2026-11-16): NFR-05.001 now Firefox 115+ only; Edge 130/Safari 18/Firefox 100 out of scope; DEF-1 obsolete; shim removed (4a54cc1). Rebuilt deb 2,379,448 B / 874d03de...; binary unchanged 8,323,296 B / f306d222...; cargo test 1048 passed. AC #3-#6,#9 and DoD #2,#8 checked. Release vehicle unchanged: no release milestone/ticket by m-21; owner decides.
 
 ---
-<!-- COMMENTS:END -->

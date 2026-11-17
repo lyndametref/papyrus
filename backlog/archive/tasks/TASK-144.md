@@ -1,23 +1,24 @@
 ---
-id: TASK-149
+id: TASK-144
 title: Verify packaged assets, offline rendering, and the binary budget
 status: Done
 assignee:
   - '@rust-dev'
 created_date: '2026-11-15T16:14:00Z'
-updated_date: '2026-11-16T09:48:00Z'
+updated_date: '2026-11-17T18:43:05Z'
 labels:
   - verification
   - packaging
   - browser
 milestone: MS-022
 dependencies:
+  - TASK-137
+  - TASK-138
+  - TASK-139
+  - TASK-140
+  - TASK-141
   - TASK-142
   - TASK-143
-  - TASK-144
-  - TASK-145
-  - TASK-147
-  - TASK-148
 references:
   - >-
     docs/architecture/adr/ADR-0027-vendored-embedded-browser-assets-and-packaging-notices.md
@@ -48,12 +49,12 @@ references:
   - docs/requirements/non-functional/NFR-03.002.md
   - docs/requirements/non-functional/NFR-05.001.md
   - docs/requirements/non-functional/NFR-06.002.md
+priority: high
 ordinal: 41610
 ---
 
-## Description
 
-<!-- SECTION:DESCRIPTION:BEGIN -->
+## Description
 **Why.** The delivery has landed, but the package itself has never been verified against the accepted asset contract. `docs/packaging.md` and the eight `*-milestone-packaging-and-verification.md` pages now describe the new model (TASK-148), and `tests/browser_cli.rs`, `tests/browser_math_cli.rs`, `tests/browser_diagram_cli.rs`, and `tests/browser_shell_cli.rs` assert the served contract — yet no run has confirmed that the artifact produced by `scripts/build-deb.sh` actually contains the vendored KaTeX and Mermaid bytes, the four-paragraph copyright, and the current binary. The package sitting in the working tree proves the hazard is real: `papyrus_0.1.0_amd64.deb` is 1,284,160 B, built 2026-11-14, carrying a 4,197,544 B binary and the old 865 B copyright, because `scripts/build-deb.sh` reuses an existing `target/release/papyrus` and is run by hand. A verifier who trusts that file would certify a pre-KaTeX, pre-Mermaid package. ADR-0027 makes the package contents, notices, digests, and the 12 MiB budget part of the release contract; ADR-0025 and ADR-0026 make offline font delivery and the scoped diagram CSP part of the browser contract.
 
 **What.** Execute the packaging, asset, notices, CSP, and budget procedure against a freshly built `.deb` and record every measurement, then confirm from the installed package that the served markup satisfies the asset, width, and navigation contracts at the HTTP level. Rendering behaviour that needs a real browser belongs to TASK-150 (see the boundary section).
@@ -171,40 +172,32 @@ ordinal: 41610
 
 - `docs/packaging.md` §3.6 item 4 states "The build fails the budget check when `stat -c %s target/release/papyrus` exceeds 12,582,912 B". No such automated check exists: a search of `src/`, `tests/`, `scripts/`, `Cargo.toml`, and the configuration finds no 12 MiB assertion. The real behaviour is the documented release check recorded here. This is reported, not edited in this ticket (the page belongs to the packaging specification owner); either the sentence gains a test or it is corrected to "release check". Item 23 records the measurement either way.
 - For the record: whether the `.deb` should eventually gain a size budget is a release-owner decision, and ADR-0027 records none today; this ticket neither adds nor recommends one.
-<!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
-<!-- AC:BEGIN -->
-- [x] #1 dpkg-deb -c lists exactly /usr/bin/papyrus (0755) and /usr/share/doc/papyrus/copyright (0644) plus their directories, with no runtime asset directory, no packaged configuration file, and no man page; the packaged binary's size and SHA-256 equal the freshly built target/release/papyrus.
-- [x] #2 The packaged copyright is byte-identical to packaging/deb/usr/share/doc/papyrus/copyright and carries the Papyrus GPL-3.0-or-later statement plus exactly four Files: paragraphs — the project, KaTeX code MIT, KaTeX fonts OFL-1.1, and Mermaid MIT — with each licence identifier and its text.
-- [x] #3 Every one of the 26 embedded asset digests and byte counts matches src/browser/vendor/MANIFEST.md when recomputed over the bytes served by the packaged binary; the manifest test passes; every url( in a served stylesheet resolves to a served /assets/katex/fonts/*.woff2 sibling; and no served asset contains @import, a remote origin, or a source map.
-- [x] #4 The packaged binary is within the 12 MiB (12,582,912 B) ceiling, and the binary size, the .deb size and SHA-256, the copyright size, and the headroom are recorded in the ticket and in docs/packaging.md.
-- [x] #5 From the installed package, math pages link the KaTeX stylesheet and script exactly once and every font the stylesheet references is served 200 font/woff2 with no-store; a page without math links no KaTeX asset; and the served markup, with no script executed, already carries the record source text (math placeholder text, diagram pre, PlantUML note). Browser-observed rendering is TASK-150.
-- [x] #6 From the installed package, every shell page is capped (div class="app") and the board is full width (div class="app app--full"); every page ships the nav-toggle markup with no preset collapsed state and loads nav-state.js synchronously with a manifest-matching digest; the served CSS exposes app--full without a route for it. Browser-observed persistence across navigation and reload is TASK-150.
-- [x] #7 papyrus check runs from the installed binary and exits 0 with no findings on a clean corpus, and exits 4 naming one duplicate-id finding with both sorted locations on a duplicate-ID corpus, writing nothing in either run.
-- [x] #8 The packaged artifact needs no network access, no deprecated/ folder access, no new crate, and no new build step: the release build succeeds with --offline; Cargo.toml still declares only clap, serde, serde_json, and yaml_serde; no build.rs or vendor fetch script exists; and the offline run inside unshare -rn passes over loopback.
-- [x] #9 The Mermaid 11.17.2 bundle ships inside the package: /assets/mermaid/mermaid.min.js is served by the installed binary with 200, text/javascript; charset=utf-8, no-store, the manifest digest and 3,572,661 bytes; it is linked exactly once and only on pages with a renderable mermaid figure; the diagram CSP literal is emitted exactly for those pages and never on assets; and the copyright carries the Mermaid MIT section.
-<!-- AC:END -->
+- [x] dpkg-deb -c lists exactly /usr/bin/papyrus (0755) and /usr/share/doc/papyrus/copyright (0644) plus their directories, with no runtime asset directory, no packaged configuration file, and no man page; the packaged binary's size and SHA-256 equal the freshly built target/release/papyrus.
+- [x] The packaged copyright is byte-identical to packaging/deb/usr/share/doc/papyrus/copyright and carries the Papyrus GPL-3.0-or-later statement plus exactly four Files: paragraphs — the project, KaTeX code MIT, KaTeX fonts OFL-1.1, and Mermaid MIT — with each licence identifier and its text.
+- [x] Every one of the 26 embedded asset digests and byte counts matches src/browser/vendor/MANIFEST.md when recomputed over the bytes served by the packaged binary; the manifest test passes; every url( in a served stylesheet resolves to a served /assets/katex/fonts/*.woff2 sibling; and no served asset contains @import, a remote origin, or a source map.
+- [x] The packaged binary is within the 12 MiB (12,582,912 B) ceiling, and the binary size, the .deb size and SHA-256, the copyright size, and the headroom are recorded in the ticket and in docs/packaging.md.
+- [x] From the installed package, math pages link the KaTeX stylesheet and script exactly once and every font the stylesheet references is served 200 font/woff2 with no-store; a page without math links no KaTeX asset; and the served markup, with no script executed, already carries the record source text (math placeholder text, diagram pre, PlantUML note). Browser-observed rendering is TASK-150.
+- [x] From the installed package, every shell page is capped (div class="app") and the board is full width (div class="app app--full"); every page ships the nav-toggle markup with no preset collapsed state and loads nav-state.js synchronously with a manifest-matching digest; the served CSS exposes app--full without a route for it. Browser-observed persistence across navigation and reload is TASK-150.
+- [x] papyrus check runs from the installed binary and exits 0 with no findings on a clean corpus, and exits 4 naming one duplicate-id finding with both sorted locations on a duplicate-ID corpus, writing nothing in either run.
+- [x] The packaged artifact needs no network access, no deprecated/ folder access, no new crate, and no new build step: the release build succeeds with --offline; Cargo.toml still declares only clap, serde, serde_json, and yaml_serde; no build.rs or vendor fetch script exists; and the offline run inside unshare -rn passes over loopback.
+- [x] The Mermaid 11.17.2 bundle ships inside the package: /assets/mermaid/mermaid.min.js is served by the installed binary with 200, text/javascript; charset=utf-8, no-store, the manifest digest and 3,572,661 bytes; it is linked exactly once and only on pages with a renderable mermaid figure; the diagram CSP literal is emitted exactly for those pages and never on assets; and the copyright carries the Mermaid MIT section.
 
 ## Definition of Done
-<!-- DOD:BEGIN -->
 - [x] #1 Every numbered checklist item (1-41) is executed and each has its command, exit status, and observed output or measurement recorded in the ticket notes.
 - [x] #2 A dated TASK-149 evidence section exists in docs/packaging.md with the environment, package artifact, contents, notice, digest, CSP, width and navigation results, and the budget arithmetic; earlier dated sections and the live procedure are unchanged.
 - [x] #3 All sizes are recorded: built and packaged binary bytes (equal), .deb bytes and SHA-256, copyright bytes, KaTeX and Mermaid asset weights, and the byte and MiB headroom against 12,582,912 B.
 - [x] #4 No packaging regression: exactly two packaged files with modes 0755 and 0644, no asset directory, no configuration file, no man page, and a copyright file identical to the repository copy with all four Files: paragraphs.
 - [x] #5 Any failed, skipped, or unavailable item is reported with its evidence and its owning task; an unavailable capability is recorded as a limitation with the named fallback, never as a pass, and no criterion is waived.
 - [x] #6 The browser-only observations (rendered fonts, rendered diagrams, hostile fixtures, nav persistence, JavaScript-disabled operation, the three-browser matrix) are handed to TASK-150 by reference and are not claimed as verified here.
-<!-- DOD:END -->
 
-## Implementation Notes
 
-<!-- SECTION:NOTES:BEGIN -->
+## Notes
 All 41 checklist items executed on Debian Forky amd64 with rustc 1.99.1. Build: cargo build --release, 1044 tests pass, clippy and fmt clean. Package: .deb 2,379,712 B containing exactly two files (papyrus 0755 and copyright 0644, 8,000 B), packaged binary byte-identical to the built one (8,323,136 B, headroom 4,259,776 B under the 12 MiB ceiling). Notices: copyright identical to the repo copy with four Files paragraphs and all licence texts. Assets: 26 manifest rows equal 26 table entries; 26/26 digests verified on disk and over HTTP with correct status, bytes, Content-Type, Content-Length and no-store; HEAD empty; 404 and 405 edges correct; offline scans pass; 60 url() values resolve to 20 woff2 with the 40 woff/ttf variants 404 by design; asset module filesystem-free. CSP: strict on 12 response classes, diagram on exactly the 3 renderable-mermaid pages including a mixed math+diagram page, none on assets or JSON, script-src self everywhere. Installed package: two-file tree with no runtime asset dir, config or man page; 20/20 fonts served offline; math-free pages carry zero KaTeX; Mermaid bundle conditional and ordered after KaTeX before app.js; source text present with JS off; board-only full width; nav contract on 11/11 pages with nav-state.js; check exits 0 clean and 4 on a duplicate-ID corpus with an unchanged project hash. Absence proofs: works with an empty cwd, no man page, outbound network blocked while loopback works, cargo build --offline succeeds, no new crate or build step, no deprecated/ path. No defect found in the packaged artifact.
-<!-- SECTION:NOTES:END -->
+
 
 ## Comments
-
-<!-- COMMENTS:BEGIN -->
 author: @rust-dev
 created: 2026-11-16T09:42:00Z
 
@@ -222,10 +215,8 @@ created: 2026-11-16T09:47:00Z
 Measurement provenance note: a concurrent session advanced HEAD from 676128c to cc20dd0 during the run and, at 10:43 CET, started uncommitted page-level diagram-numbering work in src/browser/math.rs, src/browser/render.rs, and tests/browser_diagram_cli.rs (another ticket). The recorded binary and .deb SHA-256 values describe the artifact built at 10:29-10:30 CET from the then-current tree; they will not reproduce after a rebuild. cargo test on the later tree at 10:46 CET passed 1,046 / 0 failed / 23 ignored. The HTTP-level contract evidence (CSP, assets, width, navigation, check) is unaffected by that client-side change.
 
 ---
-<!-- COMMENTS:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 The release package was verified end to end against the delivered contract without finding a defect: the .deb contains exactly the binary and one copyright document, the packaged binary matches the built one byte for byte, every bundled asset digest matches the manifest on disk and over HTTP, the offline scans pass, both content-security-policy classes appear on exactly the right response classes, and the release binary stays at 7.94 MiB of the 12 MiB ceiling. An isolated install confirmed fonts load offline, math-free pages request nothing, the Mermaid bundle is linked only on diagram pages, the board alone is full width, the navigation contract holds on every page, and papyrus check reports 0 on a clean corpus and 4 on a corpus with duplicate IDs without changing a byte. Two findings are recorded: the packaging prose that implied an automated budget gate is reconciled, and the package grows slightly more than the earlier estimate, which no budget governs.
-<!-- SECTION:FINAL_SUMMARY:END -->
