@@ -306,7 +306,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) {
     let api = request.target.path.starts_with("/api/");
 
     let response = match validate_host(&request, state) {
-        Ok(host_header) => match validate_origin(&request, &host_header) {
+        Ok(_host_header) => match validate_origin(&request, state) {
             Ok(()) => handle_request(request, state),
             Err(error) => error_response(error.status, api, state),
         },
@@ -361,30 +361,85 @@ fn validate_host(request: &Request, state: &ServerState) -> Result<String, HttpE
     }
 }
 
-fn validate_origin(request: &Request, host_header: &str) -> Result<(), HttpError> {
+fn validate_origin(request: &Request, state: &ServerState) -> Result<(), HttpError> {
     if request.method != Method::Post {
         return Ok(());
     }
     let Some(origin) = request.header("origin") else {
         return Ok(());
     };
-    let origin = origin.to_ascii_lowercase();
-    let Some(rest) = origin.strip_prefix("http://") else {
+    let origin = origin.trim().to_ascii_lowercase();
+    if origin == "null" {
+        return Err(HttpError::new(403));
+    }
+    // Parse scheme.
+    let (scheme, rest) = if let Some(r) = origin.strip_prefix("http://") {
+        ("http", r)
+    } else if let Some(r) = origin.strip_prefix("https://") {
+        ("https", r)
+    } else {
         return Err(HttpError::new(403));
     };
-    let host = host_header.to_ascii_lowercase();
-    if rest == host {
+    // Reject any path, query, fragment, or userinfo component.
+    if rest.contains('/') || rest.contains('?') || rest.contains('#') || rest.contains('@') {
+        return Err(HttpError::new(403));
+    }
+    if rest.is_empty() {
+        return Err(HttpError::new(403));
+    }
+    // Split host and port.
+    let (host_raw, port) = if rest.starts_with('[') {
+        // IPv6 bracketed form: [host]:port or [host]
+        let Some(close) = rest.find(']') else {
+            return Err(HttpError::new(403));
+        };
+        let host = &rest[..=close];
+        let after = &rest[close + 1..];
+        let port = if after.is_empty() {
+            if scheme == "https" { 443 } else { 80 }
+        } else if let Some(p) = after.strip_prefix(':') {
+            match p.parse::<u16>() {
+                Ok(n) => n as u32,
+                Err(_) => return Err(HttpError::new(403)),
+            }
+        } else {
+            return Err(HttpError::new(403));
+        };
+        (host.to_string(), port)
+    } else if let Some((h, p)) = rest.rsplit_once(':') {
+        // Could be host:port or an unbracketed IPv6 (no port). Treat as port only
+        // if the part after the colon is a valid port number.
+        if p.chars().all(|c| c.is_ascii_digit()) && !p.is_empty() {
+            let port: u32 = match p.parse() {
+                Ok(n) => n,
+                Err(_) => return Err(HttpError::new(403)),
+            };
+            (h.to_string(), port)
+        } else {
+            // Unbracketed IPv6 without port.
+            (rest.to_string(), if scheme == "https" { 443 } else { 80 })
+        }
+    } else {
+        (rest.to_string(), if scheme == "https" { 443 } else { 80 })
+    };
+
+    // Normalize IPv6 host to bracketed form.
+    let host_norm = if host_raw.starts_with('[') {
+        host_raw.to_string()
+    } else if host_raw.contains(':') {
+        format!("[{}]", host_raw)
+    } else {
+        host_raw.to_string()
+    };
+
+    let candidate = format!("{}:{}", host_norm, port);
+    if allowed_host_values(state).contains(&candidate) {
         return Ok(());
     }
-    if request.version == http::Version::Http10 || request.version == http::Version::Http11 {
-        // The same host value that passed the Host check, allowing an omitted
-        // or explicit `:80` suffix for the default HTTP port.
-        if rest == format!("{}:80", host) {
-            return Ok(());
-        }
-        if let Some(stripped) = host.strip_suffix(":80")
-            && rest == stripped
-        {
+    // Also allow portless allowed entries when origin port is the default and the
+    // allowed set contains a portless form (port 80 case).
+    if port == 80 || port == 443 {
+        if allowed_host_values(state).contains(&host_norm) {
             return Ok(());
         }
     }
