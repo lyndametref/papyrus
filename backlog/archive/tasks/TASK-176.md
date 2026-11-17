@@ -2,7 +2,7 @@
 id: TASK-176
 title: "Add integration tests for quoted assignee and comparable list fields in Backlog.md import"
 created_date: '2026-11-17T11:00:05Z'
-updated_date: '2026-11-17T11:04:01Z'
+updated_date: '2026-11-17T18:47:29Z'
 labels:
   - bug
 references:

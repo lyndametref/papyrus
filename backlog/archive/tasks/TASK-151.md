@@ -2,7 +2,7 @@
 id: TASK-151
 title: "Design tests for quoted assignee metadata in Backlog.md import"
 created_date: '2026-11-16T19:34:33Z'
-updated_date: '2026-11-17T10:32:14Z'
+updated_date: '2026-11-17T18:47:28Z'
 labels:
   - bug
 references:

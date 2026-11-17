@@ -2,7 +2,7 @@
 id: TASK-156
 title: "Refine the browser origin validation fix"
 created_date: '2026-11-16T20:02:21Z'
-updated_date: '2026-11-17T14:21:27Z'
+updated_date: '2026-11-17T18:47:29Z'
 labels:
   - bug
 references:

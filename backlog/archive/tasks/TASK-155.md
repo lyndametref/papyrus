@@ -2,7 +2,7 @@
 id: TASK-155
 title: "Design tests for browser POST origin validation"
 created_date: '2026-11-16T20:02:19Z'
-updated_date: '2026-11-17T14:18:39Z'
+updated_date: '2026-11-17T18:47:29Z'
 labels:
   - bug
 references:

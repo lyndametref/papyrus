@@ -2,7 +2,7 @@
 id: TASK-153
 title: "Fix Backlog.md import to emit Papyrus-canonical quoted assignee metadata and repair affected task files"
 created_date: '2026-11-16T19:34:36Z'
-updated_date: '2026-11-17T10:50:07Z'
+updated_date: '2026-11-17T18:47:28Z'
 labels:
   - bug
 references:

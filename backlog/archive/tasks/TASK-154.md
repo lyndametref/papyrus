@@ -2,7 +2,7 @@
 id: TASK-154
 title: "Verify MS-023 Backlog.md import metadata fix"
 created_date: '2026-11-16T19:34:37Z'
-updated_date: '2026-11-17T11:07:38Z'
+updated_date: '2026-11-17T18:47:28Z'
 labels:
   - bug
 references:
