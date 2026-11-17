@@ -233,13 +233,16 @@ fn run_backlog(
             };
 
             // Read content.
-            let content = match fs::read_to_string(&path) {
+            let raw_content = match fs::read_to_string(&path) {
                 Ok(c) => c,
                 Err(e) => {
                     skipped.push((path.clone(), format!("cannot read file: {}", e)));
                     continue;
                 }
             };
+            // Translation boundary: Backlog.md may contain unquoted @-prefixed
+            // assignee entries; quote them so the YAML parses.
+            let content = quote_at_prefixed_scalars(&raw_content);
 
             // Parse front matter + document.
             let fm = match frontmatter::parse(&content) {
@@ -1162,6 +1165,42 @@ fn collect_existing_titles(
         }
     }
     out
+}
+
+// ---------- input normalization ----------
+
+fn quote_at_prefixed_scalars(content: &str) -> String {
+    let Some((is, ie, _)) = frontmatter::find_block(content) else {
+        return content.to_string();
+    };
+    let prefix = &content[..is];
+    let inner = &content[is..ie];
+    let suffix = &content[ie..];
+    let mut new_inner = String::with_capacity(inner.len());
+    for line in inner.split_inclusive('\n') {
+        let (line_no_nl, nl) = if let Some(s) = line.strip_suffix('\n') {
+            (s, "\n")
+        } else {
+            (line, "")
+        };
+        new_inner.push_str(&quote_at_list_item(line_no_nl));
+        new_inner.push_str(nl);
+    }
+    format!("{}{}{}", prefix, new_inner, suffix)
+}
+
+fn quote_at_list_item(line: &str) -> String {
+    let trimmed = line.trim_start();
+    let indent_len = line.len() - trimmed.len();
+    let indent = &line[..indent_len];
+    let Some(rest) = trimmed.strip_prefix("- ") else {
+        return line.to_string();
+    };
+    let val = rest.trim();
+    if val.starts_with('@') && !val.starts_with('\'') && !val.starts_with('"') {
+        return format!("{}- '{}'", indent, val.replace('\'', "''"));
+    }
+    line.to_string()
 }
 
 // ---------- body conversion ----------
