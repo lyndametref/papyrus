@@ -111,17 +111,17 @@ impl RecordDescriptor {
     /// Canonical lifecycle archive location of a backlog family, if the
     /// family has one.
     ///
-    /// Tasks are the only backlog family with a lifecycle archive location.
-    /// Milestones are closed in place and carry `ArchivePolicy::None`; their
-    /// legacy `<backlog_directory>/archive/milestones/` folder is read/import
-    /// only and is exposed by [`Self::resolve_read_import_directory`].
+    /// Tasks and milestones have a lifecycle archive location under
+    /// `<backlog_directory>/archive/`. For milestones the folder is also the
+    /// legacy read/import location exposed by
+    /// [`Self::resolve_read_import_directory`] (ADR-032).
     pub fn resolve_archive_directory(
         &self,
         cfg: &Config,
         project_dir: &std::path::Path,
     ) -> Option<Result<std::path::PathBuf, AppError>> {
         match self.record_type {
-            "task" => {
+            "task" | "milestone" => {
                 let raw = project_dir
                     .join(&cfg.backlog_directory)
                     .join("archive")
@@ -134,10 +134,10 @@ impl RecordDescriptor {
 
     /// Read/import-only archive location of a family, if it has one.
     ///
-    /// `<backlog_directory>/archive/milestones/` remains readable and is the
-    /// one-way Backlog.md import destination (ADR-0023 decisions 2 and 4).
-    /// It is not a lifecycle archive destination: no milestone command moves a
-    /// record into or out of it, and no command except the import creates it.
+    /// `<backlog_directory>/archive/milestones/` is the one-way Backlog.md
+    /// import destination and the milestone lifecycle archive destination
+    /// (ADR-032). It remains readable by list, view, search, and browser
+    /// resolution.
     pub fn resolve_read_import_directory(
         &self,
         cfg: &Config,
@@ -157,11 +157,8 @@ impl RecordDescriptor {
 
     /// Canonical archived location of a family, if the family has one.
     ///
-    /// Document descriptors resolve to `<active dir>/archived` and task
-    /// descriptors resolve to their archive location. Milestones have no
-    /// archived lifecycle location (`ArchivePolicy::None`): their legacy
-    /// `<backlog_directory>/archive/milestones/` folder is read/import only
-    /// and is exposed by [`Self::resolve_read_import_directory`]. Decision and
+    /// Document descriptors resolve to `<active dir>/archived`; tasks and
+    /// milestones resolve to their lifecycle archive location. Decision and
     /// other families have no archived location.
     pub fn resolve_archived_directory(
         &self,
@@ -169,8 +166,7 @@ impl RecordDescriptor {
         project_dir: &std::path::Path,
     ) -> Option<Result<std::path::PathBuf, AppError>> {
         match self.record_type {
-            "task" => self.resolve_archive_directory(cfg, project_dir),
-            "milestone" => None,
+            "task" | "milestone" => self.resolve_archive_directory(cfg, project_dir),
             _ => {
                 if self.doc_type_key.is_some() {
                     let active = self.resolve_directory(cfg, project_dir).ok()?;
@@ -205,7 +201,11 @@ impl RecordDescriptor {
     pub fn declared_statuses(&self, cfg: &crate::config::Config) -> Vec<String> {
         match self.record_type {
             "task" => cfg.statuses.clone(),
-            "milestone" => vec!["open".to_string(), "closed".to_string()],
+            "milestone" => vec![
+                "open".to_string(),
+                "closed".to_string(),
+                "archived".to_string(),
+            ],
             "release" => vec!["planned".to_string(), "released".to_string()],
             _ if self.doc_type_key.is_some() => self
                 .doc_type_key
@@ -358,28 +358,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn milestone_has_no_lifecycle_archive_location() {
+    fn milestone_has_a_lifecycle_archive_location() {
         let cfg = Config::default();
         let project = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".tmp");
         let milestone = descriptor_for("milestone").expect("milestone");
 
-        assert!(
-            milestone
-                .resolve_archive_directory(&cfg, &project)
-                .is_none(),
-            "milestones have no lifecycle archive location"
-        );
-        assert!(
-            milestone
-                .resolve_archived_directory(&cfg, &project)
-                .is_none(),
-            "the record layer must not expose a milestone archive destination"
-        );
+        let archive = milestone
+            .resolve_archive_directory(&cfg, &project)
+            .expect("milestones have a lifecycle archive location")
+            .expect("milestone archive stays in the project");
+        assert!(archive.ends_with("backlog/archive/milestones"));
+        let archived = milestone
+            .resolve_archived_directory(&cfg, &project)
+            .expect("milestones expose an archived location")
+            .expect("milestone archive stays in the project");
+        assert_eq!(archive, archived);
         let import = milestone
             .resolve_read_import_directory(&cfg, &project)
             .expect("milestone has a read/import location")
             .expect("read/import location stays in the project");
-        assert!(import.ends_with("backlog/archive/milestones"));
+        assert_eq!(import, archive);
 
         let dirs = milestone.resolve_read_directories(&cfg, &project);
         assert_eq!(dirs.len(), 3);

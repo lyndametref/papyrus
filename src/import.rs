@@ -615,8 +615,9 @@ fn run_backlog(
 
         // dest path
         let dir = if rec.archived {
-            // Milestones have no lifecycle archive location; the one-way
-            // import is the only writer of the read/import archive folder.
+            // Archived milestone records import into the shared archive
+            // folder, which is also the milestone lifecycle archive
+            // destination (ADR-032).
             ms_desc
                 .resolve_read_import_directory(&cfg, &ctx.project_dir)
                 .and_then(|r| r.ok())
