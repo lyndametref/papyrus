@@ -59,6 +59,11 @@ pub enum MilestoneCmd {
         /// Milestone ID.
         id: String,
     },
+    /// Archive a milestone (`open -> closed -> archived`).
+    Archive {
+        /// Milestone ID.
+        id: String,
+    },
     /// Permanently delete a milestone.
     Delete {
         id: String,
@@ -118,6 +123,7 @@ pub fn run(ctx: &Context, cmd: MilestoneCmd) -> Result<crate::CommandOutput, App
             &reference,
         ),
         MilestoneCmd::Close { id } => close(ctx, &id),
+        MilestoneCmd::Archive { id } => archive(ctx, &id),
         MilestoneCmd::Delete { id, force } => delete(ctx, &id, force),
     }
 }
@@ -762,6 +768,99 @@ pub fn close(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErr
     let json = ctx
         .json
         .then(|| serde_json::json!({"id": id, "status": "closed"}));
+    Ok(crate::CommandOutput {
+        text: id,
+        json,
+        ..Default::default()
+    })
+}
+
+/// Archive a milestone: the only transition to `archived`.
+///
+/// An open milestone is closed first and then archived in a single write; a
+/// closed milestone is archived directly. An already archived milestone is a
+/// no-op success. Any other stored status is rejected with a validation
+/// outcome (exit 4) before any write, leaving the file untouched. The record is
+/// moved to the milestone lifecycle archive folder with the shared atomic
+/// writer, preserving title, description, labels, references, and release
+/// assignment.
+pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
+    let requested = sanitize_text(id_raw)?;
+    let cfg = load_config(ctx)?;
+    let path = resolve_milestone_path(ctx, &cfg, &requested)?;
+    reject_milestone_write_conflict(ctx, &path)?;
+    let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let doc = crate::record::document::parse(&content)?;
+    let id = doc
+        .front_matter
+        .as_ref()
+        .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, "id"))
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or(requested);
+    let current = doc
+        .front_matter
+        .as_ref()
+        .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, "status"))
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "open".to_string());
+
+    match current.as_str() {
+        "archived" => {
+            let json = ctx
+                .json
+                .then(|| serde_json::json!({"id": id, "status": "archived"}));
+            return Ok(crate::CommandOutput {
+                text: id,
+                json,
+                ..Default::default()
+            });
+        }
+        "open" | "closed" => {}
+        _ => {
+            return Err(AppError::Validation(format!(
+                "milestone {} has status {}; only open, closed, or archived milestones can be archived",
+                id, current
+            )));
+        }
+    }
+
+    let now = crate::record::frontmatter::utc_now();
+    let new_content = crate::record::patch::apply_patch(
+        &doc,
+        &[
+            crate::record::patch::PatchOp::SetFrontMatter("status".into(), "archived".into()),
+            crate::record::patch::PatchOp::SetFrontMatter("updated_date".into(), now),
+        ],
+    )?;
+
+    let archive_dir = milestone_descriptor()
+        .resolve_archive_directory(&cfg, &ctx.project_dir)
+        .ok_or_else(|| {
+            AppError::Runtime("milestone has no lifecycle archive location".to_string())
+        })??;
+    fs::create_dir_all(&archive_dir).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let archive_dir = Context::ensure_within(&ctx.project_dir, &archive_dir)?;
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?
+        .to_owned();
+    let dest = Context::ensure_within(&ctx.project_dir, &archive_dir.join(&file_name))?;
+
+    if dest == path {
+        let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
+        crate::record::store::write_atomic(ctx, &safe_write, &new_content)?;
+    } else {
+        if dest.exists() {
+            return Err(AppError::Validation(format!("already archived: {}", id)));
+        }
+        crate::record::store::write_atomic(ctx, &dest, &new_content)?;
+        fs::remove_file(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    }
+
+    let json = ctx
+        .json
+        .then(|| serde_json::json!({"id": id, "status": "archived"}));
     Ok(crate::CommandOutput {
         text: id,
         json,

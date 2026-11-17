@@ -495,18 +495,6 @@ pub fn relocate_if_archived(ctx: &Context, path: &Path) -> Result<PathBuf, Reloc
     let archived_dir = match desc.resolve_archived_directory(&cfg, &ctx.project_dir) {
         Some(Ok(dir)) => dir,
         Some(Err(e)) => return Err(RelocateError::Other(e)),
-        None if desc.record_type == "milestone" => {
-            // Milestones have no lifecycle archive location (ADR-0017
-            // constraint 3, ADR-0023 decisions 2 and 4). A stored `archived`
-            // value is outside the milestone vocabulary, so preserve the
-            // record in place and report the condition instead of moving it or
-            // creating a folder.
-            eprintln!(
-                "warning: milestone has legacy status 'archived'; leaving record in place: {}",
-                safe.display()
-            );
-            return Ok(safe);
-        }
         None => {
             return Err(RelocateError::Other(AppError::Validation(format!(
                 "record type {} has no archived location",
@@ -1014,7 +1002,7 @@ mod tests {
     }
 
     #[test]
-    fn archived_milestone_in_active_folder_is_preserved_by_read_paths() {
+    fn archived_milestone_in_active_folder_is_relocated_by_read_paths() {
         let dir = tmpdir("milestone-archived-preserved");
         let c = ctx(&dir);
         fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
@@ -1027,24 +1015,21 @@ mod tests {
             .unwrap_or_default();
         let read_dirs = desc.resolve_read_directories(&cfg, &c.project_dir);
         let prefixes = desc.configured_prefixes(&cfg);
+        let archived = dir.join("backlog/archive/milestones/MS-001.md");
         let resolved =
             crate::record::resolve::resolve_in_dirs(&c, &read_dirs, "MS-001", &prefixes, false)
                 .expect("read path succeeds")
                 .expect("milestone resolves");
         assert_eq!(
-            resolved.path, path,
-            "the record must stay in the active folder"
+            resolved.path, archived,
+            "the archived record moves to the canonical archive folder"
         );
-        assert_eq!(fs::read_to_string(&path).unwrap(), content);
-        assert!(
-            !dir.join("backlog/archive/milestones").exists(),
-            "a read path must not create the milestone archive folder"
-        );
+        assert!(!path.exists(), "the active-folder copy is removed");
+        assert_eq!(fs::read_to_string(&archived).unwrap(), content);
 
-        let after = relocate_if_archived(&c, &path).expect("read-path relocation is a no-op");
-        assert_eq!(after, path);
-        assert_eq!(fs::read_to_string(&path).unwrap(), content);
-        assert!(!dir.join("backlog/archive/milestones").exists());
+        let after = relocate_if_archived(&c, &archived).expect("archived folder read is a no-op");
+        assert_eq!(after, archived);
+        assert_eq!(fs::read_to_string(&archived).unwrap(), content);
     }
 
     fn reassign_fixture(name: &str) -> (Context, std::path::PathBuf) {

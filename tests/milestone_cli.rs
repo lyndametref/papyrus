@@ -329,17 +329,15 @@ fn milestone_close_error_paths() {
     assert!(String::from_utf8_lossy(&out.stderr).contains("not found: MS-999"));
 
     // Removed milestone verbs are unknown subcommands.
-    for verb in ["archive", "restore"] {
-        let out = bin()
-            .args(["--dir", p, "milestone", verb, "MS-001"])
-            .output()
-            .unwrap();
-        assert_eq!(out.status.code(), Some(2), "milestone {verb} must exit 2");
-    }
+    let out = bin()
+        .args(["--dir", p, "milestone", "restore", "MS-001"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2), "milestone restore must exit 2");
     let help =
         String::from_utf8(bin().args(["milestone", "--help"]).output().unwrap().stdout).unwrap();
     assert!(help.contains("close"), "help: {help}");
-    assert!(!help.contains("archive"), "help: {help}");
+    assert!(help.contains("archive"), "help: {help}");
     assert!(!help.contains("restore"), "help: {help}");
 
     let _ = fs::remove_dir_all(&d);

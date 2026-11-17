@@ -1975,7 +1975,7 @@ const DECISION_STATES: &[&str] = &[
     "deprecated",
     "superseded",
 ];
-const MILESTONE_STATES: &[&str] = &["open", "closed"];
+const MILESTONE_STATES: &[&str] = &["open", "closed", "archived"];
 const RELEASE_STATES: &[&str] = &["planned", "released"];
 const MOCKUP_STATES: &[&str] = &["pending", "approved", "archived"];
 
@@ -2075,6 +2075,7 @@ const MILESTONE_VERBS: &[Verb] = &[
     Verb::View,
     Verb::Edit,
     Verb::Close,
+    Verb::Archive,
     Verb::Delete,
 ];
 const RELEASE_VERBS: &[Verb] = &[
@@ -2124,11 +2125,11 @@ const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
         content: ContentModel::Typed(&MILESTONE_SCHEMA),
         frontmatter_status: Some("status"),
         frontmatter_extra: &["release"],
-        // The milestone lifecycle is `open -> closed` in place (ADR-0017
-        // constraint 3, ADR-0022 decision 5). The legacy milestone archive
-        // folder under the backlog directory is a read/import location only
-        // (ADR-0023 decisions 2 and 4).
-        archive: ArchivePolicy::None,
+        // The milestone lifecycle is `open -> closed -> archived` (ADR-032).
+        // `archive` closes an open milestone if needed, then moves the file to
+        // the backlog archive milestones folder, which is both the lifecycle
+        // archive destination and the legacy read/import location.
+        archive: FRONTMATTER_ARCHIVE,
         create_options: NO_CREATE_OPTIONS,
         record: None,
     },
@@ -3116,12 +3117,14 @@ mod tests {
                 Verb::View,
                 Verb::Edit,
                 Verb::Close,
+                Verb::Archive,
                 Verb::Delete
             ],
-            "milestone verbs are exactly create, list, view, edit, close, delete"
+            "milestone verbs are exactly create, list, view, edit, close, archive, delete"
         );
         assert!(milestone.has_verb(Verb::Close));
-        for absent in [Verb::Archive, Verb::Restore, Verb::Status] {
+        assert!(milestone.has_verb(Verb::Archive));
+        for absent in [Verb::Restore, Verb::Status] {
             assert!(
                 !milestone.has_verb(absent),
                 "milestone must not expose {}",
@@ -3507,8 +3510,8 @@ mod tests {
         );
         assert_eq!(
             registry.descriptor("milestone").unwrap().archive_policy,
-            ArchivePolicy::None,
-            "milestones are closed in place; the legacy archive folder is read/import-only"
+            FRONTMATTER_ARCHIVE,
+            "milestones archive to the backlog archive milestones folder"
         );
         assert_eq!(
             registry.descriptor("release").unwrap().archive_policy,
