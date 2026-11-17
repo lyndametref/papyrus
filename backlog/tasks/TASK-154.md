@@ -2,12 +2,12 @@
 id: TASK-154
 title: "Verify MS-023 Backlog.md import metadata fix"
 created_date: '2026-11-16T19:34:37Z'
-updated_date: '2026-11-16T19:34:37Z'
+updated_date: '2026-11-17T10:50:11Z'
 labels:
   - bug
 references:
   - RE-001
-status: ToDo
+status: In-Progress
 assignee:
   - quality-gatekeeper
 milestone: MS-023
