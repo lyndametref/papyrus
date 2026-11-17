@@ -370,6 +370,20 @@ fn validate_origin(request: &Request, state: &ServerState) -> Result<(), HttpErr
     };
     let origin = origin.trim().to_ascii_lowercase();
     if origin == "null" {
+        // Browsers may send `Origin: null` for same-origin navigational POSTs
+        // (e.g. form submissions). Trust the browser-set Sec-Fetch-Site hint,
+        // which cannot be forged by page script, to admit those while keeping
+        // cross-site `null` origins forbidden.
+        let same_site = request
+            .header("sec-fetch-site")
+            .map(|v| {
+                let v = v.trim().to_ascii_lowercase();
+                v == "same-origin" || v == "same-site"
+            })
+            .unwrap_or(false);
+        if same_site {
+            return Ok(());
+        }
         return Err(HttpError::new(403));
     }
     // Parse scheme.
