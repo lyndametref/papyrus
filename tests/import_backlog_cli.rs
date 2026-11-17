@@ -584,3 +584,163 @@ fn status_mismatch_preserved() {
             || stdout.contains("does not match a configured status")
     );
 }
+
+fn make_at_source(d: &std::path::Path) {
+    let src = d.join("srcproj");
+    fs::create_dir_all(src.join("backlog/tasks")).unwrap();
+    fs::create_dir_all(src.join("backlog/milestones")).unwrap();
+
+    let task1 = r#"---
+id: task-1
+title: At Assignee Task
+status: ToDo
+assignee:
+  - @rust-dev
+  - @qa
+created_date: '2026-01-01T00:00:00Z'
+updated_date: '2026-01-02T00:00:00Z'
+labels:
+  - l1
+  - l2
+milestone: m-1
+dependencies:
+  - task-2
+references:
+  - ref.md
+documentation:
+  - doc.md
+type: task
+ordinal: 7
+---
+## Description
+desc
+"#;
+    fs::write(
+        src.join("backlog/tasks/task-1 - At Assignee Task.md"),
+        task1,
+    )
+    .unwrap();
+
+    let task2 = r#"---
+id: task-2
+title: Dep Task
+status: ToDo
+assignee: []
+created_date: '2026-01-03T00:00:00Z'
+updated_date: '2026-01-03T00:00:00Z'
+---
+"#;
+    fs::write(src.join("backlog/tasks/task-2.md"), task2).unwrap();
+
+    let ms1 = r#"---
+id: m-1
+title: Source Milestone
+created_date: '2026-01-06T00:00:00Z'
+updated_date: '2026-01-07T00:00:00Z'
+---
+"#;
+    fs::write(
+        src.join("backlog/milestones/m-1 - Source Milestone.md"),
+        ms1,
+    )
+    .unwrap();
+}
+
+#[test]
+fn import_quoted_assignee_and_list_fields_survive() {
+    let d = tmpdir("quoted_assignee");
+    make_at_source(&d);
+    let src = d.join("srcproj");
+    let tg = d.join("tg");
+    init(&tg);
+    let out = bin()
+        .args([
+            "--dir",
+            tg.to_str().unwrap(),
+            "import",
+            "backlog",
+            "--from",
+            src.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let p = tg.join("backlog/tasks/TASK-001.md");
+    let c = fs::read_to_string(&p).unwrap();
+    assert!(c.contains("assignee:\n  - '@rust-dev'"), "got: {}", c);
+    assert!(c.contains("  - '@qa'"), "got: {}", c);
+    assert!(c.contains("labels:\n  - l1"), "got: {}", c);
+    assert!(c.contains("  - l2"), "got: {}", c);
+    assert!(c.contains("dependencies:\n  - TASK-002"), "got: {}", c);
+    assert!(c.contains("documentation:\n  - doc.md"), "got: {}", c);
+    assert!(c.contains("references:\n  - ref.md"), "got: {}", c);
+
+    // round-trip via task view
+    let out = bin()
+        .args(["--dir", tg.to_str().unwrap(), "task", "view", "TASK-001"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v = String::from_utf8_lossy(&out.stdout);
+    assert!(v.contains("@rust-dev"), "got: {}", v);
+    assert!(v.contains("@qa"), "got: {}", v);
+    assert!(v.contains("TASK-002"), "got: {}", v);
+    assert!(v.contains("doc.md"), "got: {}", v);
+}
+
+#[test]
+fn import_empty_assignee_list_stays_empty() {
+    let d = tmpdir("empty_assignee");
+    // minimal source with empty assignee
+    let src = d.join("srcproj");
+    fs::create_dir_all(src.join("backlog/tasks")).unwrap();
+    let task = r#"---
+id: task-1
+title: Empty Assignee Task
+status: ToDo
+assignee: []
+created_date: '2026-01-01T00:00:00Z'
+updated_date: '2026-01-02T00:00:00Z'
+---
+"#;
+    fs::create_dir_all(src.join("backlog/tasks")).unwrap();
+    fs::write(src.join("backlog/tasks/task-1.md"), task).unwrap();
+    let tg = d.join("tg");
+    init(&tg);
+    let out = bin()
+        .args([
+            "--dir",
+            tg.to_str().unwrap(),
+            "import",
+            "backlog",
+            "--from",
+            src.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let c = fs::read_to_string(tg.join("backlog/tasks/TASK-001.md")).unwrap();
+    assert!(c.contains("assignee: []"), "got: {}", c);
+    let out = bin()
+        .args(["--dir", tg.to_str().unwrap(), "task", "view", "TASK-001"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(String::from_utf8_lossy(&out.stdout).contains("assignee: []"));
+}
