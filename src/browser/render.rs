@@ -516,32 +516,6 @@ fn member_list(members: &[Record]) -> String {
     format!("<ul class=\"req-list\">{}</ul>", items)
 }
 
-fn form_label(record: &Record) -> String {
-    if record.is_group {
-        return "Group".to_string();
-    }
-    if record.is_requirement() {
-        return "Requirement".to_string();
-    }
-    match record.handler() {
-        Some(TypedHandler::Requirement(_)) => "Requirement".to_string(),
-        Some(TypedHandler::Task) => "Task".to_string(),
-        Some(TypedHandler::Milestone) => "Milestone".to_string(),
-        Some(TypedHandler::Release) => "Release".to_string(),
-        Some(TypedHandler::Decision) => "Decision".to_string(),
-        Some(TypedHandler::Glossary) => "Glossary term".to_string(),
-        Some(TypedHandler::UiSpec) => "UI specification".to_string(),
-        Some(TypedHandler::UiMockup) => "UI mockup".to_string(),
-        Some(TypedHandler::Rule) => "Business rule".to_string(),
-        Some(TypedHandler::Audit) => "Audit record".to_string(),
-        Some(TypedHandler::TechSpec) => "Technical specification".to_string(),
-        Some(TypedHandler::UseCase) => "Use case".to_string(),
-        Some(TypedHandler::TestCase) => "Test case".to_string(),
-        Some(TypedHandler::TestReport) => "Test report".to_string(),
-        None => "Document".to_string(),
-    }
-}
-
 /// Read-only status cell, immediately before the ID.
 fn row_status(record: &Record) -> String {
     format!(
@@ -1067,6 +1041,7 @@ pub fn view_page(
     related_release: Option<&Record>,
     resolved_dependencies: &[Option<Record>],
     resolved_refs: &[Option<Record>],
+    dependents: &[Record],
     cfg: &Config,
     chrome: Chrome<'_>,
 ) -> RecordPage {
@@ -1540,11 +1515,39 @@ pub fn view_page(
         }
         details.push_str("</ul></details>");
     }
-    let form_line = format!(
-        "<p class=\"record-meta\">{}</p>",
-        escape(&form_label(record))
-    );
-    content = format!("{}{}", form_line, content);
+    if !dependents.is_empty() {
+        details.push_str(&format!(
+            "<details><summary>Dependents ({})</summary><ul class=\"req-list\">",
+            dependents.len()
+        ));
+        for dep in dependents {
+            details.push_str(&format!(
+                "<li><a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a></li>",
+                escape(&dep.id),
+                escape(&dep.id),
+                escape(&dep.title)
+            ));
+        }
+        details.push_str("</ul></details>");
+    }
+    if record.is_requirement()
+        && !record.is_group
+        && let Some(group_id) = record.group_id.as_deref()
+    {
+        if let Some(group) = resolved_group {
+            details.push_str(&format!(
+                    "<details><summary>Owning group</summary><p><a href=\"/doc/{}\">{} {}</a></p></details>",
+                    escape(&group.id),
+                    escape(group_id),
+                    escape(&group.title)
+                ));
+        } else {
+            details.push_str(&format!(
+                    "<details><summary>Owning group</summary><p>{} <span class=\"unresolved\">(not an active group)</span></p></details>",
+                    escape(group_id)
+                ));
+        }
+    }
     if record.handler() == Some(TypedHandler::Decision) {
         content = format!(
             "<p class=\"record-meta\">Decision type: {}</p><p class=\"record-meta\">Status: {}</p>{}",
@@ -1553,12 +1556,12 @@ pub fn view_page(
             content
         );
     }
+    if record.handler() == Some(TypedHandler::UiMockup) {
+        content = format!("<p class=\"record-meta\">UI mockup</p>{}", content);
+    }
     let extra = record_view_extra_rows(record, &["created_date", "updated_date", "labels"]);
     if !extra.is_empty() {
         content.push_str(&extra);
-    }
-    if !details.is_empty() {
-        content.push_str(&details);
     }
     let taglist = if record.labels.is_empty() {
         String::new()
@@ -1581,34 +1584,90 @@ pub fn view_page(
     } else {
         String::new()
     };
+    let view = record_view(record);
+    let created = view
+        .as_ref()
+        .map(|v| v.value_text("created_date"))
+        .unwrap_or_default();
+    let created = if created.is_empty() {
+        "(none)".to_string()
+    } else {
+        created
+    };
+    let updated = view
+        .as_ref()
+        .map(|v| v.value_text("updated_date"))
+        .unwrap_or_default();
+    let updated = if updated.is_empty() {
+        "(none)".to_string()
+    } else {
+        updated
+    };
+    let status = escape(&record.status_text());
+    let id = escape(&record.id);
+    let title = escape(&record.title);
+    let details_html = if details.is_empty() {
+        String::new()
+    } else {
+        details.clone()
+    };
     let page_head = if record.handler() == Some(TypedHandler::Audit) {
         let audit_type = record.audit_type.as_deref().unwrap_or("security");
         format!(
-            "<div class=\"page-head\"><div><p class=\"id\">{} <span class=\"badge\">{}</span></p><h1 class=\"h1\">{}</h1>{}</div>\
+            "<div class=\"page-head\"><div><p class=\"id\">{} <span class=\"badge\">{}</span> <span class=\"badge\">{}</span></p><h1 class=\"h1\">{}</h1><p class=\"sub\">Created date: {} \u{00b7} Updated date: {}</p>{}{}</div>\
 <div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Edit</a></div></div>",
-            escape(&record.id),
+            id,
             escape(audit_type),
-            escape(&record.title),
+            status,
+            title,
+            escape(&created),
+            escape(&updated),
             taglist,
-            escape(&record.id)
+            details_html,
+            id
         )
-    } else {
+    } else if record.handler() == Some(TypedHandler::Decision) {
+        let decision_type = record.decision_type.as_deref().unwrap_or("(none)");
+        format!(
+            "<div class=\"page-head\"><div><p class=\"id\">{} <span class=\"badge\">{}</span></p><h1 class=\"h1\">{}</h1><p class=\"sub\">Decision type: {} \u{00b7} Status: {} \u{00b7} Created date: {} \u{00b7} Updated date: {}</p>{}{}</div>\
+<div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Edit</a></div></div>",
+            id,
+            status,
+            title,
+            escape(decision_type),
+            status,
+            escape(&created),
+            escape(&updated),
+            taglist,
+            details_html,
+            id
+        )
+    } else if record.handler() == Some(TypedHandler::UiMockup) {
         format!(
             "<div class=\"page-head\"><div><p class=\"id\">{}</p><h1 class=\"h1\">{}</h1>{}{}</div>\
 <div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Edit</a></div></div>",
-            escape(&record.id),
-            escape(&record.title),
+            id, title, taglist, status_line, id
+        )
+    } else {
+        format!(
+            "<div class=\"page-head\"><div><p class=\"id\">{} <span class=\"badge\">{}</span></p><h1 class=\"h1\">{}</h1><p class=\"sub\">Created date: {} \u{00b7} Updated date: {}</p>{}{}</div>\
+<div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Edit</a></div></div>",
+            id,
+            status,
+            title,
+            escape(&created),
+            escape(&updated),
             taglist,
-            status_line,
-            escape(&record.id)
+            details_html,
+            id
         )
     };
     let title = format!("Papyrus \u{2014} {} {}", record.id, record.title);
     let breadcrumb_html = breadcrumb(record, resolved_group, related_milestone, related_release);
-    let meta_html = if record.is_requirement() {
-        metadata_block(record, resolved_group, false)
-    } else {
+    let meta_html = if record.handler() == Some(TypedHandler::UiMockup) {
         metadata_block_backlog(record, related_milestone, related_release)
+    } else {
+        String::new()
     };
     let body = render_template(
         VIEW_TEMPLATE,
@@ -4251,23 +4310,7 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
     } else {
         format!("<p class=\"taglist\">{}</p>", tags)
     };
-    let page_head = format!(
-        "<h1 class=\"h1\">{} {}</h1>{}<p class=\"status-line\"><span class=\"badge\">Status</span> {}</p>",
-        escape(&record.id),
-        escape(&record.title),
-        label_tags,
-        escape(&record.status_text())
-    );
-    let meta = format!(
-        "<div class=\"meta summary-card\"><dl class=\"dl\">\
-<div><dt>Record ID</dt><dd class=\"mono\">{}</dd></div>\
-<div><dt>Created date</dt><dd>{}</dd></div>\
-<div><dt>Updated date</dt><dd>{}</dd></div>\
-</dl></div>",
-        escape(&record.id),
-        escape(&created),
-        escape(&updated)
-    );
+
     let mut has_math = false;
     let mut has_diagram = false;
     let mut next_diagram = 1u32;
@@ -4282,6 +4325,7 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
             prose.html
         })
         .unwrap_or_else(|| "<p>No description.</p>".to_string());
+
     let skip = [
         "id",
         "title",
@@ -4291,6 +4335,7 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
         "references",
     ];
     let metadata = record_view_extra_rows(record, &skip);
+
     let mut references = String::new();
     if !record.refs.is_empty() {
         let items: String = record
@@ -4299,24 +4344,40 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
             .map(|value| format!("<li>{}</li>", escape(value)))
             .collect();
         references = format!(
-            "<details class=\"references\"><summary>References</summary><ul>{}</ul></details>",
+            "<details><summary>References ({})</summary><ul class=\"req-list\">{}</ul></details>",
+            record.refs.len(),
             items
         );
     }
+
     let content = format!(
-        "<section class=\"section\"><h2 class=\"h2\">Description</h2>{}</section>{}{}<p><a class=\"btn\" href=\"/doc/{}/edit\">Edit</a></p>",
-        description,
-        metadata,
-        references,
-        escape(&record.id)
+        "<section class=\"record-section\"><h2>Description</h2>{}</section>{}",
+        description, metadata
     );
+
+    let id = escape(&record.id);
+    let title = escape(&record.title);
+    let status = escape(&record.status_text());
+    let page_head = format!(
+        "<div class=\"page-head\"><div><p class=\"id\">{} <span class=\"badge\">{}</span></p><h1 class=\"h1\">{}</h1><p class=\"sub\">Created date: {} \u{00b7} Updated date: {}</p>{}{}</div>\
+<div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Edit</a></div></div>",
+        id,
+        status,
+        title,
+        escape(&created),
+        escape(&updated),
+        label_tags,
+        references,
+        id
+    );
+
     let body = render_template(
         DOCUMENT_DETAIL_TEMPLATE,
         &[],
         &[
             ("breadcrumb", &breadcrumb(record, None, None, None)),
             ("page_head", &page_head),
-            ("meta", &meta),
+            ("meta", ""),
             ("content", &content),
         ],
     );

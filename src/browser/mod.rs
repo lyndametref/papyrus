@@ -1571,6 +1571,18 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
         } else {
             Vec::new()
         };
+    let dependents: Vec<records::Record> = if record.handler() == Some(TypedHandler::Task) {
+        index
+            .records
+            .iter()
+            .filter(|candidate| {
+                candidate.id != record.id && candidate.dependencies.contains(&record.id)
+            })
+            .cloned()
+            .collect()
+    } else {
+        Vec::new()
+    };
     let (project, bind_note) = chrome_for(&cfg, state);
     let chrome = render::Chrome {
         project: &project,
@@ -1588,6 +1600,7 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
             related_release.as_ref(),
             &resolved_deps,
             &resolved_refs,
+            &dependents,
             &cfg,
             chrome,
         )

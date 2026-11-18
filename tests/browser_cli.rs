@@ -887,9 +887,7 @@ fn t12_record_views() {
     let server = Server::start(&dir, &["--no-open"], &[]);
 
     let req = get(&server, "/doc/REQ-001.001").text();
-    assert!(req.contains("Record ID"));
-    assert!(req.contains("Requirement"));
-    assert!(req.contains("Business requirement"));
+    assert!(req.contains("<p class=\"id\">"));
     assert!(req.contains("REQ-001 Payments Group"));
     assert!(req.contains("User story"));
     assert!(req.contains("Description"));
@@ -5207,9 +5205,8 @@ fn t25c_view_business_rule() {
     let dir = rule_fixture("t25c");
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/doc/RUL-001").text();
-    assert!(html.contains("Record ID"));
+    assert!(html.contains("<p class=\"id\">"));
     assert!(html.contains("RUL-001"));
-    assert!(html.contains("Business rule"));
     assert!(html.contains("Business Rules"));
     assert!(html.contains("<h1 class=\"h1\">First rule</h1>"));
     assert!(html.contains("Description"));
@@ -5820,9 +5817,8 @@ fn t26c_view_audit_record() {
     let dir = audit_fixture("t26c");
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/doc/AUD-001").text();
-    assert!(html.contains("Record ID"));
+    assert!(html.contains("<p class=\"id\">"));
     assert!(html.contains("AUD-001"));
-    assert!(html.contains("Audit record"));
     assert!(html.contains("Audit Records"));
     assert!(html.contains("<h1 class=\"h1\">First audit</h1>"));
     assert!(html.contains("<span class=\"badge\">security</span>"));
@@ -6423,9 +6419,8 @@ fn t57c_view_technical_specification() {
     .unwrap();
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/doc/TECH-001").text();
-    assert!(html.contains("Record ID"));
+    assert!(html.contains("<p class=\"id\">"));
     assert!(html.contains("TECH-001"));
-    assert!(html.contains("Technical specification"));
     assert!(html.contains("Technical Specifications"));
     assert!(html.contains("<h1 class=\"h1\">Offline architecture</h1>"));
     assert!(html.contains("Defines the local browser."));
@@ -7615,7 +7610,7 @@ fn t81d_view_use_case_metadata_projection() {
     .unwrap();
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/doc/UC-001").text();
-    assert!(html.contains("Record ID"));
+    assert!(html.contains("<p class=\"id\">"));
     assert!(html.contains("UC-001"));
     assert!(html.contains("Use Cases"));
     assert!(html.contains("<h1 class=\"h1\">Offline architecture</h1>"));
@@ -8226,7 +8221,7 @@ fn t93_glossary_landing() {
     // TASK-142: references render in the Title cell of the shared list.
     assert!(html.contains("<li>REF-1</li>"));
     let detail = get(&server, "/doc/GLO-001").text();
-    assert!(detail.contains("Record ID"));
+    assert!(detail.contains("<p class=\"id\">"));
     assert!(detail.contains("tag1"));
     assert!(detail.contains("<details"));
     drop(server);
