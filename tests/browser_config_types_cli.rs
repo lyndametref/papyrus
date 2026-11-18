@@ -235,17 +235,6 @@ fn version_of(html: &str) -> String {
     rest[..end].to_string()
 }
 
-fn has_order(haystack: &str, needles: &[&str]) -> bool {
-    let mut position = 0usize;
-    for needle in needles {
-        match haystack[position..].find(needle) {
-            Some(found) => position += found + needle.len(),
-            None => return false,
-        }
-    }
-    true
-}
-
 /// Values of the enabled `<option>` elements inside a filter form, in order.
 fn enabled_option_values(filter: &str) -> Vec<String> {
     filter
