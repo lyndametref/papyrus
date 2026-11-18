@@ -8699,30 +8699,172 @@ fn tc035_configuration_editing_is_cli_only() {
 // TC-036
 #[test]
 fn tc036_managed_artifact_documentation_available_outside_browser() {
-    let docs = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("docs");
-    assert!(docs.exists());
-    assert!(docs.join("specifications").exists());
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+    // The managed-artifact lifecycle content that the removed browser page
+    // presented remains in the outside-browser specifications.
+    let ui_010 = fs::read_to_string(root.join("docs/specifications/ui/UI-010.md")).unwrap();
+    assert!(ui_010.contains("## 6. Lifecycle page"));
+    assert!(ui_010.contains("One section (`h2`) per fixed record type"));
+    assert!(ui_010.contains("Tasks, Milestones, Releases, Decisions"));
+
+    let ui_012 = fs::read_to_string(root.join("docs/specifications/ui/UI-012.md")).unwrap();
+    assert!(ui_012.contains("## 7. Lifecycle page"));
+    assert!(ui_012.contains("One section (`h2`) per fixed record type"));
+    assert!(
+        ui_012.contains("Backlog.md docs, drafts, and project configuration files are excluded")
+    );
+
+    // The removal decision records that the documentation stays outside the browser.
+    let adr = fs::read_to_string(root.join("decisions/ADR-034-test-adr.md")).unwrap();
+    assert!(adr.contains("their documentation remains available outside the browser"));
+
+    // The affected technical building block carries the removal revision banner.
+    let tech = fs::read_to_string(root.join("docs/specifications/technical/TECH-050.md")).unwrap();
+    assert!(tech.contains("Revised (TASK-170"));
+    assert!(tech.contains("browser surfaces removed per ADR-034"));
 }
 
 // TC-037
 #[test]
 fn tc037_agent_skills_documentation_available_outside_browser() {
-    let docs = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("docs");
-    assert!(docs.exists());
-    assert!(docs.join("specifications").exists());
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+    // The agent-skills content that the removed browser page presented
+    // remains in the outside-browser specifications.
+    let ui_011 = fs::read_to_string(root.join("docs/specifications/ui/UI-011.md")).unwrap();
+    assert!(ui_011.contains("## 4. Page content"));
+    assert!(ui_011.contains("Agent skills and workflows"));
+    assert!(ui_011.contains("Grouped skill sections"));
+    assert!(ui_011.contains("Project setup and init"));
+
+    let ui_012 = fs::read_to_string(root.join("docs/specifications/ui/UI-012.md")).unwrap();
+    assert!(ui_012.contains("## 8. Agent skills page"));
+    assert!(ui_012.contains("read-only, configuration-parameterized page"));
+
+    // The project-local agent skills stay available to agents.
+    for (skill, marker) in [
+        ("test-design", "Run the Phase 4 test design task"),
+        (
+            "manage-test-cases",
+            "Create, read, update, approve, verify, and archive integration test cases",
+        ),
+        ("managed-records", "Manage tasks, milestones, releases"),
+    ] {
+        let path = root.join(".opencode/skills").join(skill).join("SKILL.md");
+        let body = fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("missing skill {}: {}", path.display(), e));
+        assert!(body.contains(&format!("name: {}", skill)));
+        assert!(
+            body.contains(marker),
+            "skill {} lost its description",
+            skill
+        );
+    }
+
+    // The affected technical building block carries the removal revision banner.
+    let tech = fs::read_to_string(root.join("docs/specifications/technical/TECH-051.md")).unwrap();
+    assert!(tech.contains("Revised (TASK-170"));
+    assert!(tech.contains("browser surfaces removed per ADR-034"));
 }
 
 // TC-038
 #[test]
 fn tc038_removal_does_not_change_records_or_config() {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    fn snapshot_tree(root: &Path) -> Vec<(String, u64)> {
+        let mut files = Vec::new();
+        let mut pending = vec![root.to_path_buf()];
+        while let Some(dir) = pending.pop() {
+            let entries = match fs::read_dir(&dir) {
+                Ok(entries) => entries,
+                Err(_) => continue,
+            };
+            for entry in entries {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    pending.push(path);
+                } else if path.is_file() {
+                    let relative = path
+                        .strip_prefix(root)
+                        .unwrap()
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    let mut hasher = DefaultHasher::new();
+                    fs::read(&path).unwrap().hash(&mut hasher);
+                    files.push((relative, hasher.finish()));
+                }
+            }
+        }
+        files.sort();
+        files
+    }
+
     let dir = fixture("tc038");
+    create_decision(&dir, "Pick one");
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "task",
+        "create",
+        "Snapshot task",
+        "-d",
+        "Task description",
+    ]);
+
+    let roots = ["backlog", "decisions", "docs"];
+    let snapshots = |dir: &Path| -> Vec<Vec<(String, u64)>> {
+        roots
+            .iter()
+            .map(|root| snapshot_tree(&dir.join(*root)))
+            .collect()
+    };
+
     let config_before = fs::read_to_string(dir.join("papyrus.config.yml")).unwrap();
+    let records_before = snapshots(&dir);
+    assert!(!records_before[0].is_empty(), "backlog records missing");
+    assert!(!records_before[1].is_empty(), "decision records missing");
+    assert!(!records_before[2].is_empty(), "document records missing");
+
     let server = Server::start(&dir, &["--no-open"], &[]);
-    assert_eq!(get(&server, "/").status, 200);
-    assert_eq!(get(&server, "/?type=req").status, 200);
+    for path in [
+        "/",
+        "/?type=req",
+        "/doc/REQ-001.001",
+        "/doc/TASK-001",
+        "/doc/ADR-001",
+    ] {
+        assert_eq!(get(&server, path).status, 200, "{}", path);
+    }
+    // Visiting, and failing to visit, the removed sections must not write anything.
+    for path in ["/lifecycle", "/skills", "/config"] {
+        assert_eq!(get(&server, path).status, 404, "{}", path);
+    }
     drop(server);
+
+    assert_eq!(records_before, snapshots(&dir));
+    assert_eq!(
+        config_before,
+        fs::read_to_string(dir.join("papyrus.config.yml")).unwrap()
+    );
+
+    // Record identifiers, prefixes, and folders are unchanged.
+    for path in [
+        "backlog/tasks/TASK-001.md",
+        "decisions/ADR-001-pick-one.md",
+        "docs/requirements/business/REQ-001.md",
+        "docs/requirements/business/REQ-001.001.md",
+    ] {
+        assert!(dir.join(path).exists(), "missing {}", path);
+    }
     let config_after = fs::read_to_string(dir.join("papyrus.config.yml")).unwrap();
-    assert_eq!(config_before, config_after);
+    assert!(config_after.contains("task_prefix: TASK"));
+    assert!(config_after.contains("prefix: REQ"));
+    assert!(config_after.contains("backlog_directory: backlog/"));
+    assert!(config_after.contains("decision_directory: decisions/"));
+    assert!(config_after.contains("doc_directory: docs/"));
     let _ = fs::remove_dir_all(&dir);
 }
 
