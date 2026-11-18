@@ -1530,6 +1530,24 @@ pub fn view_page(
         }
         details.push_str("</ul></details>");
     }
+    if record.is_requirement()
+        && !record.is_group
+        && let Some(group_id) = record.group_id.as_deref()
+    {
+        if let Some(group) = resolved_group {
+            details.push_str(&format!(
+                    "<details><summary>Owning group</summary><p><a href=\"/doc/{}\">{} {}</a></p></details>",
+                    escape(&group.id),
+                    escape(group_id),
+                    escape(&group.title)
+                ));
+        } else {
+            details.push_str(&format!(
+                    "<details><summary>Owning group</summary><p>{} <span class=\"unresolved\">(not an active group)</span></p></details>",
+                    escape(group_id)
+                ));
+        }
+    }
     if record.handler() == Some(TypedHandler::Decision) {
         content = format!(
             "<p class=\"record-meta\">Decision type: {}</p><p class=\"record-meta\">Status: {}</p>{}",
