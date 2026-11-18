@@ -2,7 +2,7 @@
 id: TECH-061
 title: "Browser Specification Revisions (TASK-86)"
 created_date: '2026-11-16T17:46:52Z'
-updated_date: '2026-11-16T17:47:27Z'
+updated_date: '2026-11-18T22:26:40Z'
 labels: []
 references:
   - ADR-0010
@@ -38,9 +38,14 @@ references:
   - TASK-93
   - TASK-94
   - TASK-95
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-061 Browser Specification Revisions (TASK-86)
+
+> **Revised (TASK-201, 2026-11-18):** the configuration view (section 3), the `/config` route and `Configuration` sidebar entry, the read-only lifecycle configuration clauses (section 8, items 3-5), and the related mockup and open-question items are retired per ADR-034 and REQ-06.018; configuration editing is CLI-only and the browser serves no configuration or lifecycle page. The retired clauses are retained below as history. See TECH-080.
 
 ## Description
 **Ticket:** TASK-86
@@ -50,7 +55,7 @@ status: verified
 
 ## Purpose
 
-Revise the browser specification corpus so that it states the new browser contract introduced by REQ-06.003 (as extended) and REQ-06.006 through REQ-06.012: non-functional requirements grouped by their owning group, an error-only console with a browser-only debug flag, an editable configuration view, shared-header branding, record references as links, a concise glossary landing page, a consistent single record view layout, and curated per-artifact descriptions with read-only configuration on the lifecycle page. The revisions also remove any remaining Backlog.md storage-ID wording from browser specs so that routes, links, form values, and JSON carry Papyrus IDs only (ADR-0010, ADR-0012, ADR-0013).
+Revise the browser specification corpus so that it states the new browser contract introduced by REQ-06.003 (as extended) and REQ-06.006 through REQ-06.012: non-functional requirements grouped by their owning group, an error-only console with a browser-only debug flag, an editable configuration view (retired per ADR-034; configuration editing is CLI-only), shared-header branding, record references as links, a concise glossary landing page, a consistent single record view layout, and curated per-artifact descriptions with read-only configuration on the lifecycle page (the browser lifecycle page and its read-only configuration display are retired per ADR-034). The revisions also remove any remaining Backlog.md storage-ID wording from browser specs so that routes, links, form values, and JSON carry Papyrus IDs only (ADR-0010, ADR-0012, ADR-0013).
 
 This ticket is documentation/specification work only. It does not change requirements, business rules, or implementation code. Implementation of the revised contract is delivered by TASK-93, TASK-94, and TASK-95; UI approval is delivered by TASK-87.
 
@@ -58,9 +63,9 @@ This ticket is documentation/specification work only. It does not change require
 
 ### In scope
 
-- Revising `docs/specifications/browser-requirements.md` for NFR grouping, console verbosity, the configuration view, shared header branding, reference links, and the shared single record view layout.
+- Revising `docs/specifications/browser-requirements.md` for NFR grouping, console verbosity, the configuration view (retired per ADR-034), shared header branding, reference links, and the shared single record view layout.
 - Revising `docs/specifications/browser-glossary-terms.md` for the glossary landing page and the single record view layout.
-- Revising `docs/specifications/browser-managed-artifacts-and-lifecycles.md` for curated per-artifact descriptions and read-only per-section configuration.
+- Revising `docs/specifications/browser-managed-artifacts-and-lifecycles.md` for curated per-artifact descriptions and read-only per-section configuration (the read-only configuration display is retired per ADR-034; the document stays outside the browser).
 - Revising every other browser specification that renders a record view or a record reference so that it references the shared single record view layout and the shared reference-link rule, and contains no Backlog.md storage-ID wording.
 - Recording which mockup packages require revision or creation.
 - Updating traceability sections in the revised specifications.
@@ -96,7 +101,9 @@ The revised `browser-requirements.md` must state all of the following:
 4. Errors are output whether or not `--debug` is set.
 5. The man page and help text are updated to document `--debug` as browser-only.
 
-### 3. Configuration view (AC #3)
+### 3. Configuration view (AC #3) (retired)
+
+> **Retired (TASK-201, 2026-11-18):** per ADR-034 and REQ-06.018 the browser serves no configuration view; `GET /config`, `GET /config/edit`, `POST /config`, and `GET /?type=config` return `404`, and there is no `Configuration` sidebar entry. Clauses 1-8 below record the superseded requirement and are retained as history.
 
 The revised browser specification must state all of the following:
 
@@ -151,15 +158,15 @@ The revised `browser-requirements.md` must define a shared single record view la
 6. The layout applies to every managed Markdown record type that has a single record view. UI mockup HTML views are excluded.
 7. The summary card does not show status, milestone, assignee, labels, or references; those remain in their existing locations outside the card, except labels which move to the taglist under the title.
 
-### 8. Per-artifact descriptions and read-only configuration (AC #8)
+### 8. Per-artifact descriptions and read-only configuration (AC #8) (read-only configuration display retired)
 
 The revised `browser-managed-artifacts-and-lifecycles.md` must state all of the following:
 
 1. Description text is curated content shipped with the browser binary, written for the page, available offline (NFR-01.003), and not derived from requirement files, record content, or configuration.
 2. Each of the twelve fixed sections includes a good description of its artifact on top of its lifecycle and existing status.
-3. Each section shows read-only effective configuration: the artifact's `enabled` state, its ID prefix, and its storage folder. The task section additionally shows the configured statuses.
-4. Configuration values on this page are display-only. Changes are made only through the configuration view (section 3).
-5. The page points to the configuration view for changes, and does not offer editing.
+3. **Retired (ADR-034):** each section shows read-only effective configuration: the artifact's `enabled` state, its ID prefix, and its storage folder. The task section additionally shows the configured statuses.
+4. **Retired (ADR-034):** configuration values on this page are display-only. Changes are made only through the CLI (`papyrus config set/unset`); the former configuration view (section 3) is retired.
+5. **Retired (ADR-034):** the page points to the configuration view for changes, and does not offer editing.
 6. The covered set remains fixed and is not derived from configured `document_types`.
 
 ### 9. Papyrus IDs and mockup identification (AC #9)
@@ -170,10 +177,10 @@ The revised browser specifications must satisfy all of the following:
 2. Every revised specification's traceability section cites REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012, and ADR-0010, ADR-0012, ADR-0013 as applicable.
 3. The mockup impact is recorded:
    - Existing packages that render record views or shared shells (MOCK-0001 through MOCK-0013) require revision for the shared header branding, the single record view layout, and reference links. Revision does not renumber or replace a MOCK id.
-   - MOCK-0010 additionally requires revision for per-artifact descriptions and read-only configuration on the lifecycle page.
+   - MOCK-0010 additionally requires revision for per-artifact descriptions and read-only configuration on the lifecycle page (the read-only configuration display is retired per ADR-034).
    - MOCK-0001 additionally requires revision for NFR grouping under owning groups.
    - MOCK-0004 additionally requires revision for the glossary landing page (dates omitted, labels as tags, no references).
-   - A new mockup package is required for the configuration view and the consolidated single record view layout, branding, links, grouping, glossary landing, and lifecycle per-artifact configuration. It is created and approved under TASK-87 and receives the next sequential MOCK id. No package is approved for implementation until the user explicitly approves it.
+   - A new mockup package is required for the consolidated single record view layout, branding, links, grouping, and glossary landing; the configuration-view and lifecycle per-artifact configuration parts are retired per ADR-034. It is created and approved under TASK-87 and receives the next sequential MOCK id. No package is approved for implementation until the user explicitly approves it.
 
 ## Target specifications
 
@@ -181,7 +188,7 @@ The revised browser specifications must satisfy all of the following:
 |---|---|
 | `docs/specifications/browser-requirements.md` | NFR grouping; console verbosity; configuration view; shared header branding; reference links; single record view layout; ID-only wording. |
 | `docs/specifications/browser-glossary-terms.md` | Glossary landing page; single record view layout reference. |
-| `docs/specifications/browser-managed-artifacts-and-lifecycles.md` | Curated descriptions; read-only per-section configuration. |
+| `docs/specifications/browser-managed-artifacts-and-lifecycles.md` | Curated descriptions; read-only per-section configuration (retired per ADR-034). |
 | `docs/specifications/browser-tasks-milestones-and-releases.md` | Single record view layout reference; reference links. |
 | `docs/specifications/browser-decision-records.md` | Single record view layout reference; reference links. |
 | `docs/specifications/browser-ui-specifications.md` | Single record view layout reference; reference links. |
@@ -196,14 +203,14 @@ The revised browser specifications must satisfy all of the following:
 
 - Assumption: This ticket edits specification documents only; no code, requirements, or business rules are changed.
 - Assumption: The shared single record view layout is defined once in `browser-requirements.md` and referenced by per-type specifications, rather than duplicated.
-- Assumption: The configuration view route is a design decision; the recommended default is `/config` with `/?type=config` as an alias, subject to TASK-87 approval. If a different route is chosen, the revised specification records it and no other behavior changes.
+- Assumption: The configuration view route is a design decision; the recommended default is `/config` with `/?type=config` as an alias, subject to TASK-87 approval. If a different route is chosen, the revised specification records it and no other behavior changes. Retired per ADR-034: the browser serves no configuration view.
 - Assumption: Existing MOCK ids are not renumbered; revisions are new files or in-place approved updates per the registry's normal process.
 - Assumption: No new ADR is required; the revisions follow ADR-0010, ADR-0012, and ADR-0013.
 - Assumption: Standard documentation definition of done applies.
 
 ## Open questions
 
-- OQ-1 (recommended default: sidebar entry labelled `Configuration` linking to `/config`) — Whether the configuration view is reached from the sidebar or from a header link is a design decision. The recommended default is a sidebar entry after the document types, consistent with the lifecycle and skills pages. Subject to TASK-87.
+- OQ-1 (recommended default: sidebar entry labelled `Configuration` linking to `/config`) — Whether the configuration view is reached from the sidebar or from a header link is a design decision. The recommended default is a sidebar entry after the document types, consistent with the lifecycle and skills pages. Subject to TASK-87. Closed by ADR-034: no configuration view, `/config` route, or sidebar entry exists.
 - OQ-2 (recommended default: per-type specifications reference the shared layout by section number) — Whether each per-type specification restates the shared single record view layout or only references it. Restating risks drift; referencing is preferred. Subject to reviewer preference during refinement review.
 
 ## Traceability

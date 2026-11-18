@@ -2,7 +2,7 @@
 id: TECH-054
 title: "Complete Content-Management Milestone Packaging and Verification"
 created_date: '2026-11-16T17:46:50Z'
-updated_date: '2026-11-16T17:47:24Z'
+updated_date: '2026-11-18T22:25:53Z'
 labels: []
 references:
   - ADR-0001
@@ -92,9 +92,14 @@ references:
   - TASK-83
   - TECH-001
   - UI-001
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-054 Complete Content-Management Milestone Packaging and Verification
+
+> **Revised (TASK-201, 2026-11-18):** the managed-artifacts-and-lifecycles and agent-skills browser pages, their sidebar entries, and their packaging render checks are retired per ADR-034 and REQ-06.018; the package verification now asserts the removed-surface contract (routes `404`, no sidebar entry, no inventory card) instead. See TECH-080.
 
 ## Description
 **Ticket:** TASK-20
@@ -104,7 +109,7 @@ status: verified
 
 ## Purpose
 
-Package the complete Papyrus feature set delivered by milestones m-0 through m-12 as one final installable amd64 Debian increment, and verify in an isolated Debian Forky environment that the packaged binary installs, uninstalls, and provides every supported record family, unified search across all documented record types, and the offline local browser over all Papyrus content, including the cross-type inventory, metadata projection, managed-artifact lifecycle and agent-skills pages, interactive init walkthrough, ID padding validation, lazy front-matter migration, and the native layout and one-way import. This is the last task of milestone m-12 and closes its "ship the final installable increment" goal.
+Package the complete Papyrus feature set delivered by milestones m-0 through m-12 as one final installable amd64 Debian increment, and verify in an isolated Debian Forky environment that the packaged binary installs, uninstalls, and provides every supported record family, unified search across all documented record types, and the offline local browser over all Papyrus content, including the cross-type inventory, metadata projection, the removed-surface contract for the retired managed-artifact lifecycle and agent-skills pages, interactive init walkthrough, ID padding validation, lazy front-matter migration, and the native layout and one-way import. This is the last task of milestone m-12 and closes its "ship the final installable increment" goal.
 
 This is a packaging and verification task: no new product behavior is added. Work is limited to building, packaging, verifying, documenting, and adding one milestone-level integration test.
 
@@ -117,7 +122,7 @@ This is a packaging and verification task: no new product behavior is added. Wor
 - Verify package contents contain only the binary and the copyright file — no runtime asset, template, configuration, or man files are packaged, because assets are embedded through the static asset table. First-party and vendored browser assets are embedded through the static asset table, and the single copyright file carries one notice section per bundled asset family (KaTeX code MIT, KaTeX fonts OFL-1.1, Mermaid MIT).
 - Install and uninstall the package in an isolated Debian Forky environment without modifying the host.
 - Smoke-test the installed binary across every supported record family: business requirements, non-functional requirements, tasks, milestones, releases, decisions, glossary terms, UI specifications, UI mockups, business rules, audit records, and technical specifications — create, list, view, edit (and deprecate/restore or archive/restore where documented), search, and browser view/edit.
-- Smoke-test the cross-type capabilities delivered by m-12: unified search across all record types, the browser inventory hub, the final sidebar order, cross-type ID resolution, deprecated-record hiding, disabled-type gating, front-matter metadata projection, the managed artifacts and lifecycles page, the agent skills and workflows page, the interactive init walkthrough, ID padding validation (1–6), lazy front-matter migration on first read/write, and the native layout and one-way import.
+- Smoke-test the cross-type capabilities delivered by m-12: unified search across all record types, the browser inventory hub, the final sidebar order, cross-type ID resolution, deprecated-record hiding, disabled-type gating, front-matter metadata projection, the removed-surface contract of the retired managed artifacts and lifecycles page and agent skills and workflows page, the interactive init walkthrough, ID padding validation (1–6), lazy front-matter migration on first read/write, and the native layout and one-way import.
 - Verify offline operation: search and browser work with no internet access, using only loopback and locally served assets.
 - Verify the browser configuration keys (`browser_host`, `browser_port`, `browser_open`) behave as documented in the installed binary.
 - Re-run the Rust quality gates: `cargo build --release`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check` with Rust 1.99.1.
@@ -222,7 +227,7 @@ For each family the installed binary exercises at least create → list → view
 2. `--no-open` suppresses the platform opener: no `xdg-open` invocation occurs and the process still serves.
 3. `GET /` renders the inventory hub with exactly one `h1` whose text is `Browser inventory`, one card per supported record type in the final sidebar order, and the active-record count for each type; disabled document types contribute no card and no error.
 4. Each represented type's card links to its per-type list (`/?type=<category>`); following the link renders that category's list with `aria-current="page"` on the matching sidebar entry.
-5. The sidebar on the inventory hub, on a per-type list, on the managed-artifacts page, and on the agent-skills page lists entries in the final order (Business requirements, Business rules, Audit records, Technical specifications, Non-functional requirements, Backlog, Decisions, Glossary, UI specifications, UI mockups, Managed artifacts & lifecycles, Agent skills & workflows), with the active entry marked `aria-current="page"` and the non-colour cue; gated entries are omitted when their type is disabled. On the inventory hub no document-type entry is active.
+5. The sidebar on the inventory hub and on a per-type list lists entries in the final order (Business requirements, Business rules, Audit records, Technical specifications, Non-functional requirements, Backlog, Decisions, Glossary, UI specifications, UI mockups), with the active entry marked `aria-current="page"` and the non-colour cue; gated entries are omitted when their type is disabled. On the inventory hub no document-type entry is active. The retired `Managed artifacts & lifecycles` and `Agent skills & workflows` entries are absent (ADR-034).
 6. `GET /?type=req` (and every other documented `?type=` value) still renders its per-type list exactly as before this increment; `GET /` no longer renders the requirements list. `GET /?type=all` (and any other undocumented value) returns `400`.
 7. `GET /doc/<id>` renders the record view for a record of every supported family, including ID, form, category, title, and body fields; a deprecated ID and an unknown ID return `404` with the per-type `404` page.
 8. Cross-type ID resolution: an ID present in exactly one category resolves to that record; an ID present in two categories returns `500` with a generic message; a deprecated or unknown ID returns `404`. Deprecated records are never matched or counted.
@@ -234,7 +239,7 @@ For each family the installed binary exercises at least create → list → view
 14. Every `text/html` response carries exactly one of the two CSP strings fixed in `browser-requirements.md` §9.7: the strict string when the pre-pass did not set `has_diagram`, and the diagram string only when it did. `/assets/` and non-HTML responses carry no CSP; `script-src` never gains `'unsafe-inline'`, `'unsafe-eval'`, a nonce, or a hash.
 15. Asset verification: `cargo test` runs the manifest test and asserts the manifest row set equals `ASSETS[].path` with no duplicate or missing row and recomputes SHA-256 and byte length for every entry; `dpkg-deb --fsys-tarfile papyrus_<version>_amd64.deb | tar -xO ./usr/share/doc/papyrus/copyright` shows the GPL-3.0-or-later block plus one section per bundled family; `dpkg-deb -c` still lists exactly the binary and the copyright file; `stat -c %s` on the built binary is at most 12,582,912 B (12 MiB), with the measured budget recorded in `docs/packaging.md`.
 16. A missing or empty store directory renders its empty state instead of failing (no server error).
-17. `GET /lifecycle` (and `/?type=lifecycle`) renders the managed artifacts and lifecycles page; `GET /skills` (and `/?type=skills`) renders the agent skills and workflows page. Both render the shared shell and the sidebar in final order.
+17. `GET /lifecycle`, `GET /?type=lifecycle`, `GET /skills`, and `GET /?type=skills` return `404` per ADR-034 and REQ-06.018, and `GET /` renders no card for the two retired virtual pages. The managed-artifacts-and-lifecycles and agent-skills documentation stays outside the browser.
 18. Front-matter metadata projection (REQ-06.004): list and detail views read `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, and type-specific keys from the YAML front matter; `created_date` and `updated_date` are read-only in the browser; a save writes changed values to the front matter, refreshes `updated_date`, preserves every other front-matter key and the rest of the file, and never copies metadata into the body.
 
 #### 3.5 Offline operation
@@ -268,7 +273,7 @@ For each family the installed binary exercises at least create → list → view
 1. A new file `tests/content_management_smoke.rs` provides a milestone-level end-to-end test against the built binary (`CARGO_BIN_EXE_papyrus`), using temporary project directories, a free loopback port, and the same startup-line wait and child-kill-on-drop pattern as `tests/browser_cli.rs`.
 2. Test 1 — `milestone_content_management_flow`: initialize a project; create one record of every supported family carrying a shared unique multi-word phrase; assert the unified search (default, `--type doc`, `--type task`/`milestone`/`release`/`decision`, `--limit`, `--json`, quoted phrase, empty result); then start `browser --no-open` on a free port and assert the startup line, the inventory hub with one card per type and correct counts, the final sidebar order with `aria-current`, a record view for at least three families, an edit round-trip (303 then updated view and matching CLI `view`), the JSON API, both assets, the 320 px markup hooks, and the absence of external references.
 3. Test 2 — `content_management_cross_type_resolution`: verify cross-type ID resolution (single match, multi-match → 500, deprecated → 404, unknown → 404) and deprecated hiding in counts.
-4. Test 3 — `content_management_metadata_and_pages`: verify front-matter metadata projection on a list and detail view, the managed artifacts and lifecycles page, and the agent skills and workflows page render.
+4. Test 3 — `content_management_metadata_and_pages`: verify front-matter metadata projection on a list and detail view and assert the removed-surface contract: `GET /lifecycle`, `GET /skills`, and their `?type=` aliases return `404`, and the inventory hub renders no card for either retired page (ADR-034).
 5. Test 4 — `installed_layout_has_no_runtime_asset_dependency`: run the binary with its working directory set to an empty directory and the project directory containing no asset files; assert `search` and `browser` still work and served assets are non-empty.
 6. The new tests must not duplicate the per-type contract coverage in `tests/*_cli.rs` and `tests/*_smoke.rs` (request limits, error-status matrix, concurrency cap, XSS, symlink escape, version conflict, accessibility audit). Those remain authoritative there.
 7. Tests require no internet access, bind only loopback, and leave no child process running.
@@ -286,7 +291,7 @@ For each family the installed binary exercises at least create → list → view
 
 | Input / output | Description |
 |---|---|
-| Source tree | Post-m-12 state: all record families, unified search, complete browser access, metadata projection, managed artifacts and skills pages, init walkthrough, id padding, migration. || Toolchain | Rust 1.99.1 via `rust-toolchain.toml`; `dpkg-deb`, `fakeroot`; Debian Forky amd64. |
+| Source tree | Post-m-12 state: all record families, unified search, complete browser access, metadata projection, removed-surface checks for the retired managed-artifacts and skills pages, init walkthrough, id padding, migration. || Toolchain | Rust 1.99.1 via `rust-toolchain.toml`; `dpkg-deb`, `fakeroot`; Debian Forky amd64. |
 | `scripts/build-deb.sh` | Unchanged packaging script; reads the version from `Cargo.toml`. |
 | `papyrus_<version>_amd64.deb` | Built package in the project root. |
 | Isolated root/admin | `./.tmp/` directories for `dpkg --instdir/--admindir`; removed after the run. |
@@ -332,7 +337,7 @@ For each family the installed binary exercises at least create → list → view
 | T-20-13 | Browser: JSON API and embedded assets served from the binary | `GET /api/*`, `GET /assets/*` |
 | T-20-14 | Shell/list layout, CSP classes, asset digests, and the 12 MiB budget | Markup/asset assertions on served content; manifest test; `stat -c %s` |
 | T-20-15 | Front-matter metadata projection in CLI and browser | Installed-binary view/edit assertions |
-| T-20-16 | Managed artifacts and lifecycles page and agent skills and workflows page render | Installed-binary browser assertions |
+| T-20-16 | Retired managed-artifacts/lifecycle and agent-skills surfaces: `/lifecycle`, `/skills`, and their `?type=` aliases return `404`; the inventory hub and sidebar carry no entry for them (ADR-034) | Installed-binary browser assertions |
 | T-20-17 | Lazy migration and native layout in the installed binary | Installed-binary read/write assertions |
 | T-20-18 | Offline operation with no internet access | `unshare -rn` run with a failing outbound connection, then search + browser smoke |
 | T-20-19 | Browser configuration keys work in the installed binary | `config list/get/set/unset` and startup-line assertions |

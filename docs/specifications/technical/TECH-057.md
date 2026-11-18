@@ -2,7 +2,7 @@
 id: TECH-057
 title: "Browser Access for Use Cases, Test Cases, and Test Reports"
 created_date: '2026-11-16T17:46:51Z'
-updated_date: '2026-11-16T17:47:25Z'
+updated_date: '2026-11-18T22:26:09Z'
 labels: []
 references:
   - ADR-0001
@@ -70,9 +70,14 @@ references:
   - TASK-82
   - TASK-86
   - TC-001
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-057 Browser Access for Use Cases, Test Cases, and Test Reports
+
+> **Revised (TASK-201, 2026-11-18):** the `Managed artifacts & lifecycles` and `Agent skills & workflows` sidebar entries in section 3 are retired per ADR-034 and REQ-06.018; the sidebar order now ends at `UI Mockups`. See TECH-080.
 
 ## Description
 **Ticket:** TASK-81
@@ -119,7 +124,7 @@ Use cases, test cases, and test reports are Markdown text records with the fixed
 
 1. The category selector (`?type=`) accepts `use-case`, `test-case`, and `test-report` in addition to the existing values `req` (default), `nfr`, `task`, `milestone`, `release`, `decision`, `glossary`, `ui-spec`, `ui-mockup`, `business-rule`, `audit-record`, and `tech-spec`. Any other value, including `all`, is `400`.
 2. `GET /` and `GET /?type=req` render the same page (baseline rule retained).
-3. The sidebar lists the document types in this order: Business requirements, Business Rules, Audit Records, Technical Specifications, Use Cases, Test Cases, Test Reports, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications, UI Mockups, Managed artifacts & lifecycles, Agent skills & workflows. The selected entry carries `aria-current="page"` and the non-colour cue (bold + underline). The sidebar remains extensible.
+3. The sidebar lists the document types in this order: Business requirements, Business Rules, Audit Records, Technical Specifications, Use Cases, Test Cases, Test Reports, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications, UI Mockups. The `Managed artifacts & lifecycles` and `Agent skills & workflows` entries are retired per ADR-034 (TASK-201). The selected entry carries `aria-current="page"` and the non-colour cue (bold + underline). The sidebar remains extensible.
 4. When `document_types.use-case.enabled`, `document_types.test-case.enabled`, or `document_types.test-report.enabled` is `false`, the corresponding sidebar entry is omitted and `?type=use-case` / `?type=test-case` / `?type=test-report` renders that category's empty state rather than an error (baseline section 4.4).
 5. The list page renders only the selected category; the other categories are not rendered at all.
 6. A missing or unreadable directory for any of the three types is not a server error: the category renders its empty state and its API returns an empty array.
