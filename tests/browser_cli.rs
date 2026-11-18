@@ -8716,7 +8716,18 @@ fn tc036_managed_artifact_documentation_available_outside_browser() {
     );
 
     // The removal decision records that the documentation stays outside the browser.
-    let adr = fs::read_to_string(root.join("decisions/ADR-034-test-adr.md")).unwrap();
+    // Resolve the record by ID prefix so a filename slug change does not break the check.
+    let adr_path = fs::read_dir(root.join("decisions"))
+        .unwrap()
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .find(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("ADR-034-"))
+        })
+        .unwrap_or_else(|| panic!("ADR-034 record not found under decisions/"));
+    let adr = fs::read_to_string(&adr_path).unwrap();
+    assert!(adr.contains("id: ADR-034"));
     assert!(adr.contains("their documentation remains available outside the browser"));
 
     // The affected technical building block carries the removal revision banner.
