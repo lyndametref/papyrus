@@ -429,18 +429,13 @@ fn scanner_covers_production_after_the_render_test_module() {
             .all(|(lineno, _)| *lineno != test_module_line),
         "the test attribute must not be a production line"
     );
-    for marker in [
-        "pub fn lifecycle_page",
-        "pub fn config_page",
-        "pub fn inventory_page",
-    ] {
-        let (lineno, _) = production
-            .iter()
-            .find(|(_, line)| line.contains(marker))
-            .unwrap_or_else(|| panic!("{marker} must be scanned"));
-        assert!(
-            *lineno > test_module_line,
-            "{marker} at line {lineno} must be scanned after the test module at {test_module_line}"
-        );
-    }
+    let marker = "pub fn inventory_page";
+    let (lineno, _) = production
+        .iter()
+        .find(|(_, line)| line.contains(marker))
+        .unwrap_or_else(|| panic!("{marker} must be scanned"));
+    assert!(
+        *lineno > test_module_line,
+        "{marker} at line {lineno} must be scanned after the test module at {test_module_line}"
+    );
 }

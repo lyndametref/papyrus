@@ -2,12 +2,12 @@
 id: TASK-174
 title: "Implement removal of browser sections"
 created_date: '2026-11-16T21:03:23Z'
-updated_date: '2026-11-16T21:03:23Z'
+updated_date: '2026-11-18T20:36:43Z'
 labels: []
 references:
   - REQ-06.018
   - RE-005
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-027
@@ -21,3 +21,7 @@ type: implementation
 
 ## Description
 Code and automated tests for removing browser sections and routes.
+
+
+## Comments
+- **rust-dev**: Implemented removal of browser sections. Removed routes/handlers/pages for /config, /config/edit, /lifecycle, /skills and their query aliases; removed inventory hub cards and sidebar utility entries; removed lifecycle/skills/config render functions and sidebar active-state helpers. Other browser pages and navigation remain functional. Added/updated automated tests TC-033..TC-039 in tests/browser_cli.rs. Updated obsolete tests asserting removed surfaces. Checks: cargo fmt, cargo clippy --all-targets, cargo test --lib (426 passed), cargo test --test browser_cli (181 passed) all green.
