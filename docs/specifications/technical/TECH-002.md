@@ -2,7 +2,7 @@
 id: TECH-002
 title: "Project Initialization and Configuration Commands"
 created_date: '2026-11-16T17:46:43Z'
-updated_date: '2026-11-16T17:46:59Z'
+updated_date: '2026-11-18T22:50:56Z'
 labels: []
 references:
   - ADR-0001
@@ -44,9 +44,14 @@ references:
   - TASK-2
   - TASK-3
   - TASK-85
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-002 Project Initialization and Configuration Commands
+
+> **Revised (TASK-203, 2026-11-18):** the browser configuration view clauses — section 3 item 12, the browser-view tail of item 21, the out-of-scope list-editing item, and the relocation assumption — are retired per ADR-034 and REQ-06.018 (RE-005): the browser serves no configuration view and configuration editing is CLI-only. The `config set` configuration, list-key, and whole-folder relocation clauses (BR-003, REQ-01.002) remain current. REQ-06.008, which the retired clauses cite, is archived; the retired text is retained below as history. See TECH-080.
 
 ## Description
 **Ticket:** TASK-2 / TASK-85 (spec revision); TASK-111 (list-valued configuration keys revision); TASK-112 (default document set and document-status seeding revision); TASK-122 (config list default_status revision); TASK-127 (init directory-set revision)
@@ -92,7 +97,7 @@ It was revised again (TASK-127) so that OQ-1 is resolved: section 2 item 4 now n
 - Actual record ID assignment and archive/restore preservation logic — consumed by record commands in later tickets; this ticket delivers their configuration keys only.
 - Git workflows beyond invoking repository initialization when `--no-git` is absent.
 - UI mockups or web UI — none for this ticket.
-- List editing in the browser configuration view: the view's editable-key whitelist is unchanged, and a list key remains non-editable there (CLI `config set` only).
+- List editing in the browser configuration view: the view's editable-key whitelist is unchanged, and a list key remains non-editable there (CLI `config set` only). Retired (TASK-203, 2026-11-18, ADR-034, REQ-06.018): the browser serves no configuration view, so list keys remain writable only through CLI `config set`, which stays current.
 - A quoting/escaping form for commas, `--append`/`--remove` flags, or a `config get --json` list mode beyond the existing JSON array (ADR-0024).
 - Non-amd64 or non-Debian distribution concerns — ADR-0002.
 
@@ -150,7 +155,7 @@ It was revised again (TASK-127) so that OQ-1 is resolved: section 2 item 4 now n
     - If any entry cannot be moved (for example an entry with the same relative path already exists at the destination, or a write failure), nothing is moved, both folders are left as they were, the configuration value is not persisted, and the command reports a conflict (exit code 4).
     - On success the source folder no longer holds the moved content and is removed once empty.
     - Cross-device moves fall back to the atomic copy-then-remove sequence and are reported as non-atomic in the command output if a single rename is impossible.
-12. The browser configuration view (REQ-06.008) is a consumer of this same `config set` path: it invokes the relocation routine through `config set` and may not move folders itself. It performs no folder move of its own.
+12. **Retired (TASK-203, 2026-11-18, ADR-034, REQ-06.018):** the browser configuration view (REQ-06.008, archived) is a consumer of this same `config set` path: it invokes the relocation routine through `config set` and may not move folders itself. It performs no folder move of its own. No browser configuration view exists; the CLI `config set` relocation path of item 11 remains current.
 13. **List-key classification.** A single declared classification names the list-valued keys: the top-level task `statuses` and each `document_types.<slug>.statuses`. Every other key is scalar, including `default_status`, `document_types.<slug>.default_status`, `prefix`, `directory`, `enabled`, `id_padding`, and `browser_*`. Classification depends only on the key; it never inspects the shape of the supplied value.
 14. **Comma-separated form.** For a list-valued key, `config set` splits the raw value on `,`, trims surrounding whitespace from each element, preserves element order, case, internal whitespace, and duplicates, and does not interpret YAML in the value (`true`, `1`, and `[a]` remain strings). An empty or whitespace-only value is rejected with exit 4 and a message naming the key. An element that is empty after trimming is rejected the same way; it is not dropped. A value containing a newline or other control character is rejected with exit 4.
 15. **No escaping or quoting.** Commas are separators only. Backslashes, single quotes, and double quotes have no escape meaning; `active\,archived` splits at the comma and is then rejected by status validation where the resulting elements are invalid. A value that must contain a comma can only be written by editing `papyrus.config.yml` directly. `config set --help` states this limitation.
@@ -159,7 +164,7 @@ It was revised again (TASK-127) so that OQ-1 is resolved: section 2 item 4 now n
 18. **Scalar keys unchanged.** For a non-list key a comma remains an ordinary character of the scalar value; no existing `config set` invocation changes meaning.
 19. **Unset unchanged.** `config unset` removes a list key; there is no clear-list operation and no empty list is written. The top-level key then falls back to the default task list. An absent `document_types.<slug>.statuses` declaration is reported by `config get` as a missing key (exit 3) and the effective document status model falls back to `active`/`archived`. Removing a declaration whose entry keeps a `default_status` that the fallback list would not contain is refused by the validator (exit 4) and the file is unchanged.
 20. **Documentation.** `papyrus(1)` (`config set`) and `papyrus-config(5)` (`statuses`, `document_types`) state the comma-separated form, flow-sequence storage, empty-value rejection, and no-escape limitation. No new flag is introduced.
-21. **Document-type default status in the flattened listing.** For each `document_types.<slug>` entry, `config list` emits the keys `prefix`, `directory`, `enabled`, then `statuses` if the entry declares a status list, then `default_status` if the entry declares a default status. The `default_status` line appears immediately after the same slug's `statuses` line when both exist, and immediately after `enabled` when the entry declares a default status but no status list. An entry that declares no `default_status` gets no such key and no empty or placeholder value. Slugs appear in ascending key order, as they already do. `--json` carries the same value at `document_types.<slug>.default_status` and omits the member when the entry declares none. Printing the key is a read-only listing concern: key parsing, validation, `config set`/`config unset`, `config get`, the tolerant repair load, and the browser configuration view's own logic are unchanged; because the browser view renders this same flattened listing, a declared `default_status` becomes a visible editable scalar row there with no browser code change.
+21. **Document-type default status in the flattened listing.** For each `document_types.<slug>` entry, `config list` emits the keys `prefix`, `directory`, `enabled`, then `statuses` if the entry declares a status list, then `default_status` if the entry declares a default status. The `default_status` line appears immediately after the same slug's `statuses` line when both exist, and immediately after `enabled` when the entry declares a default status but no status list. An entry that declares no `default_status` gets no such key and no empty or placeholder value. Slugs appear in ascending key order, as they already do. `--json` carries the same value at `document_types.<slug>.default_status` and omits the member when the entry declares none. Printing the key is a read-only listing concern: key parsing, validation, `config set`/`config unset`, `config get`, and the tolerant repair load are unchanged. **Retired (TASK-203, 2026-11-18, ADR-034, REQ-06.018):** the former clause also stated that the browser configuration view's own logic was unchanged and that, because that view rendered this same flattened listing, a declared `default_status` appeared there as a visible editable scalar row with no browser code change; the browser serves no configuration view, so no browser row exists. The `config list` behaviour above remains current.
 
 ### 4. Common CLI controls and outcomes
 
@@ -204,7 +209,7 @@ It was revised again (TASK-127) so that OQ-1 is resolved: section 2 item 4 now n
 - Assumption: configuration is read/written as YAML using a Rust YAML crate added as a runtime dependency; that crate's license must be audited for GPL-3.0-or-later compatibility before release (NFR-06.001/002).
 - Assumption: input sanitization uses normalization/escaping (per user decision), not wholesale rejection, except where normalization cannot yield a valid value; list-valued status elements follow ADR-0024's reject-only behavior.
 - Assumption: symlink resolution uses canonical paths for the project-directory boundary.
-- Assumption: folder relocation uses the shared `record::relocate` routine (ADR-0013 stage 5) invoked by `config set`; the browser configuration view calls the same path.
+- Assumption: folder relocation uses the shared `record::relocate` routine (ADR-0013 stage 5) invoked by `config set`; the browser configuration view calls the same path. Retired (TASK-203, 2026-11-18, ADR-034, REQ-06.018): the browser serves no configuration view, so only the CLI `config set` caller remains; the CLI relocation assumption stays current.
 - Assumption: an empty element after trimming (for example `a,,b`) is rejected rather than dropped, because silently persisting an empty task status would be invalid data; ADR-0024 rejects an empty list and leaves no drop rule.
 - Assumption: flow rendering uses `[a, b]` (brackets, comma, single space), matching the existing top-level `statuses` rendering in `config list`.
 - Assumption: a list element containing a newline or other control character is rejected (exit 4), because a single-line flow sequence cannot represent it unambiguously (NFR-02.002).

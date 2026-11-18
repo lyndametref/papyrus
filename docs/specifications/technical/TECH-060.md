@@ -2,7 +2,7 @@
 id: TECH-060
 title: "Papyrus-Native Record Layout and Single ID Space"
 created_date: '2026-11-16T17:46:52Z'
-updated_date: '2026-11-16T17:47:27Z'
+updated_date: '2026-11-18T22:50:56Z'
 labels: []
 references:
   - ADR-0006
@@ -39,9 +39,14 @@ references:
   - TASK-90
   - TASK-92
   - TASK-98
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-060 Papyrus-Native Record Layout and Single ID Space
+
+> **Revised (TASK-203, 2026-11-18):** section 8 item 7, which required the browser configuration view to reach the `config set` relocation path, is retired per ADR-034 and REQ-06.018 (RE-005): the browser serves no configuration view and configuration editing is CLI-only. The CLI `config set` whole-folder relocation clauses (section 8 items 1-6, REQ-01.002) remain current. REQ-06.008, which the retired item cites, is archived; the retired text is retained below as history. See TECH-080.
 
 ## Description
 **Ticket:** TASK-83 (specification); refined for implementation TASK-88
@@ -156,7 +161,7 @@ Define the Papyrus-native on-disk record layout and the single Papyrus ID space 
 4. It pre-checks the whole plan (destination entry conflicts, containment, permissions) before moving anything.
 5. On any failure it moves nothing (or rolls back what it already moved), persists no configuration value, and reports the conflict outcome of REQ-01.004.
 6. After success the source folder is removed when empty.
-7. The browser configuration view (REQ-06.008) must call this same `config set` path; it may not move folders itself.
+7. **Retired (TASK-203, 2026-11-18, ADR-034, REQ-06.018):** the browser configuration view (REQ-06.008, archived) must call this same `config set` path; it may not move folders itself. No browser configuration view exists, so the CLI `config set` command is the only caller of this routine; items 1-6 above remain current.
 
 ### 9. Configuration is the only source of paths and statuses
 

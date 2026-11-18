@@ -2,7 +2,7 @@
 id: TECH-065
 title: "Release 1.0 Native Layout, Import, Relocation, and Single ID Space Verification and Packaging"
 created_date: '2026-11-16T17:46:53Z'
-updated_date: '2026-11-16T17:47:29Z'
+updated_date: '2026-11-18T22:50:56Z'
 labels: []
 references:
   - ADR-0001
@@ -47,9 +47,14 @@ references:
   - TASK-97
   - TASK-98
   - TASK-99
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-065 Release 1.0 Native Layout, Import, Relocation, and Single ID Space Verification and Packaging
+
+> **Revised (TASK-203, 2026-11-18):** the browser configuration-view clauses — the relocation scope bullet, section 7 item 4, and the `browser view equivalence` part of the T-98-08 verification row — are retired per ADR-034 and REQ-06.018 (RE-005): the browser serves no configuration view and configuration editing is CLI-only. The CLI-only `config set` relocation and installed-binary verification clauses (REQ-01.002) remain current. REQ-06.008, which the retired clauses cite, is archived; the retired text is retained below as history. See TECH-080.
 
 ## Description
 **Ticket:** TASK-98
@@ -73,7 +78,7 @@ This is a verification and packaging ticket. Product behaviour must not change; 
 - Invisibility of an unimported Backlog.md store on every surface, and full readability after `papyrus import backlog`.
 - Single-ID proof for CLI text, CLI `--json`, browser JSON, browser HTML, and browser URLs, including rejection of a Backlog ID as an unknown record.
 - Import fidelity, excluded scope, and the documented upgrade path, verified against the sample fixture only.
-- Relocation atomicity and conflict behaviour, re-verified through the installed binary; the browser configuration view reaching the same `config set` path.
+- Relocation atomicity and conflict behaviour, re-verified through the installed binary; **retired (TASK-203, 2026-11-18, ADR-034, REQ-06.018):** the check that the browser configuration view reaches the same `config set` path — the browser serves no configuration view, so only the CLI `config set` relocation path is re-verified.
 - Search indexing whole persisted text including front matter, and correspondence with the documented search behaviour.
 - Rust quality gates on the pinned toolchain, and the isolated Debian Forky amd64 package build, install, smoke, uninstall, and purge.
 - One new automated integration test file, `tests/release_native_layout_smoke.rs`, for the parts that can be asserted against the built binary.
@@ -150,7 +155,7 @@ This is a verification and packaging ticket. Product behaviour must not change; 
 1. `config set backlog_directory <new>` moves every file and subfolder of the source folder, including unmanaged files, and removes the source folder when empty.
 2. A destination conflict, an unwritable destination, or a destination outside the project exits 4, moves nothing, leaves both trees intact, and persists no configuration value; the configuration file is byte-identical.
 3. A multi-segment destination is accepted and resolved relative to the project directory; every resolved path stays inside the project.
-4. The browser configuration view reaches the same relocation path: the same move performed through the view produces the same on-disk result and configuration value as the CLI, and the view never moves a folder itself.
+4. **Retired (TASK-203, 2026-11-18, ADR-034, REQ-06.018):** the browser configuration view reaches the same relocation path: the same move performed through the view produces the same on-disk result and configuration value as the CLI, and the view never moves a folder itself. No browser configuration view exists; items 1-3 and 5 remain current for the CLI `config set` path.
 5. Success and conflict are re-verified through the installed binary; `tests/config_relocation_cli.rs` remains authoritative for the exhaustive case matrix.
 
 ### 8. Search over whole persisted text (CLI) and browser record exposure
@@ -234,7 +239,7 @@ This is a verification and packaging ticket. Product behaviour must not change; 
 | T-98-05 | One Papyrus ID on every surface; Backlog ID rejected | Captured CLI text, `--json`, browser HTML, JSON API, URLs; `task view task-1` exits 3 |
 | T-98-06 | Import fidelity, bodies, destinations, excluded scope | Fixture-expectation comparison of every in-scope record and the excluded counts |
 | T-98-07 | Documented upgrade path executes as written | Literal procedure run on the isolated project; plan/report kept; findings recorded |
-| T-98-08 | Relocation atomicity, conflict, containment, browser path | CLI `config set` success/conflict, hash comparisons, browser view equivalence, installed-binary re-check |
+| T-98-08 | Relocation atomicity, conflict, containment, browser path | CLI `config set` success/conflict, hash comparisons, installed-binary re-check; **retired (TASK-203, 2026-11-18, ADR-034, REQ-06.018):** the former browser-path and browser view equivalence requirements, which the rewritten `t98_08` no longer tests because the browser serves no configuration view |
 | T-98-09 | Search indexes front matter on the CLI; browser exposes the record | Front-matter-only query via `papyrus search` (text and `--json`); the same record rendered by the browser record view and the JSON API; project hash unchanged |
 | T-98-10 | Rust quality gates pass | `cargo build --release`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check` |
 | T-98-11 | Debian package metadata and contents | `./scripts/build-deb.sh`, `dpkg-deb -I`, `dpkg-deb -c`, copyright inspection |
