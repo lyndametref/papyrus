@@ -2,7 +2,7 @@
 id: TECH-068
 title: "Registry-Derived Browser Views for Config-Defined Document Types"
 created_date: '2026-11-16T17:46:54Z'
-updated_date: '2026-11-16T17:47:30Z'
+updated_date: '2026-11-18T20:22:31Z'
 labels: []
 references:
   - ADR-0005
@@ -32,9 +32,14 @@ references:
   - TASK-110
   - TASK-113
   - TASK-114
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-068 Registry-Derived Browser Views for Config-Defined Document Types
+
+> **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
 
 ## Description
 **Ticket:** TASK-114

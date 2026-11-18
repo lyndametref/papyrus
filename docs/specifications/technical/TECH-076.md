@@ -2,7 +2,7 @@
 id: TECH-076
 title: "Browser Shell UI: Shared List Layout, Width Classes, and Collapsible Navigation"
 created_date: '2026-11-16T17:46:56Z'
-updated_date: '2026-11-16T17:47:34Z'
+updated_date: '2026-11-18T20:22:32Z'
 labels: []
 references:
   - ADR-0005
@@ -25,9 +25,14 @@ references:
   - TASK-146
   - TASK-148
   - TASK-150
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-076 Browser Shell UI: Shared List Layout, Width Classes, and Collapsible Navigation
+
+> **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
 
 ## Description
 **Tickets:** TASK-148 (publisher; contract fixed by TASK-141, TASK-142, TASK-144)
