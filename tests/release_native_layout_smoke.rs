@@ -1680,21 +1680,43 @@ fn t98_08_relocation_atomicity_and_browser_path() {
     let config = fs::read_to_string(cli.join("papyrus.config.yml")).unwrap();
     assert!(config.contains("backlog_directory: native/store"));
 
-    // The browser configuration view reaches the same path.
+    // The browser has no configuration surface: the removed routes stay 404
+    // and relocation remains CLI-only, as asserted above.
     let browser = scratch.join("browser");
     fs::create_dir_all(&browser).unwrap();
     init_project(&browser);
     write(&browser.join("backlog/extra.txt"), "unmanaged");
     {
         let server = Server::start(&browser, &scratch);
+        for path in [
+            "/config",
+            "/config/edit",
+            "/lifecycle",
+            "/skills",
+            "/?type=config",
+            "/?type=lifecycle",
+            "/?type=skills",
+        ] {
+            let response = get(&server, path);
+            assert_eq!(response.status, 404, "{path}");
+            let body = response.text();
+            assert!(body.contains("Record not found"), "{path}");
+            for marker in ["Configuration", "Managed artifacts", "Agent skills"] {
+                assert!(!body.contains(marker), "{path} body: {marker}");
+            }
+        }
         let body = form_body(&[("key", "backlog_directory"), ("value", "moved/here")]);
         let response = post_form(&server, "/config", &body);
-        assert_eq!(response.status, 303);
-        assert_eq!(response.header("Location"), Some("/config"));
+        assert_eq!(response.status, 404);
+        assert_eq!(response.header("Location"), None);
     }
-    assert!(browser.join("moved/here/extra.txt").exists());
+    assert!(
+        browser.join("backlog/extra.txt").exists(),
+        "a browser POST must not move the folder"
+    );
+    assert!(!browser.join("moved/here").exists());
     let config = fs::read_to_string(browser.join("papyrus.config.yml")).unwrap();
-    assert!(config.contains("backlog_directory: moved/here"));
+    assert!(!config.contains("moved/here"));
 
     // Destination conflict: exit 4, move nothing, configuration unchanged.
     let conflict = scratch.join("conflict");

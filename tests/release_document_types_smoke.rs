@@ -1064,8 +1064,19 @@ fn t117_08_browser_matrix_over_http() {
     assert_eq!(list.status, 200);
     let html = list.text();
     let sidebar_start = html.find(">Documents</p>").expect("Documents group");
-    let sidebar_end = html.find(">Configuration</a>").expect("utility");
+    let sidebar_end = sidebar_start
+        + html[sidebar_start..]
+            .find("</nav>")
+            .expect("sidebar nav close");
     assert!(html[sidebar_start..sidebar_end].contains("Notes"));
+    // The removed utility entries stay gone from every served sidebar.
+    for marker in [
+        ">Configuration</a>",
+        ">Managed artifacts</a>",
+        ">Agent skills</a>",
+    ] {
+        assert!(!html.contains(marker), "{marker}");
+    }
     assert!(html.contains("data-list-layout=\"shared\""));
     let mut position = 0usize;
     for key in ["id", "title", "status", "created", "updated", "actions"] {
@@ -1200,14 +1211,16 @@ fn t117_08_browser_matrix_over_http() {
     assert!(!get(&server, "/api/docs/note").text().contains("NOTE-002"));
     assert!(!get(&server, "/?type=note").text().contains("NOTE-900"));
 
-    // B-15 / B-16 / B-17 / B-18
+    // B-15: the managed-artifact lifecycle view is removed from the browser.
+    for path in ["/lifecycle", "/?type=lifecycle"] {
+        assert_eq!(get(&server, path).status, 404, "{path}");
+    }
     let lifecycle = get(&server, "/lifecycle").text();
-    assert!(lifecycle.contains("Backlog"));
-    assert!(lifecycle.contains("Decisions"));
-    assert!(lifecycle.contains("Documents"));
-    assert!(lifecycle.contains("Notes"));
-    assert_eq!(lifecycle.matches("enabled:").count(), 17);
+    assert!(lifecycle.contains("Record not found"));
+    assert!(!lifecycle.contains("Managed artifacts"));
+    assert!(!lifecycle.contains("enabled:"));
 
+    // B-16 / B-17 / B-18
     let api = get(&server, "/api/docs/note");
     assert_eq!(api.status, 200);
     let rows = parse_json(&api.text());
@@ -1264,7 +1277,12 @@ fn t117_08_browser_matrix_over_http() {
     assert_eq!(get(&server, "/doc/NOTE-001/edit").status, 404);
     assert_eq!(get(&server, "/api/docs/note").status, 404);
     assert!(!get(&server, "/").text().contains(">Notes<"));
-    let lifecycle = get(&server, "/lifecycle").text();
-    assert!(lifecycle.contains("Notes"));
-    assert!(lifecycle.contains("enabled: false"));
+    for path in ["/lifecycle", "/?type=lifecycle"] {
+        assert_eq!(get(&server, path).status, 404, "{path}");
+    }
+    // The disabled state stays inspectable through the CLI.
+    assert_eq!(
+        run_ok(&project, &["config", "get", "document_types.note.enabled"]),
+        "false"
+    );
 }

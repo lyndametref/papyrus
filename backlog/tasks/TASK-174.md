@@ -2,11 +2,30 @@
 id: TASK-174
 title: "Implement removal of browser sections"
 created_date: '2026-11-16T21:03:23Z'
-updated_date: '2026-11-18T20:36:43Z'
+updated_date: '2026-11-18T21:36:11Z'
 labels: []
 references:
   - REQ-06.018
   - RE-005
+  - REQ-06.003
+  - REQ-06.005
+  - REQ-06.008
+  - NFR-01.002
+  - ADR-034
+  - TECH-080
+  - UI-018
+  - MOCK-020
+  - BR-003
+  - BR-004
+  - TC-033
+  - TC-034
+  - TC-035
+  - TC-036
+  - TC-037
+  - TC-038
+  - TC-039
+  - AUD-107
+  - AUD-108
 status: Done
 assignee:
   - rust-dev
