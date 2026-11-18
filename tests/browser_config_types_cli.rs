@@ -696,7 +696,8 @@ fn t114_11_builtin_list_uses_shared_columns_and_keeps_sections() {
     let rule = get(&server, "/?type=business-rule").text();
     assert!(rule.contains("Business Rules"));
     let spec = get(&server, "/doc/TECH-001").text();
-    assert!(spec.contains("Technical specification"));
+    assert!(!spec.contains("Technical specification"));
+    assert!(spec.contains("<p class=\"id\">"));
     drop(server);
     let _ = fs::remove_dir_all(&d);
 }

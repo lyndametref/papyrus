@@ -497,12 +497,12 @@ fn detail_and_edit_field_sets_are_unchanged_per_family() {
         .unwrap();
         let id = fixture["records"][0]["id"].as_str().unwrap();
         let detail = server.get(&format!("/doc/{id}"));
-        for label in ["Record ID", "Created date", "Updated date"] {
-            assert!(
-                detail.contains(&format!("<dt>{label}</dt>")),
-                "{family} {id} detail {label}"
-            );
-        }
+        // Record ID, Created date, and Updated date moved to the page head
+        // under the uniform single-document layout (ADR-033).
+        assert!(
+            detail.contains("<p class=\"id\">"),
+            "{family} {id} page head id"
+        );
         let edit = server.get(&format!("/doc/{id}/edit"));
         for label in *labels {
             assert!(edit.contains(label), "{family} {id} edit label {label}");

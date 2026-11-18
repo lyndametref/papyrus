@@ -1343,10 +1343,6 @@ pub fn view_page(
                     "<section class=\"record-section\"><h2>References</h2><p class=\"text\" style=\"white-space: pre-wrap\">{}</p></section>",
                     escape(&refs)
                 ));
-                details.push_str(&format!(
-                    "<details><summary>References (1)</summary><p class=\"text\" style=\"white-space: pre-wrap\">{}</p></details>",
-                    escape(&refs)
-                ));
             }
         }
         Some(TypedHandler::Rule) => {
@@ -1548,18 +1544,21 @@ pub fn view_page(
                 ));
         }
     }
-    if record.handler() == Some(TypedHandler::Decision) {
-        content = format!(
-            "<p class=\"record-meta\">Decision type: {}</p><p class=\"record-meta\">Status: {}</p>{}",
-            escape(record.decision_type.as_deref().unwrap_or("(none)")),
-            escape(record.status.as_deref().unwrap_or("(none)")),
-            content
-        );
-    }
-    if record.handler() == Some(TypedHandler::UiMockup) {
-        content = format!("<p class=\"record-meta\">UI mockup</p>{}", content);
-    }
-    let extra = record_view_extra_rows(record, &["created_date", "updated_date", "labels"]);
+    // Decision type and Status are surfaced through the page_head (rendered
+    // under the content per ADR-033); they are not prepended above the
+    // artifact content. UiMockup records no longer re-add a document type
+    // label (ADR-033 point 4).
+    let extra = record_view_extra_rows(
+        record,
+        &[
+            "created_date",
+            "updated_date",
+            "labels",
+            "status",
+            "decision_type",
+            "audit_type",
+        ],
+    );
     if !extra.is_empty() {
         content.push_str(&extra);
     }
@@ -1629,13 +1628,12 @@ pub fn view_page(
     } else if record.handler() == Some(TypedHandler::Decision) {
         let decision_type = record.decision_type.as_deref().unwrap_or("(none)");
         format!(
-            "<div class=\"page-head\"><div><p class=\"id\">{} <span class=\"badge\">{}</span></p><h1 class=\"h1\">{}</h1><p class=\"sub\">Decision type: {} \u{00b7} Status: {} \u{00b7} Created date: {} \u{00b7} Updated date: {}</p>{}{}</div>\
+            "<div class=\"page-head\"><div><p class=\"id\">{} <span class=\"badge\">{}</span></p><h1 class=\"h1\">{}</h1><p class=\"sub\">Decision type: {} \u{00b7} Created date: {} \u{00b7} Updated date: {}</p>{}{}</div>\
 <div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Edit</a></div></div>",
             id,
             status,
             title,
             escape(decision_type),
-            status,
             escape(&created),
             escape(&updated),
             taglist,
@@ -4333,6 +4331,9 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
         "updated_date",
         "labels",
         "references",
+        "status",
+        "decision_type",
+        "audit_type",
     ];
     let metadata = record_view_extra_rows(record, &skip);
 
