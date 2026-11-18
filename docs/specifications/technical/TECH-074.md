@@ -2,7 +2,7 @@
 id: TECH-074
 title: "Browser Shell, PageWidth Contract, Shared List Layout, and Collapsible Navigation (TASK-141, TASK-144)"
 created_date: '2026-11-16T17:46:55Z'
-updated_date: '2026-11-16T17:47:33Z'
+updated_date: '2026-11-18T20:22:32Z'
 labels: []
 references:
   - ADR-0005
@@ -36,9 +36,14 @@ references:
   - TASK-148
   - TASK-149
   - TASK-150
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-074 Browser Shell, PageWidth Contract, Shared List Layout, and Collapsible Navigation (TASK-141, TASK-144)
+
+> **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
 
 ## Description
 **Tickets:** TASK-141 (§3.1–§3.3, §4.1, §5, §6 — delivered), TASK-144 (§3.4, §4.2–§4.5 — refined 2026-11-16)

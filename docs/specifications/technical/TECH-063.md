@@ -2,7 +2,7 @@
 id: TECH-063
 title: "Browser Configuration View, Single Record View Layout, and Lifecycle Configuration (Design Review)"
 created_date: '2026-11-16T17:46:52Z'
-updated_date: '2026-11-16T17:47:28Z'
+updated_date: '2026-11-18T20:22:31Z'
 labels: []
 references:
   - ADR-0010
@@ -27,9 +27,14 @@ references:
   - TASK-93
   - TASK-94
   - TASK-95
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-063 Browser Configuration View, Single Record View Layout, and Lifecycle Configuration (Design Review)
+
+> **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
 
 ## Description
 **Ticket:** TASK-87

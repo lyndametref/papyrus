@@ -2,7 +2,7 @@
 id: TECH-051
 title: "Browser Page for Agent Skills and Workflows"
 created_date: '2026-11-16T17:46:50Z'
-updated_date: '2026-11-16T17:47:22Z'
+updated_date: '2026-11-18T20:22:30Z'
 labels: []
 references:
   - ADR-0005
@@ -34,9 +34,14 @@ references:
   - TASK-76
   - TASK-77
   - TASK-86
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-051 Browser Page for Agent Skills and Workflows
+
+> **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
 
 ## Description
 **Ticket:** TASK-77

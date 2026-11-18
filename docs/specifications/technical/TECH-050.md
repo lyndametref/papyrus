@@ -2,7 +2,7 @@
 id: TECH-050
 title: "Browser Page for Managed Artifacts and Lifecycles"
 created_date: '2026-11-16T17:46:50Z'
-updated_date: '2026-11-16T17:47:22Z'
+updated_date: '2026-11-18T20:22:29Z'
 labels: []
 references:
   - ADR-0005
@@ -48,9 +48,14 @@ references:
   - TASK-72
   - TASK-86
   - TASK-95
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-050 Browser Page for Managed Artifacts and Lifecycles
+
+> **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
 
 ## Description
 **Ticket:** TASK-72
