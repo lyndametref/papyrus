@@ -2,7 +2,7 @@
 id: TECH-007
 title: "Offline Browser Access for Requirement Content"
 created_date: '2026-11-16T17:46:43Z'
-updated_date: '2026-11-16T17:47:02Z'
+updated_date: '2026-11-18T22:24:45Z'
 labels: []
 references:
   - ADR-0001
@@ -59,9 +59,14 @@ references:
   - TASK-7
   - TASK-86
   - TASK-87
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-007 Offline Browser Access for Requirement Content
+
+> **Revised (TASK-201, 2026-11-18):** the configuration view (section 4d), its `/config` route and sidebar entry, the link to the lifecycle page, and the lifecycle/configuration/skills CSP response class are retired per ADR-034 and REQ-06.018; the browser serves no configuration view and configuration editing is CLI-only. See TECH-080.
 
 ## Description
 **Ticket:** TASK-6
@@ -241,7 +246,9 @@ Deliver the first increment of `papyrus browser`: a blocking, dependency-free HT
 6. The layout applies to every managed Markdown record type that has a single record view. UI mockup HTML views are excluded.
 7. The summary card does not show status, milestone, assignee, labels, or references; those remain in their existing locations outside the card, except labels which move to the taglist under the title.
 
-### 4d. Configuration view
+### 4d. Configuration view (retired)
+
+> **Retired (TASK-201, 2026-11-18):** per ADR-034 and REQ-06.018 the browser serves no configuration view. `GET /config`, `GET /config/edit`, `POST /config`, and `GET /?type=config` return `404` and relocate nothing; there is no `Configuration` sidebar entry and no link from any page to a lifecycle view. Configuration editing is CLI-only (`papyrus config get/set/unset`). Clauses 1-8 below are retained as history.
 
 1. The browser serves a configuration view for the current project.
 2. Editing uses `papyrus config get/set`, so folder changes are relocated by the single relocation routine (REQ-01.002, ADR-0010 decision 8). The browser never moves a folder itself.
@@ -411,7 +418,7 @@ Routes are exact. `{id}` is a record ID as defined in section 7.1.
 
    | Response | String |
    |---|---|
-   | `text/html` whose pre-pass did not set `has_diagram`: lists, board, record/document views without a figure, edit, inventory, lifecycle, configuration, skills, and every 400/404/405/415/422/500 page | strict |
+   | `text/html` whose pre-pass did not set `has_diagram`: lists, board, record/document views without a figure, edit, inventory, and every 400/404/405/415/422/500 page | strict |
    | `text/html` record or document view whose pre-pass set `has_diagram` | diagram |
    | Every `/assets/*` response, including the Mermaid bundle and the WOFF2 fonts | none |
    | JSON, text, and every non-HTML response | none |

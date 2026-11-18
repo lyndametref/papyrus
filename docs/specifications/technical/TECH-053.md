@@ -2,7 +2,7 @@
 id: TECH-053
 title: "Complete Browser Access for All Papyrus Content"
 created_date: '2026-11-16T17:46:50Z'
-updated_date: '2026-11-16T17:47:23Z'
+updated_date: '2026-11-18T22:25:20Z'
 labels: []
 references:
   - ADR-0005
@@ -50,9 +50,14 @@ references:
   - TASK-73
   - TASK-76
   - TASK-77
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-053 Complete Browser Access for All Papyrus Content
+
+> **Revised (TASK-201, 2026-11-18):** the Managed artifacts & lifecycles and Agent skills & workflows sidebar entries, their `/lifecycle` and `/skills` routes and `?type=` aliases, and their two inventory cards are retired per ADR-034 and REQ-06.018; the browser now serves the twelve record categories only. See TECH-080.
 
 ## Description
 **Ticket:** TASK-19
@@ -69,9 +74,9 @@ Final integration increment of the offline, project-local web interface: one nav
 ### In scope
 
 - An inventory hub at `GET /` listing every supported record type as a card with an illustrative count, with the represented types linking to their per-type list view (`/?type=<category>`). The requirements list view moves to `GET /?type=req`; `GET /?type=req` and the requirements list behavior are unchanged.
-- The persistent sidebar in the final order established by the approved MOCK-0012 and the per-type increments: Business requirements, Business rules, Audit records, Technical specifications, Non-functional requirements, Backlog, Decisions, Glossary, UI specifications, UI mockups, Managed artifacts & lifecycles, Agent skills & workflows. Gating by `document_types.*.enabled` for the gated types is retained; `Managed artifacts & lifecycles` and `Agent skills & workflows` remain always present.
-- `aria-current="page"` and the non-colour cue (bold + underline) on the active sidebar entry, including on the inventory hub (no entry active) and on the lifecycle and skills pages.
-- The `?type=` category selector continues to accept exactly the existing values (`req`, `nfr`, `task`, `milestone`, `release`, `decision`, `glossary`, `ui-spec`, `ui-mockup`, `business-rule`, `audit-record`, `tech-spec`, plus the `lifecycle` and `skills` aliases). Any other value, including `all`, remains `400`.
+- The persistent sidebar in the final order established by the approved MOCK-0012 and the per-type increments: Business requirements, Business rules, Audit records, Technical specifications, Non-functional requirements, Backlog, Decisions, Glossary, UI specifications, UI mockups. Gating by `document_types.*.enabled` for the gated types is retained. The `Managed artifacts & lifecycles` and `Agent skills & workflows` entries are retired per ADR-034 (TASK-201).
+- `aria-current="page"` and the non-colour cue (bold + underline) on the active sidebar entry, including on the inventory hub (no entry active).
+- The `?type=` category selector continues to accept exactly the existing values (`req`, `nfr`, `task`, `milestone`, `release`, `decision`, `glossary`, `ui-spec`, `ui-mockup`, `business-rule`, `audit-record`, `tech-spec`; the former `lifecycle` and `skills` aliases are retired per ADR-034 and now return `404`). Any other value, including `all`, remains `400`.
 - Cross-type ID resolution: a record ID is resolved by exact match across all twelve record categories; an ID matching records in more than one category is `500` with a generic message; a deprecated or unknown ID is `404`.
 - Deprecated records of every document type are hidden from lists, counts, and the inventory, and are unreachable by URL, consistently with the per-type increments.
 - Disabled or absent document types contribute no records and no error to the inventory or to any list; their sidebar entry is omitted.
@@ -96,24 +101,24 @@ Final integration increment of the offline, project-local web interface: one nav
 ### 1. Route and navigation
 
 1. `GET /` serves the inventory hub. `GET /?type=req`, `GET /?type=nfr`, and every other documented `?type=` value continue to serve their existing per-type list page. The baseline rule that `GET /` and `GET /?type=req` render the same page is superseded by this increment: `GET /` now renders the inventory hub, and `GET /?type=req` renders the requirements list.
-2. `GET /lifecycle` and `GET /?type=lifecycle` serve the managed-artifacts-and-lifecycles page (TASK-72); `GET /skills` and `GET /?type=skills` serve the agent-skills page (TASK-77). These aliases are unchanged.
+2. `GET /lifecycle`, `GET /?type=lifecycle`, `GET /skills`, and `GET /?type=skills` are retired per ADR-034 and REQ-06.018: each returns `404` and nothing is relocated. The managed-artifacts-and-lifecycles and agent-skills documentation remains outside the browser (TASK-72, TASK-77).
 3. Any method other than `GET`/`HEAD` on a known path is `405` with an `Allow: GET, HEAD` header; an unknown path is `404`.
-4. The sidebar is rendered on every page, including the inventory hub, the lifecycle page, and the skills page, using the final order in Scope. The active entry carries `aria-current="page"` and the non-colour cue; on the inventory hub no document-type entry is active.
+4. The sidebar is rendered on every page, including the inventory hub, using the final order in Scope. The active entry carries `aria-current="page"` and the non-colour cue; on the inventory hub no document-type entry is active.
 5. The navigation is expanded by default at every width; the header toggle collapses and expands it, and the reader's choice persists in `papyrus.nav`, matching the baseline.
 
 ### 2. Inventory hub
 
 1. The page renders the shared shell: header (product name, project name, static offline/bind note), persistent left sidebar, `main`, footer, and exactly one `h1` with the text `Browser inventory` (per MOCK-0012). A subtitle states that the inventory lists every record type Papyrus manages.
 2. The page renders one card per supported record type, in the final sidebar order, each showing the type name, the record count for that type (active records only), and a short description. The count is computed from the configured active store, exactly as the per-type list count; a missing or disabled store contributes `0` and no error.
-3. A represented type's card links to its per-type list view (`/?type=<category>`). The represented types are all twelve record categories plus the two virtual pages: Managed artifacts & lifecycles (`/lifecycle`) and Agent skills & workflows (`/skills`). Every card is therefore clickable; cards for disabled document types are omitted rather than shown as zero-count.
+3. A represented type's card links to its per-type list view (`/?type=<category>`). The represented types are the twelve record categories; the former Managed artifacts & lifecycles (`/lifecycle`) and Agent skills & workflows (`/skills`) cards are retired per ADR-034. Every remaining card is therefore clickable; cards for disabled document types are omitted rather than shown as zero-count.
 4. A card for a type that has no records shows its empty-state note (for example "No technical specifications found.") and remains clickable.
 5. The page renders no record list, count beyond the card count, form, or edit control of its own; per-type lists remain the place to browse records.
 6. The page works with JavaScript disabled; cards are plain links.
 
 ### 3. Sidebar (final order and gating)
 
-1. The sidebar lists entries in this order: Business requirements, Business rules, Audit records, Technical specifications, Non-functional requirements, Backlog, Decisions, Glossary, UI specifications, UI mockups, Managed artifacts & lifecycles, Agent skills & workflows.
-2. Gated entries (Business requirements, Business rules, Audit records, Technical specifications, Non-functional requirements, UI specifications, UI mockups) are omitted when the corresponding `document_types.<key>.enabled` is `false` or the key is absent, exactly as in the per-type increments. Backlog, Decisions, Glossary, Managed artifacts & lifecycles, and Agent skills & workflows are always present.
+1. The sidebar lists entries in this order: Business requirements, Business rules, Audit records, Technical specifications, Non-functional requirements, Backlog, Decisions, Glossary, UI specifications, UI mockups. The `Managed artifacts & lifecycles` and `Agent skills & workflows` entries are retired per ADR-034 (TASK-201).
+2. Gated entries (Business requirements, Business rules, Audit records, Technical specifications, Non-functional requirements, UI specifications, UI mockups) are omitted when the corresponding `document_types.<key>.enabled` is `false` or the key is absent, exactly as in the per-type increments. Backlog, Decisions, and Glossary are always present.
 3. The selected entry carries `aria-current="page"` and the non-colour cue (bold + underline). The Backlog entry is active for `task`, `milestone`, and `release` categories.
 4. Labels use the approved casing from MOCK-0012 (`Business requirements`, `Business rules`, `Audit records`, `Technical Specifications` → `Technical specifications`? keep per-type label). The exact labels follow the per-type increments and MOCK-0012; no label is changed by this increment beyond ordering.
 
@@ -148,19 +153,19 @@ Integration tests extend `tests/browser_cli.rs` (and siblings) with at least the
 - T-19c: the inventory shows the correct active-record count for a project containing records of every supported type, and shows `0` (or the empty-state note) for a type with no records.
 - T-19d: `GET /?type=req` (and every other documented `?type=` value) still renders its per-type list exactly as before this increment; `GET /` no longer renders the requirements list.
 - T-19e: `GET /?type=all` (and any other undocumented value) returns `400`.
-- T-19f: the sidebar on the inventory hub, on a per-type list, on the lifecycle page, and on the skills page lists entries in the final order, with the active entry marked `aria-current="page"` and the non-colour cue; gated entries are omitted when their type is disabled.
+- T-19f: the sidebar on the inventory hub and on a per-type list lists entries in the final order, with the active entry marked `aria-current="page"` and the non-colour cue; gated entries are omitted when their type is disabled.
 - T-19g: cross-type ID resolution: an ID present in exactly one category resolves to that record; an ID present in two categories returns `500`; a deprecated ID and an unknown ID return `404` with the per-type `404` page.
 - T-19h: deprecated records of at least three document types are absent from the inventory counts and return `404` on view, edit, POST, and API, with identical HTML `404` bodies for deprecated and unknown IDs.
 - T-19i: a project with a disabled document type (for example `tech-spec.enabled: false`) shows no card for it and no error on the inventory; `?type=tech-spec` renders the empty state.
 - T-19j: the inventory and every per-type list/edit view render without JavaScript, keep controls labelled and stacked at 320 CSS pixels, and contain no `http://` or `https://` reference.
-- T-19k: an offline asset scan finds no external origin in inventory, list, view, edit, lifecycle, skills, and error responses; representative asset responses carry the documented MIME and no CSP, and the manifest digest test passes.
+- T-19k: an offline asset scan finds no external origin in inventory, list, view, edit, and error responses; representative asset responses carry the documented MIME and no CSP, and the manifest digest test passes.
 - T-19l: build, tests, clippy, and formatting pass with existing dependencies only.
 
 ## Assumptions
 
 - Assumption: The inventory hub replaces the previous default `GET /` → requirements-list behavior; `GET /?type=req` becomes the canonical requirements list route. This follows the approved MOCK-0012 route table (`GET /` = inventory). Existing tests that call `GET /` expecting the requirements list are updated as part of this increment; no product behavior other than the landing route changes.
 - Assumption: The inventory card counts are active-record counts computed by the same store reads as the per-type lists; they are not cached and not persisted.
-- Assumption: "Represented types" in the approved MOCK-0012 are all twelve record categories plus the two virtual pages, because every category already has a per-type list view delivered by earlier increments. Cards for disabled document types are omitted rather than shown as disabled.
+- Assumption: "Represented types" in the approved MOCK-0012 are the twelve record categories, because every category already has a per-type list view delivered by earlier increments; the two virtual pages shown by the mockup are retired per ADR-034 (TASK-201). Cards for disabled document types are omitted rather than shown as disabled.
 - Assumption: Real-browser verification in Firefox, Edge, and Safari (NFR-05.001) remains a deferred follow-up, consistent with sibling increments.
 - Assumption: No new dependencies, crates, or ADRs are introduced; the change is confined to the existing `src/browser/` module and its tests.
 - Assumption: The metadata projection (REQ-06.004, ADR-0009) is already implemented by the per-type increments; this increment adds no new metadata keys and changes no editable field set.
@@ -191,7 +196,7 @@ Integration tests extend `tests/browser_cli.rs` (and siblings) with at least the
 |---|---|
 | AC-1 | `GET /` renders the inventory hub with one card per supported type in final order, counts, and links; `GET /?type=req` still renders the requirements list. |
 | AC-2 | The sidebar on every page lists entries in the final order with the active entry marked; gated entries are omitted when disabled. |
-| AC-3 | `?type=` accepts exactly the documented values (plus `lifecycle`/`skills` aliases); any other value is `400`. |
+| AC-3 | `?type=` accepts exactly the documented values (the `lifecycle`/`skills` aliases are retired and return `404`); any other value is `400`. |
 | AC-4 | Cross-type ID resolution returns `404` for deprecated/unknown IDs, `500` for an ID present in more than one category, and the record for a unique ID. |
 | AC-5 | Deprecated records are absent from inventory counts and unreachable by URL with the per-type `404` page. |
 | AC-6 | Disabled/absent document types contribute no card, no records, and no error. |
@@ -209,13 +214,13 @@ UI mockups are required before any UI implementation work and must be approved b
 
 ### Screens covered by the approved package
 
-1. **Shared shell** (reused): header, sidebar with twelve document-type entries plus two virtual pages, `main`, footer, one `h1` per page.
+1. **Shared shell** (reused): header, sidebar with twelve document-type entries (the two virtual pages shown by the mockup are retired per ADR-034), `main`, footer, one `h1` per page.
 2. **Inventory hub** (`/`): type cards with counts; represented types clickable.
 3. **Representative record views** (tasks, milestones, releases, technical specifications): list/detail/edit with front-matter metadata block.
-4. **Lifecycle page** (`/lifecycle`): twelve sections.
-5. **Skills page** (`/skills`): configuration block and grouped skills.
+4. **Lifecycle page** (`/lifecycle`): twelve sections. Retired per ADR-034; the route now returns `404`.
+5. **Skills page** (`/skills`): configuration block and grouped skills. Retired per ADR-034; the route now returns `404`.
 6. **Error pages**: reused 404/400/405/415/500 plus per-type 404 pages.
-7. **320 CSS px**: list, edit, lifecycle, skills views; sidebar toggle.
+7. **320 CSS px**: list and edit views (the lifecycle and skills views are retired, ADR-034); sidebar toggle.
 
 ### Layout decisions resolved by this specification
 

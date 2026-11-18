@@ -2,7 +2,7 @@
 id: TECH-058
 title: "Use Cases and Test Documentation Milestone Packaging and Verification"
 created_date: '2026-11-16T17:46:51Z'
-updated_date: '2026-11-16T17:47:26Z'
+updated_date: '2026-11-18T22:26:10Z'
 labels: []
 references:
   - ADR-0001
@@ -54,9 +54,14 @@ references:
   - TASK-81
   - TASK-82
   - TC-001
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-058 Use Cases and Test Documentation Milestone Packaging and Verification
+
+> **Revised (TASK-201, 2026-11-18):** the `Managed artifacts & lifecycles` and `Agent skills & workflows` sidebar entries asserted in the browser smoke step are retired per ADR-034 and REQ-06.018; the verified sidebar order now ends at `UI Mockups`. See TECH-080.
 
 ## Description
 **Ticket:** TASK-82
@@ -175,7 +180,7 @@ All commands run against the installed binary with `--dir <project>` pointing at
 
 1. `papyrus --dir <project> browser --no-open --port <free-port>` prints exactly one startup line `Serving http://127.0.0.1:<free-port>/` and serves until killed. `<free-port>` is obtained by binding `127.0.0.1:0`, reading the port, and dropping the listener, with a retry if the bind fails.
 2. `--no-open` suppresses the platform opener.
-3. `GET /?type=use-case`, `GET /?type=test-case`, and `GET /?type=test-report` render their categories. The sidebar lists Business requirements, Business Rules, Audit Records, Technical Specifications, Use Cases, Test Cases, Test Reports, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications, UI Mockups, Managed artifacts & lifecycles, and Agent skills & workflows, and the selected entry carries `aria-current="page"` with the non-colour cue. The default category stays `req`; any other `?type=` value, including `all`, is `400`.
+3. `GET /?type=use-case`, `GET /?type=test-case`, and `GET /?type=test-report` render their categories. The sidebar lists Business requirements, Business Rules, Audit Records, Technical Specifications, Use Cases, Test Cases, Test Reports, Non-functional requirements, Backlog, Decisions, Glossary, UI Specifications, UI Mockups; the `Managed artifacts & lifecycles` and `Agent skills & workflows` entries are retired per ADR-034 (TASK-201); the selected entry carries `aria-current="page"` with the non-colour cue. The default category stays `req`; any other `?type=` value, including `all`, is `400`.
 4. The list renders one `h2` per category (`Use Cases`, `Test Cases`, `Test Reports`) with the record count and one row per active record in ascending ID order, each row linking `ID + title` to `/doc/{id}` with the first paragraph of the description as a preview and a metadata line (created date, updated date, labels, references). Empty and long-title states render; non-matching `.md` files, non-`.md` files, and `deprecated/` are never listed or counted.
 5. `GET /doc/<ID>` renders the view: record ID (monospace), record form `Use case`/`Test case`/`Test report`, category `Use Cases`/`Test Cases`/`Test Reports`, the title as `h1`, and the description as body text with `white-space: pre-wrap` and no "Description" heading; an empty description shows `(none)`. The applicability, when present, renders as a section headed "Applicability" with `white-space: pre-wrap`. The breadcrumb is the category plural then the ID, and the page offers exactly one action, `Edit`; the raw file is never served or embedded.
 6. `GET /doc/<ID>/edit` yields the form matching MOCK-0013: required title input, required multi-line description textarea, optional multi-line applicability textarea, front-matter metadata block (ID, created date, updated date read-only; labels and references tags), hidden `version` input plus the visible non-interactive annotation `Hidden field: version (optimistic-concurrency token)`, and `Save changes`/`Cancel`. The pristine, dirty, validation-error (422), conflict (409), and 320 CSS-pixel states are present, and the form works with JavaScript disabled.

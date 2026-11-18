@@ -2,7 +2,7 @@
 id: TECH-069
 title: "Config-Defined Document Types Release Verification and Packaging"
 created_date: '2026-11-16T17:46:54Z'
-updated_date: '2026-11-16T17:47:31Z'
+updated_date: '2026-11-18T22:26:56Z'
 labels: []
 references:
   - ADR-0003
@@ -41,9 +41,14 @@ references:
   - TASK-116
   - TASK-117
   - TASK-122
-status: verified
+  - ADR-034
+  - REQ-06.018
+  - RE-005
+status: draft
 ---
 # TECH-069 Config-Defined Document Types Release Verification and Packaging
+
+> **Revised (TASK-201, 2026-11-18):** the `/lifecycle` expectations in matrix rows B-14 and B-15, the T-117-03 lifecycle check, and the `/lifecycle` descriptor-count assumption are retired per ADR-034 and REQ-06.018; `GET /lifecycle` returns `404` and the disabled-type check no longer depends on a lifecycle page. See TECH-080.
 
 ## Description
 **Ticket:** TASK-117
@@ -82,7 +87,7 @@ recorded.
   the documented exit codes `0/1/2/3/4` (section 3).
 - A browser matrix for a config-defined type: list, detail, edit, read-only
   status, validated status filter, archived/unknown equivalence,
-  disabled-type invisibility, lifecycle page, JSON API, and assets (section 4).
+  disabled-type invisibility, the retired `/lifecycle` route returning `404`, JSON API, and assets (section 4).
 - One upgrade scenario from a pre-change configuration containing `req`,
   `deploy`, and a `deprecated/` folder, executed literally from the Release 1.0
   upgrade notes (section 5).
@@ -219,8 +224,8 @@ only. The `note` fixture carries records with `active`, `review`, and
 | B-11 | `?status=archived`, `?status=bogus`, `?status=Review`, `?status=`, duplicate `status` | `400` with the standard error page and no record list |
 | B-12 | No `status` parameter | every active-directory record listed, including custom statuses |
 | B-13 | Archived record | omitted from list; detail, edit, POST, and API return `404`; the 404 page is identical to an unknown ID |
-| B-14 | `document_types.note.enabled: false` | no sidebar entry, no list, no detail, no API (`404`); `/lifecycle` still lists `Notes` with `enabled: false` |
-| B-15 | `/lifecycle` | groups `Backlog`, `Decisions`, `Documents`; one section per registry descriptor (17 with `note`); custom statuses, prefix, folder, and enabled state shown; no hardcoded type count |
+| B-14 | `document_types.note.enabled: false` | no sidebar entry, no list, no detail, no API (`404`); `GET /lifecycle` returns `404` (retired per ADR-034), so no page lists `Notes` |
+| B-15 | `/lifecycle` (retired) | `GET /lifecycle` and `GET /?type=lifecycle` return `404` per ADR-034 and REQ-06.018; the former Backlog/Decisions/Documents grouping and descriptor count are retired history, not a served surface |
 | B-16 | `/api/docs/note` | `200`; array rows with `id`, `kind`, `title`, `status`, `labels`, `references`, `version`, `path`, `metadata` |
 | B-17 | `/assets/app.css`, `/assets/app.js` | `200`, non-empty, correct content type, `Cache-Control: no-store` |
 | B-18 | Served HTML/CSS/JS | no external references; HTML carries the CSP |
@@ -450,7 +455,7 @@ gap.
 |---|---|---|
 | T-117-01 | Full suite plus the named document-type suites pass; a user-added type completes the CLI lifecycle | `cargo test` with recorded counts; `tests/release_document_types_smoke.rs` runs create/list/view/edit/status/archive/delete through the binary |
 | T-117-02 | CLI help, `--json`, and exit codes `0/1/2/3/4` | Section 3 matrix, captured stdout/stderr and exit status |
-| T-117-03 | Browser list/detail/edit, read-only status, filter, archived/unknown, disabled, lifecycle, API, assets | Section 4 matrix over HTTP |
+| T-117-03 | Browser list/detail/edit, read-only status, filter, archived/unknown, disabled, removed-surface `404` for `/lifecycle` and `/skills`, API, assets | Section 4 matrix over HTTP |
 | T-117-04 | Upgrade from a pre-change configuration follows the documented steps and ends with a working dynamic command | Section 5 scripted scenario plus the installed-binary repeat |
 | T-117-05 | Package builds, installs, runs a configuration-added command offline, and removes cleanly | Section 6 in an isolated dpkg root |
 | T-117-06 | No-drift rules fail on the forbidden patterns | `tests/document_type_no_drift.rs` in the passing suite |
@@ -481,9 +486,9 @@ gap.
 - Assumption: the five carried gaps are findings from completed tasks
   (TASK-115/TASK-116) and are not new scope; TASK-117 verifies and reports
   them without editing their source documents.
-- Assumption: the `/lifecycle` page counts every registry descriptor, so the
-  default count is 16 and a fixture with `note` is 17; the test asserts the
-  relationship, not a frozen number.
+- Assumption: the former `/lifecycle` page counted every registry descriptor
+  (default 16, 17 with `note`). The page is retired per ADR-034 and `GET /lifecycle`
+  returns `404`, so no page asserts a descriptor count (TASK-201).
 
 ## Open questions
 

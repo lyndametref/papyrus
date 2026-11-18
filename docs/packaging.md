@@ -1137,7 +1137,7 @@ statuses follow the existing contract: `0` success, `1` IO/boundary, `2` usage,
 | Browser: JSON API and embedded assets served from the binary | PASS |
 | 320 px markup hooks and no external references | PASS |
 | Front-matter metadata projection (REQ-06.004) | PASS |
-| Managed artifacts and lifecycles page and agent skills and workflows page render | PASS |
+| Configuration, managed-artifacts/lifecycle, and agent-skills browser surfaces removed: `/config`, `/config/edit`, `/lifecycle`, and `/skills` with their `?type=` aliases return `404`; no sidebar entry and no inventory card (ADR-034, TASK-170, TASK-194, TASK-197) | PASS |
 | Lazy migration and Backlog.md round-trip | PASS |
 | Offline operation over loopback | PASS |
 | Browser configuration keys: list/get/set/unset, configured port, `--port` override, defaults restored, invalid values exit 4 | PASS |
@@ -1357,8 +1357,9 @@ Observed results:
   kept and byte-identical.
 - **Relocation** — a multi-segment destination moved all files including unmanaged
   files/subfolders and removed the empty source; the browser configuration view
-  produced the same result. Conflict, unwritable, and out-of-project destinations
-  exited 4, moved nothing, and left the configuration file byte-identical.
+  (retired later by ADR-034) produced the same result. Conflict, unwritable, and
+  out-of-project destinations exited 4, moved nothing, and left the configuration
+  file byte-identical.
 - **Search** — the front-matter-only query `fm-only-label` (a label present only in
   TASK-001's front matter) returned TASK-001 on the CLI and was visible in the
   browser record view and `/api/doc/TASK-001`; quoted phrases, `--type`, `--limit`,
@@ -1578,8 +1579,8 @@ HTTP only against `browser --no-open --port <free>` on a `note` fixture with
 | B-11 invalid filters | `archived`, `bogus`, `Review`, empty, duplicate each 400 with the error page and no list |
 | B-12 no status | all active-directory records, including custom statuses |
 | B-13 archived | omitted; detail/edit/POST/API 404; 404 page identical to an unknown ID; deprecated file also 404 |
-| B-14 disabled type | after restart: list/detail/edit/API 404; no sidebar entry; `/lifecycle` still lists `Notes` with `enabled: false` |
-| B-15 lifecycle | Backlog, Decisions, Documents; 17 `enabled:` sections with `note`; custom statuses/prefix/folder shown |
+| B-14 disabled type | after restart: list/detail/edit/API 404; no sidebar entry; `GET /lifecycle` returns `404` (retired per ADR-034), so no page lists `Notes` |
+| B-15 `/lifecycle` (retired) | `GET /lifecycle`, `GET /?type=lifecycle`, `GET /skills`, and `GET /?type=skills` return `404`; no lifecycle or agent-skills page is served (ADR-034) |
 | B-16 `/api/docs/note` | 200; rows carry id, kind, title, status, labels, references, version, path, metadata |
 | B-17 assets | app.css/app.js 200, non-empty, correct type, `Cache-Control: no-store` |
 | B-18 CSP/external refs | `default-src 'none'; …` present; no `http://`/`https://` reference in served HTML |
@@ -1787,8 +1788,9 @@ contained exactly the same two files, and `/usr/share/papyrus`, `/etc`, and
 
 - Both literals were compared byte-for-byte with `pub const CSP` / `pub const
   CSP_DIAGRAM`. Strict was observed on `/`, `/?type=req`, `/?type=task`,
-  `/doc/<no-math>`, `/doc/<no-math>/edit`, `/doc/<math-only>`, `/lifecycle`, `/config`,
-  `/skills`, `/nope`, a PlantUML-only page, and an over-cap fence page (12/12).
+  `/doc/<no-math>`, `/doc/<no-math>/edit`, `/doc/<math-only>`, `/nope`, a PlantUML-only
+  page, and an over-cap fence page (9/9). The retired `/config`, `/lifecycle`, and
+  `/skills` routes are `404` and were excluded (ADR-034).
   Diagram was observed only on pages with a renderable `mermaid` figure (3/3).
 - No `Content-Security-Policy` on any `/assets/...` response or any
   `application/json` response. In both literals `script-src` is exactly `'self'` with no
