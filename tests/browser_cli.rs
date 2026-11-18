@@ -9115,3 +9115,4 @@ fn tc032_reference_links_resolve_and_unresolved_plain_text() {
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
+
