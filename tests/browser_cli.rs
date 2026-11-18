@@ -8921,3 +8921,197 @@ fn t143_asset_module_is_filesystem_free() {
         );
     }
 }
+
+// TC-024
+#[test]
+fn tc024_uniform_single_record_layout_metadata_order() {
+    let dir = backlog_fixture("tc024");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/doc/TASK-001").text();
+    let id_pos = html.find("<p class=\"id\">TASK-001").unwrap();
+    let title_pos = html.find("<h1 class=\"h1\">Task One</h1>").unwrap();
+    assert!(id_pos < title_pos);
+    assert!(html.contains("<p class=\"id\">TASK-001 <span class=\"badge\">ToDo</span>"));
+    assert!(html.contains("Created date:"));
+    assert!(html.contains("Updated date:"));
+    let content_pos = html.find("Task description").unwrap();
+    let page_head_pos = html.find("<div class=\"page-head\">").unwrap();
+    assert!(content_pos < page_head_pos);
+    assert!(html.contains("<details><summary>Dependents (1)</summary>"));
+    assert!(!html.contains("<details open"));
+    assert!(!html.contains("record-meta"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TC-025
+#[test]
+fn tc025_uniform_layout_applies_to_managed_markdown_types() {
+    // REQ / NFR
+    let dir = fixture("tc025");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    for path in ["/doc/REQ-001.001", "/doc/NFR-001.001"] {
+        let html = get(&server, path).text();
+        assert!(html.contains("<p class=\"id\">"), "{}", path);
+        assert!(html.contains("<h1 class=\"h1\">"), "{}", path);
+        assert!(html.contains("<span class=\"badge\">"), "{}", path);
+        assert!(html.contains("Created date:"), "{}", path);
+        assert!(html.contains("Updated date:"), "{}", path);
+        assert!(!html.contains("record-meta"), "{}", path);
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+
+    for (f, path) in [
+        (rule_fixture("tc025-rule"), "/doc/RUL-001"),
+        (audit_fixture("tc025-audit"), "/doc/AUD-001"),
+        (tech_spec_fixture("tc025-tech"), "/doc/TECH-001"),
+        (use_case_fixture("tc025-uc"), "/doc/UC-001"),
+        (decision_fixture("tc025-dec"), "/doc/ADR-001"),
+        (backlog_fixture("tc025-task"), "/doc/TASK-001"),
+    ] {
+        let server = Server::start(&f, &["--no-open"], &[]);
+        let html = get(&server, path).text();
+        assert!(html.contains("<p class=\"id\">"), "{}", path);
+        assert!(html.contains("<h1 class=\"h1\">"), "{}", path);
+        assert!(html.contains("<span class=\"badge\">"), "{}", path);
+        assert!(html.contains("Created date:"), "{}", path);
+        assert!(html.contains("Updated date:"), "{}", path);
+        assert!(!html.contains("record-meta"), "{}", path);
+        drop(server);
+        let _ = fs::remove_dir_all(&f);
+    }
+}
+
+// TC-026
+#[test]
+fn tc026_collapsible_sections_omitted_for_empty_collections() {
+    let dir = tech_spec_fixture("tc026");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/doc/TECH-001").text();
+    assert!(!html.contains("<details"));
+    assert!(!html.contains("<summary>References"));
+    assert!(!html.contains("<summary>Dependencies"));
+    assert!(!html.contains("<summary>Dependents"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TC-027
+#[test]
+fn tc027_collapsible_sections_native_details_collapsed() {
+    let dir = backlog_fixture("tc027");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/doc/TASK-001").text();
+    assert!(html.contains("<details>"));
+    assert!(html.contains("<summary>Dependents (1)</summary>"));
+    assert!(!html.contains("<details open"));
+    assert!(!html.contains("<details class=\"board-milestone\" open"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+
+    let dir = rule_fixture("tc027-rule");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/doc/RUL-001").text();
+    assert!(html.contains("<details><summary>Requirements (1)</summary>"));
+    assert!(!html.contains("<details open"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TC-028
+#[test]
+fn tc028_single_record_view_works_without_javascript() {
+    let dir = backlog_fixture("tc028");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/doc/TASK-001").text();
+    assert_eq!(get(&server, "/doc/TASK-001").status, 200);
+    assert!(html.contains("<details>"));
+    assert!(!html.contains("onclick="));
+    assert!(html.contains("Task One"));
+    assert!(html.contains("Created date:"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TC-029
+#[test]
+fn tc029_ui_mockup_records_excluded_from_uniform_layout() {
+    let dir = mockup_fixture("tc029");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/doc/MOCK-001").text();
+    assert!(html.contains("<h1 class=\"h1\">First mockup</h1>"));
+    assert!(html.contains("UI Mockups"));
+    assert!(!html.contains("Created date:"));
+    assert!(!html.contains("Updated date:"));
+    assert!(!html.contains("<details"));
+    assert!(!html.contains("UI mockup"));
+    assert!(!html.contains("record-meta"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TC-030
+#[test]
+fn tc030_single_record_layout_renders_in_firefox_115() {
+    let dir = backlog_fixture("tc030");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    for path in ["/doc/TASK-001", "/doc/TASK-002"] {
+        let resp = get(&server, path);
+        assert_eq!(resp.status, 200, "{}", path);
+        let html = resp.text();
+        assert!(html.contains("<details>"), "{}", path);
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TC-031
+#[test]
+fn tc031_all_content_viewable_and_editable_with_uniform_layout() {
+    let dir = tech_spec_fixture("tc031");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let view = get(&server, "/doc/TECH-001").text();
+    assert!(view.contains("Offline architecture"));
+    assert!(view.contains("Defines the local browser."));
+    let edit = get(&server, "/doc/TECH-001/edit").text();
+    assert!(edit.contains("name=\"title\""));
+    assert!(edit.contains("name=\"description\""));
+    let version = extract_version(&edit);
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Renamed spec tc031"),
+        ("description", "Edited body"),
+    ]);
+    let response = post_form(&server, "/doc/TECH-001", &body);
+    assert_eq!(response.status, 303);
+    assert_eq!(response.header("Location"), Some("/doc/TECH-001"));
+    let after = get(&server, "/doc/TECH-001").text();
+    assert!(after.contains("Renamed spec tc031"));
+    assert!(after.contains("Edited body"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TC-032
+#[test]
+fn tc032_reference_links_resolve_and_unresolved_plain_text() {
+    let dir = test_root("tc032");
+    init_project(&dir);
+    create_req_group(&dir, "Payments Group");
+    create_req(&dir, "Capture payment", "REQ-001");
+    let rules_dir = dir.join("docs/business-rules");
+    fs::create_dir_all(&rules_dir).unwrap();
+    fs::write(
+        rules_dir.join("RUL-001.md"),
+        "---\nid: RUL-001\ntitle: Rule\ncreated_date: '2026-11-13T06:43:23Z'\nupdated_date: '2026-11-13T06:43:23Z'\nlabels: []\nreferences: []\n---\n# RUL-001 Rule\n\n## Description\nDesc\n\n## Rationale\nRat\n\n## Applicability\nApp\n\n## Requirements\n- REQ-001.001\n- NOPE-001\n",
+    )
+    .unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/doc/RUL-001").text();
+    assert!(html.contains("href=\"/doc/REQ-001.001\""));
+    assert!(html.contains("NOPE-001"));
+    assert!(!html.contains("href=\"/doc/NOPE-001\""));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
