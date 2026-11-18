@@ -407,13 +407,6 @@ fn milestone_content_management_flow() {
     assert!(body.contains("aria-expanded=\"true\""));
     assert!(body.contains("aria-controls=\"site-nav\""));
 
-    let lc = server.get("/lifecycle");
-    assert_eq!(lc.status, 200);
-    assert!(lc.text().contains("Managed artifacts"));
-    let sk = server.get("/skills");
-    assert_eq!(sk.status, 200);
-    assert!(sk.text().contains("Agent skills"));
-
     assert_eq!(server.get("/doc/ZZZ-999").status, 404);
 
     drop(server);
@@ -482,14 +475,6 @@ fn content_management_metadata_and_pages() {
     let body = res.text();
     assert!(body.contains("TECH-001"));
     assert!(body.contains("Tech Title"));
-
-    let lc = server.get("/lifecycle");
-    assert_eq!(lc.status, 200);
-    assert!(lc.text().contains("Managed artifacts"));
-
-    let sk = server.get("/skills");
-    assert_eq!(sk.status, 200);
-    assert!(sk.text().contains("Agent skills"));
 
     drop(server);
     let _ = fs::remove_dir_all(&dir);

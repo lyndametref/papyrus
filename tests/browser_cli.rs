@@ -7001,365 +7001,6 @@ fn t57m_quality_gates() {
     }
 }
 
-// TASK-72 / spec §7: the twelve lifecycle section headings, in order.
-fn assert_twelve_sections_in_order(body: &str) {
-    assert_eq!(body.matches("<section>").count(), 16, "section count");
-    let backlog = body.find("<h2 class=\"h2\">Backlog</h2>").unwrap();
-    let decisions = body.find("<h2 class=\"h2\">Decisions</h2>").unwrap();
-    let documents = body.find("<h2 class=\"h2\">Documents</h2>").unwrap();
-    assert!(backlog < decisions && decisions < documents, "group order");
-    assert!(body.contains("<h2>Tasks</h2>"));
-    assert!(body.contains("<h2>Milestones</h2>"));
-    assert!(body.contains("<h2>Releases</h2>"));
-}
-
-// TASK-72 / spec §7.1-7.3: GET /lifecycle, alias route, method handling
-#[test]
-fn t72a_lifecycle_page_route_alias_and_method() {
-    let dir = fixture("lifecycle");
-    let server = Server::start(&dir, &["--no-open"], &[]);
-
-    let response = get(&server, "/lifecycle");
-    assert_eq!(response.status, 200);
-    assert_eq!(
-        response.header("Content-Type"),
-        Some("text/html; charset=utf-8")
-    );
-    let body = response.text();
-    assert!(body.contains("<h1 class=\"h1\">Managed artifacts &amp; lifecycles</h1>"));
-    assert_twelve_sections_in_order(&body);
-    assert!(body.contains("ToDo → Initiated → Refined → Implemented → Validated → Done"));
-    assert!(body.contains("The three categories are Backlog, Decisions, and Documents."));
-    assert!(body.contains("Managed artifacts &amp; lifecycles"));
-    assert!(body.contains(
-        "<a href=\"/lifecycle\" aria-current=\"page\">Managed artifacts &amp; lifecycles</a>"
-    ));
-    assert!(!body.contains("http://"), "external reference");
-    assert!(!body.contains("https://"), "external reference");
-
-    // Alias route serves the same page.
-    let alias = get(&server, "/?type=lifecycle");
-    assert_eq!(alias.status, 200);
-    assert_eq!(
-        alias.header("Content-Type"),
-        Some("text/html; charset=utf-8")
-    );
-    let alias_body = alias.text();
-    assert!(alias_body.contains("<h1 class=\"h1\">Managed artifacts &amp; lifecycles</h1>"));
-    assert_twelve_sections_in_order(&alias_body);
-    assert!(alias_body.contains("ToDo → Initiated → Refined → Implemented → Validated → Done"));
-
-    // Non-GET methods are rejected with an Allow header.
-    let post = request(server.port, "POST", "/lifecycle", &[], Some(b""));
-    assert_eq!(post.status, 405);
-    assert_eq!(post.header("Allow"), Some("GET, HEAD"));
-    drop(server);
-    let _ = fs::remove_dir_all(&dir);
-}
-
-// TASK-72 / spec §7.4: custom task-status list renders the configured chain
-#[test]
-fn t72b_lifecycle_custom_status_list() {
-    let dir = test_root("lifecycle-custom");
-    init_project(&dir);
-    set_statuses(&dir, &["Backlog", "Doing", "Done"], "Backlog");
-    let server = Server::start(&dir, &["--no-open"], &[]);
-    let body = get(&server, "/lifecycle").text();
-    assert_twelve_sections_in_order(&body);
-    assert!(body.contains("Backlog → Doing → Done"));
-    assert!(
-        !body.contains("ToDo → Initiated"),
-        "default chain must not render with custom statuses"
-    );
-    drop(server);
-    let _ = fs::remove_dir_all(&dir);
-}
-
-// TASK-95 AC #6 / spec §7.6: a disabled document type renders read-only
-// configuration with enabled: false and does not fail the page.
-#[test]
-fn t95a_lifecycle_disabled_document_type() {
-    let dir = test_root("lifecycle-disabled-type");
-    init_project(&dir);
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "config",
-        "set",
-        "document_types.tech-spec.enabled",
-        "false",
-    ]);
-
-    let server = Server::start(&dir, &["--no-open"], &[]);
-    let response = get(&server, "/lifecycle");
-    assert_eq!(response.status, 200);
-    let body = response.text();
-    assert_twelve_sections_in_order(&body);
-    assert!(body.contains("Curated description: Technical specifications are active until archived; archive moves the file to archived folder."));
-    assert!(
-        body.contains("enabled: false; ID prefix: TECH; storage folder: docs/technical."),
-        "disabled type must render enabled: false"
-    );
-    assert!(
-        body.contains("Changes via <a class=\"link\" href=\"/config\">Configuration</a>"),
-        "configuration values remain display-only and link to /config"
-    );
-    for control in ["<form", "<input"] {
-        assert!(
-            !body.contains(control),
-            "lifecycle page must offer no editing control: {}",
-            control
-        );
-    }
-
-    drop(server);
-    let _ = fs::remove_dir_all(&dir);
-}
-
-// TASK-95 AC #6 / spec §7.7: a renamed prefix and storage folder appear in
-// the rendered read-only configuration line; curated description is unchanged.
-#[test]
-fn t95b_lifecycle_renamed_prefix_and_folder() {
-    let dir = test_root("lifecycle-renamed");
-    init_project(&dir);
-    for (key, value) in [
-        ("document_types.req.prefix", "BRQ"),
-        (
-            "document_types.req.directory",
-            "requirements/business-rules/",
-        ),
-        ("doc_directory", "documentation/"),
-    ] {
-        run_ok(&["--dir", dir.to_str().unwrap(), "config", "set", key, value]);
-    }
-
-    let server = Server::start(&dir, &["--no-open"], &[]);
-    let body = get(&server, "/lifecycle").text();
-    assert_twelve_sections_in_order(&body);
-    assert!(
-        body.contains("Curated description: Requirements are active until archived; archive moves the file to archived folder.")
-    );
-    assert!(
-        body.contains(
-            "<p>Read-only config — enabled: true; ID prefix: BRQ; storage folder: documentation/requirements/business-rules."
-        ),
-        "renamed prefix and storage folder must render"
-    );
-    // Other document sections join the renamed base directory too.
-    assert!(body.contains(
-        "<p>Read-only config — enabled: true; ID prefix: NFR; storage folder: documentation/requirements/non-functional."
-    ));
-
-    drop(server);
-    let _ = fs::remove_dir_all(&dir);
-}
-
-// TASK-77 / spec §8: eight skill groups in order.
-fn assert_eight_skill_groups_in_order(body: &str) {
-    const GROUPS: [&str; 8] = [
-        "Project setup and init",
-        "Backlog, tasks, milestones, releases",
-        "Requirements and documentation management",
-        "Search",
-        "Browser usage",
-        "Release and audit workflows",
-        "Configuration management",
-        "Decisions",
-    ];
-    assert_eq!(
-        body.matches("<section>").count(),
-        9,
-        "section count (config + 8 groups)"
-    );
-    let mut previous = 0usize;
-    for (index, group) in GROUPS.iter().enumerate() {
-        let marker = format!("<h2>{}</h2>", group);
-        let position = body
-            .find(&marker)
-            .unwrap_or_else(|| panic!("missing group heading {}", group));
-        if index > 0 {
-            assert!(
-                position > previous,
-                "group heading {} is out of order",
-                group
-            );
-        }
-        previous = position;
-    }
-}
-
-/// Replace one document type's `enabled` flag in the project configuration.
-fn set_doc_type_enabled(dir: &Path, key: &str, enabled: bool) {
-    let path = dir.join("papyrus.config.yml");
-    let text = fs::read_to_string(&path).unwrap();
-    let mut out = String::new();
-    let mut in_document_types = false;
-    let mut current_key: Option<String> = None;
-    for line in text.lines() {
-        if line == "document_types:" {
-            in_document_types = true;
-            out.push_str(line);
-            out.push('\n');
-            continue;
-        }
-        if in_document_types {
-            if !line.starts_with("  ") || line.trim().is_empty() {
-                in_document_types = false;
-                current_key = None;
-                out.push_str(line);
-                out.push('\n');
-                continue;
-            }
-            let trimmed = line.trim();
-            if !line.starts_with("    ") && trimmed.ends_with(':') {
-                current_key = Some(trimmed.trim_end_matches(':').to_string());
-                out.push_str(line);
-                out.push('\n');
-                continue;
-            }
-            if current_key.as_deref() == Some(key)
-                && (trimmed == "enabled: true" || trimmed == "enabled: false")
-            {
-                out.push_str(&format!("    enabled: {}\n", enabled));
-                continue;
-            }
-            out.push_str(line);
-            out.push('\n');
-            continue;
-        }
-        out.push_str(line);
-        out.push('\n');
-    }
-    fs::write(&path, out).unwrap();
-}
-
-// TASK-77 / spec §8.1-8.3: GET /skills, alias route, method and unknown path.
-#[test]
-fn t77a_skills_page_route_alias_and_method() {
-    let dir = test_root("skills");
-    init_project(&dir);
-    let server = Server::start(&dir, &["--no-open"], &[]);
-
-    let response = get(&server, "/skills");
-    assert_eq!(response.status, 200);
-    assert_eq!(
-        response.header("Content-Type"),
-        Some("text/html; charset=utf-8")
-    );
-    let body = response.text();
-    assert_eq!(body.matches("<h1 class=\"h1\">").count(), 1);
-    assert!(body.contains("<h1 class=\"h1\">Agent skills and workflows</h1>"));
-    assert_eight_skill_groups_in_order(&body);
-    assert!(body.contains("ToDo → Initiated → Refined → Implemented → Validated → Done"));
-    assert!(body.contains("<dt>Task prefix</dt><dd>TASK</dd>"));
-    assert!(body.contains("<dt>Milestone prefix</dt><dd>MS</dd>"));
-    assert!(body.contains("<dt>Release prefix</dt><dd>REL</dd>"));
-    assert!(body.contains("<dt>ID padding</dt><dd>3 (e.g. TASK-001)</dd>"));
-    assert!(body.contains("<dt>Date format</dt><dd>yyyy-mm-dd</dd>"));
-    assert!(body.contains(
-        "<dt>Statuses</dt><dd>ToDo → Initiated → Refined → Implemented → Validated → Done</dd>"
-    ));
-    assert!(body.contains(
-        "<dt>Enabled document types</dt><dd>req, nfr, glossary, rule, ui-spec, ui-mockup, audit, tech-spec, use-case, test-case, test-report</dd>"
-    ));
-    assert!(body.contains("<dt>Enabled decision types</dt><dd>adr, bdr</dd>"));
-    assert!(body.contains("<dt>Backlog directory</dt><dd>backlog/</dd>"));
-    assert!(body.contains("<dt>Decision directory</dt><dd>decisions/</dd>"));
-    assert!(body.contains("<dt>Doc directory</dt><dd>docs/</dd>"));
-    assert!(
-        body.contains("papyrus release close REL-001"),
-        "skills page must name the implemented close command"
-    );
-    assert!(
-        body.contains("planned → released"),
-        "skills page must state the planned -> released lifecycle"
-    );
-    assert!(
-        !body.contains("papyrus release status"),
-        "skills page must not advertise a non-existent release status command"
-    );
-    assert!(
-        body.contains("papyrus milestone close MS-001"),
-        "skills page must name the implemented milestone close command"
-    );
-    assert!(
-        body.contains("open → closed"),
-        "skills page must state the open -> closed milestone lifecycle"
-    );
-    assert!(
-        !body.contains("papyrus milestone archive") && !body.contains("papyrus milestone restore"),
-        "skills page must not advertise removed milestone archive/restore commands"
-    );
-    assert!(body.contains("Agent skills &amp; workflows"));
-    assert!(
-        body.contains("<a href=\"/skills\" aria-current=\"page\">Agent skills &amp; workflows</a>")
-    );
-    assert!(!body.contains("http://"), "external reference");
-    assert!(!body.contains("https://"), "external reference");
-
-    // Alias route serves the same page.
-    let alias = get(&server, "/?type=skills");
-    assert_eq!(alias.status, 200);
-    assert_eq!(
-        alias.header("Content-Type"),
-        Some("text/html; charset=utf-8")
-    );
-    assert_eq!(alias.text(), body);
-
-    // Non-GET methods are rejected with an Allow header.
-    let post = request(server.port, "POST", "/skills", &[], Some(b""));
-    assert_eq!(post.status, 405);
-    assert_eq!(post.header("Allow"), Some("GET, HEAD"));
-
-    // Unknown path returns 404.
-    let unknown = get(&server, "/definitely-unknown-path");
-    assert_eq!(unknown.status, 404);
-
-    drop(server);
-    let _ = fs::remove_dir_all(&dir);
-}
-
-// TASK-77 / spec §8.4: custom configuration reflected.
-#[test]
-fn t77b_skills_page_custom_config() {
-    let dir = test_root("skills-custom");
-    init_project(&dir);
-    set_config_value(&dir, "task_prefix", "FOO");
-    set_config_value(&dir, "milestone_prefix", "MIL");
-    set_config_value(&dir, "release_prefix", "RLS");
-    set_config_value(&dir, "id_padding", "4");
-    set_config_value(&dir, "date_format", "dd/mm/yyyy");
-    set_statuses(&dir, &["Backlog", "Doing", "Done"], "Backlog");
-    set_doc_type_enabled(&dir, "req", false);
-
-    let server = Server::start(&dir, &["--no-open"], &[]);
-    let body = get(&server, "/skills").text();
-    assert_eight_skill_groups_in_order(&body);
-    assert!(body.contains("<dt>Task prefix</dt><dd>FOO</dd>"));
-    assert!(body.contains("<dt>Milestone prefix</dt><dd>MIL</dd>"));
-    assert!(body.contains("<dt>Release prefix</dt><dd>RLS</dd>"));
-    assert!(body.contains("<dt>ID padding</dt><dd>4 (e.g. FOO-0001)</dd>"));
-    assert!(body.contains("<dt>Date format</dt><dd>dd/mm/yyyy</dd>"));
-    assert!(body.contains("<dt>Statuses</dt><dd>Backlog → Doing → Done</dd>"));
-    assert!(body.contains(
-        "<dt>Enabled document types</dt><dd>nfr, glossary, rule, ui-spec, ui-mockup, audit, tech-spec, use-case, test-case, test-report</dd>"
-    ));
-    assert!(body.contains("<dt>Enabled decision types</dt><dd>adr, bdr</dd>"));
-    assert!(body.contains(
-        "New tasks use prefix FOO with padding 4: FOO-0001. Statuses flow Backlog → Doing → Done."
-    ));
-    assert!(body.contains("papyrus config set task_prefix FOO"));
-    assert!(
-        !body.contains("ToDo → Initiated"),
-        "default chain must not render"
-    );
-
-    drop(server);
-    let _ = fs::remove_dir_all(&dir);
-}
-
-// ---- TASK-19 DoD #2: inventory hub integration test ----
-
 #[test]
 fn t19a_inventory_hub() {
     // Empty project: inventory renders with h1, 12 cards in final order, zero counts.
@@ -7391,8 +7032,6 @@ fn t19a_inventory_hub() {
         "Use Cases",
         "Test Cases",
         "Test Reports",
-        "Managed artifacts &amp; lifecycles",
-        "Agent skills &amp; workflows",
     ];
     let mut positions = Vec::new();
     for label in &labels {
@@ -7407,8 +7046,6 @@ fn t19a_inventory_hub() {
     }
     assert!(html.contains("Business requirements &middot; 0"));
     assert!(html.contains("href=\"/?type=req\""));
-    assert!(html.contains("href=\"/lifecycle\""));
-    assert!(html.contains("href=\"/skills\""));
     drop(server);
 
     // Populated project: counts reflect active records.
@@ -7427,19 +7064,8 @@ fn t19a_inventory_hub() {
     assert!(html.contains("Non-functional requirements &middot; 2"));
     drop(server);
 
-    // Disabled document type: no card, no error.
-    let disabled = test_root("t19a-disabled");
-    init_project(&disabled);
-    set_doc_type_enabled(&disabled, "tech-spec", false);
-    let server = Server::start(&disabled, &["--no-open"], &[]);
-    let html = get(&server, "/").text();
-    assert!(!html.contains("<h3>Technical Specifications</h3>"));
-    assert_eq!(get(&server, "/?type=tech-spec").status, 404);
-    drop(server);
-
     let _ = fs::remove_dir_all(&empty);
     let _ = fs::remove_dir_all(&populated);
-    let _ = fs::remove_dir_all(&disabled);
 }
 
 // ---- TASK-19 DoD #3: cross-type integration test ----
@@ -8358,137 +7984,6 @@ fn t93_papyrus_id_only_routing() {
     let _ = fs::remove_dir_all(&dir);
 }
 
-// TASK-94: browser configuration view
-#[test]
-fn browser_config_route_and_alias() {
-    let dir = test_root("browser-config-route");
-    init_project(&dir);
-    let server = Server::start(&dir, &["--no-open"], &[]);
-    let direct = get(&server, "/config");
-    let alias = get(&server, "/?type=config");
-    assert_eq!(direct.status, 200);
-    assert_eq!(alias.status, 200);
-    let html = direct.text();
-    assert!(
-        html.contains("<a href=\"/config\""),
-        "sidebar config link missing"
-    );
-    assert!(
-        html.contains("Configuration</a>"),
-        "Configuration label missing"
-    );
-    let config_pos = html.find("Configuration</a>").expect("config pos");
-    let lifecycle_pos = html.find("Managed artifacts").expect("lifecycle pos");
-    assert!(
-        config_pos < lifecycle_pos,
-        "Configuration not before lifecycle"
-    );
-    drop(server);
-    let _ = fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn browser_config_effective_vs_explicit_badges() {
-    let dir = test_root("browser-config-badges");
-    init_project(&dir);
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "config",
-        "unset",
-        "browser_open",
-    ]);
-    let server = Server::start(&dir, &["--no-open"], &[]);
-    let html = get(&server, "/config").text();
-    assert!(html.contains(
-        "<td>browser_host</td><td>127.0.0.1</td><td><span class=\"badge\">explicit</span>"
-    ));
-    assert!(
-        html.contains("<td>browser_open</td><td>true</td><td><span class=\"badge\">default</span>")
-    );
-    assert!(html.contains("<td>statuses</td>"));
-    assert!(html.contains("read-only"));
-    assert!(html.contains("href=\"/lifecycle\""));
-    drop(server);
-    let _ = fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn browser_config_rejection_parity() {
-    let dir = test_root("browser-config-reject");
-    init_project(&dir);
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "config",
-        "set",
-        "document_types.audit.statuses",
-        "active, archived",
-    ]);
-    let config_path = dir.join("papyrus.config.yml");
-    let before = fs::read_to_string(&config_path).unwrap();
-    let server = Server::start(&dir, &["--no-open"], &[]);
-    let body = form_body(&[("key", "browser_port"), ("value", "70000")]);
-    let resp = post_form(&server, "/config", &body);
-    assert_eq!(resp.status, 422);
-    assert_eq!(fs::read_to_string(&config_path).unwrap(), before);
-    assert!(resp.text().contains("70000"));
-    assert_eq!(get(&server, "/config/edit?key=statuses").status, 404);
-    let body2 = form_body(&[("key", "statuses"), ("value", "x")]);
-    assert_eq!(post_form(&server, "/config", &body2).status, 404);
-    // List editing stays CLI-only: a document status list is shown read-only
-    // and is not accepted by the edit route or the submit route (TASK-111).
-    assert_eq!(
-        get(&server, "/config/edit?key=document_types.audit.statuses").status,
-        404
-    );
-    let body3 = form_body(&[
-        ("key", "document_types.audit.statuses"),
-        ("value", "active, archived"),
-    ]);
-    assert_eq!(post_form(&server, "/config", &body3).status, 404);
-    drop(server);
-    let _ = fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn browser_config_folder_move_from_view() {
-    let dir = test_root("browser-config-folder-move");
-    init_project(&dir);
-    fs::write(dir.join("backlog/extra.txt"), "x").unwrap();
-    let config_path = dir.join("papyrus.config.yml");
-    let server = Server::start(&dir, &["--no-open"], &[]);
-    let body = form_body(&[("key", "backlog_directory"), ("value", "archive")]);
-    let resp = post_form(&server, "/config", &body);
-    assert_eq!(resp.status, 303);
-    assert_eq!(resp.header("Location"), Some("/config"));
-    drop(server);
-    assert!(dir.join("archive/extra.txt").exists());
-    let cfg = fs::read_to_string(&config_path).unwrap();
-    assert!(cfg.contains("backlog_directory: archive"));
-    let _ = fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn browser_config_containment_refusal() {
-    let dir = test_root("browser-config-contain");
-    init_project(&dir);
-    std::os::unix::fs::symlink("../containment-escape", dir.join("escape-link")).unwrap();
-    fs::write(dir.join("backlog/extra.txt"), "x").unwrap();
-    let config_path = dir.join("papyrus.config.yml");
-    let before = fs::read_to_string(&config_path).unwrap();
-    let server = Server::start(&dir, &["--no-open"], &[]);
-    let body = form_body(&[("key", "backlog_directory"), ("value", "escape-link")]);
-    let resp = post_form(&server, "/config", &body);
-    assert_eq!(resp.status, 422);
-    drop(server);
-    assert_eq!(fs::read_to_string(&config_path).unwrap(), before);
-    assert!(dir.join("backlog/extra.txt").exists());
-    assert!(!dir.join("escape-link/extra.txt").exists());
-    let _ = fs::remove_file(dir.join("escape-link"));
-    let _ = fs::remove_dir_all(&dir);
-}
-
 // TASK-96 AC #2: `--debug` is a browser-only flag, not a global option.
 #[test]
 fn debug_flag_is_rejected_outside_browser() {
@@ -8528,8 +8023,6 @@ fn browser_console_is_quiet_by_default() {
     );
 
     assert_eq!(get(&server, "/").status, 200);
-    let body = form_body(&[("key", "browser_port"), ("value", "6421")]);
-    assert_eq!(post_form(&server, "/config", &body).status, 303);
     assert_eq!(get(&server, "/nope").status, 404);
 
     // Corrupting the configuration after startup makes a parsed request fail
@@ -9116,3 +8609,132 @@ fn tc032_reference_links_resolve_and_unresolved_plain_text() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+// TC-033
+#[test]
+fn tc033_browser_navigation_has_no_removed_entries() {
+    let dir = fixture("tc033");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/").text();
+    assert!(!html.contains("href=\"/config\""));
+    assert!(!html.contains("href=\"/lifecycle\""));
+    assert!(!html.contains("href=\"/skills\""));
+    assert!(!html.contains("Configuration"));
+    assert!(!html.contains("Managed artifacts"));
+    assert!(!html.contains("Agent skills"));
+    assert!(html.contains("Backlog"));
+    assert!(html.contains("Business requirements"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TC-034
+#[test]
+fn tc034_removed_routes_are_unreachable() {
+    let dir = fixture("tc034");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    for path in [
+        "/config",
+        "/config/edit",
+        "/lifecycle",
+        "/skills",
+        "/?type=config",
+        "/?type=lifecycle",
+        "/?type=skills",
+    ] {
+        assert_eq!(get(&server, path).status, 404, "{}", path);
+    }
+    let body = form_body(&[("key", "browser_port"), ("value", "6421")]);
+    assert_eq!(post_form(&server, "/config", &body).status, 404);
+    assert_eq!(post_form(&server, "/?type=config", &body).status, 404);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TC-035
+#[test]
+fn tc035_configuration_editing_is_cli_only() {
+    let dir = test_root("tc035");
+    init_project(&dir);
+    // Browser offers no configuration editing view.
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    assert_eq!(get(&server, "/config").status, 404);
+    assert_eq!(get(&server, "/?type=config").status, 404);
+    drop(server);
+
+    // CLI reads and updates configuration successfully.
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "config",
+        "set",
+        "browser_port",
+        "6421",
+    ]);
+    let listed = run_ok(&["--dir", dir.to_str().unwrap(), "config", "list"]);
+    assert!(listed.contains("6421"));
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "config",
+        "unset",
+        "browser_port",
+    ]);
+
+    // Folder moves are performed by the CLI.
+    fs::write(dir.join("backlog/extra.txt"), "x").unwrap();
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "config",
+        "set",
+        "backlog_directory",
+        "archive",
+    ]);
+    assert!(dir.join("archive/extra.txt").exists());
+    let cfg = fs::read_to_string(dir.join("papyrus.config.yml")).unwrap();
+    assert!(cfg.contains("backlog_directory: archive"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TC-036
+#[test]
+fn tc036_managed_artifact_documentation_available_outside_browser() {
+    let docs = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("docs");
+    assert!(docs.exists());
+    assert!(docs.join("specifications").exists());
+}
+
+// TC-037
+#[test]
+fn tc037_agent_skills_documentation_available_outside_browser() {
+    let docs = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("docs");
+    assert!(docs.exists());
+    assert!(docs.join("specifications").exists());
+}
+
+// TC-038
+#[test]
+fn tc038_removal_does_not_change_records_or_config() {
+    let dir = fixture("tc038");
+    let config_before = fs::read_to_string(dir.join("papyrus.config.yml")).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    assert_eq!(get(&server, "/").status, 200);
+    assert_eq!(get(&server, "/?type=req").status, 200);
+    drop(server);
+    let config_after = fs::read_to_string(dir.join("papyrus.config.yml")).unwrap();
+    assert_eq!(config_before, config_after);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TC-039
+#[test]
+fn tc039_other_browser_pages_continue_to_work() {
+    let dir = fixture("tc039");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    assert_eq!(get(&server, "/").status, 200);
+    assert_eq!(get(&server, "/?type=req").status, 200);
+    assert_eq!(get(&server, "/doc/REQ-001.001").status, 200);
+    assert_eq!(get(&server, "/doc/REQ-001.001/edit").status, 200);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}

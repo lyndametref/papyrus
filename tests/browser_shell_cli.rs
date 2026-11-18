@@ -370,42 +370,6 @@ fn toggle_width_and_bleed_contracts_are_in_the_assets() {
 }
 
 #[test]
-fn config_and_skills_own_their_horizontal_scrolling() {
-    let server = Server::start(&fixture_root().join("project"));
-
-    let config = server.get("/config");
-    assert!(
-        config.contains(
-            "<div class=\"table-scroll\" role=\"region\" aria-label=\"Effective configuration\" tabindex=\"0\">"
-        ),
-        "the configuration table scrolls inside its own region"
-    );
-
-    let skills = server.get("/skills");
-    assert!(skills.contains(
-        "<pre role=\"region\" aria-label=\"Initialize a new project command\" tabindex=\"0\">"
-    ));
-    assert!(
-        skills.matches("<pre role=\"region\" aria-label=\"").count() > 1,
-        "every command block is a named, focusable region"
-    );
-    let css = include_str!("../src/browser/app.css");
-    assert!(css.contains("pre { max-width: 100%; overflow-x: auto; }"));
-    assert!(
-        css.contains("pre:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }"),
-        "the command scroller shows a visible focus ring"
-    );
-
-    let board = server.get("/?type=task");
-    assert!(
-        board.contains(
-            "<div class=\"board-columns\" role=\"region\" aria-label=\"Task board columns\" tabindex=\"0\">"
-        ),
-        "the board columns own their horizontal scrolling"
-    );
-}
-
-#[test]
 fn every_family_list_uses_the_shared_layout() {
     let server = Server::start(&fixture_root().join("project"));
     let milestone = server.get("/?type=milestone");

@@ -235,17 +235,6 @@ fn version_of(html: &str) -> String {
     rest[..end].to_string()
 }
 
-fn has_order(haystack: &str, needles: &[&str]) -> bool {
-    let mut position = 0usize;
-    for needle in needles {
-        match haystack[position..].find(needle) {
-            Some(found) => position += found + needle.len(),
-            None => return false,
-        }
-    }
-    true
-}
-
 /// Values of the enabled `<option>` elements inside a filter form, in order.
 fn enabled_option_values(filter: &str) -> Vec<String> {
     filter
@@ -292,7 +281,7 @@ fn t114_01_user_added_type_end_to_end() {
     assert!(html.contains("Second note"));
     assert!(html.contains("href=\"/doc/NOTE-001\""));
     let sidebar_start = html.find(">Documents</p>").expect("Documents group");
-    let sidebar_end = html.find(">Configuration</a>").expect("utility");
+    let sidebar_end = html.find("</nav>").expect("sidebar end");
     let sidebar = &html[sidebar_start..sidebar_end];
     assert!(sidebar.contains("Notes"), "sidebar={sidebar}");
     assert_eq!(get(&server, "/doc/NOTE-001").status, 200);
@@ -573,9 +562,6 @@ fn t114_09_disabled_type_is_invisible_but_lifecycle_lists_it() {
     assert_eq!(get(&server, "/?type=note").status, 404);
     assert_eq!(get(&server, "/api/docs/note").status, 404);
     assert_eq!(get(&server, "/doc/NOTE-001").status, 404);
-    let lifecycle = get(&server, "/lifecycle").text();
-    assert!(lifecycle.contains("Notes"));
-    assert!(lifecycle.contains("enabled: false"));
     drop(server);
     let _ = fs::remove_dir_all(&d);
 }
@@ -698,21 +684,6 @@ fn t114_11_builtin_list_uses_shared_columns_and_keeps_sections() {
     let spec = get(&server, "/doc/TECH-001").text();
     assert!(!spec.contains("Technical specification"));
     assert!(spec.contains("<p class=\"id\">"));
-    drop(server);
-    let _ = fs::remove_dir_all(&d);
-}
-
-// T-114-12 -----------------------------------------------------------------
-#[test]
-fn t114_12_lifecycle_groups_and_count() {
-    let d = init("12");
-    let server = Server::start(&d);
-    let body = get(&server, "/lifecycle").text();
-    assert!(has_order(&body, &["Backlog", "Decisions", "Documents"]));
-    assert_eq!(body.matches("<section>").count(), 17);
-    assert!(body.contains("Notes"));
-    assert!(body.contains("review"));
-    assert!(!body.contains("12 types"));
     drop(server);
     let _ = fs::remove_dir_all(&d);
 }
