@@ -9,7 +9,7 @@ use crate::registry::{
     ArtifactCategory as CategoryKind, ArtifactRegistry, IdShape, TypeDescriptor,
 };
 
-/// The three sidebar/lifecycle groups (REQ-06.003).
+/// The three sidebar groups (REQ-06.003).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NavGroup {
     Backlog,
@@ -53,7 +53,7 @@ pub enum NotFoundPage {
 pub enum PageRoute {
     /// The backlog kanban board (`/?type=task` with its query variants).
     Board,
-    /// Every other route: lists, detail, edit, inventory, config, skills, errors.
+    /// Every other route: lists, detail, edit, inventory, errors.
     Other,
 }
 
@@ -75,12 +75,10 @@ pub struct Presentation {
     pub slug: &'static str,
     /// Sidebar and inventory label.
     pub label: &'static str,
-    /// List and lifecycle section heading.
+    /// List section heading.
     pub heading: &'static str,
     /// Lower-case noun used in empty-state copy.
     pub short: &'static str,
-    /// Curated one-line lifecycle description.
-    pub lifecycle: &'static str,
     /// Inventory note.
     pub note: &'static str,
     /// Legacy `?type=` value, when it differs from the slug.
@@ -105,7 +103,6 @@ const fn builtin(
     label: &'static str,
     heading: &'static str,
     short: &'static str,
-    lifecycle: &'static str,
     note: &'static str,
     legacy_type: Option<&'static str>,
     order: u32,
@@ -115,7 +112,6 @@ const fn builtin(
         label,
         heading,
         short,
-        lifecycle,
         note,
         legacy_type,
         order,
@@ -159,7 +155,6 @@ pub const PRESENTATION: &[Presentation] = &[
                     "Backlog",
                     "Tasks",
                     "tasks",
-                    "Tasks move through the configured task statuses and are archived under the backlog archive folder.",
                     "Backlog tasks in this project.",
                     None,
                     100,
@@ -177,7 +172,6 @@ pub const PRESENTATION: &[Presentation] = &[
                 "Milestones",
                 "Milestones",
                 "milestones",
-                "Milestones move from open to closed.",
                 "Milestones in this project.",
                 None,
                 110,
@@ -192,7 +186,6 @@ pub const PRESENTATION: &[Presentation] = &[
             "Releases",
             "Releases",
             "releases",
-            "Releases move from planned to released.",
             "Releases in this project.",
             None,
             120,
@@ -207,7 +200,6 @@ pub const PRESENTATION: &[Presentation] = &[
                     "Decisions",
                     "Decisions",
                     "decisions",
-                    "Decisions move from proposed to accepted or rejected; an accepted decision may be deprecated or superseded.",
                     "Decisions in this project.",
                     None,
                     200,
@@ -224,7 +216,6 @@ pub const PRESENTATION: &[Presentation] = &[
             "Business requirements",
             "Business requirements",
             "business requirements",
-            "Requirements are active until archived; archive moves the file to archived folder.",
             "Business requirements in this project.",
             None,
             10,
@@ -238,7 +229,6 @@ pub const PRESENTATION: &[Presentation] = &[
                 "Business Rules",
                 "Business Rules",
                 "business rules",
-                "Business rules are active until archived; archive moves the file to archived folder.",
                 "Business rules in this project.",
                 Some("business-rule"),
                 20,
@@ -254,7 +244,6 @@ pub const PRESENTATION: &[Presentation] = &[
                 "Audit Records",
                 "Audit Records",
                 "audit records",
-                "Audit records are active until archived; archive moves the file to archived folder.",
                 "Audit records in this project.",
                 Some("audit-record"),
                 30,
@@ -270,7 +259,6 @@ pub const PRESENTATION: &[Presentation] = &[
                 "Technical Specifications",
                 "Technical Specifications",
                 "technical specifications",
-                "Technical specifications are active until archived; archive moves the file to archived folder.",
                 "Technical specifications in this project.",
                 None,
                 40,
@@ -286,7 +274,6 @@ pub const PRESENTATION: &[Presentation] = &[
                 "Use Cases",
                 "Use Cases",
                 "use cases",
-                "Use cases are active until archived; archive moves the file to archived folder.",
                 "Use cases in this project.",
                 None,
                 50,
@@ -302,7 +289,6 @@ pub const PRESENTATION: &[Presentation] = &[
                 "Test Cases",
                 "Test Cases",
                 "test cases",
-                "Test cases are active until archived; archive moves the file to archived folder.",
                 "Test cases in this project.",
                 None,
                 60,
@@ -318,7 +304,6 @@ pub const PRESENTATION: &[Presentation] = &[
                 "Test Reports",
                 "Test Reports",
                 "test reports",
-                "Test reports are active until archived; archive moves the file to archived folder.",
                 "Test reports in this project.",
                 None,
                 70,
@@ -333,7 +318,6 @@ pub const PRESENTATION: &[Presentation] = &[
             "Non-functional requirements",
             "Non-functional requirements",
             "non-functional requirements",
-            "Requirements are active until archived; archive moves the file to archived folder.",
             "Non-functional requirements in this project.",
             None,
             80,
@@ -346,7 +330,6 @@ pub const PRESENTATION: &[Presentation] = &[
             "Glossary",
             "Glossary",
             "glossary terms",
-            "Glossary terms are active until archived; archive moves the file to archived folder.",
             "Glossary terms in this project.",
             None,
             90,
@@ -359,7 +342,6 @@ pub const PRESENTATION: &[Presentation] = &[
             "UI Specifications",
             "UI Specifications",
             "UI specifications",
-            "UI specifications are active until archived; archive moves the file to archived folder.",
             "UI specifications in this project.",
             None,
             100,
@@ -373,7 +355,6 @@ pub const PRESENTATION: &[Presentation] = &[
                 "UI Mockups",
                 "UI Mockups",
                 "UI mockups",
-                "UI mockups move from pending to approved, then archived.",
                 "UI mockups in this project.",
                 None,
                 110,
@@ -495,16 +476,6 @@ pub fn noun(slug: &str, count: usize) -> String {
     } else {
         format!("{plural}s")
     }
-}
-
-/// Curated or shared lifecycle description.
-pub fn lifecycle_description(slug: &str) -> String {
-    presentation(slug)
-        .map(|entry| entry.lifecycle.to_string())
-        .unwrap_or_else(|| {
-            "Config-defined document records are active until archived; archive moves the file to archived folder."
-                .to_string()
-        })
 }
 
 /// Inventory note.
