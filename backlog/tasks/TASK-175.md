@@ -2,7 +2,7 @@
 id: TASK-175
 title: "Verify MS-027 removal of browser sections"
 created_date: '2026-11-16T21:03:26Z'
-updated_date: '2026-11-18T22:21:37Z'
+updated_date: '2026-11-18T22:48:58Z'
 labels: []
 references:
   - REQ-06.018
@@ -37,7 +37,8 @@ dependencies:
   - TASK-200
   - TASK-201
   - TASK-202
-ordinal: 60
+  - TASK-203
+ordinal: "61"
 documentation: []
 type: milestone-verification
 ---
