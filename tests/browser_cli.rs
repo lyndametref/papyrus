@@ -3922,7 +3922,6 @@ fn t15c_view_decision_fields() {
     let view = get(&server, "/doc/ADR-001").text();
     for needle in [
         "Decision type",
-        "Status",
         "Decision",
         "Context",
         "Consequences",
@@ -4405,7 +4404,7 @@ fn t40c_view_ui_mockup() {
     let html = get(&server, "/doc/MOCK-001").text();
     assert!(html.contains("Record ID"));
     assert!(html.contains("MOCK-001"));
-    assert!(html.contains("UI mockup"));
+    // Document type is no longer repeated on the view (ADR-033 point 4).
     assert!(html.contains("UI Mockups"));
     assert!(html.contains("<h1 class=\"h1\">First mockup</h1>"));
     assert!(html.contains("<h2>UI specifications</h2>"));
