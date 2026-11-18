@@ -2,7 +2,7 @@
 id: TASK-168
 title: "Implement uniform single-document browser layout"
 created_date: '2026-11-16T21:03:15Z'
-updated_date: '2026-11-18T20:00:00Z'
+updated_date: '2026-11-18T19:22:45Z'
 labels: []
 references:
   - REQ-06.012
@@ -24,3 +24,4 @@ Code and automated tests for uniform single-document browser layout.
 
 ## Comments
 - **rust-dev**: Implemented uniform single-document browser layout. Modified render.rs, mod.rs, view.html, document_detail.html. cargo fmt, clippy --all-targets, test --lib pass. 6 pre-existing browser_cli assertions (Record ID) fail due to old layout expectations; to be updated by test suite.
+- **rust-dev**: Implementation complete. Shared single-document layout applied: ID small above big bold title, status label beside ID, created and updated under title, references dependencies dependents as collapsible native details, no document type repetition, metadata under content, owning group preserved. UI mockup views excluded. Works without JS. Tests: browser_cli 176 passed, lib 426 passed. Clippy only pre-existing browser warning. Full suite has pre-existing failures AUD-039 and no_drift.
