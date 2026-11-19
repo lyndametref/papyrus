@@ -438,6 +438,10 @@ fn tc_054_help_documents_the_stdin_path() {
             &["decision", "edit", "--help"],
             &["--decision", "--context", "--consequences"],
         ),
+        (&["audit", "create", "--help"], &["--content"]),
+        (&["audit", "edit", "--help"], &["--content"]),
+        (&["glossary", "create", "--help"], &["--definition"]),
+        (&["glossary", "edit", "--help"], &["--definition"]),
     ];
     for (args, fields) in cases {
         let out = run_ok(&dir, args);
@@ -536,4 +540,233 @@ fn typed_document_types_accept_stdin_description_on_create_and_edit() {
         content.contains("Edited spec one\n\nEdited spec two"),
         "{content}"
     );
+}
+
+#[test]
+fn audit_content_create_and_edit_read_multiline_stdin() {
+    let dir = init("audit-content");
+    let id = stdout(&run_stdin_ok(
+        &dir,
+        &[
+            "audit",
+            "create",
+            "--title",
+            "Multiline audit",
+            "--content",
+            "-",
+        ],
+        b"Audit line one\n\nAudit line two\nAudit line three\n",
+    ));
+    assert_eq!(id, "AUD-001");
+    let content = view(&dir, "audit", &id);
+    assert!(
+        content.contains("## Content\nAudit line one\n\nAudit line two\nAudit line three"),
+        "{content}"
+    );
+
+    run_stdin_ok(
+        &dir,
+        &["audit", "edit", &id, "--content=-"],
+        b"Edited audit one\r\n\r\nEdited audit two\r\n",
+    );
+    let content = view(&dir, "audit", &id);
+    assert!(
+        content.contains("## Content\nEdited audit one\n\nEdited audit two"),
+        "{content}"
+    );
+    assert!(!content.contains("Audit line one"), "{content}");
+    assert!(!content.contains('\r'), "{content}");
+}
+
+#[test]
+fn glossary_definition_create_and_edit_read_multiline_stdin() {
+    let dir = init("glossary-definition");
+    let id = stdout(&run_stdin_ok(
+        &dir,
+        &[
+            "glossary",
+            "create",
+            "--term",
+            "Multiline term",
+            "--definition",
+            "-",
+        ],
+        b"Definition line one\n\nDefinition line two\n",
+    ));
+    assert_eq!(id, "GLO-001");
+    let content = view(&dir, "glossary", &id);
+    assert!(
+        content.contains("## Definition\nDefinition line one\n\nDefinition line two"),
+        "{content}"
+    );
+
+    run_stdin_ok(
+        &dir,
+        &["glossary", "edit", &id, "--definition=-"],
+        b"Edited definition one\r\n\r\nEdited definition two\r\n",
+    );
+    let content = view(&dir, "glossary", &id);
+    assert!(
+        content.contains("## Definition\nEdited definition one\n\nEdited definition two"),
+        "{content}"
+    );
+    assert!(!content.contains("Definition line one"), "{content}");
+    assert!(!content.contains('\r'), "{content}");
+}
+
+#[test]
+fn audit_content_stdin_failures_exit_4_without_writing() {
+    let dir = init("audit-content-errors");
+    for input in [b"".as_slice(), b"  \n\t\n ".as_slice()] {
+        let out = run_stdin(
+            &dir,
+            &[
+                "audit",
+                "create",
+                "--title",
+                "Empty audit",
+                "--content",
+                "-",
+            ],
+            input,
+        );
+        assert_eq!(out.status.code(), Some(4), "{:?}", stderr(&out));
+    }
+    let invalid = run_stdin(
+        &dir,
+        &[
+            "audit",
+            "create",
+            "--title",
+            "Invalid audit",
+            "--content",
+            "-",
+        ],
+        b"ok\n\xff\n",
+    );
+    assert_eq!(invalid.status.code(), Some(4));
+    assert_eq!(stdout(&run_ok(&dir, &["audit", "list"])), "");
+
+    let id = stdout(&run_stdin_ok(
+        &dir,
+        &["audit", "create", "--title", "Seed audit", "--content", "-"],
+        b"seed content\n",
+    ));
+    assert_eq!(id, "AUD-001", "failed input must not allocate an ID");
+    let path = dir.join(format!("docs/audit-records/{id}.md"));
+    let before = fs::read(&path).unwrap();
+
+    for input in [
+        b"".as_slice(),
+        b"  \n\t\n ".as_slice(),
+        b"ok\n\xff\n".as_slice(),
+    ] {
+        let out = run_stdin(&dir, &["audit", "edit", &id, "--content", "-"], input);
+        assert_eq!(out.status.code(), Some(4), "{:?}", stderr(&out));
+    }
+    assert_eq!(fs::read(&path).unwrap(), before);
+}
+
+#[test]
+fn glossary_definition_stdin_failures_exit_4_without_writing() {
+    let dir = init("glossary-definition-errors");
+    for input in [b"".as_slice(), b"  \n\t\n ".as_slice()] {
+        let out = run_stdin(
+            &dir,
+            &[
+                "glossary",
+                "create",
+                "--term",
+                "Empty term",
+                "--definition",
+                "-",
+            ],
+            input,
+        );
+        assert_eq!(out.status.code(), Some(4), "{:?}", stderr(&out));
+    }
+    let invalid = run_stdin(
+        &dir,
+        &[
+            "glossary",
+            "create",
+            "--term",
+            "Invalid term",
+            "--definition",
+            "-",
+        ],
+        b"ok\n\xff\n",
+    );
+    assert_eq!(invalid.status.code(), Some(4));
+    assert_eq!(stdout(&run_ok(&dir, &["glossary", "list"])), "");
+
+    let id = stdout(&run_stdin_ok(
+        &dir,
+        &[
+            "glossary",
+            "create",
+            "--term",
+            "Seed term",
+            "--definition",
+            "-",
+        ],
+        b"seed definition\n",
+    ));
+    assert_eq!(id, "GLO-001", "failed input must not allocate an ID");
+    let path = dir.join(format!("docs/glossary/{id}.md"));
+    let before = fs::read(&path).unwrap();
+
+    for input in [
+        b"".as_slice(),
+        b"  \n\t\n ".as_slice(),
+        b"ok\n\xff\n".as_slice(),
+    ] {
+        let out = run_stdin(&dir, &["glossary", "edit", &id, "--definition", "-"], input);
+        assert_eq!(out.status.code(), Some(4), "{:?}", stderr(&out));
+    }
+    assert_eq!(fs::read(&path).unwrap(), before);
+}
+
+#[test]
+fn audit_and_glossary_literal_values_do_not_read_stdin() {
+    let dir = init("audit-glossary-literal");
+    // Invalid UTF-8 on stdin proves the literal path never reads it.
+    let audit_id = stdout(&run_stdin(
+        &dir,
+        &[
+            "audit",
+            "create",
+            "--title",
+            "Literal audit",
+            "--content",
+            "literal content",
+            "--audit-type",
+            "-",
+        ],
+        b"\xff\xfe",
+    ));
+    let content = view(&dir, "audit", &audit_id);
+    assert!(content.contains("## Content\nliteral content"), "{content}");
+    assert!(content.contains("## Audit Type\n-"), "{content}");
+
+    let glossary_id = stdout(&run_stdin(
+        &dir,
+        &[
+            "glossary",
+            "create",
+            "--term",
+            "Literal term",
+            "--definition",
+            "literal definition",
+            "--reference",
+            "-",
+        ],
+        b"\xff\xfe",
+    ));
+    let content = view(&dir, "glossary", &glossary_id);
+    assert!(
+        content.contains("## Definition\nliteral definition"),
+        "{content}"
+    );
+    assert!(content.contains("references:"), "{content}");
 }

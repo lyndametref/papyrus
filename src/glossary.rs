@@ -14,11 +14,12 @@ pub fn handle(
 ) -> Result<CommandOutput, AppError> {
     match verb {
         DocumentVerb::Create => {
+            let definition = resolve_definition_required(args)?;
             let id = create(
                 ctx,
                 scope,
                 args.require("term")?,
-                args.require("definition")?,
+                &definition,
                 args.get_all("label"),
                 args.get_all("reference"),
             )?;
@@ -26,19 +27,42 @@ pub fn handle(
         }
         DocumentVerb::List => list(ctx, scope, record),
         DocumentVerb::View => view(ctx, scope, record, args.require("id")?),
-        DocumentVerb::Edit => edit(
-            ctx,
-            scope,
-            record,
-            args.require("id")?,
-            args.get("term"),
-            args.get("definition"),
-            args.get_all("label"),
-            args.get_all("reference"),
-            args.flag("editor"),
-        ),
+        DocumentVerb::Edit => {
+            let definition = resolve_definition_optional(args)?;
+            edit(
+                ctx,
+                scope,
+                record,
+                args.require("id")?,
+                args.get("term"),
+                definition.as_ref(),
+                args.get_all("label"),
+                args.get_all("reference"),
+                args.flag("editor"),
+            )
+        }
         other => Err(crate::document::unsupported_verb(other)),
     }
+}
+
+/// Resolve `--definition -` on create before any ID is allocated or file is
+/// written.
+fn resolve_definition_required(args: &DocumentArgs) -> Result<sanitize::Text, AppError> {
+    let raw = args.require("definition")?;
+    let stdin = sanitize::resolve_stdin_fields(&[("definition", Some(raw))])?;
+    sanitize::text_value("definition", Some(raw.to_string()), stdin.as_ref())
+        .ok_or_else(|| AppError::Validation("missing required argument: definition".to_string()))
+}
+
+/// Resolve `--definition -` on edit before any write.
+fn resolve_definition_optional(args: &DocumentArgs) -> Result<Option<sanitize::Text>, AppError> {
+    let raw = args.get("definition");
+    let stdin = sanitize::resolve_stdin_fields(&[("definition", raw)])?;
+    Ok(sanitize::text_value(
+        "definition",
+        raw.map(str::to_string),
+        stdin.as_ref(),
+    ))
 }
 
 fn sanitize_text(input: &str) -> Result<String, AppError> {
@@ -108,12 +132,12 @@ pub fn create(
     ctx: &Context,
     scope: &DocumentScope,
     term_raw: &str,
-    definition_raw: &str,
+    definition_text: &sanitize::Text,
     labels_raw: &[String],
     references_raw: &[String],
 ) -> Result<String, AppError> {
     let term = sanitize_text(term_raw)?;
-    let definition = sanitize_text(definition_raw)?;
+    let definition = definition_text.resolve()?;
 
     let mut labels: Vec<String> = Vec::new();
     for l in labels_raw {
@@ -295,7 +319,7 @@ pub fn edit(
     record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
     term_raw: Option<&str>,
-    definition_raw: Option<&str>,
+    definition_text: Option<&sanitize::Text>,
     labels_raw: &[String],
     references_raw: &[String],
     editor: bool,
@@ -319,8 +343,8 @@ pub fn edit(
     if let Some(t) = term_raw {
         gd.term = sanitize_text(t)?;
     }
-    if let Some(d) = definition_raw {
-        gd.definition = sanitize_text(d)?;
+    if let Some(d) = definition_text {
+        gd.definition = d.resolve()?;
     }
 
     let editor_cmd = if editor {
@@ -344,7 +368,7 @@ pub fn edit(
             gd.term.clone(),
         ));
     }
-    if definition_raw.is_some() {
+    if definition_text.is_some() {
         ops.push(crate::record::patch::PatchOp::SetSection(
             "## Definition".into(),
             gd.definition.clone(),
