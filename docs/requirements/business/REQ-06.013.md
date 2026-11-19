@@ -2,10 +2,13 @@
 id: REQ-06.013
 title: "Present the Backlog as a Per-Milestone Kanban Board"
 created_date: '2026-11-15T15:46:30Z'
-updated_date: '2026-11-16T20:59:19Z'
+updated_date: '2026-11-19T11:13:59Z'
 labels: []
 references:
   - RE-002
+  - REQ-06.020
+  - REQ-06.021
+  - REQ-06.022
 ---
 # REQ-06.013 Present the Backlog as a Per-Milestone Kanban Board
 
@@ -49,7 +52,7 @@ Presentation details not fixed here — card contents beyond the task link, colu
 - "Clean up all" is available only in the browser; no CLI equivalent is provided in this release.
 - Archived tasks are not shown on the board.
 - Every milestone is shown in its release or unassigned region, including a milestone whose status is `closed`.
-- No archived milestone state exists: milestones have no archive or restore command, so no milestone is hidden from the board by an archive state.
+- Archived milestones are not shown on the board (REQ-03.001).
 
 ## Traceability
 - Source: customer-feedback handoff — project owner, Item 1 (high), raw quote:
@@ -71,3 +74,7 @@ Presentation details not fixed here — card contents beyond the task link, colu
 - RE-002 — Milestone command must support archiving milestones; ADR-0022/ADR-0023 wording on milestones is superseded by REQ-03.001.
 - NFR-01.002 — Display, View, and Edit All Papyrus Content in a Local Browser
 - NFR-05.001 — Display the Browser Interface in Named Browsers
+- Correction 2026-11-19: removed a stale acceptance criterion that claimed milestones have no archive state; the milestone lifecycle is `open -> closed -> archived` per REQ-03.001.
+- REQ-06.020 - Order Milestones and Releases by Lowest Task Ordinal in the Browser Backlog (milestone and release ordering in this view).
+- REQ-06.021 - Mark Open and Closed Milestones and Releases in the Browser Backlog (lifecycle markers on the milestone summary and the release separator).
+- REQ-06.022 - Clean Up Closed Milestones and Released Releases in the Browser Backlog (milestone and release cleanup, separate from the task `Clean up all` action).
