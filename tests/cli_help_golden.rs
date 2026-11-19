@@ -78,6 +78,14 @@ fn cases() -> Vec<(String, Vec<String>)> {
             ));
         }
     }
+    for slug in ["task", "milestone", "decision"] {
+        for verb in ["create", "edit"] {
+            out.push((
+                format!("verb-{slug}-{verb}"),
+                vec![slug.to_string(), verb.to_string(), "--help".to_string()],
+            ));
+        }
+    }
     let error_cases: [(&str, &[&str]); 10] = [
         ("err-unknown-slug", &["nosuch", "--help"]),
         ("err-disabled-slug", &["legacy", "--help"]),

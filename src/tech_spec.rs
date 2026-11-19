@@ -19,7 +19,7 @@ pub fn handle(
                 ctx,
                 scope,
                 args.require("title")?,
-                args.require("description")?,
+                args.require_text("description")?,
                 args.get_all("label"),
                 args.get_all("reference"),
             )?;
@@ -33,7 +33,7 @@ pub fn handle(
             record,
             args.require("id")?,
             args.get("title"),
-            args.get("description"),
+            args.text("description"),
             args.get_all("label"),
             args.get_all("reference"),
             args.flag("editor"),
@@ -137,12 +137,12 @@ fn create(
     ctx: &Context,
     scope: &DocumentScope,
     title_raw: &str,
-    description_raw: &str,
+    description_raw: sanitize::Text,
     labels_raw: &[String],
     references_raw: &[String],
 ) -> Result<String, AppError> {
     let title = sanitize_field(title_raw)?;
-    let description = sanitize_field(description_raw)?;
+    let description = description_raw.resolve()?;
 
     let mut labels: Vec<String> = Vec::new();
     for l in labels_raw {
@@ -323,7 +323,7 @@ fn edit(
     record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
     title_raw: Option<&str>,
-    description_raw: Option<&str>,
+    description_raw: Option<sanitize::Text>,
     labels_raw: &[String],
     references_raw: &[String],
     editor: bool,
@@ -346,8 +346,8 @@ fn edit(
     if let Some(title) = title_raw {
         record.title = sanitize_field(title)?;
     }
-    if let Some(description) = description_raw {
-        record.description = sanitize_field(description)?;
+    if let Some(description) = &description_raw {
+        record.description = description.resolve()?;
     }
 
     let editor_cmd = if editor {

@@ -168,6 +168,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
           <b style="color: light-dark(#1a7f37, #3fb950);">-d, --description &lt;text&gt;</b>
           Task description.
+          Use "-" to read multiline text from standard input.
 
           <b style="color: light-dark(#1a7f37, #3fb950);">--ac &lt;criteria&gt;</b>
           Acceptance criterion. Repeatable.
@@ -225,6 +226,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
           <b style="color: light-dark(#1a7f37, #3fb950);">-d, --description &lt;text&gt;</b>
           Update the description.
+          Use "-" to read multiline text from standard input.
 
           <b style="color: light-dark(#1a7f37, #3fb950);">--ac &lt;criteria&gt;</b>
           Add an acceptance criterion. Repeatable.
@@ -288,6 +290,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
           <b style="color: light-dark(#1a7f37, #3fb950);">-d, --description &lt;text&gt;</b>
           Milestone description.
+          Use "-" to read multiline text from standard input.
 
           <b style="color: light-dark(#1a7f37, #3fb950);">--release &lt;id&gt;</b>
           Assign the milestone to a release.
@@ -306,6 +309,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
           <b style="color: light-dark(#1a7f37, #3fb950);">-d, --description &lt;text&gt;</b>
           Update the description.
+          Use "-" to read multiline text from standard input.
 
           <b style="color: light-dark(#1a7f37, #3fb950);">--release &lt;id&gt;</b>
           Assign the milestone to a release.
@@ -375,12 +379,15 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
           <b style="color: light-dark(#1a7f37, #3fb950);">-d, --decision &lt;text&gt;</b>
           The decision which was taken.
+          Use "-" to read multiline text from standard input.
 
           <b style="color: light-dark(#1a7f37, #3fb950);">--context &lt;text&gt;</b>
           Context of the decision.
+          Use "-" to read multiline text from standard input.
 
           <b style="color: light-dark(#1a7f37, #3fb950);">--consequences &lt;text&gt;</b>
           Consequences of the decision.
+          Use "-" to read multiline text from standard input.
 
        <b style="color: light-dark(#8250df, #d2a8ff);">list</b>
        List decisions.
@@ -399,15 +406,18 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
           <b style="color: light-dark(#1a7f37, #3fb950);">-d, --decision &lt;text&gt;</b>
           The decision which was taken.
+          Use "-" to read multiline text from standard input.
 
           <b style="color: light-dark(#1a7f37, #3fb950);">--status &lt;status&gt;</b>
           Set the status.
 
           <b style="color: light-dark(#1a7f37, #3fb950);">--context &lt;text&gt;</b>
           Context of the decision.
+          Use "-" to read multiline text from standard input.
 
           <b style="color: light-dark(#1a7f37, #3fb950);">--consequences &lt;text&gt;</b>
           Consequences of the decision.
+          Use "-" to read multiline text from standard input.
 
           <b style="color: light-dark(#1a7f37, #3fb950);">--superseded-by &lt;id&gt;</b>
            Mark this decision as superseded by at most one other decision of the same type. Cannot be combined with --status.
@@ -441,6 +451,12 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
         [--label &lt;label&gt;...] [--reference &lt;value&gt;...] [--editor]</b>.
         Built-in types keep their typed fields; <b>papyrus &lt;document-slug&gt; --help</b>
         is authoritative for the selected type.
+
+        <b>Multiline stdin:</b> <b>create</b> and <b>edit</b> accept
+        <b>-d, --description &lt;text&gt;</b> from standard input when the value
+        is exactly <b>-</b>. This applies to the generic model and to every
+        typed document type that declares <b>--description</b>.
+        Use "-" to read multiline text from standard input.
 
        <b style="color: light-dark(#8250df, #d2a8ff);">status &lt;id&gt; &lt;value&gt;</b>
         Set <b>active</b> or a declared custom status in place. Front-matter-backed

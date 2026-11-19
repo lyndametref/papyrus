@@ -16,7 +16,11 @@ pub enum MilestoneCmd {
         #[arg(value_name = "title")]
         title: String,
         /// Milestone description.
-        #[arg(short = 'd', long = "description")]
+        #[arg(
+            short = 'd',
+            long = "description",
+            help = crate::sanitize::MULTILINE_STDIN_HELP
+        )]
         description: Option<String>,
         /// Assign the milestone to a release.
         #[arg(long = "release")]
@@ -39,7 +43,11 @@ pub enum MilestoneCmd {
         #[arg(long = "title")]
         title: Option<String>,
         /// Update the description.
-        #[arg(short = 'd', long = "description")]
+        #[arg(
+            short = 'd',
+            long = "description",
+            help = crate::sanitize::MULTILINE_STDIN_HELP
+        )]
         description: Option<String>,
         /// Assign the milestone to a release.
         #[arg(long = "release")]
@@ -82,10 +90,11 @@ pub fn run(ctx: &Context, cmd: MilestoneCmd) -> Result<crate::CommandOutput, App
             label,
             reference,
         } => {
+            let description = sanitize::resolve_text_field("description", description)?;
             let id = create(
                 ctx,
                 &title,
-                description.as_deref(),
+                description,
                 release.as_deref(),
                 &label,
                 &reference,
@@ -116,7 +125,7 @@ pub fn run(ctx: &Context, cmd: MilestoneCmd) -> Result<crate::CommandOutput, App
             ctx,
             &id,
             title.as_deref(),
-            description.as_deref(),
+            sanitize::resolve_text_field("description", description)?,
             release.as_deref(),
             no_release,
             &label,
@@ -347,15 +356,15 @@ fn body_document(
 pub fn create(
     ctx: &Context,
     title_raw: &str,
-    desc_raw: Option<&str>,
+    desc_raw: Option<sanitize::Text>,
     release_raw: Option<&str>,
     labels_raw: &[String],
     references_raw: &[String],
 ) -> Result<String, AppError> {
     let cfg = load_config(ctx)?;
     let title = sanitize_text(title_raw)?;
-    let desc = match desc_raw {
-        Some(s) => Some(sanitize_text(s)?),
+    let desc = match &desc_raw {
+        Some(text) => Some(text.resolve()?),
         None => None,
     };
     let release = match release_raw {
@@ -554,7 +563,7 @@ pub fn edit(
     ctx: &Context,
     id_raw: &str,
     title_raw: Option<&str>,
-    desc_raw: Option<&str>,
+    desc_raw: Option<sanitize::Text>,
     release_raw: Option<&str>,
     no_release: Option<Option<String>>,
     labels_raw: &[String],
@@ -596,8 +605,8 @@ pub fn edit(
     if let Some(t) = title_raw {
         title_val = sanitize_text(t)?;
     }
-    if let Some(d) = desc_raw {
-        desc_val = Some(sanitize_text(d)?);
+    if let Some(d) = &desc_raw {
+        desc_val = Some(d.resolve()?);
     }
     if let Some(r) = release_raw {
         let rid = sanitize_text(r)?;
@@ -1029,7 +1038,7 @@ mod tests {
         let id = create(
             &c,
             "New Milestone",
-            Some("Milestone desc"),
+            Some(sanitize::Text::literal("Milestone desc")),
             Some("REL-001"),
             &["m16".to_string()],
             &[],

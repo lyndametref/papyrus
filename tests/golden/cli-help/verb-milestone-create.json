@@ -1,0 +1,5 @@
+{
+  "exit": 0,
+  "stdout": "Create a milestone\n\nUsage: papyrus milestone create [OPTIONS] <title>\n\nArguments:\n  <title>  Milestone title\n\nOptions:\n  -d, --description <DESCRIPTION>  Use \"-\" to read multiline text from standard input.\n      --json                       Emit stable, machine-readable JSON.\n      --dir <path>                 Project directory. Default: the current working directory.\n      --release <RELEASE>          Assign the milestone to a release\n      --config <file>              Configuration file. Default: papyrus.config.yml in the project directory.\n      --label <LABEL>              Label\n      --no-color                   Disable ANSI color output.\n      --reference <REFERENCE>      Reference\n  -h, --help                       Print help\n",
+  "stderr": ""
+}
