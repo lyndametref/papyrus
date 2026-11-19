@@ -2,7 +2,7 @@
 id: TASK-210
 title: "Verify lowest-ordinal milestone ordering, markers, and cleanup in the browser Backlog"
 created_date: '2026-11-19T11:20:03Z'
-updated_date: '2026-11-19T11:20:03Z'
+updated_date: '2026-11-19T19:11:43Z'
 labels: []
 references:
   - REQ-06.020
@@ -10,12 +10,13 @@ references:
   - REQ-06.022
   - REQ-06.013
   - RE-008
-status: ToDo
+status: In-Progress
 assignee:
   - quality-gatekeeper
 milestone: MS-030
 dependencies:
   - TASK-209
+  - TASK-212
 ordinal: 60
 documentation: []
 type: milestone-verification
