@@ -28,11 +28,17 @@ references:
   - ADR-034
   - REQ-06.018
   - RE-005
+  - ADR-035
+  - REQ-06.019
+  - RE-006
+  - TASK-178
 status: draft
 ---
 # TECH-076 Browser Shell UI: Shared List Layout, Width Classes, and Collapsible Navigation
 
 > **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
+
+> **Revised (TASK-178, 2026-11-19):** reference visibility in the shared browser list is per artifact family per ADR-035 and REQ-06.019 (source RE-006). `ContentModel::Generic` (config-defined document types) renders no reference list in any list row; `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep it; labels render for every family. Single-document view, CLI list and view, JSON API, `RecordView`, and front matter are unchanged.
 
 ## Description
 **Tickets:** TASK-148 (publisher; contract fixed by TASK-141, TASK-142, TASK-144)
@@ -50,7 +56,7 @@ This page is the normative browser-shell contract for page chrome, the shared li
 ### 1.1 In scope
 
 - The page shell: header, document-type sidebar, main region, and footer rendered once per response.
-- The shared list layout used by every list view, including the fixed column order, family slots, Title-cell labels and references, action placement, and grouped rows.
+- The shared list layout used by every list view, including the fixed column order, family slots, Title-cell labels and (for non-Generic families) references, action placement, and grouped rows.
 - The `Capped` and `Full` page-width classes and the `.bleed` full-width region inside a capped page.
 - The navigation toggle, its `papyrus.nav` persistence, the default-expanded state, and behaviour without JavaScript.
 - The accessibility contract for the shell, the shared list, and the collapsed navigation.
@@ -116,7 +122,16 @@ Slots come from declared presentation data, never from a `match` on a slug, a ha
 
 ### 3.3 Title cell: labels and references
 
-The Title cell renders the record link, then the record's front-matter labels and references below it, from escaped values. Labels and references are general front-matter metadata, not family data: they are rendered for every family, are never a slot, and never reorder a column. This preserves REQ-06.004 parity when the list shows the same values as the CLI.
+The Title cell renders the record link, then the record's front-matter labels below it, from escaped values. Labels are general front-matter metadata, not family data: they are rendered for every family, including config-defined document types, are never a slot, and never reorder a column.
+
+Reference visibility is a declared property of the artifact family, resolved from the descriptor content model (ADR-035, REQ-06.019):
+
+- `ContentModel::Typed` and `ContentModel::HtmlMockup` families render the reference list below the labels, from escaped values.
+- `ContentModel::Generic` families (config-defined document types) render no reference list in any row; the reference block is omitted, not collapsed, emptied, or made expandable.
+- Labels remain for every family; only references change.
+- Visibility is resolved from the descriptor content model, never from a slug match, a presentation override, a per-family template, or a new presentation field.
+
+`Row.references` may still carry the `RecordView` projection; the shared renderer omits the block for `Generic` families. This qualifies REQ-06.004 browser-list parity for Generic families only. The CLI list and view keep references, the JSON API and `RecordView` are unchanged, and the single-document view keeps its collapsible References section (REQ-06.012, ADR-033). Front matter and record files are unchanged.
 
 ### 3.4 Action cell
 
@@ -235,9 +250,9 @@ Every browser byte comes from the static table `src/browser/assets.rs` (`Asset`,
 
 | Artifact | Reference |
 |---|---|
-| Requirements | REQ-06.016, REQ-06.015, REQ-06.004, REQ-06.013, REQ-05.007 |
+| Requirements | REQ-06.016, REQ-06.015, REQ-06.004 (qualified for Generic list rows by REQ-06.019), REQ-06.019 (per-family reference visibility; source RE-006), REQ-06.013, REQ-05.007, REQ-06.012 (single-document view keeps references) |
 | NFRs | NFR-05.001 (browser floor), NFR-01.003 (offline) |
-| ADRs | ADR-0028, ADR-0027, ADR-0025, ADR-0026, ADR-0005 |
+| ADRs | ADR-0028 (decision 2 and constraint 11 amended by ADR-035 for Generic lists), ADR-035 (per-family reference visibility), ADR-0033 (collapsible detail sections), ADR-0027, ADR-0025, ADR-0026, ADR-0005 |
 | UI | MOCK-0016, MOCK-0018, `docs/specifications/ui/browser-shell-and-shared-list-ui.md` |
-| Tickets | TASK-141, TASK-142, TASK-144, TASK-146, TASK-148 |
+| Tickets | TASK-141, TASK-142, TASK-144, TASK-146, TASK-148, TASK-178 (revision) |
 | Implementation | `src/browser/shell.rs`, `list.rs`, `routes.rs`, `render.rs`, `templates/shell.html`, `app.css`, `app.js`, `nav-state.js`, `assets.rs`, `http.rs` |

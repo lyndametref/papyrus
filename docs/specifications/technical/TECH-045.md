@@ -2,7 +2,7 @@
 id: TECH-045
 title: "Render One Metadata Projection in CLI and Browser Views"
 created_date: '2026-11-16T17:46:49Z'
-updated_date: '2026-11-16T17:47:19Z'
+updated_date: '2026-11-19T06:47:46Z'
 labels: []
 references:
   - ADR-0006
@@ -30,9 +30,15 @@ references:
   - TASK-70
   - TASK-72
   - TASK-98
-status: verified
+  - ADR-035
+  - REQ-06.019
+  - RE-006
+  - TASK-178
+status: draft
 ---
 # TECH-045 Render One Metadata Projection in CLI and Browser Views
+
+> **Revised (TASK-178, 2026-11-19):** reference visibility in the shared browser list is per artifact family per ADR-035 and REQ-06.019 (source RE-006). `ContentModel::Generic` (config-defined document types) renders no reference list in any list row; `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep it; labels render for every family. The `RecordView` projection, single-document view, CLI list and view, JSON API, and front matter are unchanged.
 
 ## Description
 **Ticket:** TASK-67
@@ -42,7 +48,7 @@ status: verified
 
 ## Purpose
 
-Deliver ADR-0013 decision 5 (superseding ADR-0009): a single `RecordView` projection that is the only source for record metadata in every read surface, so that CLI list/view text and `--json`, browser list/detail JSON, and browser HTML present identical metadata values for the same record. This ticket implements REQ-06.004 (CLI and browser read front matter), REQ-05.010 (front-matter field map), REQ-05.011 (metadata maintained through all commands), and REQ-01.005 (single Papyrus ID space), on top of the shared envelope and Papyrus identity delivered by TASK-63 and TASK-64 and the option exposure delivered by TASK-65. It does not migrate the corpus (TASK-68, TASK-69), remove legacy serializers (TASK-70), or add the lifecycle page (TASK-72).
+Deliver ADR-0013 decision 5 (superseding ADR-0009): a single `RecordView` projection that is the only source for record metadata in every read surface, so that CLI list/view text and `--json`, browser list/detail JSON, and browser HTML present identical metadata values for the same record. REQ-06.019 qualifies only the browser list presentation for `ContentModel::Generic` families: `RecordView` still carries references, and the shared list renderer omits them (ADR-035). This ticket implements REQ-06.004 (CLI and browser read front matter), REQ-05.010 (front-matter field map), REQ-05.011 (metadata maintained through all commands), and REQ-01.005 (single Papyrus ID space), on top of the shared envelope and Papyrus identity delivered by TASK-63 and TASK-64 and the option exposure delivered by TASK-65. It does not migrate the corpus (TASK-68, TASK-69), remove legacy serializers (TASK-70), or add the lifecycle page (TASK-72).
 
 ## Scope
 
@@ -93,7 +99,7 @@ Deliver ADR-0013 decision 5 (superseding ADR-0009): a single `RecordView` projec
 ### 3. Browser rendering
 
 1. Browser list and detail JSON (`GET /api/...`) for every managed record type is rendered from `RecordView`. The JSON contains the same `metadata` object as the CLI `--json` output for the same record, plus the existing browser-specific fields (path, version, and the typed fields the browser form already uses).
-2. Browser HTML list and detail pages render metadata from `RecordView`: list rows show at least id, title, created_date, updated_date, labels, references, and the type-specific keys in a metadata line beneath the primary link; detail pages show a metadata block (`dl`) with Record ID, Title, Created date, Updated date, Labels, References, plus type-specific keys (per MOCK-0010 section 4).
+2. Browser HTML list and detail pages render metadata from `RecordView`. Detail pages show a metadata block (`dl`) with Record ID, Title, Created date, Updated date, Labels, References, plus type-specific keys (per MOCK-0010 section 4), and the single-document References disclosure is unchanged (REQ-06.012). List rows show at least id, title, created_date, updated_date, labels, and the type-specific keys beneath the primary link, with references shown only for `ContentModel::Typed` and `ContentModel::HtmlMockup` families. A `ContentModel::Generic` (config-defined document type) list row renders no reference block, omitted rather than emptied (ADR-035, REQ-06.019); `RecordView`, the JSON API, the CLI list and view, and front matter still carry the references.
 3. The browser editable field set is unchanged from the existing per-type edit forms. `created_date` and `updated_date` are rendered read-only (disabled inputs, clearly marked "(read-only)") in the edit form and are never accepted from the request.
 4. Timestamps are rendered as the quoted ISO-8601 UTC strings stored in front matter, without reformatting, unless a human-readable secondary is added (MOCK-0010 OQ-4 default: as stored).
 5. Labels and references are rendered as tags in view and as a tag add/remove interaction in edit, reusing the existing interaction (MOCK-0002/MOCK-0010).
@@ -177,9 +183,9 @@ Correction is owned by `business-analyst`/`tech-writer` and is a prerequisite fo
 | Artifact | Reference |
 |---|---|
 | Ticket | TASK-67 |
-| Requirements | REQ-06.004, REQ-05.010, REQ-05.011, REQ-01.005, REQ-06.002, REQ-06.003 |
-| ADRs | ADR-0006, ADR-0012, ADR-0013 (decision 5) |
-| Related tickets | TASK-63, TASK-64, TASK-65, TASK-66, TASK-68, TASK-69, TASK-70, TASK-72, TASK-19 |
+| Requirements | REQ-06.004 (browser list parity, qualified for Generic list rows by REQ-06.019), REQ-06.019 (per-family reference visibility; source RE-006), REQ-05.010, REQ-05.011, REQ-01.005, REQ-06.002, REQ-06.003, REQ-06.012 (single-document view keeps references) |
+| ADRs | ADR-0006, ADR-0012, ADR-0013 (decision 5), ADR-035 (per-family reference visibility; projection unchanged), ADR-033 (collapsible detail sections) |
+| Related tickets | TASK-63, TASK-64, TASK-65, TASK-66, TASK-68, TASK-69, TASK-70, TASK-72, TASK-19, TASK-178 (revision) |
 | Source | `src/record/` (`frontmatter`, `document`, `patch`, `store`, `identity`), `src/browser/records.rs`, per-type CLI modules, `src/browser/mod.rs` |
 | UI | `docs/specifications/ui/browser-front-matter-and-lifecycle-ui.md`, `docs/specifications/ui/mockups/MOCK-0010-browser-front-matter-and-lifecycle-review.html` |
 | Tests | `tests/browser_cli.rs`, module unit tests in `src/record/` and `src/browser/records.rs` |

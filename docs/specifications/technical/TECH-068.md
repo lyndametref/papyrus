@@ -35,11 +35,17 @@ references:
   - ADR-034
   - REQ-06.018
   - RE-005
+  - ADR-035
+  - REQ-06.019
+  - RE-006
+  - TASK-178
 status: draft
 ---
 # TECH-068 Registry-Derived Browser Views for Config-Defined Document Types
 
 > **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
+
+> **Revised (TASK-178, 2026-11-19):** reference visibility in shared browser list views is per artifact family per ADR-035 and REQ-06.019 (source RE-006). `ContentModel::Generic` (config-defined document types) renders no reference list in any list row; `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep it; labels render for every family. Single-document view, CLI list and view, JSON API, `RecordView`, and front matter are unchanged.
 
 ## Description
 **Ticket:** TASK-114
@@ -208,7 +214,7 @@ Out of scope:
    - `Created` renders the front-matter `created_date` as stored, or `(none)`
      when the key is absent; it is never derived or rewritten by the browser.
    - `Updated` renders the stored `updated_date`, or `(none)`.
-3. Rows are ordered by ID ascending. The Title cell carries the record labels and references; the legacy type-specific row metadata is not carried over by the shared contract.
+3. Rows are ordered by ID ascending. The Title cell carries the record labels for every family. It carries references for `ContentModel::Typed` and `ContentModel::HtmlMockup` families; a `ContentModel::Generic` (config-defined document type) list row renders no reference block, omitted rather than emptied (ADR-035, REQ-06.019). Visibility is resolved from the descriptor content model, never from a slug or presentation override. Detail, CLI list and view, JSON API, `RecordView`, and front matter keep references unchanged. The legacy type-specific row metadata is not carried over by the shared contract.
 4. The page shows a count of the records displayed (after filtering) and the
    existing empty state when there are none.
 5. Built-in typed list pages render through the shared contract of (2) and
@@ -567,7 +573,7 @@ Out of scope:
 
 | ID | Scenario | Assertion |
 |---|---|---|
-| T-114-01 | User-added type `note` (prefix `NOTE`, directory `notes/`, statuses `["active","review","approved"]`, default `active`), records created with the CLI | `GET /?type=note` 200 lists both records in the shared list contract with no family slot; sidebar shows `Notes` under the `Documents` group; `Created` shows the front-matter `created_date`; detail 200; edit 200; `GET /api/docs/note` 200 array with `id/title/status/labels/references/version/path/metadata` |
+| T-114-01 | User-added type `note` (prefix `NOTE`, directory `notes/`, statuses `["active","review","approved"]`, default `active`), records created with the CLI | `GET /?type=note` 200 lists both records in the shared list contract with no family slot; the Title cell renders labels but no reference block (ADR-035, REQ-06.019); sidebar shows `Notes` under the `Documents` group; `Created` shows the front-matter `created_date`; detail 200 and keeps the collapsible References section; edit 200; `GET /api/docs/note` 200 array with `id/title/status/labels/references/version/path/metadata` (references unchanged in the API) |
 | T-114-02 | Canonical vs legacy API | `/api/docs/glossary` body equals `/api/glossary`; `/api/docs/rule` equals `/api/business-rules`; `/api/docs/audit` equals `/api/audit-records`; `/api/docs/ui-mockup` equals `/api/mockups`; `/api/docs/req` equals `/api/requirements?type=req` |
 | T-114-03 | Status read-only | List shows the structural Status column in the fixed order and the detail shows `review`; `Created` equals the stored `created_date`; edit form contains no `name="status"`/`name="status_change"`; `POST /doc/NOTE-001` with `status=archived` and a valid version returns 422 and the file is byte-identical |
 | T-114-04 | Filter values and order | The filter select offers exactly `active`, `review`, `approved` in that order and no empty/`All records` option; `Show all` is the only reset and omits `status`; no `status=archived` option; `?status=review` lists only the review record; `?status=approved` shows the empty state; a type with no custom statuses offers only `active` |
@@ -577,7 +583,7 @@ Out of scope:
 | T-114-08 | Archived-in-active auto-relocation | Hand-edit `notes/NOTE-002.md` to `status: archived`; browser list moves it to `notes/archived/`, omits it, and detail, edit, and API requests 404 |
 | T-114-09 | Disabled type invisibility | Start with `document_types.note.enabled false`: no sidebar entry under `Documents`, no inventory card, `/?type=note` 404, `/api/docs/note` 404, `/doc/NOTE-001` 404; lifecycle still shows `Notes` with `enabled: false` |
 | T-114-10 | Generic edit round trip | POST title/description/labels/references: front matter and heading updated, description section updated, labels/references replace the edited lists, unknown `## Notes` section and unknown key preserved, status unchanged, updated_date refreshed, second identical save writes nothing; stale version returns 409 |
-| T-114-11 | Built-in characterization | Glossary list/detail/edit fixture matches the recorded baseline apart from the shared seven-column list contract and the additive status filter; tech-spec, rule, ui-mockup, req/nfr list/detail/edit keep their existing sections and field sets with the shared row fields |
+| T-114-11 | Built-in characterization | Glossary (`ContentModel::Typed`) list/detail/edit fixture matches the recorded baseline apart from the shared seven-column list contract and the additive status filter, and its list rows keep the reference block; tech-spec, rule, ui-mockup, req/nfr list/detail/edit keep their existing sections and field sets with the shared row fields; a UI-mockup (`ContentModel::HtmlMockup`) list row keeps references |
 | T-114-12 | Lifecycle page | Default config renders `Backlog`, `Decisions`, `Documents` groups, one section per registry descriptor (16 by default), custom statuses and prefix/folder/enabled per document, shared description for `note`, and no fixed `12` count |
 | T-114-13 | Route/table invariants | Unit test: sidebar document entries across the three groups = inventory slugs = canonical API slugs = `type` canonical values = `registry.enabled(Document)`; the sidebar renders exactly the `Backlog`, `Decisions`, `Documents` groups; grep test: no `enum Category`, no `Category::`, no second document-type registry, and no per-slug list/detail/edit/dispatch branch in `src/browser/`; slug literals occur only in the static presentation table |
 | T-114-14 | Method and safety | `POST /api/docs/note` 405 + `Allow: GET, HEAD`; unknown API slug 404; coded directory escaping the project yields no page and no traversal; `?type=business-rule` and `?type=rule` render the same list |
@@ -696,7 +702,8 @@ Out of scope:
 
 - REQ-06.014 — Display config-defined document types in the browser.
 - REQ-06.003 — Describe managed artifacts and their lifecycles.
-- REQ-06.004 — Front-matter metadata projection in CLI and browser views.
+- REQ-06.004 — Front-matter metadata projection in CLI and browser views; browser list parity is qualified for `ContentModel::Generic` rows by REQ-06.019.
+- REQ-06.019 — Do not show the reference list in document-type browser list views (source RE-006); labels stay for every family; detail, CLI, API, and front matter unchanged.
 - REQ-06.012 — Single record view layout.
 - REQ-05.007 — Archive state, `archived/` only, auto-relocation, archived
   invisibility.
@@ -711,8 +718,10 @@ Out of scope:
 - ADR-0005 / ADR-0006 / ADR-0013 — transport, atomic writes, and the shared
   record layer.
 - ADR-0018 — generic document content model.
+- ADR-035 — per-family reference visibility in the shared browser list layout; amends ADR-0028 decision 2 and constraint 11 and ADR-0020 decision 5 for `ContentModel::Generic` lists.
 - TASK-105 (registry), TASK-107 (record layer), TASK-110 (generic handler),
   TASK-113 (search) — completed dependencies.
+- TASK-178 — MS-028 specification revision (draft; architect conformance required).
 - Project-owner decision 2026-11-14 — sidebar grouped by the three artifact
   categories; document list columns ID, Title, Status, family slot(s), Created, Updated, Actions;
   archived records never listed, reachable, or returned by the API. Withdraws
