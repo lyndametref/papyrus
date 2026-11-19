@@ -554,6 +554,19 @@ pub struct BoardCleanup<'a> {
     pub tasks: &'a [&'a Record],
 }
 
+/// The open milestone-cleanup confirmation region.
+#[derive(Clone, Copy)]
+pub struct BoardMilestoneCleanup<'a> {
+    pub milestone: &'a Record,
+}
+
+/// The open release-cleanup confirmation region.
+#[derive(Clone, Copy)]
+pub struct BoardReleaseCleanup<'a> {
+    pub release: &'a Record,
+    pub milestones: &'a [&'a Record],
+}
+
 fn board_milestone_for<'a>(task: &Record, milestones: &'a Index) -> Option<&'a Record> {
     task.milestone_id.as_deref().and_then(|id| {
         milestones
@@ -561,6 +574,67 @@ fn board_milestone_for<'a>(task: &Record, milestones: &'a Index) -> Option<&'a R
             .iter()
             .find(|milestone| milestone.id == id)
     })
+}
+
+fn milestone_lowest_ordinal(milestone: &Record, tasks: &Index) -> Option<i64> {
+    tasks
+        .records
+        .iter()
+        .filter(|task| task.milestone_id.as_deref() == Some(milestone.id.as_str()))
+        .filter_map(|task| task.ordinal)
+        .min()
+}
+
+fn release_lowest_ordinal(release: &Record, milestones: &Index, tasks: &Index) -> Option<i64> {
+    milestones
+        .records
+        .iter()
+        .filter(|milestone| milestone.release_id.as_deref() == Some(release.id.as_str()))
+        .filter_map(|milestone| milestone_lowest_ordinal(milestone, tasks))
+        .min()
+}
+
+fn cmp_milestone_order(a: &&Record, b: &&Record, tasks: &Index) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    match (
+        milestone_lowest_ordinal(a, tasks),
+        milestone_lowest_ordinal(b, tasks),
+    ) {
+        (Some(x), Some(y)) => {
+            if x != y {
+                x.cmp(&y)
+            } else {
+                a.id.cmp(&b.id)
+            }
+        }
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => a.id.cmp(&b.id),
+    }
+}
+
+fn cmp_release_order(
+    a: &&Record,
+    b: &&Record,
+    milestones: &Index,
+    tasks: &Index,
+) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    match (
+        release_lowest_ordinal(a, milestones, tasks),
+        release_lowest_ordinal(b, milestones, tasks),
+    ) {
+        (Some(x), Some(y)) => {
+            if x != y {
+                x.cmp(&y)
+            } else {
+                a.id.cmp(&b.id)
+            }
+        }
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => a.id.cmp(&b.id),
+    }
 }
 
 fn board_card(task: &Record, cfg: &Config, expand: Option<&str>) -> String {
@@ -695,6 +769,43 @@ fn board_cleanup_confirm(cleanup: &BoardCleanup<'_>) -> String {
     html
 }
 
+fn board_milestone_cleanup_confirm(cleanup: &BoardMilestoneCleanup<'_>) -> String {
+    let id = escape(&cleanup.milestone.id);
+    let title = escape(&cleanup.milestone.title);
+    let cancel = format!(
+        "<a class=\"link\" href=\"/?type=task&expand={}\">Cancel</a>",
+        id
+    );
+    format!(
+        "<section class=\"board-confirm\" role=\"region\" aria-label=\"Clean up milestone {}\"><h3 class=\"h3\">Warning: archive milestone {}</h3><p>Milestone <strong>{} \u{2014} {}</strong> will be archived.</p><p>Milestone ID to be archived: <strong>{}</strong>.</p><form class=\"board-confirm-actions\" method=\"post\" action=\"/?type=task\"><input type=\"hidden\" name=\"milestone_cleanup\" value=\"1\"><input type=\"hidden\" name=\"milestone\" value=\"{id}\"><input type=\"hidden\" name=\"expand\" value=\"{id}\"><button type=\"submit\">Archive {}</button>{}</form></section>",
+        id, id, id, title, id, id, cancel
+    )
+}
+
+fn board_release_cleanup_confirm(cleanup: &BoardReleaseCleanup<'_>) -> String {
+    let id = escape(&cleanup.release.id);
+    let title = escape(&cleanup.release.title);
+    let cancel = "<a class=\"link\" href=\"/?type=task\">Cancel</a>".to_string();
+    let mut html = format!(
+        "<section class=\"board-confirm\" role=\"region\" aria-label=\"Clean up release {}\"><h3 class=\"h3\">Warning: archive closed milestones in {}</h3><p>Release <strong>{} \u{2014} {}</strong>. The following closed milestones will be archived:</p><ul>",
+        id, id, id, title
+    );
+    for m in cleanup.milestones {
+        html.push_str(&format!(
+            "<li><strong>{}</strong> \u{2014} {}</li>",
+            escape(&m.id),
+            escape(&m.title)
+        ));
+    }
+    html.push_str("</ul>");
+    let count = cleanup.milestones.len();
+    html.push_str(&format!(
+        "<form class=\"board-confirm-actions\" method=\"post\" action=\"/?type=task\"><input type=\"hidden\" name=\"release_cleanup\" value=\"1\"><input type=\"hidden\" name=\"release\" value=\"{}\"><button type=\"submit\">Archive {} milestones</button>{}</form></section>",
+        id, count, cancel
+    ));
+    html
+}
+
 fn board_columns(
     cfg: &Config,
     tasks: &[&Record],
@@ -756,20 +867,73 @@ fn board_columns(
     html
 }
 
+fn milestone_marker(milestone: &Record) -> &'static str {
+    match milestone.status.as_deref().unwrap_or("open") {
+        "closed" | "archived" => "\u{2705}",
+        _ => "\u{1F518}",
+    }
+}
+
+fn board_milestone_cleanup_control(milestone: &Record) -> String {
+    if milestone.status.as_deref() != Some("closed") {
+        return String::new();
+    }
+    format!(
+        " <a class=\"link board-cleanup\" href=\"/?type=task&expand={id}&milestone_cleanup={id}\" aria-label=\"Clean up milestone {id}\">Clean up</a>",
+        id = escape(&milestone.id)
+    )
+}
+
+fn release_marker(release: &Record) -> &'static str {
+    match release.status.as_deref().unwrap_or("planned") {
+        "released" => "\u{2705}",
+        _ => "\u{1F518}",
+    }
+}
+
+fn release_has_closed_milestone(release: &Record, milestones: &Index) -> bool {
+    milestones.records.iter().any(|m| {
+        m.release_id.as_deref() == Some(release.id.as_str())
+            && m.status.as_deref() == Some("closed")
+    })
+}
+
+fn board_release_cleanup_control(release: &Record, milestones: &Index) -> String {
+    if release.status.as_deref() != Some("released")
+        || !release_has_closed_milestone(release, milestones)
+    {
+        return String::new();
+    }
+    format!(
+        " <a class=\"link board-cleanup\" href=\"/?type=task&release_cleanup={id}\" aria-label=\"Clean up closed milestones in {id}\">Clean up</a>",
+        id = escape(&release.id)
+    )
+}
+
 fn board_milestone_section(
     milestone: &Record,
     tasks: &[&Record],
     cfg: &Config,
     open: bool,
     cleanup: Option<&BoardCleanup<'_>>,
+    milestone_cleanup: Option<&BoardMilestoneCleanup<'_>>,
 ) -> String {
     let cleanup = cleanup.filter(|cleanup| cleanup.milestone.id == milestone.id);
-    let confirm = cleanup.map(board_cleanup_confirm).unwrap_or_default();
+    let task_confirm = cleanup.map(board_cleanup_confirm).unwrap_or_default();
+    let ms_cleanup = milestone_cleanup.filter(|mc| mc.milestone.id == milestone.id);
+    let ms_confirm = ms_cleanup
+        .map(board_milestone_cleanup_confirm)
+        .unwrap_or_default();
+    let confirm = format!("{}{}", task_confirm, ms_confirm);
+    let marker = milestone_marker(milestone);
+    let control = board_milestone_cleanup_control(milestone);
     format!(
-        "<details class=\"board-milestone\"{}><summary>{} \u{2014} {}</summary>{}{}</details>",
+        "<details class=\"board-milestone\"{}><summary>{} \u{2014} {} {}{}</summary>{}{}</details>",
         if open { " open" } else { "" },
         escape(&milestone.id),
+        escape(marker),
         escape(&milestone.title),
+        control,
         confirm,
         board_columns(cfg, tasks, Some(milestone), cleanup)
     )
@@ -798,6 +962,8 @@ pub fn board_page(
     expand: Option<&str>,
     alert: Option<BoardAlert<'_>>,
     cleanup: Option<&BoardCleanup<'_>>,
+    milestone_cleanup: Option<&BoardMilestoneCleanup<'_>>,
+    release_cleanup: Option<&BoardReleaseCleanup<'_>>,
     chrome: Chrome<'_>,
 ) -> String {
     let board_slug = chrome.routes.board_slug().unwrap_or_default();
@@ -825,7 +991,7 @@ pub fn board_page(
         // ascending ID order. A dangling release reference belongs to the
         // no-release group because it names no active release.
         let mut groups: Vec<(Option<&Record>, Vec<&Record>)> = Vec::new();
-        let no_release: Vec<&Record> = milestones
+        let mut no_release: Vec<&Record> = milestones
             .records
             .iter()
             .filter(|milestone| match milestone.release_id.as_deref() {
@@ -836,15 +1002,19 @@ pub fn board_page(
                 None => true,
             })
             .collect();
+        no_release.sort_by(|a, b| cmp_milestone_order(a, b, tasks));
         if !no_release.is_empty() {
             groups.push((None, no_release));
         }
-        for release in &releases.records {
-            let group: Vec<&Record> = milestones
+        let mut sorted_releases: Vec<&Record> = releases.records.iter().collect();
+        sorted_releases.sort_by(|a, b| cmp_release_order(a, b, milestones, tasks));
+        for release in &sorted_releases {
+            let mut group: Vec<&Record> = milestones
                 .records
                 .iter()
                 .filter(|milestone| milestone.release_id.as_deref() == Some(release.id.as_str()))
                 .collect();
+            group.sort_by(|a, b| cmp_milestone_order(a, b, tasks));
             groups.push((Some(release), group));
         }
 
@@ -874,11 +1044,22 @@ pub fn board_page(
                 None => section.push_str(
                     "<h2 class=\"h2 board-group-head\">Milestones without a release</h2>",
                 ),
-                Some(release) => section.push_str(&format!(
-                    "<h2 class=\"h2 release-sep\">{} \u{2014} {}</h2>",
-                    escape(&release.id),
-                    escape(&release.title)
-                )),
+                Some(release) => {
+                    let marker = release_marker(release);
+                    let control = board_release_cleanup_control(release, milestones);
+                    section.push_str(&format!(
+                        "<h2 class=\"h2 release-sep\">{} \u{2014} {} {}{}</h2>",
+                        escape(&release.id),
+                        escape(marker),
+                        escape(&release.title),
+                        control
+                    ));
+                    if let Some(rc) = release_cleanup
+                        && rc.release.id == release.id
+                    {
+                        section.push_str(&board_release_cleanup_confirm(rc));
+                    }
+                }
             }
             if release.is_some() && group.is_empty() {
                 section.push_str("<p class=\"board-empty\">No milestones in this release.</p>");
@@ -895,6 +1076,7 @@ pub fn board_page(
                     cfg,
                     open_id == Some(milestone.id.as_str()),
                     cleanup,
+                    milestone_cleanup,
                 ));
             }
         }

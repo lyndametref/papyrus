@@ -2,7 +2,7 @@
 id: TASK-209
 title: "Implement lowest-ordinal milestone ordering, markers, and cleanup in browser"
 created_date: '2026-11-19T11:02:54Z'
-updated_date: '2026-11-19T18:43:11Z'
+updated_date: '2026-11-19T18:56:54Z'
 labels: []
 references:
   - REQ-06.020
@@ -57,7 +57,7 @@ references:
   - TC-095
   - TC-096
   - TC-097
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-030
@@ -127,3 +127,6 @@ Definition of done: TASK-209 implements the change in the files above, automated
 - [ ] #21 Cleanup: the controls are available in the browser only and add no CLI command (TC-097; MS-030 AC-14).
 - [ ] #22 Verification: cargo fmt --check, cargo clippy --all-targets, and cargo test pass; all TC-066 through TC-097 are satisfied and verified by TASK-210.
 - [ ] #25 Implementation stays within the browser backlog board code and introduces no new CLI command, JSON API endpoint, write path, dependency, or ADR.
+## Comments
+- **unknown**: Implemented. Commit 59cb2fe.
+- **orchestrator**: Implementation verified: cargo fmt --check, cargo clippy --all-targets, cargo test --test browser_cli (182 passed) pass. Pre-existing unrelated failure in list_characterization_replay (decision renders no table) also fails on main; not introduced by this change. TASK-209 Done.

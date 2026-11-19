@@ -836,6 +836,8 @@ fn render_board_page(
     expand: Option<&str>,
     alert: Option<render::BoardAlert<'_>>,
     cleanup: Option<&render::BoardCleanup<'_>>,
+    milestone_cleanup: Option<&render::BoardMilestoneCleanup<'_>>,
+    release_cleanup: Option<&render::BoardReleaseCleanup<'_>>,
 ) -> String {
     let ctx = state.context();
     let task_slug = state
@@ -862,6 +864,8 @@ fn render_board_page(
         expand,
         alert,
         cleanup,
+        milestone_cleanup,
+        release_cleanup,
         chrome,
     )
 }
@@ -885,6 +889,21 @@ fn cleanup_final_status(cfg: &Config) -> Option<&str> {
         .map(String::as_str)
         .filter(|status| *status != "active")
 }
+
+const MILESTONE_CLEANUP_PARAMS: &[&str] = &[
+    "milestone_cleanup",
+    "cleanup_milestone",
+    "ms_cleanup",
+    "archive_milestone",
+    "milestone_archive",
+];
+const RELEASE_CLEANUP_PARAMS: &[&str] = &[
+    "release_cleanup",
+    "cleanup_release",
+    "rel_cleanup",
+    "archive_release",
+    "release_archive",
+];
 
 /// Render the server-side `Clean up all` preview without writing anything: the
 /// named milestone stays expanded and the column action is replaced by the
@@ -924,6 +943,84 @@ fn board_cleanup_preview(
             Some(milestone.id.as_str()),
             None,
             Some(&cleanup),
+            None,
+            None,
+        ),
+    ))
+}
+
+fn board_milestone_cleanup_preview(
+    state: &ServerState,
+    cfg: &Config,
+    milestone_id: &str,
+) -> Result<Response, HttpError> {
+    let ctx = state.context();
+    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone);
+    let milestone = milestones
+        .records
+        .iter()
+        .find(|m| m.id == milestone_id)
+        .ok_or_else(|| HttpError::new(404))?;
+    if milestone.status.as_deref() != Some("closed") {
+        return Err(HttpError::new(404));
+    }
+    let cleanup = render::BoardMilestoneCleanup { milestone };
+    Ok(Response::html(
+        200,
+        render_board_page(
+            state,
+            cfg,
+            Some(milestone.id.as_str()),
+            None,
+            None,
+            Some(&cleanup),
+            None,
+        ),
+    ))
+}
+
+fn board_release_cleanup_preview(
+    state: &ServerState,
+    cfg: &Config,
+    release_id: &str,
+) -> Result<Response, HttpError> {
+    let ctx = state.context();
+    let releases = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Release);
+    let release = releases
+        .records
+        .iter()
+        .find(|r| r.id == release_id)
+        .ok_or_else(|| HttpError::new(404))?;
+    if release.status.as_deref() != Some("released") {
+        return Err(HttpError::new(404));
+    }
+    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone);
+    let closed: Vec<&Record> = milestones
+        .records
+        .iter()
+        .filter(|m| {
+            m.release_id.as_deref() == Some(release.id.as_str())
+                && m.status.as_deref() == Some("closed")
+        })
+        .collect();
+    if closed.is_empty() {
+        return Err(HttpError::new(404));
+    }
+    let cleanup = render::BoardReleaseCleanup {
+        release,
+        milestones: closed.as_slice(),
+    };
+    // The above borrows `closed` which lives until end of function; render_board_page called before return, okay.
+    Ok(Response::html(
+        200,
+        render_board_page(
+            state,
+            cfg,
+            closed.first().map(|m| m.id.as_str()),
+            None,
+            None,
+            None,
+            Some(&cleanup),
         ),
     ))
 }
@@ -933,11 +1030,26 @@ fn board_cleanup_preview(
 fn board_cleanup_post(request: &Request, state: &ServerState) -> Result<Response, HttpError> {
     let slug = type_from_query(request, state)?;
     let descriptor = view_descriptor(state, &slug).ok_or_else(|| HttpError::new(404))?;
-    if handler_of(&descriptor) == Some(TypedHandler::Task) {
-        board_cleanup_submit(request, state)
-    } else {
-        Err(HttpError::new(405))
+    if handler_of(&descriptor) != Some(TypedHandler::Task) {
+        return Err(HttpError::new(405));
     }
+    if media_type(request) != "application/x-www-form-urlencoded" {
+        return Err(HttpError::new(415));
+    }
+    let fields = parse_form(&request.body)?;
+    let has_ms = MILESTONE_CLEANUP_PARAMS
+        .iter()
+        .any(|name| fields.iter().any(|(k, v)| k == *name && v.trim() == "1"));
+    let has_rel = RELEASE_CLEANUP_PARAMS
+        .iter()
+        .any(|name| fields.iter().any(|(k, v)| k == *name && v.trim() == "1"));
+    if has_ms {
+        return board_milestone_cleanup_submit(request, state, &fields);
+    }
+    if has_rel {
+        return board_release_cleanup_submit(request, state, &fields);
+    }
+    board_cleanup_submit(request, state)
 }
 
 /// Handle the `Clean up all` confirm submission: archive every task of the
@@ -968,6 +1080,8 @@ fn board_cleanup_submit(request: &Request, state: &ServerState) -> Result<Respon
                 details: &[],
                 subheading: message,
             }),
+            None,
+            None,
             None,
         );
         return Ok(Response::html(422, html));
@@ -1024,6 +1138,139 @@ fn board_cleanup_submit(request: &Request, state: &ServerState) -> Result<Respon
             subheading: "Some tasks could not be archived.",
         }),
         None,
+        None,
+        None,
+    );
+    Ok(Response::html(200, html))
+}
+
+fn board_milestone_cleanup_submit(
+    _request: &Request,
+    state: &ServerState,
+    fields: &[(String, String)],
+) -> Result<Response, HttpError> {
+    let milestone_id = form_field(fields, "milestone").unwrap_or("").trim();
+    if milestone_id.is_empty() {
+        return Err(HttpError::new(400));
+    }
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let ctx = state.context();
+    let milestones = enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Milestone);
+    let milestone = milestones
+        .records
+        .iter()
+        .find(|m| m.id == milestone_id)
+        .ok_or_else(|| HttpError::new(404))?;
+    if milestone.status.as_deref() != Some("closed") {
+        return Err(HttpError::new(404));
+    }
+    match crate::milestone::archive(&ctx, milestone_id) {
+        Ok(_) => {
+            let type_key = routes::legacy_url_key(board_task_slug(state));
+            Ok(Response::redirect(&format!(
+                "/?type={}&expand={}",
+                type_key, milestone_id
+            )))
+        }
+        Err(error) => {
+            let message = format!("Failed to archive {}.", milestone_id);
+            let failures = vec![format!("{} \u{2014} {}", milestone_id, error)];
+            let html = render_board_page(
+                state,
+                &cfg,
+                Some(milestone_id),
+                Some(render::BoardAlert {
+                    heading: "Milestone cleanup finished with failures",
+                    message: &message,
+                    details: &failures,
+                    subheading: "The milestone could not be archived.",
+                }),
+                None,
+                None,
+                None,
+            );
+            Ok(Response::html(200, html))
+        }
+    }
+}
+
+fn board_release_cleanup_submit(
+    _request: &Request,
+    state: &ServerState,
+    fields: &[(String, String)],
+) -> Result<Response, HttpError> {
+    let release_id = form_field(fields, "release").unwrap_or("").trim();
+    if release_id.is_empty() {
+        return Err(HttpError::new(400));
+    }
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let ctx = state.context();
+    let releases = enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Release);
+    let release = releases
+        .records
+        .iter()
+        .find(|r| r.id == release_id)
+        .ok_or_else(|| HttpError::new(404))?;
+    if release.status.as_deref() != Some("released") {
+        return Err(HttpError::new(404));
+    }
+    let milestones = enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Milestone);
+    let closed: Vec<String> = milestones
+        .records
+        .iter()
+        .filter(|m| {
+            m.release_id.as_deref() == Some(release.id.as_str())
+                && m.status.as_deref() == Some("closed")
+        })
+        .map(|m| m.id.clone())
+        .collect();
+    if closed.is_empty() {
+        let type_key = routes::legacy_url_key(board_task_slug(state));
+        return Ok(Response::redirect(&format!("/?type={}", type_key)));
+    }
+    let mut archived = 0usize;
+    let total = closed.len();
+    let mut failures: Vec<String> = Vec::new();
+    for id in &closed {
+        match crate::milestone::archive(&ctx, id) {
+            Ok(_) => archived += 1,
+            Err(error) => failures.push(format!("{} \u{2014} {}", id, error)),
+        }
+    }
+    let expand_target = milestones
+        .records
+        .iter()
+        .find(|m| {
+            m.release_id.as_deref() == Some(release.id.as_str())
+                && m.status.as_deref() == Some("closed")
+        })
+        .map(|m| m.id.clone());
+    if failures.is_empty() {
+        let type_key = routes::legacy_url_key(board_task_slug(state));
+        let location = if let Some(id) = expand_target {
+            format!("/?type={}&expand={}", type_key, id)
+        } else {
+            format!("/?type={}", type_key)
+        };
+        return Ok(Response::redirect(&location));
+    }
+    let message = format!(
+        "Archived {} of {} milestones in {}.",
+        archived, total, release_id
+    );
+    let html = render_board_page(
+        state,
+        &cfg,
+        expand_target.as_deref(),
+        Some(render::BoardAlert {
+            heading: "Release cleanup finished with failures",
+            message: &message,
+            details: &failures,
+            subheading: "Some milestones could not be archived.",
+        }),
+        None,
+        None,
+        None,
     );
     Ok(Response::html(200, html))
 }
@@ -1034,15 +1281,38 @@ fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpErr
     let descriptor = view_descriptor(state, &slug).ok_or_else(|| HttpError::new(404))?;
     let descriptor = &descriptor;
     if handler_of(descriptor) == Some(TypedHandler::Task) {
+        for name in MILESTONE_CLEANUP_PARAMS {
+            if let Some(value) = http::query_param(&request.target.query, name)?
+                && !value.trim().is_empty()
+            {
+                return board_milestone_cleanup_preview(state, &cfg, &value);
+            }
+        }
+        for name in RELEASE_CLEANUP_PARAMS {
+            if let Some(value) = http::query_param(&request.target.query, name)?
+                && !value.trim().is_empty()
+            {
+                return board_release_cleanup_preview(state, &cfg, &value);
+            }
+        }
         if let Some(milestone) = http::query_param(&request.target.query, "cleanup")?
             && !milestone.trim().is_empty()
         {
+            if let Some(scope) = http::query_param(&request.target.query, "scope")? {
+                let scope = scope.to_lowercase();
+                if scope == "milestone" || scope == "ms" {
+                    return board_milestone_cleanup_preview(state, &cfg, &milestone);
+                }
+                if scope == "release" || scope == "rel" {
+                    return board_release_cleanup_preview(state, &cfg, &milestone);
+                }
+            }
             return board_cleanup_preview(state, &cfg, &milestone);
         }
         let expand = http::query_param(&request.target.query, "expand")?;
         return Ok(Response::html(
             200,
-            render_board_page(state, &cfg, expand.as_deref(), None, None),
+            render_board_page(state, &cfg, expand.as_deref(), None, None, None, None),
         ));
     }
     // The status filter and shared row-field order belong to document-type
@@ -1530,6 +1800,8 @@ fn board_failure_response(
             details: &[],
             subheading: "Status change could not be persisted.",
         }),
+        None,
+        None,
         None,
     );
     Response::html(status_code, html)
@@ -4065,6 +4337,7 @@ mod tests {
             definition: None,
             view: None,
             status: Some("pending".to_string()),
+            ordinal: None,
             milestone_id: None,
             milestone_title: None,
             assignee: None,
@@ -4140,6 +4413,7 @@ mod tests {
             definition: None,
             view: None,
             status: None,
+            ordinal: None,
             milestone_id: None,
             milestone_title: None,
             assignee: None,

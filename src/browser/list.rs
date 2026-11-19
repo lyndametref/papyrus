@@ -828,6 +828,7 @@ mod tests {
             definition: None,
             view: None,
             status: None,
+            ordinal: None,
             milestone_id: None,
             milestone_title: None,
             assignee: None,

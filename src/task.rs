@@ -411,6 +411,7 @@ pub(crate) struct TaskData {
     pub(crate) deps: Vec<String>,
     pub(crate) acs: Vec<String>,
     pub(crate) comments: Vec<(String, String)>,
+    pub(crate) ordinal: Option<i64>,
 }
 
 fn document_frontmatter_scalar(
@@ -531,6 +532,8 @@ pub(crate) fn task_from_document(doc: &crate::record::document::Document) -> Tas
         }
         comments.push(("unknown".to_string(), item));
     }
+    let ordinal = document_frontmatter_scalar(doc, "ordinal")
+        .and_then(|value| value.trim().parse::<i64>().ok());
     TaskData {
         id,
         title,
@@ -542,6 +545,7 @@ pub(crate) fn task_from_document(doc: &crate::record::document::Document) -> Tas
         deps,
         acs,
         comments,
+        ordinal,
     }
 }
 
@@ -725,6 +729,7 @@ pub fn create(
         deps: deps.clone(),
         acs: acs.clone(),
         comments: Vec::new(),
+        ordinal: None,
     };
 
     // ordinal default
