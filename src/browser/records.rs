@@ -47,6 +47,7 @@ pub struct Record {
     pub definition: Option<String>,
     pub view: Option<String>,
     pub status: Option<String>,
+    pub ordinal: Option<i64>,
     pub milestone_id: Option<String>,
     pub milestone_title: Option<String>,
     pub assignee: Option<String>,
@@ -276,6 +277,7 @@ fn default_record(
         definition: None,
         view: None,
         status: None,
+        ordinal: None,
         milestone_id: None,
         milestone_title: None,
         assignee: None,
@@ -361,6 +363,7 @@ pub fn load_record(
             };
             record.description = td.description;
             record.status = (!td.status.is_empty()).then_some(td.status);
+            record.ordinal = td.ordinal;
             record.milestone_id = td.milestone;
             record.assignee = td.assignee;
             record.labels = td.labels;
@@ -371,6 +374,20 @@ pub fn load_record(
         Some(TypedHandler::Milestone) => {
             record.title = non_empty_or(frontmatter_title(&record.doc), &stem);
             record.description = section_or_none(&record.doc, "Description");
+            record.status = record
+                .doc
+                .front_matter
+                .as_ref()
+                .and_then(|fm| {
+                    if crate::record::frontmatter::contains_key(&fm.raw, "status") {
+                        crate::record::frontmatter::current_value_string(&fm.raw, "status")
+                    } else {
+                        None
+                    }
+                })
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty())
+                .or_else(|| Some("open".to_string()));
             record.release_id = match record.doc.front_matter.as_ref() {
                 Some(fm) if crate::record::frontmatter::contains_key(&fm.raw, "release") => {
                     crate::record::frontmatter::current_value_string(&fm.raw, "release")
@@ -383,6 +400,20 @@ pub fn load_record(
         Some(TypedHandler::Release) => {
             record.title = non_empty_or(heading_title(&record.doc), &stem);
             record.description = section_or_none(&record.doc, "Description");
+            record.status = record
+                .doc
+                .front_matter
+                .as_ref()
+                .and_then(|fm| {
+                    if crate::record::frontmatter::contains_key(&fm.raw, "status") {
+                        crate::record::frontmatter::current_value_string(&fm.raw, "status")
+                    } else {
+                        None
+                    }
+                })
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty())
+                .or_else(|| Some("planned".to_string()));
         }
         Some(TypedHandler::Decision) => {
             record.title = non_empty_or(heading_title(&record.doc), &stem);

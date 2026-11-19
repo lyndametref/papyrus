@@ -2993,7 +2993,7 @@ fn t103a_board_layout_columns_and_cards() {
     // MS-001 cards are ordered by ascending ID, link to the record view, show
     // the assignee and framed labels, and escape record text.
     let ms1_start = html
-        .find("<summary>MS-001 \u{2014} Milestone One</summary>")
+        .find("<summary>MS-001 \u{2014} \u{1F518} Milestone One</summary>")
         .unwrap();
     let ms1_end = html[ms1_start..].find("</details>").unwrap() + ms1_start;
     let ms1 = &html[ms1_start..ms1_end];
@@ -3039,32 +3039,46 @@ fn t103b_release_grouping_and_expand() {
     let html = get(&server, "/?type=task").text();
 
     let no_release = html.find("Milestones without a release").unwrap();
-    let rel1 = html.find("REL-001 \u{2014} Release One").unwrap();
-    let rel2 = html.find("REL-002 \u{2014} Release Two").unwrap();
-    let rel3 = html.find("REL-003 \u{2014} Release Three").unwrap();
+    let rel1 = html.find("REL-001 \u{2014} \u{1F518} Release One").unwrap();
+    let rel2 = html.find("REL-002 \u{2014} \u{1F518} Release Two").unwrap();
+    let rel3 = html
+        .find("REL-003 \u{2014} \u{1F518} Release Three")
+        .unwrap();
     let unassigned = html.find("Tasks without a milestone").unwrap();
     assert!(no_release < rel1 && rel1 < rel2 && rel2 < rel3);
     assert!(rel3 < unassigned, "without-milestone section comes last");
     assert!(html.contains("No milestones in this release."));
-    assert!(html.find("MS-002 \u{2014} Milestone Two").unwrap() < rel1);
-    assert!(rel1 < html.find("MS-001 \u{2014} Milestone One").unwrap());
-    assert!(rel2 < html.find("MS-003 \u{2014} Milestone Three").unwrap());
+    assert!(
+        html.find("MS-002 \u{2014} \u{1F518} Milestone Two")
+            .unwrap()
+            < rel1
+    );
+    assert!(
+        rel1 < html
+            .find("MS-001 \u{2014} \u{1F518} Milestone One")
+            .unwrap()
+    );
+    assert!(
+        rel2 < html
+            .find("MS-003 \u{2014} \u{1F518} Milestone Three")
+            .unwrap()
+    );
 
     // Default open: first milestone in render order with a task (MS-002).
     assert!(html.contains(
-        "class=\"board-milestone\" open><summary>MS-002 \u{2014} Milestone Two</summary>"
+        "class=\"board-milestone\" open><summary>MS-002 \u{2014} \u{1F518} Milestone Two</summary>"
     ));
-    assert!(!html.contains("open><summary>MS-001 \u{2014} Milestone One</summary>"));
+    assert!(!html.contains("open><summary>MS-001 \u{2014} \u{1F518} Milestone One</summary>"));
 
     let expanded = get(&server, "/?type=task&expand=MS-001").text();
-    assert!(expanded.contains("open><summary>MS-001 \u{2014} Milestone One</summary>"));
-    assert!(!expanded.contains("open><summary>MS-002 \u{2014} Milestone Two</summary>"));
+    assert!(expanded.contains("open><summary>MS-001 \u{2014} \u{1F518} Milestone One</summary>"));
+    assert!(!expanded.contains("open><summary>MS-002 \u{2014} \u{1F518} Milestone Two</summary>"));
 
     // Unknown or archived milestone IDs fall back to the default.
     for value in ["MS-999", "MS-005", "not-an-id"] {
         let page = get(&server, &format!("/?type=task&expand={}", value)).text();
         assert!(
-            page.contains("open><summary>MS-002 \u{2014} Milestone Two</summary>"),
+            page.contains("open><summary>MS-002 \u{2014} \u{1F518} Milestone Two</summary>"),
             "expand={} fallback",
             value
         );
@@ -8890,4 +8904,81 @@ fn tc039_other_browser_pages_continue_to_work() {
     assert_eq!(get(&server, "/doc/REQ-001.001/edit").status, 200);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn ms030_smoke_milestone_and_release_cleanup() {
+    let dir = test_root("ms030-smoke");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    create_task(&dir, "Task One", "MS-001");
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "milestone",
+        "close",
+        "MS-001",
+    ]);
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "release",
+        "close",
+        "REL-001",
+    ]);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(html.contains("\u{2705} Milestone One") || html.contains("MS-001"));
+    assert!(html.contains("Clean up"));
+    // milestone cleanup preview
+    let preview = get(&server, "/?type=task&milestone_cleanup=MS-001").text();
+    assert!(preview.contains("MS-001"));
+    assert!(preview.contains("board-confirm"));
+    // confirm archives milestone
+    let body = form_body(&[
+        ("milestone_cleanup", "1"),
+        ("milestone", "MS-001"),
+        ("expand", "MS-001"),
+    ]);
+    let resp = post_form(&server, "/?type=task", &body);
+    assert_eq!(resp.status, 303);
+    let html2 = get(&server, "/?type=task").text();
+    assert!(!html2.contains("MS-001 \u{2014}"));
+
+    // release cleanup with another milestone
+    let dir2 = test_root("ms030-smoke2");
+    init_project(&dir2);
+    create_release(&dir2, "Release Two");
+    create_milestone(&dir2, "Milestone Two", "REL-001");
+    create_task(&dir2, "Task Two", "MS-001");
+    run_ok(&[
+        "--dir",
+        dir2.to_str().unwrap(),
+        "milestone",
+        "close",
+        "MS-001",
+    ]);
+    run_ok(&[
+        "--dir",
+        dir2.to_str().unwrap(),
+        "release",
+        "close",
+        "REL-001",
+    ]);
+    let server2 = Server::start(&dir2, &["--no-open"], &[]);
+    let preview2 = get(&server2, "/?type=task&release_cleanup=REL-001").text();
+    assert!(preview2.contains("MS-001"));
+    assert!(preview2.contains("board-confirm"));
+    let body2 = form_body(&[("release_cleanup", "1"), ("release", "REL-001")]);
+    let resp2 = post_form(&server2, "/?type=task", &body2);
+    assert_eq!(resp2.status, 303);
+    let html3 = get(&server2, "/?type=task").text();
+    assert!(html3.contains("REL-001"));
+    assert!(!html3.contains("MS-001 \u{2014}"));
+
+    drop(server);
+    drop(server2);
+    let _ = fs::remove_dir_all(&dir);
+    let _ = fs::remove_dir_all(&dir2);
 }

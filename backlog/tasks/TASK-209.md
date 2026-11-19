@@ -2,7 +2,7 @@
 id: TASK-209
 title: "Implement lowest-ordinal milestone ordering, markers, and cleanup in browser"
 created_date: '2026-11-19T11:02:54Z'
-updated_date: '2026-11-19T18:43:11Z'
+updated_date: '2026-11-19T18:45:18Z'
 labels: []
 references:
   - REQ-06.020
@@ -57,7 +57,7 @@ references:
   - TC-095
   - TC-096
   - TC-097
-status: ToDo
+status: In-Progress
 assignee:
   - rust-dev
 milestone: MS-030
