@@ -890,20 +890,8 @@ fn cleanup_final_status(cfg: &Config) -> Option<&str> {
         .filter(|status| *status != "active")
 }
 
-const MILESTONE_CLEANUP_PARAMS: &[&str] = &[
-    "milestone_cleanup",
-    "cleanup_milestone",
-    "ms_cleanup",
-    "archive_milestone",
-    "milestone_archive",
-];
-const RELEASE_CLEANUP_PARAMS: &[&str] = &[
-    "release_cleanup",
-    "cleanup_release",
-    "rel_cleanup",
-    "archive_release",
-    "release_archive",
-];
+const MILESTONE_CLEANUP_PARAMS: &[&str] = &["milestone_cleanup"];
+const RELEASE_CLEANUP_PARAMS: &[&str] = &["release_cleanup"];
 
 /// Render the server-side `Clean up all` preview without writing anything: the
 /// named milestone stays expanded and the column action is replaced by the
@@ -1228,6 +1216,17 @@ fn board_release_cleanup_submit(
         let type_key = routes::legacy_url_key(board_task_slug(state));
         return Ok(Response::redirect(&format!("/?type={}", type_key)));
     }
+    // Capture an expand target that survives cleanup before archiving any
+    // milestone, so a successful run never expands an archived milestone.
+    let surviving_expand_target = milestones
+        .records
+        .iter()
+        .find(|m| {
+            m.release_id.as_deref() == Some(release.id.as_str())
+                && m.status.as_deref() != Some("closed")
+        })
+        .map(|m| m.id.clone());
+    eprintln!("DEBUG closed={:?}", closed);
     let mut archived = 0usize;
     let total = closed.len();
     let mut failures: Vec<String> = Vec::new();
@@ -1237,14 +1236,7 @@ fn board_release_cleanup_submit(
             Err(error) => failures.push(format!("{} \u{2014} {}", id, error)),
         }
     }
-    let expand_target = milestones
-        .records
-        .iter()
-        .find(|m| {
-            m.release_id.as_deref() == Some(release.id.as_str())
-                && m.status.as_deref() == Some("closed")
-        })
-        .map(|m| m.id.clone());
+    let expand_target = surviving_expand_target;
     if failures.is_empty() {
         let type_key = routes::legacy_url_key(board_task_slug(state));
         let location = if let Some(id) = expand_target {
