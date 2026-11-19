@@ -2,7 +2,7 @@
 id: TASK-210
 title: "Verify lowest-ordinal milestone ordering, markers, and cleanup in the browser Backlog"
 created_date: '2026-11-19T11:20:03Z'
-updated_date: '2026-11-19T19:37:35Z'
+updated_date: '2026-11-19T19:44:50Z'
 labels: []
 references:
   - REQ-06.020
@@ -33,3 +33,5 @@ Verify MS-030 against its acceptance criteria AC-1 to AC-17 and close the milest
 - **orchestrator**: sha256 6f6146b1243604b12d3159b54634e1c0c5784515b3721c08c4933589e96b4370
 - **orchestrator**: file papyrus-0.2.0-rc.1-cli.tar.gz size 3132051
 - **orchestrator**: commit 7d915a40a7a7dadff90be55d8061978a33dd9f86
+- **orchestrator**: RC package is .deb: papyrus_0.2.0-rc.1_amd64.deb size 2401080.
+- **orchestrator**: sha256 340a399c13fe5292655657e6c7a89dda05b815c67f9bb672967a2d7b17a442f2
