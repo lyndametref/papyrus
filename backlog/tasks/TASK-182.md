@@ -2,7 +2,7 @@
 id: TASK-182
 title: "Implement removal of reference list from document-type browser list views"
 created_date: '2026-11-18T19:30:34Z'
-updated_date: '2026-11-18T19:30:34Z'
+updated_date: '2026-11-19T07:46:51Z'
 labels: []
 references:
   - REQ-06.019
@@ -16,6 +16,10 @@ dependencies:
 ordinal: 50
 documentation:
   - src/browser/render.rs
+  - src/browser/list.rs
+  - tests/list_characterization_replay.rs
+  - tests/browser_config_types_cli.rs
+  - tests/list_shared_layout.rs
 type: implementation
 ---
 
