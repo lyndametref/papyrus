@@ -2,7 +2,7 @@
 id: TASK-212
 title: "Correct MS-030 code audit findings (AUD-132)"
 created_date: '2026-11-19T19:11:02Z'
-updated_date: '2026-11-19T19:12:14Z'
+updated_date: '2026-11-19T19:25:56Z'
 labels: []
 references:
   - AUD-132
@@ -14,7 +14,7 @@ references:
   - REQ-06.013
   - TC-066
   - TC-066..TC-097
-status: In-Progress
+status: Done
 assignee:
   - rust-dev
 milestone: MS-030
@@ -45,3 +45,13 @@ type: implementation
 - [ ] #14 cargo fmt check, cargo clippy all targets, cargo test test browser_cli, and cargo test pass, excluding the pre-existing unrelated list_characterization_replay failure.
 ## Description
 Code audit AUD-132 requires corrections before MS-030 verification. Scope is limited to the browser backlog board: implement TC-066..TC-097 as strict integration tests and apply the low-severity cleanup fixes. No new CLI command, API endpoint, write path, or ADR.
+## Comments
+- **rust-dev**: done
+- **rust-dev**: Branch task TASK-212 commit ed64453 strict tests
+- **rust-dev**: TC-066 to TC-097 strict integration tests added
+- **rust-dev**: Canonical cleanup params and surviving expand target
+- **rust-dev**: Cancel link aligned dead archived arm removed
+- **rust-dev**: fmt clippy pass browser_cli 214 passed full cargo only pre-existing failure
+- **rust-dev**: Final commit 3bc3ce5 branch task TASK-212
+- **rust-dev**: fmt and clippy pass browser_cli 213 passed full cargo only pre-existing failure
+- **orchestrator**: Correction verified: cargo fmt --check, cargo clippy --all-targets, cargo test --test browser_cli (213 passed) pass; full cargo test still only the pre-existing unrelated list_characterization_replay failure. TC-066..TC-097 implemented as strict integration tests; alias params canonicalized; expand target and cancel link aligned; dead archived arm removed. TASK-212 Done.

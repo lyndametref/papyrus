@@ -785,7 +785,15 @@ fn board_milestone_cleanup_confirm(cleanup: &BoardMilestoneCleanup<'_>) -> Strin
 fn board_release_cleanup_confirm(cleanup: &BoardReleaseCleanup<'_>) -> String {
     let id = escape(&cleanup.release.id);
     let title = escape(&cleanup.release.title);
-    let cancel = "<a class=\"link\" href=\"/?type=task\">Cancel</a>".to_string();
+    let expand = cleanup
+        .milestones
+        .first()
+        .map(|m| m.id.as_str())
+        .unwrap_or("");
+    let cancel = format!(
+        "<a class=\"link\" href=\"/?type=task&expand={}\">Cancel</a>",
+        escape(expand)
+    );
     let mut html = format!(
         "<section class=\"board-confirm\" role=\"region\" aria-label=\"Clean up release {}\"><h3 class=\"h3\">Warning: archive closed milestones in {}</h3><p>Release <strong>{} \u{2014} {}</strong>. The following closed milestones will be archived:</p><ul>",
         id, id, id, title
@@ -869,7 +877,7 @@ fn board_columns(
 
 fn milestone_marker(milestone: &Record) -> &'static str {
     match milestone.status.as_deref().unwrap_or("open") {
-        "closed" | "archived" => "\u{2705}",
+        "closed" => "\u{2705}",
         _ => "\u{1F518}",
     }
 }

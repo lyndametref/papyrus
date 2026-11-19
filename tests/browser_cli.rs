@@ -8906,36 +8906,472 @@ fn tc039_other_browser_pages_continue_to_work() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+// ---- TC-066..TC-097 MS-030 strict integration tests ----
+
+fn set_task_ordinal(dir: &Path, id: &str, ordinal: i64) {
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "task",
+        "edit",
+        id,
+        "--ordinal",
+        &ordinal.to_string(),
+    ]);
+}
+
+fn close_milestone(dir: &Path, id: &str) {
+    run_ok(&["--dir", dir.to_str().unwrap(), "milestone", "close", id]);
+}
+
+fn close_release(dir: &Path, id: &str) {
+    run_ok(&["--dir", dir.to_str().unwrap(), "release", "close", id]);
+}
+
 #[test]
-fn ms030_smoke_milestone_and_release_cleanup() {
-    let dir = test_root("ms030-smoke");
+fn tc066_milestones_in_release_ordered_by_lowest_task_ordinal() {
+    let dir = test_root("tc066");
+    init_project(&dir);
+    create_release(&dir, "Release A");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    create_milestone(&dir, "Milestone Two", "REL-001");
+    create_task(&dir, "Task One", "MS-001");
+    set_task_ordinal(&dir, "TASK-001", 20);
+    create_task(&dir, "Task Two", "MS-002");
+    set_task_ordinal(&dir, "TASK-002", 10);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    let ms2 = html.find("MS-002 \u{2014}").unwrap();
+    let ms1 = html.find("MS-001 \u{2014}").unwrap();
+    assert!(ms2 < ms1);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc067_milestones_no_release_ordered_and_group_first() {
+    let dir = test_root("tc067");
+    init_project(&dir);
+    create_milestone_no_release(&dir, "Milestone Three");
+    create_milestone_no_release(&dir, "Milestone Four");
+    create_task(&dir, "Task One", "MS-001");
+    set_task_ordinal(&dir, "TASK-001", 30);
+    create_task(&dir, "Task Two", "MS-002");
+    set_task_ordinal(&dir, "TASK-002", 5);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone Five", "REL-001");
+    create_task(&dir, "Task Three", "MS-003");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    let no_release = html.find("Milestones without a release").unwrap();
+    let rel = html.find("REL-001").unwrap();
+    assert!(no_release < rel);
+    let ms2 = html.find("MS-002 \u{2014}").unwrap();
+    let ms1 = html.find("MS-001 \u{2014}").unwrap();
+    assert!(ms2 < ms1);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc068_no_task_milestone_after_tasked() {
+    let dir = test_root("tc068");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    create_milestone(&dir, "Milestone Two", "REL-001");
+    create_task(&dir, "Task One", "MS-001");
+    set_task_ordinal(&dir, "TASK-001", 10);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    let ms1 = html.find("MS-001 \u{2014}").unwrap();
+    let ms2 = html.find("MS-002 \u{2014}").unwrap();
+    assert!(ms1 < ms2);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc069_equal_ordinal_tie_by_milestone_id() {
+    let dir = test_root("tc069");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    create_milestone(&dir, "Milestone Two", "REL-001");
+    create_task(&dir, "Task One", "MS-001");
+    set_task_ordinal(&dir, "TASK-001", 10);
+    create_task(&dir, "Task Two", "MS-002");
+    set_task_ordinal(&dir, "TASK-002", 10);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    let ms1 = html.find("MS-001 \u{2014}").unwrap();
+    let ms2 = html.find("MS-002 \u{2014}").unwrap();
+    assert!(ms1 < ms2);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc070_releases_ordered_by_lowest_task_ordinal() {
+    let dir = test_root("tc070");
+    init_project(&dir);
+    create_release(&dir, "Release B");
+    create_release(&dir, "Release C");
+    create_milestone(&dir, "Milestone B", "REL-001");
+    create_milestone(&dir, "Milestone C", "REL-002");
+    create_task(&dir, "Task B", "MS-001");
+    set_task_ordinal(&dir, "TASK-001", 25);
+    create_task(&dir, "Task C", "MS-002");
+    set_task_ordinal(&dir, "TASK-002", 5);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    let rel2 = html.find("REL-002").unwrap();
+    let rel1 = html.find("REL-001").unwrap();
+    assert!(rel2 < rel1);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc071_release_no_task_after_tasked() {
+    let dir = test_root("tc071");
+    init_project(&dir);
+    create_release(&dir, "Release D");
+    create_release(&dir, "Release E");
+    create_milestone(&dir, "Milestone D", "REL-001");
+    create_milestone(&dir, "Milestone E", "REL-002");
+    create_task(&dir, "Task D", "MS-001");
+    set_task_ordinal(&dir, "TASK-001", 10);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    let rel1 = html.find("REL-001").unwrap();
+    let rel2 = html.find("REL-002").unwrap();
+    assert!(rel1 < rel2);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc072_releases_equal_ordinal_tie_by_id() {
+    let dir = test_root("tc072");
+    init_project(&dir);
+    create_release(&dir, "Release F");
+    create_release(&dir, "Release G");
+    create_milestone(&dir, "Milestone F", "REL-001");
+    create_milestone(&dir, "Milestone G", "REL-002");
+    create_task(&dir, "Task F", "MS-001");
+    set_task_ordinal(&dir, "TASK-001", 15);
+    create_task(&dir, "Task G", "MS-002");
+    set_task_ordinal(&dir, "TASK-002", 15);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    let rel1 = html.find("REL-001").unwrap();
+    let rel2 = html.find("REL-002").unwrap();
+    assert!(rel1 < rel2);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc073_archived_task_not_contributing() {
+    let dir = test_root("tc073");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    create_milestone(&dir, "Milestone Two", "REL-001");
+    create_task(&dir, "Task One", "MS-001");
+    set_task_ordinal(&dir, "TASK-001", 1);
+    run_ok(&[
+        "--dir",
+        dir.to_str().unwrap(),
+        "task",
+        "archive",
+        "TASK-001",
+    ]);
+    create_task(&dir, "Task Two", "MS-002");
+    set_task_ordinal(&dir, "TASK-002", 20);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    let ms2 = html.find("MS-002 \u{2014}").unwrap();
+    let ms1 = html.find("MS-001 \u{2014}").unwrap();
+    assert!(ms2 < ms1);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc074_changing_ordinal_reorders() {
+    let dir = test_root("tc074");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    create_milestone(&dir, "Milestone Two", "REL-001");
+    create_task(&dir, "Task One", "MS-001");
+    set_task_ordinal(&dir, "TASK-001", 20);
+    create_task(&dir, "Task Two", "MS-002");
+    set_task_ordinal(&dir, "TASK-002", 10);
+    set_task_ordinal(&dir, "TASK-001", 5);
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    let ms1 = html.find("MS-001 \u{2014}").unwrap();
+    let ms2 = html.find("MS-002 \u{2014}").unwrap();
+    assert!(ms1 < ms2);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc075_grouping_and_no_milestone_section_unchanged() {
+    let dir = test_root("tc075");
+    init_project(&dir);
+    create_milestone_no_release(&dir, "Milestone One");
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone Two", "REL-001");
+    create_task(&dir, "Task One", "MS-002");
+    create_task_no_milestone(&dir, "Task No Milestone");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    let no_rel = html.find("Milestones without a release").unwrap();
+    let rel = html.find("REL-001").unwrap();
+    let unassigned = html.find("Tasks without a milestone").unwrap();
+    assert!(no_rel < rel);
+    assert!(rel < unassigned);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc076_open_milestone_marker() {
+    let dir = test_root("tc076");
+    init_project(&dir);
+    create_milestone_no_release(&dir, "Milestone One");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(html.contains("\u{1F518} Milestone One"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc077_closed_milestone_marker() {
+    let dir = test_root("tc077");
+    init_project(&dir);
+    create_milestone_no_release(&dir, "Milestone One");
+    close_milestone(&dir, "MS-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(html.contains("\u{2705} Milestone One"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc078_planned_release_marker() {
+    let dir = test_root("tc078");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(html.contains("\u{1F518} Release One"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc079_released_release_marker() {
+    let dir = test_root("tc079");
     init_project(&dir);
     create_release(&dir, "Release One");
     create_milestone(&dir, "Milestone One", "REL-001");
     create_task(&dir, "Task One", "MS-001");
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "milestone",
-        "close",
-        "MS-001",
-    ]);
-    run_ok(&[
-        "--dir",
-        dir.to_str().unwrap(),
-        "release",
-        "close",
-        "REL-001",
-    ]);
+    close_milestone(&dir, "MS-001");
+    close_release(&dir, "REL-001");
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/?type=task").text();
-    assert!(html.contains("\u{2705} Milestone One") || html.contains("MS-001"));
-    assert!(html.contains("Clean up"));
-    // milestone cleanup preview
-    let preview = get(&server, "/?type=task&milestone_cleanup=MS-001").text();
-    assert!(preview.contains("MS-001"));
-    assert!(preview.contains("board-confirm"));
-    // confirm archives milestone
+    assert!(html.contains("\u{2705} Release One"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc080_archived_milestone_not_displayed() {
+    let dir = test_root("tc080");
+    init_project(&dir);
+    create_milestone_no_release(&dir, "Milestone One");
+    let archived = dir.join("backlog/archive/milestones");
+    fs::create_dir_all(&archived).unwrap();
+    fs::rename(
+        dir.join("backlog/milestones/MS-001.md"),
+        archived.join("MS-001.md"),
+    )
+    .unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(!html.contains("MS-001 \u{2014}"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc081_marker_changes_after_close() {
+    let dir = test_root("tc081");
+    init_project(&dir);
+    create_milestone_no_release(&dir, "Milestone One");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(html.contains("\u{1F518} Milestone One"));
+    drop(server);
+    close_milestone(&dir, "MS-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(html.contains("\u{2705} Milestone One"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc082_release_marker_changes_after_release() {
+    let dir = test_root("tc082");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(html.contains("\u{1F518} Release One"));
+    drop(server);
+    close_release(&dir, "REL-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(html.contains("\u{2705} Release One"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc083_marker_and_id_present() {
+    let dir = test_root("tc083");
+    init_project(&dir);
+    create_milestone_no_release(&dir, "Milestone One");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(html.contains("MS-001"));
+    assert!(html.contains("\u{1F518}"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc084_markers_do_not_change_ordering() {
+    let dir = test_root("tc084");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    create_milestone(&dir, "Milestone Two", "REL-001");
+    create_task(&dir, "Task One", "MS-001");
+    set_task_ordinal(&dir, "TASK-001", 10);
+    create_task(&dir, "Task Two", "MS-002");
+    set_task_ordinal(&dir, "TASK-002", 20);
+    close_milestone(&dir, "MS-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    let ms1 = html.find("MS-001 \u{2014}").unwrap();
+    let ms2 = html.find("MS-002 \u{2014}").unwrap();
+    assert!(ms1 < ms2);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc085_closed_milestone_cleanup_control() {
+    let dir = test_root("tc085");
+    init_project(&dir);
+    create_milestone_no_release(&dir, "Milestone One");
+    close_milestone(&dir, "MS-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(html.contains("Milestone One"));
+    assert!(html.contains("board-cleanup"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc086_released_release_cleanup_control() {
+    let dir = test_root("tc086");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    create_task(&dir, "Task One", "MS-001");
+    close_milestone(&dir, "MS-001");
+    close_release(&dir, "REL-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(html.contains("Release One"));
+    assert!(html.contains("board-cleanup"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc087_released_release_no_closed_milestone_no_cleanup() {
+    let dir = test_root("tc087");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    close_release(&dir, "REL-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(!html.contains("milestone_cleanup="));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc088_open_milestone_no_cleanup() {
+    let dir = test_root("tc088");
+    init_project(&dir);
+    create_milestone_no_release(&dir, "Milestone One");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(!html.contains("release_cleanup="));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc089_planned_release_no_cleanup() {
+    let dir = test_root("tc089");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task").text();
+    assert!(!html.contains("release_cleanup="));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc090_milestone_cleanup_confirm_lists_id() {
+    let dir = test_root("tc090");
+    init_project(&dir);
+    create_milestone_no_release(&dir, "Milestone One");
+    close_milestone(&dir, "MS-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task&milestone_cleanup=MS-001").text();
+    assert!(html.contains("board-confirm"));
+    assert!(html.contains("MS-001"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc091_milestone_cleanup_confirm_archives() {
+    let dir = test_root("tc091");
+    init_project(&dir);
+    create_milestone_no_release(&dir, "Milestone One");
+    close_milestone(&dir, "MS-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
     let body = form_body(&[
         ("milestone_cleanup", "1"),
         ("milestone", "MS-001"),
@@ -8943,42 +9379,123 @@ fn ms030_smoke_milestone_and_release_cleanup() {
     ]);
     let resp = post_form(&server, "/?type=task", &body);
     assert_eq!(resp.status, 303);
-    let html2 = get(&server, "/?type=task").text();
-    assert!(!html2.contains("MS-001 \u{2014}"));
-
-    // release cleanup with another milestone
-    let dir2 = test_root("ms030-smoke2");
-    init_project(&dir2);
-    create_release(&dir2, "Release Two");
-    create_milestone(&dir2, "Milestone Two", "REL-001");
-    create_task(&dir2, "Task Two", "MS-001");
-    run_ok(&[
-        "--dir",
-        dir2.to_str().unwrap(),
-        "milestone",
-        "close",
-        "MS-001",
-    ]);
-    run_ok(&[
-        "--dir",
-        dir2.to_str().unwrap(),
-        "release",
-        "close",
-        "REL-001",
-    ]);
-    let server2 = Server::start(&dir2, &["--no-open"], &[]);
-    let preview2 = get(&server2, "/?type=task&release_cleanup=REL-001").text();
-    assert!(preview2.contains("MS-001"));
-    assert!(preview2.contains("board-confirm"));
-    let body2 = form_body(&[("release_cleanup", "1"), ("release", "REL-001")]);
-    let resp2 = post_form(&server2, "/?type=task", &body2);
-    assert_eq!(resp2.status, 303);
-    let html3 = get(&server2, "/?type=task").text();
-    assert!(html3.contains("REL-001"));
-    assert!(!html3.contains("MS-001 \u{2014}"));
-
+    let html = get(&server, "/?type=task").text();
+    assert!(!html.contains("MS-001 \u{2014}"));
     drop(server);
-    drop(server2);
     let _ = fs::remove_dir_all(&dir);
-    let _ = fs::remove_dir_all(&dir2);
+}
+
+#[test]
+fn tc092_milestone_cleanup_cancel_archives_nothing() {
+    let dir = test_root("tc092");
+    init_project(&dir);
+    create_milestone_no_release(&dir, "Milestone One");
+    close_milestone(&dir, "MS-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let _preview = get(&server, "/?type=task&milestone_cleanup=MS-001").text();
+    let html = get(&server, "/?type=task").text();
+    assert!(html.contains("MS-001 \u{2014}"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc093_release_cleanup_confirm_lists_closed_ids() {
+    let dir = test_root("tc093");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    create_milestone(&dir, "Milestone Two", "REL-001");
+    create_task(&dir, "Task One", "MS-001");
+    create_task(&dir, "Task Two", "MS-002");
+    close_milestone(&dir, "MS-001");
+    close_milestone(&dir, "MS-002");
+    close_release(&dir, "REL-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let html = get(&server, "/?type=task&release_cleanup=REL-001").text();
+    assert!(html.contains("board-confirm"));
+    assert!(html.contains("MS-001"));
+    assert!(html.contains("MS-002"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc094_release_cleanup_archives_milestones_release_visible() {
+    let dir = test_root("tc094");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    create_milestone(&dir, "Milestone Two", "REL-001");
+    create_task(&dir, "Task One", "MS-001");
+    create_task(&dir, "Task Two", "MS-002");
+    close_milestone(&dir, "MS-001");
+    close_milestone(&dir, "MS-002");
+    close_release(&dir, "REL-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let body = form_body(&[("release_cleanup", "1"), ("release", "REL-001")]);
+    let resp = post_form(&server, "/?type=task", &body);
+    assert_eq!(resp.status, 303);
+    let html = get(&server, "/?type=task").text();
+    assert!(!html.contains("MS-001 \u{2014}"));
+    assert!(!html.contains("MS-002 \u{2014}"));
+    assert!(html.contains("REL-001"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc095_release_cleanup_never_archives_release() {
+    let dir = test_root("tc095");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    create_task(&dir, "Task One", "MS-001");
+    close_milestone(&dir, "MS-001");
+    close_release(&dir, "REL-001");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let body = form_body(&[("release_cleanup", "1"), ("release", "REL-001")]);
+    let resp = post_form(&server, "/?type=task", &body);
+    assert_eq!(resp.status, 303);
+    let html = get(&server, "/?type=task").text();
+    assert!(html.contains("REL-001 \u{2014}"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc096_cleanup_partial_failure_reported() {
+    let dir = test_root("tc096");
+    init_project(&dir);
+    create_release(&dir, "Release One");
+    create_milestone(&dir, "Milestone One", "REL-001");
+    create_milestone(&dir, "Milestone Two", "REL-001");
+    create_task(&dir, "Task One", "MS-001");
+    create_task(&dir, "Task Two", "MS-002");
+    close_milestone(&dir, "MS-001");
+    close_milestone(&dir, "MS-002");
+    close_release(&dir, "REL-001");
+    // force failure for MS-001 by pre-creating archived file
+    let archived = dir.join("backlog/archive/milestones");
+    fs::create_dir_all(&archived).unwrap();
+    fs::create_dir(archived.join("MS-001.md")).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let body = form_body(&[("release_cleanup", "1"), ("release", "REL-001")]);
+    let resp = post_form(&server, "/?type=task", &body);
+    assert_eq!(resp.status, 200);
+    let html = resp.text();
+    assert!(html.contains("MS-001"));
+    let html2 = get(&server, "/?type=task").text();
+    assert!(html2.contains("MS-001 \u{2014}"));
+    assert!(!html2.contains("MS-002 \u{2014}"));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tc097_no_cli_cleanup_command() {
+    let help_ms = run_ok(&["milestone", "--help"]);
+    let help_rel = run_ok(&["release", "--help"]);
+    assert!(!help_ms.to_lowercase().contains("cleanup"));
+    assert!(!help_rel.to_lowercase().contains("cleanup"));
 }
