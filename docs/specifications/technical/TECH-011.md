@@ -2,7 +2,7 @@
 id: TECH-011
 title: "Browser Access for Backlog Records (Tasks, Milestones, Releases)"
 created_date: '2026-11-16T17:46:44Z'
-updated_date: '2026-11-16T17:47:04Z'
+updated_date: '2026-11-19T18:07:24Z'
 labels: []
 references:
   - ADR-0001
@@ -65,7 +65,13 @@ references:
   - TASK-8
   - TASK-86
   - TASK-9
-status: verified
+  - REQ-06.020
+  - REQ-06.021
+  - REQ-06.022
+  - RE-008
+  - ADR-0032
+  - TASK-205
+status: draft
 ---
 # TECH-011 Browser Access for Backlog Records (Tasks, Milestones, Releases)
 
@@ -76,6 +82,8 @@ status: verified
 **UI mockups:** [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html) (approved; kanban-board revision approved 2026-11-12 UTC under TASK-102) — extends the approved baseline [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html); see [UI design handoff](#ui-design-handoff)
 
 > **Revised (TASK-147, 2026-11-15):** section 3 gains the per-milestone **Clean up all** action required by the 2026-11-15 revision of REQ-06.013. This revision supersedes the earlier out-of-scope statement that every archiving operation is CLI-only; creating, restoring, and deleting tasks remain CLI-only, and no project-wide bulk archive is added. The board layout, the board's status change, and archived exclusion are unchanged. The action, its confirmation warning, and its failure report are drawn by [`MOCK-0017`](ui/mockups/MOCK-0017-browser-cleanup-all-board-action-review.html) and recorded in [`ui/browser-backlog-records-ui.md`](ui/browser-backlog-records-ui.md); MOCK-0017 stays `draft` because the approval step was waived for the TASK-147 implementation run, so the visible design awaits owner review.
+
+> **Revised (TASK-205/MS-030, 2026-11-19):** section 3 **Release grouping** item 4 now follows REQ-06.020 (ordering by lowest contained non-archived task ordinal ascending, replacing ascending milestone/release ID ordering); new **Lifecycle markers** subsection per REQ-06.021 (🔘/✅ before titles); new **Milestone and release cleanup controls** subsection per REQ-06.022 (browser-only archive controls with confirmation and partial-failure handling). ADR-0022, ADR-0032, ADR-0006, and ADR-0013 remain authoritative; no new endpoint, write path, or ADR is introduced. Status moved to draft pending verification.
 
 ## Purpose
 
@@ -142,8 +150,27 @@ The combined Backlog view (`/?type=task`, sidebar entry "Backlog") is the per-mi
 1. Milestones assigned to a release appear under that release.
 2. Milestones assigned to no release are grouped together before the first release.
 3. Each release boundary is marked by a bold separator that names the release and does not rely on colour alone.
-4. Release ordering follows ascending release ID; milestones within a release follow ascending milestone ID; the no-release group precedes all releases.
+4. Ordering of milestones and releases on the board follows REQ-06.020 and is recomputed from current record data on every render: milestones inside a release are ordered by the lowest ordinal among their non-archived tasks ascending; a milestone with no non-archived task is ordered after every milestone that has one, by milestone ID ascending; milestones with equal lowest ordinals are ordered by milestone ID ascending. Milestones in the no-release group follow the same rule. Releases are ordered by the lowest ordinal among the non-archived tasks in their milestones ascending; a release with no such task is ordered after every release that has one, by release ID ascending; releases with equal lowest ordinals are ordered by release ID ascending. The no-release group precedes all releases.
 5. A release with no active milestones still renders its separator and an explicit empty state for the group.
+
+**Lifecycle markers (REQ-06.021)**
+
+1. Every displayed open milestone shows the marker `🔘` immediately before its title; every displayed closed milestone shows `✅` immediately before its title.
+2. Every displayed planned release shows `🔘` immediately before its title; every displayed released release shows `✅` immediately before its title.
+3. The marker is placed immediately before the title text in the milestone summary and in the release heading, in addition to the existing record ID and title, and does not replace status information shown elsewhere.
+4. Archived milestones are not displayed and therefore carry no marker.
+5. The marker reflects the stored lifecycle state and changes after that state changes and the view is reloaded.
+
+**Milestone and release cleanup controls (REQ-06.022)**
+
+1. Each displayed closed milestone shows a cleanup control immediately after its title.
+2. Each displayed released release that contains at least one closed milestone shows a cleanup control immediately after its title.
+3. A released release with no closed milestone shows no cleanup control.
+4. Activating a milestone cleanup control shows a confirmation that lists the milestone ID that will be archived; confirming archives that milestone using the milestone archive semantics of REQ-03.001 and ADR-0032, removing it from the view; cancelling archives nothing.
+5. Activating a release cleanup control shows a confirmation that lists the IDs of the closed milestones in that release that will be archived; confirming archives each listed milestone, one by one, using the same archive semantics; the release itself remains visible and released and is never archived.
+6. If archiving one milestone fails, the failure is reported for that milestone, the remaining milestones are still archived, and the failed milestone stays visible.
+7. The cleanup controls are browser-only actions: they introduce no CLI command, no JSON API endpoint, and no new write path; archiving reuses the existing task/milestone archive entry point and the single write path of ADR-0013.
+8. Milestone and release lifecycle rules are unchanged by these controls.
 
 **Tasks without a milestone**
 
@@ -372,11 +399,12 @@ UI mockups are required before any UI implementation work and must be approved b
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012, REQ-06.013, REQ-02, REQ-02.001, REQ-02.002, REQ-02.003, REQ-02.004, REQ-03, REQ-03.001, REQ-03.002, REQ-05.001, REQ-05.002, REQ-05.007, REQ-01.002 |
+| Requirement | REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012, REQ-06.013, REQ-06.020, REQ-06.021, REQ-06.022, REQ-02, REQ-02.001, REQ-02.002, REQ-02.003, REQ-02.004, REQ-03, REQ-03.001, REQ-03.002, REQ-05.001, REQ-05.002, REQ-05.007, REQ-01.002 |
 | Business rule | BR-004 (browser command behavior), BR-005 (task command behavior), BR-006 (milestone command behavior), BR-007 (release command behavior), BR-016 (configuration keys and precedence) |
-| ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0010, ADR-0012, ADR-0013 |
-| Ticket | TASK-6 (baseline), TASK-8, TASK-9, TASK-11, TASK-86, TASK-101, TASK-102, TASK-103, TASK-147 (`Clean up all` revision) |
+| ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0010, ADR-0012, ADR-0013, ADR-0022, ADR-0032 |
+| Ticket | TASK-6 (baseline), TASK-8, TASK-9, TASK-11, TASK-86, TASK-101, TASK-102, TASK-103, TASK-147 (`Clean up all` revision), TASK-205 (MS-030 architecture assessment) |
 | Increment boundary | REQ-06.002 covers both stores; the documentation-store part was delivered by TASK-6/TASK-7, the backlog-store part by this ticket. |
 | UI mockups | MOCK-0001 (approved baseline); MOCK-0002 (approved; kanban-board revision approved 2026-11-12 UTC under TASK-102) — `docs/specifications/ui/mockups/MOCK-0002-browser-backlog-records-review.html` |
 | Related specification | `docs/specifications/browser-requirements.md` (TASK-6 baseline), `docs/specifications/task-management.md` (TASK-9), `docs/specifications/milestone-and-release-management.md` (TASK-8) |
 | Related specification | `docs/specifications/search-requirements.md` (TASK-5/TASK-10) |
+| Request | RE-008 (milestone ordering by lowest task ordinal, lifecycle markers, cleanup) |

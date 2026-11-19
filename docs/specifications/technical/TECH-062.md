@@ -2,7 +2,7 @@
 id: TECH-062
 title: "Browser Specification Revisions for the Per-Milestone Kanban Board (TASK-101)"
 created_date: '2026-11-16T17:46:52Z'
-updated_date: '2026-11-16T17:47:28Z'
+updated_date: '2026-11-19T18:07:29Z'
 labels: []
 references:
   - ADR-0005
@@ -23,12 +23,19 @@ references:
   - REQ-06.002
   - REQ-06.003
   - REQ-06.013
+  - REQ-06.020
+  - REQ-06.021
+  - REQ-06.022
+  - RE-008
+  - ADR-0022
+  - ADR-0032
+  - TASK-205
   - TASK-101
   - TASK-102
   - TASK-103
   - TASK-11
   - TASK-86
-status: verified
+status: draft
 ---
 # TECH-062 Browser Specification Revisions for the Per-Milestone Kanban Board (TASK-101)
 
@@ -77,7 +84,7 @@ This ticket is documentation/specification work only. It does not change require
 1. Milestones assigned to a release appear under that release.
 2. Milestones assigned to no release are grouped together before the first release.
 3. Each release boundary is marked by a bold separator that names the release and does not rely on colour alone.
-4. Release ordering follows ascending release ID; milestones within a release follow ascending milestone ID; the no-release group precedes all releases.
+4. Ordering follows REQ-06.020: milestones within a release and in the no-release group are ordered by the lowest ordinal among their non-archived tasks ascending (milestones with no non-archived task after all others, by milestone ID ascending; ties by milestone ID ascending); releases are ordered by the lowest ordinal among the non-archived tasks in their milestones ascending (releases with no such task after all others, by release ID ascending; ties by release ID ascending). The no-release group precedes all releases.
 
 ### 3. Tasks without a milestone (AC #3)
 
@@ -147,7 +154,7 @@ UI mockups are required before any UI implementation work and must be approved b
 
 ## Assumptions
 
-- Assumption: Release ordering is ascending release ID; milestone ordering within a release and within the no-release group is ascending milestone ID; the no-release group precedes all releases.
+- Assumption: Release and milestone ordering follows REQ-06.020 (lowest contained non-archived task ordinal ascending, with no-task records last ordered by ID ascending, and ties by ID ascending); the no-release group precedes all releases. Lifecycle markers (REQ-06.021) and milestone/release cleanup controls (REQ-06.022) are specified in TECH-011 and do not change this board contract.
 - Assumption: Task ordering within a column is ascending task ID, consistent with the existing browser list ordering.
 - Assumption: The `?type=` category selector and the sidebar Backlog entry remain; the combined Backlog view's task presentation becomes the board. The flat per-category task row list is replaced by the board surface.
 - Assumption: The board reuses the existing browser write contract (ADR-0006 version token, ADR-0013 single write path); no new endpoint, crate, module, or ADR is introduced.
