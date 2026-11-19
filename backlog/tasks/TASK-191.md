@@ -2,7 +2,7 @@
 id: TASK-191
 title: "Refine multiline stdin input implementation"
 created_date: '2026-11-18T21:13:37Z'
-updated_date: '2026-11-19T04:56:19Z'
+updated_date: '2026-11-19T05:46:42Z'
 labels:
   - bug
 references:
@@ -37,6 +37,7 @@ references:
   - TC-052
   - TC-053
   - TC-054
+  - TASK-204
 status: Done
 assignee:
   - task-refiner
@@ -119,3 +120,4 @@ Outcome: fix RE-007 so document-type, task, milestone, and decision `create`/`ed
 - [ ] AC-6: `--help` for every affected create and edit command documents the stdin path and the accepting fields using the sentence `Use "-" to read multiline text from standard input.`, and the README.md manpage entries are consistent (TC-054).
 ## Comments
 - **task-refiner**: Refinement complete. Fixed stdin contract: exact `-` sentinel on accepting options, one stdin read per invocation to EOF, UTF-8 required, CRLF to LF, trim outer line terminators only, internal blank lines preserved, LF the only allowed control character, empty or whitespace-only input and multiple sentinels exit 4 with no write, no implicit stdin read, and --editor still runs after field patches. Accepting fields: --description on document, task, and milestone create and edit; --decision, --context, and --consequences on decision create and edit. No new flags. Help uses the sentence: Use "-" to read multiline text from standard input. Prerequisites: TASK-190 Done with TC-040 through TC-054 approved; MS-029 plans no architecture, technical-specification, or UI task because this is a CLI-only input fix. Implementation contract is in the description for TASK-192.
+- **task-refiner**: Contract extension for MS-029 AC-1: audit options content and glossary options definition also accept the exact hyphen sentinel and read multiline text from standard input under the same contract. Implemented by TASK-204.
