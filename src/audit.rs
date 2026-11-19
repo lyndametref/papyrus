@@ -15,11 +15,12 @@ pub fn handle(
 ) -> Result<CommandOutput, AppError> {
     match verb {
         DocumentVerb::Create => {
+            let content = resolve_content_required(args)?;
             let id = create(
                 ctx,
                 scope,
                 args.require("title")?,
-                args.require("content")?,
+                &content,
                 args.get("audit_type"),
                 args.get_all("label"),
                 args.get_all("reference"),
@@ -28,20 +29,43 @@ pub fn handle(
         }
         DocumentVerb::List => list(ctx, scope, record),
         DocumentVerb::View => view(ctx, scope, record, args.require("id")?),
-        DocumentVerb::Edit => edit(
-            ctx,
-            scope,
-            record,
-            args.require("id")?,
-            args.get("title"),
-            args.get("content"),
-            args.get("audit_type"),
-            args.get_all("label"),
-            args.get_all("reference"),
-            args.flag("editor"),
-        ),
+        DocumentVerb::Edit => {
+            let content = resolve_content_optional(args)?;
+            edit(
+                ctx,
+                scope,
+                record,
+                args.require("id")?,
+                args.get("title"),
+                content.as_ref(),
+                args.get("audit_type"),
+                args.get_all("label"),
+                args.get_all("reference"),
+                args.flag("editor"),
+            )
+        }
         other => Err(crate::document::unsupported_verb(other)),
     }
+}
+
+/// Resolve `--content -` on create before any ID is allocated or file is
+/// written.
+fn resolve_content_required(args: &DocumentArgs) -> Result<sanitize::Text, AppError> {
+    let raw = args.require("content")?;
+    let stdin = sanitize::resolve_stdin_fields(&[("content", Some(raw))])?;
+    sanitize::text_value("content", Some(raw.to_string()), stdin.as_ref())
+        .ok_or_else(|| AppError::Validation("missing required argument: content".to_string()))
+}
+
+/// Resolve `--content -` on edit before any write.
+fn resolve_content_optional(args: &DocumentArgs) -> Result<Option<sanitize::Text>, AppError> {
+    let raw = args.get("content");
+    let stdin = sanitize::resolve_stdin_fields(&[("content", raw)])?;
+    Ok(sanitize::text_value(
+        "content",
+        raw.map(str::to_string),
+        stdin.as_ref(),
+    ))
 }
 
 fn sanitize_field(raw: &str) -> Result<String, AppError> {
@@ -133,13 +157,13 @@ pub fn create(
     ctx: &Context,
     scope: &DocumentScope,
     title_raw: &str,
-    content_raw: &str,
+    content_text: &sanitize::Text,
     audit_type_raw: Option<&str>,
     labels_raw: &[String],
     references_raw: &[String],
 ) -> Result<String, AppError> {
     let title = sanitize_field(title_raw)?;
-    let content = sanitize_field(content_raw)?;
+    let content = content_text.resolve()?;
     let audit_type = match audit_type_raw {
         Some(v) => sanitize_field(v)?,
         None => "security".to_string(),
@@ -328,7 +352,7 @@ pub fn edit(
     record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
     title_raw: Option<&str>,
-    content_raw: Option<&str>,
+    content_text: Option<&sanitize::Text>,
     audit_type_raw: Option<&str>,
     labels_raw: &[String],
     references_raw: &[String],
@@ -363,8 +387,8 @@ pub fn edit(
     if let Some(t) = title_raw {
         record.title = sanitize_field(t)?;
     }
-    if let Some(c) = content_raw {
-        record.content = sanitize_field(c)?;
+    if let Some(c) = content_text {
+        record.content = c.resolve()?;
     }
     if let Some(a) = audit_type_raw {
         record.audit_type = sanitize_field(a)?;
@@ -380,7 +404,7 @@ pub fn edit(
             record.title.clone(),
         ));
     }
-    if content_raw.is_some() {
+    if content_text.is_some() {
         ops.push(crate::record::patch::PatchOp::SetSection(
             "## Content".into(),
             record.content.clone(),

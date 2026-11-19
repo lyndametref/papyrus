@@ -455,7 +455,9 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
         <b>Multiline stdin:</b> <b>create</b> and <b>edit</b> accept
         <b>-d, --description &lt;text&gt;</b> from standard input when the value
         is exactly <b>-</b>. This applies to the generic model and to every
-        typed document type that declares <b>--description</b>.
+        typed document type that declares <b>--description</b>. It also applies
+        to <b>audit</b> create and edit <b>--content</b> and to <b>glossary</b>
+        create and edit <b>--definition</b>.
         Use "-" to read multiline text from standard input.
 
        <b style="color: light-dark(#8250df, #d2a8ff);">status &lt;id&gt; &lt;value&gt;</b>
