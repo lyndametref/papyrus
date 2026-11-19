@@ -39,11 +39,17 @@ references:
   - ADR-034
   - REQ-06.018
   - RE-005
+  - ADR-035
+  - REQ-06.019
+  - RE-006
+  - TASK-178
 status: draft
 ---
 # TECH-074 Browser Shell, PageWidth Contract, Shared List Layout, and Collapsible Navigation (TASK-141, TASK-144)
 
 > **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
+
+> **Revised (TASK-178, 2026-11-19):** reference visibility in the shared browser list is per artifact family per ADR-035 and REQ-06.019 (source RE-006). `ContentModel::Generic` (config-defined document types) renders no reference list in any list row; `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep it; labels render for every family. Single-document view, CLI list and view, JSON API, `RecordView`, and front matter are unchanged.
 
 ## Description
 **Tickets:** TASK-141 (§3.1–§3.3, §4.1, §5, §6 — delivered), TASK-144 (§3.4, §4.2–§4.5 — refined 2026-11-16)
@@ -266,8 +272,8 @@ pub struct Row {
     pub title: String,
     pub href: String,                   // "/doc/{id}"; a route, never a stored value
     pub cells: Vec<String>,             // Status, family slot(s), Created, Updated — in that order
-    pub labels: Vec<String>,            // front-matter labels, rendered in the Title cell
-    pub references: Vec<String>,        // front-matter references, rendered in the Title cell
+    pub labels: Vec<String>,            // front-matter labels, rendered in the Title cell for every family
+    pub references: Vec<String>,        // front-matter references; rendered only for Typed and HtmlMockup families (ADR-035)
     pub actions: Vec<(String, String)>, // (label, href): View, Edit, family
     pub children: Vec<Row>,             // grouped families
 }
@@ -281,7 +287,7 @@ Rules:
 - Reserved keys: `id`, `title`, `status`, `created`, `updated`, and `actions` are structural and may not be declared as a slot, must not be repeated inside one family, and may not be reordered (ADR-0028 decision 2 and downstream constraint 10).
 - `Row.cells.len() == columns.len() - 3` (ID, Title, and Actions are structural). `ListPlan::render` asserts this and the column-shape rules; a violation is a programming error, not a 500.
 - `title` is not duplicated inside `cells`; it is required because the ADR row sketch has no title field and the ID/Title cells are structural.
-- `labels` and `references` are general front-matter metadata, not family data. The shared list renders them in the Title cell below the link and escapes them in `list.rs`, because `Row` carries values, not markup. `href` is a route the builder computes, never a stored value, so a stored `href` key cannot reach the cell.
+- `labels` and `references` are general front-matter metadata, not family data. `labels` render in the Title cell below the link for every family. `references` render in the Title cell only for `ContentModel::Typed` and `ContentModel::HtmlMockup` families; a `ContentModel::Generic` (config-defined document type) row renders no reference block at all, omitted rather than emptied (ADR-035, REQ-06.019). Visibility is resolved from the descriptor content model, never from a slug, a presentation override, or a per-family template. `Row.references` still carries the `RecordView` projection for every family; only the list rendering omits it for `Generic`. `list.rs` escapes the values, because `Row` carries values, not markup. `href` is a route the builder computes, never a stored value, so a stored `href` key cannot reach the cell.
 - `empty` is `Some` when the filtered index has no records for the family; the table is then replaced by the empty block. TASK-142 pins one shared pair for every family: message `No {noun} in this project.` and help `Records are created from the command line; this browser does not create records.` `{noun}` is the same singular/plural noun the count note uses (`business requirements`; `notes` for a config-defined type). The legacy per-family variants (requirement group wording and the cross-family hint, the technical-specification/use-case/test-case/test-report "were found in the configured directory" wording, the "Archived … are hidden" sentence) are recorded as accepted differences in TASK-142 and reconciled by the specification port owned by TASK-148. Empty copy never lives behind per-family builder code (AC3).
 - `count_note` is supplied by the caller and is the only other variable string. Flat families use `list::count_note(slug, record count)` (`3 milestones`, `1 milestone`, `0 releases`); grouped families use the group/member note (`1 group · 3 requirements`, `0 groups · 0 requirements`), counted from the rows actually emitted. A config-defined type falls back to its lower-case slug (`2 notes`).
 - Cell values are rendered HTML built from escaped values; `render` applies no further escaping to `cells`, `actions`, or `children`.
@@ -317,7 +323,7 @@ Rules:
 </section>
 ```
 
-The header carries seven cells for the reference family. A family with two slots carries eight and a family with no slot carries six: only the slot cells vary, the six structural cells are fixed in place.
+The header carries seven cells for the reference family. A family with two slots carries eight and a family with no slot carries six: only the slot cells vary, the six structural cells are fixed in place. The `row-tags` list renders for every family; the `row-refs` list and its `<ul>` element are omitted entirely for `ContentModel::Generic` families, while `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep them (ADR-035, REQ-06.019).
 
 Stable test hooks, independent of styling: `data-list-layout="shared"`, `data-column="{key}"`, `data-row-id`, `data-child-of`. Exact classes and spacing remain design decisions and are fixed by the approved mockup (§7), not by this document.
 
@@ -339,12 +345,13 @@ Stable test hooks, independent of styling: `data-list-layout="shared"`, `data-co
 
 ### 5.5 List parity contract (REQ-06.004)
 
-REQ-06.004 is a must-have requirement: the browser list must show the same front-matter values as the CLI for the same record. The shared list therefore guarantees, for every family including config-defined types:
+REQ-06.004 is a must-have requirement: the browser list must show the same front-matter values as the CLI for the same record. REQ-06.019 qualifies that parity for list views only: a `ContentModel::Generic` (config-defined document type) list row omits the reference list, while CLI list and view output keep it (ADR-035). The shared list therefore guarantees, for every family including config-defined types:
 
 - `created` and `updated` are fixed cells in fixed positions, never slots and never optional.
-- `labels` and `references` render in the Title cell, below the link, from escaped values.
+- `labels` render in the Title cell, below the link, for every family, from escaped values.
+- `references` render in the Title cell, below the labels, for `ContentModel::Typed` and `ContentModel::HtmlMockup` families; a `ContentModel::Generic` family omits the reference block entirely (ADR-035, REQ-06.019). The value is unchanged in front matter, `RecordView`, the JSON API, the single-document view, and CLI list and view.
 - `status` renders verbatim as stored, including a custom status declared for the type; the list never renames or maps it to a display label (REQ-07.001, REQ-07.002).
-- No family may drop, rename, or relocate any of these values, and no slot may stand in for one of them. The only declared variation is the family slot(s), their labels, and the empty copy.
+- No family may drop, rename, or relocate any of these values, and no slot may stand in for one of them. The only declared variations are the family slot(s), their labels, the empty copy, and reference visibility by content model.
 
 A family that needs another front-matter value declares it as a family slot, and a slot may not displace a structural column (ADR-0028 downstream constraints 10 and 11).
 
@@ -380,7 +387,8 @@ The following is the settled behaviour once every family renders through `ListPl
 - **Status filter (REQ-06.014).** Every enabled document type keeps the single status filter (`active` plus declared custom statuses, configured order, `archived` never offered) rendered above the shared section. Milestone, release, decision, and task views have no filter. The filter decides the index; `ListPlan` never filters. A filter value outside the offered set stays a 400. A filtered list with no matches shows the shared empty block; filter-specific empty copy is out of scope.
 - **Grouped rows.** As in §5.4; the group-aware count note is `N group(s) · M requirement(s)` computed from the rows actually emitted — the group rows shown and the member rows shown, orphan members included — never from a synthesised group.
 - **Empty state.** One shared message and help pair (see §5.1), one muted `(none)` for an unset status, date, or slot value, and the count note for zero records.
-- **Actions.** `View` then `Edit` in the last cell, each with a record-specific accessible name; the title cell carries the record's labels and references.
+- **Actions.** `View` then `Edit` in the last cell, each with a record-specific accessible name; the title cell carries the record's labels for every family and its references for Typed and HtmlMockup families only.
+- **Reference visibility (REQ-06.019, ADR-035).** The shared renderer omits the reference block for `ContentModel::Generic` (config-defined document type) rows and keeps it for `ContentModel::Typed` and `ContentModel::HtmlMockup` families. The decision is read from the descriptor content model; no slug match, presentation override, per-family template, or new presentation field is added. Labels stay for every family. Single-document view, CLI list and view, JSON API, `RecordView`, and front matter are unchanged.
 - **Task family.** `/?type=task` is still the REQ-06.013 board: no shared table, no `Actions` cell, no status filter, and the per-milestone grouping unchanged.
 
 ## 6. Characterization fixtures (AC5)
@@ -392,11 +400,11 @@ Fixtures guard TASK-142, so they must be produced from the **pre-change** binary
 - **Families covered:** tasks (board inventory, since no task list exists), milestones, releases, decisions, business requirements (grouped), NFRs (grouped), glossary terms, business rules, audit records, technical specifications, UI specifications, UI mockups, use cases, test cases, test reports, and the config-defined `note` type. Plus one empty-state fixture per family.
 - **Captured per fixture:** `schema`, `family`, `url`, `captured_from_commit`, `heading`, `count_note`, `row_order` (IDs in render order), `baseline_columns` (today's header labels in order), `baseline_row_shape` (`ul`, `table`, or `board`), `records` (per ID: `title`, `status`, `created`, `updated`, `labels`, `references`, declared slot values, `href`, and `actions` — empty today because no list renders action cells), `grouped` (group → child IDs, requirements and NFRs only), `excluded` (archived IDs that must stay absent), and `empty` (bool).
 - **What is a target and what is evidence:** `baseline_columns` and `baseline_row_shape` are recorded as evidence of the pre-change contract and are **not** replayed, because they are exactly what the shared layout changes; `baseline_columns` is the only place the old five-column order survives, and it is evidence only. Captured `actions` (`[]` today) are evidence only; the action cell is asserted from the contract instead.
-- **Replayed, normalized:** record set and relative row order, title, `href`, label and reference values in the Title cell, slot values, created and updated, group→child nesting, archived IDs absent, and the heading and count note where the family's presentation heading and count contract are unchanged. A captured `""` or `"(none)"` status, date, or slot value is the shared muted `(none)`; a non-empty status stays verbatim. This refines the README's "replayed targets" line, which predates the pinned differences below.
+- **Replayed, normalized:** record set and relative row order, title, `href`, label values in every Title cell, reference values in the Title cell for Typed and HtmlMockup families and no reference block for the Generic family, slot values, created and updated, group→child nesting, archived IDs absent, and the heading and count note where the family's presentation heading and count contract are unchanged. A captured `""` or `"(none)"` status, date, or slot value is the shared muted `(none)`; a non-empty status stays verbatim. This refines the README's "replayed targets" line, which predates the pinned differences below.
 - **Accepted differences (TASK-142, recorded in the ticket as A1–A8):**
-  - **A1 Shared layout.** Table instead of `<ul>`, the fixed header sequence, the `Created` column, the `View`/`Edit` action cell, the Title-cell labels/references, and the muted `(none)` for unset values; this is the intended change every populated fixture shares.
-  - **A2 First-paragraph preview removed.** The legacy list rows rendered the first paragraph of the record body — `definition` for glossary terms and `description` for UI specifications, business rules, audit records, technical specifications, use cases, test cases, and test reports. The shared row carries only the Title cell (link, labels, references) plus the fixed cells; no body preview is rendered for any family.
-  - **A3 Legacy row metadata removed.** The `row-meta` line (`created`, `updated`, `labels`, `references`, and every remaining front-matter key) is not carried over: `created`/`updated` are structural columns and `labels`/`references` are in the Title cell. Every other field it exposed already has a column or a declared slot; the one field with no other home, decision `superseded_by`, is now the declared `Superseded by` slot (§5.3), so CLI/browser parity is preserved.
+  - **A1 Shared layout.** Table instead of `<ul>`, the fixed header sequence, the `Created` column, the `View`/`Edit` action cell, the Title-cell labels and, for Typed and HtmlMockup families, references, and the muted `(none)` for unset values; this is the intended change every populated fixture shares.
+  - **A2 First-paragraph preview removed.** The legacy list rows rendered the first paragraph of the record body — `definition` for glossary terms and `description` for UI specifications, business rules, audit records, technical specifications, use cases, test cases, and test reports. The shared row carries only the Title cell (link, labels, and references where the family keeps them) plus the fixed cells; no body preview is rendered for any family.
+  - **A3 Legacy row metadata removed.** The `row-meta` line (`created`, `updated`, `labels`, `references`, and every remaining front-matter key) is not carried over: `created`/`updated` are structural columns, `labels` are in the Title cell, and `references` are in the Title cell except for the Generic family (ADR-035). Every other field it exposed already has a column or a declared slot; the one field with no other home, decision `superseded_by`, is now the declared `Superseded by` slot (§5.3), so CLI/browser parity is preserved.
   - **A4 Requirement and NFR heading.** `Requirements` becomes the presentation heading (`Business requirements`, `Non-functional requirements`); the grouped count note keeps its group/member shape.
   - **A5 Subheading copy.** The list subheading is now the presentation inventory note, so the legacy `<Family> records in this project.` sentence is replaced: `Milestone records…` → `Milestones in this project.`, `Release records…` → `Releases in this project.`, `Decision records…` → `Decisions in this project.`, `Business requirement records…` → `Business requirements in this project.`, `Non-functional requirement records…` → `Non-functional requirements in this project.` The other families' subheadings already matched their presentation note. Fixtures do not capture a subheading, so this difference is recorded here and in the ticket, not replayed.
   - **A6 Shared empty state.** Every legacy per-family empty block (the requirement cross-family hint and group messages, the technical-specification/use-case/test-case/test-report "were found in the configured directory" wording, the "Archived … are hidden" sentence) is replaced by the one shared message/help pair in §5.1. The per-family UI description port is TASK-148.
@@ -404,7 +412,7 @@ Fixtures guard TASK-142, so they must be produced from the **pre-change** binary
   - **A8 Config-defined count noun.** `note` count note changes from `2 records` to `2 notes` (a config-defined type uses its own noun), and every empty fixture's count note (`No records`, `No groups`, `""`) becomes `0 <noun>` (or `0 groups · 0 requirements`).
 - **Producer:** `tests/list_characterization_capture.rs`, an `#[ignore]`d test that boots the current browser against `project/`, parses the pre-change markup (document table rows, `req-list` rows, board cards), and writes `expected/*.json`. It is run once on the pre-change commit and then kept for audit only.
 - **Format decision:** JSON with `serde_json` (already a dev-dependency); no HTML golden files, because the header and cell markup is exactly what changes and byte-comparison would encode the old markup as the target.
-- **Replay (TASK-142):** `tests/list_characterization_replay.rs` gains one loop over every populated and empty fixture (`expected/*.json`, 32 files). For each fixture it asserts the shared layout shows the same record set, the same relative row order, `created` and `updated` as cells, `labels` and `references` in the Title cell, the same status/slot values, the same group→child nesting, the recorded archived IDs absent, the heading and count note where §6 keeps them, and — for the empty fixtures — no table plus the shared empty message, help, and zero count. It asserts the shared header sequence and the `View`/`Edit` actions separately, because those are the intended change. The task fixture is replayed against the board (heading, count note, milestone grouping/card order, archived exclusion; no shared table or header). The reference family is covered by this same loop: the dedicated `reference_family_replays_its_characterization_fixture` test was folded into it, so coverage is preserved and no milestone-specific test remains.
+- **Replay (TASK-142):** `tests/list_characterization_replay.rs` gains one loop over every populated and empty fixture (`expected/*.json`, 32 files). For each fixture it asserts the shared layout shows the same record set, the same relative row order, `created` and `updated` as cells, `labels` in every Title cell, `references` in the Title cell for Typed and HtmlMockup families and absent for the `note` Generic family (ADR-035, REQ-06.019), the same status/slot values, the same group→child nesting, the recorded archived IDs absent, the heading and count note where §6 keeps them, and — for the empty fixtures — no table plus the shared empty message, help, and zero count. It asserts the shared header sequence and the `View`/`Edit` actions separately, because those are the intended change. The task fixture is replayed against the board (heading, count note, milestone grouping/card order, archived exclusion; no shared table or header). The reference family is covered by this same loop: the dedicated `reference_family_replays_its_characterization_fixture` test was folded into it, so coverage is preserved and no milestone-specific test remains.
 - **New contract tests (TASK-142):** a new `tests/list_shared_layout.rs` asserts (a) every enabled descriptor, resolved through its representative navigation route, returns `data-list-layout="shared"` and exactly the fixed `data-column` sequence including its declared slots (the task descriptor is excluded and asserted on the board instead; a disabled type stays 404), and (b) every archived ID recorded in every fixture is absent from its list, or from the board's `data-task` cards for the task family. The grouped-row proof (one `<tbody>`, group row before its `data-child-of` children, unresolved member as a top-level row) lives in the replay file beside the requirement and NFR fixtures.
 
 ## 7. UI gate
@@ -448,11 +456,11 @@ All three open questions and the ticket's task-family premise are settled by the
 
 | Artifact | Reference |
 | --- | --- |
-| Requirements | REQ-06.016; REQ-06.015 (width **and** navigation visibility); REQ-06.004 (browser list parity); REQ-06.013 (board, now `Full`); REQ-05.007 (archive exclusion); REQ-06.003, REQ-06.009, REQ-06.012, REQ-06.014 (shell, header, list routes) |
+| Requirements | REQ-06.016; REQ-06.015 (width **and** navigation visibility); REQ-06.004 (browser list parity, qualified for Generic list rows by REQ-06.019); REQ-06.019 (per-family reference visibility; source RE-006); REQ-06.013 (board, now `Full`); REQ-05.007 (archive exclusion); REQ-06.003, REQ-06.009, REQ-06.012, REQ-06.014 (shell, header, list routes) |
 | NFRs | NFR-01.002; NFR-01.003; NFR-05.001 (Firefox 115+ at 320/480/720 px) |
-| ADRs | ADR-0028 (decisions 1, 2, 3, 4, 5, 6, 7, 8, 9; downstream constraints 4–9 and 15); ADR-0005 (templates, CSP, progressive enhancement, no cookies); ADR-0017; ADR-0020 (decision 5 amended by ADR-0028 constraint 9) |
+| ADRs | ADR-0028 (decisions 1, 2, 3, 4, 5, 6, 7, 8, 9; downstream constraints 4–9 and 15; decision 2 and constraint 11 amended by ADR-035 for Generic lists); ADR-035 (per-family reference visibility); ADR-0005 (templates, CSP, progressive enhancement, no cookies); ADR-0017; ADR-0020 (decision 5 amended by ADR-0028 constraint 9) |
 | Domain model | `docs/domain-model/` — requirement group and member requirement (grouped rows) |
 | Business rules | `docs/business-rules/` — archive and lifecycle rules cited by the existing list pages |
 | UI | MOCK-0016 (shell and shared list); TASK-144 header/collapsed-layout MOCK id in §7.4; `docs/specifications/ui/browser-shell-and-shared-list-ui.md` |
-| Tickets | TASK-141; TASK-142; TASK-144; TASK-145; TASK-146; TASK-147; TASK-148; TASK-149; TASK-150 |
+| Tickets | TASK-141; TASK-142; TASK-144; TASK-145; TASK-146; TASK-147; TASK-148; TASK-149; TASK-150; TASK-178 (revision) |
 | Implementation | `src/browser/shell.rs`, `src/browser/list.rs`, `src/browser/render.rs`, `src/browser/routes.rs`, `src/browser/templates/shell.html`, `src/browser/app.css`, `src/browser/app.js`, `src/browser/nav-state.js` (new), `src/browser/assets.rs`, `src/browser/vendor/MANIFEST.md`, `src/browser/http.rs`, tests |
