@@ -15,11 +15,11 @@ pub enum DecisionCmd {
         title: String,
         #[arg(short = 't', long = "decision-type")]
         decision_type: Option<String>,
-        #[arg(short = 'd', long = "decision")]
+        #[arg(short = 'd', long = "decision", help = crate::sanitize::MULTILINE_STDIN_HELP)]
         decision: Option<String>,
-        #[arg(long = "context")]
+        #[arg(long = "context", help = crate::sanitize::MULTILINE_STDIN_HELP)]
         context: Option<String>,
-        #[arg(long = "consequences")]
+        #[arg(long = "consequences", help = crate::sanitize::MULTILINE_STDIN_HELP)]
         consequences: Option<String>,
         #[arg(long = "label")]
         label: Vec<String>,
@@ -37,13 +37,13 @@ pub enum DecisionCmd {
         id: String,
         #[arg(long = "title")]
         title: Option<String>,
-        #[arg(short = 'd', long = "decision")]
+        #[arg(short = 'd', long = "decision", help = crate::sanitize::MULTILINE_STDIN_HELP)]
         decision: Option<String>,
         #[arg(long = "status", conflicts_with = "superseded_by")]
         status: Option<String>,
-        #[arg(long = "context")]
+        #[arg(long = "context", help = crate::sanitize::MULTILINE_STDIN_HELP)]
         context: Option<String>,
-        #[arg(long = "consequences")]
+        #[arg(long = "consequences", help = crate::sanitize::MULTILINE_STDIN_HELP)]
         consequences: Option<String>,
         #[arg(long = "superseded-by", conflicts_with = "status")]
         superseded_by: Option<String>,
@@ -65,13 +65,21 @@ pub fn run(ctx: &Context, cmd: DecisionCmd) -> Result<crate::CommandOutput, AppE
             label,
             reference,
         } => {
+            let stdin = sanitize::resolve_stdin_fields(&[
+                ("decision", decision.as_deref()),
+                ("context", context.as_deref()),
+                ("consequences", consequences.as_deref()),
+            ])?;
+            let decision = sanitize::text_value("decision", decision, stdin.as_ref());
+            let context = sanitize::text_value("context", context, stdin.as_ref());
+            let consequences = sanitize::text_value("consequences", consequences, stdin.as_ref());
             let id = create(
                 ctx,
                 &title,
                 decision_type.as_deref(),
-                decision.as_deref(),
-                context.as_deref(),
-                consequences.as_deref(),
+                decision,
+                context,
+                consequences,
                 &label,
                 &reference,
             )?;
@@ -99,18 +107,25 @@ pub fn run(ctx: &Context, cmd: DecisionCmd) -> Result<crate::CommandOutput, AppE
             superseded_by,
             label,
             reference,
-        } => edit(
-            ctx,
-            &id,
-            title.as_deref(),
-            decision.as_deref(),
-            status.as_deref(),
-            context.as_deref(),
-            consequences.as_deref(),
-            superseded_by.as_deref(),
-            &label,
-            &reference,
-        ),
+        } => {
+            let stdin = sanitize::resolve_stdin_fields(&[
+                ("decision", decision.as_deref()),
+                ("context", context.as_deref()),
+                ("consequences", consequences.as_deref()),
+            ])?;
+            edit(
+                ctx,
+                &id,
+                title.as_deref(),
+                sanitize::text_value("decision", decision, stdin.as_ref()),
+                status.as_deref(),
+                sanitize::text_value("context", context, stdin.as_ref()),
+                sanitize::text_value("consequences", consequences, stdin.as_ref()),
+                superseded_by.as_deref(),
+                &label,
+                &reference,
+            )
+        }
     }
 }
 
@@ -339,9 +354,9 @@ pub fn create(
     ctx: &Context,
     title_raw: &str,
     type_raw: Option<&str>,
-    decision_raw: Option<&str>,
-    context_raw: Option<&str>,
-    consequences_raw: Option<&str>,
+    decision_raw: Option<sanitize::Text>,
+    context_raw: Option<sanitize::Text>,
+    consequences_raw: Option<sanitize::Text>,
     labels_raw: &[String],
     references_raw: &[String],
 ) -> Result<String, AppError> {
@@ -352,16 +367,16 @@ pub fn create(
         None => "adr".to_string(),
     };
     let entry = type_entry(&cfg, &type_key)?;
-    let decision = match decision_raw {
-        Some(s) => Some(sanitize_text(s)?),
+    let decision = match &decision_raw {
+        Some(text) => Some(text.resolve()?),
         None => None,
     };
-    let context = match context_raw {
-        Some(s) => Some(sanitize_text(s)?),
+    let context = match &context_raw {
+        Some(text) => Some(text.resolve()?),
         None => None,
     };
-    let consequences = match consequences_raw {
-        Some(s) => Some(sanitize_text(s)?),
+    let consequences = match &consequences_raw {
+        Some(text) => Some(text.resolve()?),
         None => None,
     };
 
@@ -552,10 +567,10 @@ pub fn edit(
     ctx: &Context,
     id_raw: &str,
     title_raw: Option<&str>,
-    decision_raw: Option<&str>,
+    decision_raw: Option<sanitize::Text>,
     status_raw: Option<&str>,
-    context_raw: Option<&str>,
-    consequences_raw: Option<&str>,
+    context_raw: Option<sanitize::Text>,
+    consequences_raw: Option<sanitize::Text>,
     superseded_by_raw: Option<&str>,
     labels_raw: &[String],
     references_raw: &[String],
@@ -584,14 +599,14 @@ pub fn edit(
     if let Some(t) = title_raw {
         dd.title = sanitize_text(t)?;
     }
-    if let Some(d) = decision_raw {
-        dd.decision = Some(sanitize_text(d)?);
+    if let Some(d) = &decision_raw {
+        dd.decision = Some(d.resolve()?);
     }
-    if let Some(c) = context_raw {
-        dd.context = Some(sanitize_text(c)?);
+    if let Some(c) = &context_raw {
+        dd.context = Some(c.resolve()?);
     }
-    if let Some(c) = consequences_raw {
-        dd.consequences = Some(sanitize_text(c)?);
+    if let Some(c) = &consequences_raw {
+        dd.consequences = Some(c.resolve()?);
     }
     if let Some(s) = status_raw {
         let st = sanitize_text(s)?;

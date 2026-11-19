@@ -20,7 +20,11 @@ pub enum TaskCmd {
     Create {
         #[arg(value_name = "title")]
         title: String,
-        #[arg(short = 'd', long = "description")]
+        #[arg(
+            short = 'd',
+            long = "description",
+            help = crate::sanitize::MULTILINE_STDIN_HELP
+        )]
         description: Option<String>,
         #[arg(long = "ac")]
         ac: Vec<String>,
@@ -68,7 +72,11 @@ pub enum TaskCmd {
         id: String,
         #[arg(long = "title")]
         title: Option<String>,
-        #[arg(short = 'd', long = "description")]
+        #[arg(
+            short = 'd',
+            long = "description",
+            help = crate::sanitize::MULTILINE_STDIN_HELP
+        )]
         description: Option<String>,
         #[arg(long = "ac")]
         ac: Vec<String>,
@@ -127,10 +135,11 @@ pub fn run(ctx: &Context, cmd: TaskCmd) -> Result<crate::CommandOutput, AppError
             ordinal,
             assignee,
         } => {
+            let description = sanitize::resolve_text_field("description", description)?;
             let id = create(
                 ctx,
                 &title,
-                description.as_deref(),
+                description,
                 &ac,
                 &depends_on,
                 milestone.as_deref(),
@@ -198,7 +207,7 @@ pub fn run(ctx: &Context, cmd: TaskCmd) -> Result<crate::CommandOutput, AppError
             ctx,
             &id,
             title.as_deref(),
-            description.as_deref(),
+            sanitize::resolve_text_field("description", description)?,
             &ac,
             &comment,
             comment_author.as_deref(),
@@ -610,7 +619,7 @@ fn unique_push(vec: &mut Vec<String>, val: String) {
 pub fn create(
     ctx: &Context,
     title_raw: &str,
-    desc_raw: Option<&str>,
+    desc_raw: Option<sanitize::Text>,
     ac_raw: &[String],
     deps_raw: &[String],
     milestone_raw: Option<&str>,
@@ -623,8 +632,8 @@ pub fn create(
 ) -> Result<String, AppError> {
     let cfg = load_config(ctx)?;
     let title = sanitize_text(title_raw)?;
-    let desc = match desc_raw {
-        Some(s) => Some(sanitize_text(s)?),
+    let desc = match &desc_raw {
+        Some(text) => Some(text.resolve()?),
         None => None,
     };
     let mut acs: Vec<String> = Vec::new();
@@ -954,7 +963,7 @@ pub fn edit(
     ctx: &Context,
     id_raw: &str,
     title_raw: Option<&str>,
-    desc_raw: Option<&str>,
+    desc_raw: Option<sanitize::Text>,
     ac_raw: &[String],
     comments_raw: &[String],
     comment_author_raw: Option<&str>,
@@ -1007,8 +1016,8 @@ pub fn edit(
     if let Some(t) = title_raw {
         td.title = sanitize_text(t)?;
     }
-    if let Some(d) = desc_raw {
-        td.description = Some(sanitize_text(d)?);
+    if let Some(d) = &desc_raw {
+        td.description = Some(d.resolve()?);
     }
     if let Some(s) = status_raw {
         let st = sanitize_text(s)?;
@@ -1083,9 +1092,13 @@ pub fn edit(
             tv.clone(),
         ));
     }
-    if let Some(d) = desc_raw {
-        let dv = sanitize::sanitize_path_string(d)
-            .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?;
+    if let Some(d) = &desc_raw {
+        let dv = if d.is_multiline() {
+            d.as_str().to_string()
+        } else {
+            sanitize::sanitize_path_string(d.as_str())
+                .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?
+        };
         td.description = Some(dv.clone());
         let body = rebuild_marker_section(
             &doc,
@@ -1877,7 +1890,7 @@ mod tests {
         let id = create(
             &c,
             "New Task",
-            Some("Desc"),
+            Some(sanitize::Text::literal("Desc")),
             &["first ac".to_string()],
             &[],
             None,

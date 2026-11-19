@@ -19,7 +19,7 @@ pub fn handle(
                 ctx,
                 scope,
                 args.require("title")?,
-                args.require("description")?,
+                args.require_text("description")?,
                 args.get("applicability"),
                 args.get_all("label"),
                 args.get_all("reference"),
@@ -34,7 +34,7 @@ pub fn handle(
             record,
             args.require("id")?,
             args.get("title"),
-            args.get("description"),
+            args.text("description"),
             args.get("applicability"),
             args.get_all("label"),
             args.get_all("reference"),
@@ -126,13 +126,13 @@ fn create(
     ctx: &Context,
     scope: &DocumentScope,
     title_raw: &str,
-    description_raw: &str,
+    description_raw: sanitize::Text,
     applicability_raw: Option<&str>,
     labels_raw: &[String],
     references_raw: &[String],
 ) -> Result<String, AppError> {
     let title = sanitize_field(title_raw)?;
-    let description = sanitize_field(description_raw)?;
+    let description = description_raw.resolve()?;
 
     let applicability = match applicability_raw {
         Some(raw) => {
@@ -325,7 +325,7 @@ fn edit(
     record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
     title_raw: Option<&str>,
-    description_raw: Option<&str>,
+    description_raw: Option<sanitize::Text>,
     applicability_raw: Option<&str>,
     labels_raw: &[String],
     references_raw: &[String],
@@ -350,8 +350,8 @@ fn edit(
     } else {
         None
     };
-    let description_new = if let Some(d) = description_raw {
-        Some(sanitize_field(d)?)
+    let description_new = if let Some(d) = &description_raw {
+        Some(d.resolve()?)
     } else {
         None
     };

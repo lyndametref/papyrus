@@ -14,7 +14,7 @@ use crate::registry::{
 use crate::sanitize;
 
 use serde_json::json;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 
@@ -74,11 +74,32 @@ impl From<DocumentVerb> for crate::registry::Verb {
 #[derive(Clone, Debug, Default)]
 pub struct DocumentArgs {
     values: BTreeMap<String, Vec<String>>,
+    multiline: BTreeSet<String>,
 }
 
 impl DocumentArgs {
     pub fn insert(&mut self, id: impl Into<String>, values: Vec<String>) {
         self.values.insert(id.into(), values);
+    }
+
+    /// Mark an argument as resolved from standard input.
+    pub fn mark_multiline(&mut self, id: &str) {
+        self.multiline.insert(id.to_string());
+    }
+
+    pub fn is_multiline(&self, id: &str) -> bool {
+        self.multiline.contains(id)
+    }
+
+    /// A text argument that remembers whether it came from standard input.
+    pub fn text(&self, id: &str) -> Option<sanitize::Text> {
+        self.get(id).map(|value| {
+            if self.is_multiline(id) {
+                sanitize::Text::multiline(value)
+            } else {
+                sanitize::Text::literal(value)
+            }
+        })
     }
 
     pub fn get(&self, id: &str) -> Option<&str> {
@@ -105,6 +126,11 @@ impl DocumentArgs {
 
     pub fn require(&self, id: &str) -> Result<&str, AppError> {
         self.get(id)
+            .ok_or_else(|| AppError::Validation(format!("missing required argument: {}", id)))
+    }
+
+    pub fn require_text(&self, id: &str) -> Result<sanitize::Text, AppError> {
+        self.text(id)
             .ok_or_else(|| AppError::Validation(format!("missing required argument: {}", id)))
     }
 
@@ -160,6 +186,8 @@ pub struct DocumentInvocation {
     pub id: Option<String>,
     pub title: Option<String>,
     pub description: Option<String>,
+    /// True when `description` was resolved from standard input.
+    pub description_multiline: bool,
     pub labels: Vec<String>,
     pub references: Vec<String>,
     pub editor: bool,
@@ -177,6 +205,7 @@ impl DocumentInvocation {
             id: None,
             title: None,
             description: None,
+            description_multiline: false,
             labels: Vec::new(),
             references: Vec::new(),
             editor: false,
@@ -190,7 +219,7 @@ impl DocumentInvocation {
 pub fn run(
     ctx: &Context,
     registry: &ArtifactRegistry,
-    invocation: DocumentInvocation,
+    mut invocation: DocumentInvocation,
 ) -> Result<crate::CommandOutput, AppError> {
     let descriptor = registry.descriptor(&invocation.slug).ok_or_else(|| {
         AppError::Validation(format!(
@@ -217,6 +246,8 @@ pub fn run(
             invocation.slug
         )));
     }
+
+    resolve_stdin_description(&mut invocation)?;
 
     let scope = DocumentScope::resolve(ctx, descriptor)?;
     let record = registry
@@ -371,6 +402,28 @@ fn current_list(doc: &Document, key: &str) -> Vec<String> {
     Vec::new()
 }
 
+/// Resolve `-d -` for document create and edit before any ID is allocated or
+/// file is written. Only the description is an accepting option here.
+fn resolve_stdin_description(invocation: &mut DocumentInvocation) -> Result<(), AppError> {
+    if !matches!(invocation.verb, DocumentVerb::Create | DocumentVerb::Edit) {
+        return Ok(());
+    }
+    let Some(value) = invocation.args.get("description").map(str::to_string) else {
+        return Ok(());
+    };
+    let resolved = sanitize::resolve_stdin_fields(&[("description", Some(value.as_str()))])?;
+    let Some(input) = resolved else {
+        return Ok(());
+    };
+    invocation
+        .args
+        .insert(input.field, vec![input.text.clone()]);
+    invocation.args.mark_multiline(input.field);
+    invocation.description = Some(input.text);
+    invocation.description_multiline = true;
+    Ok(())
+}
+
 fn create_generic(
     ctx: &Context,
     descriptor: &TypeDescriptor,
@@ -383,6 +436,7 @@ fn create_generic(
         .ok_or_else(|| AppError::Validation("title is required".to_string()))?;
     let title = sanitize_field(&title_raw)?;
     let description = match invocation.description {
+        Some(d) if invocation.description_multiline => Some(d),
         Some(d) => Some(sanitize_field(&d)?),
         None => None,
     };
@@ -654,7 +708,11 @@ fn edit_generic(
     }
 
     if let Some(desc_raw) = invocation.description {
-        let new_desc = sanitize_field(&desc_raw)?;
+        let new_desc = if invocation.description_multiline {
+            desc_raw
+        } else {
+            sanitize_field(&desc_raw)?
+        };
         let current_desc = document::section_text(&doc, "Description").unwrap_or_default();
         if new_desc != current_desc.trim() {
             ops.push(PatchOp::SetSection("## Description".to_string(), new_desc));
@@ -971,6 +1029,7 @@ mod tests {
             id,
             title,
             description,
+            description_multiline: false,
             labels,
             references,
             editor: false,
@@ -1772,7 +1831,7 @@ mod tests {
             Some("R"),
             None,
             None,
-            Some("desc"),
+            Some(sanitize::Text::literal("desc")),
             "REQ-001",
             &[],
             &[],
@@ -1795,7 +1854,7 @@ mod tests {
             Some("NR"),
             None,
             None,
-            Some("desc"),
+            Some(sanitize::Text::literal("desc")),
             "NFR-001",
             &[],
             &[],
@@ -1989,6 +2048,7 @@ mod tests {
             id: Some("DEP-001".to_string()),
             title: None,
             description: None,
+            description_multiline: false,
             labels: vec![],
             references: vec![],
             editor: true,
@@ -2465,7 +2525,7 @@ mod tests {
             Some("R"),
             None,
             None,
-            Some("desc"),
+            Some(sanitize::Text::literal("desc")),
             "REQ-001",
             &[],
             &[],

@@ -19,7 +19,7 @@ pub fn handle(
                 ctx,
                 scope,
                 args.require("title")?,
-                args.require("description")?,
+                args.require_text("description")?,
                 args.require("rationale")?,
                 args.require("applicability")?,
                 args.get_all("requirement"),
@@ -36,7 +36,7 @@ pub fn handle(
             record,
             args.require("id")?,
             args.get("title"),
-            args.get("description"),
+            args.text("description"),
             args.get_all("requirement"),
             args.optional("no_requirement")
                 .map(|value| value.map(str::to_string)),
@@ -210,7 +210,7 @@ pub fn create(
     ctx: &Context,
     scope: &DocumentScope,
     title_raw: &str,
-    description_raw: &str,
+    description_raw: sanitize::Text,
     rationale_raw: &str,
     applicability_raw: &str,
     requirements_raw: &[String],
@@ -218,7 +218,7 @@ pub fn create(
     references_raw: &[String],
 ) -> Result<String, AppError> {
     let title = sanitize_field(title_raw)?;
-    let description = sanitize_field(description_raw)?;
+    let description = description_raw.resolve()?;
     let rationale = sanitize_field(rationale_raw)?;
     let applicability = sanitize_field(applicability_raw)?;
 
@@ -414,7 +414,7 @@ pub fn edit(
     record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
     title_raw: Option<&str>,
-    description_raw: Option<&str>,
+    description_raw: Option<sanitize::Text>,
     requirements_add: &[String],
     no_requirement: Option<Option<String>>,
     labels_raw: &[String],
@@ -443,8 +443,8 @@ pub fn edit(
     if let Some(t) = title_raw {
         record.title = sanitize_field(t)?;
     }
-    if let Some(d) = description_raw {
-        record.description = sanitize_field(d)?;
+    if let Some(d) = &description_raw {
+        record.description = d.resolve()?;
     }
 
     // additions before removals

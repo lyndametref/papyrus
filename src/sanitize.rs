@@ -1,9 +1,145 @@
+use crate::error::AppError;
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
+
+/// The exact option value that selects multiline standard input.
+pub const STDIN_SENTINEL: &str = "-";
+
+/// The help sentence every multiline-capable option carries.
+pub const MULTILINE_STDIN_HELP: &str = "Use \"-\" to read multiline text from standard input.";
 
 /// Reject any Unicode control character (C0, DEL, and C1) from an already
 /// trimmed single-line value.
 fn has_control_character(value: &str) -> bool {
     value.chars().any(char::is_control)
+}
+
+/// Normalize text read from standard input.
+///
+/// CRLF and lone CR become LF, leading and trailing line terminators are
+/// stripped, everything else (including internal blank lines and per-line
+/// spaces) is preserved. LF is the only permitted control character. Returns
+/// `None` for empty or whitespace-only input and for any other control
+/// character.
+pub fn sanitize_multiline(input: &str) -> Option<String> {
+    let normalized = input.replace("\r\n", "\n").replace('\r', "\n");
+    let trimmed = normalized.trim_matches('\n');
+    if trimmed.trim().is_empty() {
+        return None;
+    }
+    if trimmed.chars().any(|ch| ch != '\n' && ch.is_control()) {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
+
+/// A description-like field value: either a literal option value or text that
+/// was read from standard input and is already validated.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Text {
+    value: String,
+    multiline: bool,
+}
+
+impl Text {
+    pub fn literal(value: impl Into<String>) -> Self {
+        Text {
+            value: value.into(),
+            multiline: false,
+        }
+    }
+
+    pub fn multiline(value: impl Into<String>) -> Self {
+        Text {
+            value: value.into(),
+            multiline: true,
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.value
+    }
+
+    pub fn is_multiline(&self) -> bool {
+        self.multiline
+    }
+
+    /// Validate a literal value exactly like the historical single-line path;
+    /// multiline text was validated when it was read from standard input.
+    pub fn resolve(&self) -> Result<String, AppError> {
+        if self.multiline {
+            return Ok(self.value.clone());
+        }
+        sanitize_name(&self.value)
+            .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))
+    }
+}
+
+/// One option resolved from standard input.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StdinInput {
+    pub field: &'static str,
+    pub text: String,
+}
+
+/// Resolve the `-` sentinel among the accepting options of one invocation.
+///
+/// More than one sentinel is rejected before standard input is read. When
+/// exactly one option holds the sentinel, standard input is read once to
+/// end-of-file and validated.
+pub fn resolve_stdin_fields(
+    fields: &[(&'static str, Option<&str>)],
+) -> Result<Option<StdinInput>, AppError> {
+    let sentinels: Vec<&'static str> = fields
+        .iter()
+        .filter(|(_, value)| value.is_some_and(|v| v == STDIN_SENTINEL))
+        .map(|(name, _)| *name)
+        .collect();
+    if sentinels.len() > 1 {
+        let names = sentinels
+            .iter()
+            .map(|name| format!("--{name}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(AppError::Validation(format!(
+            "multiple options request multiline text from standard input: {names}"
+        )));
+    }
+    let Some(field) = sentinels.first().copied() else {
+        return Ok(None);
+    };
+
+    let mut bytes = Vec::new();
+    std::io::stdin()
+        .lock()
+        .read_to_end(&mut bytes)
+        .map_err(|e| AppError::Runtime(format!("failed to read standard input: {e}")))?;
+    let raw = String::from_utf8(bytes)
+        .map_err(|_| AppError::Validation("standard input is not valid UTF-8".to_string()))?;
+    let text = sanitize_multiline(&raw).ok_or_else(|| {
+        AppError::Validation(
+            "standard input is empty or contains unsupported control characters".to_string(),
+        )
+    })?;
+    Ok(Some(StdinInput { field, text }))
+}
+
+/// Pair a possibly-sentinel option value with a resolved stdin input.
+pub fn text_value(field: &str, value: Option<String>, stdin: Option<&StdinInput>) -> Option<Text> {
+    value.map(|literal| match stdin {
+        Some(input) if input.field == field => Text::multiline(input.text.clone()),
+        _ => Text::literal(literal),
+    })
+}
+
+/// Resolve one accepting option, reading standard input when its value is the
+/// sentinel.
+pub fn resolve_text_field(
+    field: &'static str,
+    value: Option<String>,
+) -> Result<Option<Text>, AppError> {
+    let stdin = resolve_stdin_fields(&[(field, value.as_deref())])?;
+    Ok(text_value(field, value, stdin.as_ref()))
 }
 
 /// Normalize user-controlled input. Returns `None` if a valid value cannot be
@@ -358,5 +494,53 @@ mod slug_tests {
         );
         assert_eq!(kebab_slug("  A/B: C!  "), "a-b-c");
         assert_eq!(kebab_slug("!!!"), "");
+    }
+}
+
+#[cfg(test)]
+mod multiline_tests {
+    use super::{Text, sanitize_multiline};
+
+    #[test]
+    fn normalizes_line_endings_and_preserves_internal_blank_lines() {
+        assert_eq!(
+            sanitize_multiline("one\r\n\r\ntwo\rthree\n"),
+            Some("one\n\ntwo\nthree".to_string())
+        );
+    }
+
+    #[test]
+    fn strips_outer_line_terminators_only() {
+        assert_eq!(
+            sanitize_multiline("\n\n  padded line  \n\n"),
+            Some("  padded line  ".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_empty_whitespace_only_and_control_characters() {
+        assert_eq!(sanitize_multiline(""), None);
+        assert_eq!(sanitize_multiline("  \n\t\n "), None);
+        assert_eq!(sanitize_multiline("a\tb"), None);
+        assert_eq!(sanitize_multiline("a\u{0}b"), None);
+        assert_eq!(sanitize_multiline("a\u{7F}b"), None);
+        assert_eq!(sanitize_multiline("a\u{85}b"), None);
+    }
+
+    #[test]
+    fn literal_text_keeps_the_single_line_rules() {
+        assert_eq!(
+            Text::literal("  Title  ").resolve().unwrap(),
+            "Title".to_string()
+        );
+        assert!(Text::literal("a/b").resolve().is_err());
+        assert!(Text::literal("a\nb").resolve().is_err());
+    }
+
+    #[test]
+    fn multiline_text_is_returned_verbatim_after_validation() {
+        let text = Text::multiline("a/b\n\nc\\d");
+        assert!(text.is_multiline());
+        assert_eq!(text.resolve().unwrap(), "a/b\n\nc\\d");
     }
 }

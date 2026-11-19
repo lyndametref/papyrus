@@ -1,0 +1,5 @@
+{
+  "exit": 0,
+  "stdout": "Usage: papyrus decision edit [OPTIONS] <ID>\n\nArguments:\n  <ID>  \n\nOptions:\n      --json                           Emit stable, machine-readable JSON.\n      --title <TITLE>                  \n  -d, --decision <DECISION>            Use \"-\" to read multiline text from standard input.\n      --dir <path>                     Project directory. Default: the current working directory.\n      --config <file>                  Configuration file. Default: papyrus.config.yml in the project directory.\n      --status <STATUS>                \n      --context <CONTEXT>              Use \"-\" to read multiline text from standard input.\n      --no-color                       Disable ANSI color output.\n      --consequences <CONSEQUENCES>    Use \"-\" to read multiline text from standard input.\n      --superseded-by <SUPERSEDED_BY>  \n      --label <LABEL>                  \n      --reference <REFERENCE>          \n  -h, --help                           Print help\n",
+  "stderr": ""
+}

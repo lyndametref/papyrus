@@ -45,7 +45,7 @@ pub fn handle(
                 args.get("title"),
                 args.get("title_flag"),
                 args.get("story"),
-                args.get("description"),
+                args.text("description"),
                 args.require("group")?,
                 args.get_all("label"),
                 args.get_all("reference"),
@@ -73,7 +73,7 @@ pub fn handle(
             args.require("id")?,
             args.get("title"),
             args.get("story"),
-            args.get("description"),
+            args.text("description"),
             args.get_all("label"),
             args.get_all("reference"),
             args.flag("editor"),
@@ -175,7 +175,7 @@ pub fn create(
     title_raw: Option<&str>,
     title_flag_raw: Option<&str>,
     story_raw: Option<&str>,
-    desc_raw: Option<&str>,
+    desc_raw: Option<sanitize::Text>,
     group_raw: &str,
     labels_raw: &[String],
     references_raw: &[String],
@@ -204,7 +204,7 @@ pub fn create(
         None => None,
     };
     let desc = match desc_raw {
-        Some(s) => Some(sanitize_text(s)?),
+        Some(text) => Some(text.resolve()?),
         None => None,
     };
     let mut labels: Vec<String> = Vec::new();
@@ -570,7 +570,7 @@ pub fn edit(
     id_raw: &str,
     title_raw: Option<&str>,
     story_raw: Option<&str>,
-    desc_raw: Option<&str>,
+    desc_raw: Option<sanitize::Text>,
     labels_raw: &[String],
     references_raw: &[String],
     editor: bool,
@@ -593,8 +593,8 @@ pub fn edit(
     {
         parsed.story = Some(sanitize_text(s)?);
     }
-    if let Some(d) = desc_raw {
-        parsed.description = Some(sanitize_text(d)?);
+    if let Some(d) = &desc_raw {
+        parsed.description = Some(d.resolve()?);
     }
 
     let mut ops: Vec<crate::record::patch::PatchOp> = Vec::new();
