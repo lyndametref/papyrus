@@ -9,7 +9,7 @@ use crate::browser::records::{Index, Record};
 use crate::browser::render::escape;
 use crate::browser::render::render_template;
 use crate::browser::routes;
-use crate::registry::{IdShape, TypeDescriptor};
+use crate::registry::{ContentModel, IdShape, TypeDescriptor};
 
 /// The list section template: heading, count note, then the table or empty state.
 const LIST_TEMPLATE: &str = "<section class=\"section\" aria-label=\"{{heading}}\">\
@@ -28,6 +28,11 @@ pub struct ListPlan {
     pub columns: Vec<Column>,
     pub rows: Vec<Row>,
     pub empty: Option<EmptyState>,
+    /// Whether the Title cell renders the front-matter reference list.
+    ///
+    /// Resolved from the descriptor content model (ADR-035): config-defined
+    /// document types (`ContentModel::Generic`) omit the block entirely.
+    pub show_references: bool,
 }
 
 /// One column of the shared table.
@@ -145,12 +150,14 @@ impl ListPlan {
         } else {
             None
         };
+        let show_references = !matches!(descriptor.content_model, ContentModel::Generic);
         ListPlan {
             heading: heading.to_string(),
             count_note: count_note.to_string(),
             columns,
             rows,
             empty,
+            show_references,
         }
     }
 
@@ -190,9 +197,15 @@ impl ListPlan {
         }
         let mut rows = String::new();
         for row in &self.rows {
-            render_row(row, &self.columns, None, &mut rows);
+            render_row(row, &self.columns, self.show_references, None, &mut rows);
             for child in &row.children {
-                render_row(child, &self.columns, Some(&row.id), &mut rows);
+                render_row(
+                    child,
+                    &self.columns,
+                    self.show_references,
+                    Some(&row.id),
+                    &mut rows,
+                );
             }
         }
         format!(
@@ -410,7 +423,13 @@ fn count_phrase(count: usize, singular: &str, plural: &str) -> String {
     }
 }
 
-fn render_row(row: &Row, columns: &[Column], parent: Option<&str>, out: &mut String) {
+fn render_row(
+    row: &Row,
+    columns: &[Column],
+    show_references: bool,
+    parent: Option<&str>,
+    out: &mut String,
+) {
     let child_of = parent
         .map(|parent| format!(" data-child-of=\"{}\"", escape(parent)))
         .unwrap_or_default();
@@ -433,7 +452,7 @@ fn render_row(row: &Row, columns: &[Column], parent: Option<&str>, out: &mut Str
             .collect();
         title_cell.push_str(&format!("<ul class=\"row-tags\">{tags}</ul>"));
     }
-    if !row.references.is_empty() {
+    if show_references && !row.references.is_empty() {
         let references: String = row
             .references
             .iter()
@@ -482,6 +501,26 @@ mod tests {
             .unwrap_or_else(|| panic!("descriptor {slug}"))
     }
 
+    fn generic_descriptor(slug: &str) -> TypeDescriptor {
+        let mut cfg = Config::default();
+        cfg.document_types.insert(
+            slug.to_string(),
+            crate::config::DocTypeEntry {
+                prefix: "NOTE".to_string(),
+                directory: "notes/".to_string(),
+                enabled: true,
+                statuses: Some(vec!["active".to_string(), "archived".to_string()]),
+                default_status: None,
+            },
+        );
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        registry
+            .descriptors()
+            .find(|descriptor| descriptor.slug == slug)
+            .cloned()
+            .unwrap_or_else(|| panic!("descriptor {slug}"))
+    }
+
     fn plan(columns: Vec<Column>, rows: Vec<Row>) -> ListPlan {
         ListPlan {
             heading: "Milestones".to_string(),
@@ -489,6 +528,7 @@ mod tests {
             columns,
             rows,
             empty: None,
+            show_references: true,
         }
     }
 
@@ -678,6 +718,7 @@ mod tests {
             ],
             rows: vec![group],
             empty: None,
+            show_references: true,
         };
         let html = columns.render();
         assert_eq!(html.matches("<tbody>").count(), 1);
@@ -702,6 +743,62 @@ mod tests {
         assert!(html.contains("<li class=\"tag\">&lt;b&gt;</li>"));
         assert!(html.contains("<li>a&amp;b</li>"));
         assert!(!html.contains("<b>"));
+    }
+
+    #[test]
+    fn generic_family_omits_references_but_keeps_labels_and_projection() {
+        let mut note = record("NOTE-001", false, None);
+        note.descriptor = generic_descriptor("note");
+        note.labels = vec!["note-label".to_string()];
+        note.refs = vec!["NOTE-REF-1".to_string()];
+        let index = Index {
+            records: vec![note],
+            ..Index::default()
+        };
+        let plan = ListPlan::for_descriptor(
+            &generic_descriptor("note"),
+            "note",
+            &index,
+            "Notes",
+            &count_note("note", 1),
+        );
+        assert!(
+            !plan.show_references,
+            "Generic rows omit the reference block"
+        );
+        assert_eq!(
+            plan.rows[0].references,
+            vec!["NOTE-REF-1".to_string()],
+            "the Row keeps the RecordView reference projection"
+        );
+        let html = plan.render();
+        let start = html.find("data-row-id=\"NOTE-001\"").unwrap();
+        let end = html[start..].find("</tr>").unwrap() + start;
+        let row = &html[start..end];
+        assert!(row.contains("<ul class=\"row-tags\"><li class=\"tag\">note-label</li></ul>"));
+        assert!(!row.contains("row-refs"), "no reference element at all");
+        assert!(!row.contains("NOTE-REF-1"));
+    }
+
+    #[test]
+    fn typed_and_html_mockup_families_keep_the_reference_block() {
+        for (slug, presentation) in [("milestone", "milestone"), ("ui-mockup", "ui-mockup")] {
+            let mut doc = record("X-001", false, None);
+            doc.descriptor = descriptor(slug);
+            doc.refs = vec!["REF-001".to_string()];
+            let index = Index {
+                records: vec![doc],
+                ..Index::default()
+            };
+            let plan =
+                ListPlan::for_descriptor(&descriptor(slug), presentation, &index, "List", "1 item");
+            assert!(plan.show_references, "{slug} keeps references");
+            let html = plan.render();
+            assert!(
+                html.contains("<ul class=\"row-refs\"><li>REF-001</li></ul>"),
+                "{slug} renders the reference block"
+            );
+        }
     }
 
     #[test]

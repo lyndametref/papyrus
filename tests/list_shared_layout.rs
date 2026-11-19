@@ -285,3 +285,23 @@ fn archived_records_are_absent_from_every_list_and_the_board() {
         }
     }
 }
+
+// TC-055 / TC-057: a Generic family keeps the shared layout, labels, and row
+// actions while omitting every reference block.
+#[test]
+fn generic_family_keeps_the_shared_layout_without_reference_rows() {
+    let server = Server::start(&fixture_root().join("project"));
+    let html = server.get("/?type=note");
+    assert_shared_table(&html, "note");
+    assert!(html.contains("<li class=\"tag\">note</li>"), "labels stay");
+    assert!(
+        !html.contains("row-refs"),
+        "no reference block in a Generic list"
+    );
+    assert!(!html.contains("NOTE-REF-1"));
+    let start = html.find("data-row-id=\"NOTE-001\"").expect("NOTE-001 row");
+    let row = &html[start..];
+    let row = &row[..row.find("</tr>").unwrap()];
+    assert!(row.contains("aria-label=\"View NOTE-001\">View</a>"));
+    assert!(row.contains("aria-label=\"Edit NOTE-001\">Edit</a>"));
+}
