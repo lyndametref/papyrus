@@ -41,11 +41,6 @@ status: verified
 # TECH-047 Interactive Init Walkthrough for Artifact Activation
 
 ## Description
-**Ticket:** TASK-75 / TASK-85 (spec revision) / TASK-104 (cursor-driven list revision) / TASK-112 (default-set and status-seeding revision) / TASK-127 (directory-creation revision)
-**Milestone:** m-12 (Final Cross-Type Integration)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Deliver the interactive walkthrough at `papyrus init <project_name>` required by REQ-01.006 (and REQ-01.001, REQ-01.002, REQ-01.007, BR-016): before writing `papyrus.config.yml`, present every available artifact in a single cursor-driven list, let the user choose which to activate, and prompt for the ID prefix and storage folder of each activated artifact. Non-interactive/CI environments (no TTY) use sensible defaults without prompting. The generated configuration validates successfully, including the `id_padding` range.

@@ -36,11 +36,6 @@ status: verified
 # TECH-025 Expand Unified Search to Glossary Terms
 
 ## Description
-**Ticket:** TASK-31
-**Milestone:** m-5 (Search and Browser for Glossary)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Extend `papyrus search` so that glossary terms are searched in addition to business and non-functional requirements, task, milestone, release, and decision records. Glossary terms are document records: they are stored under the configured `document_types.glossary` directory and are searched whenever the documented `doc` type is selected (including the default all-types search). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by `docs/specifications/search-tasks-milestones-and-releases.md` and `docs/specifications/search-decision-records.md` are reused unchanged. This increment implements REQ-06.001 under REQ-05/REQ-05.003/REQ-05.007, and advances BR-015 and BR-011.

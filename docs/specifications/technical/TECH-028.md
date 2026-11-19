@@ -37,11 +37,6 @@ status: verified
 # TECH-028 Expand Unified Search to UI Specifications
 
 ## Description
-**Ticket:** TASK-35
-**Milestone:** m-6 (UI Specifications)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Extend `papyrus search` so that UI specifications are searched in addition to business and non-functional requirements, task, milestone, release, decision, and glossary records. UI specifications are document records: they are stored under the configured `document_types.ui-spec` directory (default `docs/specifications/ui/`) and are searched whenever the documented `doc` type is selected (including the default all-types search). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by `docs/specifications/search-tasks-milestones-and-releases.md`, `docs/specifications/search-decision-records.md`, and `docs/specifications/search-glossary-terms.md` are reused unchanged. This increment implements REQ-06.001 under REQ-05/REQ-05.004/REQ-05.007, and advances BR-015 and BR-012.

@@ -80,11 +80,6 @@ status: draft
 > **Revised (TASK-201, 2026-11-18):** the `Managed artifacts & lifecycles` and `Agent skills & workflows` sidebar entries in section 3 are retired per ADR-034 and REQ-06.018; the sidebar order now ends at `UI Mockups`. See TECH-080.
 
 ## Description
-**Ticket:** TASK-81
-**Milestone:** m-15 (Use Cases and Test Documentation)
-**Status:** Refined (execution-ready)
-**UI mockups:** [`MOCK-0013`](ui/mockups/MOCK-0013-browser-use-cases-test-cases-and-test-reports-review.html) — `approved` on 2026-11-11 (UTC) (TASK-79). UI description: [`ui/browser-use-cases-test-cases-and-test-reports-ui.md`](ui/browser-use-cases-test-cases-and-test-reports-ui.md). Extends the approved baseline MOCK-0001…MOCK-0012.
-
 ## Purpose
 
 Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), TASK-15 (decision records), TASK-23 (glossary terms), TASK-24 (UI specifications), TASK-40 (UI mockups), TASK-25 (business rules), TASK-26 (audit records), TASK-57 (technical specifications), TASK-66/TASK-67 (front-matter metadata projection), and TASK-72 (managed artifacts) so it also serves three documentation stores — use cases, test cases, and test reports — each with a title, a description, and an optional applicability, plus the general front-matter metadata (`id`, `title`, `created_date`, `updated_date`, `labels`, `references`). The transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 is reused unchanged; this increment adds three documentation categories (`use-case`, `test-case`, `test-report`), their record models, list/view/edit screens, API endpoints, and tests. It implements the browser-visibility part of REQ-05.012, REQ-05.013, REQ-05.014 and REQ-05.007 under REQ-06.002, and advances NFR-01.002 (display and edit all Papyrus content) for these three types. Deprecated records of all three types are hidden from lists and unreachable by URL, consistent with every other document type (REQ-05.007, BR-018/BR-019/BR-020).

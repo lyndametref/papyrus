@@ -92,11 +92,6 @@ status: verified
 # TECH-024 CLI Milestone Packaging and Verification
 
 ## Description
-**Ticket:** TASK-62
-**Milestone:** m-4 (CLI)
-**Status:** Refined (execution-ready)
-**UI mockups:** none new — no UI change in this ticket; the shipped browser interface keeps MOCK-0001 (approved), MOCK-0002 (approved), and MOCK-0003 (pending approval, TASK-15) as its baseline. No new mockup is produced.
-
 ## Purpose
 
 Package the current Papyrus feature set (TASK-1 foundation + TASK-2 init/config + TASK-3 req/nfreq + TASK-5 search + TASK-6 browser + TASK-8 milestones/releases + TASK-9 tasks + TASK-10 backlog search + TASK-11 backlog browser + TASK-12 packaging + TASK-13 decision management + TASK-14 decision search + TASK-15 decision browser + TASK-16 packaging + TASK-30 glossary management + TASK-34 UI specifications + TASK-38 UI mockups + TASK-43 business rules + TASK-47 audit records + TASK-55 technical specifications + TASK-61 README fix) as an installable amd64 Debian package, and verify in an isolated Debian Forky environment that the packaged binary installs, uninstalls, and provides the six new record-management command families end to end.

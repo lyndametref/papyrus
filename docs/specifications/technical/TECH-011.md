@@ -2,7 +2,7 @@
 id: TECH-011
 title: "Browser Access for Backlog Records (Tasks, Milestones, Releases)"
 created_date: '2026-11-16T17:46:44Z'
-updated_date: '2026-11-19T18:07:24Z'
+updated_date: '2026-11-19T21:42:42Z'
 labels: []
 references:
   - ADR-0001
@@ -76,15 +76,9 @@ status: draft
 # TECH-011 Browser Access for Backlog Records (Tasks, Milestones, Releases)
 
 ## Description
-**Ticket:** TASK-11
-**Milestone:** m-2 (Backlog Discovery and Management)
-**Status:** Refined (execution-ready; approved base mockup MOCK-0002; the TASK-147 `Clean up all` revision is drawn by MOCK-0017, still `draft` pending owner approval)
-**UI mockups:** [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html) (approved; kanban-board revision approved 2026-11-12 UTC under TASK-102) — extends the approved baseline [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html); see [UI design handoff](#ui-design-handoff)
-
 > **Revised (TASK-147, 2026-11-15):** section 3 gains the per-milestone **Clean up all** action required by the 2026-11-15 revision of REQ-06.013. This revision supersedes the earlier out-of-scope statement that every archiving operation is CLI-only; creating, restoring, and deleting tasks remain CLI-only, and no project-wide bulk archive is added. The board layout, the board's status change, and archived exclusion are unchanged. The action, its confirmation warning, and its failure report are drawn by [`MOCK-0017`](ui/mockups/MOCK-0017-browser-cleanup-all-board-action-review.html) and recorded in [`ui/browser-backlog-records-ui.md`](ui/browser-backlog-records-ui.md); MOCK-0017 stays `draft` because the approval step was waived for the TASK-147 implementation run, so the visible design awaits owner review.
 
 > **Revised (TASK-205/MS-030, 2026-11-19):** section 3 **Release grouping** item 4 now follows REQ-06.020 (ordering by lowest contained non-archived task ordinal ascending, replacing ascending milestone/release ID ordering); new **Lifecycle markers** subsection per REQ-06.021 (🔘/✅ before titles); new **Milestone and release cleanup controls** subsection per REQ-06.022 (browser-only archive controls with confirmation and partial-failure handling). ADR-0022, ADR-0032, ADR-0006, and ADR-0013 remain authoritative; no new endpoint, write path, or ADR is introduced. Status moved to draft pending verification.
-
 ## Purpose
 
 Extend the first browser increment (TASK-6, `docs/specifications/browser-requirements.md`) so the same offline, project-local, read-and-edit web interface also serves the backlog store: active task, milestone, and release records. The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds three backlog categories, their record models, list/view/edit screens, API endpoints, and tests. It implements the backlog-store part of REQ-06.002 under the same requirement, and advances NFR-01.002 (display and edit all Papyrus content) for the backlog record types.

@@ -22,19 +22,6 @@ status: verified
 # TECH-072 Remove the Process-Global Descriptor Cache and Slug Leaks
 
 ## Description
-**Ticket:** TASK-121
-**Milestone:** m-18 (Descriptor Single-Source Cleanup)
-**Status:** Refined — execution-ready
-**UI mockups:** none. Backend refactor with no user-visible interface.
-**Requirements:** none new. Behavior is preserved; the relevant constraints are
-REQ-07.001 (three artifact categories), REQ-07.002 (config-defined types need
-no code), REQ-07.003 (baseline document verbs), REQ-01.004 (exit codes).
-**ADRs:** ADR-0017 (decision 10: "No new dependency, no new process model … no
-cache"), ADR-0016 (one command tree built at startup from the registry),
-ADR-0018 (generic document content model), ADR-0013 (record layer ownership).
-**Predecessors:** TASK-119 (descriptor-driven dispatch), TASK-120 (registry as
-the single record-descriptor source) — both completed.
-
 ## Purpose
 
 Two `Box::leak` sites survive the TASK-119/TASK-120 refactor even though the

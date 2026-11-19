@@ -33,11 +33,6 @@ status: verified
 # TECH-023 Technical Specifications Management from the CLI
 
 ## Description
-**Ticket:** TASK-55
-**Milestone:** m-4 (CLI)
-**Status:** Refined (execution-ready)
-**UI mockups:** none (CLI-only; browser UI for this record type is TASK-57/TASK-58)
-
 ## Purpose
 
 Deliver the `tech-spec` commands so a project contributor can create, list, view, edit, deprecate, and restore technical specifications, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-05.009, the lifecycle part of REQ-05.007, NFR-02.002, NFR-04.001, and NFR-04.002, together with the documented command contract in BR-017 and the configuration contract in BR-016. It provides the records that later tickets search (TASK-56) and expose in the browser (TASK-57).

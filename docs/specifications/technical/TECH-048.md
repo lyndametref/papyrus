@@ -32,11 +32,6 @@ status: verified
 # TECH-048 Remove Legacy Record Serializers and Enforce the No-Drift Rule
 
 ## Description
-**Ticket:** TASK-97
-**Milestone:** m-16 (Release 1.0)
-**Status:** Implemented (rework for quality-gate decisions D1–D4 delivered 2026-11-13)
-**UI mockups:** none (refactor only; no user-visible change)
-
 ## Purpose
 
 Deliver ADR-0013 Stage 7: delete every remaining legacy per-type record parser and writer and the

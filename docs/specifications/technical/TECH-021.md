@@ -32,11 +32,6 @@ status: verified
 # TECH-021 Business Rules Management from the CLI
 
 ## Description
-**Ticket:** TASK-43
-**Milestone:** m-4 (CLI)
-**Status:** Refined (execution-ready)
-**UI mockups:** none (CLI-only; browser UI for this record type is TASK-25/TASK-45)
-
 ## Purpose
 
 Deliver the `rule` commands so a project contributor can create, list, view, edit, deprecate, and restore business rules, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-05.005 and the lifecycle part of REQ-05.007, together with the documented command contract in BR-013. It provides the records that later tickets search (TASK-44) and expose in the browser (TASK-25).

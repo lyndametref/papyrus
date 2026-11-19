@@ -102,11 +102,6 @@ status: draft
 > **Revised (TASK-201, 2026-11-18):** the managed-artifacts-and-lifecycles and agent-skills browser pages, their sidebar entries, and their packaging render checks are retired per ADR-034 and REQ-06.018; the package verification now asserts the removed-surface contract (routes `404`, no sidebar entry, no inventory card) instead. See TECH-080.
 
 ## Description
-**Ticket:** TASK-20
-**Milestone:** m-12 (Final Cross-Type Integration)
-**Status:** Refined (execution-ready)
-**UI mockups:** none new — no UI change in this ticket; MOCK-0012 (approved 2026-11-10) remains the layout reference for the shipped browser interface, reusing the approved baseline MOCK-0001 and the approved patterns MOCK-0010 and MOCK-0011. No new mockup is produced.
-
 ## Purpose
 
 Package the complete Papyrus feature set delivered by milestones m-0 through m-12 as one final installable amd64 Debian increment, and verify in an isolated Debian Forky environment that the packaged binary installs, uninstalls, and provides every supported record family, unified search across all documented record types, and the offline local browser over all Papyrus content, including the cross-type inventory, metadata projection, the removed-surface contract for the retired managed-artifact lifecycle and agent-skills pages, interactive init walkthrough, ID padding validation, lazy front-matter migration, and the native layout and one-way import. This is the last task of milestone m-12 and closes its "ship the final installable increment" goal.

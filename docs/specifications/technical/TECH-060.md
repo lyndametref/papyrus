@@ -49,12 +49,6 @@ status: draft
 > **Revised (TASK-203, 2026-11-18):** section 8 item 7, which required the browser configuration view to reach the `config set` relocation path, is retired per ADR-034 and REQ-06.018 (RE-005): the browser serves no configuration view and configuration editing is CLI-only. The CLI `config set` whole-folder relocation clauses (section 8 items 1-6, REQ-01.002) remain current. REQ-06.008, which the retired item cites, is archived; the retired text is retained below as history. See TECH-080.
 
 ## Description
-**Ticket:** TASK-83 (specification); refined for implementation TASK-88
-**Scope note (2026-11-12):** applies to every managed family; releases are verified rather than rebuilt, and the documented command set is unchanged.
-**Milestone:** m-16 (Release 1.0)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Define the Papyrus-native on-disk record layout and the single Papyrus ID space that replace the Backlog.md layout of ADR-0008. This specification implements ADR-0010, REQ-01.005, and REQ-01.002 for every managed record type: configuration-driven directories, one file per record, one Papyrus ID as the record identity, tolerant reads, allocation without offsets, moves for archive/deprecate, and the intentional invisibility of Backlog.md stems. It is the destination layout the one-way import (see `import-backlog-md-records.md`) writes into and the layout every later implementation task (TASK-88 … TASK-98) must honour.

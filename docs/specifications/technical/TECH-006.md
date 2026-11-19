@@ -29,11 +29,6 @@ status: verified
 # TECH-006 Search Business and Non-Functional Requirements
 
 ## Description
-**Ticket:** TASK-5
-**Milestone:** m-1 (Search and Browser for Requirements)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Deliver the first increment of `papyrus search`: one read-only, project-local free-text search over the records implemented so far — business requirements, non-functional requirements, and their requirement group documents — with the full documented type vocabulary and option shape already in place for later increments. The command contract is REQ-06.001 and BR-015 (`papyrus(1)` → COMMANDS → search); where the man page is silent, this specification fixes explicit, testable defaults (see Assumptions and Open questions).

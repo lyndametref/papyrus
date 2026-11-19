@@ -29,11 +29,6 @@ status: verified
 # TECH-018 Glossary Terms Management from the CLI
 
 ## Description
-**Ticket:** TASK-30
-**Milestone:** m-4 (CLI)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Deliver the `glossary` commands so a project contributor can create, list, view, edit, deprecate, and restore glossary terms, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-05.003 and REQ-05.007, together with the documented command contract in BR-011. It provides the glossary terms that later tickets search (TASK-31) and expose in the browser (TASK-23).

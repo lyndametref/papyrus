@@ -19,11 +19,6 @@ status: verified
 # TECH-031 Expand Unified Search to UI Mockups
 
 ## Description
-**Ticket:** TASK-39
-**Milestone:** m-7 (UI Mockups)
-**Status:** Refined (execution-ready)
-**UI mockups:** none (CLI-only)
-
 ## Purpose
 
 Extend `papyrus search` to include UI mockups. Stored under `<doc_directory>/<document_types.ui-mockup.directory>/` (default `docs/specifications/ui/mockups/`). Searched under `--type doc`; no new type value. Match, ordering, output, exit codes per search-requirements.md. REQ-06.001 under REQ-05/REQ-05.009; advances BR-015.

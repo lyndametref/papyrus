@@ -17,11 +17,6 @@ status: verified
 # TECH-046 Constrain id_padding to 1-6 in Configuration Validation
 
 ## Description
-**Ticket:** TASK-74
-**Milestone:** m-12 (Final Cross-Type Integration)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Constrain the `id_padding` configuration key to the inclusive range 1-6 per REQ-01.007, REQ-01.005, and BR-016, so file IDs (task, milestone, release, and all other record types) use consistent padding with a clear upper limit. Validation rejects out-of-range values instead of clamping them, and ID formatting keeps padding as a minimum width (wider numbers are never truncated or errored).

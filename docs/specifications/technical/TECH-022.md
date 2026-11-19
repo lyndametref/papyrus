@@ -32,11 +32,6 @@ status: verified
 # TECH-022 Audit Records Management from the CLI
 
 ## Description
-**Ticket:** TASK-47
-**Milestone:** m-4 (CLI)
-**Status:** Refined (execution-ready)
-**UI mockups:** none (CLI-only; browser UI for this record type is TASK-26/TASK-49)
-
 ## Purpose
 
 Deliver the `audit` commands so a project contributor can create, list, view, edit, deprecate, and restore audit records, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-05.006, the lifecycle part of REQ-05.007, NFR-02.002, NFR-04.001, and NFR-04.002, together with the documented command contract in BR-014 and the configuration contract in BR-016. It provides the records that later tickets search (TASK-48) and expose in the browser (TASK-26).

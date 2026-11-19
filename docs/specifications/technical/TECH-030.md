@@ -13,11 +13,6 @@ status: verified
 # TECH-030 UI Specifications Milestone Packaging and Verification
 
 ## Description
-**Ticket:** TASK-37
-**Milestone:** m-6 (UI Specifications)
-**Status:** Refined (execution-ready)
-**UI mockups:** none new; MOCK-0005 approved remains the UI specifications category reference.
-
 ## Purpose
 
 Package and verify UI-specification management, search, and browser workflows in an installable increment. Mirrors the glossary milestone (TASK-33) pattern.

@@ -34,11 +34,6 @@ status: verified
 # TECH-040 Shared Record Envelope and Front-Matter Patcher
 
 ## Description
-**Ticket:** TASK-63
-**Milestone:** m-12 (Final Cross-Type Integration)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Deliver ADR-0013 Stage 1 (superseding ADR-0009): a single shared record implementation inside the existing Rust crate so every managed record type has one front-matter parser, one lossless document envelope, one patch API, and one atomic store. This ticket implements the infrastructure required by REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.001, NFR-04.002, and NFR-04.004. It does not migrate the corpus (TASK-68, TASK-69), does not implement Papyrus identity (TASK-64), and does not change any record command surface (TASK-65).

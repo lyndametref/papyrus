@@ -51,11 +51,6 @@ status: verified
 # TECH-015 Browser Access for Decision Records
 
 ## Description
-**Ticket:** TASK-15
-**Milestone:** m-3 (Decision Records)
-**Status:** Refined (execution-ready; UI mockup pending approval)
-**UI mockups:** [`MOCK-0003`](ui/mockups/MOCK-0003-browser-decision-records-review.html) (pending approval) — extends the approved baseline [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html) and [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html); see [UI design handoff](#ui-design-handoff)
-
 ## Purpose
 
 Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements) and TASK-11 (backlog records) so it also serves the decisions store: active decision records (ADR, BDR, and configured types). The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`decision`), its record model, list/view/edit screens, API endpoints, and tests. It implements the decisions-store part of REQ-06.002 under the same requirement, and advances NFR-01.002 (display and edit all Papyrus content) for decision records. It implements REQ-04.001 and REQ-04.002 for the browser surface.

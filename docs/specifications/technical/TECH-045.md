@@ -41,11 +41,6 @@ status: draft
 > **Revised (TASK-178, 2026-11-19):** reference visibility in the shared browser list is per artifact family per ADR-035 and REQ-06.019 (source RE-006). `ContentModel::Generic` (config-defined document types) renders no reference list in any list row; `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep it; labels render for every family. The `RecordView` projection, single-document view, CLI list and view, JSON API, and front matter are unchanged.
 
 ## Description
-**Ticket:** TASK-67
-**Milestone:** m-12 (Final Cross-Type Integration)
-**Status:** Refined (execution-ready)
-**UI mockups:** [`MOCK-0010`](ui/mockups/MOCK-0010-browser-front-matter-and-lifecycle-review.html) (approved) — UI description [`ui/browser-front-matter-and-lifecycle-ui.md`](ui/browser-front-matter-and-lifecycle-ui.md); extends approved baselines MOCK-0001..MOCK-0009. No new mockup is required for this ticket.
-
 ## Purpose
 
 Deliver ADR-0013 decision 5 (superseding ADR-0009): a single `RecordView` projection that is the only source for record metadata in every read surface, so that CLI list/view text and `--json`, browser list/detail JSON, and browser HTML present identical metadata values for the same record. REQ-06.019 qualifies only the browser list presentation for `ContentModel::Generic` families: `RecordView` still carries references, and the shared list renderer omits them (ADR-035). This ticket implements REQ-06.004 (CLI and browser read front matter), REQ-05.010 (front-matter field map), REQ-05.011 (metadata maintained through all commands), and REQ-01.005 (single Papyrus ID space), on top of the shared envelope and Papyrus identity delivered by TASK-63 and TASK-64 and the option exposure delivered by TASK-65. It does not migrate the corpus (TASK-68, TASK-69), remove legacy serializers (TASK-70), or add the lifecycle page (TASK-72).

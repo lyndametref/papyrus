@@ -32,11 +32,6 @@ status: verified
 # TECH-004 Business and Non-Functional Requirements Management from the CLI
 
 ## Description
-**Ticket:** TASK-3
-**Milestone:** m-0 (Rust CLI Foundation and Requirements)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Deliver the `req` and `nfreq` commands so a project contributor can create, list, view, edit, deprecate, and restore business requirements and non-functional requirements, including their required groups, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-05.001 and REQ-05.002 and the documented lifecycle in REQ-05.007.

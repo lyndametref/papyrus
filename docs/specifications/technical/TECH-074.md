@@ -52,14 +52,6 @@ status: draft
 > **Revised (TASK-178, 2026-11-19):** reference visibility in the shared browser list is per artifact family per ADR-035 and REQ-06.019 (source RE-006). `ContentModel::Generic` (config-defined document types) renders no reference list in any list row; `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep it; labels render for every family. Single-document view, CLI list and view, JSON API, `RecordView`, and front matter are unchanged.
 
 ## Description
-**Tickets:** TASK-141 (§3.1–§3.3, §4.1, §5, §6 — delivered), TASK-144 (§3.4, §4.2–§4.5 — refined 2026-11-16)
-**Milestone:** m-21
-**Status:** Delivery record for TASK-141/142/144. The normative shell, shared-list, width, and navigation clauses now live in [`browser-shell-ui.md`](browser-shell-ui.md) (published by TASK-148 from the landed contract); this page remains the implementation detail and accepted-difference record. Contract settled 2026-11-15 (ADR-0028 amendment) and extended 2026-11-16 for TASK-144 from ADR-0028 decisions 3–8. MOCK-0016 registered 2026-11-15 (`draft`); the TASK-144 MOCK id is recorded in §7.3
-**Requirements:** REQ-06.016 (shared list layout), REQ-06.015 (content width **and** navigation visibility), REQ-06.013 (uncapped board), REQ-06.004 (browser list parity with the CLI)
-**ADR:** ADR-0028 (Accepted, amended 2026-11-15) — decisions 1, 2, 3, 6, 9 govern TASK-141; decisions 3, 4, 5, 6, 7, 8 govern TASK-144; decision 7 (mockup preview route) remains out of scope under ADR-0029
-**UI:** mockup required for both tickets — see §7. A no-mockup waiver is **not** available for the shared list (§7.1); the TASK-144 header/collapsed-layout mockup follows §7.4.
-**Downstream:** TASK-142 (delivered), TASK-145/TASK-146 (consume `.bleed`), TASK-148 (published the normative clauses in `browser-shell-ui.md`), TASK-149/TASK-150 (packaging and release verification)
-
 ## 1. Purpose and scope
 
 Introduce the three structural pieces ADR-0028 fixes, and prove the shared list on one reference family before TASK-142 spreads it:

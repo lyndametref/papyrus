@@ -55,11 +55,6 @@ status: verified
 # TECH-026 Browser Access for Glossary Terms
 
 ## Description
-**Ticket:** TASK-23
-**Milestone:** m-5 (Search and Browser for Glossary)
-**Status:** Refined (execution-ready)
-**UI mockups:** [`MOCK-0004`](ui/mockups/MOCK-0004-browser-glossary-terms-review.html) — approved 2026-11-06 (TASK-32); extends the approved baseline [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html), [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html), and [`MOCK-0003`](ui/mockups/MOCK-0003-browser-decision-records-review.html). See [UI design handoff](#ui-design-handoff).
-
 ## Purpose
 
 Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), and TASK-15 (decision records) so it also serves the glossary store: active glossary terms. The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`glossary`), its record model, list/view/edit screens, API endpoints, and tests. It implements REQ-05.003 and REQ-05.007 for the browser surface under REQ-06.002, and advances NFR-01.002 (display and edit all Papyrus content) for glossary terms. Deprecated terms are hidden from lists and unreachable by URL, mirroring archived decisions and deprecated requirements.

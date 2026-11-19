@@ -31,14 +31,6 @@ status: verified
 # TECH-075 Browser Math and Diagram Rendering (TASK-145, TASK-146)
 
 ## Description
-**Tickets:** TASK-145 (Part I, §1–§12 — math, KaTeX) delivered here; TASK-146 (Part II, §13–§20 — diagrams, Mermaid) extends the same pre-pass and the same page-asset slot
-**Milestone:** m-21
-**Status:** Part I pinned 2026-11-16 from REQ-06.017 and ADR-0025 decisions 2–10, revised 2026-11-16 with the ADR-0025 decisions 5–6 revision notes (`output` pinned to `htmlAndMathml`, `style-src` inline-style deviation accepted). Part II pinned 2026-11-16 from ADR-0026 as amended (Accepted 2026-11-16, all open questions resolved: Mermaid 11.17.2 only, no `mmd`, PlantUML source block with a note, 100,000-byte/1,000-line server caps plus client `maxEdges: 500`, two literal CSP strings, scoped `style-src 'unsafe-inline'` on diagram pages).
-**Requirements:** REQ-06.017 (math and diagrams), REQ-06.015 (content width), NFR-01.003 (offline), NFR-02.002 (sanitize input), NFR-03.001 (single binary), NFR-05.001 (supported browsers), NFR-06.002 (GPLv3-or-later linking), REQ-06.004 (browser/CLI parity)
-**ADRs:** ADR-0025 (Accepted — Part I), ADR-0026 (Accepted 2026-11-16 — Part II), ADR-0027 (vendored assets and notices), ADR-0005 (CSP baseline, no Markdown renderer), ADR-0028 (width classes; `.bleed` is used by Part II only)
-**UI:** no mockup. Neither ticket adds a control, page, or layout region: math and diagrams are content inside existing prose containers, and the DOM shapes are fixed by ADR-0025 decision 2 and ADR-0026 decisions 2–3. Visual verification is browser verification in TASK-149/TASK-150. Recorded in §11 and §20.
-**Downstream:** TASK-148 (specification port into `docs/specifications/browser-requirements*.md` and packaging wording), TASK-149 (packaged assets, offline rendering, binary budget), TASK-150 (release verification)
-
 ## 1. Purpose and scope
 
 REQ-06.017 requires the local browser to render math formulas in the curated prose fields that record views already display, fully offline, with all assets bundled, without arbitrary script execution, and with the source text as the fallback. ADR-0025 fixes the mechanism: a non-Markdown delimiter pre-pass on the server that emits placeholders, KaTeX rendering in the client, and a `font-src 'self'` CSP delta.

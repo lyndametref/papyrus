@@ -63,11 +63,6 @@ status: verified
 # TECH-013 Backlog Discovery Milestone Packaging and Verification
 
 ## Description
-**Ticket:** TASK-12
-**Milestone:** m-2 (Tasks, Milestones, Releases, and Discovery)
-**Status:** Refined (execution-ready)
-**UI mockups:** none new — no UI change in this ticket; the shipped browser interface keeps MOCK-0001 (approved) as its baseline and MOCK-0002 (approved) as the layout reference for backlog records
-
 ## Purpose
 
 Package the current Papyrus feature set (TASK-1 foundation + TASK-2 init/config + TASK-3 req/nfreq + TASK-5 search + TASK-6 browser + TASK-8 milestones/releases + TASK-9 tasks + TASK-10 backlog search + TASK-11 backlog browser) as an installable amd64 Debian package, and verify in an isolated Debian Forky environment that the packaged binary installs, uninstalls, and provides task, milestone, release, search (over task/milestone/release records), and offline local browser access (including the backlog categories) end to end. This is the last task of milestone m-2 and closes its "each increment is packaged and usable" goal for backlog discovery.

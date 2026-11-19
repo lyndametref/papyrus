@@ -28,11 +28,6 @@ status: verified
 # TECH-042 Expose Front-Matter Metadata Options on All Record Commands
 
 ## Description
-**Ticket:** TASK-65
-**Milestone:** m-12 (Final Cross-Type Integration)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Deliver ADR-0013 Stage 3 (superseding ADR-0009): every managed record command (create and edit) exposes an option for every front-matter field except `id`, `created_date`, and `updated_date`, and every write goes through the shared patch-preserving path delivered by TASK-63 and TASK-64. This ticket implements the option rule in REQ-05.011, the field map in REQ-05.010, and the view parity contract in REQ-06.004. Backlog.md file-level interoperability is not a goal of this ticket (NFR-04.004). It does not migrate the corpus (TASK-68, TASK-69), remove legacy serializers (TASK-70), or change browser UI (TASK-66, TASK-67, TASK-72).

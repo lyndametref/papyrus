@@ -30,11 +30,6 @@ status: verified
 # TECH-016 Expand Unified Search to Decision Records
 
 ## Description
-**Ticket:** TASK-14
-**Milestone:** m-3 (Decision Records)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Extend `papyrus search` so that decision records are searched in addition to task, milestone, release, and `doc` (business and non-functional requirement) records. The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by `docs/specifications/search-tasks-milestones-and-releases.md` are reused unchanged; this increment adds the decision record store to the set of searchable types. It implements REQ-06.001 under REQ-04/REQ-04.001/REQ-04.002, and advances BR-015 and BR-008.

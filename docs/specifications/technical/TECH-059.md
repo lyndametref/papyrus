@@ -31,11 +31,6 @@ status: verified
 # TECH-059 Import Backlog.md Records (`papyrus import backlog`)
 
 ## Description
-**Ticket:** TASK-83 (import sub-specification; implemented by TASK-92)
-**Milestone:** m-16 (Release 1.0)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Define the one-way import of Backlog.md task and milestone records into Papyrus records: invocation and options, source scope and exclusions, planned ID allocation, field and body mapping, status normalization, collision and duplicate handling, the one-way non-idempotent caveat, exit codes, and containment. This specification implements ADR-0011 and NFR-04.004 and is the only supported bridge from a Backlog.md store into the Papyrus-native layout (see `papyrus-native-record-layout-and-single-id-space.md`).

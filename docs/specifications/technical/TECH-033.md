@@ -27,11 +27,6 @@ status: verified
 # TECH-033 Expand Unified Search to Business Rules
 
 ## Description
-**Ticket:** TASK-44
-**Milestone:** m-8 (Business Rules)
-**Status:** Refined (execution-ready)
-**UI mockups:** none (CLI-only)
-
 ## Purpose
 
 Extend `papyrus search` to include business rules. Business rules are document records: they are stored under the configured `document_types.rule` directory (default `docs/business-rules/`) and are searched whenever the documented `doc` type is selected (including the default all-types search). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` are reused unchanged. This increment implements REQ-06.001 under REQ-05/REQ-05.005/REQ-05.007, and advances BR-015 and BR-013.

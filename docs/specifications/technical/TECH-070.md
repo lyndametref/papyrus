@@ -42,14 +42,6 @@ status: verified
 # TECH-070 Descriptor-Driven Typed Document Command Dispatch
 
 ## Description
-**Ticket:** TASK-119
-**Milestone:** m-18 (Descriptor Single-Source Cleanup)
-**Status:** Refined — execution-ready
-**UI mockups:** none. This ticket changes command construction and dispatch only; no user-visible interface is designed.
-**Requirements:** REQ-07.001, REQ-07.002, REQ-07.003, REQ-07.004, REQ-05.001, REQ-05.002, REQ-05.007, REQ-05.008, REQ-05.010, REQ-01.004, REQ-01.005
-**Business rules:** BR-001, BR-009, BR-010, BR-011, BR-012, BR-013, BR-014, BR-017, BR-018, BR-019, BR-020
-**ADRs:** ADR-0016 (Accepted), ADR-0017 (Accepted), ADR-0018 (Accepted), ADR-0022 (Accepted)
-
 ## Purpose
 
 ADR-0016 makes `document::run` the single dispatch path for every document type

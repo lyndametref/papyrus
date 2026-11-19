@@ -34,11 +34,6 @@ status: verified
 # TECH-037 Expand Unified Search to Technical Specifications
 
 ## Description
-**Ticket:** TASK-56
-**Milestone:** m-11 (Technical Specifications)
-**Status:** Refined (execution-ready)
-**UI mockups:** none (CLI-only)
-
 ## Purpose
 
 Extend `papyrus search` so that technical specifications are searched in addition to business and non-functional requirements, task, milestone, release, decision, glossary, UI specification, UI mockup, business rule, and audit records. Technical specifications are document records: they are stored under the configured `document_types.tech-spec` directory (default `docs/technical/`) and are searched whenever the documented `doc` type is selected (including the default all-types search). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by later search increments are reused unchanged. This increment implements REQ-06.001 under REQ-05/REQ-05.009/REQ-05.007, and advances BR-015 and BR-017.

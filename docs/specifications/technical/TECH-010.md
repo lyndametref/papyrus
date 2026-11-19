@@ -38,12 +38,6 @@ status: verified
 # TECH-010 Task Management from the CLI
 
 ## Description
-**Ticket:** TASK-9
-**Milestone:** m-2 (Backlog Discovery and Management)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-**Revision:** 2026-11-12 (TASK-89) — persistence now uses Papyrus-owned front matter, the task heading and retired metadata sections are gone.
-
 ## Purpose
 
 Deliver the `task` commands so a project contributor can create, inspect, update, list, filter, sort, archive, restore, and delete tasks, with stable IDs, configurable workflow status, and text-file persistence inside the project directory. This ticket implements REQ-02, REQ-02.001, REQ-02.002, REQ-02.003, and REQ-02.004, together with the documented command contract in BR-005. It provides the task records that later tickets search (TASK-10) and expose in the browser (TASK-11).

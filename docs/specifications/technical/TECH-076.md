@@ -41,14 +41,6 @@ status: draft
 > **Revised (TASK-178, 2026-11-19):** reference visibility in the shared browser list is per artifact family per ADR-035 and REQ-06.019 (source RE-006). `ContentModel::Generic` (config-defined document types) renders no reference list in any list row; `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep it; labels render for every family. Single-document view, CLI list and view, JSON API, `RecordView`, and front matter are unchanged.
 
 ## Description
-**Tickets:** TASK-148 (publisher; contract fixed by TASK-141, TASK-142, TASK-144)
-**Milestone:** m-21
-**Status:** Normative, published 2026-11-16 from the landed contract
-**Requirements:** REQ-06.016 (one shared list layout), REQ-06.015 (content width and navigation visibility), REQ-06.004 (browser/CLI metadata parity), REQ-06.013 (uncapped per-milestone board), REQ-05.007 (archived records never listed)
-**ADR:** ADR-0028 (Accepted, amended 2026-11-15 and 2026-11-16) and ADR-0005 as amended by ADR-0027
-**UI:** MOCK-0016 (shell and shared list, registry `draft`) and MOCK-0018 (navigation toggle and collapsed layout, registry `draft`); layout description `docs/specifications/ui/browser-shell-and-shared-list-ui.md`
-**Contract detail:** `docs/specifications/browser-shell-shared-list-layout-and-page-width.md` (TASK-141/142/144 delivery record and implementation detail)
-
 ## 1. Purpose and scope
 
 This page is the normative browser-shell contract for page chrome, the shared list layout, the two content-width classes, and the collapsible navigation. It states behaviour; visual measurements and pixel values are owned by the UI description and the approved mockups.

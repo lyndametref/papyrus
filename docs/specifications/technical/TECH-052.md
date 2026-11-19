@@ -64,11 +64,6 @@ status: verified
 # TECH-052 Complete Unified Search Across All Documented Record Types
 
 ## Description
-**Ticket:** TASK-18
-**Milestone:** m-12 (Final Cross-Type Integration)
-**Status:** Refined (execution-ready)
-**UI mockups:** none (CLI-only)
-
 ## Purpose
 
 Final integration increment of `papyrus search`: one query searches every documented record type that Papyrus manages, so that a contributor can find any project record without knowing which store or document family it lives in. The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, sanitization, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by every later search increment are reused unchanged; this increment adds no new `--type` value and no new option. It completes REQ-06.001 across all of REQ-05's document types plus REQ-02 (tasks), REQ-03 (milestones/releases), and REQ-04 (decisions), and advances BR-015. It also confirms that lazy front-matter migration (ADR-0012, ADR-0013) does not break or narrow search coverage.

@@ -59,11 +59,6 @@ status: verified
 # TECH-017 Decision Records Milestone Packaging and Verification
 
 ## Description
-**Ticket:** TASK-16
-**Milestone:** m-3 (Decision Records)
-**Status:** Refined (execution-ready)
-**UI mockups:** none new — no UI change in this ticket; the shipped browser interface keeps MOCK-0001 (approved) and MOCK-0002 (approved) as its baseline, and MOCK-0003 (pending approval, TASK-15) as the layout reference for the decision category
-
 ## Purpose
 
 Package the current Papyrus feature set (TASK-1 foundation + TASK-2 init/config + TASK-3 req/nfreq + TASK-5 search + TASK-6 browser + TASK-8 milestones/releases + TASK-9 tasks + TASK-10 backlog search + TASK-11 backlog browser + TASK-12 packaging + TASK-13 decision management + TASK-14 decision search + TASK-15 decision browser) as an installable amd64 Debian package, and verify in an isolated Debian Forky environment that the packaged binary installs, uninstalls, and provides decision creation, listing, viewing, editing, archiving, supersession, search over decision records, and offline local browser access (including the decision category) end to end. This is the last task of milestone m-3 and closes its "each increment is packaged and usable" goal for decision records.

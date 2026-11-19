@@ -44,11 +44,6 @@ status: draft
 > **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
 
 ## Description
-**Ticket:** TASK-77
-**Milestone:** m-12 (Final Cross-Type Integration)
-**Status:** Refined (execution-ready; UI mockup approved)
-**UI mockups:** [`MOCK-0011`](ui/mockups/MOCK-0011-browser-agent-skills-review.html) (approved 2026-11-10, TASK-76) — UI description [`ui/browser-agent-skills-ui.md`](ui/browser-agent-skills-ui.md); reuses the approved baseline shell [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html). No new mockup is required for this ticket.
-
 ## Purpose
 
 Add a read-only page to the offline, project-local web interface that lists the agent skills and workflows used to configure and operate Papyrus, per REQ-06.005. The page is agent-facing (not end-user) reference material: it presents instructions whose values are parameterized by the effective `papyrus.conf.yaml` (prefixes, `id_padding`, statuses, enabled document and decision types, directories, paths, date format) so generated instructions match the configured project. It advances NFR-01.002 (display all Papyrus content) and NFR-01.003 (offline use).

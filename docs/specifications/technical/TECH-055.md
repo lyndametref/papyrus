@@ -47,11 +47,6 @@ status: verified
 # TECH-055 Use Cases, Test Cases, and Test Reports Management from the CLI
 
 ## Description
-**Ticket:** TASK-78
-**Milestone:** m-15 (Use Cases and Test Documentation)
-**Status:** Refined (execution-ready)
-**UI mockups:** none (CLI-only; browser UI for these record types is TASK-79/TASK-81)
-
 ## Purpose
 
 Deliver three dedicated commands — `use-case`, `test-case`, and `test-report` — so a project contributor can create, list, view, edit, deprecate, and restore use-case, test-case, and test-report records, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-05.012, REQ-05.013, and REQ-05.014, the lifecycle part of REQ-05.007, NFR-02.002, NFR-04.001, and NFR-04.002, together with the documented command contract in BR-018, BR-019, and BR-020 and the configuration contract in BR-016. It provides the records that later tickets search (TASK-80) and expose in the browser (TASK-81).

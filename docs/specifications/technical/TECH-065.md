@@ -57,11 +57,6 @@ status: draft
 > **Revised (TASK-203, 2026-11-18):** the browser configuration-view clauses — the relocation scope bullet, section 7 item 4, and the `browser view equivalence` part of the T-98-08 verification row — are retired per ADR-034 and REQ-06.018 (RE-005): the browser serves no configuration view and configuration editing is CLI-only. The CLI-only `config set` relocation and installed-binary verification clauses (REQ-01.002) remain current. REQ-06.008, which the retired clauses cite, is archived; the retired text is retained below as history. See TECH-080.
 
 ## Description
-**Ticket:** TASK-98
-**Milestone:** m-16 (Release 1.0 — Native Layout, Import, and Browser Refinements)
-**Status:** Refined (execution-ready)
-**UI mockups:** none — verification and packaging only; no interface change. MOCK-0002 (TASK-102 revision) remains the approved backlog board reference.
-
 ## Purpose
 
 Deliver ADR-0013 **stage 8**: prove end to end that the combined properties the Backlog.md renunciation depends on actually hold, then produce and verify the installable release package. The individual implementation tasks tested their own behaviour; this ticket tests the whole: adoption idempotency and byte identity, no Backlog-shaped write anywhere, one Papyrus identity on every surface, import fidelity against a real sample store, relocation that never loses a folder, and search that still indexes whole persisted text now that front matter is part of it. It closes the ADR-0013 stage 8 gate on the release that claims NFR-04.004 and produces the amd64 Debian package required by NFR-03.002.

@@ -25,11 +25,6 @@ status: verified
 # TECH-005 Requirements-Management Milestone Packaging and Verification
 
 ## Description
-**Ticket:** TASK-4
-**Milestone:** m-0 (Rust CLI Foundation and Requirements)
-**Status:** Refined (execution-ready pending open question OQ-1)
-**UI mockups:** none
-
 ## Purpose
 
 Package the current Papyrus feature set (TASK-1 foundation + TASK-2 init/config + TASK-3 req/nfreq) as an installable amd64 Debian package and verify, in an isolated environment, that the packaged binary installs, uninstalls, and can initialize a project and exercise the full business/non-functional requirement lifecycle. This is a packaging/verification task: no new product behavior is added. It closes milestone m-0's "each increment is packaged and usable" goal for the requirements-management capability.

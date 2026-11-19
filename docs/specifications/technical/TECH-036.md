@@ -57,11 +57,6 @@ status: verified
 # TECH-036 Browser Access for Audit Records
 
 ## Description
-**Ticket:** TASK-26
-**Milestone:** m-9 (Audit Records)
-**Status:** Refined (execution-ready)
-**UI mockups:** [`MOCK-0008`](ui/mockups/MOCK-0008-audit-records-review.html) — approved 2026-11-07 (TASK-49); extends the approved baseline [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html), [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html), [`MOCK-0003`](ui/mockups/MOCK-0003-browser-decision-records-review.html), [`MOCK-0004`](ui/mockups/MOCK-0004-browser-glossary-terms-review.html), [`MOCK-0005`](ui/mockups/MOCK-0005-browser-ui-specifications-review.html), [`MOCK-0006`](ui/mockups/MOCK-0006-browser-ui-mockups-review.html), and [`MOCK-0007`](ui/mockups/MOCK-0007-business-rules-review.html). UI description: [`ui/browser-audit-records-ui.md`](ui/browser-audit-records-ui.md).
-
 ## Purpose
 
 Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), TASK-15 (decision records), TASK-23 (glossary terms), TASK-24 (UI specifications), TASK-40 (UI mockups), and TASK-25 (business rules) so it also serves the audit-records store: active audit records (ID, title, audit type, and content). The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`audit-record`), its record model, list/view/edit screens, API endpoints, and tests. It implements the browser-visibility part of REQ-05.006/REQ-05.007 for audit records under REQ-06.002, and advances NFR-01.002 (display and edit all Papyrus content) for audit records. Deprecated audit records are hidden from lists and unreachable by URL, consistent with deprecated requirements, glossary terms, UI specifications, UI mockups, and business rules.

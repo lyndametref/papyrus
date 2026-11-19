@@ -35,11 +35,6 @@ status: verified
 # TECH-043 Migrate Document Record Types to Front Matter Lazily on First Read and First Write
 
 ## Description
-**Ticket:** TASK-68
-**Milestone:** m-12 (Final Cross-Type Integration)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Deliver ADR-0013 Stage 3 (superseding ADR-0009): lazy, per-record migration of the document record types (business requirement, non-functional requirement, glossary term, UI specification, technical specification, business rule, audit record, decision, release) so that each managed Markdown record gains a YAML front-matter block on its first read and on its first write, with no bulk migration command required. This ticket implements REQ-05.011 (lazy per-record migration) and REQ-05.010 (front matter on every managed record) for the document record family, building only on `record::patch` and `record::store` from TASK-63 and the option exposure from TASK-65. Task and milestone migration is out of scope (TASK-69). UI mockups and other HTML are excluded (REQ-05.008, ADR-0012 decision 11). Non-record prose Markdown is never modified (ADR-0012 decision 15).

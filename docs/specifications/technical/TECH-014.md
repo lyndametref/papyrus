@@ -35,11 +35,6 @@ status: verified
 # TECH-014 Decision Records Management from the CLI
 
 ## Description
-**Ticket:** TASK-13
-**Milestone:** m-3 (Decision Records)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Deliver the `decision` commands so a project contributor can create, list, view, edit, supersede, and archive decision records, with stable IDs, documented Nygard fields, fixed status vocabulary and transitions, and text-file persistence inside the project directory. This ticket implements REQ-04, REQ-04.001, and REQ-04.002, together with the documented command contract in BR-008. It provides the decision records that later tickets search (TASK-14) and expose in the browser (TASK-15).

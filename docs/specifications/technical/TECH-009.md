@@ -44,11 +44,6 @@ status: draft
 # TECH-009 Milestone and Release Management from the CLI
 
 ## Description
-**Ticket:** TASK-8
-**Milestone:** m-2 (Backlog Discovery and Management)
-**Status:** Implemented (TASK-8; `release close` added by TASK-118; milestone lifecycle corrected to close-only by TASK-130, specification corrected by TASK-136)
-**UI mockups:** none
-**Revision:** 2026-11-12 (TASK-89) — milestone persistence now uses Papyrus-owned front matter, the milestone heading and retired `## Release` section are gone. 2026-11-14 (TASK-118) — `papyrus release close <id>` implements the fixed `planned -> released` lifecycle, and `release create` seeds `status: planned`. 2026-11-15 (TASK-136) — corrected to the close-only milestone lifecycle: `papyrus milestone close <id>` is the only `open -> closed` transition and writes `status` and `updated_date` in place. The superseded wording — the milestone lifecycle `active -> archived`, the `papyrus milestone archive` verb, the milestone archive move and archive folder lifecycle, and the archived-milestone list/view/edit cases — is removed; `<backlog_directory>/archive/milestones/` and `<backlog_directory>/milestones/archived/` are legacy read locations only (ADR-0022 decision 5, ADR-0023 decisions 2 and 4).
 ## Purpose
 
 Deliver the `milestone` and `release` commands so a project maintainer can create, list, view, edit, close, archive, and delete milestones, and create, list, view, edit, and close releases, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-03, REQ-03.001, and REQ-03.002, including the documented milestone/release relationship, the milestone lifecycle open -> closed -> archived (ADR-032), and the release lifecycle clarified by TASK-22. It provides the delivery containers that later tasks (TASK-9 onward) assign work to.

@@ -40,11 +40,6 @@ status: draft
 # TECH-062 Browser Specification Revisions for the Per-Milestone Kanban Board (TASK-101)
 
 ## Description
-**Ticket:** TASK-101
-**Milestone:** m-16 (Release 1.0)
-**Status:** Refined (execution-ready)
-**UI mockups:** [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html) (approved baseline) — revision required and re-approval required under TASK-102 before implementation. No new MOCK id is allocated by this ticket.
-
 ## Purpose
 
 Revise the browser specification corpus so that it states the new backlog view contract introduced by REQ-06.013: milestones remain expandable and collapsible, an expanded milestone shows its tasks as a kanban board with one column per configured task status, milestones are grouped by release with a bold named separator, tasks without a milestone get their own section after all milestones, cards are ordered by ascending task ID and link to the task record view, and a task's status is changed either by dragging its card or with an equivalent non-drag control, persisting immediately through the existing browser write contract. The revisions also remove any wording that still describes releases as separators between a flat milestone list or status change as drag-only.

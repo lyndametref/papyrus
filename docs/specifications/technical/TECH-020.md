@@ -35,11 +35,6 @@ status: verified
 # TECH-020 UI Mockups Management from the CLI
 
 ## Description
-**Ticket:** TASK-38
-**Milestone:** m-4 (CLI)
-**Status:** Refined (execution-ready)
-**UI mockups:** none (CLI-only; browser UI for mockups is TASK-40/TASK-41)
-
 ## Purpose
 
 Deliver the `ui-mockup` commands so a project contributor can create, list, view, edit, deprecate, restore, and supersede UI mockups, with stable `MOCK-xxxx` IDs and HTML-file persistence inside the project directory. This ticket implements REQ-05.008 and the lifecycle part of REQ-05.007. It provides the mockup records that later tickets search (TASK-39) and expose in the browser (TASK-40). No dedicated business rule exists for this command (see Open questions); BR-016 governs configuration.

@@ -24,13 +24,6 @@ status: verified
 # TECH-071 Registry-Sourced Record Descriptors
 
 ## Description
-**Ticket:** TASK-120
-**Milestone:** m-18 (Descriptor Single-Source Cleanup)
-**Status:** Refined — execution-ready
-**UI mockups:** none. This is a backend refactor with no user-visible interface.
-**Requirements:** REQ-07.001, REQ-07.002, REQ-07.003, REQ-07.004, REQ-05.007, REQ-05.010
-**ADRs:** ADR-0017 (Accepted), ADR-0018 (Accepted), ADR-0022 (Accepted), ADR-0013 (Accepted)
-
 ## Purpose
 
 ADR-0017 decisions 1 and 4 make the artifact registry the only object that maps

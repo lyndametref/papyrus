@@ -35,11 +35,6 @@ status: verified
 # TECH-012 Expand Unified Search to Task, Milestone, and Release Records
 
 ## Description
-**Ticket:** TASK-10
-**Milestone:** m-2 (Backlog Discovery and Management)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Extend `papyrus search` so that task, milestone, and release records are searched in addition to business and non-functional requirements (delivered by TASK-5). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` are reused unchanged; this increment adds three backlog record stores to the set of searchable types. It implements the backlog-store part of REQ-06.001 under REQ-02/REQ-02.001/REQ-02.003 and REQ-03/REQ-03.001/REQ-03.002, and advances BR-015.

@@ -54,11 +54,6 @@ status: draft
 > **Revised (TASK-203, 2026-11-18):** the browser configuration view clauses — section 3 item 12, the browser-view tail of item 21, the out-of-scope list-editing item, and the relocation assumption — are retired per ADR-034 and REQ-06.018 (RE-005): the browser serves no configuration view and configuration editing is CLI-only. The `config set` configuration, list-key, and whole-folder relocation clauses (BR-003, REQ-01.002) remain current. REQ-06.008, which the retired clauses cite, is archived; the retired text is retained below as history. See TECH-080.
 
 ## Description
-**Ticket:** TASK-2 / TASK-85 (spec revision); TASK-111 (list-valued configuration keys revision); TASK-112 (default document set and document-status seeding revision); TASK-122 (config list default_status revision); TASK-127 (init directory-set revision)
-**Milestone:** m-0 (Rust CLI Foundation and Requirements)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Deliver the `init` and `config` commands, plus project/configuration context selection and the common CLI controls and outcomes defined by REQ-01, so a maintainer can create a project context, select it deterministically, inspect and change effective configuration, and rely on consistent command behavior and exit statuses. This ticket also delivers the configuration keys that govern stable record IDs (prefixes and padding); record commands in later tickets consume those keys.

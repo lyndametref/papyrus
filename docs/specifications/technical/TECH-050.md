@@ -2,7 +2,7 @@
 id: TECH-050
 title: "Browser Page for Managed Artifacts and Lifecycles"
 created_date: '2026-11-16T17:46:50Z'
-updated_date: '2026-11-18T20:22:29Z'
+updated_date: '2026-11-19T21:42:42Z'
 labels: []
 references:
   - ADR-0005
@@ -58,17 +58,11 @@ status: draft
 > **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
 
 ## Description
-**Ticket:** TASK-72
-**Milestone:** m-12 (Final Cross-Type Integration)
-**Status:** Refined (execution-ready; UI mockup approved)
-**UI mockups:** [`MOCK-0010`](ui/mockups/MOCK-0010-browser-front-matter-and-lifecycle-review.html) (approved 2026-11-09, TASK-66) — UI description [`ui/browser-front-matter-and-lifecycle-ui.md`](ui/browser-front-matter-and-lifecycle-ui.md); reuses the approved baseline shell [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html). No new mockup is required for this ticket.
-
 > **Superseded in part (TASK-114):** the fixed twelve-section set and the "covered set does not change with `document_types`" rule are replaced by the registry-derived three-category page in [`browser-config-defined-document-types.md`](browser-config-defined-document-types.md) (REQ-06.003 revision of 2026-11-13). The page route, shell, and read-only configuration rules in this document remain in force.
 
 > **Revised (TASK-127):** the section 4 lifecycle wording now follows the settled archive lifecycles: documents `active -> archived` with no restore (plus configured custom statuses, front-matter only), UI mockups `pending -> approved -> archived` (supersede, no restore), milestones `open -> closed` via `papyrus milestone close`, releases `planned -> released` with no archive, decisions unchanged (Nygard status `deprecated`). Sources: ADR-0022, ADR-0023, REQ-03.001, REQ-03.002, REQ-05.007, REQ-07.001.
 
 > **Revised (TASK-147, 2026-11-15):** the scope bullet and section 3 clause 3 no longer assert that every record lifecycle operation is CLI-only, because the 2026-11-15 revision of REQ-06.013 gives the Backlog board task status change and the per-milestone `Clean up all` archive action. This page still offers no lifecycle operation, and creating, restoring, and deleting records remain CLI-only.
-
 ## Purpose
 
 Add a read-only page to the offline, project-local web interface that describes every managed artifact/document type and its lifecycle, per REQ-06.003. The page is a single static view with one section per fixed record type; task states are derived from the configured task statuses (REQ-01.002); every other type uses the lifecycle documented for that type. It advances NFR-01.002 (display all Papyrus content) by giving contributors a single place to learn what each record type is and how it moves through its states.

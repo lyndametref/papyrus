@@ -30,14 +30,6 @@ status: verified
 # TECH-064 Design Review: Revise the Backlog Kanban Board Mockup (TASK-102)
 
 ## Description
-**Ticket:** TASK-102
-**Milestone:** m-16 (Release 1.0)
-**Status:** Refined (execution-ready)
-**Requirement:** REQ-06.013
-**UI mockups:** [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html) (approved baseline) — revised in place and re-approval required under this ticket. No new MOCK id is allocated.
-**UI description:** [`ui/browser-backlog-records-ui.md`](ui/browser-backlog-records-ui.md) (section 4, Backlog view; section 9, MOCK register; section 10, approval status)
-**Related specification:** [`browser-spec-revisions-task-101.md`](browser-spec-revisions-task-101.md) (kanban board contract); [`browser-tasks-milestones-and-releases.md`](browser-tasks-milestones-and-releases.md) (section 3, List page)
-
 ## Purpose
 
 Revise the approved MOCK-0002 backlog review package so that it represents the per-milestone kanban board required by REQ-06.013, instead of the earlier flat backlog list. The revised package must be explicitly approved by the user and recorded as `approved` in the mockup registry before TASK-103 implementation starts. UI mockups may not be implemented as final UI while unapproved.

@@ -32,11 +32,6 @@ status: verified
 # TECH-019 UI Specifications Management from the CLI
 
 ## Description
-**Ticket:** TASK-34
-**Milestone:** m-4 (CLI)
-**Status:** Refined (execution-ready)
-**UI mockups:** none (CLI-only; browser UI for this record type is TASK-24/TASK-36)
-
 ## Purpose
 
 Deliver the `ui-spec` commands so a project contributor can create, list, view, edit, deprecate, and restore UI specifications, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-05.004 and the lifecycle part of REQ-05.007, together with the documented command contract in BR-012. It provides the records that later tickets search (TASK-35) and expose in the browser (TASK-24).

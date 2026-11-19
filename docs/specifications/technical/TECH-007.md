@@ -69,11 +69,6 @@ status: draft
 > **Revised (TASK-201, 2026-11-18):** the configuration view (section 4d), its `/config` route and sidebar entry, the link to the lifecycle page, and the lifecycle/configuration/skills CSP response class are retired per ADR-034 and REQ-06.018; the browser serves no configuration view and configuration editing is CLI-only. See TECH-080.
 
 ## Description
-**Ticket:** TASK-6
-**Milestone:** m-1 (Search and Browser for Requirements)
-**Status:** Refined (execution-ready; UI approved)
-**UI mockups:** MOCK-0001 — approved 2026-11-03 (UTC); see [UI design handoff](#ui-design-handoff)
-
 ## Purpose
 
 Deliver the first increment of `papyrus browser`: a blocking, dependency-free HTTP server inside the existing single Rust crate that serves a project-local, offline, read-and-edit web interface over the requirement documents implemented so far — business-requirement and non-functional-requirement groups and their member requirements — plus the configuration keys, security controls, and tests that make that interface safe and verifiable. The command contract is REQ-06.002 and BR-004 (`papyrus(1)` → COMMANDS → browser, `papyrus-config(5)` → Web UI). Where the man page is silent, this specification fixes explicit, testable defaults recorded in [Open questions](#open-questions).

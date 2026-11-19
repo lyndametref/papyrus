@@ -60,11 +60,6 @@ status: draft
 > **Revised (TASK-201, 2026-11-18):** the Managed artifacts & lifecycles and Agent skills & workflows sidebar entries, their `/lifecycle` and `/skills` routes and `?type=` aliases, and their two inventory cards are retired per ADR-034 and REQ-06.018; the browser now serves the twelve record categories only. See TECH-080.
 
 ## Description
-**Ticket:** TASK-19
-**Milestone:** m-12 (Final Cross-Type Integration)
-**Status:** Refined (execution-ready)
-**UI mockups:** [`MOCK-0012`](ui/mockups/MOCK-0012-browser-final-cross-type-review.html) — approved 2026-11-10 (TASK-60); UI description [`ui/browser-final-cross-type-ui.md`](ui/browser-final-cross-type-ui.md). Reuses the approved baseline shell [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html) and approved patterns [`MOCK-0010`](ui/mockups/MOCK-0010-browser-front-matter-and-lifecycle-review.html), [`MOCK-0011`](ui/mockups/MOCK-0011-browser-agent-skills-review.html). No new mockup is required for this ticket.
-
 ## Purpose
 
 Final integration increment of the offline, project-local web interface: one navigation (the sidebar) and one content inventory (the landing view at `GET /`) expose every record type Papyrus manages, reusing the per-type list/view/edit views delivered by TASK-6, TASK-11, TASK-15, TASK-23, TASK-24, TASK-40, TASK-25, TASK-26, TASK-57, TASK-72, and TASK-77. This task does not re-implement per-type rendering; it consolidates those increments into a single entry point and verifies cross-type consistency. It completes NFR-01.002 (display all Papyrus content in the local browser) and advances NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, and NFR-05.001 for the browser as a whole. The transport, asset delivery, rendering, security, configuration, and accessibility baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged.

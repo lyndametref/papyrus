@@ -17,11 +17,6 @@ status: verified
 # TECH-049 Verify Backlog.md Round-Trip Interoperability
 
 ## Description
-**Ticket:** TASK-71 (historical)
-**Milestone:** m-12 (Final Cross-Type Integration) — historical
-**Status:** Superseded
-**UI mockups:** none
-
 ## Purpose
 
 This specification is **superseded in intent** and no longer states a live behaviour contract. Its subject — empirical two-direction round-trip verification between Papyrus and Backlog.md, including translated identity and the Backlog.md storage shape as a gate — was renounced by NFR-04.004. Backlog.md file-level interoperability is no longer a goal; the only bridge is the one-way import. Verification now covers the native layout, the import, relocation, and the single ID space. The live contract is now defined by:

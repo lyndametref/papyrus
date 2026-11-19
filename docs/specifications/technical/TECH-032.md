@@ -55,11 +55,6 @@ status: verified
 # TECH-032 Browser Access for UI Mockups
 
 ## Description
-**Ticket:** TASK-40
-**Milestone:** m-7 (UI Mockups)
-**Status:** Refined (execution-ready)
-**UI mockups:** [`MOCK-0006`](ui/mockups/MOCK-0006-browser-ui-mockups-review.html) — approved 2026-11-06 (TASK-41); extends the approved baseline [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html), [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html), [`MOCK-0003`](ui/mockups/MOCK-0003-browser-decision-records-review.html), [`MOCK-0004`](ui/mockups/MOCK-0004-browser-glossary-terms-review.html), and [`MOCK-0005`](ui/mockups/MOCK-0005-browser-ui-specifications-review.html). UI description: [`ui/browser-ui-mockups-ui.md`](ui/browser-ui-mockups-ui.md).
-
 ## Purpose
 
 Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), TASK-15 (decision records), TASK-23 (glossary terms), and TASK-24 (UI specifications) so it also serves the UI-mockup store: active UI mockups. The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`ui-mockup`), its record model, list/view/edit screens, API endpoints, and tests. It implements REQ-05.008 and the web-visibility part of REQ-05.007 for the browser surface under REQ-06.002, and advances NFR-01.002 (display and edit all Papyrus content) for UI mockups. Deprecated mockups are hidden from lists and unreachable by URL, exactly as deprecated UI specifications and glossary terms.

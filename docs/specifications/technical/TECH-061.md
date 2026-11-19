@@ -48,11 +48,6 @@ status: draft
 > **Revised (TASK-201, 2026-11-18):** the configuration view (section 3), the `/config` route and `Configuration` sidebar entry, the read-only lifecycle configuration clauses (section 8, items 3-5), and the related mockup and open-question items are retired per ADR-034 and REQ-06.018; configuration editing is CLI-only and the browser serves no configuration or lifecycle page. The retired clauses are retained below as history. See TECH-080.
 
 ## Description
-**Ticket:** TASK-86
-**Milestone:** m-16 (Release 1.0)
-**Status:** Refined (execution-ready)
-**UI mockups:** none created by this ticket. Existing packages MOCK-0001..MOCK-0013 require revision; a new package is created under TASK-87.
-
 ## Purpose
 
 Revise the browser specification corpus so that it states the new browser contract introduced by REQ-06.003 (as extended) and REQ-06.006 through REQ-06.012: non-functional requirements grouped by their owning group, an error-only console with a browser-only debug flag, an editable configuration view (retired per ADR-034; configuration editing is CLI-only), shared-header branding, record references as links, a concise glossary landing page, a consistent single record view layout, and curated per-artifact descriptions with read-only configuration on the lifecycle page (the browser lifecycle page and its read-only configuration display are retired per ADR-034). The revisions also remove any remaining Backlog.md storage-ID wording from browser specs so that routes, links, form values, and JSON carry Papyrus IDs only (ADR-0010, ADR-0012, ADR-0013).

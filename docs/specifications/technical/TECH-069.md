@@ -51,13 +51,6 @@ status: draft
 > **Revised (TASK-201, 2026-11-18):** the `/lifecycle` expectations in matrix rows B-14 and B-15, the T-117-03 lifecycle check, and the `/lifecycle` descriptor-count assumption are retired per ADR-034 and REQ-06.018; `GET /lifecycle` returns `404` and the disabled-type check no longer depends on a lifecycle page. See TECH-080.
 
 ## Description
-**Ticket:** TASK-117
-**Milestone:** m-17 (Config-Defined Document Types and Artifact Categorization)
-**Status:** Refined — execution-ready (verification and packaging only)
-**UI mockups:** none new. Verification uses the approved browser reference [`MOCK-0015`](ui/mockups/MOCK-0015-browser-config-defined-document-types-review.html) and the existing per-feature browser tests; no interface change is designed here.
-**Requirements:** REQ-07.001, REQ-07.002, REQ-07.003, REQ-07.004, REQ-05.007, REQ-05.010, REQ-05.011, REQ-06.014, REQ-01.004, NFR-03.002, NFR-03.003, NFR-04.002, NFR-05.001
-**ADRs:** ADR-0016, ADR-0017, ADR-0019, ADR-0020, ADR-0021 (Proposed), ADR-0022, ADR-0023, ADR-0024
-
 ## Purpose
 
 Close the m-17 release gate. Twelve implementation tasks each tested their own

@@ -17,11 +17,6 @@ status: verified
 # TECH-041 Translate Papyrus and Backlog.md IDs at the Storage Boundary
 
 ## Description
-**Ticket:** TASK-64 (historical)
-**Milestone:** m-12 (Final Cross-Type Integration) — historical
-**Status:** Superseded
-**UI mockups:** none
-
 ## Purpose
 
 This specification is **superseded in intent** and no longer states a live behaviour contract. Its subject — bidirectional translation between Papyrus display IDs and Backlog.md storage IDs, fixed per-type offsets (task `0`, milestone `1`), storage prefixes, and the `m-0` base — was renounced by NFR-04.004 and REQ-01.005. Papyrus now keeps a single ID space with no translation layer. The live contract is now defined by:

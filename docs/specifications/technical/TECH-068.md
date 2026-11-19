@@ -48,13 +48,6 @@ status: draft
 > **Revised (TASK-178, 2026-11-19):** reference visibility in shared browser list views is per artifact family per ADR-035 and REQ-06.019 (source RE-006). `ContentModel::Generic` (config-defined document types) renders no reference list in any list row; `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep it; labels render for every family. Single-document view, CLI list and view, JSON API, `RecordView`, and front matter are unchanged.
 
 ## Description
-**Ticket:** TASK-114
-**Milestone:** m-17 (Config-Defined Document Types and Artifact Categorization)
-**Status:** Refined — execution-ready; `MOCK-0015` approved (2026-11-14)
-**UI mockups:** [`MOCK-0015`](ui/mockups/MOCK-0015-browser-config-defined-document-types-review.html) (approved 2026-11-14, revised for the 2026-11-14 owner request) — UI description [`ui/browser-config-defined-document-types-ui.md`](ui/browser-config-defined-document-types-ui.md); reuses the approved shell [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html) and the generic document patterns of [`MOCK-0009`](ui/mockups/MOCK-0009-browser-technical-specifications-review.html)/[`MOCK-0013`](ui/mockups/MOCK-0013-browser-use-cases-test-cases-and-test-reports-review.html)
-**Requirements:** REQ-06.014, REQ-06.003, REQ-06.004, REQ-06.012, REQ-05.007, REQ-05.011, REQ-07.001, REQ-07.002, REQ-07.004, NFR-02.002
-**ADRs:** ADR-0020, ADR-0017, ADR-0022, ADR-0005, ADR-0006, ADR-0013, ADR-0018
-
 ## Purpose
 
 The browser still resolves document types through `browser::records::Category`

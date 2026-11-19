@@ -47,11 +47,6 @@ status: verified
 # TECH-008 Search and Browser Requirements Milestone Packaging and Verification
 
 ## Description
-**Ticket:** TASK-7
-**Milestone:** m-1 (Search and Browser for Requirements)
-**Status:** Refined (execution-ready)
-**UI mockups:** none new — no UI change in this ticket; MOCK-0001 (approved 2026-11-03, UTC) remains the layout reference for the shipped browser interface
-
 ## Purpose
 
 Package the current Papyrus feature set (TASK-1 foundation + TASK-2 init/config + TASK-3 req/nfreq + TASK-5 search + TASK-6 browser) as an installable amd64 Debian package, and verify in an isolated Debian Forky environment that the packaged binary installs, uninstalls, and provides both `search` and the offline local browser over requirement content. This is the last task of milestone m-1 and closes its "each increment is packaged and usable" goal for the search/browser capability.

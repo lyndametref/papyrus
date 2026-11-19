@@ -38,11 +38,6 @@ status: verified
 # TECH-056 Expand Unified Search to Use Cases, Test Cases, and Test Reports
 
 ## Description
-**Ticket:** TASK-80
-**Milestone:** m-15 (Use Cases and Test Documentation)
-**Status:** Refined (execution-ready)
-**UI mockups:** none (CLI-only)
-
 ## Purpose
 
 Extend `papyrus search` to include use cases, test cases, and test reports. These are document records: they are stored under their configured `document_types` directories (default `use-cases/`, `test-cases/`, and `test-reports/`) and are searched whenever the documented `doc` type is selected (including the default all-types search). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by later search increments are reused unchanged. This increment implements REQ-06.001 under REQ-05/REQ-05.012/REQ-05.013/REQ-05.014/REQ-05.007, and advances BR-015 and BR-018/BR-019/BR-020.

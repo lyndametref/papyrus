@@ -27,11 +27,6 @@ status: verified
 # TECH-035 Expand Unified Search to Audit Records
 
 ## Description
-**Ticket:** TASK-48
-**Milestone:** m-9 (Audit Records)
-**Status:** Refined (execution-ready)
-**UI mockups:** none (CLI-only)
-
 ## Purpose
 
 Extend `papyrus search` to include audit records. Audit records are document records: they are stored under the configured `document_types.audit` directory (default `docs/audit-records/`) and are searched whenever the documented `doc` type is selected (including the default all-types search). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` are reused unchanged. This increment implements REQ-06.001 under REQ-05/REQ-05.006/REQ-05.007, and advances BR-015 and BR-014.

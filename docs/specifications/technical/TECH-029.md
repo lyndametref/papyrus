@@ -29,11 +29,6 @@ status: verified
 # TECH-029 Browser Access for UI Specifications
 
 ## Description
-**Ticket:** TASK-24
-**Milestone:** m-6 (UI Specifications)
-**Status:** Refined (execution-ready)
-**UI mockups:** [`MOCK-0005`](ui/mockups/MOCK-0005-browser-ui-specifications-review.html) — approved 2026-11-06 (TASK-36); extends the approved baseline [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html), [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html), [`MOCK-0003`](ui/mockups/MOCK-0003-browser-decision-records-review.html), and [`MOCK-0004`](ui/mockups/MOCK-0004-browser-glossary-terms-review.html).
-
 ## Purpose
 
 Extend the offline, project-local, read-and-edit web interface so it also serves active UI specifications (title, associated view, description). Reuses TASK-6/TASK-11/TASK-15/TASK-23 baseline (ADR-0005/ADR-0006). Implements REQ-05.004 and REQ-05.007 under REQ-06.002. Deprecated specifications hidden.

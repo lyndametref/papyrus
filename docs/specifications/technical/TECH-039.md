@@ -53,11 +53,6 @@ status: verified
 # TECH-039 Technical Specifications Milestone Packaging and Verification
 
 ## Description
-**Ticket:** TASK-59
-**Milestone:** m-11 (Technical Specifications)
-**Status:** Refined (execution-ready)
-**UI mockups:** none new — no UI change in this ticket; the shipped browser interface keeps the approved baseline MOCK-0001…MOCK-0008 and the approved MOCK-0009, which covers the Technical Specifications category.
-
 ## Purpose
 
 Package the current Papyrus feature set (all work through TASK-58, including TASK-55 technical-specification management, TASK-56 technical-specification search, TASK-57 technical-specification browser access, and the TASK-58 design review) as an installable amd64 Debian package, and verify in an isolated Debian Forky environment that the packaged binary installs, uninstalls, and provides technical-specification creation, listing, viewing, editing, deprecation, restoration, search, and offline local browser access end to end.

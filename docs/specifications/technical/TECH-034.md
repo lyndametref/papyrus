@@ -55,11 +55,6 @@ status: verified
 # TECH-034 Browser Access for Business Rules
 
 ## Description
-**Ticket:** TASK-25
-**Milestone:** m-8 (Business Rules)
-**Status:** Refined (execution-ready)
-**UI mockups:** [`MOCK-0007`](ui/mockups/MOCK-0007-business-rules-review.html) — approved 2026-11-07 (TASK-45); extends the approved baseline [`MOCK-0001`](ui/mockups/MOCK-0001-browser-requirements-review.html), [`MOCK-0002`](ui/mockups/MOCK-0002-browser-backlog-records-review.html), [`MOCK-0003`](ui/mockups/MOCK-0003-browser-decision-records-review.html), [`MOCK-0004`](ui/mockups/MOCK-0004-browser-glossary-terms-review.html), [`MOCK-0005`](ui/mockups/MOCK-0005-browser-ui-specifications-review.html), and [`MOCK-0006`](ui/mockups/MOCK-0006-browser-ui-mockups-review.html). UI description: [`ui/browser-business-rules-ui.md`](ui/browser-business-rules-ui.md).
-
 ## Purpose
 
 Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), TASK-15 (decision records), TASK-23 (glossary terms), TASK-24 (UI specifications), and TASK-40 (UI mockups) so it also serves the business-rules store: active business rules (ID, title, description, rationale, applicability, and references to business requirements). The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`business-rule`), its record model, list/view/edit screens, API endpoints, and tests. It implements REQ-05.005 and the web-visibility part of REQ-05.007 for the browser surface under REQ-06.002, and advances NFR-01.002 (display and edit all Papyrus content) for business rules. Deprecated business rules are hidden from lists and unreachable by URL, exactly as deprecated requirements, glossary terms, UI specifications, and UI mockups.

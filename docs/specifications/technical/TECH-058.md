@@ -64,11 +64,6 @@ status: draft
 > **Revised (TASK-201, 2026-11-18):** the `Managed artifacts & lifecycles` and `Agent skills & workflows` sidebar entries asserted in the browser smoke step are retired per ADR-034 and REQ-06.018; the verified sidebar order now ends at `UI Mockups`. See TECH-080.
 
 ## Description
-**Ticket:** TASK-82
-**Milestone:** m-15 (Use Cases and Test Documentation)
-**Status:** Refined (execution-ready)
-**UI mockups:** none new — no UI change in this ticket; the shipped browser interface keeps the approved baseline MOCK-0001…MOCK-0012 and the approved MOCK-0013 (TASK-79), which covers the Use Cases, Test Cases, and Test Reports categories.
-
 ## Purpose
 
 Package the current Papyrus feature set (all work through TASK-81, including TASK-78 use-case/test-case/test-report management, TASK-80 search, and TASK-81 browser access) as an installable amd64 Debian package, and verify in an isolated Debian Forky environment that the packaged binary installs, uninstalls, and provides use-case, test-case, and test-report creation, listing, viewing, editing, deprecation, restoration, search, and offline local browser access end to end.

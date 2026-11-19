@@ -31,11 +31,6 @@ status: verified
 # TECH-001 Rust CLI and Debian Package Baseline
 
 ## Description
-**Ticket:** TASK-1
-**Milestone:** m-0 (Rust CLI Foundation and Requirements)
-**Status:** Refined (execution-ready)
-**UI mockups:** none
-
 ## Purpose
 
 Establish the installable executable foundation for Papyrus: a Rust command-line binary that builds and runs with documented help and version output, packaged as an amd64 Debian `.deb` for Debian Trixie and Forky, licensed under GPL-3.0-or-later, with a runtime dependency-license audit. All later Papyrus capabilities depend on this baseline (TASK-2 … TASK-22).

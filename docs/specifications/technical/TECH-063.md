@@ -37,11 +37,6 @@ status: draft
 > **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
 
 ## Description
-**Ticket:** TASK-87
-**Milestone:** m-16 (Release 1.0)
-**Status:** Refined (execution-ready; UI mockup approved 2026-11-12)
-**UI mockups:** [`MOCK-0014`](ui/mockups/MOCK-0014-browser-configuration-view-single-record-layout-and-lifecycle-configuration-review.html) — `approved` (explicitly approved by the user on 2026-11-12 (UTC), TASK-87); UI description [`ui/browser-configuration-view-single-record-layout-and-lifecycle-configuration-ui.md`](ui/browser-configuration-view-single-record-layout-and-lifecycle-configuration-ui.md)
-
 ## Purpose
 
 Produce the approved clickable UI review package that the browser implementation tasks (TASK-93, TASK-94, TASK-95) must follow for the revised browser contract introduced by REQ-06.003 and REQ-06.006 through REQ-06.012: an editable configuration view, a consistent single record view layout, curated per-artifact descriptions with read-only configuration on the lifecycle page, non-functional requirement grouping under owning groups, shared header branding, record references as links, and a concise glossary landing page. The package is created under TASK-87 and approved by the user before any implementation starts; no browser task may invent layout or skip the approval gate.

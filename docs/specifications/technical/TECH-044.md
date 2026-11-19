@@ -20,11 +20,6 @@ status: verified
 # TECH-044 Migrate Tasks and Milestones to the Backlog.md Layout
 
 ## Description
-**Ticket:** TASK-69 (historical)
-**Milestone:** m-12 (Final Cross-Type Integration) — historical
-**Status:** Superseded
-**UI mockups:** none
-
 ## Purpose
 
 This specification is **superseded in intent** and no longer states a live behaviour contract. Its subject — lazy migration of task and milestone files to the Backlog.md on-disk layout, Backlog.md storage IDs, the `m-0` offset, and the byte-identical Backlog.md body contract — was renounced by NFR-04.004 and replaced by the Papyrus-native layout of ADR-0010. The live contract is now defined by:

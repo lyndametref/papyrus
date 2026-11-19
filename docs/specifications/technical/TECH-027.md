@@ -50,11 +50,6 @@ status: verified
 # TECH-027 Glossary Terms Milestone Packaging and Verification
 
 ## Description
-**Ticket:** TASK-33
-**Milestone:** m-5 (Glossary Terms)
-**Status:** Refined (execution-ready)
-**UI mockups:** none new — no UI change in this ticket; the shipped browser interface keeps MOCK-0001 (approved), MOCK-0002 (approved), MOCK-0003 (approved), and MOCK-0004 (approved, TASK-32) as its baseline. MOCK-0004 covers the glossary category.
-
 ## Purpose
 
 Package the current Papyrus feature set (all tasks through TASK-32, including TASK-30 glossary management, TASK-31 glossary search, and TASK-23 glossary browser access) as an installable amd64 Debian package, and verify in an isolated Debian Forky environment that the packaged binary installs, uninstalls, and provides glossary term creation, listing, viewing, editing, deprecation, restoration, search over glossary terms, and offline local browser access (including the glossary category) end to end. This is the last task of milestone m-5 and closes its "each increment is packaged and usable" goal for glossary terms.
