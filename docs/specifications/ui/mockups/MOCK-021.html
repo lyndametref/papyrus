@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' file: 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>MOCK-021 — Browser document-type list reference visibility review</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body data-mock-id="MOCK-021">
+<!-- mockup-id: MOCK-021 -->
+<!-- status: approved -->
+<!-- task: TASK-179 -->
+<!-- specs: UI-019 -->
+<!-- refs: REQ-06.019 RE-006 ADR-035 MOCK-0016 -->
+
+<header class="wf-chrome" role="navigation" aria-label="Review navigation (not part of the design)">
+  <span class="wf-chrome-label">Review</span>
+  <a class="wf-chrome-btn" href="#index">Overview</a>
+  <a class="wf-chrome-btn" href="#web">Web</a>
+  <span class="wf-chrome-note">Scaffolding for review only — not part of the mockup.</span>
+</header>
+
+<!-- 1. REVIEW LANDING -->
+<section class="wf-review wf-index is-active" data-review="index" data-screen="index">
+  <div class="wf-container">
+    <p class="wf-eyebrow">MOCK-021 · Wireframe review</p>
+    <h1 class="wf-title">Document-type list reference visibility</h1>
+    <p class="wf-subtitle">Shared browser list rows for config-defined document types (ContentModel::Generic) omit the reference list. Typed and HTML mockup families keep it. Labels stay in the Title cell for every family. Grayscale wireframe only — no visual styling, library, or technology choices.</p>
+
+    <div class="wf-box wf-ticket">
+      <h2 class="wf-section-title">Ticket</h2>
+      <p><strong>TASK-179</strong> — Design UI for removing the reference list from document-type browser list views</p>
+      <p class="wf-note">Sources: REQ-06.019 (source RE-006), ADR-035, TECH-074, TECH-076, TECH-068, TECH-045, MOCK-0016 (shared list contract), UI-016 (shared shell); spec UI-019. Milestone MS-028.</p>
+      <p class="wf-note">Contract applied here: generic document-type list rows render no reference list in any row; typed and HtmlMockup families keep references; labels render for every family. Single-document view, CLI list and view, JSON API, RecordView, and front matter are unchanged.</p>
+    </div>
+
+    <h2 class="wf-section-title">Review contents</h2>
+    <div class="wf-cards">
+      <article class="wf-box wf-card">
+        <span class="wf-badge">Web · 4 views</span>
+        <h3>Web prototype</h3>
+        <p>Notes list (generic: no reference line), Note detail (generic: References section kept), Business Rules list (typed: references kept), and UI Mockups list (HtmlMockup: references kept).</p>
+        <a class="wf-button" href="#web">Open web prototype</a>
+      </article>
+    </div>
+
+    <div class="wf-box" style="margin-top:16px">
+      <h2 class="wf-section-title" style="margin-top:0">What changes, and what does not</h2>
+      <ul>
+        <li><strong>Generic document types</strong> (configured in config, e.g. Notes): the reference list is omitted from every list row. It is not collapsed, emptied, or expandable.</li>
+        <li><strong>Typed families</strong> (e.g. Business Rules): the reference line stays in the Title cell.</li>
+        <li><strong>HtmlMockup family</strong> (UI Mockups): the reference line stays in the Title cell.</li>
+        <li><strong>Labels</strong>: stay in the Title cell for every family.</li>
+        <li><strong>Unchanged</strong>: single-document view, CLI list and view, JSON API, RecordView, front matter, fixed columns, status filter, row actions, page width, no-JavaScript behaviour, and offline operation.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 2. PROTOTYPE: one block for the web platform -->
+<div class="wf-proto" data-platform="web">
+  <nav class="wf-proto-nav" aria-label="Prototype views (review scaffolding)">
+    <span class="wf-chrome-label" style="color:var(--wf-muted)">Web views</span>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-notes">Notes list</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/view-note">Note detail</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-business-rules">Business Rules</a>
+    <a class="wf-chrome-btn wf-view-link" href="#web/list-ui-mockups">UI Mockups</a>
+  </nav>
+
+  <div class="wf-frame wf-frame--desktop">
+
+    <!-- GENERIC DOCUMENT TYPE LIST: reference list omitted from every row -->
+    <section class="wf-screen" data-platform="web" data-screen="list-notes">
+      <div class="wf-container">
+        <header class="wf-bar" role="banner" aria-label="Shared header (site-header)">
+          <span class="wf-badge" aria-hidden="true">P</span>
+          <span>
+            <span style="display:block;font-weight:700">Papyrus</span>
+            <span class="wf-note">papyrus</span>
+          </span>
+          <span class="wf-note" style="margin-left:auto;text-align:right">Local browser<br>offline · 127.0.0.1:6420</span>
+        </header>
+
+        <div class="wf-row" style="margin-top:12px;align-items:flex-start">
+          <aside style="flex:0 0 220px;max-width:220px;border-right:1px solid var(--wf-border);padding-right:12px" aria-label="Document types (site-nav)">
+            <p class="wf-section-title" style="margin-top:0">Document types</p>
+            <p class="wf-label" style="font-weight:700;margin:0 0 2px;text-transform:uppercase;letter-spacing:.06em">Backlog</p>
+            <span style="display:block">Backlog</span>
+            <p class="wf-label" style="font-weight:700;margin:10px 0 2px;text-transform:uppercase;letter-spacing:.06em">Decisions</p>
+            <span style="display:block">Decisions</span>
+            <p class="wf-label" style="font-weight:700;margin:10px 0 2px;text-transform:uppercase;letter-spacing:.06em">Documents</p>
+            <span style="display:block">Business requirements</span>
+            <a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules" style="display:block">Business Rules</a>
+            <span style="display:block">Audit Records</span>
+            <span style="display:block">Technical Specifications</span>
+            <span style="display:block">Use Cases</span>
+            <span style="display:block">Test Cases</span>
+            <span style="display:block">Test Reports</span>
+            <span style="display:block">Non-functional requirements</span>
+            <span style="display:block">Glossary</span>
+            <span style="display:block">UI Specifications</span>
+            <a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups" style="display:block">UI Mockups</a>
+            <a class="wf-link" href="#web/list-notes" data-goto="list-notes" aria-current="page" style="display:block;font-weight:700">Notes</a>
+          </aside>
+
+          <main class="wf-col" style="padding-left:4px">
+            <h1 class="wf-title">Notes</h1>
+            <p class="wf-subtitle">Config-defined document type · folder docs/notes/ · prefix NOTE. Status is read-only in the browser.</p>
+
+            <form aria-label="Status filter" style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+              <div style="flex:0 0 180px">
+                <label class="wf-label" for="notes-status">Status</label>
+                <select class="wf-input" id="notes-status">
+                  <option selected disabled>Status</option>
+                  <option>active</option>
+                  <option>review</option>
+                  <option>approved</option>
+                </select>
+              </div>
+              <button class="wf-button" type="button">Apply filter</button>
+              <a class="wf-link" href="#web/list-notes" data-goto="list-notes" style="align-self:center">Show all</a>
+            </form>
+
+            <section aria-label="Notes">
+              <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+                <h2 style="font-size:15px;margin:0">Notes</h2>
+                <p class="wf-note" style="margin:0">3 notes</p>
+              </div>
+
+              <div style="overflow-x:auto">
+                <table class="wf-table" data-list-layout="shared" aria-label="Notes" style="min-width:680px">
+                  <thead>
+                    <tr>
+                      <th scope="col" data-column="id">ID</th>
+                      <th scope="col" data-column="title">Title</th>
+                      <th scope="col" data-column="status">Status</th>
+                      <th scope="col" data-column="created">Created</th>
+                      <th scope="col" data-column="updated">Updated</th>
+                      <th scope="col" data-column="actions">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr data-row-id="NOTE-003">
+                      <td style="white-space:nowrap">NOTE-003</td>
+                      <td>
+                        <a class="wf-link" href="#web/view-note" data-goto="view-note">Release checklist notes</a>
+                        <span style="display:block;margin-top:4px"><span class="wf-badge">release</span> <span class="wf-badge">verification</span></span>
+                      </td>
+                      <td><span class="wf-badge">approved</span></td>
+                      <td style="white-space:nowrap">2026-11-18</td>
+                      <td style="white-space:nowrap">2026-11-19</td>
+                      <td style="white-space:nowrap"><a class="wf-link" href="#web/view-note" data-goto="view-note" aria-label="View NOTE-003">View</a> <a class="wf-link" href="#web/view-note" data-goto="view-note" aria-label="Edit NOTE-003">Edit</a></td>
+                    </tr>
+                    <tr data-row-id="NOTE-002">
+                      <td style="white-space:nowrap">NOTE-002</td>
+                      <td>
+                        <a class="wf-link" href="#web/view-note" data-goto="view-note">Offline rendering caveats</a>
+                        <span style="display:block;margin-top:4px"><span class="wf-badge">browser</span></span>
+                      </td>
+                      <td><span class="wf-badge">review</span></td>
+                      <td style="white-space:nowrap">2026-11-15</td>
+                      <td style="white-space:nowrap">2026-11-17</td>
+                      <td style="white-space:nowrap"><a class="wf-link" href="#web/view-note" data-goto="view-note" aria-label="View NOTE-002">View</a> <a class="wf-link" href="#web/view-note" data-goto="view-note" aria-label="Edit NOTE-002">Edit</a></td>
+                    </tr>
+                    <tr data-row-id="NOTE-001">
+                      <td style="white-space:nowrap">NOTE-001</td>
+                      <td>
+                        <a class="wf-link" href="#web/view-note" data-goto="view-note">Kickoff decisions</a>
+                        <span style="display:block;margin-top:4px"><span class="wf-badge">planning</span></span>
+                      </td>
+                      <td><span class="wf-badge">active</span></td>
+                      <td style="white-space:nowrap">2026-11-10</td>
+                      <td style="white-space:nowrap">2026-11-12</td>
+                      <td style="white-space:nowrap"><a class="wf-link" href="#web/view-note" data-goto="view-note" aria-label="View NOTE-001">View</a> <a class="wf-link" href="#web/view-note" data-goto="view-note" aria-label="Edit NOTE-001">Edit</a></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </main>
+        </div>
+
+        <footer class="wf-footer" aria-label="Footer (site-footer)">Papyrus local browser — every page is served from this project; no network access.</footer>
+      </div>
+      <p class="wf-note">Annotation (not part of the design): generic document-type list. Every row has a title link, then its label tag line; <strong>no reference line is rendered</strong> below the labels. The reference block is omitted, not collapsed or emptied. The columns, status filter, row actions, and shell are the unchanged shared list contract (MOCK-0016). Edit links are drawn where they belong; the generic edit view is unchanged and outside this review.</p>
+    </section>
+
+    <!-- GENERIC DOCUMENT DETAIL: references remain visible (unchanged context) -->
+    <section class="wf-screen" data-platform="web" data-screen="view-note">
+      <div class="wf-container">
+        <header class="wf-bar" role="banner" aria-label="Shared header (site-header)">
+          <span class="wf-badge" aria-hidden="true">P</span>
+          <span>
+            <span style="display:block;font-weight:700">Papyrus</span>
+            <span class="wf-note">papyrus</span>
+          </span>
+          <span class="wf-note" style="margin-left:auto;text-align:right">Local browser<br>offline · 127.0.0.1:6420</span>
+        </header>
+
+        <div class="wf-row" style="margin-top:12px;align-items:flex-start">
+          <aside style="flex:0 0 220px;max-width:220px;border-right:1px solid var(--wf-border);padding-right:12px" aria-label="Document types (site-nav)">
+            <p class="wf-section-title" style="margin-top:0">Document types</p>
+            <p class="wf-label" style="font-weight:700;margin:0 0 2px;text-transform:uppercase;letter-spacing:.06em">Backlog</p>
+            <span style="display:block">Backlog</span>
+            <p class="wf-label" style="font-weight:700;margin:10px 0 2px;text-transform:uppercase;letter-spacing:.06em">Decisions</p>
+            <span style="display:block">Decisions</span>
+            <p class="wf-label" style="font-weight:700;margin:10px 0 2px;text-transform:uppercase;letter-spacing:.06em">Documents</p>
+            <span style="display:block">Business requirements</span>
+            <a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules" style="display:block">Business Rules</a>
+            <span style="display:block">Audit Records</span>
+            <span style="display:block">Technical Specifications</span>
+            <span style="display:block">Use Cases</span>
+            <span style="display:block">Test Cases</span>
+            <span style="display:block">Test Reports</span>
+            <span style="display:block">Non-functional requirements</span>
+            <span style="display:block">Glossary</span>
+            <span style="display:block">UI Specifications</span>
+            <a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups" style="display:block">UI Mockups</a>
+            <a class="wf-link" href="#web/list-notes" data-goto="list-notes" aria-current="page" style="display:block;font-weight:700">Notes</a>
+          </aside>
+
+          <main class="wf-col" style="padding-left:4px">
+            <p class="wf-note" style="margin:0 0 6px"><a class="wf-link" href="#web/list-notes" data-goto="list-notes">Notes</a> › NOTE-003</p>
+            <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+              <h1 class="wf-title" style="flex:1 1 auto">Release checklist notes</h1>
+              <a class="wf-button" href="#web/view-note" data-goto="view-note">Edit</a>
+            </div>
+
+            <div class="wf-box" style="margin-bottom:12px">
+              <dl class="wf-row" style="margin:0;gap:24px">
+                <div><dt class="wf-label" style="margin:0">ID</dt><dd style="margin:0">NOTE-003</dd></div>
+                <div><dt class="wf-label" style="margin:0">Created</dt><dd style="margin:0">2026-11-18</dd></div>
+                <div><dt class="wf-label" style="margin:0">Updated</dt><dd style="margin:0">2026-11-19</dd></div>
+              </dl>
+            </div>
+
+            <p style="margin:0 0 8px"><strong>Status</strong> <span class="wf-badge">approved</span> <span class="wf-note">read-only</span></p>
+            <p style="margin:0 0 12px"><strong>Labels</strong> <span class="wf-badge">release</span> <span class="wf-badge">verification</span></p>
+
+            <p style="margin:0 0 12px">Record the checks to run before closing a release. Confirm the offline browser, the shared list, and the record views before tagging.</p>
+
+            <details open style="border:1px solid var(--wf-border);border-radius:var(--wf-radius);padding:10px 12px">
+              <summary style="cursor:pointer;font-weight:600">References (2)</summary>
+              <ul style="margin:8px 0 0;padding-left:20px">
+                <li><a class="wf-link" href="#web/view-note" data-goto="view-note">ADR-0017</a></li>
+                <li><a class="wf-link" href="#web/view-note" data-goto="view-note">REQ-06.014</a></li>
+              </ul>
+            </details>
+          </main>
+        </div>
+
+        <footer class="wf-footer" aria-label="Footer (site-footer)">Papyrus local browser — every page is served from this project; no network access.</footer>
+      </div>
+      <p class="wf-note">Annotation (not part of the design): generic single-document view. The collapsible <code>References (2)</code> section stays at the end of the page, exactly as today (REQ-06.012, ADR-033). This view is unchanged by the list change; reference links are illustrative.</p>
+    </section>
+
+    <!-- TYPED FAMILY LIST: reference line stays in the Title cell -->
+    <section class="wf-screen" data-platform="web" data-screen="list-business-rules">
+      <div class="wf-container">
+        <header class="wf-bar" role="banner" aria-label="Shared header (site-header)">
+          <span class="wf-badge" aria-hidden="true">P</span>
+          <span>
+            <span style="display:block;font-weight:700">Papyrus</span>
+            <span class="wf-note">papyrus</span>
+          </span>
+          <span class="wf-note" style="margin-left:auto;text-align:right">Local browser<br>offline · 127.0.0.1:6420</span>
+        </header>
+
+        <div class="wf-row" style="margin-top:12px;align-items:flex-start">
+          <aside style="flex:0 0 220px;max-width:220px;border-right:1px solid var(--wf-border);padding-right:12px" aria-label="Document types (site-nav)">
+            <p class="wf-section-title" style="margin-top:0">Document types</p>
+            <p class="wf-label" style="font-weight:700;margin:0 0 2px;text-transform:uppercase;letter-spacing:.06em">Backlog</p>
+            <span style="display:block">Backlog</span>
+            <p class="wf-label" style="font-weight:700;margin:10px 0 2px;text-transform:uppercase;letter-spacing:.06em">Decisions</p>
+            <span style="display:block">Decisions</span>
+            <p class="wf-label" style="font-weight:700;margin:10px 0 2px;text-transform:uppercase;letter-spacing:.06em">Documents</p>
+            <span style="display:block">Business requirements</span>
+            <a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules" aria-current="page" style="display:block;font-weight:700">Business Rules</a>
+            <span style="display:block">Audit Records</span>
+            <span style="display:block">Technical Specifications</span>
+            <span style="display:block">Use Cases</span>
+            <span style="display:block">Test Cases</span>
+            <span style="display:block">Test Reports</span>
+            <span style="display:block">Non-functional requirements</span>
+            <span style="display:block">Glossary</span>
+            <span style="display:block">UI Specifications</span>
+            <a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups" style="display:block">UI Mockups</a>
+            <a class="wf-link" href="#web/list-notes" data-goto="list-notes" style="display:block">Notes</a>
+          </aside>
+
+          <main class="wf-col" style="padding-left:4px">
+            <h1 class="wf-title">Business Rules</h1>
+            <p class="wf-subtitle">Command behavior rules for the Papyrus CLI and browser.</p>
+
+            <form aria-label="Status filter" style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+              <div style="flex:0 0 180px">
+                <label class="wf-label" for="br-status">Status</label>
+                <select class="wf-input" id="br-status">
+                  <option selected disabled>Status</option>
+                  <option>active</option>
+                  <option>archived</option>
+                </select>
+              </div>
+              <button class="wf-button" type="button">Apply filter</button>
+              <a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules" style="align-self:center">Show all</a>
+            </form>
+
+            <section aria-label="Business Rules">
+              <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+                <h2 style="font-size:15px;margin:0">Business Rules</h2>
+                <p class="wf-note" style="margin:0">3 business rules</p>
+              </div>
+
+              <div style="overflow-x:auto">
+                <table class="wf-table" data-list-layout="shared" aria-label="Business Rules" style="min-width:680px">
+                  <thead>
+                    <tr>
+                      <th scope="col" data-column="id">ID</th>
+                      <th scope="col" data-column="title">Title</th>
+                      <th scope="col" data-column="status">Status</th>
+                      <th scope="col" data-column="created">Created</th>
+                      <th scope="col" data-column="updated">Updated</th>
+                      <th scope="col" data-column="actions">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr data-row-id="BR-001">
+                      <td style="white-space:nowrap">BR-001</td>
+                      <td>
+                        <a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules">Papyrus command behavior</a>
+                        <span style="display:block;margin-top:4px"><span class="wf-badge">cli</span></span>
+                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">REQ-01.005, REQ-05.010</span>
+                      </td>
+                      <td><span class="wf-badge">active</span></td>
+                      <td style="white-space:nowrap">2026-11-15</td>
+                      <td style="white-space:nowrap">2026-11-16</td>
+                      <td style="white-space:nowrap"><a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules" aria-label="View BR-001">View</a> <a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules" aria-label="Edit BR-001">Edit</a></td>
+                    </tr>
+                    <tr data-row-id="BR-002">
+                      <td style="white-space:nowrap">BR-002</td>
+                      <td>
+                        <a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules">Papyrus init command behavior</a>
+                        <span style="display:block;margin-top:4px"><span class="wf-badge">cli</span></span>
+                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">ADR-0018, REQ-01.002</span>
+                      </td>
+                      <td><span class="wf-badge">active</span></td>
+                      <td style="white-space:nowrap">2026-11-12</td>
+                      <td style="white-space:nowrap">2026-11-16</td>
+                      <td style="white-space:nowrap"><a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules" aria-label="View BR-002">View</a> <a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules" aria-label="Edit BR-002">Edit</a></td>
+                    </tr>
+                    <tr data-row-id="BR-004">
+                      <td style="white-space:nowrap">BR-004</td>
+                      <td>
+                        <a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules">Papyrus browser command behavior</a>
+                        <span style="display:block;margin-top:4px"><span class="wf-badge">browser</span></span>
+                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">REQ-06.002, REQ-06.003</span>
+                      </td>
+                      <td><span class="wf-badge">active</span></td>
+                      <td style="white-space:nowrap">2026-11-01</td>
+                      <td style="white-space:nowrap">2026-11-16</td>
+                      <td style="white-space:nowrap"><a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules" aria-label="View BR-004">View</a> <a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules" aria-label="Edit BR-004">Edit</a></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </main>
+        </div>
+
+        <footer class="wf-footer" aria-label="Footer (site-footer)">Papyrus local browser — every page is served from this project; no network access.</footer>
+      </div>
+      <p class="wf-note">Annotation (not part of the design): typed family list. The Title cell keeps its label tag line and its reference line (muted text under the labels). This row layout is unchanged by REQ-06.019. The typed detail and edit views are outside this review; row links are drawn but do not navigate here.</p>
+    </section>
+
+    <!-- HTML MOCKUP FAMILY LIST: reference line stays in the Title cell -->
+    <section class="wf-screen" data-platform="web" data-screen="list-ui-mockups">
+      <div class="wf-container">
+        <header class="wf-bar" role="banner" aria-label="Shared header (site-header)">
+          <span class="wf-badge" aria-hidden="true">P</span>
+          <span>
+            <span style="display:block;font-weight:700">Papyrus</span>
+            <span class="wf-note">papyrus</span>
+          </span>
+          <span class="wf-note" style="margin-left:auto;text-align:right">Local browser<br>offline · 127.0.0.1:6420</span>
+        </header>
+
+        <div class="wf-row" style="margin-top:12px;align-items:flex-start">
+          <aside style="flex:0 0 220px;max-width:220px;border-right:1px solid var(--wf-border);padding-right:12px" aria-label="Document types (site-nav)">
+            <p class="wf-section-title" style="margin-top:0">Document types</p>
+            <p class="wf-label" style="font-weight:700;margin:0 0 2px;text-transform:uppercase;letter-spacing:.06em">Backlog</p>
+            <span style="display:block">Backlog</span>
+            <p class="wf-label" style="font-weight:700;margin:10px 0 2px;text-transform:uppercase;letter-spacing:.06em">Decisions</p>
+            <span style="display:block">Decisions</span>
+            <p class="wf-label" style="font-weight:700;margin:10px 0 2px;text-transform:uppercase;letter-spacing:.06em">Documents</p>
+            <span style="display:block">Business requirements</span>
+            <a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules" style="display:block">Business Rules</a>
+            <span style="display:block">Audit Records</span>
+            <span style="display:block">Technical Specifications</span>
+            <span style="display:block">Use Cases</span>
+            <span style="display:block">Test Cases</span>
+            <span style="display:block">Test Reports</span>
+            <span style="display:block">Non-functional requirements</span>
+            <span style="display:block">Glossary</span>
+            <span style="display:block">UI Specifications</span>
+            <a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups" aria-current="page" style="display:block;font-weight:700">UI Mockups</a>
+            <a class="wf-link" href="#web/list-notes" data-goto="list-notes" style="display:block">Notes</a>
+          </aside>
+
+          <main class="wf-col" style="padding-left:4px">
+            <h1 class="wf-title">UI Mockups</h1>
+            <p class="wf-subtitle">Wireframe review packages for the browser.</p>
+
+            <form aria-label="Status filter" style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+              <div style="flex:0 0 180px">
+                <label class="wf-label" for="mock-status">Status</label>
+                <select class="wf-input" id="mock-status">
+                  <option selected disabled>Status</option>
+                  <option>pending</option>
+                  <option>approved</option>
+                </select>
+              </div>
+              <button class="wf-button" type="button">Apply filter</button>
+              <a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups" style="align-self:center">Show all</a>
+            </form>
+
+            <section aria-label="UI Mockups">
+              <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+                <h2 style="font-size:15px;margin:0">UI Mockups</h2>
+                <p class="wf-note" style="margin:0">3 UI mockups</p>
+              </div>
+
+              <div style="overflow-x:auto">
+                <table class="wf-table" data-list-layout="shared" aria-label="UI Mockups" style="min-width:680px">
+                  <thead>
+                    <tr>
+                      <th scope="col" data-column="id">ID</th>
+                      <th scope="col" data-column="title">Title</th>
+                      <th scope="col" data-column="status">Status</th>
+                      <th scope="col" data-column="created">Created</th>
+                      <th scope="col" data-column="updated">Updated</th>
+                      <th scope="col" data-column="actions">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr data-row-id="MOCK-021">
+                      <td style="white-space:nowrap">MOCK-021</td>
+                      <td>
+                        <a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups">Browser document-type list reference visibility review</a>
+                        <span style="display:block;margin-top:4px"><span class="wf-badge">browser</span> <span class="wf-badge">list</span></span>
+                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">REQ-06.019, ADR-035</span>
+                      </td>
+                      <td><span class="wf-badge">approved</span></td>
+                      <td style="white-space:nowrap">2026-11-19</td>
+                      <td style="white-space:nowrap">2026-11-19</td>
+                      <td style="white-space:nowrap"><a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups" aria-label="View MOCK-021">View</a> <a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups" aria-label="Edit MOCK-021">Edit</a></td>
+                    </tr>
+                    <tr data-row-id="MOCK-0016">
+                      <td style="white-space:nowrap">MOCK-0016</td>
+                      <td>
+                        <a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups">Browser shell and shared list layout review</a>
+                        <span style="display:block;margin-top:4px"><span class="wf-badge">browser</span> <span class="wf-badge">shell</span></span>
+                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">TASK-141, REQ-06.016</span>
+                      </td>
+                      <td><span class="wf-badge">draft</span></td>
+                      <td style="white-space:nowrap">2026-11-15</td>
+                      <td style="white-space:nowrap">2026-11-15</td>
+                      <td style="white-space:nowrap"><a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups" aria-label="View MOCK-0016">View</a> <a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups" aria-label="Edit MOCK-0016">Edit</a></td>
+                    </tr>
+                    <tr data-row-id="MOCK-0015">
+                      <td style="white-space:nowrap">MOCK-0015</td>
+                      <td>
+                        <a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups">Browser config-defined document type views review</a>
+                        <span style="display:block;margin-top:4px"><span class="wf-badge">browser</span> <span class="wf-badge">documents</span></span>
+                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">TASK-114, REQ-06.014</span>
+                      </td>
+                      <td><span class="wf-badge">approved</span></td>
+                      <td style="white-space:nowrap">2026-11-14</td>
+                      <td style="white-space:nowrap">2026-11-14</td>
+                      <td style="white-space:nowrap"><a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups" aria-label="View MOCK-0015">View</a> <a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups" aria-label="Edit MOCK-0015">Edit</a></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </main>
+        </div>
+
+        <footer class="wf-footer" aria-label="Footer (site-footer)">Papyrus local browser — every page is served from this project; no network access.</footer>
+      </div>
+      <p class="wf-note">Annotation (not part of the design): HtmlMockup family list. The Title cell keeps its label tag line and its reference line. This row layout is unchanged by REQ-06.019. The mockup detail and edit views are outside this review; row links are drawn but do not navigate here.</p>
+    </section>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  function all(selector, scope) {
+    return Array.prototype.slice.call((scope || document).querySelectorAll(selector));
+  }
+  function byAttr(selector, attr, value) {
+    return all(selector).filter(function (el) { return el.getAttribute(attr) === value; })[0] || null;
+  }
+  function toggle(selector, active) {
+    all(selector).forEach(function (el) { el.classList.toggle('is-active', el === active); });
+  }
+  function go(hash) { location.hash = hash; }
+
+  function parse(rawHash) {
+    var raw = String(rawHash || '').replace(/^#\/?/, '');
+    var bits = raw.split('/');
+    if (!raw || bits[0] === 'index') return { mode: 'index' };
+    return { mode: 'proto', platform: bits[0], screen: bits[1] || '' };
+  }
+
+  function syncChrome(state) {
+    var key = state.mode === 'index' ? 'index' : state.platform;
+    all('.wf-chrome a').forEach(function (a) {
+      var target = String(a.getAttribute('href') || '').replace(/^#\/?/, '').split('/')[0];
+      var active = target === key;
+      a.classList.toggle('is-active', active);
+      if (active) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+    });
+  }
+
+  function render() {
+    var state = parse(location.hash);
+    var index = document.querySelector('[data-review="index"]');
+
+    syncChrome(state);
+
+    if (state.mode === 'proto') {
+      var proto = byAttr('.wf-proto', 'data-platform', state.platform);
+      if (!proto) { go('#index'); return; }
+      var screens = all('.wf-screen', proto);
+      var screen = state.screen ? byAttr('.wf-screen', 'data-screen', state.screen) : screens[0];
+      if (!screen || screens.indexOf(screen) === -1) screen = screens[0];
+      if (!screen) { go('#index'); return; }
+      var screenId = screen.getAttribute('data-screen');
+      if (state.screen !== screenId) { go('#' + state.platform + '/' + screenId); return; }
+
+      toggle('[data-review]', null);
+      toggle('.wf-proto', proto);
+      screens.forEach(function (s) { s.classList.toggle('is-active', s === screen); });
+      all('.wf-view-link', proto).forEach(function (link) {
+        var active = link.getAttribute('href') === '#' + state.platform + '/' + screenId;
+        link.classList.toggle('is-active', active);
+        if (active) link.setAttribute('aria-current', 'true'); else link.removeAttribute('aria-current');
+      });
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    toggle('.wf-proto', null);
+    toggle('[data-review]', index);
+  }
+
+  document.addEventListener('click', function (e) {
+    var target = e.target.closest('[data-goto]');
+    if (target) {
+      e.preventDefault();
+      var state = parse(location.hash);
+      if (state.mode === 'proto') go('#' + state.platform + '/' + target.getAttribute('data-goto'));
+    }
+  });
+
+  window.addEventListener('hashchange', render);
+  render();
+})();
+</script>
+</body>
+</html>
