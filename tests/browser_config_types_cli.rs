@@ -65,6 +65,17 @@ fn add_note(project: &Path) {
     fs::write(&path, updated).unwrap();
 }
 
+fn add_document_type(project: &Path, slug: &str, prefix: &str, directory: &str) {
+    let path = project.join("papyrus.config.yml");
+    let cfg = fs::read_to_string(&path).unwrap();
+    let block = format!(
+        "  {slug}:\n    prefix: {prefix}\n    directory: {directory}\n    enabled: true\n    statuses: [active, review, archived]\n"
+    );
+    let updated = cfg.replacen("document_types:\n", &format!("document_types:\n{block}"), 1);
+    assert_ne!(updated, cfg);
+    fs::write(&path, updated).unwrap();
+}
+
 fn create_note(project: &Path, title: &str, description: &str) -> String {
     run_ok(project, &["note", "create", title, "-d", description])
 }
@@ -763,6 +774,24 @@ fn t114_15_generic_labels_and_references_round_trip() {
     for value in ["alpha", "beta", "REF-001", "REF-002"] {
         assert!(detail.contains(value), "detail missing {value}: {detail}");
     }
+    assert!(
+        detail.contains("<details><summary>References (2)</summary>"),
+        "generic single-document view keeps its collapsible References section"
+    );
+
+    // TC-055: the generic list omits the reference block entirely but keeps
+    // labels in the Title cell.
+    let list = get(&server, "/?type=note").text();
+    let start = list.find("data-row-id=\"NOTE-004\"").expect("NOTE-004 row");
+    let row = &list[start..];
+    let row = &row[..row.find("</tr>").unwrap()];
+    assert!(row.contains("<li class=\"tag\">alpha</li>"));
+    assert!(row.contains("<li class=\"tag\">beta</li>"));
+    assert!(
+        !row.contains("row-refs"),
+        "no reference element in a generic row"
+    );
+    assert!(!row.contains("REF-001"));
 
     let api: serde_json::Value =
         serde_json::from_str(&get(&server, "/api/docs/note").text()).unwrap();
@@ -785,6 +814,20 @@ fn t114_15_generic_labels_and_references_round_trip() {
     assert!(edit.contains("name=\"references\" type=\"text\" value=\"REF-002\""));
 
     let path = d.join("docs/notes/NOTE-004.md");
+    let record_before = fs::read(&path).unwrap();
+    let config_before = fs::read(d.join("papyrus.config.yml")).unwrap();
+    let _ = get(&server, "/?type=note");
+    let _ = get(&server, "/doc/NOTE-004");
+    assert_eq!(
+        record_before,
+        fs::read(&path).unwrap(),
+        "list rendering changes no record file"
+    );
+    assert_eq!(
+        config_before,
+        fs::read(d.join("papyrus.config.yml")).unwrap(),
+        "list rendering changes no configuration file"
+    );
     let before = fs::read(&path).unwrap();
     let version = version_of(&edit);
     let body = form(&[
@@ -934,6 +977,181 @@ fn t114_18_inventory_cards_match_enabled_documents() {
         actual.len(),
         registry.enabled(ArtifactCategory::Document).count()
     );
+
+    drop(server);
+    let _ = fs::remove_dir_all(&d);
+}
+
+// TC-056 / TC-057: a document type configured after the change inherits the
+// Generic behaviour with no per-type presentation configuration, and the rest
+// of the shared list contract is unchanged.
+#[test]
+fn t182_01_newly_configured_type_omits_references_and_keeps_the_shared_layout() {
+    let d = root("182-01");
+    run_ok(&d, &["init", "Proj", "--no-git"]);
+    add_document_type(&d, "recipe", "REC", "recipes/");
+    run_ok(
+        &d,
+        &[
+            "recipe",
+            "create",
+            "Recipe One",
+            "-d",
+            "body one",
+            "--label",
+            "cooking",
+            "--reference",
+            "REF-R1",
+        ],
+    );
+    run_ok(&d, &["recipe", "create", "Recipe Two", "-d", "body two"]);
+    run_ok(&d, &["recipe", "status", "REC-002", "review"]);
+    let server = Server::start(&d);
+
+    let html = get(&server, "/?type=recipe").text();
+    assert!(html.contains("data-list-layout=\"shared\""));
+    for key in ["id", "title", "status", "created", "updated", "actions"] {
+        assert!(
+            html.contains(&format!("<th scope=\"col\" data-column=\"{key}\">")),
+            "recipe header {key}"
+        );
+    }
+    let start = html.find("data-row-id=\"REC-001\"").expect("REC-001 row");
+    let row = &html[start..];
+    let row = &row[..row.find("</tr>").unwrap()];
+    assert!(row.contains("<li class=\"tag\">cooking</li>"));
+    assert!(
+        !row.contains("row-refs"),
+        "no reference block for a new Generic type"
+    );
+    assert!(!row.contains("REF-R1"));
+    assert!(row.contains("aria-label=\"View REC-001\">View</a>"));
+    assert!(row.contains("aria-label=\"Edit REC-001\">Edit</a>"));
+    assert!(html.contains("class=\"filter\""));
+    assert!(
+        html.contains("<div class=\"app\">"),
+        "shared page width and shell"
+    );
+
+    let review = get(&server, "/?type=recipe&status=review").text();
+    assert!(review.contains("REC-002"));
+    assert!(!review.contains("REC-001"));
+    let active = get(&server, "/?type=recipe&status=active").text();
+    assert!(active.contains("REC-001"));
+    assert!(!active.contains("REC-002"));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&d);
+}
+
+// TC-059: CLI list and view keep references for config-defined document types.
+#[test]
+fn t182_02_cli_list_and_view_keep_generic_references() {
+    let d = init("182-02");
+    run_ok(
+        &d,
+        &[
+            "note",
+            "create",
+            "CLI note",
+            "-d",
+            "body",
+            "--label",
+            "alpha",
+            "--reference",
+            "REF-CLI-1",
+        ],
+    );
+    let list = run_ok(&d, &["note", "list"]);
+    assert!(list.contains("NOTE-001"));
+    assert!(list.contains("references=REF-CLI-1"), "list={list}");
+    let view = run_ok(&d, &["note", "view", "NOTE-001"]);
+    assert!(view.contains("REF-CLI-1"), "view={view}");
+    assert!(view.contains("alpha"), "view={view}");
+    let _ = fs::remove_dir_all(&d);
+}
+
+// TC-063: the glossary landing page display is unchanged and gains no
+// page-level reference section or field.
+#[test]
+fn t182_03_glossary_landing_page_display_is_unchanged() {
+    let d = init("182-03");
+    run_ok(
+        &d,
+        &[
+            "glossary",
+            "create",
+            "--term",
+            "Term One",
+            "--definition",
+            "Definition One",
+            "--label",
+            "glossary-label",
+        ],
+    );
+    run_ok(
+        &d,
+        &[
+            "glossary",
+            "create",
+            "--term",
+            "Term Two",
+            "--definition",
+            "Definition Two",
+        ],
+    );
+    let server = Server::start(&d);
+    let html = get(&server, "/?type=glossary").text();
+    assert!(html.contains("<h1 class=\"h1\">Glossary</h1>"));
+    assert!(html.contains("data-list-layout=\"shared\""));
+    assert!(html.contains("Term One"));
+    assert!(html.contains("Term Two"));
+    assert!(html.contains("<li class=\"tag\">glossary-label</li>"));
+    assert!(
+        !html.contains("<h2>References</h2>"),
+        "no page-level reference list"
+    );
+    assert!(
+        !html.contains("<dt>References</dt>"),
+        "no reference field added"
+    );
+
+    drop(server);
+    let _ = fs::remove_dir_all(&d);
+}
+
+// TC-065 / NFR-01.003: the list views and their assets are fully local.
+#[test]
+fn t182_04_list_views_and_assets_require_no_network_access() {
+    let d = init("182-04");
+    run_ok(&d, &["milestone", "create", "Milestone One", "-d", "body"]);
+    let server = Server::start(&d);
+    for path in ["/?type=note", "/?type=milestone", "/?type=ui-mockup"] {
+        let html = get(&server, path).text();
+        assert!(!html.contains("http://"), "{path} references http");
+        assert!(!html.contains("https://"), "{path} references https");
+        assert!(
+            !html.contains("href=\"//"),
+            "{path} references a protocol-relative URL"
+        );
+        assert!(
+            !html.contains("src=\"//"),
+            "{path} references a protocol-relative script"
+        );
+        assert!(
+            html.contains("href=\"/assets/app.css\""),
+            "{path} uses local assets"
+        );
+    }
+    for asset in ["/assets/app.css", "/assets/app.js", "/assets/nav-state.js"] {
+        let body = get(&server, asset).text();
+        assert!(!body.contains("http://"), "{asset} references http");
+        assert!(!body.contains("https://"), "{asset} references https");
+        assert!(
+            !body.contains("@import"),
+            "{asset} imports a remote stylesheet"
+        );
+    }
 
     drop(server);
     let _ = fs::remove_dir_all(&d);

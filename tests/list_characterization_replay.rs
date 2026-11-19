@@ -332,6 +332,45 @@ fn assert_record(html: &str, record: &Value) {
     assert!(actions > row.rfind("class=\"created-cell\"").unwrap_or(0));
 }
 
+/// ADR-035: Generic families omit every reference block; Typed and
+/// HtmlMockup families keep it. Labels stay for every family.
+fn assert_reference_visibility(html: &str, family: &str, fixture: &Value) {
+    if family == "note" {
+        assert!(
+            !html.contains("row-refs"),
+            "Generic family {family} renders no reference block in any row"
+        );
+        let row = row_block(html, "NOTE-001");
+        assert!(
+            row.contains("<li class=\"tag\">note</li>"),
+            "Generic labels stay in the Title cell"
+        );
+        assert!(
+            !row.contains("NOTE-REF-1"),
+            "Generic row hides its references"
+        );
+        return;
+    }
+    for record in fixture["records"].as_array().unwrap() {
+        let references = record["references"].as_array().unwrap();
+        if references.is_empty() {
+            continue;
+        }
+        let row = row_block(html, record["id"].as_str().unwrap());
+        assert!(
+            row.contains("<ul class=\"row-refs\">"),
+            "{family} keeps the reference block"
+        );
+    }
+    if family == "ui-mockup" {
+        let row = row_block(html, "MOCK-002");
+        assert!(
+            row.contains("<ul class=\"row-refs\"><li>MOCK-REF-1</li></ul>"),
+            "HtmlMockup family keeps the reference block"
+        );
+    }
+}
+
 fn assert_grouped(html: &str, fixture: &Value) {
     for group in fixture["grouped"].as_array().unwrap() {
         let key = group["group"].as_str().unwrap();
@@ -511,6 +550,7 @@ fn every_populated_fixture_replays_against_the_shared_layout() {
         for record in fixture["records"].as_array().unwrap() {
             assert_record(&html, record);
         }
+        assert_reference_visibility(&html, family, &fixture);
         if family == "requirement" || family == "nfr" {
             assert_grouped(&html, &fixture);
         }
