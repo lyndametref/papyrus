@@ -1,19 +1,58 @@
 ---
 id: REQ-06.019
-title: "Do not Show the Reference List in Document-Type Browser List Views"
+title: "Control Reference Visibility in Document-Type Browser List Views"
 created_date: '2026-11-18T19:28:43Z'
-updated_date: '2026-11-18T19:28:51Z'
+updated_date: '2026-11-20T20:58:11Z'
 labels: []
 references:
   - RE-006
+  - RE-010
+  - ADR-036
+  - ADR-039
+  - ADR-0035
 ---
-# REQ-06.019 Do not Show the Reference List in Document-Type Browser List Views
+# REQ-06.019 Control Reference Visibility in Document-Type Browser List Views
 
 ## User Story
-As a project contributor, I want document-type browser list views to omit the reference list so rows stay compact.
+As a project contributor, I want document-type browser list views to follow the type's reference visibility so that rows stay compact where references are not useful.
 
 ## Group
 REQ-06 Search and Local Web Interface
 
 ## Description
-In browser list views for config-defined document types (generic documents), the reference list is not displayed in any row, keeping rows compact. References remain visible in the single-document view for those document types (REQ-06.012) and in CLI list and view output (REQ-06.004). The change is limited to document-type list views: tasks, decisions, milestones, releases, requirements, NFRs, audit records, business rules, UI mockups, and the glossary landing page (REQ-06.011) are unchanged. The reference list is hidden entirely, not collapsed or expandable. No underlying record or front-matter value is changed. Criticality: Should have. Acceptance Criteria: (1) Browser list views for config-defined document types do not render the reference list in any row. (2) References remain visible in the single-document view for those document types. (3) References remain shown in CLI list and view output. (4) Other artifact families list views are unchanged, including their reference display. (5) The glossary landing page behavior is unchanged. (6) No underlying record or front-matter value is changed. (7) The views require no network access (NFR-01.003). Traceability: Source: RE-006. Product decision 2026-11-18: references are hidden entirely, not collapsed or expandable, in document-type list views. Product decision 2026-11-18: scope is config-defined document types only; tasks, decisions, milestones, releases, and other families are unchanged. REQ-06.004 - Use Front-Matter Metadata in CLI and Browser Views (CLI and detail views still show references). REQ-06.011 - Adjust Glossary Landing Page Display (precedent for omitting references on a list page; unchanged here). REQ-06.012 - Define Single Record View Layout (references remain collapsible in single-document view). REQ-06.014 - Display Config-Defined Document Types in the Browser (document-type list views in scope). REQ-06.016 - Present a Uniform List View Across Artifact Families (shared list layout; title-cell reference display qualified for document types). NFR-01.003 - Use the Browser Command and Interface Without Internet.
+In a browser list view, a row renders its reference list only when the resolved `reference_visibility` for that row's document type and, for a grouped type, its role is `Visible`.
+
+`reference_visibility` is seed data. A `SingleMarkdown` or `SingleHtmlMockup` type has one value; a `GroupedMarkdown` type has one value for the group role and one for the member role. The discriminator is the document model plus the descriptor's seed `reference_visibility`; no rule keyed on a former content model survives. In the seed, `req` and `nfr` are `Hidden` for both roles and every other seed type is `Visible`; a user-defined type defaults to `Visible` (ADR-036 decision 29).
+
+`Hidden` means the reference list is not rendered in any row of that type's browser list view. It is hidden entirely, not collapsed or expandable, and no empty placeholder is shown. For a grouped type, each group row and member row resolves the value for its own role.
+
+Reference visibility affects list rows only. References remain visible in the single-document view for every document type through its References disclosure (REQ-06.012), and in CLI list and view output, JSON output, and stored front matter (REQ-06.004). No underlying record or front-matter value is changed. The change is limited to document-type list views: tasks, decisions, milestones, releases, requirements, NFRs, audit records, business rules, UI mockups, and the glossary landing page (REQ-06.011) are unchanged. The views require no network access (NFR-01.003).
+
+Criticality: Should have.
+
+## Acceptance Criteria
+- Reference visibility is resolved from the descriptor's seed `reference_visibility` for each document type and, for a `GroupedMarkdown` type, for each of the group and member roles.
+- The discriminator is the document model plus the seed `reference_visibility`; no reference-list rule keyed on a former content model remains.
+- In the seed, `req` and `nfr` are `Hidden` for both roles and every other seed type is `Visible`; a user-defined `SingleMarkdown` type defaults to `Visible`.
+- A list row renders its reference list only when the resolved value for its type and role is `Visible`.
+- When the resolved value is `Hidden`, no row of that type's list view renders a reference list, and nothing is collapsed or expandable in its place.
+- A grouped type resolves visibility per row role, so a group row and a member row each use their own role's value.
+- References remain visible in the single-document view for every document type.
+- CLI list, CLI view, and JSON output keep showing references unchanged.
+- Other artifact families' list views are unchanged, including their reference display.
+- The glossary landing page behavior is unchanged.
+- No underlying record or front-matter value is changed.
+- The views require no network access (NFR-01.003).
+
+## Traceability
+- Source: RE-006.
+- RE-010 — Descriptor-driven document engine refactor (accepted, not reopenable): D8 (reference visibility is seed data per type and role).
+- ADR-039 — One descriptor-driven document view and edit surface: decisions 32-33 (reference visibility resolves from the descriptor per type and role; it affects list rows only) and downstream constraint 7.
+- ADR-036 — Config-declared document field schema and one descriptor model: decision 29 (seed reference visibility: `req` and `nfr` hidden for both roles, every other seed type visible) and decision 32 (seed fill).
+- ADR-0035 — Per-family reference visibility (as amended by ADR-039 decision 8: the discriminator is the document model plus the descriptor's seed `reference_visibility`; the former `ContentModel::Generic` rule is gone; labels, the detail view, and non-browser surfaces are unchanged).
+- REQ-06.004 — Use Front-Matter Metadata in CLI and Browser Views (CLI and detail views still show references).
+- REQ-06.011 — Adjust Glossary Landing Page Display (precedent for omitting references on a list page; unchanged here).
+- REQ-06.012 — Define Single Record View Layout (references remain in the single-document view).
+- REQ-06.014 — Display Config-Defined Document Types in the Browser (document-type list views in scope).
+- REQ-06.016 — Present a Uniform List View Across Artifact Families (shared list layout; title-cell reference display qualified for document types).
+- NFR-01.003 — Use the Browser Command and Interface Without Internet.
