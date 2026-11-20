@@ -2,7 +2,7 @@
 id: TASK-218
 title: "Write ADR-A: config-declared document field schema and one descriptor model"
 created_date: '2026-11-20T17:36:36Z'
-updated_date: '2026-11-20T18:18:07Z'
+updated_date: '2026-11-20T19:15:01Z'
 labels: []
 references:
   - ADR-0017
@@ -17,7 +17,7 @@ references:
   - TECH-068
   - TECH-071
   - TECH-072
-status: ToDo
+status: Done
 assignee:
   - architect
 milestone: MS-031
@@ -63,3 +63,6 @@ The source of truth is RE-010 D1-D14 (accepted, not reopenable) and MS-031 AC-2/
 - [ ] ADR-036 defines DocumentModel (SingleMarkdown, GroupedMarkdown, SingleHtmlMockup) replacing ContentModel and states the field vocabulary, reserved field keys, default-fill and collection-replace rules, and seed-only restrictions listed in the scope (MS-031 AC-2A, RE-010 D5, D6, D14).
 - [ ] ADR-036 states that the engine emits only PatchOps and never writes record bodies, and that title is fixed and non-configurable per RE-010 D13 (MS-031 AC-2A).
 - [ ] ADR-036 records the affected requirement and TECH inputs as references and leaves every requirement, TECH, source, test, and packaging file unchanged (MS-031 AC-10).
+## Comments
+- **architect**: ADR-036 accepted at decisions.ADR-036-config-declared-document-field-schema-and-one-descriptor-model.md; supersedes ADR-0017 d1-4,7,9,10 and constraints 1,4 only plus ADR-0018 in full (record marked superseded); papyrus check shows no new findings; Papyrus derived the longer filename from the full title, so the expected short path was not used.
+- **orchestrator**: Acceptance met: ADR-036 accepted, supersedes ADR-0017 decisions 1-4, 7, 9, 10 and constraints 1, 4 only, ADR-0018 in full; defines DocumentModel, field vocabulary, reserved keys, seed rules and PatchOps-only engine. No new check findings.
