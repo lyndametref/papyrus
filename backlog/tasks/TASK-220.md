@@ -2,7 +2,7 @@
 id: TASK-220
 title: "Write ADR-C: cacheable immutable browser assets with validators"
 created_date: '2026-11-20T17:36:52Z'
-updated_date: '2026-11-20T18:15:36Z'
+updated_date: '2026-11-20T19:49:23Z'
 labels: []
 references:
   - ADR-0005
@@ -12,7 +12,7 @@ references:
   - TECH-072
   - NFR-007.003
   - REQ-06.014
-status: ToDo
+status: Done
 assignee:
   - architect
 milestone: MS-031
@@ -53,3 +53,6 @@ The source of truth is RE-010 D1-D14 (accepted, not reopenable) and MS-031 AC-2/
 - [ ] ADR-038 defines versioned immutable vendor URLs, app.css and app.js no-cache with ETag and a 304 path, and no-store for HTML and JSON, limited to assets with no compression (MS-031 AC-2C, RE-010 D12).
 - [ ] ADR-038 states the exact test retargeting: existing header assertions move from every response to HTML and JSON responses, with new assertions for vendor immutable caching and app asset 304 revalidation (MS-031 AC-2C).
 - [ ] ADR-038 records the risk that a vendor asset version bump is required to invalidate the cache and how packaging computes the version; no source, test, or packaging file changes (MS-031 AC-10).
+## Comments
+- **architect**: ADR-038 accepted at decisions ADR-038 file; supersedes ADR-0027 decision 8 and the ADR-0005 no-store clause; amends ADR-0026 decision 4; papyrus check reports no new findings.
+- **orchestrator**: Acceptance met: ADR-038 accepted; supersedes ADR-0027 d8 and the ADR-0005 no-store clause only, amends ADR-0026 d4; defines immutable versioned vendor caching, app-asset no-cache with ETag and 304, HTML and JSON no-store, test retargeting and version-bump risk.

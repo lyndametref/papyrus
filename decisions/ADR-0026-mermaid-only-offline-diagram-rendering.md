@@ -2,7 +2,7 @@
 id: ADR-0026
 title: "Mermaid-Only Offline Diagram Rendering, PlantUML Out of Scope"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-16T21:08:36Z'
+updated_date: '2026-11-20T19:45:29Z'
 labels: []
 references: []
 ---
@@ -37,7 +37,6 @@ Mermaid quality also matters: it is JS code executing in the same origin as the 
 The current release binary is 4,730,296 bytes (KaTeX and its fonts already embedded). The projected binary with Mermaid 11.17.2 is 8,302,957 bytes before the small Rust/client additions.
 
 ## Decision
-
 1. **Diagram syntax support is Mermaid only.** The accepted fence info string is exactly `mermaid` (case-sensitive, trailing whitespace trimmed, zero to three leading spaces, at least three backticks or tildes, same opener/closer rules as the math fence in `docs/specifications/browser-math-and-diagram-rendering.md` §3.4). The `mmd` alias is **dropped**: REQ-06.017 names only `mermaid`, the alias is an unrequested extension, and it would double the fence-recognition and test surface. An `mmd` fence stays literal text.
 
    - `plantuml` and `puml` fences are PlantUML fences and render as source with a visible note (decision 2). `uml`, `dot`, `graphviz`, and every other unknown fence remain literal text exactly as today, fence lines included, never an error, never silently dropped.
@@ -74,10 +73,12 @@ The current release binary is 4,730,296 bytes (KaTeX and its fonts already embed
 
    - Upstream: `https://registry.npmjs.org/mermaid/-/mermaid-11.17.2.tgz`, published 2026-08-25T11:52:39Z, MIT.
    - Vendored file: `src/browser/vendor/mermaid/11.17.2/mermaid.min.js`, 3,572,661 bytes, SHA-256 `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8`.
-   - Served path: `/assets/mermaid/mermaid.min.js`, `Content-Type: text/javascript; charset=utf-8`, through the ADR-0027 asset table with a `MANIFEST.md` row, a `LICENSE`, and an `UPSTREAM.md`. No `.map`, no CSS, no icon pack, no second file is vendored.
-   - The file is a classic IIFE script, loaded as `<script src="/assets/mermaid/mermaid.min.js" defer></script>`. No module loading, no dynamic `import()`, no `fetch`. It assigns `globalThis.mermaid`.
+   - Served path: `/assets/mermaid/11.17.2/mermaid.min.js`, `Content-Type: text/javascript; charset=utf-8`, through the ADR-0027 asset table with a `MANIFEST.md` row, a `LICENSE`, and an `UPSTREAM.md`. No `.map`, no CSS, no icon pack, no second file is vendored.
+   - The file is a classic IIFE script, loaded as `<script src="/assets/mermaid/11.17.2/mermaid.min.js" defer></script>`. No module loading, no dynamic `import()`, no `fetch`. It assigns `globalThis.mermaid`.
    - Load order on a page: KaTeX stylesheet, KaTeX script, Mermaid script, then `app.js`, all deferred, so both globals exist before the client passes run.
    - The bundle is linked only on pages whose pre-pass found at least one renderable `mermaid` figure. `no-store` is unchanged (ADR-0027 decision 8), so a diagram page re-sends the 3.4 MiB bundle on each navigation; accepted for a loopback single-user interface.
+
+   *Revision (2026-11-20, amended by ADR-038): the served path and the script tag above carry the asset version, and the file is served with `Cache-Control: public, max-age=31536000, immutable` instead of `no-store`; the `no-store` sentence at the end of this decision is retired, so a diagram page no longer re-sends the 3.4 MiB bundle on each navigation (ADR-038). The pin, the single file, the SHA-256, the licence and notice obligations, the deferred classic-script load, the load order, and the link-only-on-diagram-pages rule are unchanged.*
 
 5. **Client contract.**
 
@@ -142,7 +143,6 @@ The current release binary is 4,730,296 bytes (KaTeX and its fonts already embed
 11. **Rendering is browser-only.** CLI output, `--json`, search, and the record files keep the source text. Nothing about a diagram is stored, cached, pre-rendered, or written back.
 
 12. **Binary budget: the 12 MiB ceiling in ADR-0027 decision 6 is unchanged.** The projected binary is 4,730,296 + 3,572,661 = 8,302,957 bytes (7.92 MiB) before the small Rust and `app.js` additions, leaving 4,279,955 bytes (4.08 MiB) of headroom. The compressed `.deb` estimate rises by roughly 0.75–0.98 MB; no package-size budget exists.
-
 ## Threat model
 
 A record author controls the diagram source, and Mermaid parses it client-side and builds SVG/DOM in the same origin as the unauthenticated loopback write API, so a Mermaid defect is a same-origin defect; the assets are the record corpus and the write API, not a remote account. Containment is layered and type-independent: `securityLevel: 'strict'` keeps Mermaid's DOMPurify sanitisation and disables click handling, `htmlLabels: false` removes the HTML-label injection path, the client never calls `bindFunctions` so no click or link binding is installed, the byte/line caps and `maxEdges` bound CPU and memory, `script-src 'self'` prevents inline, `eval`, or remote script, `default-src 'none'` prevents network fetches, `img-src`/`font-src 'self'` limit subresources to embedded assets, and the only style relaxation (`style-src 'self' 'unsafe-inline'`) is scoped to pages that already load the diagram bundle, so a CSS-only injection can restyle or occlude a diagram page but cannot execute script or exfiltrate data. Residual risk is a Mermaid CVE or a CSS-injection variant; the pinned version, the manifest digest, the advisory review, and the hostile-fixture tests are the controls.

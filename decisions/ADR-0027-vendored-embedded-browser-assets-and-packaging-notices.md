@@ -2,7 +2,7 @@
 id: ADR-0027
 title: "Vendored Embedded Browser Assets and Packaging Notices"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-16T21:08:36Z'
+updated_date: '2026-11-20T19:44:49Z'
 labels: []
 references: []
 ---
@@ -29,7 +29,6 @@ Forces: single binary and no runtime asset directory (ADR-0002, ADR-0005); no ne
 The total new weight is ≈4.0 MiB (Mermaid 3,572,661 B; KaTeX 275,414 B + 23,335 B + ≈259,792 B of woff2). The current binary is 4,197,544 B.
 
 ## Decision
-
 1. **One static asset table, exact-match routing, binary-safe bodies.** A new module `src/browser/assets.rs` exposes:
 
    ```rust
@@ -60,10 +59,11 @@ The total new weight is ≈4.0 MiB (Mermaid 3,572,661 B; KaTeX 275,414 B + 23,33
 
 8. **`Cache-Control: no-store` is retained.** No new cache semantics, no `ETag`, no compression, no range requests. A page with diagrams therefore re-sends the Mermaid bundle on each navigation. This is accepted for a loopback single-user interface; serving vendor assets with a long-lived cache is a separate decision and would need its own ADR because it changes ADR-0005's header contract.
 
+   *Revision (2026-11-20, superseded in part by ADR-038): the retention of `no-store`, the prohibition of cache semantics and `ETag`, and the statement that a long-lived vendor cache is a separate decision are superseded. Vendor files are served from versioned immutable URLs with `Cache-Control: public, max-age=31536000, immutable`; `app.css`, `app.js`, and `nav-state.js` are served `no-cache` with a strong `ETag` and a bodyless `304` path; HTML and JSON responses stay `no-store` (ADR-038). The rest of this decision remains in force: no compression, no range requests, and no change to the exact-match asset table.*
+
 9. **No source maps, no minified references to remote origins.** `.map` files are not embedded. A test asserts that no served asset is referenced from a page outside `/assets/`, that no served CSS contains `@import`, and that the only `url(` values in served CSS are same-origin font paths.
 
 10. **Existing offline-reference tests are retargeted, not deleted.** The `t24/t40l/t25l/t26k/t57k/t81l`-style "no `url(`, no web font" assertions scanned `app.css`; they keep scanning `app.css` and gain a sibling assertion that every `url(` in every served stylesheet resolves to an entry of the asset table.
-
 ## Consequences
 
 **Positive:**
