@@ -2,9 +2,21 @@
 id: REQ-05.010
 title: "Record Metadata in YAML Front Matter"
 created_date: '2026-11-13T20:58:56Z'
-updated_date: '2026-11-15T15:47:28Z'
+updated_date: '2026-11-20T20:45:08Z'
 labels: []
-references: []
+references:
+  - RE-010
+  - ADR-036
+  - ADR-039
+  - ADR-0007
+  - REQ-01.005
+  - REQ-05.006
+  - REQ-05.007
+  - REQ-05.008
+  - REQ-05.011
+  - REQ-07.001
+  - REQ-07.002
+  - REQ-07.004
 ---
 # REQ-05.010 Record Metadata in YAML Front Matter
 
@@ -18,23 +30,51 @@ REQ-05 Project Documentation Management
 Must have
 
 ## Description
-Every Markdown file managed by Papyrus begins with a YAML front-matter block. The block carries the general fields `id`, `title`, `created_date`, `updated_date`, `labels`, and `references` for every managed record type, followed by the type-specific fields. Task front matter carries `id`, `title`, `status`, `assignee`, `created_date`, `updated_date`, `labels`, `milestone`, `dependencies`, `references`, `documentation`, `type`, and `ordinal`; `assignee` is a YAML list. Milestone front matter carries the general fields plus `release` and `status` (`open` or `closed`). Release front matter carries the general fields plus `status` (`planned` or `released`). Front-matter-backed document types carry `status` with the value `active`, `archived`, or a custom status declared for that document type (REQ-07.001, REQ-07.002); UI mockups keep that state in their HTML content and carry no front matter (REQ-05.008). A decision's front matter may carry `superseded_by`, and front matter is additive for decisions: the existing `## Date` and `## References` sections remain part of the body, `created_date` is the front-matter timestamp and does not replace or duplicate the ADR `## Date` line, and neither section becomes an editable metadata source. Decision `status` stays in the document core and decision `type` (`adr`/`bdr`) stays derived from the record ID prefix; neither moves to front matter. Audit records carry `type`.
+**Scope.** Every Markdown file managed by Papyrus begins with a YAML front-matter block at byte 0, delimited by `---` lines. Front matter is authoritative for the keys it carries and replaces the equivalent information in the document core for records Papyrus writes. The scope is Markdown records: UI mockups keep their metadata in their HTML content and carry no front matter (REQ-05.008), and Backlog.md `docs` and `drafts` directories are not managed record types.
 
-The front-matter `id` and every reference value (`milestone`, `dependencies`, `references`, `superseded_by`) use the Papyrus ID (REQ-01.005). There is no separate storage ID and no translation at a storage boundary (NFR-04.004).
+**General keys are registry-owned.** The general front-matter keys are `id`, `title`, `status`, `labels`, `references`, `created_date`, and `updated_date`, plus `group` on a grouped member record. These eight keys are the reserved field keys (ADR-036 decision 23): Papyrus writes and maintains them, they are never declared in `document_types`, and no field may use one of them as its `key` or as its `frontmatter_key` (REQ-07.002). `title` is fixed and is not a field; `status` is reserved and read-only outside the verbs that own it; `group` is the engine-owned link of a `GroupedMarkdown` member. `labels`, `references`, `created_date`, and `updated_date` are general record metadata rather than fields (ADR-039 decision 18).
 
-Scope is Markdown records. UI mockups are excluded: their status, associated task, and references remain stored in the mockup's HTML content (REQ-05.008), which is the single source for mockup metadata, and mockup HTML files carry no front matter. Backlog.md `docs` and `drafts` directories are not managed record types and are out of scope.
+Key ownership is therefore split in exactly one way: the general keys belong to the record registry, and every other document key belongs to the type's descriptor. A document key exists only because a declared field names it in `frontmatter_key` — additional keys are config-declared, never supplied by code, by a per-type module, or by a document-type configuration key (RE-010 D14, ADR-036 decisions 14 and 28).
 
-Front matter is authoritative for the fields it carries and replaces the equivalent information in the document core for records Papyrus writes, so no retired metadata section stores a field that front matter carries; frozen decision bodies are the exception described above. Key order and YAML quoting follow the documented serialization, with general keys preceding type-specific keys. Task and milestone records have no `# <ID> <title>` body title line; their bodies use the record's section layout. Every other Markdown record type keeps a `# <ID> <title>` body title line that the writer generates from the front-matter `id` and `title`, so the two cannot diverge; frozen ADR bodies keep their existing heading and gain front matter only. Timestamps are quoted ISO-8601 UTC strings, for example `'2026-10-31T22:26:00Z'`. Adding front matter to an existing record does not change its body. Records brought in by the one-way Backlog.md import script (NFR-04.004) are written in the Papyrus record format, with this front-matter block, on import.
+**Document keys come from the descriptor.** For a document type, the front-matter keys beyond the general keys are exactly the `frontmatter_key` values of the type's declared fields for the record's role (ADR-036 decision 14):
+
+- A field with only a `heading` contributes no front-matter key; its value lives in the body section.
+- A field with only a `frontmatter_key` is metadata-only and has no body section.
+- A field with both writes both the body section and the front-matter key from the same submitted value; a read displays the body section and does not merge the two locations, and a divergence already on disk is left as stored (ADR-036 decision 21, ADR-039 decision 16).
+- `frontmatter_key` may differ from the field `key`; for example the `audit` type's `audit_type` field is stored under the front-matter key `type` (REQ-05.006).
+
+Document front-matter keys follow field sequence order after the general keys, so the seed field sequence is the order source for the record file as it is for body sections and CLI options (ADR-036 decision 20). An undeclared key already present on disk is preserved as stored and is displayed read-only; Papyrus never repairs or merges it (ADR-039 decision 18).
+
+**What is not a configuration key.** `model`, `title`, `content`, and `id_shape` are not `document_types` keys and a declaration of any of them is rejected (REQ-07.002, REQ-07.004). The document model is seed data, the title is a fixed record invariant and reserved key, the content is the record body produced by the field sequence, and the ID shape follows the model (plain ID for `SingleMarkdown` and `SingleHtmlMockup`, plain group and dotted member IDs for `GroupedMarkdown`).
+
+**Backlog and decision keys are unchanged.** Task front matter carries `id`, `title`, `status`, `assignee`, `created_date`, `updated_date`, `labels`, `milestone`, `dependencies`, `references`, `documentation`, `type`, and `ordinal`; `assignee` is a YAML list. Milestone front matter carries the general keys plus `release` and `status` (`open` or `closed`). Release front matter carries the general keys plus `status` (`planned` or `released`). Decisions, milestones, releases, and tasks stay bespoke (RE-010 D4): a decision's front matter may carry `superseded_by`, front matter is additive for decisions, the existing `## Date` and `## References` sections remain part of the body, `created_date` does not replace or duplicate the ADR `## Date` line, and decision `status` and decision `type` (`adr`/`bdr`) stay in the document core and derived from the record ID prefix. Frozen ADR bodies keep their existing heading and sections and gain front matter only.
+
+**Document status.** A front-matter-backed document type carries `status` with the value `active`, `archived`, or a custom status declared for that document type (REQ-07.001, REQ-07.002). Papyrus writes `archived` only when it moves the record into the type's `archived/` subfolder, and no create, edit, or field option sets the value (REQ-05.011). UI mockup HTML files carry no front matter and keep their state in the HTML metadata comment (REQ-05.008).
+
+**Identifiers, references, and serialization.** The front-matter `id` and every reference value (`milestone`, `dependencies`, `references`, `superseded_by`, `group`, and the values of list-valued fields) use the Papyrus ID (REQ-01.005); there is no separate storage ID and no translation at a storage boundary (NFR-04.004). Timestamps are quoted ISO-8601 UTC strings, for example `'2026-10-31T22:26:00Z'`. Key order and YAML quoting follow the documented serialization, with the general keys preceding the document keys.
+
+**Body title line.** Task and milestone records have no `# <ID> <title>` body title line; their bodies use the record's section layout. Every other Markdown record type keeps a `# <ID> <title>` body title line that the writer generates from the front-matter `id` and `title`, so the two cannot diverge.
+
+**Adoption and import.** Adding front matter to an existing record does not change its body. Records brought in by the one-way Backlog.md import script (NFR-04.004) are written in the Papyrus record format, with this front-matter block, on import.
 
 ## Acceptance Criteria
 - Every managed Markdown record file created by Papyrus begins with a YAML front-matter block at byte 0, delimited by `---` lines.
 - Every managed Markdown record type carries `id`, `title`, `created_date`, `updated_date`, `labels`, and `references` in its front matter.
+- The general keys `id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, and `group` are reserved; a field whose `key` or `frontmatter_key` equals one of them is rejected (REQ-07.002).
+- The general keys are written and maintained by Papyrus and are never declared in `document_types`.
+- `title` is fixed and is not a field, `status` is reserved and read-only outside the `status` and `archive` verbs, and `group` is the engine-owned link of a `GroupedMarkdown` member record.
+- For a document type, every front-matter key beyond the general keys corresponds to the `frontmatter_key` of a declared field of the record's role, and no other document key is written.
+- A field with only a `heading` contributes no front-matter key; a field with only a `frontmatter_key` has no body section; a field with both writes both locations from one value.
+- `frontmatter_key` may differ from the field `key`; the `audit` type stores its `audit_type` field under the front-matter key `type`.
+- A body and front-matter divergence already on disk is left as stored, is displayed from the body section, and is never repaired or merged.
+- Document front-matter keys follow field sequence order after the general keys.
+- An undeclared key already present on disk is preserved as stored and is displayed read-only.
+- `model`, `title`, `content`, and `id_shape` are not `document_types` keys, and a declaration of any of them is rejected (REQ-07.004).
 - Task front matter carries `id`, `title`, `status`, `assignee`, `created_date`, `updated_date`, `labels`, `milestone`, `dependencies`, `references`, `documentation`, `type`, and `ordinal`; `assignee` is a YAML list.
-- Milestone front matter carries the general fields plus `release` and `status`; `status` is `open` or `closed`.
-- Release front matter carries the general fields plus `status`; `status` is `planned` or `released`.
-- Front-matter-backed document types carry `status`; its value is `active`, `archived`, or a custom status declared for that type, and Papyrus writes `archived` only when it moves the record into the type's `archived/` subfolder.
+- Milestone front matter carries the general keys plus `release` and `status`; `status` is `open` or `closed`.
+- Release front matter carries the general keys plus `status`; `status` is `planned` or `released`.
 - A decision's front matter may carry `superseded_by`; adding front matter to a decision leaves `## Date` and `## References` intact and does not move decision `status` or decision `type` into front matter.
-- An audit record's front matter carries `type`.
+- A front-matter-backed document type carries `status`; its value is `active`, `archived`, or a custom status declared for that type, and Papyrus writes `archived` only when it moves the record into the type's `archived/` subfolder.
 - The front-matter `id` and every reference value carry the Papyrus ID; no second, tool-specific ID appears in front matter.
 - Tasks and milestones have no `# <ID> <title>` body title line; every other Markdown record type keeps a body title line generated by the writer from the front-matter `id` and `title`.
 - A frozen ADR body keeps its existing heading and sections; the added front-matter block is the only change made to an existing decision file.
@@ -54,12 +94,21 @@ Front matter is authoritative for the fields it carries and replaces the equival
 - User decision 2026-11-08 (heading policy, decision mapping, release key, decision status/type): tasks and milestones have no `# <ID> <title>` body title line, other document records keep a writer-generated one, frozen ADR bodies gain front matter only; decision front matter is additive and `## Date`/`## References` stay intact; releases carry the general keys only; decision `status`/`type` are unchanged by this requirement.
 - Maintainer decision 2026-11-11: the front-matter `id` and reference values use the Papyrus ID only (single ID space); the Backlog.md key-set, storage-ID, and serialization clauses are removed per NFR-04.004.
 - ADR-0007 — YAML Front Matter as the Single Record Metadata Source (field map, canonical key order, heading policy, scope exclusions).
-- Project-owner decision 2026-11-13: milestone and release records store `status` in front matter (`open`/`closed`, `planned`/`released`), and front-matter-backed documents store `status` (`active`/`archived`); UI mockups remain HTML-only (REQ-05.008). This supersedes the earlier "release records carry general fields only" clause.
+- Project-owner decision 2026-11-13: milestone and release records store `status` in front matter (`open`/`closed`, `planned`/`released`), and front-matter-backed documents store `status` (`active`/`archived`); UI mockups remain HTML-only (REQ-05.008).
 - Project-owner decision 2026-11-13 (D5): a front-matter-backed document's `status` may also hold a custom status declared for its type (`document_types.<slug>.statuses`), while `archived` remains reserved for records stored in the `archived/` subfolder (REQ-07.001).
+- RE-010 — Descriptor-driven document engine refactor (accepted, not reopenable): D4 (backlog and decision records stay bespoke), D6 (`SingleHtmlMockup` is the only HTML model), D7 (`group` is engine-owned and reserved), D10 (seed presentation facts), D13 (fixed title and reserved key), D14 (`model`, `title`, `content`, and `id_shape` are not config keys; a field sequence declares the fields).
+- ADR-036 — Config-declared document field schema and one descriptor model: decisions 13-14 (`heading` and `frontmatter_key`, and a `frontmatter_key` that may differ from `key`), decision 20 (sequence position is order everywhere), decision 21 (both locations written, no merging), decisions 23-24 (the eight reserved keys, fixed title), decision 28 (the seed table is the only built-in field definition), decision 29 (seed fields and their storage), decision 32 (seed fill).
+- ADR-039 — One descriptor-driven document view and edit surface: decision 14 (the record envelope plus the field map), decision 16 (deterministic value resolution and no merging), decision 18 (general metadata, fixed title, read-only status, undeclared keys as `extra_metadata`), decision 29 (presentation facts in the seed).
+- ADR-0013 — Shared record envelope without a storage layer (one patch and write path).
 - REQ-01.005 — Assign Stable Record IDs
 - REQ-03.002 — Manage Releases
+- REQ-05.006 — Manage Audit Records (`audit_type` stored in the front-matter key `type`)
 - REQ-05.007 — Manage Documentation Record Lifecycle
 - REQ-05.008 — Manage UI Mockups (mockup metadata remains in HTML)
+- REQ-05.011 — Maintain Record Metadata Through All Commands (general-key ownership and field options)
+- REQ-07.001 — Organize Artifacts into Three Categories (document `status` values)
+- REQ-07.002 — Configure Document Types and Slugs (rejected keys, reserved field keys, `frontmatter_key`)
+- REQ-07.004 — Provide One Schema-Driven Document Content Model with Three Document Models (general keys plus declared fields; `model`, `title`, `content`, and `id_shape` are not configuration keys)
 - NFR-04.001 — Persist Application Data Only in Text Files
 - NFR-04.004 — Renounce Backlog.md Compatibility and Provide Import
 - docs/specifications/browser-*.md — browser persistence contract already refers to preserving "front matter"
