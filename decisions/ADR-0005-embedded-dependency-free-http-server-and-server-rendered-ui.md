@@ -2,7 +2,7 @@
 id: ADR-0005
 title: "Embedded Dependency-Free HTTP Server and Server-Rendered Browser UI"
 created_date: '2026-11-03T00:00:00Z'
-updated_date: '2026-11-16T21:08:35Z'
+updated_date: '2026-11-20T19:27:48Z'
 labels: []
 references: []
 ---
@@ -37,7 +37,6 @@ The alternatives considered were a Rust web framework (for example axum or actix
 - Compile all assets into the binary so the `.deb` contains only `/usr/bin/papyrus` and the copyright file; no runtime asset directory is required.
 
 ## Consequences
-
 **Positive:**
 
 - The browser works fully offline and needs no runtime dependency, external server, asset directory, or network fetch (NFR-01.003).
@@ -60,10 +59,11 @@ The alternatives considered were a Rust web framework (for example axum or actix
 - *XSS and injection*: render-time escaping, `serde_json` for JSON, CSP without `'unsafe-inline'`, and no inline scripts or event handlers.
 - *DNS rebinding and CSRF*: strict `Host`/`Origin` validation and `Content-Type` enforcement; no session or credential exists to protect.
 - *Resource exhaustion*: request-line, target, header, body, connection, and timeout caps.
-- *Per-request re-reads*: every request re-reads configuration and record files from disk (specification section 3.18); per-record config re-reads and duplicate record parsing in `browser::records` are accepted for this increment and tracked as performance follow-ups.
-- *Deferred follow-ups (tracked, not implemented here)*: config loading moved out of `commands`; per-record config re-reads and duplicate record parsing; template placeholder hardening tests; test temp-directory hygiene (older suites use `std::env::temp_dir()`); manpage/README over-promising ("both backlog and documentation stores"); NFR-01.002 scope clarification; NFR-05.001 real-browser (GUI) verification. Owners implied by affected area.
-- *Future scale or feature pressure*: introducing a framework, async runtime, template engine, or external asset pipeline requires a new ADR; this ADR is the baseline those changes must supersede.
+- *Per-request re-reads*: every request re-reads record files from disk (specification section 3.18 and ADR-0006 save-then-reread); the configuration, registry, and route table are served from the in-server snapshot of ADR-037, which is rebuilt only when the configuration file's modification time or length changes. Configuration re-reads per record are gone, and reference resolution parses each record once per request. Residual per-request record reads are accepted and tracked as performance follow-ups.
 
+  *Revision (2026-11-20, amended by ADR-037): this risk bullet previously said every request re-reads configuration and record files and accepted per-record configuration re-reads. Configuration, registry, and routes now come from one mtime-invalidated snapshot, and duplicate record parsing within a request is collapsed into one request-scoped record snapshot. The no-cache rule for record content between requests is unchanged.*
+- *Deferred follow-ups (tracked, not implemented here)*: config loading moved out of `commands`; per-record config re-reads (retired by ADR-037) and duplicate record parsing within a request (collapsed by ADR-037's request-scoped record snapshot); template placeholder hardening tests; test temp-directory hygiene (older suites use `std::env::temp_dir()`); manpage/README over-promising ("both backlog and documentation stores"); NFR-01.002 scope clarification; NFR-05.001 real-browser (GUI) verification. Owners implied by affected area.
+- *Future scale or feature pressure*: introducing a framework, async runtime, template engine, or external asset pipeline requires a new ADR; this ADR is the baseline those changes must supersede.
 ## Alternatives Considered
 
 | Option | Outcome | Reason |

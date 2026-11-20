@@ -2,7 +2,7 @@
 id: TASK-219
 title: "Write ADR-B: in-server configuration and registry snapshot with mtime invalidation"
 created_date: '2026-11-20T17:36:52Z'
-updated_date: '2026-11-20T18:15:36Z'
+updated_date: '2026-11-20T19:30:58Z'
 labels: []
 references:
   - ADR-0005
@@ -19,7 +19,7 @@ references:
   - REQ-07.002
   - NFR-007.001
   - NFR-007.002
-status: ToDo
+status: Done
 assignee:
   - architect
 milestone: MS-031
@@ -62,3 +62,6 @@ The source of truth is RE-010 D1-D14 (accepted, not reopenable) and MS-031 AC-2/
 - [ ] ADR-037 defines mtime-based invalidation across the config file, registry inputs, and route table; one atomic snapshot swap; and fail-closed reload that keeps serving the last known good snapshot while reporting the error through the existing diagnostics path (MS-031 AC-2B, RE-010 D11).
 - [ ] ADR-037 defines a request-scoped record snapshot for title and reference resolution and states that no write content or version token is derived from the snapshot, so optimistic concurrency still reads the live record (MS-031 AC-2B, RE-010 D11).
 - [ ] ADR-037 explains why the cache does not reintroduce the staleness risk ADR-0017 avoided and leaves all source, test, and packaging files unchanged (MS-031 AC-10).
+## Comments
+- **architect**: ADR-037 accepted at decisions ADR-037-in-server-configuration-and-registry-snapshot.md; supersedes ADR-0017 d10 no-cache clause; amends ADR-0016 d3 and d9, ADR-0005 and ADR-0006 no-cache risk bullets, ADR-0020 d2; papyrus check shows only 3 pre-existing archived-task frontmatter conflicts
+- **orchestrator**: ADR-037 accepted by owner decision (all MS-031 ADRs accepted). Supersedes only ADR-0017 d10 no-cache clause; dated amendments to ADR-0016 d3 and d9, ADR-0005, ADR-0006, ADR-0020 d2; defines atomic mtime snapshot, fail-closed reload, request-scoped record snapshot. No new check findings.

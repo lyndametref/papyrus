@@ -2,7 +2,7 @@
 id: ADR-0020
 title: "Registry-Derived Browser Views for Config-Defined Document Types"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-16T21:08:36Z'
+updated_date: '2026-11-20T19:27:55Z'
 labels: []
 references: []
 ---
@@ -29,10 +29,11 @@ Current code shape, which is entirely closed against new types:
 Forces: no new dependency, template engine, or asset (ADR-0005); no per-type code for config-defined types (REQ-06.014); identical 404 for archived and unknown (REQ-05.007); the existing CLI metadata projection must be the same one the browser renders (REQ-06.004); existing built-in pages must not regress; and the route table must stay auditable and traversal-safe.
 
 ## Decision
-
 1. **The registry (ADR-0017) is the only source of the browser's type set.** Navigation, list pages, detail routing, edit forms, the lifecycle page, and the JSON API iterate `ArtifactRegistry`: `enabled(Document)` for navigable views, `all(Document)` for the lifecycle and configuration pages. No module may hold a second list of document-type keys.
 
-2. **The route table is assembled once at startup from the registry; its semantics are unchanged from ADR-0005.** The table is still fixed for the process lifetime, matched by exact string comparison after single-pass percent-decoding, never joined to a filesystem path, and served through the same handler/security/chrome pipeline. What changes is only that the table's document entries are produced by iterating the registry instead of being written by hand. The universal `/doc/{id}` and `/doc/{id}/edit` routes are kept: detail addressing stays ID-based, and the ID's owner is resolved by prefix through `registry::resolve_id`.
+2. **The route table is assembled from the registry; its semantics are unchanged from ADR-0005.** The table is fixed for the lifetime of one serving snapshot (ADR-037), matched by exact string comparison after single-pass percent-decoding, never joined to a filesystem path, and served through the same handler/security/chrome pipeline. What changes is only that the table's document entries are produced by iterating the registry instead of being written by hand. The universal `/doc/{id}` and `/doc/{id}/edit` routes are kept: detail addressing stays ID-based, and the ID's owner is resolved by prefix through `registry::resolve_id`.
+
+   *Revision (2026-11-20, amended by ADR-037): this decision previously said the table is assembled once at startup and is fixed for the process lifetime. ADR-037 derives the table in the same atomic rebuild as the configuration and registry, so it is fixed for the lifetime of one serving snapshot; a configuration change that alters the type set produces a new table with the new snapshot and never a partially updated one. Matching, path rules, the handler and security pipeline, and the universal routes are unchanged.*
 
 3. **One canonical list route and one canonical API route per type, plus the existing built-in aliases.** `/?type=<slug>` remains the list route for every type. The JSON API gains one canonical endpoint `/api/docs/<slug>` for every type. The existing `/api/requirements`, `/api/glossary`, `/api/tech-specs`, and the other built-in endpoint names remain as aliases so no existing consumer breaks; new code must use the canonical form. An unknown or disabled `type`/`<slug>` is `404`, not `400`: a type that has no views is indistinguishable from an address that does not exist, which is the same rule REQ-05.007 applies to archived records. Changing the current `400` is a deliberate, documented status-code change.
 
@@ -54,7 +55,6 @@ Forces: no new dependency, template engine, or asset (ADR-0005); no per-type cod
 10. **Writes keep the ADR-0006 and ADR-0013 contracts unchanged.** A browser save for a config-defined type parses and patches through `record::document`/`record::patch`, writes through `record::store::write_atomic`, carries the version token, returns `409` on a stale token, and refreshes `updated_date` once per write.
 
 11. **No new dependency, asset, or template engine.** The generic templates use the existing `{{name}}` single-pass renderer and escaping, are embedded with `include_str!`, and are served from the same binary (ADR-0005).
-
 ## Consequences
 
 **Positive:**
