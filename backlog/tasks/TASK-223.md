@@ -2,7 +2,7 @@
 id: TASK-223
 title: "Rewrite REQ-07.004 for one schema-driven document content model with three models"
 created_date: '2026-11-20T17:37:30Z'
-updated_date: '2026-11-20T18:15:38Z'
+updated_date: '2026-11-20T20:17:03Z'
 labels: []
 references:
   - ADR-036
@@ -17,7 +17,7 @@ references:
   - REQ-07.002
   - REQ-07.003
   - BR-017
-status: ToDo
+status: Done
 assignee:
   - requirements-engineer
 milestone: MS-031
@@ -59,3 +59,6 @@ RE-010 D5/D6/D9/D13/D14 are accepted and not reopenable. Only the listed REQ fil
 - [ ] REQ-07.004 states the GroupedMarkdown and SingleHtmlMockup behavior in the scope, including immutable membership, the engine-owned group link, and fixed pending, approved, and archived metadata with no status verb (MS-031 AC-4, RE-010 D6, D7).
 - [ ] REQ-07.004 states the seed-only model restriction, the fixed title contract, that configuration is never executable, and that the engine emits only PatchOps (MS-031 AC-4, RE-010 D5, D6, D13).
 - [ ] REQ-07.004's Acceptance Criteria and Traceability sections are updated coherently, cite no archived REQ-06.003, and the user has verified the rewrite (MS-031 AC-4, AC-8).
+## Comments
+- **requirements-engineer**: REQ-07.004 rewritten with 18 acceptance criteria, papyrus check unchanged at 3 pre-existing archived-task findings
+- **orchestrator**: Acceptance met: REQ-07.004 rewritten with 18 acceptance criteria covering DocumentModel, field schema, title contract, group semantics, mockup semantics, seed-only rules and PatchOps-only engine; traceability to RE-010 and ADR-036, ADR-039; no new check findings.

@@ -1,15 +1,18 @@
 ---
 id: REQ-07.004
-title: "Provide a Generic Content Model for Config-Defined Document Types"
+title: "Provide One Schema-Driven Document Content Model with Three Document Models"
 created_date: '2026-11-13T21:00:17Z'
-updated_date: '2026-11-15T15:47:29Z'
+updated_date: '2026-11-20T20:14:44Z'
 labels: []
-references: []
+references:
+  - RE-010
+  - ADR-036
+  - ADR-039
 ---
-# REQ-07.004 Provide a Generic Content Model for Config-Defined Document Types
+# REQ-07.004 Provide One Schema-Driven Document Content Model with Three Document Models
 
 ## User Story
-As a project contributor, I want a document type added through configuration to have a usable content model so that I can create and edit its records without new code or a per-type schema.
+As a project contributor, I want every document type to declare its content fields under one of three document models so that a record's fields, commands, and presentation stay consistent without per-type code.
 
 ## Group
 REQ-07 Artifact Categories and Config-Defined Document Types
@@ -18,43 +21,66 @@ REQ-07 Artifact Categories and Config-Defined Document Types
 Must have
 
 ## Description
-A document type that exists only because it was declared in `document_types` has no type-specific fields in this release. Its records use the same generic content model as technical specifications: a required title, an optional description that forms the document body, and the general front-matter fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, and `status` (REQ-05.010). Labels and references are repeatable and are supplied through `--label` and `--reference` on create and edit.
+Every document type — a default seed type or a user-defined type — has exactly one **document model**. There are three models, and the former `ContentModel` is removed:
 
-The `status` of an active record is `active` or one of the type's declared custom statuses (REQ-07.001, REQ-07.002), and it becomes `archived` only through archiving. A new record starts at the type's configured `default_status`, or at `active` when none is configured. Status is not set by a create or edit option: it is lifecycle- and configuration-owned and changes only through `papyrus <document-slug> status` and `archive` (REQ-05.011).
+- **SingleMarkdown** — one record per ID, with a Markdown body.
+- **GroupedMarkdown** — a group record plus member records, each with a Markdown body.
+- **SingleHtmlMockup** — one record per ID, with an HTML body.
 
-Records are created with an ID built from the entry's `prefix` and `id_padding` (REQ-01.005), stored under `doc_directory` plus the entry's `directory`, and archived into the `archived/` subfolder of that folder (REQ-05.007). The generic model has no per-type field schema and no template file, so declaring the entry is the whole setup. A config-defined type has the baseline command family and no additional verbs (REQ-07.003).
+The model is not a configuration key: `model`, `title`, `content`, and `id_shape` are rejected in `document_types`. A seed slug takes its model from the seed table, and every user-defined slug is `SingleMarkdown`. `GroupedMarkdown` and `SingleHtmlMockup` are seed-only: only `req` and `nfr` are grouped, only `ui-mockup` is an HTML mockup, and a user-defined type stays `SingleMarkdown` even when it reuses a seed prefix, directory, or field name.
 
-The baseline command family is the same for every document type. Built-in default types keep their existing type-specific content, fields, and additional verbs, and the generic model adds no field to them and does not replace their documented fields (REQ-05.001 to REQ-05.014).
+**Declared field set.** A document type declares the content fields its records support, and a field's position in its sequence is its order in the record body, in CLI options and help, and in the browser form. `SingleMarkdown` and `SingleHtmlMockup` declare one `fields` sequence, which may be empty (`fields: []`). `GroupedMarkdown` declares `group.fields` and `member.fields` with independent order, and a top-level `fields` on a grouped type is rejected. A field declares a stable `key`, at least one storage location (a body `heading`, a `frontmatter_key`, or both), its CLI `option`, a presentation `label` and `help`, a `kind` of `text`, `multiline`, or `list`, whether it is `required`, and the `verbs` (`create` and `edit`) on which its option is offered. The keys `id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, and `group` are reserved: a field may use none of them as its key or front-matter key, and field keys are unique within a role. A required field must be supplied on create and may be changed but not cleared on edit; an optional field may be cleared. Adding or changing a field is a configuration file edit, not a code change.
+
+A type therefore has no fixed content model. A record carries the general front-matter keys `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, and `status` (REQ-05.010) plus exactly the fields its type and role declare, stored under the declared headings and front-matter keys. `labels` and `references` remain general repeatable metadata rather than fields and are supplied through `--label` and `--reference`.
+
+**Title.** Title is fixed and non-configurable for every model. It is single-line, non-empty, always present in the record, required on create, and can never be cleared by an edit. It is not a field, its key is reserved, it is the positional title on create, and it is changed through `--title` on edit. A `SingleHtmlMockup` record applies the same title contract to the title in its HTML metadata.
+
+**GroupedMarkdown.** The group record has a plain ID `<PREFIX>-<group-sequence>`, and each member record has a dotted ID `<PREFIX>-<group-sequence>.<member-sequence>`. `create-group` creates the group record with a positional title. `create` creates a member and requires an existing active group of the same type, supplied through the group slot or `--group`; a group of another type, an archived group, or an unknown group is rejected and nothing is written. The member's `group` front-matter key is written and maintained only by the engine: it is reserved, is never a field, is never editable through a field option, and a member's group link cannot change after creation. Group and member records follow the document status model (REQ-07.001). Archiving or deleting a group archives, deletes, or otherwise changes none of its members, and a list shows the group records and their members in group order, then member order.
+
+**SingleHtmlMockup.** A type of this model has one record per ID with a plain ID, and its state lives in the HTML metadata comment rather than in YAML front matter. The allowed states are fixed to `pending`, `approved`, and `archived`; configuration cannot add, remove, or rename them, a `statuses` or `default_status` declaration on such a type is rejected, and the type has no `status` verb. `archive` is the only path to `archived`, and `supersede` records the superseding ID (REQ-05.008). The type declares no field sequence and its record is presented through its fixed metadata rather than through fields.
+
+**Configuration is data, never code.** Configuration declares fields and presentation facts only. It is never executable: no template, expression, script, or code path is read from configuration. Content changes are computed by the document engine as patch operations (`PatchOp` values that set a front-matter key, set or clear a body section, set the heading title, and the model-specific group-link, HTML-metadata, and supersession changes) and applied in one atomic write by the single record writer. The engine never formats or writes a record body itself, so byte preservation, optimistic concurrency, and the single write path are retained (ADR-0013), and a patch that changes nothing performs no write.
 
 ## Acceptance Criteria
-- A document type added through `document_types` can create a record with a required title and optional description.
-- Records of a config-defined type carry the general front-matter fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, and `status`.
-- A config-defined record contains no type-specific field beyond those general fields: no additional front-matter key and no type-specific body section appears.
-- Labels and references are supplied through repeatable `--label` and `--reference` options on create and edit.
-- Record IDs use the entry's `prefix` and the configured `id_padding`.
-- Records are stored under `doc_directory` plus the entry's `directory`, and archive into that folder's `archived/` subfolder.
-- A config-defined type is usable in create, list, view, edit, archive, and delete with only `prefix`, `directory`, and `enabled` declared (plus optional `statuses` and `default_status`); no field schema, template file, or other per-type artifact is needed.
-- A new record starts at the type's configured `default_status`, or at `active` when none is configured.
-- `status` is not accepted as a create or edit option; it changes only through `papyrus <document-slug> status` and `archive`.
-- A config-defined type offers the baseline command family and no additional verbs.
-- Default document types keep their existing type-specific fields and additional verbs; the generic model adds no field to them.
+- Every document type has exactly one document model, `SingleMarkdown`, `GroupedMarkdown`, or `SingleHtmlMockup`; `ContentModel` is removed and no command, configuration key, or browser page exposes it.
+- A `document_types` entry that declares `model`, `title`, `content`, or `id_shape` is rejected, and a type takes its model from the seed table or from the `SingleMarkdown` default for a user-defined slug.
+- Only `req` and `nfr` are `GroupedMarkdown` and only `ui-mockup` is `SingleHtmlMockup`; a user-defined type is `SingleMarkdown`, including when it reuses a seed prefix, directory, or field name.
+- A `SingleMarkdown` or `SingleHtmlMockup` type declares one `fields` sequence, which may be empty; a `GroupedMarkdown` type declares `group.fields` and `member.fields` in independent order and is rejected if it declares a top-level `fields`.
+- A field declares a key, at least one of `heading` and `frontmatter_key`, a `kind` of `text`, `multiline`, or `list`, a required flag, and verbs from `create` and `edit`; a field with neither `heading` nor `frontmatter_key` is rejected.
+- A field key or front-matter key equal to `id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, or `group` is rejected, and a duplicate field key within a role is rejected.
+- A created record carries the general front matter `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, and `status` plus exactly the fields its type and role declare.
+- A create that omits a required field produces one validation outcome and writes no file.
+- An edit that clears a required field is rejected and writes no file, while an optional field can be cleared.
+- Field sequence position governs the record body order, the CLI option and help order, and the browser form order.
+- Title is single-line and non-empty in every model, required on create, never clearable on edit, is not a field, and its key is reserved; a `SingleHtmlMockup` record applies the same contract in its HTML metadata.
+- A `GroupedMarkdown` group has a plain ID `<PREFIX>-<group-sequence>` and its members have dotted IDs `<PREFIX>-<group-sequence>.<member-sequence>`.
+- `create-group` creates a group record, and creating a member requires an existing active group of the same type supplied through the group slot or `--group`; an unknown, archived, or other-type group is rejected and nothing is written.
+- The `group` front-matter link is engine-owned: it is not a field, has no option, and cannot be changed after creation.
+- Archiving or deleting a group leaves its members unchanged, and a list shows group records and their members in group order, then member order.
+- A `SingleHtmlMockup` type has one record per ID with a plain ID, a fixed `pending`, `approved`, or `archived` metadata state, no `status` verb, a rejection of `statuses` and `default_status`, and `archive` as its only path to `archived`.
+- Configuration declares fields and presentation facts only and is never executable: no template, expression, script, or code path is read from configuration.
+- The document engine emits only patch operations (`PatchOp`) and never writes a record body; the single record writer applies them atomically, and a patch that changes nothing writes no file.
 
 ## Open Questions
-- Whether a per-entry field schema or a template file should be added later. Current requirement: neither exists.
-- Whether a config-defined type may reuse a built-in type's content schema. Current requirement: no.
+- Whether a maximum title length is required; this requirement fixes title as single-line and non-empty, while ADR-039 requires a length limit in form validation.
+- Whether renaming a field key or heading migrates already stored sections and front-matter keys; this requirement fixes field keys as stable and defines no migration.
 
 ## Traceability
-- Source: customer-feedback handoff — in-session user feedback, Item 10 (needs clarification), raw quote:
-  - "any type of document can be configured in the config file. a default set is proposed at init but editing the file allows to create any document type unless the name is already used by a buit in document type."
-- Project-owner decision 2026-11-13 (refinement): config-defined types use a generic content model equivalent to technical specifications; no per-type schema and no template.
-- Project-owner decision 2026-11-13 (D1): the baseline verb family is shared by every document type, and built-in typed types may add verbs; "same family for all" therefore describes the baseline, not the complete verb set of the built-in types.
-- Project-owner decision 2026-11-13 (D5): `status` of a generic record is a declared custom status or `active`, starts at `default_status`, and is not supplied through create or edit options (REQ-05.011).
-- REQ-01.005 — Assign Stable Record IDs
-- REQ-05.007 — Manage Document Archive State and Deletion
-- REQ-05.010 — Record Metadata in YAML Front Matter
-- REQ-05.011 — Maintain Record Metadata Through All Commands
-- REQ-06.004 — Use Front-Matter Metadata in CLI and Browser Views
-- REQ-07.001 — Organize Artifacts into Three Categories (document status model)
-- REQ-07.002 — Configure Document Types and Slugs
-- REQ-07.003 — Dispatch Config-Defined Document Commands
-- BR-017 — Tech Spec Command Behavior (typed type whose content model the generic model mirrors)
+- Source: RE-010 — Descriptor-driven document engine refactor: fixed owner decisions (accepted, not reopenable): D5 (`DocumentModel` supersedes `ContentModel`), D6 (grouped and HTML models seed-only; user-defined default `SingleMarkdown`), D7 (immutable group membership, engine-owned link, no cascade, merged order), D9 (record, JSON, and status-code equivalence), D13 (fixed title contract), D14 (nested group/member field blocks, `fields` sequence, no per-field order or enabled, no `model`/`title`/`content`/`id_shape` keys).
+- ADR-036 — Config-declared document field schema and one descriptor model (one descriptor, three `DocumentModel` variants, field vocabulary, role field sets, seed table, model-derived verbs, PatchOp-only engine).
+- ADR-039 — One descriptor-driven document view and edit surface (one field map per model and role, fixed title control, role-aware rendering, fixed mockup metadata, one submit path).
+- ADR-0017 — Artifact category registry and type descriptors (decisions 1-4, 7, 9, and 10 replaced by ADR-036; decisions 5, 6, and 8 remain in force).
+- ADR-0018 — Generic document content model (superseded in full by ADR-036).
+- ADR-0013 — Shared record envelope without a storage layer (single patch and write path).
+- ADR-0019 — Fail-Closed Document-Type Configuration Validation (rejected keys and field declarations).
+- REQ-07.001 — Organize Artifacts into Three Categories (document status model, status writers, mockup states).
+- REQ-07.002 — Configure Document Types and Slugs (entry validation and rejected keys).
+- REQ-07.003 — Dispatch Config-Defined Document Commands (model-derived verbs and options).
+- REQ-05.001 — Manage Business Requirements, REQ-05.002 — Manage Non-Functional Requirements (the two grouped seed types).
+- REQ-05.003 — Manage Glossary Terms (single-Markdown seed type with a required field).
+- REQ-05.008 — Manage UI Mockups (HTML metadata lifecycle and `supersede`).
+- REQ-05.010 — Record Metadata in YAML Front Matter (general front-matter keys and metadata-only fields).
+- REQ-05.011 — Maintain Record Metadata Through All Commands (`status` exemption from field options).
+- REQ-01.005 — Assign Stable Record IDs (prefix and padding for plain IDs; hierarchical IDs for grouped members).
+- BR-016 — Papyrus Configuration Keys and Precedence (needs revision for the document model and field sequence keys).
+- BR-017 — Papyrus tech-spec Command Behavior (seed single-Markdown type; needs revision for the declared field set).
