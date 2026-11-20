@@ -2,7 +2,7 @@
 id: TASK-221
 title: "Write ADR-D: one descriptor-driven document view and edit surface"
 created_date: '2026-11-20T17:36:52Z'
-updated_date: '2026-11-20T18:15:37Z'
+updated_date: '2026-11-20T20:02:53Z'
 labels: []
 references:
   - ADR-0020
@@ -14,7 +14,7 @@ references:
   - TECH-066
   - TECH-067
   - TECH-068
-status: ToDo
+status: Done
 assignee:
   - architect
 milestone: MS-031
@@ -26,6 +26,7 @@ documentation:
   - decisions/ADR-0020-registry-derived-browser-views-for-document-types.md
   - decisions/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md
   - decisions/ADR-035-per-family-reference-visibility-in-the-shared-browser-list-layout.md
+  - decisions/ADR-039-one-descriptor-driven-document-view-and-edit-surface.md
 type: architecture
 ---
 
@@ -55,3 +56,6 @@ The source of truth is RE-010 D1-D14 (accepted, not reopenable) and MS-031 AC-2/
 - [ ] ADR-039 defines one generic list, view, edit, conflict, and not-found renderer driven by the record envelope plus the descriptor field map, with one generic form_post that preserves optimistic concurrency and the existing error surface (MS-031 AC-2D).
 - [ ] ADR-039 moves presentation facts (labels, section headings, field order, help text) into the config seed with no per-type code branch, keeps Backlog and Decision browser surfaces unchanged, and sources reference visibility from seed reference_visibility per type and role (MS-031 AC-2D, RE-010 D4, D8, D10).
 - [ ] ADR-039 leaves every source, test, and packaging file unchanged (MS-031 AC-10).
+## Comments
+- **architect**: ADR-039 accepted at decisions ADR-039-one-descriptor-driven-document-view-and-edit-surface.md; amended ADR-0020 decisions 1 3 5, ADR-0028 decisions 1 2 and constraint 10, ADR-0033 decisions 1 2 6 7, and ADR-0035 reference-visibility discriminator; papyrus check unchanged with 3 pre-existing findings; no source test or packaging change.
+- **orchestrator**: Acceptance met: ADR-039 accepted; one descriptor-driven list, view, edit, conflict and 404 surface with model-neutral field map and seed-declared presentation; ADR-0020, ADR-0028, ADR-0033 and ADR-0035 amended; backlog and decision surfaces unchanged.

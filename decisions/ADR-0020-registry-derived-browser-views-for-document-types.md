@@ -2,7 +2,7 @@
 id: ADR-0020
 title: "Registry-Derived Browser Views for Config-Defined Document Types"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-20T19:27:55Z'
+updated_date: '2026-11-20T19:58:54Z'
 labels: []
 references: []
 ---
@@ -31,11 +31,15 @@ Forces: no new dependency, template engine, or asset (ADR-0005); no per-type cod
 ## Decision
 1. **The registry (ADR-0017) is the only source of the browser's type set.** Navigation, list pages, detail routing, edit forms, the lifecycle page, and the JSON API iterate `ArtifactRegistry`: `enabled(Document)` for navigable views, `all(Document)` for the lifecycle and configuration pages. No module may hold a second list of document-type keys.
 
+   *Revision (2026-11-20, amended by ADR-039): the descriptor is also the only source of a document type's presentation facts. The static presentation table may not hold a document entry, and the document list, view, edit, conflict, and not-found surfaces are one descriptor-driven path. Backlog and decision entries may remain because those surfaces are bespoke.*
+
 2. **The route table is assembled from the registry; its semantics are unchanged from ADR-0005.** The table is fixed for the lifetime of one serving snapshot (ADR-037), matched by exact string comparison after single-pass percent-decoding, never joined to a filesystem path, and served through the same handler/security/chrome pipeline. What changes is only that the table's document entries are produced by iterating the registry instead of being written by hand. The universal `/doc/{id}` and `/doc/{id}/edit` routes are kept: detail addressing stays ID-based, and the ID's owner is resolved by prefix through `registry::resolve_id`.
 
    *Revision (2026-11-20, amended by ADR-037): this decision previously said the table is assembled once at startup and is fixed for the process lifetime. ADR-037 derives the table in the same atomic rebuild as the configuration and registry, so it is fixed for the lifetime of one serving snapshot; a configuration change that alters the type set produces a new table with the new snapshot and never a partially updated one. Matching, path rules, the handler and security pipeline, and the universal routes are unchanged.*
 
 3. **One canonical list route and one canonical API route per type, plus the existing built-in aliases.** `/?type=<slug>` remains the list route for every type. The JSON API gains one canonical endpoint `/api/docs/<slug>` for every type. The existing `/api/requirements`, `/api/glossary`, `/api/tech-specs`, and the other built-in endpoint names remain as aliases so no existing consumer breaks; new code must use the canonical form. An unknown or disabled `type`/`<slug>` is `404`, not `400`: a type that has no views is indistinguishable from an address that does not exist, which is the same rule REQ-05.007 applies to archived records. Changing the current `400` is a deliberate, documented status-code change.
+
+   *Revision (2026-11-20, amended by ADR-039): the canonical routes, exact matching, the universal document routes, and the 404 rule are unchanged. The legacy alias set and the legacy `?type=` key are seed data (`api_aliases`, `type_alias`) rather than a static table, and one document handler serves the route of every document type.*
 
 4. **`Category` is deleted; `Form` becomes a descriptor property.** `ArtifactCategory` (`Backlog | Decision | Document`) comes from the registry. The requirement/group distinction that `Category::Req`/`Category::Nfr` and `Form` encode today moves into the `req`/`nfr` descriptors as `form: Requirement | Group` and `id_shape: Grouped` (group records plus dotted member records); `Dotted` remains the member-only shape. This agrees with ADR-0018 decision 5 and TASK-105 encoding decision D1, so the list page still renders groups and requirements separately without branching on a slug.
 
@@ -43,6 +47,8 @@ Forces: no new dependency, template engine, or asset (ADR-0005); no per-type cod
    - Generic (`content_model = Generic`, ADR-0018): one `document_list.html`, one `document_detail.html`, one `document_edit.html` rendering title, description, labels, and references from the shared `RecordView`. The list and detail views render `status` read-only for every document type; the edit form never offers a status field. The list view's status filter is built from the descriptor's status model (ADR-0017): `active` plus the declared custom statuses in configured order, with no `archived` option.
    - Typed built-ins: keep their existing field sets and forms, but their handlers are selected by descriptor, not by a `match` on the id's prefix or on a category enum.
    - Presentation strings (page titles, curated descriptions, field labels) are looked up by slug from a static built-in table; a config-defined slug gets a title-cased label from its slug and the shared document description required by REQ-06.003.
+
+   *Superseded (2026-11-20, by ADR-039): this decision is replaced as a whole. There is one descriptor-driven document surface for every document type, not two generic view families with typed forms; the field-specific forms of the typed built-ins are deleted rather than kept, and presentation strings come from the descriptor's seed entry, not from a static table keyed by slug.*
 
 6. **Status filtering is a validated projection, never a free-form query.** A list request's `status` filter accepts only `active` or a custom status declared for that type; any other value (including `archived` and an undeclared value) is rejected rather than applied as an unfiltered or guessed match, and a type with no custom statuses offers only `active`. Filtering compares the stored front-matter value exactly, so a record whose value is no longer declared remains visible under `active`-only listing rules but is never silently rewritten.
 
@@ -55,6 +61,12 @@ Forces: no new dependency, template engine, or asset (ADR-0005); no per-type cod
 10. **Writes keep the ADR-0006 and ADR-0013 contracts unchanged.** A browser save for a config-defined type parses and patches through `record::document`/`record::patch`, writes through `record::store::write_atomic`, carries the version token, returns `409` on a stale token, and refreshes `updated_date` once per write.
 
 11. **No new dependency, asset, or template engine.** The generic templates use the existing `{{name}}` single-pass renderer and escaping, are embedded with `include_str!`, and are served from the same binary (ADR-0005).
+
+### Amendment (2026-11-20) — ADR-039
+
+- **Amended:** decision 1 (the descriptor is the only source of a document type's presentation facts) and decision 3 (seed-declared aliases and one document handler).
+- **Superseded:** decision 5, and the rejected alternative "Server-side rendering from a data-driven generic page for **all** types, dropping typed forms". The alternative is no longer rejected.
+- **Not changed:** decisions 2, 4, and 6 to 11, every downstream constraint, the route semantics, the security and write contracts, and this record's accepted status.
 ## Consequences
 
 **Positive:**
