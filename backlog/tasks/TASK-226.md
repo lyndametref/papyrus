@@ -2,7 +2,7 @@
 id: TASK-226
 title: "Amend REQ-05.001 to REQ-05.014 for seed-declared fields, grouped req and nfr, and the HTML mockup model"
 created_date: '2026-11-20T17:38:12Z'
-updated_date: '2026-11-20T17:38:33Z'
+updated_date: '2026-11-20T18:15:39Z'
 labels: []
 references:
   - ADR-036
@@ -11,6 +11,17 @@ references:
   - REQ-05.008
   - REQ-05.010
   - REQ-07.004
+  - REQ-07.001
+  - BR-009
+  - BR-010
+  - BR-011
+  - BR-012
+  - BR-013
+  - BR-014
+  - BR-017
+  - BR-018
+  - BR-019
+  - BR-020
 status: ToDo
 assignee:
   - requirements-engineer
@@ -26,6 +37,14 @@ documentation:
   - docs/requirements/business/REQ-05.006.md
   - docs/requirements/business/REQ-05.008.md
   - docs/requirements/business/REQ-05.010.md
+  - docs/requirements/business/REQ-05.002.md
+  - docs/requirements/business/REQ-05.004.md
+  - docs/requirements/business/REQ-05.007.md
+  - docs/requirements/business/REQ-05.009.md
+  - docs/requirements/business/REQ-05.011.md
+  - docs/requirements/business/REQ-05.012.md
+  - docs/requirements/business/REQ-05.013.md
+  - docs/requirements/business/REQ-05.014.md
 type: requirements
 ---
 
@@ -41,3 +60,29 @@ Scope: light amendments to 05.001, 05.002, 05.004, 05.005, 05.006, 05.007, 05.00
 - tech-spec (05.009), ui-spec (05.004), use-case (05.012), test-case (05.013), test-report (05.014): SingleMarkdown with their existing fields expressed in the seed; no behavior loss.
 - 05.010: general front-matter keys id, title, status, labels, references, created_date, updated_date, group are reserved; additional keys are config-declared; model, title, content, id_shape are not config keys.
 - 05.007 and 05.011: archive/delete and status behavior unchanged; group archive or delete cascades to nothing.
+## Refinement inputs (TASK-290)
+
+### Requirement file map (current section numbers)
+- REQ-05.001 (§5.1) — docs/requirements/business/REQ-05.001.md — Manage Business Requirements — light amendment — req GroupedMarkdown
+- REQ-05.002 (§5.2) — docs/requirements/business/REQ-05.002.md — Manage Non-Functional Requirements — light amendment — nfr GroupedMarkdown
+- REQ-05.003 (§5.3) — docs/requirements/business/REQ-05.003.md — Manage Glossary Terms — light amendment — title replaces --term
+- REQ-05.004 (§5.4) — docs/requirements/business/REQ-05.004.md — Manage UI Specifications — light amendment — ui-spec SingleMarkdown
+- REQ-05.005 (§5.5) — docs/requirements/business/REQ-05.005.md — Manage Business Rules — light amendment — rule fields
+- REQ-05.006 (§5.6) — docs/requirements/business/REQ-05.006.md — Manage Audit Records — light amendment — audit fields
+- REQ-05.007 (§5.7) — docs/requirements/business/REQ-05.007.md — Manage Document Archive State and Deletion — light amendment — archive/delete unchanged
+- REQ-05.008 (§5.8) — docs/requirements/business/REQ-05.008.md — Manage UI Mockups — major rewrite — ui-mockup SingleHtmlMockup
+- REQ-05.009 (§5.9) — docs/requirements/business/REQ-05.009.md — Manage Technical Specifications — light amendment — tech-spec SingleMarkdown
+- REQ-05.010 (§5.10) — docs/requirements/business/REQ-05.010.md — Record Metadata in YAML Front Matter — major rewrite — reserved general front-matter keys
+- REQ-05.011 (§5.11) — docs/requirements/business/REQ-05.011.md — Maintain Record Metadata Through All Commands — light amendment — status behavior unchanged
+- REQ-05.012 (§5.12) — docs/requirements/business/REQ-05.012.md — Manage Use Cases — light amendment — use-case SingleMarkdown
+- REQ-05.013 (§5.13) — docs/requirements/business/REQ-05.013.md — Manage Test Cases — light amendment — test-case SingleMarkdown
+- REQ-05.014 (§5.14) — docs/requirements/business/REQ-05.014.md — Manage Test Reports — light amendment — test-report SingleMarkdown
+
+### Refinement assumptions / definition of done
+Nine per-type document modules are being deleted, but their behavior must remain expressible as seed data. The scope list is the complete expected field/behavior inventory; any field not listed must be found in the current module and reported rather than dropped. Only the fourteen listed REQ files change; the user verifies each rewrite. Done means all acceptance criteria pass and no source or test file changes (MS-031 AC-10).
+## Acceptance Criteria
+- [ ] All fourteen REQ-05 records are amended: light amendments to 05.001, 05.002, 05.004, 05.005, 05.006, 05.007, 05.009, 05.011, 05.012, 05.013, and 05.014; major rewrites of 05.008 and 05.010; and the 05.003 title and --term change (MS-031 AC-4).
+- [ ] REQ-05.001 and REQ-05.002 describe the GroupedMarkdown shape: plain-ID group, dotted-ID members, story and description member fields, required group slot, same-type active group reuse, cross-type and archived-group rejection, hidden references, immutable membership, and no cascade on archive or delete (MS-031 AC-4, RE-010 D7).
+- [ ] Each built-in document type's field set is expressed in REQ-05 exactly as listed in the scope, including glossary definition, rule rationale and applicability, rule requirements, audit audit_type and content, and ui-mockup fixed metadata with no status verb (MS-031 AC-4).
+- [ ] REQ-05.010 reserves id, title, status, labels, references, created_date, updated_date, and group, makes additional keys config-declared, and states that model, title, content, and id_shape are not config keys (MS-031 AC-4, RE-010 D14).
+- [ ] REQ-05.007 and REQ-05.011 keep archive or delete and status behavior unchanged, no changed record cites archived REQ-06.003, Acceptance Criteria and Traceability are updated, and the user has verified every rewrite (MS-031 AC-4, AC-8).
