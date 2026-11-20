@@ -2,7 +2,7 @@
 id: TASK-224
 title: "Rewrite REQ-07.002 for the nested document-type entry shape, defaults, and diagnostics"
 created_date: '2026-11-20T17:37:43Z'
-updated_date: '2026-11-20T18:15:38Z'
+updated_date: '2026-11-20T20:24:50Z'
 labels: []
 references:
   - ADR-036
@@ -13,7 +13,7 @@ references:
   - REQ-05.010
   - REQ-01.008
   - BR-016
-status: ToDo
+status: Done
 assignee:
   - requirements-engineer
 milestone: MS-031
@@ -55,3 +55,6 @@ RE-010 D14 (nested config, fields sequence, selector paths, no model/title/conte
 - [ ] REQ-07.002 states the default and merge rules: scalars fill from the seed, fields and group.fields and member.fields and statuses replace wholesale, prefix and directory are never filled, and an absent slug stays absent (MS-031 AC-4, RE-010 D14).
 - [ ] REQ-07.002 states unknown-key and unknown-enum rejection with the `document_types.<slug>.<path>` form, selector paths with numeric [0], config list effective values with key selectors, config unset collection reset, fields: [] validity, and minimal init entries (MS-031 AC-4, AC-9).
 - [ ] REQ-07.002 states fail-closed one-pass validation, has updated Acceptance Criteria and Traceability, cites no archived REQ-06.003, and the user has verified the rewrite (MS-031 AC-4, AC-8).
+## Comments
+- **requirements-engineer**: REQ-07.002 rewritten with 40 acceptance criteria covering the nested entry shape, field item vocabulary, reserved and duplicate field keys, scalar fill and collection replace, prefix and directory never filled, absent slug absent, minimal init, config set target-entry materialization, selector paths with keyed and indexed forms, config list effective values, config unset collection reset, comma syntax only for flat lists, and one-pass document_types.<slug>.<path> diagnostics. papyrus check shows 3 findings, unchanged from baseline, none on REQ-07.002. Status kept In-Progress.
+- **orchestrator**: Acceptance met: REQ-07.002 rewritten with 40 testable acceptance criteria covering entry shape, field vocabulary, fill and merge, diagnostics, selector paths and comma rules; open ambiguity on config set materialization vs ADR-0019 d9 recorded for TASK-258.
