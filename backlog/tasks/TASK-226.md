@@ -2,7 +2,7 @@
 id: TASK-226
 title: "Amend REQ-05.001 to REQ-05.014 for seed-declared fields, grouped req and nfr, and the HTML mockup model"
 created_date: '2026-11-20T17:38:12Z'
-updated_date: '2026-11-20T18:15:39Z'
+updated_date: '2026-11-20T20:48:08Z'
 labels: []
 references:
   - ADR-036
@@ -22,7 +22,7 @@ references:
   - BR-018
   - BR-019
   - BR-020
-status: ToDo
+status: Done
 assignee:
   - requirements-engineer
 milestone: MS-031
@@ -86,3 +86,6 @@ Nine per-type document modules are being deleted, but their behavior must remain
 - [ ] Each built-in document type's field set is expressed in REQ-05 exactly as listed in the scope, including glossary definition, rule rationale and applicability, rule requirements, audit audit_type and content, and ui-mockup fixed metadata with no status verb (MS-031 AC-4).
 - [ ] REQ-05.010 reserves id, title, status, labels, references, created_date, updated_date, and group, makes additional keys config-declared, and states that model, title, content, and id_shape are not config keys (MS-031 AC-4, RE-010 D14).
 - [ ] REQ-05.007 and REQ-05.011 keep archive or delete and status behavior unchanged, no changed record cites archived REQ-06.003, Acceptance Criteria and Traceability are updated, and the user has verified every rewrite (MS-031 AC-4, AC-8).
+## Comments
+- **requirements-engineer**: Amended REQ-05.001 to REQ-05.014 for the seed-declared field model. Grouped req and nfr: plain group ID plus dotted member IDs, seed fields story and description, required same-type active group, engine-owned immutable group link, merged group-then-member list order, hidden references, no cascade. Glossary term is the record title with a required definition field and --term removed. Business rule description plus create-only rationale and applicability plus a requirements list field; audit audit_type stored under front matter key type plus required content; tech-spec, ui-spec, use-case, test-case and test-report expressed as seed fields. Major rewrites: UI mockup as SingleHtmlMockup with fixed pending, approved and archived metadata, supersede verb and no status verb; front matter with registry-owned general keys id, title, status, labels, references, created_date, updated_date and group and descriptor frontmatter_key document keys. Archive and delete plus status behaviour unchanged. Acceptance criteria and traceability updated in every record citing RE-010, ADR-036, ADR-039 and related ADRs; no archived REQ-06.003 cited. papyrus check stays at the 3 pre-existing task frontmatter-conflict findings.
+- **orchestrator**: Acceptance met: REQ-05.001..014 all amended to the seed-declared field model, grouped req and nfr, title contract and front-matter ownership; no new check findings; open questions recorded (group link location, glossary identity, mockup metadata key).
