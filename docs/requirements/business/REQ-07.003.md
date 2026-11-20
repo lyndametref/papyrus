@@ -2,9 +2,27 @@
 id: REQ-07.003
 title: "Dispatch Config-Defined Document Commands"
 created_date: '2026-11-13T21:00:12Z'
-updated_date: '2026-11-15T15:47:29Z'
+updated_date: '2026-11-20T20:31:17Z'
 labels: []
-references: []
+references:
+  - RE-010
+  - ADR-036
+  - ADR-0016
+  - REQ-07.001
+  - REQ-07.002
+  - REQ-07.004
+  - REQ-05.001
+  - REQ-05.002
+  - REQ-05.003
+  - REQ-05.006
+  - REQ-05.007
+  - REQ-05.008
+  - REQ-05.010
+  - REQ-05.011
+  - REQ-01.004
+  - BR-001
+  - BR-011
+  - NFR-03.003
 ---
 # REQ-07.003 Dispatch Config-Defined Document Commands
 
@@ -18,34 +36,67 @@ REQ-07 Artifact Categories and Config-Defined Document Types
 Must have
 
 ## Description
-For every enabled `document_types` entry, Papyrus exposes a command named by its slug. Every document type — built-in default entries and user-added entries alike — has the **baseline command family**:
+For every enabled `document_types` entry, Papyrus exposes a command named by its slug. The command tree is built at startup from the effective configuration and the artifact registry, so adding a valid entry is enough to obtain a working command and a help line, with no rebuild and no per-type code (REQ-07.002, ADR-0016).
 
-- `papyrus <document-slug> create <title> [--description <text>] [--label <label>...] [--reference <value>...]`
-- `papyrus <document-slug> list`
-- `papyrus <document-slug> view <id>`
-- `papyrus <document-slug> edit <id> [--title <title>] [--description <text>] [--label <label>...] [--reference <value>...] [--editor]`
-- `papyrus <document-slug> archive <id>`
-- `papyrus <document-slug> delete <id> [--force]`
+**Verbs derived from the document model.** The verb family is a function of the type's document model and is never declared in configuration or supplied by a per-type module or table (REQ-07.004):
 
-The baseline is a lower bound, not the complete verb set of every type. Front-matter-backed document types additionally accept `papyrus <document-slug> status <id> <value>` (REQ-07.001); UI mockups keep their state in HTML metadata and have no `status` command (REQ-05.008). A built-in typed document type may declare additional verbs beyond the baseline, and those verbs are documented by that type's requirement. In this release, the built-in typed types add `create-group`, plus the `--group` option on requirement creation, for business and non-functional requirements (REQ-05.001, REQ-05.002), and `supersede` for UI mockups (REQ-05.008). A config-defined generic document type offers the baseline family only (REQ-07.004).
+- Every model has the baseline verbs `create`, `list`, `view`, `edit`, `archive`, and `delete`.
+- `status <id> <value>` exists for `SingleMarkdown` and `GroupedMarkdown` only (REQ-07.001).
+- `create-group` and the `--group` option on `create` exist only for `GroupedMarkdown` (REQ-05.001, REQ-05.002).
+- `supersede` exists only for `SingleHtmlMockup` (REQ-05.008).
+- No other verb is derived. Two types of the same model expose the same verb set and derive their options from their own field sequences under the same rules.
 
 There is no `deprecate` and no `restore` command for documents: `archive` replaces `deprecate`, and archiving has no inverse command (REQ-05.007). `delete` permanently removes a record, archiving an active record first, and asks for confirmation unless `--force` is given (REQ-05.007).
 
-The command tree is built from the effective configuration when Papyrus starts. Adding a valid entry to `papyrus.config.yml` is therefore enough to obtain a working command: the same Papyrus binary exposes `papyrus <new-slug>`, and `papyrus --help` lists the new slug, without a rebuild and without per-type code. `papyrus --help` lists every enabled document slug alongside the built-in commands, and `papyrus <document-slug> --help` shows the baseline verbs plus any additional verbs of that type. Global options (`--json`, `--dir`, `--config`, `--no-color`) apply to these commands exactly as to other commands (REQ-01.004).
+**Field options derived from the field sequence.** Each declared field contributes one long option, generated from the type's field sequence for the record's role (REQ-07.002, REQ-07.004):
+
+- The option name is the field's declared `option`, or its `key` in kebab case when `option` is absent.
+- The option takes the field's `label` and `help`, and the field `kind` decides the value form: `text` is a single value, `multiline` also accepts `-` to read standard input, and `list` is repeatable.
+- The option is offered only on the verbs listed in the field's `verbs`; a field whose `verbs` exclude a verb has no option on that verb.
+- A `required` field must be supplied on create; a create that omits it produces one validation outcome and writes no file. On edit a required field may be changed but not cleared, and an optional field may be cleared.
+- Field options follow the field sequence order in parsing and help, including the role-appropriate sequence of a `GroupedMarkdown` type.
+
+`--label` and `--reference` remain general repeatable metadata rather than fields (REQ-05.010), and no create, edit, or field option sets `status` (REQ-05.011).
+
+**Uniform title contract.** Title is fixed and non-configurable for every document type and model, and its command surface is generated by the engine, never by an entry or a per-type module (REQ-07.004):
+
+- The title is the first positional `TITLE` on `create` and `create-group`.
+- `--title` is accepted on `create`, `create-group`, and `edit`.
+- The title is required on create: a create with no title produces one validation outcome and writes no file. Supplying both the positional `TITLE` and `--title` on one invocation is rejected as a conflicting title source, and nothing is written.
+- The title is single-line and non-empty, and an edit can never clear it: an empty `--title` is rejected and nothing is written.
+- `title` is a reserved field key, so no field declares it as its `key` or `frontmatter_key`.
+- `audit` and `create-group` gain the positional `TITLE` additively: their existing `--title` option keeps its current name and meaning, and no existing positional argument of any document command is renamed, removed, or reordered.
+- There is no `--term` option on any document command. A glossary term is the record title, so the glossary command uses this title contract, and `--definition` remains the glossary's declared field (REQ-05.003).
+
+**Deterministic help.** Help output for one effective configuration is identical across runs, machines, working directories, terminal widths, and locales, and contains no absolute path, host name, timestamp, process identifier, or memory address. Enabled document types are listed in seed `order` order, ties broken by slug. These are frozen: the root about line, the per-type line `Manage <slug> documents.`, the per-type help line of each enabled type, each verb's about line, the type order, and the verb listing of `papyrus <slug> --help`; regenerating the tree reproduces the current about text. Per-option help prose and option order are generated from seed field data (`label`, `help`, and sequence position), so a seed change legitimately changes them and such a regeneration is not a help regression. Error text and exit codes are unchanged.
+
+**Dynamic dispatch.** The command tree is built from the effective configuration when Papyrus starts, after the configuration is validated (REQ-07.002). `papyrus --help` lists every enabled document slug alongside the built-in commands, and `papyrus <document-slug> --help` shows the model-derived verbs and the generated options and help. Global options (`--json`, `--dir`, `--config`, `--no-color`) apply to these commands exactly as to other commands (REQ-01.004).
 
 Built-in commands are never shadowed. A configuration whose slug equals a built-in command name is rejected at configuration load (REQ-07.002), so at invocation a slug always resolves to a document type. An unknown slug, or the slug of a disabled entry, is a usage error with no fallback to another command. Command outcomes use the common exit codes of REQ-01.004.
-
 ## Acceptance Criteria
-- Every enabled `document_types` entry has a `papyrus <document-slug>` command.
-- The command family of every document type includes at least the baseline verbs `create`, `list`, `view`, `edit`, `archive`, and `delete`.
-- Front-matter-backed document types also accept `status <id> <value>`; UI mockups do not.
-- A built-in typed document type may provide verbs and options beyond the baseline: `create-group` and `--group` for business and non-functional requirements (REQ-05.001, REQ-05.002), and `supersede` for UI mockups (REQ-05.008).
-- `create` requires a title and accepts optional description, labels, and references.
-- `edit` accepts title, description, labels, references, and `--editor`.
-- No `deprecate` and no `restore` command exists for documents.
-- `delete` permanently removes a record, archives an active record first, and requires confirmation unless `--force` is given.
-- After a valid entry is added to `papyrus.config.yml`, the same Papyrus binary exposes `papyrus <new-slug>`, lists the slug in `papyrus --help`, and runs its baseline verbs, with no rebuild.
-- `papyrus --help` lists every enabled document slug, and `papyrus <document-slug> --help` lists the baseline verbs plus any additional verbs of that type.
+- Every enabled `document_types` entry has a `papyrus <document-slug>` command, built from the effective configuration and the registry at startup with no rebuild and no per-type code.
+- Every document model has the baseline verbs `create`, `list`, `view`, `edit`, `archive`, and `delete`.
+- `status <id> <value>` is offered only for `SingleMarkdown` and `GroupedMarkdown`; a `SingleHtmlMockup` type has no `status` verb.
+- `create-group` and the `--group` option on `create` are offered only for `GroupedMarkdown`, and only `req` and `nfr` are of that model.
+- `supersede` is offered only for `SingleHtmlMockup`, and only `ui-mockup` is of that model.
+- The verb set is derived from the document model alone: no configuration key, per-type table, or per-type module declares a verb, and two types of the same model expose the same verb set.
+- No `deprecate` and no `restore` command exists for documents; `delete` archives an active record first and requires confirmation unless `--force` is given.
+- Each declared field produces one long option named by its `option`, or by its `key` in kebab case when `option` is absent, with the field's `label` and `help`.
+- A field option is offered only on the verbs listed in that field's `verbs`.
+- A field option takes a single value for `kind: text`, accepts `-` for standard input for `kind: multiline`, and is repeatable for `kind: list`.
+- Field options appear in field sequence order in parsing and in help, including the role-appropriate sequence of a `GroupedMarkdown` type.
+- A create that omits a required field produces one validation outcome and writes no file; an edit that clears a required field is rejected and writes nothing, while an optional field can be cleared.
+- No create, edit, or field option sets `status`, and `--label` and `--reference` remain general repeatable metadata.
+- The title is the first positional `TITLE` on `create` and `create-group`, and `--title` is accepted on `create`, `create-group`, and `edit`.
+- A create without a title produces one validation outcome and writes no file; supplying both the positional `TITLE` and `--title` on one invocation is rejected as a conflicting title source and writes nothing.
+- The title is single-line and non-empty, and an edit can never clear it: an empty `--title` is rejected and nothing is written.
+- `title` is a reserved field key, so no field declares it as its `key` or `frontmatter_key`.
+- `audit` and `create-group` accept the positional `TITLE` additively, keep their existing `--title` option, and no existing positional argument of any document command is renamed, removed, or reordered.
+- No document command accepts `--term`; the glossary command uses the title contract, and a glossary term is the record title.
+- Help output for one effective configuration is identical across runs, machines, working directories, terminal widths, and locales, and contains no absolute path, host name, timestamp, process identifier, or memory address.
+- Enabled document types are listed in seed `order` order with ties broken by slug; the root about line, `Manage <slug> documents.`, each type's help line, each verb's about line, the type order, and the verb listing are frozen, and regenerating the tree reproduces the current about text.
+- Per-option help prose and option order are generated from seed field data (`label`, `help`, and sequence position), so a seed change may regenerate them and such a regeneration is not a help regression.
+- `papyrus --help` lists every enabled document slug alongside the built-in commands, and `papyrus <document-slug> --help` lists the model-derived verbs with their generated options and help.
 - Global options apply to document commands and `--json` output includes errors.
 - An unknown slug or a disabled entry's slug produces a usage error (exit code 2) and does not execute another command.
 - A slug that collides with a built-in command never shadows it, because the configuration is rejected at load (REQ-07.002).
@@ -61,13 +112,20 @@ Built-in commands are never shadowed. A configuration whose slug equals a built-
 - Project-owner decisions 2026-11-13 (refinement): verb set is `create`, `list`, `view`, `edit`, `delete`, `archive`; no `restore`; dispatch is dynamic only (static document commands are removed, including the `nfreq` alias); slug collisions with built-in commands are rejected at load; unknown or disabled slugs are usage errors.
 - Project-owner decision 2026-11-13 (D1): the six base verbs are a baseline per document type, not an exhaustive set; built-in typed types may declare additional verbs (`create-group` and `--group` for REQ-05.001/05.002, `supersede` for REQ-05.008); the REQ-05 typed groups are unchanged.
 - Project-owner decision 2026-11-13 (D5): `papyrus <document-slug> status <id> <value>` is added for front-matter-backed document types and never archives (REQ-07.001).
-- Current state: `src/lib.rs` defines a static clap `Commands` enum, so no dynamic dispatch exists; this requirement is not implemented.
-- REQ-01.004 — Use Common CLI Controls and Outcomes
-- REQ-05.001 — Manage Business Requirements, REQ-05.002 — Manage Non-Functional Requirements (additional group verbs and `--group`)
+- RE-010 — Descriptor-driven document engine refactor (accepted, not reopenable): D5 and D6 (three document models, grouped and HTML seed-only) fix the model that derives the verbs; D10 (presentation facts live in the config seed); D13 (fixed title, uniform positional title plus `--title` on create, create-group, and edit, `--term` removed, `audit` and `create-group` gain a positional title additively, HTML mockup metadata uses the same contract); D14 (field sequence with no per-field order, so sequence position is option order).
+- ADR-036 — Config-declared document field schema and one descriptor model (decision 8 model-derived verbs and the absence of per-type verb modules; decisions 15, 19, and 20 option name, verbs, and sequence-position order; decision 24 title contract and no `--term`).
+- ADR-0016 — Runtime Config-Derived Command Dispatch for Document Slugs (decisions 1-3, 5, 6, and 8-10 dispatch, parsing, and error behavior; decision 4 and the 2026-11-20 amendment: verbs derived from the model, engine-generated uniform title arguments, frozen about lines and type order, model-generated per-option prose).
+- REQ-07.001 — Organize Artifacts into Three Categories (model-derived `status` verb, status model unchanged by the content model)
+- REQ-07.002 — Configure Document Types and Slugs (slug, reserved built-in names, validated configuration)
+- REQ-07.004 — Provide One Schema-Driven Document Content Model with Three Document Models (models, fields, reserved keys, title, grouped and mockup rules)
+- REQ-05.001 — Manage Business Requirements, REQ-05.002 — Manage Non-Functional Requirements (the two `GroupedMarkdown` seed types)
+- REQ-05.003 — Manage Glossary Terms (glossary `definition` field; the term is the record title)
+- REQ-05.006 — Manage Audit Records (audit gains the positional title additively)
 - REQ-05.007 — Manage Document Archive State and Deletion (archive and delete semantics)
-- REQ-05.008 — Manage UI Mockups (`supersede`, no `status` command)
-- REQ-07.001 — Organize Artifacts into Three Categories (document status command)
-- REQ-07.002 — Configure Document Types and Slugs (slug validation, enabled state)
-- REQ-07.004 — Provide a Generic Content Model for Config-Defined Document Types
-- BR-001 — Papyrus Command Behavior (documented command behavior)
+- REQ-05.008 — Manage UI Mockups (`supersede`, fixed metadata states, no `status` verb)
+- REQ-05.010 — Record Metadata in YAML Front Matter (`--label` and `--reference` as general metadata)
+- REQ-05.011 — Maintain Record Metadata Through All Commands (`status` exemption from field options)
+- REQ-01.004 — Use Common CLI Controls and Outcomes (global options and exit codes)
+- BR-001 — Papyrus Command Behavior (needs the model-derived verb statement)
+- BR-011 — Papyrus glossary Command Behavior (needs the title contract in place of `--term`)
 - NFR-03.003 — Provide Command Man Pages in the Debian Package (covers built-in commands; config-defined slugs have no man page in this release, recorded as a release risk without amending the NFR)
