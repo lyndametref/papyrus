@@ -2,7 +2,7 @@
 id: ADR-0028
 title: "Browser Shell: Shared List Layout, Content-Width Contract, and Collapsible Navigation"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-20T19:59:21Z'
+updated_date: '2026-11-20T20:09:06Z'
 labels: []
 references: []
 ---
@@ -94,6 +94,12 @@ Forces: one layout for a type set that changes at runtime (ADR-0017, ADR-0020); 
 - **Amended:** decision 1 (one descriptor-driven `view.html` and `edit.html`; no typed field sets for documents) and decision 2 (seed-only slots and labels; reference visibility from the seed per type and role).
 - **Amended downstream constraint 10:** the prohibited slot-key set is the union of the structural keys (`id`, `title`, `status`, `created`, `updated`, `actions`) and the ADR-036 decision 23 reserved field keys (`id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, `group`). Slots are declared only in the seed entry; a document field, a general metadata key, or a handler may not introduce a column. The structural column set itself is unchanged.
 - **Not changed:** decisions 3 to 9, downstream constraints 1 to 9 and 11 to 15, the width contract, the navigation model, CSP, the archive-exclusion rule, and this record's accepted status.
+
+### Amendment (2026-11-20) — descriptor model cross-check
+
+- **Decision 1 — one generic edit renderer.** The clause that `view.html`/`edit.html` keep their typed field sets is superseded exactly as ADR-039 decision 4 records: there is one descriptor-driven edit form for every document model, built from the field map (ADR-039 decision 22), and no per-family or per-type edit template survives. Conflict reuses the same form; not-found reuses `view.html`.
+- **Decision 2 — reserved field keys versus slots.** The prohibited slot-key set is the union of the structural keys (`id`, `title`, `status`, `created`, `updated`, `actions`) and the reserved field keys of ADR-036 decision 23 (`id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, `group`), as ADR-039 decision 6 records. Slots are seed data. A document field never becomes a column, whether or not its key is reserved, because a document descriptor's slots come from its seed entry and the seed declares none (ADR-039 decision 25). The reserved-key rule bounds the naming of a seed slot for a bespoke family; it is not a licence to add one.
+- **Not changed:** decisions 3-9, downstream constraints 1-9 and 11-15, the width contract, CSP, the navigation model, and this record's accepted status. This note introduces no rule beyond ADR-039 decisions 4, 6, and 25.
 ## Consequences
 
 **Positive:**

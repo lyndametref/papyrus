@@ -2,7 +2,7 @@
 id: ADR-0025
 title: "Bundled KaTeX Client-Side Math Rendering"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-16T21:08:36Z'
+updated_date: '2026-11-20T20:09:06Z'
 labels: []
 references: []
 ---
@@ -30,7 +30,6 @@ Forces: offline and single-binary (NFR-01.003, NFR-03.001, ADR-0002); no new Rus
 REQ-06.017 states that rendering happens **in the browser only** and that CLI output shows source text unchanged, which removes server-side preprocessing from the option space at requirement level; it is still recorded below so the exclusion is traceable.
 
 ## Decision
-
 1. **Math is rendered client-side by KaTeX, vendored into the binary.** No TeX engine, service, or preprocessing step exists on the server. `papyrus` and every non-browser surface keep printing the stored source text; the browser prints the same source until a client script replaces the placeholder.
 
 2. **The server does a non-Markdown pre-pass over each displayed prose field and emits placeholders.** This is the whole of the server-side work and it is not a Markdown renderer:
@@ -68,6 +67,11 @@ REQ-06.017 states that rendering happens **in the browser only** and that CLI ou
 
 10. **Rendering is a display concern only.** No write path, patch, front matter, or search index knows about math. `papyrus search` and `papyrus <slug> view` keep matching and printing the source text.
 
+### Amendment (2026-11-20) — descriptor model cross-check
+
+- **Decision 8 — prose-field selection.** For document records the named prose-field list is replaced by the field map: the pre-pass runs over every `ResolvedField` whose `kind` is `text` or `multiline` and whose value is present. Field kind, sequence position, and heading all come from the descriptor (ADR-036 decisions 11-20), so a new or renamed field is rendered as prose without an amendment to this record. List-kind fields render through the list renderer; `extra_metadata` rows, IDs, titles, labels, references, status and dates, list cells, and form inputs stay literal as decision 8 already requires. Backlog and decision records are bespoke and keep their current curated prose fields. `SingleHtmlMockup` bodies are HTML and are not routed through the pre-pass.
+- **Decision 4 — KaTeX serve paths are versioned.** The paths that ADR-038 decision 4 attributes to this record now carry the asset-version segment of ADR-038 decision 8: `/assets/katex/0.16.11/katex.min.css` and `/assets/katex/0.16.11/fonts/<name>.woff2`. The relative `url(fonts/…)` references resolve inside the versioned directory, as ADR-038 decision 12 states, and the unversioned `/assets/katex/...` paths are `404` with no alias (ADR-038 decision 11). The embedded path `src/browser/vendor/katex/0.16.11/` and the byte-identical vendoring rule are unchanged.
+- **Not changed:** decisions 1-3, 5-7, 9, and 10, the delimiter contract, the CSP delta, `trust: false`, the fallback behaviour, the no-new-crate rule, and this record's accepted status.
 ## Consequences
 
 **Positive:**

@@ -2,7 +2,7 @@
 id: ADR-0016
 title: "Runtime Config-Derived Command Dispatch for Document Slugs"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-20T19:27:22Z'
+updated_date: '2026-11-20T20:09:05Z'
 labels: []
 references: []
 ---
@@ -70,6 +70,13 @@ Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exact
    *Revision (2026-11-20, amended by ADR-037): this decision bounds the CLI command tree, which is still built once per process with no I/O beyond the already-loaded configuration; it no longer describes the browser's serving metadata. The browser keeps one configuration, registry, and route snapshot and rebuilds it only when an input fingerprint changes, so a request that changes nothing performs no rebuild. No caching crosses process boundaries (ADR-037).*
 
 10. **Removals are part of this decision.** The static document-type variants of `Commands`, their `clap::Subcommand` enums, and the `nfreq` command name are deleted, not retained as hidden aliases (REQ-07.002 and REQ-07.003 both forbid the alias). `req` and `nfr` keep working only because they are default `document_types` entries.
+
+### Amendment (2026-11-20) — descriptor model cross-check
+
+- **Decision 4 — verbs are derived from the model.** `cli::document_command` keeps one builder and one `DocumentInvocation`, but the verb family comes from `DocumentModel`, not from a descriptor declaration: the baseline verbs always, `status` for `SingleMarkdown` and `GroupedMarkdown`, `create-group` and `--group` only for `GroupedMarkdown`, and `supersede` only for `SingleHtmlMockup` (ADR-036 decision 8). The clause "plus any verb the descriptor declares as an extension" is superseded; verbs, options, and help are never per-type declarations.
+- **Decision 4 — engine-generated title arguments.** The title arguments are engine-generated and uniform for every document type and model: the positional `TITLE` on `create` and `create-group`, and `--title` on `create`, `create-group`, and `edit` (ADR-036 decision 24). No type supplies its own title option, there is no `--term`, and the HTML mockup metadata uses the same title contract. Field options are generated from the field sequence, in sequence order, and offered only on the verbs listed by the field's `verbs` (ADR-036 decisions 15, 19, and 20).
+- **Decision 7 — frozen about lines and type order.** The about line `Manage <slug> documents.`, the per-type lines of `papyrus --help`, and the verb and option groups of `papyrus <slug> --help` are frozen: regenerating the tree must reproduce today's about lines and the same ordering of enabled types (the seed `order` values reproduce the current registry order). Per-option help prose and option order are generated from the seed field data (`help`, `label`, and sequence position), so a seed change legitimately changes that prose and order; such a regeneration is not a help regression. Error text and exit codes are unchanged.
+- **Not changed:** decisions 1-3, 5, 6, and 8-10, the builder/derive split, the two-phase startup, `BUILTIN_COMMANDS`, and this record's accepted status.
 ## Consequences
 
 **Positive:**

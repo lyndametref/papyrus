@@ -2,7 +2,7 @@
 id: ADR-0019
 title: "Fail-Closed Document-Type Configuration Validation"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-16T21:08:36Z'
+updated_date: '2026-11-20T20:09:04Z'
 labels: []
 references: []
 ---
@@ -32,7 +32,6 @@ Forces: NFR-02.002 requires every user-supplied value to be sanitized **and** re
 A typo in a slug therefore has two conflicting demands: the tool must refuse to run (REQ-07.002), and the user must be able to repair it with `papyrus config set` (REQ-01.002). The owner decided on 2026-11-13 (D4) that both hold through two repair surfaces, and decision 10 records the resulting constraint.
 
 ## Decision
-
 1. **One validation function, one failure outcome.** `Config::validate` remains the single validator; it is extended with a document-type section and reused by every loader. Failure is always `AppError::Validation` (exit 4), and the message names every offending key in the form `document_types.<slug>.<field>` (or `document_types.<slug>` for a slug-level violation), in `BTreeMap` order, so the outcome is deterministic and one startup attempt reports all violations rather than only the first.
 
 2. **Slug grammar is reject-only, exactly as specified.**
@@ -78,6 +77,15 @@ A typo in a slug therefore has two conflicting demands: the tool must refuse to 
 
 13. **Diagnostics are actionable.** A rejected entry reports the slug, the field, the offending value, and the rule it violated (for example `document_types.req.directory: value must be relative and stay inside the project directory: ../shared`). The same message is used by the CLI and by `config list`'s validation report so a fix can be made from either surface.
 
+### Amendment (2026-11-20) — descriptor model cross-check
+
+- **Decision 7 — status vocabulary keyed on the model.** The `ui-mockup` exception is keyed on `DocumentModel::SingleHtmlMockup`, not on the slug: a `statuses` or `default_status` declaration on a `SingleHtmlMockup` entry is rejected because that model keeps its state in HTML metadata. A `SingleMarkdown` or `GroupedMarkdown` entry is validated by the `active`/`archived` rules above, unchanged. Because the model is seed-only (ADR-036 decision 31), the observable result for the default set is unchanged; only the discriminator moves from the slug to the model.
+- **Decision 8 — entry set wholesale, collections replace.** The whole-map rule stands for the entry set: a present `document_types` replaces the seed set and no absent entry is re-added. Inside a surviving entry the rule is fixed by ADR-036 decision 32: scalars (`enabled`, `label`, `plural`, `order`, `summary`, `type_alias`, `default_status`, `reference_visibility`, the model, and the roles) fill from the seed when absent and are overridden when present; collections (`fields`, `group.fields`, `member.fields`, `statuses`, `slots`, `api_aliases`) replace wholesale when present, including `fields: []`; the two role blocks resolve independently; `prefix` and `directory` are never filled. "Wholesale" therefore applies to the entry set, never to one element of a collection.
+- **Decision 10 — selector paths and file-edit-only fields.** `config list` prints the full effective configuration with every leaf addressed by a selector path `document_types.<slug>.<path>`, field leaves included (sequence position and property, for example `document_types.req.group.fields[0].key`). `config set` and `config unset` address scalar leaves only. A field sequence is not a list-valued key (ADR-0024), so adding, removing, or reordering a field is file-edit-only (RE-010 D14). Repair mode still validates the resulting configuration with decisions 1-7 and writes nothing on failure.
+- **Decision 11 — new invariants re-asserted.** The registry constructor, like the validator, asserts the descriptor invariants it depends on: a field `key` and a `frontmatter_key` are never reserved keys (ADR-036 decision 23); field keys are unique within a role and may repeat across the group and member roles; every field declares `heading`, `frontmatter_key`, or both; no field declares `order` or `enabled`; `GroupedMarkdown` and `SingleHtmlMockup` are seed-only, so a user-defined slug resolves to `SingleMarkdown` and a `model`, `title`, `content`, or `id_shape` key is rejected; `group.fields` and `member.fields` exist only on `GroupedMarkdown`, a grouped type has no top-level `fields`, and a `SingleHtmlMockup` type has `fields: []`.
+- **Decision 13 — indexed field diagnostics.** A field diagnostic names the offending entry by indexed selector path and, when a key is present, the field key; for example `document_types.req.group.fields[2].heading` with the key `story` named in the same message. Aggregation into one outcome, deterministic order, the named field, and exit code 4 are unchanged.
+- **Clarification, not a change.** Decision 5 cites ADR-0018 decision 7 for the record claim rule; ADR-0018 is superseded in full (ADR-036 decision 2), and the claim rule now lives in ADR-036 decision 7 and registry resolution. The citation is history.
+- **Not changed:** decisions 1-6, 9, and 12, the slug, prefix, directory, and duplicate-key rules, the two repair surfaces, and this record's accepted status.
 ## Consequences
 
 **Positive:**
