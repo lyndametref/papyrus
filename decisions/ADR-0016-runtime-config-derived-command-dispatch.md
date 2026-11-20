@@ -2,7 +2,7 @@
 id: ADR-0016
 title: "Runtime Config-Derived Command Dispatch for Document Slugs"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-16T21:08:36Z'
+updated_date: '2026-11-20T19:27:22Z'
 labels: []
 references: []
 ---
@@ -29,7 +29,6 @@ Current code shape:
 Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exactly as documented in REQ-01.004; help must stay accurate for a set that changes per project; a failed configuration must fail closed (REQ-07.002); the built-in command surface must not regress; and the same built-in table must be reusable for validation (ADR-0019) and documentation (ADR-0021) so the three cannot drift.
 
 ## Decision
-
 1. **One command tree is built at startup from the artifact registry** (`cli::tree(&ArtifactRegistry) -> clap::Command`, builder API). It is the single source of parsing, usage, and help. The builder and the derive macros are **split by surface**: `cli::tree` builds the root command and the global arguments (`--json`, `--dir`, `--config`, `--no-color`) with the builder API; `cli::tree::document_command` and `cli::tree::verb_command` build the entire document surface with the builder API; the built-in trees remain `clap` **derive** in `src/cli/builtin.rs` (`BuiltinCmd`, `ConfigCmd`, `InitArgs`) plus one `#[derive(Subcommand)]` enum per family in `src/task.rs`, `src/milestone.rs`, `src/release.rs`, `src/decision.rs`, `src/import.rs`, grafted onto the root with `BuiltinCmd::augment_subcommands(cmd)` and parsed with `BuiltinCmd::from_arg_matches`. `clap` remains the only parser and the only dependency.
 
    *Revision (2026-11-15, owner decision): this decision previously stated that the derive macros were replaced by explicit builder construction for `Cli` and for *every* built-in subcommand. Converting the built-in trees to the builder API was considered and rejected by the owner, so the split above — builder for the root, the global arguments, and the whole document surface, derive for the built-in families — is the contract, not an interim state.*
@@ -46,6 +45,8 @@ Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exact
    - **Phase 4 — dispatch.** `match` on the resolved command: a built-in handler, or `Command::Document { slug, verb }`.
 
    `papyrus init` skips phases 2–3's configuration load, because REQ-01.001 requires it to run without a configuration file.
+
+   *Revision (2026-11-20, amended by ADR-037): phases 1–4 and their order are unchanged. The validate-then-build sequence of phase 2 is also the reload path for the browser's serving snapshot: a configuration change is loaded and fully validated (ADR-0019), then the registry is built (ADR-0017), and only then is the route table derived, so a reload passes the same gates as startup. A reload failure after startup does not abort the process and does not produce a tree or snapshot from a partial type set; it keeps the last known good snapshot serving (ADR-037). The startup outcomes stated in phase 2 are unchanged.*
 
 4. **Document commands are built by one function, not one type.** `cli::document_command(descriptor)` produces a `clap::Command` whose about line is `Manage <slug> documents.` and whose subcommands are the baseline verbs of REQ-07.003 (`create`, `list`, `view`, `edit`, `archive`, `delete`), plus `status <id> <value>` when the descriptor is front-matter-backed, plus any verb the descriptor declares as an extension. Every verb parses into one `DocumentInvocation { slug, verb: DocumentVerb, args: DocumentArgs }` value; `document::run(ctx, registry, invocation)` is the only handler. Type-specific verbs (REQ-05.001 `create-group`, REQ-05.002 `--group`, REQ-05.008 `supersede`) and the `status` presence rule are descriptor data, not a second handler (ADR-0017).
 
@@ -66,8 +67,9 @@ Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exact
 
 9. **Startup work is bounded and observable.** The tree is built once per process in `O(built-ins + enabled types)`; no completion scripts, no per-request rebuilding, and no caching across processes. Building the tree is not allowed to perform I/O beyond the already-loaded configuration.
 
-10. **Removals are part of this decision.** The static document-type variants of `Commands`, their `clap::Subcommand` enums, and the `nfreq` command name are deleted, not retained as hidden aliases (REQ-07.002 and REQ-07.003 both forbid the alias). `req` and `nfr` keep working only because they are default `document_types` entries.
+   *Revision (2026-11-20, amended by ADR-037): this decision bounds the CLI command tree, which is still built once per process with no I/O beyond the already-loaded configuration; it no longer describes the browser's serving metadata. The browser keeps one configuration, registry, and route snapshot and rebuilds it only when an input fingerprint changes, so a request that changes nothing performs no rebuild. No caching crosses process boundaries (ADR-037).*
 
+10. **Removals are part of this decision.** The static document-type variants of `Commands`, their `clap::Subcommand` enums, and the `nfreq` command name are deleted, not retained as hidden aliases (REQ-07.002 and REQ-07.003 both forbid the alias). `req` and `nfr` keep working only because they are default `document_types` entries.
 ## Consequences
 
 **Positive:**

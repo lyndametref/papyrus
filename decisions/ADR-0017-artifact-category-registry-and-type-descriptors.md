@@ -2,7 +2,7 @@
 id: ADR-0017
 title: "Artifact Category Registry and Per-Type Behavior Descriptors"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-16T21:08:36Z'
+updated_date: '2026-11-20T19:26:48Z'
 labels: []
 references: []
 ---
@@ -33,7 +33,6 @@ ADR-0013 fixes the record envelope, the single write path (`record::store`), the
 Forces: one structural model for CLI, record layer, search, and browser (otherwise five places drift); type-specific behavior must remain possible for built-in types without special-casing outside that model; config-defined types must require no code; the single write path and front-matter contract must not be weakened; the artifact categories and fixed lifecycles of REQ-07.001 must be expressible as data, not as ad-hoc `match` arms.
 
 ## Decision
-
 1. **One registry, built at startup, describes every artifact type.** `src/registry.rs` exposes `ArtifactRegistry` with three category collections and one descriptor type. It is assembled from two sources, in this order:
    - the static built-in descriptors (the built-in templates in `src/registry.rs` plus `record::descriptor` entries) for tasks, milestones, releases, and decisions;
    - one runtime `TypeDescriptor` per `document_types` entry, derived mechanically from `DocTypeEntry` plus the static document descriptor of the same slug when one exists.
@@ -79,8 +78,9 @@ Forces: one structural model for CLI, record layer, search, and browser (otherwi
 
 9. **Construction is fallible and total.** `ArtifactRegistry::build(&Config)` returns an error if any invariant fails (missing prefix, unknown category, duplicate slug, disabled type with a command, verb/extension mismatch, a status model whose custom list is absent for a type that has one, a status verb on a type without front-matter status), and on success contains exactly the configured type set. Validation (ADR-0019) runs first; this constructor is the second gate and is also called in tests without a filesystem.
 
-10. **No new dependency, no new process model.** The registry is plain data built in-process; it introduces no cache, no index file, no background scan, and no serialization format.
+10. **No new dependency, no new process model.** The registry is plain data built in-process; it introduces no index file, no background scan, and no serialization format.
 
+   *Revision (2026-11-20, amended by ADR-037): the no-cache clause of this decision is superseded; the rest remains in force. The registry is still plain data built in-process, with no new dependency, no new process model, no index file, no background scan, and no serialization format. ADR-037 adds one in-server serving snapshot that holds the validated configuration, the registry, and the route table, is invalidated by input-file modification time, and is swapped atomically; that snapshot is the only cache this decision now permits.*
 ## Consequences
 
 **Positive:**

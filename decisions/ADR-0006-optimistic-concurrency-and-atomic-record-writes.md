@@ -2,7 +2,7 @@
 id: ADR-0006
 title: "Optimistic Concurrency and Atomic Record Writes for Browser Edits"
 created_date: '2026-11-03T00:00:00Z'
-updated_date: '2026-11-16T21:08:35Z'
+updated_date: '2026-11-20T19:27:33Z'
 labels: []
 references: []
 ---
@@ -33,7 +33,6 @@ The problem is twofold: a save must not silently overwrite a file changed after 
 - Preserve unknown and editor-added `## ` sections content-identically, preserve the original section order, keep the first heading as `# <ID> <title>`, and terminate the file with a single LF newline.
 
 ## Consequences
-
 **Positive:**
 
 - No lock manager, lock file, daemon, or stale-lock recovery is needed; the CLI and browser can coexist without a shared process.
@@ -59,8 +58,9 @@ The problem is twofold: a save must not silently overwrite a file changed after 
 - *Lost unknown sections*: the parser/serializer preserves unknown `## ` sections and their order; tests cover this.
 - *CLI non-atomicity*: as noted in Context, CLI record writes are not atomic and not version-checked; they can race with browser edits and drop unknown sections. Mitigation is documentation of the limitation plus a follow-up task to align CLI writes with this contract.
 - *Duplicate parsing*: record reading uses `records::parse_doc`, the CLI uses `requirement::parse_document`, and writing uses `apply_edit`; the three implementations can drift. Mitigation is shared tests and a future refactor to a single parser/serializer.
-- *Per-request config re-reads*: every request re-reads the effective configuration from disk (browser-requirements.md section 3.18); this is expected for the no-cache, no-session model and is not a defect.
+- *Configuration freshness*: the effective configuration is served from the in-server snapshot of ADR-037, which is rebuilt only when the configuration file's modification time or length changes, so every request uses one consistent configuration. The no-cache, no-session model still governs record content and the version token: a save re-reads the live record, compares the live token, and no record content is cached across requests.
 
+  *Revision (2026-11-20, amended by ADR-037): this risk bullet previously said every request re-reads the effective configuration from disk and that this is expected for the no-cache, no-session model. ADR-037 serves configuration, registry, and routes from one mtime-invalidated snapshot, so the no-cache rule is stated for record content, which is what this record's concurrency contract needs.*
 ## Alternatives Considered
 
 | Option | Outcome | Reason |
