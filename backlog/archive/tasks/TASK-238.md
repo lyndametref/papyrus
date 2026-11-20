@@ -2,7 +2,7 @@
 id: TASK-238
 title: "Assess architecture impact of baseline and characterization work"
 created_date: '2026-11-20T17:40:40Z'
-updated_date: '2026-11-20T17:40:40Z'
+updated_date: '2026-11-20T18:00:05Z'
 labels: []
 references:
   - ADR-036
@@ -23,3 +23,5 @@ type: architecture
 
 ## Description
 Confirm that characterization, fixtures, and benchmark harnesses require no architecture change beyond ADR-036 to ADR-039. Decide where fixtures and harnesses live, how they are invoked, and which observable surfaces are frozen. Record any deviation as an ADR amendment request back to the planner instead of designing new structure here. Do not start until MS-031 governance is accepted.
+## Comments
+- **planner**: Retired from the executable plan by owner decision: architecture decided once in MS-031; no per-milestone architecture impact assessment.

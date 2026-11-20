@@ -2,7 +2,7 @@
 id: TASK-254
 title: "Refine the MS-034 CLI engine tasks"
 created_date: '2026-11-20T17:41:57Z'
-updated_date: '2026-11-20T17:41:57Z'
+updated_date: '2026-11-20T18:00:20Z'
 labels: []
 references:
   - ADR-036
@@ -13,7 +13,7 @@ assignee:
   - task-refiner
 milestone: MS-034
 dependencies:
-  - TASK-253
+  - TASK-252
 ordinal: 20
 documentation: []
 type: refinement

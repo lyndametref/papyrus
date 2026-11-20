@@ -2,7 +2,7 @@
 id: TASK-271
 title: "Assess architecture impact of the snapshot and asset-caching work"
 created_date: '2026-11-20T17:43:07Z'
-updated_date: '2026-11-20T17:43:07Z'
+updated_date: '2026-11-20T18:00:06Z'
 labels: []
 references:
   - ADR-037
@@ -25,3 +25,5 @@ type: architecture
 
 ## Description
 Confirm that request snapshots, the mtime-invalidated config, registry, and route snapshot, and asset caching need no decision beyond ADR-037 and ADR-038. Decide the snapshot boundary, the reload error surface, and where the asset version comes from at build time. Record deviations as amendment requests.
+## Comments
+- **planner**: Retired from the executable plan by owner decision: architecture decided once in MS-031; no per-milestone architecture impact assessment.

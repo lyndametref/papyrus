@@ -2,7 +2,7 @@
 id: TASK-264
 title: "Refine the MS-035 browser engine tasks"
 created_date: '2026-11-20T17:42:31Z'
-updated_date: '2026-11-20T17:42:31Z'
+updated_date: '2026-11-20T18:00:20Z'
 labels: []
 references:
   - ADR-039
@@ -12,7 +12,7 @@ assignee:
   - task-refiner
 milestone: MS-035
 dependencies:
-  - TASK-263
+  - TASK-261
 ordinal: 30
 documentation: []
 type: refinement

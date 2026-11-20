@@ -2,7 +2,7 @@
 id: TASK-272
 title: "Refine the MS-036 performance tasks"
 created_date: '2026-11-20T17:43:07Z'
-updated_date: '2026-11-20T17:43:07Z'
+updated_date: '2026-11-20T18:00:20Z'
 labels: []
 references:
   - ADR-037
@@ -14,7 +14,7 @@ assignee:
   - task-refiner
 milestone: MS-036
 dependencies:
-  - TASK-271
+  - TASK-270
 ordinal: 20
 documentation: []
 type: refinement

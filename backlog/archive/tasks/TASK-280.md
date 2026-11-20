@@ -2,7 +2,7 @@
 id: TASK-280
 title: "Assess architecture impact of cleanup and the single release boundary"
 created_date: '2026-11-20T17:43:51Z'
-updated_date: '2026-11-20T17:43:51Z'
+updated_date: '2026-11-20T18:00:06Z'
 labels: []
 references:
   - ADR-036
@@ -23,3 +23,5 @@ type: architecture
 
 ## Description
 Confirm that cleanup, documentation, and packaging need no decision beyond ADR-036 to ADR-039. Confirm that exactly one release boundary exists and that earlier milestone builds are verification artifacts, not releases or RCs. Record deviations as amendment requests instead of creating a release decision here.
+## Comments
+- **planner**: Retired from the executable plan by owner decision: architecture decided once in MS-031; no per-milestone architecture impact assessment.
