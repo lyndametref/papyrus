@@ -2,7 +2,7 @@
 id: ADR-0028
 title: "Browser Shell: Shared List Layout, Content-Width Contract, and Collapsible Navigation"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-16T21:08:36Z'
+updated_date: '2026-11-20T19:59:21Z'
 labels: []
 references: []
 ---
@@ -29,8 +29,9 @@ Current shape:
 Forces: one layout for a type set that changes at runtime (ADR-0017, ADR-0020); no template engine (ADR-0005); no per-family render branches for lists; the nav state must survive navigation without a server, a session, or a cookie; and `X-Frame-Options: DENY` plus `frame-ancestors 'none'` mean an embedded mockup preview is a separate decision, not a side effect of a width class.
 
 ## Decision
-
 1. **A new `browser::shell` module owns page chrome.** It produces the document skeleton (head, header, nav, `<main>`, footer), the width class, and the nav toggle. Templates are reduced to: `shell.html` (chrome with `{{sidebar}}` and `{{main}}` slots), `list.html` (the single shared list layout), `view.html`, `edit.html`, `error.html`. `document_list.html` is deleted; its content model becomes slots in the shared list. `view.html`/`edit.html` keep their typed field sets — REQ-06.016 mandates a uniform **list** layout only, and collapsing detail/edit forms is out of scope.
+
+   *Revision (2026-11-20, amended by ADR-039): `view.html` and `edit.html` are single descriptor-driven templates for every document type; the typed field sets are not kept, and `document_detail.html`/`document_edit.html` are deleted. The conflict page renders through `edit.html` and the document not-found page through `view.html`, so the template set stays five. The shell module and every other rule of this decision are unchanged.*
 
 2. **One shared list layout with a server-built column plan.** `browser::list` builds, per list page:
 
@@ -49,6 +50,8 @@ Forces: one layout for a type set that changes at runtime (ADR-0017, ADR-0020); 
    - Archived records remain excluded because indexing is enabled-only and active-only (ADR-0020 decision 7); the layout never sees them.
 
    *Revision (2026-11-15, architecture review at TASK-141 blocker resolution): the fixed order previously read `ID, Title, Status, family slot(s), Updated, Actions`, the slot table declared release → `Status`, and the row carried no title, labels, or references. The order now includes `Created`, release declares no slot, and the row carries the title plus labels/references in the Title cell, because REQ-06.004 is a must-have requirement whose acceptance criteria require the browser list to show the same front-matter values as the CLI, including `created_date`, `labels`, and `references`. Dropping them would have required a business-requirement change, not an architecture decision. Resolved question 3 is satisfied structurally by this order instead of by ad-hoc per-family slots. No other part of decision 2 changed.*
+
+   *Revision (2026-11-20, amended by ADR-039): family slot labels and presence come from the descriptor's seed entry alone; the presentation table is no longer consulted for a document type, and a document field never becomes a column. Slot keys may not be any reserved field key of ADR-036 decision 23. Reference rendering in a row is decided by the descriptor's seed `reference_visibility` per type and role, not by the content model. The fixed column order, the structural columns, the Title-cell labels, the grouped row variant, and the action placement are unchanged.*
 
 3. **The width decision is made on the server, per route.** `routes.rs` gains a route property:
 
@@ -86,6 +89,11 @@ Forces: one layout for a type set that changes at runtime (ADR-0017, ADR-0020); 
    - While both list paths exist, `list_page` chooses the shared builder or the legacy builder from a declared presentation field, `list_layout: ListLayout { Shared, Legacy }` (default `Legacy`). No `match` on a slug or handler is introduced for the migration. TASK-142 sets every family to `Shared` and deletes the field together with the legacy builders in the same change, so no transitional branch can survive.
    - The task family has no shared-list surface and gets none from this ADR. REQ-06.013 owns the backlog view; the task slots stay declared for a future task list, which requires its own decision.
 
+### Amendment (2026-11-20) — ADR-039
+
+- **Amended:** decision 1 (one descriptor-driven `view.html` and `edit.html`; no typed field sets for documents) and decision 2 (seed-only slots and labels; reference visibility from the seed per type and role).
+- **Amended downstream constraint 10:** the prohibited slot-key set is the union of the structural keys (`id`, `title`, `status`, `created`, `updated`, `actions`) and the ADR-036 decision 23 reserved field keys (`id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, `group`). Slots are declared only in the seed entry; a document field, a general metadata key, or a handler may not introduce a column. The structural column set itself is unchanged.
+- **Not changed:** decisions 3 to 9, downstream constraints 1 to 9 and 11 to 15, the width contract, the navigation model, CSP, the archive-exclusion rule, and this record's accepted status.
 ## Consequences
 
 **Positive:**
