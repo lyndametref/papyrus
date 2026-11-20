@@ -2,7 +2,7 @@
 id: TASK-228
 title: "Update BR-001 and BR-016 for the derived document command surface and nested configuration schema"
 created_date: '2026-11-20T17:39:27Z'
-updated_date: '2026-11-20T18:15:40Z'
+updated_date: '2026-11-20T21:07:08Z'
 labels: []
 references:
   - BR-001
@@ -13,7 +13,7 @@ references:
   - REQ-01.002
   - TECH-070
   - TECH-077
-status: ToDo
+status: Done
 assignee:
   - requirements-engineer
 milestone: MS-031
@@ -49,3 +49,6 @@ BR-001 and BR-016 describe the generated surface and nested entry shape; no manu
 - [ ] BR-016 documents entry keys, nested group and member blocks, the fields sequence, selector path grammar, scalar default-fill, collection replace, prefix and directory never filled, absent slug stays absent, reserved front-matter keys, and the `document_types.<slug>.<path>` diagnostic form (MS-031 AC-6, RE-010 D14).
 - [ ] BR-016 records precedence exactly: file value beats seed for scalars, a configured collection replaces the seed collection wholesale, and config unset restores the seed collection (MS-031 AC-6).
 - [ ] Both rules remain consistent with REQ-07.002, REQ-07.003, and ADR-036, and the user has verified them (MS-031 AC-6, AC-8).
+## Comments
+- **requirements-engineer**: Updated BR-001 and BR-016 for the descriptor-derived document command surface and the nested configuration entry. BR-001: the document command family is generated from the descriptor; baseline verbs plus model-derived status for SingleMarkdown and GroupedMarkdown, create-group with required --group on create for GroupedMarkdown, and supersede for SingleHtmlMockup; no status verb for SingleHtmlMockup; title is the first positional TITLE on create and create-group with --title on create, create-group, and edit; backlog and decision commands unchanged. BR-016: entry keys, nested group and member blocks, the fields sequence, selector path grammar, scalar default fill, wholesale collection replace for fields and statuses, prefix and directory never filled, absent slug stays absent, reserved front matter keys, the exact document_types.slug.path diagnostic form; precedence where a file scalar beats the seed, a configured collection replaces the seed collection wholesale, and config unset restores the seed collection. Justification for the exact diagnostic form wording is REQ-07.002 and ADR-036 decision 34. papyrus check reports the same three pre-existing TASK-098 TASK-111 TASK-112 frontmatter findings and no new finding.
+- **orchestrator**: Acceptance met: BR-001 now derives the document command family from the descriptor with the title contract; BR-016 states the nested entry shape, fill and replace precedence, selector paths and the exact diagnostic form; no new check findings.
