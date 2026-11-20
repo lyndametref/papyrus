@@ -2,7 +2,7 @@
 id: ADR-0005
 title: "Embedded Dependency-Free HTTP Server and Server-Rendered Browser UI"
 created_date: '2026-11-03T00:00:00Z'
-updated_date: '2026-11-20T19:27:48Z'
+updated_date: '2026-11-20T19:45:29Z'
 labels: []
 references: []
 ---
@@ -25,7 +25,6 @@ ADR-0001 selects Rust and ADR-0004 fixes the repository-root single crate. The T
 The alternatives considered were a Rust web framework (for example axum or actix-web), an async runtime (tokio), a template engine (askama or tera), externally served assets, an external web server or CGI, and a WebView/Tauri shell. Each adds dependencies, runtime files, or a second execution model that conflicts with the offline, dependency-free, single-binary packaging requirement.
 
 ## Decision
-
 - Implement the browser as a **blocking HTTP/1.1 server** using only `std::net::TcpListener`, `std::net::TcpStream`, and `std::io`. No web framework, async runtime, or new dependency.
 - Serve **exactly one request per connection** with `Connection: close`; handle each accepted connection on its own `std::thread`; cap concurrent connections at 16; reject the 17th immediately with `503`; use 5-second read and write timeouts; support only `GET`, `HEAD`, and `POST`; reject `Transfer-Encoding`, keep-alive, pipelining, TLS, HTTP/2, WebSocket, and compression.
 - Route against a **fixed route table** after single-pass percent-decoding. Request paths are never joined to filesystem paths. Record IDs are validated and resolved by exact match against active directory listings.
@@ -33,9 +32,11 @@ The alternatives considered were a Rust web framework (for example axum or actix
 - Embed CSS and JavaScript with `include_str!` (`src/browser/app.css`, `src/browser/app.js`). No CDN, web font, icon font, image, remote `@import`, or remote `url(...)`. JavaScript is optional progressive enhancement (dirty-form guard and narrow-viewport sidebar toggle); every page works without it.
 - Provide a minimal read/write **JSON API** (`GET /api/requirements`, `GET /api/doc/{id}`, `POST /api/doc/{id}`) using `serde_json`, backed by the same record access as the HTML routes.
 - Adopt the security posture fixed by the specification: no authentication, authorization, accounts, sessions, cookies, or TLS; loopback bind by default; non-loopback bind allowed but warned about; `Host` and `Origin` validation plus strict `Content-Type` checks as the CSRF and DNS-rebinding mitigation; HTML escaping, CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and `Cache-Control: no-store`; no outbound network access; no absolute filesystem paths in responses.
+
+   *Revision (2026-11-20, superseded in part by ADR-038): the `Cache-Control: no-store` entry of this bullet is superseded. Vendor files are served from versioned immutable URLs, `app.css`, `app.js`, and `nav-state.js` are served `no-cache` with a strong `ETag` and a bodyless `304` path, and every HTML and JSON response stays `no-store` (ADR-038). Every other header and security measure in this list, the transport rules, and the no-compression rule are unchanged.*
+
 - Keep the module boundaries inside the single crate: `browser::http` (protocol parsing/writing), `browser::records` (record indexing, parsing, validation, atomic persistence), `browser::render` (templates and escaping), and `browser::mod` (option resolution, server lifecycle, routing, handlers, JSON shaping). Configuration keys and their validation live in `config`; project-directory enforcement stays in `context`. Configuration *loading* orchestration currently resides in `commands` (`crate::commands::load_effective_config`) and is a deferred refactor — this ADR fixes key ownership and validation, not the call site.
 - Compile all assets into the binary so the `.deb` contains only `/usr/bin/papyrus` and the copyright file; no runtime asset directory is required.
-
 ## Consequences
 **Positive:**
 
