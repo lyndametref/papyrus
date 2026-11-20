@@ -2,7 +2,7 @@
 id: TASK-230
 title: "Update BR-017 to BR-020 for config-declared SingleMarkdown document types"
 created_date: '2026-11-20T17:39:27Z'
-updated_date: '2026-11-20T17:39:27Z'
+updated_date: '2026-11-20T18:15:41Z'
 labels: []
 references:
   - BR-017
@@ -13,6 +13,8 @@ references:
   - REQ-05.012
   - REQ-05.013
   - REQ-05.014
+  - BR-001
+  - BR-016
 status: ToDo
 assignee:
   - requirements-engineer
@@ -35,3 +37,19 @@ Scope:
 - BR-017 (tech-spec), BR-018 (use-case), BR-019 (test-case), BR-020 (test-report): each becomes a SingleMarkdown document type whose fields are declared in the seed; baseline verbs plus status; no type-specific verb; title is the positional argument and --title on edit; front-matter keys come from each field's frontmatter_key; the existing body headings and field order are preserved in the seed sequence.
 - Record the exact field list for each type in the rule so a later seed change is a requirement change, not a silent behavior change.
 - State that these types are user-extensible: adding a field is a file edit and needs no code.
+## Refinement inputs (TASK-290)
+
+### Business-rule file map
+- BR-017 — `docs/business-rules/BR-017-tech-spec-command-behavior.md` — sections `Description`, `Rationale`, `Applicability` (Type entry; Verbs and content; Status and archive).
+- BR-018 — `docs/business-rules/BR-018-use-case-document-type-behavior.md` — sections `Description`, `Rationale`, `Applicability` (Type entry; Verbs and content; Status and archive).
+- BR-019 — `docs/business-rules/BR-019-test-case-document-type-behavior.md` — sections `Description`, `Rationale`, `Applicability` (Type entry; Verbs and content; Status and archive).
+- BR-020 — `docs/business-rules/BR-020-test-report-document-type-behavior.md` — sections `Description`, `Rationale`, `Applicability` (Type entry; Verbs and content; Status and archive).
+
+### Refinement assumptions / definition of done
+The exact field list for each type is the behavior contract; a later seed change is a requirement change. Only the four listed BR files change; the user verifies all four. Done means all acceptance criteria pass and no source or test file changes (MS-031 AC-10).
+## Acceptance Criteria
+- [ ] BR-017 to BR-020 each state that the type is SingleMarkdown with fields declared in the seed, baseline verbs plus status, and no type-specific verb (MS-031 AC-6, RE-010 D6).
+- [ ] Each rule states the positional title and --title on edit, and that front-matter keys come from each field's frontmatter_key (MS-031 AC-6, RE-010 D13).
+- [ ] Each rule records the exact field list and preserves the existing body headings and field order in the seed sequence (MS-031 AC-6).
+- [ ] Each rule states that these types are user-extensible and adding a field is a file edit requiring no code (MS-031 AC-6, RE-010 D14).
+- [ ] The four rules remain consistent with REQ-05.009, REQ-05.012, REQ-05.013, REQ-05.014, and ADR-036, and the user has verified them (MS-031 AC-6, AC-8).

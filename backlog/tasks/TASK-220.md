@@ -2,7 +2,7 @@
 id: TASK-220
 title: "Write ADR-C: cacheable immutable browser assets with validators"
 created_date: '2026-11-20T17:36:52Z'
-updated_date: '2026-11-20T17:36:52Z'
+updated_date: '2026-11-20T18:15:36Z'
 labels: []
 references:
   - ADR-0005
@@ -10,6 +10,8 @@ references:
   - ADR-0027
   - NFR-07.003
   - TECH-072
+  - NFR-007.003
+  - REQ-06.014
 status: ToDo
 assignee:
   - architect
@@ -19,6 +21,9 @@ dependencies:
 ordinal: 40
 documentation:
   - decisions/ADR-038-cacheable-immutable-browser-assets.md
+  - decisions/ADR-0027-vendored-embedded-browser-assets-and-packaging-notices.md
+  - decisions/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md
+  - decisions/ADR-0026-mermaid-only-offline-diagram-rendering.md
 type: architecture
 ---
 
@@ -34,3 +39,17 @@ Scope: author ADR-038, "Cacheable immutable browser assets with validators".
 - State that no compression is introduced in this change.
 - Define the exact test retargeting: existing header assertions move from every response to HTML/JSON responses, and new assertions cover vendor immutable caching and app asset 304 revalidation.
 - Record the risk that a version bump is required to invalidate a vendor asset, and how packaging computes the version.
+## Refinement inputs (TASK-290)
+
+### ADR inventory and amendment targets (`decisions/`)
+Inputs: ADR-0027 d8 (`decisions/ADR-0027-vendored-embedded-browser-assets-and-packaging-notices.md`), ADR-0005 no-store-on-every-response clause (`decisions/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md`), ADR-0026 d4 (`decisions/ADR-0026-mermaid-only-offline-diagram-rendering.md`).
+Output path: `decisions/ADR-038-cacheable-immutable-browser-assets.md`. If the project declines asset caching, ADR-038 must record the explicit exclusion required by NFR-007.003.
+
+### Refinement assumptions / definition of done
+The source of truth is RE-010 D1-D14 (accepted, not reopenable) and MS-031 AC-2/AC-3. No decision is renumbered, softened, split, or reopened. Done means every acceptance criterion passes, the record is accepted and user-verified, and no source, test, or packaging file changes (MS-031 AC-10).
+## Acceptance Criteria
+- [ ] ADR-038 exists at `decisions/ADR-038-cacheable-immutable-browser-assets.md` with status accepted (MS-031 AC-2C).
+- [ ] ADR-038 supersedes ADR-0027 decision 8 and the no-store-on-every-response clause of ADR-0005, and amends ADR-0026 decision 4 for Mermaid loading (MS-031 AC-2C).
+- [ ] ADR-038 defines versioned immutable vendor URLs, app.css and app.js no-cache with ETag and a 304 path, and no-store for HTML and JSON, limited to assets with no compression (MS-031 AC-2C, RE-010 D12).
+- [ ] ADR-038 states the exact test retargeting: existing header assertions move from every response to HTML and JSON responses, with new assertions for vendor immutable caching and app asset 304 revalidation (MS-031 AC-2C).
+- [ ] ADR-038 records the risk that a vendor asset version bump is required to invalidate the cache and how packaging computes the version; no source, test, or packaging file changes (MS-031 AC-10).

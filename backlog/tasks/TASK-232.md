@@ -2,7 +2,7 @@
 id: TASK-232
 title: "Design the equivalence gate, fixture corpus, and benchmark protocol test cases"
 created_date: '2026-11-20T17:39:46Z'
-updated_date: '2026-11-20T17:39:46Z'
+updated_date: '2026-11-20T18:15:42Z'
 labels: []
 references:
   - REQ-07.001
@@ -12,6 +12,18 @@ references:
   - NFR-007.001
   - NFR-007.002
   - NFR-007.003
+  - BR-001
+  - BR-009
+  - BR-010
+  - BR-011
+  - BR-012
+  - BR-013
+  - BR-014
+  - BR-016
+  - BR-017
+  - BR-018
+  - BR-019
+  - BR-020
 status: ToDo
 assignee:
   - test-manager
@@ -37,3 +49,68 @@ Scope: author Gherkin test cases for every changed requirement and business rule
 - Benchmark protocol: 100 and 1,000 records, warm-up and measured runs, recorded hardware, p50 and p95, and the exact commands.
 - Deliberate behavior changes are listed as expected deltas, never as equivalence failures: uniform title CLI, --term removal, help prose, asset headers, latency.
 - Cover config diagnostics: unknown key, unknown enum, reserved field key, duplicate field key, bad selector path, collection unset, and fields: [].
+## Refinement inputs (TASK-290)
+
+### Coverage map — changed requirements and rules (one TC each)
+Changed requirements:
+- REQ-07.001 (§7.1) — docs/requirements/business/REQ-07.001.md — Organize Artifacts into Three Categories
+- REQ-07.002 (§7.2) — docs/requirements/business/REQ-07.002.md — Configure Document Types and Slugs
+- REQ-07.003 (§7.3) — docs/requirements/business/REQ-07.003.md — Dispatch Config-Defined Document Commands
+- REQ-07.004 (§7.4) — docs/requirements/business/REQ-07.004.md — Provide a Generic Content Model for Config-Defined Document Types
+- REQ-05.001 (§5.1) — docs/requirements/business/REQ-05.001.md — Manage Business Requirements
+- REQ-05.002 (§5.2) — docs/requirements/business/REQ-05.002.md — Manage Non-Functional Requirements
+- REQ-05.003 (§5.3) — docs/requirements/business/REQ-05.003.md — Manage Glossary Terms
+- REQ-05.004 (§5.4) — docs/requirements/business/REQ-05.004.md — Manage UI Specifications
+- REQ-05.005 (§5.5) — docs/requirements/business/REQ-05.005.md — Manage Business Rules
+- REQ-05.006 (§5.6) — docs/requirements/business/REQ-05.006.md — Manage Audit Records
+- REQ-05.007 (§5.7) — docs/requirements/business/REQ-05.007.md — Manage Document Archive State and Deletion
+- REQ-05.008 (§5.8) — docs/requirements/business/REQ-05.008.md — Manage UI Mockups
+- REQ-05.009 (§5.9) — docs/requirements/business/REQ-05.009.md — Manage Technical Specifications
+- REQ-05.010 (§5.10) — docs/requirements/business/REQ-05.010.md — Record Metadata in YAML Front Matter
+- REQ-05.011 (§5.11) — docs/requirements/business/REQ-05.011.md — Maintain Record Metadata Through All Commands
+- REQ-05.012 (§5.12) — docs/requirements/business/REQ-05.012.md — Manage Use Cases
+- REQ-05.013 (§5.13) — docs/requirements/business/REQ-05.013.md — Manage Test Cases
+- REQ-05.014 (§5.14) — docs/requirements/business/REQ-05.014.md — Manage Test Reports
+- REQ-06.004 (§6.4) — docs/requirements/business/REQ-06.004.md — Use Front-Matter Metadata in CLI and Browser Views
+- REQ-06.014 (§6.14) — docs/requirements/business/REQ-06.014.md — Display Config-Defined Document Types in the Browser
+- REQ-06.019 (§6.19) — docs/requirements/business/REQ-06.019.md — Do not Show the Reference List in Document-Type Browser List Views
+- REQ-01.002 (§1.2) — docs/requirements/business/REQ-01.002.md — Read and Edit Project Configuration
+- REQ-01.005 (§1.5) — docs/requirements/business/REQ-01.005.md — Assign Stable Record IDs
+- REQ-01.008 (§1.8) — docs/requirements/business/REQ-01.008.md — Run Project Diagnostics (`papyrus check`)
+Changed NFRs:
+- NFR-007.001 (NFR §7.1) — docs/requirements/non-functional/NFR-007.001.md — Inventory latency at 1,000 records (p95 under 250 ms)
+- NFR-007.002 (NFR §7.2) — docs/requirements/non-functional/NFR-007.002.md — View and edit latency at 1,000 records (p95 under 100 ms)
+- NFR-007.003 (NFR §7.3) — docs/requirements/non-functional/NFR-007.003.md — Browser asset caching contract (versioned immutable vendor assets and validated app assets)
+Changed business rules:
+- BR-001 — docs/business-rules/BR-001-papyrus-command-behavior.md
+- BR-009 — docs/business-rules/BR-009-req-command-behavior.md
+- BR-010 — docs/business-rules/BR-010-nfr-command-behavior.md
+- BR-011 — docs/business-rules/BR-011-glossary-command-behavior.md
+- BR-012 — docs/business-rules/BR-012-ui-spec-command-behavior.md
+- BR-013 — docs/business-rules/BR-013-rule-command-behavior.md
+- BR-014 — docs/business-rules/BR-014-audit-command-behavior.md
+- BR-016 — docs/business-rules/BR-016-configuration-keys-and-precedence.md
+- BR-017 — docs/business-rules/BR-017-tech-spec-command-behavior.md
+- BR-018 — docs/business-rules/BR-018-use-case-document-type-behavior.md
+- BR-019 — docs/business-rules/BR-019-test-case-document-type-behavior.md
+- BR-020 — docs/business-rules/BR-020-test-report-document-type-behavior.md
+
+### User-verification path (test cases)
+MS-031 produces no UI specification and no UI mockup, so the `manage-ui-specs` verification step does not apply; the test-case verification flow below is the gate.
+1. Create each test case with `papyrus test-case create "<title>" --description - --reference <REQ|NFR> [--reference <BR>]`. Papyrus assigns the TC id and file under `docs/test-cases/`; the initial status is `draft`.
+2. Present every draft to the user: TC id, title, the single GIVEN/WHEN/THEN scenario, and traceability.
+3. Only explicit user approval changes status: `papyrus test-case status <TC-ID> approved`. Silence or another reviewer's approval is not approval.
+4. On change requests: `papyrus test-case edit <TC-ID> --description -`, keep the status `draft`, and present again.
+5. Coverage gate: every changed REQ/NFR and BR in the map above has at least one `approved` TC; a missing TC is a coverage gap and blocks TASK-235 and TASK-237.
+6. TASK-232 is Done only when the coverage matrix is complete and every one of its test cases is `approved`.
+
+### Refinement assumptions / definition of done
+The equivalence gate and benchmark protocol are designs, not code; no test implementation is written in MS-031. Done means all acceptance criteria pass and no source, test, or packaging file changes (MS-031 AC-8, AC-9, AC-10).
+## Acceptance Criteria
+- [ ] Every changed REQ, NFR, and BR in the coverage map has at least one Gherkin test case with one scenario, one WHEN block, and traceability (MS-031 AC-8).
+- [ ] The equivalence gate is defined: record-file bytes strict, JSON strict including documented key order, HTTP status codes strict, and rendered HTML semantic by selectors, text, navigation, form fields, and absence of per-type wrappers (MS-031 AC-9).
+- [ ] The fixture corpus includes at least one type per model, a grouped type with multiple members, an HTML mockup in each metadata state, a user-defined SingleMarkdown type, a record with unresolved references, and a record at the archived boundary (MS-031 AC-9).
+- [ ] The benchmark protocol covers 100 and 1,000 records, warm-up and measured runs, recorded hardware, p50 and p95, and the exact commands (MS-031 AC-9).
+- [ ] Deliberate behavior changes are listed as expected deltas, never as equivalence failures: uniform title CLI, --term removal, help prose, asset headers, and latency (MS-031 AC-9).
+- [ ] Config-diagnostic scenarios cover unknown key, unknown enum, reserved field key, duplicate field key, bad selector path, collection unset, and fields: [] (MS-031 AC-9).
+- [ ] All test cases are `approved` only after explicit user verification, and the coverage matrix has zero gaps; dependent tasks TASK-235 and TASK-237 remain blocked until then (MS-031 AC-8).
