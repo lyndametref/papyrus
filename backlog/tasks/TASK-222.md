@@ -2,7 +2,7 @@
 id: TASK-222
 title: "Amend ADR-0019, ADR-0016, ADR-0012, ADR-0023, ADR-0035, ADR-0028, ADR-0024, ADR-0025, and ADR-0034 for the new model"
 created_date: '2026-11-20T17:37:01Z'
-updated_date: '2026-11-20T18:19:12Z'
+updated_date: '2026-11-20T20:10:52Z'
 labels: []
 references:
   - ADR-0012
@@ -25,7 +25,7 @@ references:
   - ADR-0026
   - REQ-07.004
   - TECH-077
-status: ToDo
+status: Done
 assignee:
   - architect
 milestone: MS-031
@@ -91,3 +91,6 @@ The source of truth is RE-010 D1-D14 (accepted, not reopenable) and MS-031 AC-2/
 - [ ] ADR-0034 notes that ADR-0020 d9 is already retired and that a lifecycle page must not be reintroduced (MS-031 AC-3).
 - [ ] ADR-0017 and ADR-0018 are not modified by this task; their supersession remains in ADR-036 (MS-031 AC-2A, AC-3).
 - [ ] A cross-check finds no remaining contradictory statement among the nine amended ADRs, and no source, test, or packaging file is changed (MS-031 AC-3, AC-10).
+## Comments
+- **architect**: Amended ADR-0019 0016 0012 0023 0024 0025 0028 0034 0035 in place with dated notes, numbering preserved; papyrus check reports the same 3 pre-existing frontmatter-conflict findings and no new findings.
+- **orchestrator**: Acceptance met: nine ADRs amended in place with dated notes, decision numbering preserved and no reopening (ADR-0019, ADR-0016, ADR-0012, ADR-0023, ADR-0035, ADR-0028, ADR-0024, ADR-0025, ADR-0034); ADR-0017 and ADR-0018 untouched; no new check findings.

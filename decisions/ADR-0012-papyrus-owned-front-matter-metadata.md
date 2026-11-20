@@ -2,7 +2,7 @@
 id: ADR-0012
 title: "Papyrus-Owned Front Matter as the Single Record Metadata Source"
 created_date: '2026-11-11T00:00:00Z'
-updated_date: '2026-11-16T21:08:35Z'
+updated_date: '2026-11-20T20:09:05Z'
 labels: []
 references: []
 ---
@@ -23,7 +23,6 @@ ADR-0007 (Accepted) established front matter as the single metadata source and t
 Forces: one metadata source per field; lossless preservation of everything a command does not change; identical values in CLI and browser; a single ID space; no second parser or serializer; no new dependency (`yaml_serde` 0.10 is already used); frozen ADR bodies; and a corpus that still contains records without front matter, which must converge without a bulk rewrite.
 
 ## Decision
-
 1. **A YAML front-matter block is mandatory for every Markdown record created or adopted by Papyrus.** The block starts at byte 0, opens with a line containing exactly `---`, and closes with a line containing exactly `---` followed by a blank line before the body. Nothing precedes it. Records created by Papyrus always carry it; existing records gain it on first read or first write (decision 9), so a record never read or written may still lack it, and the corpus converges record by record.
 
 2. **Field map.** Every record type carries the general keys in this canonical order:
@@ -83,6 +82,11 @@ Forces: one metadata source per field; lossless preservation of everything a com
 
 15. **Non-record Markdown is out of scope.** A file is a record only when a descriptor claims its directory and filename/ID pattern. Documentation that is not a managed record type never gains front matter implicitly.
 
+### Amendment (2026-11-20) — descriptor model cross-check
+
+- **Decision 2 — config-declared front-matter keys are a second extension point.** The document rows of the field map are superseded by ADR-0023 decision 5 as amended. A document's additional front-matter keys are `status`, the engine-owned `group` where the model is `GroupedMarkdown`, and every key its field sequence declares as `frontmatter_key`. Declaring a `frontmatter_key` in the seed or in configuration is the second extension point beside the key registry: it adds an accepted key for that descriptor only. The general keys (`id`, `title`, `created_date`, `updated_date`, `labels`, `references`) stay protected: they remain registry-owned, their canonical order is unchanged, and no field may use a reserved key of ADR-036 decision 23. The audit `type` key becomes the seed field `audit_type` declared with `frontmatter_key: type`. Task, milestone, release, and decision rows are unchanged.
+- **Decision 6 — registry plus declarations; heading ownership.** The key registry remains the only source of the general keys and the reserved keys; a config-declared `frontmatter_key` is validated against it and is not a general key. Heading ownership is fixed: the `# <ID> <title>` title line is owned by the shared writer (decision 5) and is written by no other component, the document engine included except through `SetHeadingTitle`; every level-2 `## ` field heading is owned by the descriptor field sequence, one heading per field, and the document engine writes sections only through PatchOps (ADR-036 decisions 35 and 36); no other component may add, rename, or reorder a body heading. The shared front-matter implementation keeps parsing, patching, unknown keys, and key order exactly as decision 6 already states.
+- **Not changed:** decisions 1, 3-5, 7-15, the general-key order, front matter as the only metadata store, lazy adoption, and this record's status (Superseded by ADR-0023).
 ## Consequences
 
 **Positive:**

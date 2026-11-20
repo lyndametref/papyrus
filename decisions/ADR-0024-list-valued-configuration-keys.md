@@ -2,7 +2,7 @@
 id: ADR-0024
 title: "List-Valued Configuration Keys in `papyrus config set`"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-16T21:08:36Z'
+updated_date: '2026-11-20T20:09:05Z'
 labels: []
 references: []
 ---
@@ -23,7 +23,6 @@ ADR-0019 makes configuration fail-closed with two repair surfaces, one of which 
 Forces: keep `config set`'s single value argument and its scalar semantics for every non-list key; do not turn `config set` into a YAML parser; keep validation on the resulting configuration (ADR-0019); keep the file format stable and readable; introduce no new flag, key type, or dependency.
 
 ## Decision
-
 1. **List-valued keys are declared in one constant.** `config::LIST_VALUED_KEYS` names the keys whose value is a YAML sequence: the top-level `statuses` (task statuses) and `document_types.<slug>.statuses` for every slug. Every other key — including `default_status`, `prefix`, `directory`, `enabled`, `id_padding`, and `browser_*` — keeps scalar semantics. The constant is the only place a key is classified; key parsing must not guess from the value's shape.
 
 2. **`config set` with a list-valued key takes a comma-separated list.**
@@ -42,6 +41,11 @@ Forces: keep `config set`'s single value argument and its scalar semantics for e
 
 7. **The syntax is documented where the key is documented.** `papyrus-config(5)` and `config set`'s help state the comma-separated form, the flow-sequence storage, and the no-escape limitation. No new flag (`--append`, `--remove`, `--json`) is added.
 
+### Amendment (2026-11-20) — descriptor model cross-check
+
+- **Decision 1 — list-valued key set.** `LIST_VALUED_KEYS` keeps exactly the scalar status lists it names: the top-level task `statuses` and `document_types.<slug>.statuses`. The descriptor's `fields`, `group.fields`, and `member.fields` collections are sequences of mappings, not list-valued keys: a comma-separated scalar list cannot express a mapping, so they are never classified as list-valued and `config set` never writes them. Presentation collections (`slots`, `api_aliases`) are not classified here and remain declarative file data; this note does not add them to the comma-separated surface.
+- **Consequence for fields.** Adding, removing, or reordering a field, and every per-field property edit, is a configuration file edit (RE-010 D14; ADR-0019 decision 10 as amended). `config set` keeps its scalar semantics (decision 4) and its validation-before-write rule (decision 5).
+- **Not changed:** decisions 2-7, the comma syntax, the flow-sequence storage for the status lists, the no-escape rule, and this record's accepted status.
 ## Consequences
 
 **Positive:**

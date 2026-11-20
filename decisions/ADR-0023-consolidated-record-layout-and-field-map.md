@@ -2,7 +2,7 @@
 id: ADR-0023
 title: "Consolidated Record Layout and Front-Matter Field Map"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-16T21:08:36Z'
+updated_date: '2026-11-20T20:09:05Z'
 labels: []
 references: []
 ---
@@ -28,7 +28,6 @@ The owner decided on 2026-11-13 to consolidate rather than patch further: one AD
 Forces: one identity, one file, one name (ADR-0010 decision 1); configuration-driven paths with project-directory containment (NFR-04.002); atomic, non-destructive moves (ADR-0006); a single writer and patch API (ADR-0013); one metadata source per field (ADR-0012); adoption without a bulk migration (REQ-05.011); fixed milestone/release/decision lifecycles and configurable task/document status vocabularies (REQ-07.001); and no clause left in the corpus that an implementer could follow into a defect.
 
 ## Decision
-
 1. **This ADR is the single authoritative statement of the on-disk layout and the front-matter field map.** It supersedes ADR-0010 and ADR-0012. ADR-0022 remains Accepted and in force for the lifecycle *operations* (status semantics, archive sequence, `status` command, delete, no restore); this ADR consolidates the layout and metadata contract that ADR-0022 amended. Nothing here overrides ADR-0011 (import), ADR-0006 (atomic write and version token), or ADR-0013 (envelope, patch, single writer).
 
 2. **Layout: configuration-driven active and archive locations.**
@@ -98,6 +97,11 @@ Forces: one identity, one file, one name (ADR-0010 decision 1); configuration-dr
    - Remaining in force from ADR-0012 through this restatement: decisions 1, 3, 4, 5, 6, 7, 9, 11, 12, 13, 14, 15 and the corrected decisions 8 and 10 above.
    - ADR-0022's lifecycle-operation decisions are unaffected and remain the reference for archive, `status`, delete, and the no-restore rule.
 
+### Amendment (2026-11-20) — descriptor model cross-check
+
+- **Decision 5 — document front-matter keys.** The document rows of the field map are completed by the descriptor. A document type's additional front-matter keys are the general keys plus `status` plus every key declared by a field `frontmatter_key` in that type's field sequence (ADR-036 decisions 14 and 21). The audit row's `type` is the seed field `audit_type` declared with `frontmatter_key: type` (ADR-036 decision 29), not a fixed map entry; a config-declared document type gains `status` and its declared front-matter keys. `group` remains engine-owned and reserved and is never a field. The general keys, their canonical order, and their protection are unchanged, and a field may not declare a reserved key (ADR-036 decision 23).
+- **Downstream constraint 4.** Decision 5 remains authoritative for the general keys, the reserved keys, and the status vocabulary: adding or removing one of those still requires a key-registry change and an update to this ADR. Adding or removing a *document* front-matter key is a field declaration in the descriptor — a configuration file edit for a config-declared type, a seed edit for a built-in — validated by ADR-0019, and it needs no amendment to this ADR.
+- **Not changed:** decisions 1-4 and 6-9, the layout, ID allocation, the delegation of lifecycle operations to ADR-0022, and this record's accepted status.
 ## Consequences
 
 **Positive:**
