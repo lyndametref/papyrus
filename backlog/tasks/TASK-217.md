@@ -2,13 +2,13 @@
 id: TASK-217
 title: "Record request RE-010 for the descriptor-driven document engine refactor"
 created_date: '2026-11-20T17:35:52Z'
-updated_date: '2026-11-20T17:35:52Z'
+updated_date: '2026-11-20T18:05:12Z'
 labels: []
 references:
   - REQ-07.004
   - ADR-0017
   - ADR-0018
-status: ToDo
+status: Done
 assignee:
   - requirements-engineer
 milestone: MS-031
@@ -41,3 +41,8 @@ Scope: create request RE-010 through the Papyrus request command and record the 
 Also record the target architecture: three category handlers (Backlog, Decision, Document) and one schema-driven document engine with three models.
 
 Out of scope: any requirement, ADR, TECH, or code change; those are separate tasks in this milestone.
+## Comments
+- **unknown**: test comment
+- **requirements-engineer**: author test
+- **requirements-engineer**: Created RE-010 at docs requests RE-010.md with 14 owner decisions; no new papyrus check findings
+- **orchestrator**: Acceptance met: RE-010 exists with all 14 owner decisions verbatim, marked accepted and not reopenable, plus target architecture and scope sections.
