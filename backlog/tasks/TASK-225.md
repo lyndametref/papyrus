@@ -2,7 +2,7 @@
 id: TASK-225
 title: "Update REQ-07.001 and REQ-07.003 for status-model separation, derived verbs, and the uniform title contract"
 created_date: '2026-11-20T17:37:43Z'
-updated_date: '2026-11-20T18:15:39Z'
+updated_date: '2026-11-20T20:32:30Z'
 labels: []
 references:
   - ADR-036
@@ -15,7 +15,7 @@ references:
   - REQ-05.006
   - BR-001
   - BR-011
-status: ToDo
+status: Done
 assignee:
   - requirements-engineer
 milestone: MS-031
@@ -50,3 +50,6 @@ The content model must not alter the status model. RE-010 D13 (fixed title, unif
 - [ ] REQ-07.003 states the uniform title contract: first positional TITLE plus --title on create and create-group, --title on edit, required on create, non-empty, never clearable on edit, reserved field key; --term is removed and glossary uses the title contract; audit and create-group gain a positional title additively (MS-031 AC-4, RE-010 D13).
 - [ ] REQ-07.003 states deterministic help output across runs and machines, with frozen about lines and type order while per-option prose may regenerate (MS-031 AC-4).
 - [ ] Both files have updated Acceptance Criteria and Traceability, cite no archived REQ-06.003, and the user has verified the changes (MS-031 AC-4, AC-8).
+## Comments
+- **requirements-engineer**: Phase 2 evidence. Amended REQ-07.001: content-model independence, closed status value set (active, declared custom, archived), status writers limited to the status and archive verbs, fixed SingleHtmlMockup states pending approved archived with no status verb, archive as the only path to archived. Rewrote REQ-07.003: model-derived verbs (baseline, status for the two Markdown models, create-group and group option only for GroupedMarkdown, supersede only for SingleHtmlMockup), field options derived from the field sequence and per-field verbs, uniform title contract (first positional TITLE plus title option on create and create-group, title option on edit, required on create, non-empty, never clearable, reserved field key, no term option, glossary on the title contract, audit and create-group gain a positional title additively), deterministic help with frozen about lines and type order and regenerable per-option prose, unchanged dispatch and error rules. Acceptance criteria added: 5 in REQ-07.001 and 27 in REQ-07.003. papyrus check shows the same 3 pre-existing archived-task frontmatter conflicts and no new findings. Open items: REQ-05.003 still names a glossary term; BR-001 and BR-011 still describe per-type verbs and the term option; the verb-level about text versus one generic verb line needs confirmation. No other requirement BR TECH source or test changed.
+- **orchestrator**: Acceptance met: REQ-07.001 amended with 5 status-model criteria; REQ-07.003 rewritten with 27 command-derivation criteria including model-derived verbs, field options, uniform title contract, --term removal and deterministic help. REQ-05.003 term wording flagged.
