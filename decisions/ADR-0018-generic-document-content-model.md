@@ -2,14 +2,15 @@
 id: ADR-0018
 title: "Generic Document Content Model for Config-Defined Types"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-16T21:08:36Z'
+updated_date: '2026-11-20T19:13:11Z'
 labels: []
 references: []
+superseded_by: ADR-036
 ---
 # Generic Document Content Model for Config-Defined Types
 
 ## Status
-accepted
+Superseded by ADR-036
 ## Date
 
 2026-11-13 (status: Proposed, 2026-11-13; status: Accepted, 2026-11-13)
