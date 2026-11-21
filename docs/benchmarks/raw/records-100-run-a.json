@@ -1,0 +1,322 @@
+{
+  "schema": "papyrus.benchmark-baseline/1",
+  "profile": "records-100",
+  "active_records": 100,
+  "corpus_hash": "7b88012297517150ed40e5fc1cbc6b4f74e5915aea0f6e61f92155d514e5404e",
+  "corpus_files": 101,
+  "harness_command": "cargo test --release --test benchmark_baseline -- --ignored --nocapture",
+  "git_commit": "c34cf77a209d8af09b759b4534e146fb617cc2aa",
+  "rustc_version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "build_profile": "release (lto=true, strip=true)",
+  "host": {
+    "cpu_model": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+    "physical_cores": 6,
+    "logical_cores": 12,
+    "ram_gib": 15.3,
+    "disk_type": "SSD (mapper/linux-root)",
+    "kernel": "Linux 7.2.15+deb14-amd64 x86_64",
+    "distribution": "Debian GNU/Linux forky/sid"
+  },
+  "date": "2026-11-21T20:28:21+01:00",
+  "run": "a",
+  "protocol": {
+    "reduced_sample_protocol": true,
+    "band_a": {
+      "p50_max_ms": 999,
+      "warmups": 10,
+      "measured": 100
+    },
+    "band_b": {
+      "p50_min_ms": 1000,
+      "warmups": 2,
+      "measured": 20
+    },
+    "band_selection": "the first five measured samples of run A select the band per route and profile, count toward the measured total, and run B reuses the same band and counts",
+    "initial_warmups_before_probe": 2,
+    "connection": "one loopback TCP connection per request, sequential",
+    "readiness_request": "one unmeasured GET / before the protocol",
+    "server_observation": "debug request log line: {method} {path} {status} {n}ms",
+    "wall_observation": "client-side std::time::Instant around connect/request/read",
+    "percentile": "nearest-rank",
+    "baseline_only_p95": "a p95 from fewer than 100 samples is baseline-only and is never compared against the NFR-007.001 or NFR-007.002 thresholds",
+    "post_refactor": "MS-036 re-measures with the full NFR-007 protocol of 10 warm-up + 100 measured requests per route"
+  },
+  "routes": [
+    {
+      "label": "inventory",
+      "path": "/",
+      "band": "B",
+      "warmups": 2,
+      "measured": 20,
+      "truncated": false,
+      "full_protocol_measured": 100,
+      "reason": "band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty",
+      "baseline_only_p95": true,
+      "server_observed_ms": {
+        "p50": 1041,
+        "p95": 1051,
+        "min": 1035,
+        "max": 1081,
+        "mean": 1043.05
+      },
+      "wall_us": {
+        "p50": 1041716,
+        "p95": 1052076,
+        "min": 1035517,
+        "max": 1081577,
+        "mean": 1043741.4
+      }
+    },
+    {
+      "label": "view-single-markdown",
+      "path": "/doc/NOTE-001",
+      "band": "A",
+      "warmups": 10,
+      "measured": 100,
+      "truncated": false,
+      "full_protocol_measured": 100,
+      "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
+      "baseline_only_p95": false,
+      "server_observed_ms": {
+        "p50": 44,
+        "p95": 46,
+        "min": 44,
+        "max": 59,
+        "mean": 44.8
+      },
+      "wall_us": {
+        "p50": 45180,
+        "p95": 46537,
+        "min": 44244,
+        "max": 60005,
+        "mean": 45487.55
+      }
+    },
+    {
+      "label": "view-grouped-group",
+      "path": "/doc/REQ-001",
+      "band": "A",
+      "warmups": 10,
+      "measured": 100,
+      "truncated": false,
+      "full_protocol_measured": 100,
+      "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
+      "baseline_only_p95": false,
+      "server_observed_ms": {
+        "p50": 309,
+        "p95": 322,
+        "min": 303,
+        "max": 361,
+        "mean": 310.69
+      },
+      "wall_us": {
+        "p50": 309907,
+        "p95": 323023,
+        "min": 303890,
+        "max": 362129,
+        "mean": 311388.92
+      }
+    },
+    {
+      "label": "view-grouped-member",
+      "path": "/doc/REQ-001.001",
+      "band": "A",
+      "warmups": 10,
+      "measured": 100,
+      "truncated": false,
+      "full_protocol_measured": 100,
+      "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
+      "baseline_only_p95": false,
+      "server_observed_ms": {
+        "p50": 339,
+        "p95": 345,
+        "min": 332,
+        "max": 352,
+        "mean": 339.03
+      },
+      "wall_us": {
+        "p50": 339400,
+        "p95": 345943,
+        "min": 332949,
+        "max": 352258,
+        "mean": 339766.72
+      }
+    },
+    {
+      "label": "view-single-html-mockup",
+      "path": "/doc/MOCK-001",
+      "band": "A",
+      "warmups": 10,
+      "measured": 100,
+      "truncated": false,
+      "full_protocol_measured": 100,
+      "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
+      "baseline_only_p95": false,
+      "server_observed_ms": {
+        "p50": 1,
+        "p95": 1,
+        "min": 1,
+        "max": 2,
+        "mean": 1.01
+      },
+      "wall_us": {
+        "p50": 2129,
+        "p95": 2177,
+        "min": 1410,
+        "max": 2237,
+        "mean": 1928.81
+      }
+    },
+    {
+      "label": "view-unresolved-reference",
+      "path": "/doc/REQ-001.004",
+      "band": "A",
+      "warmups": 10,
+      "measured": 100,
+      "truncated": false,
+      "full_protocol_measured": 100,
+      "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
+      "baseline_only_p95": false,
+      "server_observed_ms": {
+        "p50": 340,
+        "p95": 348,
+        "min": 335,
+        "max": 351,
+        "mean": 341.16
+      },
+      "wall_us": {
+        "p50": 340913,
+        "p95": 348310,
+        "min": 335195,
+        "max": 351559,
+        "mean": 341858.29
+      }
+    },
+    {
+      "label": "edit-single-markdown",
+      "path": "/doc/NOTE-001/edit",
+      "band": "A",
+      "warmups": 10,
+      "measured": 100,
+      "truncated": false,
+      "full_protocol_measured": 100,
+      "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
+      "baseline_only_p95": false,
+      "server_observed_ms": {
+        "p50": 44,
+        "p95": 45,
+        "min": 44,
+        "max": 47,
+        "mean": 44.37
+      },
+      "wall_us": {
+        "p50": 45051,
+        "p95": 45651,
+        "min": 44564,
+        "max": 47313,
+        "mean": 45086.41
+      }
+    },
+    {
+      "label": "edit-grouped-group",
+      "path": "/doc/REQ-001/edit",
+      "band": "A",
+      "warmups": 10,
+      "measured": 100,
+      "truncated": false,
+      "full_protocol_measured": 100,
+      "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
+      "baseline_only_p95": false,
+      "server_observed_ms": {
+        "p50": 312,
+        "p95": 319,
+        "min": 307,
+        "max": 334,
+        "mean": 312.37
+      },
+      "wall_us": {
+        "p50": 312428,
+        "p95": 319488,
+        "min": 307582,
+        "max": 334985,
+        "mean": 313053.89
+      }
+    },
+    {
+      "label": "edit-grouped-member",
+      "path": "/doc/REQ-001.001/edit",
+      "band": "A",
+      "warmups": 10,
+      "measured": 100,
+      "truncated": false,
+      "full_protocol_measured": 100,
+      "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
+      "baseline_only_p95": false,
+      "server_observed_ms": {
+        "p50": 341,
+        "p95": 353,
+        "min": 337,
+        "max": 369,
+        "mean": 343.14
+      },
+      "wall_us": {
+        "p50": 342112,
+        "p95": 353655,
+        "min": 337596,
+        "max": 369368,
+        "mean": 343851.6
+      }
+    },
+    {
+      "label": "edit-single-html-mockup",
+      "path": "/doc/MOCK-001/edit",
+      "band": "A",
+      "warmups": 10,
+      "measured": 100,
+      "truncated": false,
+      "full_protocol_measured": 100,
+      "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
+      "baseline_only_p95": false,
+      "server_observed_ms": {
+        "p50": 1,
+        "p95": 1,
+        "min": 0,
+        "max": 1,
+        "mean": 0.7
+      },
+      "wall_us": {
+        "p50": 1217,
+        "p95": 1568,
+        "min": 1129,
+        "max": 1779,
+        "mean": 1301.59
+      }
+    },
+    {
+      "label": "edit-unresolved-reference",
+      "path": "/doc/REQ-001.004/edit",
+      "band": "A",
+      "warmups": 10,
+      "measured": 100,
+      "truncated": false,
+      "full_protocol_measured": 100,
+      "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
+      "baseline_only_p95": false,
+      "server_observed_ms": {
+        "p50": 343,
+        "p95": 351,
+        "min": 337,
+        "max": 355,
+        "mean": 344.02
+      },
+      "wall_us": {
+        "p50": 343963,
+        "p95": 351720,
+        "min": 337980,
+        "max": 355378,
+        "mean": 344724.06
+      }
+    }
+  ],
+  "omitted_routes": []
+}

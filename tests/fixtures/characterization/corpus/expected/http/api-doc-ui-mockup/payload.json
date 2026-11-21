@@ -1,1 +1,1 @@
-{"id":"MOCK-002","kind":"ui-mockup","form":"ui-mockup","title":"Approved mockup","specs":["UI-002"],"refs":["MOCK-REF-2"],"task":"TASK-002","status":"approved","superseded_by":null,"version":"1795279858.443718907.432","path":"docs/specifications/ui/mockups/MOCK-002.html","metadata":{}}
+{"id":"MOCK-002","kind":"ui-mockup","form":"ui-mockup","title":"Approved mockup","specs":["UI-002"],"refs":["MOCK-REF-2"],"task":"TASK-002","status":"approved","superseded_by":null,"version":"{{VERSION}}","path":"docs/specifications/ui/mockups/MOCK-002.html","metadata":{}}

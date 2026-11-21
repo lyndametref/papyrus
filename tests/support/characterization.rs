@@ -166,21 +166,39 @@ impl Normaliser {
 
 fn normalise_versions(text: &str) -> String {
     const ATTR: &str = "name=\"version\" value=\"";
+    const JSON: &str = "\"version\":\"";
+    let text = replace_version_after(text, ATTR);
+    replace_version_after(&text, JSON)
+}
+
+/// Replace the quoted value after `prefix` with [`VERSION`] when the value is
+/// an mtime-derived version token. Both the edit-form hidden input and the
+/// JSON `version` field carry the same volatile token.
+fn replace_version_after(text: &str, prefix: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
-    while let Some(position) = rest.find(ATTR) {
-        out.push_str(&rest[..position + ATTR.len()]);
-        let value = &rest[position + ATTR.len()..];
+    while let Some(position) = rest.find(prefix) {
+        out.push_str(&rest[..position + prefix.len()]);
+        let value = &rest[position + prefix.len()..];
         let Some(end) = value.find('"') else {
             out.push_str(value);
             return out;
         };
-        out.push_str(VERSION);
-        out.push_str(&value[end..]);
-        rest = &value[end..];
+        if is_version_token(&value[..end]) {
+            out.push_str(VERSION);
+        } else {
+            out.push_str(&value[..end]);
+        }
+        out.push('"');
+        rest = &value[end + 1..];
     }
     out.push_str(rest);
     out
+}
+
+fn is_version_token(value: &str) -> bool {
+    let parts: Vec<&str> = value.split('.').collect();
+    parts.len() == 3 && parts.iter().all(|part| digits(part.as_bytes()))
 }
 
 fn digits(bytes: &[u8]) -> bool {
@@ -478,8 +496,18 @@ pub fn compare_case(
         let path = directory.join(name);
         let expected =
             fs::read(&path).map_err(|error| format!("read {}: {error}", path.display()))?;
-        if &expected != actual {
-            return Err(first_difference(name, &expected, actual));
+        // Version tokens come from file mtimes, which a checkout does not
+        // preserve. Normalise both sides so the replay compares content, not
+        // the working tree's timestamps. Files written by a capture already
+        // carry `{{VERSION}}`; the two normalisations are idempotent.
+        let expected_text = normalise_versions(&String::from_utf8_lossy(&expected));
+        let actual_text = normalise_versions(&String::from_utf8_lossy(actual));
+        if expected_text.as_bytes() != actual_text.as_bytes() {
+            return Err(first_difference(
+                name,
+                expected_text.as_bytes(),
+                actual_text.as_bytes(),
+            ));
         }
     }
     Ok(())
