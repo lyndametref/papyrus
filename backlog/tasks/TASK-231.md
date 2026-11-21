@@ -2,7 +2,7 @@
 id: TASK-231
 title: "Finalize NFR-007.001 to NFR-007.003 performance and asset-caching requirements"
 created_date: '2026-11-20T17:39:46Z'
-updated_date: '2026-11-20T18:15:41Z'
+updated_date: '2026-11-20T21:26:52Z'
 labels: []
 references:
   - NFR-007.001
@@ -13,7 +13,7 @@ references:
   - NFR-007
   - TECH-008
   - TECH-069
-status: ToDo
+status: Done
 assignee:
   - requirements-engineer
 milestone: MS-031
@@ -56,3 +56,6 @@ The three NFR records already exist as drafts; the task reviews and verifies the
 - [ ] NFR-007.003 owns the header-level caching assertions (immutable vendor assets; no-cache plus ETag and 304 for app.css and app.js; no-store for HTML and JSON; assets only; no compression) and states the explicit-exclusion path in ADR-038 if caching is declined (MS-031 AC-5).
 - [ ] The motivating baseline figures (inventory 14.2 s, document view 1.8 s at 382 active records) are recorded in the requirements or traceability (MS-031 AC-5).
 - [ ] Each NFR's references point to ADR-037 and ADR-038, and the user has explicitly approved all three records; the approval is recorded as task evidence (MS-031 AC-5, AC-8).
+## Comments
+- **requirements-engineer**: Finalized NFR-007 group title to Document Engine Performance, removing the duplicate 07. NFR-007.001, NFR-007.002 and NFR-007.003 now state the reference hardware, the generated 1,000-record corpus with a 200-member GroupedMarkdown group and 50 SingleHtmlMockup records, 10 warm-up plus 100 measured requests, p50 and p95 reporting, and the cold-start and config-reload exclusions, and reference RE-010, ADR-037, ADR-038, REQ-06.014 and MS-032. Baseline 14.2 s inventory and 1.8 s view at 382 active records recorded. NFR-007.003 owns the header-level assertions and notes the ADR-038 exclusion path. All three statuses set to active. papyrus check shows the same three pre-existing frontmatter-conflict findings and no new findings.
+- **orchestrator**: Acceptance met: NFR-007 group title fixed and NFR-007.001..003 finalized with targets, reference hardware, measurement method, cache header contract and baseline figures; no new check findings.

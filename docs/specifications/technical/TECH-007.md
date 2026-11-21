@@ -2,32 +2,43 @@
 id: TECH-007
 title: "Offline Browser Access for Requirement Content"
 created_date: '2026-11-16T17:46:43Z'
-updated_date: '2026-11-18T22:24:45Z'
+updated_date: '2026-11-21T07:44:32Z'
 labels: []
 references:
   - ADR-0001
   - ADR-0003
   - ADR-0004
-  - ADR-0010
+  - ADR-0005
+  - ADR-0006
+  - ADR-0007
   - ADR-0012
   - ADR-0013
+  - ADR-0016
+  - ADR-0017
+  - ADR-0019
+  - ADR-0020
+  - ADR-0022
   - ADR-0025
   - ADR-0026
   - ADR-0027
   - ADR-0028
+  - ADR-0033
+  - ADR-0034
+  - ADR-0035
+  - ADR-0036
+  - ADR-0037
+  - ADR-0038
+  - ADR-0039
   - BR-004
   - BR-016
   - MOCK-0001
-  - NFR-001
   - NFR-001.001
   - NFR-01.002
   - NFR-01.003
   - NFR-02.002
-  - NFR-04
   - NFR-04.001
   - NFR-04.002
   - NFR-05.001
-  - REQ-001
   - REQ-001.001
   - REQ-01.002
   - REQ-01.003
@@ -35,369 +46,530 @@ references:
   - REQ-05.001
   - REQ-05.002
   - REQ-05.007
-  - REQ-06
   - REQ-06.002
-  - REQ-06.003
   - REQ-06.006
   - REQ-06.007
-  - REQ-06.008
   - REQ-06.009
   - REQ-06.010
   - REQ-06.011
   - REQ-06.012
-  - TASK-11
-  - TASK-146
-  - TASK-15
-  - TASK-150
-  - TASK-19
-  - TASK-2
-  - TASK-23
-  - TASK-27
-  - TASK-3
-  - TASK-5
-  - TASK-6
-  - TASK-7
-  - TASK-86
-  - TASK-87
-  - ADR-034
   - REQ-06.018
-  - RE-005
-status: draft
+  - REQ-06.019
+  - REQ-07.004
+status: verified
 ---
 # TECH-007 Offline Browser Access for Requirement Content
 
-> **Revised (TASK-201, 2026-11-18):** the configuration view (section 4d), its `/config` route and sidebar entry, the link to the lifecycle page, and the lifecycle/configuration/skills CSP response class are retired per ADR-034 and REQ-06.018; the browser serves no configuration view and configuration editing is CLI-only. See TECH-080.
-
-## Description
 ## Purpose
 
-Deliver the first increment of `papyrus browser`: a blocking, dependency-free HTTP server inside the existing single Rust crate that serves a project-local, offline, read-and-edit web interface over the requirement documents implemented so far — business-requirement and non-functional-requirement groups and their member requirements — plus the configuration keys, security controls, and tests that make that interface safe and verifiable. The command contract is REQ-06.002 and BR-004 (`papyrus(1)` → COMMANDS → browser, `papyrus-config(5)` → Web UI). Where the man page is silent, this specification fixes explicit, testable defaults recorded in [Open questions](#open-questions).
+Deliver `papyrus browser`: a blocking, dependency-free HTTP server inside the
+single Rust crate that serves a project-local, offline, read-and-edit web
+interface. Business-requirement and non-functional-requirement content is
+browsed through the same unified document surface as every other document type,
+not through per-type handlers. The record's field map drives the view, edit
+form, conflict page, and list row.
+
+The browser serves from the immutable `ServingSnapshot` of ADR-037: one
+validated configuration, one registry, and one route table. Transport, security,
+and cache behavior follow ADR-0005 and ADR-0038.
 
 ## Scope
 
 ### In scope
 
-- `papyrus browser [--host <host>] [--port <port>] [--no-open] [--debug]` exactly as documented in `papyrus(1)` (BR-004, REQ-06.002, REQ-06.007).
-- Option resolution with precedence command line > environment > configuration file > built-in defaults, defaults `127.0.0.1` / `6420` / open enabled, and a warning for a non-loopback bind address (REQ-06.002, REQ-01.003).
-- A blocking HTTP/1.1 server over `std::net::TcpListener` in the existing crate, with request limits, timeouts, deterministic error responses, and no outbound network access (NFR-01.003, NFR-02.002).
-- Listing, viewing, and editing active business-requirement and non-functional-requirement groups and requirements in the browser, with save-then-reread persistence (REQ-05.001, REQ-05.002, NFR-01.002).
-- Deprecation visibility in the browser: deprecated records are not listed and are not reachable (REQ-05.001, REQ-05.002, REQ-05.007).
-- A minimal read/write JSON API over the same records, used by the tests and by later increments.
-- Embedded HTML/CSS/JS assets and templates compiled into the binary: embedded assets are served from one static table — first-party files, vendored KaTeX code and its 20 WOFF2 fonts, and the vendored Mermaid bundle are same-origin; there is no CDN, no remote font, no network fetch, and no new dependency.
-- New configuration keys `browser_host`, `browser_port`, `browser_open` with defaults, validation, `config list/get/set/unset` integration, and serialization (BR-016, REQ-01.002).
-- HTML escaping, JSON encoding, ID/record resolution that never joins user input into a path, project-directory boundary checks on every read and write, symlink-escape rejection, request-body caps, and Host/Origin validation as the CSRF and DNS-rebinding mitigation (NFR-02.002, NFR-04.002).
-- Support in Firefox 115+ (NFR-05.001) using only widely supported HTML/CSS/JS, with basic accessibility.
-- Unit and integration tests, including spawning the binary and speaking HTTP over `TcpStream`.
+- `papyrus browser [--host <host>] [--port <port>] [--no-open] [--debug]`
+  exactly as documented in the browser command contract.
+- Option resolution with precedence command line > environment > configuration
+  file > built-in defaults, defaults `127.0.0.1` / `6420` / open enabled, and a
+  warning for a non-loopback bind address.
+- A blocking HTTP/1.1 server over `std::net::TcpListener` in the existing
+  crate, with request limits, timeouts, deterministic error responses, and no
+  outbound network access.
+- Listing, viewing, and editing requirement groups and members through the
+  document surface, with save-then-reread persistence.
+- Deprecation visibility: archived records are not listed and are not
+  reachable.
+- A minimal read/write JSON API over the same records.
+- Embedded HTML/CSS/JS assets compiled into the binary: first-party files,
+  versioned vendored KaTeX files and fonts, and the versioned vendored Mermaid
+  bundle, all same-origin.
+- The browser configuration keys `browser_host`, `browser_port`, and
+  `browser_open` with defaults, validation, and configuration-command
+  integration.
+- HTML escaping, JSON encoding, ID resolution that never joins user input into
+  a path, project-directory boundary checks, symlink-escape rejection,
+  request-body caps, and Host/Origin validation.
+- Firefox 115+ support using widely supported HTML/CSS/JS, with basic
+  accessibility.
+- Unit and integration tests, including spawning the binary and speaking HTTP
+  over `TcpStream`.
 
 ### Out of scope
 
-- Creating, deprecating, restoring, or deleting records from the browser; moving records between groups; changing record IDs.
-- Browsing or editing tasks, milestones, releases, decisions, glossary terms, business rules, UI specifications, audit records, deployment records, or specification documents — later tickets (TASK-11, TASK-15, TASK-19, TASK-23 … TASK-27).
-- Browsing the backlog store (tasks, milestones, releases), the decisions store, or the `docs/specifications/` tree. REQ-06.002 covers both the backlog and the documentation stores; the backlog-store part of that requirement is delivered by TASK-11, not by this increment (see [Assumptions](#assumptions)).
-- Search inside the browser UI, Markdown rendering, syntax highlighting, rich-text editing, attachments, or file uploads.
+- Creating, deprecating, restoring, or deleting records from the browser;
+  moving records between groups; changing record IDs.
+- Browsing or editing backlog, decision, or non-document records.
+- Browsing the backlog store, the decisions store, or the
+  `docs/specifications/` tree as unmanaged prose.
+- Search inside the browser UI, Markdown rendering, syntax highlighting,
+  rich-text editing, attachments, or file uploads.
 - Authentication, authorization, user accounts, sessions, cookies, or TLS.
-- Automatic opening of the browser when the platform opener is absent beyond a warning.
-- Packaging and release verification — TASK-7.
-- New dependencies, a web framework, an async runtime, a templating engine, a Markdown renderer, or a second crate/application (ADR-0001, ADR-0004).
+- Automatic opening of the browser when the platform opener is absent beyond a
+  warning.
+- Packaging and release verification.
+- New dependencies, a web framework, an async runtime, a templating engine, a
+  Markdown renderer, or a second crate/application.
 
 ## Behavior
 
 ### 1. Command shape and option resolution
 
-1. The command is exactly `papyrus browser [--host <host>] [--port <port>] [--no-open] [--debug]`. It has no positional arguments and no subcommands. `--debug` is an option of the `browser` command only; it is not a global option and is not accepted by any other command.
-2. `--host <host>` takes one value. `--port <port>` takes one value. `--no-open` is a boolean flag with no value.
-3. Supplying an unknown option, an extra positional argument, or a flag without its required value is a usage error (exit 2).
-4. `--port` must be an integer in `1..=65535`. Non-numeric, negative, zero, and out-of-range values are usage errors (exit 2).
-5. `--host` must be a non-empty string that is either an IPv4 literal, an IPv6 literal, or a DNS host name. Validation rules are in section 1.10; a value that fails them is a validation error (exit 4).
-6. Effective values are resolved independently per setting, highest precedence first:
-   1. command-line option (`--host`, `--port`, `--no-open`);
-   2. environment variable (`PAPYRUS_BROWSER_HOST`, `PAPYRUS_BROWSER_PORT`, `PAPYRUS_BROWSER_OPEN`);
-   3. configuration file key (`browser_host`, `browser_port`, `browser_open`);
-   4. built-in default (`127.0.0.1`, `6420`, open enabled).
-7. The built-in defaults are `127.0.0.1`, `6420`, and `browser_open: true` (REQ-06.002, BR-016).
-8. `--no-open` can only disable opening; there is no `--open` flag. An environment or configuration value can therefore be overridden in the "off" direction only, which matches the documented option set.
-9. Environment values are read only when the corresponding command-line option is absent. `PAPYRUS_BROWSER_PORT` is parsed with the same rules as `--port`; an invalid environment value is a validation error (exit 4). `PAPYRUS_BROWSER_OPEN` accepts exactly `true` or `false` (case-insensitive); any other value is a validation error (exit 4). An empty environment value is treated as unset.
-10. Host validation (applies to the resolved value from any source): at most 255 bytes; no leading or trailing whitespace; no whitespace, NUL, other control characters, `/`, `\`, `@`, `?`, `#`, `,`, or `%`; must parse as `std::net::IpAddr` or match `^[A-Za-z0-9]([A-Za-z0-9.-]{0,253})$` and not end with `.` or `-`.
-11. A resolved host that is not a loopback address prints a warning to standard error before binding: `warning: binding to non-loopback address <host>; the interface is reachable from the network`. Loopback means an IPv4 address in `127.0.0.0/8`, the IPv6 address `::1`, or the literal host name `localhost` (case-insensitive). Host names other than `localhost` are never treated as loopback, and are never resolved for the purpose of the warning.
-12. A non-loopback host is allowed, not rejected (REQ-06.002, BR-004).
-13. Global options (`--json`, `--dir`, `--config`, `--no-color`) behave as for the existing commands. `--dir` and `--config` select the project directory and configuration file before the server starts; the project directory is canonicalized and every served path is checked against it (NFR-04.002). `--debug` is not a global option: it is accepted only by the `browser` command.
-14. The command never writes to the configuration file.
+1. The command is exactly `papyrus browser [--host <host>] [--port <port>]
+   [--no-open] [--debug]`. It has no positional arguments and no subcommands.
+   `--debug` is an option of the `browser` command only; it is not a global
+   option and is not accepted by any other command.
+2. `--host <host>` takes one value. `--port <port>` takes one value.
+   `--no-open` is a boolean flag with no value.
+3. Supplying an unknown option, an extra positional argument, or a flag without
+   its required value is a usage error (exit 2).
+4. `--port` must be an integer in `1..=65535`. Non-numeric, negative, zero, and
+   out-of-range values are usage errors (exit 2).
+5. `--host` must be a non-empty string that is either an IPv4 literal, an IPv6
+   literal, or a DNS host name.
+6. Effective values are resolved independently per setting, highest precedence
+   first: command-line option, environment variable
+   (`PAPYRUS_BROWSER_HOST`, `PAPYRUS_BROWSER_PORT`, `PAPYRUS_BROWSER_OPEN`),
+   configuration file key (`browser_host`, `browser_port`, `browser_open`),
+   then the built-in default (`127.0.0.1`, `6420`, open enabled).
+7. Environment values are read only when the corresponding command-line option
+   is absent. An invalid environment value is a validation error (exit 4), and
+   an empty environment value is treated as unset.
+8. Host validation applies to the resolved value from any source: at most 255
+   bytes; no leading or trailing whitespace; no whitespace, NUL, other control
+   characters, `/`, `\`, `@`, `?`, `#`, `,`, or `%`; it must parse as
+   `std::net::IpAddr` or match a host-name pattern and not end with `.` or `-`.
+9. A resolved host that is not a loopback address prints
+   `warning: binding to non-loopback address <host>; the interface is reachable from the network`
+   to standard error before binding. Loopback means `127.0.0.0/8`, `::1`, or
+   `localhost` (case-insensitive).
+10. Global options (`--json`, `--dir`, `--config`, `--no-color`) behave as for
+    the existing commands. `--dir` and `--config` select the project directory
+    and configuration file before the server starts. The command never writes
+    the configuration file.
 
 ### 2. Startup, opening, and lifecycle
 
-1. The server resolves the effective configuration first. An invalid configuration (including an invalid `browser_host`, `browser_port`, or `browser_open`) fails with exit 4 before any socket is opened.
-2. The listener is bound with `std::net::TcpListener::bind((host, port))` before any output or browser launch.
-3. Bind failure — port already in use, permission denied, unresolvable host name, unsupported address — exits 1 with a message of the form `cannot bind <host>:<port>: <os message>` on standard error. With `--json`, the standard error object `{"error":{"code":1,"message":"..."}}` is emitted instead.
-4. On success the command prints exactly one startup line to standard output and flushes it before serving:
-   - text mode: `Serving http://<host>:<port>/`
-   - `--json` mode: `{"status":"serving","url":"http://<host>:<port>/","host":"<host>","port":<port>,"open":<bool>}`
-5. `<host>` in the printed URL is the effective bind host, except that a wildcard bind address (`0.0.0.0` or `::`) is printed as `127.0.0.1`, because a wildcard address is not a usable navigation target.
-6. If opening is enabled, the default browser is opened at that URL after the startup line is flushed, using the platform opener: `xdg-open <url>` on Linux and other Unix systems, `open <url>` on macOS, `cmd /C start "" <url>` on Windows. The opener process is spawned without waiting for it and with its standard streams discarded; it is never reaped, so only a spawn failure is observable by this command (section 2.8).
-7. Opening is suppressed when `--no-open` is present, or when the resolved open setting is `false`. No other condition suppresses it.
-8. A missing or non-executable opener, or any failure to spawn it, is a warning, never a fatal error: `warning: could not open the default browser: <reason>` on standard error. The server keeps serving. Because the opener is spawned without waiting, a later non-zero exit status of the opener process is not observed and is not a Papyrus error.
-9. After startup the process serves requests until it is interrupted (SIGINT/SIGTERM) or a fatal listener error occurs. There is no graceful-shutdown protocol, no `--daemon`, no PID file, and no automatic exit after inactivity.
-10. A fatal accept-loop error (for example the listener becomes unusable) exits 1 with a runtime message.
-11. Standard output carries only the single startup line; per-request diagnostics go to standard error. Warnings are plain `warning: ...` lines on standard error in both text and `--json` modes, because they are diagnostics and not command output.
-12. By default the browser command outputs only errors to the console. Per-request logging is disabled unless `--debug` is set. With `--debug`, each received request is logged as exactly one line on standard error, formatted as `<method> <path> <status> <duration>ms`, containing the method, the path (without query, decoded, truncated to 200 characters), the response status, and the duration as whole milliseconds measured from the start of connection handling to the end of the response write (`0ms` is allowed). Request headers and bodies are never logged. Errors are output whether or not `--debug` is set. Always-on error output means warnings, bind/startup/runtime failures, and pre-parse rejection lines of the form `- - <status>`; parsed requests that return a 4xx or 5xx response are responses, not console errors, and are logged only with `--debug`. For the over-capacity rejection in section 3.2 the request is never read, so the method and path are logged as `-` and the duration is omitted, giving the exact line `- - 503`, with or without `--debug`. Per-request and error lines are always written to standard error, never to standard output, so `--json` output remains the single startup object.
+1. The server loads and validates the startup configuration first. An invalid
+   configuration fails with exit 4 before any socket is opened. The first
+   `ServingSnapshot` is built after the listener binds.
+2. The listener is bound with `std::net::TcpListener::bind((host, port))`
+   before any output or browser launch.
+3. Bind failure exits 1 with a message of the form
+   `cannot bind <host>:<port>: <os message>`; with `--json`, the standard error
+   object is emitted instead.
+4. On success the command prints exactly one startup line to standard output
+   and flushes it before serving: `Serving http://<host>:<port>/`, or the JSON
+   object with the same URL, host, port, and open flag.
+5. If opening is enabled, the default browser is opened at that URL after the
+   startup line is flushed. The opener is spawned without waiting and with its
+   standard streams discarded. A missing or failed opener is a warning, never a
+   fatal error.
+6. After startup the process serves requests until interrupted or a fatal
+   listener error. There is no graceful-shutdown protocol, daemon mode, PID
+   file, or automatic exit after inactivity.
+7. Standard output carries only the single startup line. Per-request
+   diagnostics and warnings go to standard error. With `--debug`, each request
+   is logged as one `<method> <path> <status> <duration>ms` line; headers and
+   bodies are never logged.
 
 ### 3. HTTP server behavior
 
-1. The server is a blocking HTTP/1.1 server implemented with `std::net::TcpListener` and `std::io::{BufReader, Read, Write}` only. No web framework, async runtime, or new dependency is used (ADR-0001, ADR-0004).
-2. Each accepted connection is handled on its own `std::thread`. At most 16 connections are handled concurrently. A connection accepted while the limit is already reached is rejected without reading the request: the server immediately writes `503 Service Unavailable` with `Connection: close`, closes the connection, and logs the rejection as specified in section 2.12. This rejection happens before request parsing, so the Host and Origin validation of section 9.8 does not apply to it.
-3. Requests may use HTTP/1.0 or HTTP/1.1. Any other version receives `505 HTTP Version Not Supported`.
-4. Exactly one request is served per connection. Every response includes `Connection: close`, and the connection is closed after the response body is written (no keep-alive, no pipelining).
-5. Allowed methods are `GET`, `HEAD`, and `POST`. `HEAD` returns the same status and headers as the corresponding `GET` with no body. Any other method on a known path receives `405 Method Not Allowed` with `Allow: GET, HEAD, POST`; on an unknown path it receives `404`, because unknown paths are `404` for every method (section 3.12).
-6. `POST` is accepted only on `/doc/{id}` and `/api/doc/{id}`. A `POST` to a known path that does not accept `POST` receives `405 Method Not Allowed`; a `POST` to an unknown path receives `404 Not Found`, exactly as for every other method (section 3.12).
-7. Request-line and header limits:
-   - request line (method, target, version) at most 8192 bytes, otherwise `414 URI Too Long`;
-   - request target at most 2048 bytes, otherwise `414 URI Too Long`;
-   - header block at most 16384 bytes and at most 64 header fields, otherwise `431 Request Header Fields Too Large`;
-   - header field names and values are read as ISO-8859-1 bytes and converted lossily to UTF-8 for matching; only the headers named in this specification are interpreted.
-8. Body limits and framing:
-   - request body at most 1 MiB (1048576 bytes), otherwise `413 Content Too Large`;
-   - `Transfer-Encoding` is not supported; its presence receives `501 Not Implemented`;
-   - `POST` without `Content-Length` receives `411 Length Required`;
-   - duplicate `Content-Length` headers, a non-numeric `Content-Length`, or both `Transfer-Encoding` and `Content-Length` receive `400 Bad Request`;
-   - the body is read exactly `Content-Length` bytes; extra bytes after the body are ignored and the connection is closed.
-9. Timeouts: the complete request (request line, headers, and body) must arrive within 5 seconds of connection acceptance, otherwise `408 Request Timeout`; writing the response must complete within 5 seconds, otherwise the connection is closed. Both are implemented with socket read/write timeouts.
-10. Request-target parsing: only origin-form targets (`/path` or `/path?query`) are accepted. Absolute-form (`http://...`), authority-form, and asterisk-form targets receive `400`. The path is percent-decoded exactly once; an encoded NUL (`%00`), encoded `/` (`%2F`), encoded `\` (`%5C`), or any decoded control character receives `400`.
-11. Path traversal is rejected: after decoding, any `.` or `..` segment, any empty segment other than a single trailing slash, or a path that does not start with `/` receives `400`. Paths are matched against a fixed route table; no request path is ever joined to a filesystem path.
+1. The server is a blocking HTTP/1.1 server implemented with
+   `std::net::TcpListener` and `std::io::{BufReader, Read, Write}` only. No web
+   framework, async runtime, or new dependency is used.
+2. Each accepted connection is handled on its own thread. At most 16
+   connections are handled concurrently. A connection accepted over the limit
+   is rejected without reading the request: the server writes `503 Service
+   Unavailable` with `Connection: close`, closes, and logs `- - 503`.
+3. Requests may use HTTP/1.0 or HTTP/1.1. Any other version receives `505`.
+4. Exactly one request is served per connection. Every response includes
+   `Connection: close`; there is no keep-alive and no pipelining.
+5. Allowed methods are `GET`, `HEAD`, and `POST`. `HEAD` returns the same
+   status and headers as `GET` with no body. Any other method on a known path
+   receives `405` with `Allow`; on an unknown path it receives `404`.
+6. `POST` is accepted only on `/doc/{id}` and `/api/doc/{id}`. A `POST` to a
+   known path that does not accept it receives `405`; to an unknown path it
+   receives `404`.
+7. Request-line and header limits: request line at most 8192 bytes (`414`);
+   target at most 2048 bytes (`414`); header block at most 16384 bytes and at
+   most 64 fields (`431`). Header names and values are read as ISO-8859-1
+   bytes and converted lossily to UTF-8 for matching.
+8. Body limits: at most 1 MiB (`413`); `Transfer-Encoding` receives `501`;
+   `POST` without `Content-Length` receives `411`; duplicate or non-numeric
+   `Content-Length`, or both `Transfer-Encoding` and `Content-Length`, receive
+   `400`. The body is read exactly `Content-Length` bytes.
+9. Timeouts: the complete request must arrive within 5 seconds of connection
+   acceptance (`408`); writing the response must complete within 5 seconds.
+10. Only origin-form targets (`/path` or `/path?query`) are accepted. The path
+    is percent-decoded exactly once; an encoded NUL, encoded `/`, encoded `\`,
+    or any decoded control character receives `400`.
+11. Path traversal is rejected after decoding: `.` or `..` segments, an empty
+    segment other than a single trailing slash, or a path that does not start
+    with `/` receives `400`. Paths are matched against a fixed route table; no
+    request path is ever joined to a filesystem path.
 12. Routing and status codes:
     - known route with a valid request: the route's success response;
-    - well-formed request for an unknown path: `404 Not Found`, for every method;
-    - known path with a disallowed method: `405 Method Not Allowed`;
-    - malformed request line or headers: `400 Bad Request`;
-    - unsupported media type on `POST`: `415 Unsupported Media Type`;
-    - request body over the cap: `413`;
-    - invalid or missing origin/host validation: `400` or `403` as specified in section 9;
-    - unexpected internal failure: `500 Internal Server Error` with a generic message and no internal detail.
-13. Every response carries `Content-Type` with an explicit charset where textual (`text/html; charset=utf-8`, `application/json; charset=utf-8`, `text/css; charset=utf-8`, `text/javascript; charset=utf-8`, `text/plain; charset=utf-8`), plus `Content-Length`, `Connection: close`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and `X-Frame-Options: DENY`. HTML responses additionally carry the Content-Security-Policy in section 9.7. A `Date` header is optional; `Server: papyrus` is sent without a version number.
-14. There is no TLS, no HTTP/2, no WebSocket, and no compression. The default bind address is loopback-only; binding elsewhere is the operator's explicit choice and is warned about (section 1.11).
-15. The server makes no outbound network connections. It does not fetch, proxy, resolve remote resources, or contact the opener's target over the network itself.
-16. Binding a host name uses the platform resolver; on a disconnected host an IP literal or `localhost` therefore binds reliably, while an arbitrary host name may fail with exit 1. This is the only name-resolution step in the command.
-17. A missing or unreadable configured document directory is not a server error: the corresponding document type category renders its empty state and the API returns an empty array (consistent with `req list`).
-18. Concurrent requests are independent; the server keeps no session state, no cache, and no in-memory copy of record content between requests. Every request re-reads the configuration and the record file from disk.
+    - well-formed request for an unknown path: `404` for every method;
+    - known path with a disallowed method: `405`;
+    - malformed request line or headers: `400`;
+    - unsupported media type on `POST`: `415`;
+    - body over the cap: `413`;
+    - invalid or missing Host/Origin validation: `400` or `403`;
+    - unexpected internal failure: `500` with a generic message.
+13. Every response carries `Content-Type` with an explicit charset where
+    textual, plus `Content-Length`, `Connection: close`, and the security
+    headers. HTML responses carry the CSP. The cache class decides the
+    `Cache-Control` line and whether an `ETag` is emitted (section 6).
+14. There is no TLS, HTTP/2, WebSocket, compression, or outbound connection.
+    The default bind address is loopback-only; binding elsewhere is warned
+    about.
+15. A missing or unreadable configured document directory is not a server
+    error: the corresponding list renders its empty state and the API returns
+    an empty array.
+16. Concurrent requests are independent. The server keeps no session state and
+    no in-memory copy of record content across requests. Each request takes one
+    `ServingSnapshot` handle for configuration, registry, and routes; record
+    content is read from disk for that request.
 
-### 4. UI content scope for this increment
+### 4. UI content scope
 
-1. The interface covers exactly four record forms:
-   - business-requirement group (`document_types.req` prefix plus `-<number>`),
-   - business requirement (`document_types.req` prefix plus `-<number>.<number>`),
-   - non-functional-requirement group (`document_types.nfr` prefix plus `-<number>`),
-   - non-functional requirement (`document_types.nfr` prefix plus `-<number>.<number>`).
-2. Record sources are the active directories `doc_directory` + `document_types.req.directory` and `doc_directory` + `document_types.nfr.directory`, resolved from the effective configuration. Directories and prefixes are never hardcoded; the default prefixes are `REQ` and `NFR`.
-3. Only files directly inside those directories whose `.md` file stem matches the form in section 4.1 are records. Subdirectories (including `deprecated/`), `index.html`, and files whose stem does not match are ignored. There is no recursive traversal.
-4. A document type that is absent from the configuration or has `enabled: false` contributes no records and no error. Its sidebar entry is omitted, and requesting it directly with `?type=` renders that category's empty state rather than an error (OQ-13).
-5. Deprecated records are not listed, not counted, not reachable by URL, and not editable through the interface (REQ-05.001, REQ-05.002, REQ-05.007). A request for a deprecated record's ID returns `404`, exactly as for an unknown ID.
-6. **Navigation model — persistent document-type sidebar.** Every page shares one shell: a `header` (product name, project name, and a static "Local browser / offline · `<host>:<port>`" note), a persistent left sidebar `nav` labelled "Document types", `main`, and a `footer`. The sidebar lists the document types as vertical links, business requirements first, then non-functional requirements, and is extensible: a later increment adds a document type by adding one sidebar entry and one category route value, without changing the list page structure. The header carries the navigation toggle that collapses and expands the sidebar; the expanded state is the default and the choice persists in `localStorage` under `papyrus.nav` (see `browser-shell-ui.md` §5).
-7. The sidebar selects exactly one document category at a time. The list page renders only the selected category; the other category is not rendered at all (not as an empty section, and not as a second section). The two document types are separate categories, not a filter over one combined list.
-8. The default category is business requirements: `GET /` and `GET /?type=req` render the same page.
-9. The selected category renders one section (`h2`) titled with the category name, showing the category's group count and requirement count. The list renders through the shared list contract in `browser-shell-ui.md` §3: group rows and member rows in one table, the Group slot carrying the stored reference, and the shared count note. The legacy nested-link rows and the per-group member count are not carried over.
-10. For business requirements, a requirement whose `## Group` reference does not match an active group of the same type, and a requirement with no `## Group` section, renders as a top-level row in ID order (`browser-shell-ui.md` §3.5). The Group slot shows the stored reference verbatim; an absent reference shows the muted `(none)`. The legacy `(not found)` annotation is not carried over (`browser-shell-shared-list-layout-and-page-width.md` A7). There is no trailing catch-all section.
-
-10a. **Non-functional requirement grouping.** Non-functional atomic requirements are listed under their owning group row in the shared list, matching the grouping used for business requirements. There is no trailing catch-all section for the non-functional category. The owning group is derived in the browser from the requirement ID prefix: `REQ-XX.YYY` -> `REQ-XX`, `NFR-XX.YYY` -> `NFR-XX`. No `Group` field is added to non-functional atomic requirement files and the requirement file format is unchanged. A group row shows the group record's title (for example `NFR-04 Persistence`); when the group record is missing, the group number is used (`NFR-04`). A group with no atomic requirements still renders as a group row with no children. Every atomic requirement appears under exactly one group; none is dropped. The JSON index (`/api/requirements`, `type=nfr`) is ordered by group and then by requirement ID, consistent with the list page, and carries the resolved group title or `null` when the group record is missing (falling back to the group number in the rendered HTML).
-11. A group with no member requirements still renders its group row with no children; the shared empty state and count rules in `browser-shell-ui.md` §3.6 apply.
-12. The category selection is a query parameter on the list page: `type=req` (default) or `type=nfr`. `GET /` and `?type=req` select business requirements, `?type=nfr` selects non-functional requirements. There is no combined "all" view: any other value, including `all`, is `400`.
-13. Viewing a requirement shows: ID (read-only), record form (group or requirement), document type (business or non-functional), title, owning group ID and title (as a link to the group record when the group is active), user story for business-requirement records only, and description.
-14. Viewing a group shows the group's own fields — ID, record form, document type, title, user story for business-requirement groups only, and description — followed by a "Requirements in this group" section (`h2`) listing the group's member requirements in ascending ID order as links whose text is "ID + title". A group with no members shows the empty state from section 4.11 in that section.
-15. Breadcrumbs are the primary navigation on record pages. On the record view the breadcrumb is `Requirements` (a link to the record's category, `/?type=req` or `/?type=nfr`), then the owning group when it resolves (a link to the group record), then the record ID as the current, non-linked crumb. On the edit page the breadcrumb is `Requirements › <ID> › Edit`: it does not include the owning group, which appears in the read-only metadata block, and `Edit` is the current, non-linked crumb (matches MOCK-0001).
-16. The record view offers exactly one action, `Edit`. There is no "Back to requirements" action on the record view: the breadcrumb and the sidebar are the navigation. Error pages keep their single recovery link to `/`.
-17. Editing is limited to the documented content fields:
-    - business-requirement group: title, user story, description;
-    - business requirement: title, user story, description;
-    - non-functional-requirement group: title, description;
-    - non-functional requirement: title, description.
-18. Record ID, record form, document type, and group membership are not editable. They are displayed as read-only text and are never accepted from the request.
-19. Requirement references inside any field (for example `REQ-05.001`, `NFR-04.002`) are displayed as literal text, never auto-linked or interpreted.
-20. Field content is displayed as text with preserved line breaks and collapsed runs of whitespace only where CSS chooses; no Markdown is rendered, so `*`, `#`, backticks, and links appear literally.
-21. No create, deprecate, restore, delete, move, or rename operation is offered. There is no "new record" control, and no control performs any of those actions.
-22. The interface is fully usable without internet access: every asset is served by the same process, and no page references an external origin (NFR-01.003).
-23. The edit form carries the optimistic-concurrency token in a hidden `version` input (section 7.12). The approved mockup (MOCK-0001) draws this as a visible, non-interactive dashed annotation on the edit form; the shipped wording is `Hidden field: version (optimistic-concurrency token)`. The annotation is static status text, not a form control: it is not focusable, never contains the token value, is never submitted, and its wording is fixed.
+1. The interface covers every enabled document type through the unified document
+   surface. For the requirement families, `req` and `nfr` are
+   `GroupedMarkdown` types with group and member records.
+2. Record sources are the active directory of `doc_directory` plus the
+   descriptor's configured directory, resolved from the snapshot. Directories
+   and prefixes are never hardcoded.
+3. Only files directly inside those directories whose extension follows the
+   model and whose stem matches the descriptor's prefix and ID shape are
+   records. Subdirectories (including `archived/` and a legacy `deprecated/`),
+   `index.html`, and non-matching files are ignored.
+4. A document type absent from the configuration or disabled contributes no
+   records and no error. Its sidebar entry, list, detail, edit, and API routes
+   are absent; a direct request is `404`.
+5. Archived records are not listed, not counted, not reachable by URL, and not
+   editable. A request for an archived record returns the same `404` page as an
+   unknown ID.
+6. **Navigation model.** Every page shares one shell: a header with the project
+   name and a static "Local browser / offline" note, a persistent left sidebar
+   grouped by `Backlog`, `Decisions`, and `Documents`, `main`, and a footer. The
+   sidebar has one entry per enabled descriptor. The header carries the
+   navigation toggle; the expanded state is the default and the choice
+   persists in `localStorage` under `papyrus.nav`.
+7. The sidebar selects exactly one category page at a time. A list page
+   renders only the selected type; there is no combined "all documents" view.
+8. The default page is the inventory. `GET /` without a `type` renders the
+   inventory; `GET /?type=<slug>` renders one type's list.
+9. A list renders through the shared list contract: ID, Title, Status, family
+   slots, Created, Updated, Actions. Group and member rows use the shared
+   hierarchical row variant in merged group-then-member order.
+10. A requirement whose group link does not resolve to an active group of the
+    same type, and a requirement with no group link, renders as a top-level row
+    in ID order. The group slot shows the stored reference verbatim; an absent
+    reference shows `(none)`. There is no trailing catch-all section.
+11. A group with no members still renders its group row with no children; the
+    shared empty state and count rules apply.
+12. **View.** The document view builder renders the ADR-033 order: the shared
+    head and chrome, breadcrumb, a small record ID above the title, the title,
+    read-only status beside the ID, the labels taglist, and the created and
+    updated dates under the title; then one section per non-empty field in
+    descriptor order, where an absent optional field is omitted and an absent
+    required field renders as an empty section; then read-only extra metadata;
+    then references, dependencies, and dependents as three separate native
+    `<details>` disclosures, each rendered only when non-empty; then an `Edit`
+    action. A `GroupedMarkdown` group renders the group fields then a read-only
+    member list; a member renders the member fields then a read-only group
+    link.
+13. **Edit.** The document edit builder renders the fixed title control, the
+    editable declared fields in sequence order, the general labels and
+    references controls, read-only status and dates, and the hidden version
+    token. `status` is never a control, and a field whose verbs exclude `edit`
+    is read-only. A `SingleHtmlMockup` form offers `title` plus the list-valued
+    `specs` and `refs` editable; `labels`, `references`, `status`, `task`, and
+    `superseded_by` are read-only.
+14. Field content is displayed with the existing prose pipeline; raw Markdown
+    is not rendered as formatted text outside that pipeline. References are
+    displayed as links when they resolve and as plain text otherwise.
+15. No create, delete, move, or rename operation is offered. There is no
+    "new record" control.
+16. The interface is fully usable without internet access: every asset is
+    served by the same process, and no page references an external origin.
+17. The edit form carries the optimistic-concurrency token in a hidden
+    `version` input. The approved mockup draws this as a visible,
+    non-interactive dashed annotation; the shipped wording is
+    `Hidden field: version (optimistic-concurrency token)`. The annotation is
+    static status text, not a form control.
 
 ### 4a. Shared header branding
 
 1. On every browser page, the project name renders large and bold.
 2. The "Papyrus" mention renders in smaller letters.
 3. The "P" mark keeps its current size and styling.
-4. The project name shown is the configured project name (REQ-01.002).
+4. The project name shown is the configured project name.
 5. The rule applies to the shared header of every page.
-6. Every per-type browser specification that describes the shared shell references this rule rather than restating it.
+6. Every per-type browser specification references this rule rather than
+   restating it.
 
 ### 4b. Record references as links
 
-1. Every rendered record reference that resolves to a Papyrus record is a hyperlink: task dependencies, a task's milestone, `references` values, and a sub-requirement's owning group.
-2. Activating a link navigates to the referenced record's view; the browser back button returns to the originating page.
-3. A reference that does not resolve to an existing record is rendered as plain text and raises no error.
-4. Links are generated in the page and work offline (NFR-01.003).
-5. Unresolved references are not styled as errors and do not produce 404 responses.
+1. Every rendered record reference that resolves to a Papyrus record is a
+   hyperlink: task dependencies, a task's milestone, `references` values, a
+   member's owning group, and the linked records of a field.
+2. Activating a link navigates to the referenced record's view; the browser
+   back button returns to the originating page.
+3. A reference that does not resolve is rendered as plain text and raises no
+   error.
+4. Links are generated in the page and work offline.
 
 ### 4c. Single record view layout
 
-1. A summary card at the beginning of the view shows only the record ID, the created date, and the updated date.
-2. A sub-requirement additionally shows its owning group in the summary card, and nothing else is added to the card.
-3. Dependencies and references appear at the end of the view as collapsible sections, each shown only when the record has at least one such value.
-4. Collapsible sections use native HTML disclosure elements and work with JavaScript disabled (NFR-05.001).
-5. Labels are shown as a taglist under the title.
-6. The layout applies to every managed Markdown record type that has a single record view. UI mockup HTML views are excluded.
-7. The summary card does not show status, milestone, assignee, labels, or references; those remain in their existing locations outside the card, except labels which move to the taglist under the title.
+1. The view follows the ADR-033 metadata order: a small record ID above the
+   title, the title, read-only status beside the ID, the labels taglist, and
+   the created and updated dates under the title.
+2. A member requirement additionally shows its owning group as a read-only link
+   after the metadata block; nothing else is added.
+3. The artifact content follows the metadata block with one section per
+   non-empty field in descriptor order. An absent optional field is omitted; an
+   absent required field renders as an empty section.
+4. References, dependencies, and dependents appear as three separate native
+   `<details>` disclosures, each shown only when the record has at least one
+   such value.
+5. Collapsible sections use native HTML disclosure elements and work with
+   JavaScript disabled.
+6. The layout applies to every managed Markdown record type that has a single
+   record view. UI mockup HTML views use the same head and chrome with a fixed
+   metadata block.
+7. The view does not repeat the document type. Created and updated dates sit
+   directly under the title, and there is no summary card.
 
 ### 4d. Configuration view (retired)
 
-> **Retired (TASK-201, 2026-11-18):** per ADR-034 and REQ-06.018 the browser serves no configuration view. `GET /config`, `GET /config/edit`, `POST /config`, and `GET /?type=config` return `404` and relocate nothing; there is no `Configuration` sidebar entry and no link from any page to a lifecycle view. Configuration editing is CLI-only (`papyrus config get/set/unset`). Clauses 1-8 below are retained as history.
-
-1. The browser serves a configuration view for the current project.
-2. Editing uses `papyrus config get/set`, so folder changes are relocated by the single relocation routine (REQ-01.002, ADR-0010 decision 8). The browser never moves a folder itself.
-3. No path outside the project directory can be defined; every path passes `Context::ensure_within`.
-4. The view shows effective configuration values, including values that come from built-in defaults, and marks which keys are explicitly set in `papyrus.config.yml`.
-5. Editable keys are exactly the keys `papyrus config set` accepts. The view applies the same keys, validation, and precedence as the CLI and cannot persist a key or value the CLI would reject (REQ-01.003).
-6. No configuration key is treated as secret in the current configuration, and the view never reads or displays environment-variable values as editable configuration.
-7. The view links to the lifecycle page for per-artifact read-only configuration and does not duplicate editing there.
-8. The route, sidebar entry, and form encoding are design decisions recorded here (recommended default: `/config`, with `/?type=config` as an alias; subject to TASK-87 approval). The recommended sidebar entry is labelled `Configuration` and is placed after the document types, consistent with the lifecycle and skills pages (OQ-1).
+1. Per the retired-surface decision, the browser serves no configuration view.
+   `GET /config`, `GET /config/edit`, `POST /config`, and `GET /?type=config`
+   return `404` and relocate nothing.
+2. There is no `Configuration` sidebar entry and no link from any page to a
+   lifecycle view.
+3. Configuration editing is CLI-only (`papyrus config get/set/unset`).
+4. Clauses 1-8 of the earlier configuration-view contract remain historical
+   only and are not served.
 
 ### 5. HTTP endpoints
 
-Routes are exact. `{id}` is a record ID as defined in section 7.1.
+Routes are exact. `{id}` is a record ID validated per section 7.1.
 
 | Method | Path | Request | Success response |
 |---|---|---|---|
-| `GET` | `/` | optional `?type=req\|nfr` (default `req`) | `200 text/html` list page for one document category |
-| `GET` | `/doc/{id}` | — | `200 text/html` record view |
+| `GET` | `/` | optional `?type=<slug>` | `200 text/html` inventory, or one type's list |
+| `GET` | `/doc/{id}` | — | `200 text/html` document view |
 | `GET` | `/doc/{id}/edit` | — | `200 text/html` edit form |
-| `POST` | `/doc/{id}` | `application/x-www-form-urlencoded`: `version`, `title`, optional `story`, optional `description` | `303 See Other` with `Location: /doc/{id}` |
-| `GET` | `/api/requirements` | optional `?type=req\|nfr` (default `req`) | `200 application/json` record index for one document category |
+| `POST` | `/doc/{id}` | `application/x-www-form-urlencoded`: `version`, `title`, declared field options, `labels`, `references` | `303 See Other` with `Location: /doc/{id}` |
+| `GET` | `/api/docs/{slug}` | — | `200 application/json` list for one type |
 | `GET` | `/api/doc/{id}` | — | `200 application/json` record |
-| `POST` | `/api/doc/{id}` | `application/json`: `{"version":"...","title":"...","story":"..."\|null,"description":"..."\|null}` | `200 application/json` updated record |
-| `GET` | `/assets/app.css` | — | `200 text/css` embedded stylesheet |
-| `GET` | `/assets/app.js` | — | `200 text/javascript` embedded script |
+| `POST` | `/api/doc/{id}` | `application/json`: `version`, `title`, field values | `200 application/json` updated record |
+| `GET` | `/assets/app.css`, `/assets/app.js`, `/assets/nav-state.js` | — | `200` embedded first-party asset |
+| `GET` | `/assets/<package>/<asset-version>/<file>` | — | `200` embedded vendor asset |
 | `HEAD` | any `GET` route | — | same status and headers, no body |
 | any | any other route | — | `404` for every method on an unknown path; `405` for a known path with a disallowed method |
 
-1. `/api/requirements` response:
-
-```json
-{
-  "groups": [
-    {"id": "REQ-001", "kind": "req", "form": "group", "title": "Payments Group"}
-  ],
-  "requirements": [
-    {"id": "REQ-001.001", "kind": "req", "form": "requirement", "title": "Capture payment", "group": "REQ-001"}
-  ]
-}
-```
-
-`kind` is `req` or `nfr`; `form` is `group` or `requirement`; `group` is the stored group reference or `null` when absent. The response covers exactly one document category, matching the list page: `type=req` (default) returns business-requirement records, `type=nfr` returns non-functional records; any other value, including `all`, is `400`. Both arrays are ordered by ID ascending and every record carries the `kind` of the selected category.
-
-2. `/api/doc/{id}` and the `POST` success response:
-
-```json
-{
-  "id": "REQ-001.001",
-  "kind": "req",
-  "form": "requirement",
-  "title": "Capture payment",
-  "group": {"id": "REQ-001", "title": "Payments Group"},
-  "story": "As a cashier, I want ...",
-  "description": "The quick brown fox ...",
-  "version": "1762000000.123456789.412",
-  "path": "docs/requirements/business/REQ-001.001.md"
-}
-```
-
-`story` is `null` for non-functional records and when absent; `description` is `null` when absent; `group` is `null` for group records and for requirements whose group cannot be resolved. `path` is relative to the project directory, uses `/` separators, and never exposes an absolute path.
-
+1. The canonical `/api/docs/{slug}` response is the same shape as the type's
+   seed-declared legacy alias. An alias is indistinguishable from the
+   canonical form. Response ordering is by ID ascending, with grouped types
+   merged group-then-member.
+2. A document view and edit form are built from the field map:
+   `SingleMarkdown` uses the top-level `fields` with role `Single`;
+   `GroupedMarkdown` uses `group.fields` with role `Group` or `member.fields`
+   with role `Member`; `SingleHtmlMockup` uses fixed metadata. A field with
+   only `heading` reads the body section; a field with only `frontmatter_key`
+   reads that key; a field with both reads the body section and does not merge
+   the two locations.
 3. Error responses:
-   - HTML routes return an HTML error page with the status, a short message, and a link back to `/`.
-   - JSON routes return `{"error":{"code":<http-status>,"message":"<message>"}}` with the matching HTTP status. The `code` field is the HTTP status, not the CLI exit code.
-   - A `POST` to a form endpoint that fails validation returns `422` with the edit form re-rendered, the submitted values preserved, a form-level summary, and field-level messages. In the re-rendered form, each summary entry links to the offending field and names the actual field error, using the same text as that field's message (section 7.5).
-4. `POST /doc/{id}` requires `Content-Type: application/x-www-form-urlencoded` (parameters ignored) and rejects anything else with `415`. `POST /api/doc/{id}` requires `Content-Type: application/json` and rejects anything else with `415`.
-5. Form fields are `version` (required), `title` (required), `story` (business-requirement forms only), and `description`. Unknown form fields are ignored. Repeated fields: the last value wins. Field values are percent-decoded with `+` as space; malformed percent-encoding receives `400`.
-6. A successful form `POST` returns `303` and no body; the client re-fetches the view page, which reads the file from disk again (save-then-reread).
-7. The JSON `POST` replaces the fields it is given and leaves omitted fields unchanged, except that an explicit `null` for `story` or `description` clears that section. `title` is required and must be a string. `version` is required. Unknown JSON members are ignored; a body that is not a JSON object, or a member of the wrong type, receives `400`.
-8. `story` sent to a non-functional record is ignored (not an error), matching the CLI, which has no story option for `nfreq`.
-9. Assets are served with an `ETag`-free, cache-free policy (`Cache-Control: no-store`) and are identical for every request; they contain no per-request data.
+   - HTML routes return an HTML error page with the status, a short message,
+     and a link back to `/`.
+   - JSON routes return
+     `{"error":{"code":<http-status>,"message":"<message>"}}` with the matching
+     HTTP status. The `code` field is the HTTP status, not the CLI exit code.
+   - A form `POST` that fails validation returns `422` with the edit form
+     re-rendered, the submitted values, a form-level summary, and field-level
+     messages.
+4. `POST /doc/{id}` requires
+   `Content-Type: application/x-www-form-urlencoded` and rejects anything else
+   with `415`. `POST /api/doc/{id}` requires `Content-Type: application/json`
+   and rejects anything else with `415`.
+5. Form fields are `version` (required), `title`, the declared field keys, and
+   the general `labels` and `references` lists. A `status` field is rejected
+   with `422`. Unknown fields are rejected. A repeated list-valued field
+   accumulates into one ordered list as ADR-036 decision 17 and the ADR-039
+   field map require; the last value does not win. For `SingleHtmlMockup` the
+   form offers `title` plus the list-valued `specs` and `refs`; `labels`,
+   `references`, `status`, `task`, and `superseded_by` are read-only. Values
+   are percent-decoded with `+` as space; malformed percent-encoding receives
+   `400`.
+6. A successful form `POST` returns `303` and no body; the client re-fetches
+   the view, which reads the file from disk again.
+7. The JSON `POST` replaces the fields it is given and leaves omitted fields
+   unchanged, except that an explicit `null` clears an optional section.
+   `title` and `version` are required. Unknown members are rejected; a body
+   that is not a JSON object, or a member of the wrong type, receives `400`.
+8. Assets are served with the cache classes of section 6 and are identical for
+   every request; they contain no per-request data.
 
 ### 6. Assets and rendering
 
-1. HTML templates are text files `src/browser/templates/shell.html`, `list.html`, `view.html`, `edit.html`, `error.html`, plus the `document_detail.html` and `document_edit.html` body fragments; all are embedded with `include_str!` and rendered server-side. The static asset table serves only `/assets/*`: `/assets/nav-state.js`, the KaTeX stylesheet/script, and the built-in WOFF2 fonts.
-2. Substitution uses a single documented placeholder syntax `{{name}}` with a fixed, per-template allowlist of names. There is no template engine dependency, no expression evaluation, and no placeholder expansion inside substituted values (a value containing `{{...}}` is emitted literally).
-3. Every substituted value is HTML-escaped in text and attribute context: `&` → `&amp;`, `<` → `&lt;`, `>` → `&gt;`, `"` → `&quot;`, `'` → `&#39;`. Attribute values are always double-quoted. Escaping happens at render time only; stored content is never pre-escaped.
-4. JSON is produced only with `serde_json`, never by string concatenation or format strings.
-5. Bundled, same-origin fonts replace the earlier system-font-only rule (ADR-0027 decision 7). The first-party stylesheet `/assets/app.css` still uses the system font stack (`system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`) and contains no `url()` reference. Two stylesheets ship: `/assets/app.css` and the byte-identical vendored `/assets/katex/katex.min.css`, whose 60 relative `url(fonts/…)` values resolve to `/assets/katex/fonts/*.woff2` entries of the static asset table. Only the WOFF2 form is served. No served CSS contains `@import`; no reference is remote; there is no `<img>` element, no `srcset`, no icon font, and no CDN reference. The page-level font stack stays the system stack; KaTeX fonts apply only inside rendered math.
-6. The scripts are optional progressive enhancement. `nav-state.js` is synchronous, applies the stored navigation state, and reveals the toggle; `app.js` is deferred and owns the toggle behaviour, the dirty-form guard, tag editing, the board status change, and the math and diagram render passes (`browser-shell-ui.md` §5.5; `browser-math-and-diagram-rendering.md` §6 and §16). With JavaScript disabled, every page, link, form, and error state still works, and the expanded navigation stays visible and usable.
-7. No server-rendered page emits an inline `<script>`, an inline event-handler attribute, or an inline `style` attribute. KaTeX's own `style` attributes are dropped under `style-src 'self'`, and that cosmetic deviation is accepted (ADR-0025 decision 6 revision). The only `'unsafe-inline'` in the policy is `style-src` on a diagram response, and it is scoped exactly as `browser-requirements.md` §9.7 records.
-8. All pages declare `<!doctype html>`, `<html lang="en">`, a unique `<title>`, and `<meta charset="utf-8">`; the `<meta name="viewport" content="width=device-width, initial-scale=1">` tag is present.
-9. Pages contain no absolute URLs to other origins. The only URLs are root-relative paths on the serving origin, and every asset URL is a root-relative `/assets/` path from the static table.
+1. HTML templates are text files `src/browser/templates/shell.html`,
+   `list.html`, `view.html`, `edit.html`, and `error.html`; all are embedded
+   with `include_str!` and rendered server-side. `view.html` and `edit.html`
+   are single descriptor-driven templates for every document model.
+2. Substitution uses one placeholder syntax `{{name}}` with a fixed per-template
+   allowlist. There is no template engine dependency, no expression evaluation,
+   and no placeholder expansion inside substituted values.
+3. Every substituted value is HTML-escaped in text and attribute context:
+   `&` to `&amp;`, `<` to `&lt;`, `>` to `&gt;`, `"` to `&quot;`, `'` to
+   `&#39;`. Attribute values are always double-quoted. Escaping happens at
+   render time only; stored content is never pre-escaped.
+4. JSON is produced only with `serde_json`, never by string concatenation.
+5. Assets are same-origin entries of one static table. First-party assets are
+   `/assets/app.css`, `/assets/app.js`, and `/assets/nav-state.js`; they are
+   served with `Cache-Control: no-cache` and a strong SHA-256 `ETag`, and a
+   matching `If-None-Match` on `GET` or `HEAD` returns a bodyless `304`.
+6. Vendored assets are served from `/assets/<package>/<asset-version>/<file>`
+   and carry `Cache-Control: public, max-age=31536000, immutable` with no
+   `ETag`; a conditional request returns the full `200`. The unversioned vendor
+   paths return `404`.
+7. The first-party stylesheet uses the system font stack and contains no
+   `url()` reference. KaTeX's relative `url(fonts/...)` values resolve under
+   the versioned KaTeX directory. No served CSS contains `@import`; no
+   reference is remote; there is no `<img>`, `srcset`, icon font, or CDN.
+8. The scripts are optional progressive enhancement. `nav-state.js` applies
+   the stored navigation state and reveals the toggle; `app.js` owns the
+   toggle, the dirty-form guard, tag editing, and the math and diagram render
+   passes. With JavaScript disabled, every page, link, form, and error state
+   still works.
+9. No server-rendered page emits an inline `<script>`, an inline event-handler
+   attribute, or an inline `style` attribute. The only `'unsafe-inline'` is
+   `style-src` on a diagram response, scoped as the browser requirements
+   record.
+10. All pages declare `<!doctype html>`, `<html lang="en">`, a unique
+    `<title>`, `<meta charset="utf-8">`, and the viewport meta tag.
+11. Pages contain no absolute URLs to other origins. The only URLs are
+    root-relative paths on the serving origin.
 
 ### 7. Editing contract
 
-1. Record ID validation: an ID is accepted only if it is 1–128 bytes, contains only ASCII letters, digits, `.`, `_`, and `-`, does not start with `.` or `-`, does not contain `..`, and is not `.` or `..`. After validation the ID is resolved by exact, case-sensitive match against the file stems found by listing the active `req` and `nfr` directories; the ID is never concatenated into a path. An ID that matches a stem in exactly one directory resolves to that record; an ID that matches in neither is `404`; an ID that matches in both is `500` with a generic message, because a shared prefix across two document types is an ambiguous configuration. The document type is taken from the directory that matched, never from the request.
-2. The record form (group versus requirement) is derived from the matched file stem, never from the request.
-3. Editable fields and their rules:
-
-| Field | Applies to | Required | Rules |
-|---|---|---|---|
-| `title` | all forms | yes | trimmed; 1–200 Unicode scalar values; no NUL, CR, LF, or other control characters; may contain `#`, `*`, and other punctuation |
-| `story` | `req` group and `req` requirement | no | trimmed; at most 20000 Unicode scalar values; LF allowed; CR and CRLF normalized to LF; TAB allowed; other control characters rejected; empty clears the section |
-| `description` | all forms | no | same rules as `story` |
-
-4. Additional content rules for `story` and `description`:
-   - a line whose first two characters are `## ` is rejected with a validation error, because the record format uses `## ` to delimit sections and such a line would change the parsed record;
-   - a line consisting only of whitespace is preserved as an empty line;
-   - values are stored unescaped and unmodified apart from the trimming and newline normalization above.
-5. Validation failures return `422` (HTML form re-rendered with messages, JSON error object) and never modify the file. The form-level error summary links each entry to its field, and each summary entry names the actual field error and uses the same text as that field's message: `Title is required.` only for an empty title; `Description contains a line starting with ## .` for a `## ` line; and the field's own accurate text for control-character and length errors (for example `Title cannot contain control characters.` and `Description must be at most 20000 characters.`).
-6. Record ID, group reference, `## Group` section content, and unknown sections are never editable.
-7. Unknown and editor-added sections are preserved. On save:
-   1. the file is read as UTF-8 text;
-   2. the first line is replaced with `# <ID> <title>`;
-   3. each of the sections `## User Story`, `## Group`, and `## Description` keeps its original position; a non-empty value replaces that section's body, an empty value removes the section, and a newly non-empty value whose section is absent is inserted after the last preceding known section when one exists, otherwise before the first following known section, otherwise appended at the end of the file;
-   4. every other `## ` section is written back content-identically, in its original order and position;
-   5. a single trailing newline terminates the file and line endings are LF.
-8. A record with no `## Group` section is displayed and edited as a requirement without a resolved group; saving never adds a `## Group` section.
-9. If the `## Group` reference does not resolve to an active group of the same type, the stored line is preserved unchanged and the group is displayed as unresolved text.
-10. Writes are atomic and project-local:
-    1. a temporary file `<id>.md.tmp` is created in the same directory with `create_new(true)`, retrying with a numeric suffix if it already exists;
-    2. the content is written as UTF-8 bytes and `sync_all` is called;
-    3. the original file's permissions are copied to the temporary file;
-    4. the temporary file is renamed over the target with `std::fs::rename`;
-    5. the directory is synced on a best-effort basis;
-    6. on any failure the temporary file is removed and the original file is left untouched.
-11. Every read and write path — record directory, record file, temporary file — passes through `Context::ensure_within` before use. A symbolic link that resolves outside the project directory is rejected; the request receives `404` and the outside content is neither read nor written. No temporary file is left behind after a failed or rejected request.
-12. Concurrent edits use optimistic concurrency without locking. The version token is `"<mtime-seconds>.<mtime-nanos>.<length>"` of the record file at render time, sent as the `version` form field or JSON member. The token itself is a hidden, non-focusable input; the edit form additionally shows the static dashed annotation described in section 4.23. On `POST`:
-    - missing or malformed `version` → `400`;
-    - current on-disk token differs → `409 Conflict` with the message "record changed on disk; reload the form", and no write;
-    - token matches → the write proceeds.
-    The check and the rename are not one atomic operation; this residual race is accepted for a single-user loopback interface and documented here.
-13. A record file that is not valid UTF-8 is skipped by the list and API index (consistent with `req list`) and returns `500` with a generic message when requested directly; it is never partially decoded or rewritten.
-14. After a successful write the server does not keep a cached copy; the redirect target re-reads the file, so a successful save is proven by the follow-up `GET`.
-15. Editing a record never changes its ID, its directory, or its deprecation state.
+1. Record ID validation: an ID is accepted only if it is 1-128 bytes, contains
+   only ASCII letters, digits, `.`, `_`, and `-`, does not start with `.` or
+   `-`, does not contain `..`, and is not `.` or `..`. The ID is resolved by
+   exact, case-sensitive match against the enabled descriptors' active
+   directories; it is never concatenated into a path. An ID that matches no
+   descriptor returns `404`. An ID that matches more than one enabled prefix is
+   a `500` with a generic message, because a shared prefix is an ambiguous
+   configuration. The descriptor is taken from the match, never from the
+   request.
+2. The record role (group or member) is derived from the matched ID shape and
+   the descriptor, never from the request.
+3. The model-neutral field map is built once per loaded record. Editable fields
+   and their rules:
+   - `title` is required, single-line, non-empty, and 1-200 Unicode scalar
+     values; it rejects NUL, CR, LF, and other control characters.
+   - a `text` field accepts a single-line scalar and rejects control
+     characters.
+   - a `multiline` field accepts LF, normalizes CR and CRLF to LF, allows TAB,
+     rejects other control characters, and rejects a line whose first two
+     characters are `## `.
+   - a `list` field is a repeatable list of scalar values; each entry follows
+     the `text` rules.
+   - a required field may be changed but not cleared; an optional field may be
+     cleared.
+4. `status` is never accepted from the form or JSON. `labels` and `references`
+   are general metadata and are saved as the resulting lists.
+5. Validation failures return `422` (HTML form re-rendered with messages, JSON
+   error object) and never modify the file.
+6. Record ID, group link, and unknown sections are never editable. Unknown and
+   editor-added sections are preserved. On save, the field's declared
+   `heading` section and `frontmatter_key` are set from the same submitted
+   value; a field with both writes both locations.
+7. Writes are atomic and project-local: a temporary file is created in the same
+   directory with `create_new(true)`, written as UTF-8, synced, given the
+   original permissions, and renamed over the target. The directory is synced
+   on a best-effort basis. On failure the temporary file is removed and the
+   original is left untouched.
+8. Every read and write path passes through `Context::ensure_within` before
+   use. A symlink that resolves outside the project directory is rejected; the
+   request receives `404` and the outside content is neither read nor written.
+9. Concurrent edits use optimistic concurrency without locking. The version
+   token is `"<mtime-seconds>.<mtime-nanos>.<length>"` of the live file at
+   render time, sent as the `version` form field or JSON member. On `POST`:
+   missing or malformed token is `400`; a current token mismatch is
+   `409 Conflict` with no write; a matching token proceeds.
+10. A record file that is not valid UTF-8 is skipped by the list and API index
+    and returns `500` with a generic message when requested directly.
+11. After a successful write the server keeps no cached copy; the redirect
+    target re-reads the file, so a successful save is proven by the follow-up
+    `GET`.
+12. Editing a record never changes its ID, its directory, or its archive state.
 
 ### 8. Configuration changes
 
-1. `Config` gains three fields, serialized and deserialized with the existing `serde(default)` / `deny_unknown_fields` behavior:
+1. `Config` carries three browser keys with defaults:
 
 | Key | Type | Default | Validation |
 |---|---|---|---|
-| `browser_host` | string | `127.0.0.1` | rules in section 1.10 |
+| `browser_host` | string | `127.0.0.1` | section 1.8 |
 | `browser_port` | unsigned 16-bit integer | `6420` | `1..=65535`, therefore `0` is rejected |
 | `browser_open` | boolean | `true` | must parse as a boolean |
 
-2. `Config::validate()` enforces the rules above and returns a validation error (exit 4) naming the offending key. Because the existing commands validate the merged configuration on load, an invalid browser key also fails those commands; this is the existing behavior for every configuration key.
-3. `config list` prints the three effective keys in stable order, appended after the `document_types.*` entries in the order `browser_host`, `browser_port`, `browser_open`.
-4. `config get browser_host|browser_port|browser_open` prints the effective value.
-5. `config set` parses the value as a YAML scalar, persists it, and re-validates the merged configuration; an out-of-range port, a non-boolean open value, or an invalid host is a validation error (exit 4) and the file is not changed.
-6. `config unset` removes the key and falls back to the default, re-validating the merged configuration.
-7. `config list --json` includes the three fields with their effective values.
-8. The man page already documents these keys (`papyrus-config(5)` → Web UI, `README.md` lines 1000–1009 and the example at 1040–1042); no requirement change is needed. The environment variables in section 1.6 are not documented in the man page (see OQ-1).
+2. `Config::validate()` enforces these rules and returns a validation error
+   (exit 4) naming the offending key. Every command that validates the merged
+   configuration fails on an invalid browser key.
+3. The browser reads these values from the startup configuration only. After
+   the listener binds, a fingerprint of the configuration file is checked once
+   per request; a change rebuilds configuration, registry, and routes and
+   publishes one new snapshot atomically. A reload does not rebind the socket,
+   change the concurrency cap, or change the Host/Origin allowlist, so a change
+   to `browser_host`, `browser_port`, or `browser_open` takes effect at the next
+   start.
+4. A failed reload keeps the previous snapshot serving and reports one
+   `warning: ...` line on standard error; it does not exit, serve a
+   configuration error page, or fall back to defaults.
+5. `config list` prints the three effective keys in stable order after the
+   `document_types.*` entries. `config get` prints one value. `config set`
+   persists and re-validates the merged configuration; an invalid value is
+   refused and the file is not changed. `config unset` removes the key and
+   falls back to the default, re-validating the result. `config list --json`
+   includes the three fields.
 
 ### 9. Security
 
-1. **HTML escaping.** Every dynamic value in HTML is escaped as specified in section 6.3, in both text and attribute context. No user-controlled value reaches the response unescaped.
-2. **JSON encoding.** All JSON is built with `serde_json`. User-controlled strings are encoded, not concatenated, and `</script>`-style breakouts are impossible because no JSON is embedded in HTML.
-3. **ID and path handling.** Record IDs are validated and then resolved by exact match against a directory listing; no request value is joined to a path. Request paths are matched against a fixed route table after single-pass percent-decoding, with `.`/`..` segments, encoded separators, encoded NUL, and control characters rejected.
-4. **Boundary checks.** Every filesystem read and write — active directory, record file, temporary file, configuration file — passes `Context::ensure_within` against the canonicalized project directory (NFR-04.002). Symlink escapes are rejected before any content is read or written.
-5. **No traversal or symlink escape.** A symlinked record pointing outside the project is not listed, returns `404` when requested, and cannot be written through.
-6. **Request-size caps.** Request line 8192 bytes, target 2048 bytes, header block 16384 bytes and 64 fields, body 1 MiB, 16 concurrent connections, 5-second read and write timeouts.
-7. **Headers and content policy.** Every `text/html` response carries exactly one of the two CSP strings below: the strict string on every HTML response whose pre-pass did not set `has_diagram`, and the diagram string only when the rendering pre-pass set `has_diagram`. `/assets/` responses and non-HTML responses carry no CSP. `script-src 'self'` never gains `'unsafe-inline'`, `'unsafe-eval'`, a nonce, or a hash.
+1. **HTML escaping.** Every dynamic value is escaped as specified in section
+   6.3, in text and attribute context. No user-controlled value reaches the
+   response unescaped.
+2. **JSON encoding.** All JSON is built with `serde_json`; no JSON is embedded
+   in HTML.
+3. **ID and path handling.** Record IDs are validated and then resolved by
+   exact match against a directory listing; no request value is joined to a
+   path. Request paths are matched against a fixed route table after
+   single-pass percent-decoding, with traversal and control characters
+   rejected.
+4. **Boundary checks.** Every filesystem read and write passes
+   `Context::ensure_within` against the canonicalized project directory.
+   Symlink escapes are rejected before any content is read or written.
+5. **Request-size caps.** Request line 8192 bytes, target 2048 bytes, header
+   block 16384 bytes and 64 fields, body 1 MiB, 16 concurrent connections,
+   5-second read and write timeouts.
+6. **Headers and content policy.** Every `text/html` response carries exactly
+   one of the two CSP strings below: the strict string on every HTML response
+   whose pre-pass did not set `has_diagram`, and the diagram string only when
+   the rendering pre-pass set `has_diagram`. Asset and non-HTML responses carry
+   no CSP. `script-src 'self'` never gains `'unsafe-inline'`, `'unsafe-eval'`,
+   a nonce, or a hash.
 
    Strict (`http::CSP`):
 
@@ -405,258 +577,64 @@ Routes are exact. `{id}` is a record ID as defined in section 7.1.
    default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'
    ```
 
-   Diagram (`http::CSP_DIAGRAM`, accepted under ADR-0026 decision 6):
+   Diagram (`http::CSP_DIAGRAM`):
 
    ```
    default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'
    ```
 
-   | Response | String |
-   |---|---|
-   | `text/html` whose pre-pass did not set `has_diagram`: lists, board, record/document views without a figure, edit, inventory, and every 400/404/405/415/422/500 page | strict |
-   | `text/html` record or document view whose pre-pass set `has_diagram` | diagram |
-   | Every `/assets/*` response, including the Mermaid bundle and the WOFF2 fonts | none |
-   | JSON, text, and every non-HTML response | none |
-
-   Status: the strict string is live. The diagram string is implemented in `http::CSP_DIAGRAM` (TASK-146) and verified by TASK-150. The response classes are summarized in `browser-shell-ui.md` §8. All HTML responses also send `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and `Cache-Control: no-store`. All responses send `Connection: close`.
-8. **DNS rebinding and CSRF mitigation (chosen mitigation).** There is no authentication, no cookie, and no session, so the chosen mitigation is strict origin validation:
-   1. the `Host` header must be present and must equal one of `<effective-host>:<port>`, `localhost:<port>`, `127.0.0.1:<port>`, or `[::1]:<port>` (case-insensitive host, exact port); when the effective port is `80`, the `:<port>` suffix may be omitted, as browsers do for the default HTTP port; a mismatch receives `400`;
-   2. on `POST`, if `Origin` is present it must equal `http://<matching-host>:<port>` with the same host value that passed the `Host` check (again allowing an omitted `:80`), otherwise `403`;
-   3. on `POST`, `Content-Type` must be `application/x-www-form-urlencoded` or `application/json` as appropriate, otherwise `415`, which prevents cross-origin `text/plain` and `multipart/form-data` simple requests from being useful;
-   4. no CSRF token is used, because there is no session or credential to protect and the origin checks above reject cross-origin form submissions in all supported browsers.
-9. **No secret leakage.** Error responses and pages never include absolute filesystem paths, environment variable values, OS error chains beyond a short reason, stack traces, or request bodies. JSON `path` values are relative to the project directory. Log lines contain only method, truncated decoded path, and status.
-10. **No external access.** The server performs no outbound connections and serves no external resource. There is no telemetry, no update check, no remote font, and no CDN. Bundled fonts are same-origin entries of the static asset table.
-11. **Transport.** There is no TLS. The default bind address is loopback. A non-loopback bind prints the warning in section 1.11 and exposes an unauthenticated read/write interface to the network; this is documented behavior, not a defect (REQ-06.002, BR-004).
-12. **Response integrity.** Request-derived data is never written into response headers; `Location` values are fixed, root-relative paths derived from a validated ID.
-13. **Input sanitization.** All request input is normalized and validated before use (NFR-02.002): IDs per section 7.1, paths per section 3.10–3.11, form values per section 7.3–7.4, JSON per section 5.7.
+   Every HTML response also sends `X-Frame-Options: DENY`,
+   `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and
+   `Cache-Control: no-store`. All responses send `Connection: close`.
+7. **DNS rebinding and CSRF mitigation.** There is no authentication, cookie,
+   or session, so the mitigation is strict origin validation:
+   - the `Host` header must equal `<effective-host>:<port>`, `localhost:<port>`,
+     `127.0.0.1:<port>`, or `[::1]:<port>` (case-insensitive host, exact port;
+     an omitted `:80` is allowed); a mismatch receives `400`;
+   - on `POST`, if `Origin` is present it must equal
+     `http://<matching-host>:<port>`, otherwise `403`;
+   - on `POST`, `Content-Type` must be `application/x-www-form-urlencoded` or
+     `application/json` as appropriate, otherwise `415`;
+   - no CSRF token is used.
+8. **No secret leakage.** Error responses and pages never include absolute
+   filesystem paths, environment values, OS error chains beyond a short
+   reason, stack traces, or request bodies. JSON `path` values are relative to
+   the project directory. Log lines contain only method, truncated decoded
+   path, and status.
+9. **No external access.** The server performs no outbound connections and
+   serves no external resource. There is no telemetry, update check, remote
+   font, or CDN.
+10. **Transport.** There is no TLS. The default bind address is loopback; a
+    non-loopback bind warns and exposes an unauthenticated read/write interface
+    to the network.
+11. **Response integrity.** Request-derived data is never written into response
+    headers; `Location` values are fixed, root-relative paths derived from a
+    validated ID.
 
 ### 10. Browser support and accessibility
 
-The shell, shared-list, width, and navigation contract is specified in `browser-shell-ui.md`.
+1. The interface uses only features available in Firefox 115+: HTML5 forms,
+   `<!doctype html>`, UTF-8, CSS flexbox and grid, CSS custom properties,
+   `white-space: pre-wrap`, the system font stack plus the bundled KaTeX WOFF2
+   fonts, and ES2019 JavaScript.
+2. Forbidden: `:has()`, container queries, `color-mix()`, `@layer`, subgrid,
+   `dialog`, popover, `inert`, and any feature that requires a newer engine
+   than the stated baseline.
+3. Every page, link, form, and error state works with JavaScript disabled.
+4. The navigation toggle, tag editing, and math/diagram rendering are
+   progressive enhancements, never required to read or edit a record.
 
-1. The interface uses only features available in Firefox 115+ (NFR-05.001): HTML5 forms, `<!doctype html>`, UTF-8, CSS flexbox and grid, CSS custom properties, `white-space: pre-wrap`, the system font stack plus the bundled KaTeX WOFF2 fonts, and ES2019 JavaScript (no optional chaining required, no top-level await, no private class fields).
-2. Forbidden: `:has()`, container queries, `color-mix()`, `@layer`, subgrid, `dialog`, popover, `inert`, and any feature that would require a newer engine than the stated baselines.
-3. No JavaScript module loading, no `fetch`, no dynamic import, and no framework. The stylesheet loads in `<head>`, followed by the synchronous `/assets/nav-state.js` and the deferred `/assets/app.js`; math pages additionally link the KaTeX stylesheet and deferred script, and diagram pages add the deferred Mermaid script before `app.js` (`browser-shell-ui.md` §5.5).
-4. Accessibility basics:
-   - semantic landmarks `header`, `nav`, `main`, `footer`; exactly one `h1` per page and no skipped heading levels;
-   - the document-type sidebar is one `nav` (or `aside` containing a `nav`) labelled "Document types"; the entry for the selected category carries `aria-current="page"` and a non-colour cue (bold weight plus underline), so selection is never conveyed by colour alone; on record view and edit pages the entry for the record's document type carries `aria-current="page"`;
-   - one `<button class="nav-toggle" type="button" aria-expanded="true" aria-controls="site-nav">` with the stable accessible name `Navigation` sits in the header on every page at every width, left of the brand; the server emits it with `hidden` and the synchronous `/assets/nav-state.js` reveals it. It collapses and expands `<nav id="site-nav">`, persists the choice in `localStorage` under `papyrus.nav`, and defaults to expanded at every viewport width. With JavaScript disabled the navigation is expanded, visible, and usable, and no toggle is offered; the collapsed navigation is removed with `hidden`;
-   - every form control has a `<label for>`; required fields are marked in text and with the `required` attribute;
-   - error messages are associated with their fields via `aria-describedby`, and the form error summary uses `role="alert"`;
-   - visible focus indicators; all controls reachable and operable by keyboard; no keyboard trap;
-   - text contrast at least 4.5:1 against its background; status is never conveyed by color alone;
-   - the page remains usable at 200% zoom and at a 320 CSS-pixel viewport width without horizontal scrolling of text; long group titles and unbreakable words wrap inside their row;
-   - link text is descriptive out of context (record ID plus title, not "click here").
-5. The interface works with JavaScript disabled and with the browser's built-in font, zoom, and high-contrast settings.
+## Conformance checks
 
-## Inputs and outputs
-
-| Input / output | Description |
+| Check | How it is verified |
 |---|---|
-| `--host <host>` | Bind address; IP literal or DNS name; default `127.0.0.1`. |
-| `--port <port>` | TCP port `1..=65535`; default `6420`. |
-| `--no-open` | Suppress opening the default browser. |
-| `--debug` | Browser-only flag; log one line per received request to stderr (method, path, status, duration). Not a global option. |
-| `PAPYRUS_BROWSER_HOST` / `PAPYRUS_BROWSER_PORT` / `PAPYRUS_BROWSER_OPEN` | Environment tier of the precedence chain (OQ-1). |
-| `browser_host` / `browser_port` / `browser_open` | Configuration keys, defaults `127.0.0.1` / `6420` / `true`. |
-| Startup output | One line on stdout: `Serving http://<host>:<port>/` or the JSON object in section 2.4. |
-| Diagnostics | `warning: ...` lines; with `--debug`, one request log line per request on stderr (method, path, status, duration); errors always. |
-| HTTP responses | HTML pages, JSON documents, CSS, JS, and error pages per sections 3 and 5. |
-| Files written | Only record `.md` files inside the configured active type directories, written atomically. |
-| Exit status | `0` only if the server ends normally (not expected), `1` runtime/bind failure, `2` usage, `4` validation. `3` is never used. |
-
-## Validation and error behavior
-
-| Condition | Exit / status | Output |
-|---|---|---|
-| Unknown option, extra positional, missing option value | exit 2 | Usage message on stderr. |
-| `--port` non-numeric, `0`, negative, or greater than 65535 | exit 2 | Usage message on stderr. |
-| Invalid `PAPYRUS_BROWSER_PORT` or `PAPYRUS_BROWSER_OPEN` value | exit 4 | Validation message on stderr. |
-| Invalid `--host` value | exit 4 | Validation message on stderr. |
-| Invalid configuration key value | exit 4 | Validation message on stderr. |
-| Bind failure (port in use, permission, unresolvable host) | exit 1 | `cannot bind <host>:<port>: <reason>` on stderr. |
-| Non-loopback host | serves | `warning: binding to non-loopback address ...` on stderr. |
-| Opener missing or failing to spawn | serves | `warning: could not open the default browser: ...` on stderr. |
-| Over-capacity connection (17th concurrent) | 503 | Immediate `Service Unavailable` with `Connection: close`; request not read; log line `- - 503`. |
-| Malformed request line, headers, or target | 400 | HTML or JSON error page. |
-| Unknown path (any method) | 404 | HTML or JSON error page. |
-| Known path, wrong method | 405 | Error page with `Allow: GET, HEAD, POST`. |
-| Unsupported media type on `POST` | 415 | Error page. |
-| Request line or target too long | 414 | Error page. |
-| Header block or field count too large | 431 | Error page. |
-| Body too large | 413 | Error page. |
-| Request read timeout | 408 | Error page, then close. |
-| Bad `Host`, duplicate `Content-Length`, bad percent-encoding | 400 | Error page. |
-| Cross-origin `Origin` on `POST` | 403 | Error page. |
-| Unknown, deprecated, or non-matching record ID | 404 | Error page. |
-| Invalid field value or `## ` line in a multi-line field | 422 | Edit form re-rendered with messages, or JSON error. |
-| Stale `version` token | 409 | Conflict page or JSON error; no write. |
-| Missing or malformed `version` | 400 | Error page or JSON error. |
-| Symlink escaping the project directory | 404 | Error page; nothing read or written outside. |
-| Non-UTF-8 record file | skipped in list; 500 when requested directly | Generic error page. |
-| Internal failure | 500 | Generic error page; no internal detail. |
-
-## Tests
-
-### Unit tests (in-module `#[cfg(test)]`)
-
-1. Configuration: defaults for the three browser keys, `0` and out-of-range port rejection, invalid host rejection, `browser_open` non-boolean rejection, flattened key order, and JSON serialization.
-2. Host validation and loopback classification: IPv4, IPv6, `localhost`, DNS names, wildcard addresses, and each rejection rule in section 1.10.
-3. Option resolution: a pure resolver over (CLI, environment, configuration) covering every tier, per-setting independence, and invalid environment values.
-4. Request parsing: method, target, version, header count and size limits, duplicate `Content-Length`, `Transfer-Encoding` presence, missing `Content-Length` on `POST`, and body cap.
-5. Target handling: single-pass percent-decoding, `%2F`, `%5C`, `%00`, control characters, `.`/`..` segments, empty segments, absolute-form, and over-long targets.
-6. Route matching and status mapping for every row of the validation table.
-7. HTML escaping in text and attribute contexts for all five characters, including a value that already contains entity-like text.
-8. Placeholder rendering: known placeholders substituted, unknown placeholders rejected at build time or left untouched as specified, and a value containing `{{name}}` emitted literally.
-9. Record block parser and serializer: replace, remove, and insert each known section; preserve unknown sections; a record without `## Group`; CRLF normalization; exactly one trailing newline.
-10. Field validation: title length and control characters, story and description control characters, `## ` line rejection, trimming, and empty-value clearing.
-11. Version token formatting and comparison, including the stale and malformed cases.
-12. JSON response shapes for the record index, a record, and an error object.
-
-### Integration tests (`tests/browser_cli.rs`, spawning the binary)
-
-1. Harness: a helper starts the binary with `--dir` and an explicit `--port`, waits for the startup line, and returns the base URL; the child process is killed and its temporary project directory removed at test end. Ports are obtained by binding `127.0.0.1:0`, reading the assigned port, dropping the listener, and retrying on a bind failure, so tests do not collide.
-2. A minimal HTTP client over `std::net::TcpStream` builds raw requests and parses the status line, headers, and body; helpers cover `GET`, `HEAD`, and `POST` with a body.
-3. Scenarios: checks T-01 to T-30 in the mapping table below, including the edit round-trip, the JSON API, every error status, the request limits, XSS, symlink escape, port conflict, non-loopback warning, opener suppression and absence, deprecated visibility, UTF-8 handling, and the offline asset scan.
-4. Tests never require internet access, never bind a non-loopback address except in the warning test (which binds `0.0.0.0` briefly and sends no traffic), and never leave a child process running.
-
-## UI design handoff
-
-UI mockups are required before any UI implementation work and must be approved by the user. The `@ui-designer` produces wireframe artifacts only — no branding, color palette, logo, or visual identity; layout, content, states, and interaction affordances only.
-
-**Approved artifact:** MOCK-0001 — [`docs/specifications/ui/mockups/MOCK-0001-browser-requirements-review.html`](ui/mockups/MOCK-0001-browser-requirements-review.html), approved 2026-11-03 (UTC). It is one fully self-contained review package: a review landing page (ticket, milestone, sources, approval status, one button per content), a 12-slide design deck (cover, grouped view slides with "What it shows" / "Why this way", cross-cutting decisions, open questions), and a clickable web prototype with 25 views (requirement list 6, record view 5, edit form 6, error page 6, 320 px 2). Styles are inlined in the file; it references no external stylesheet, script, font, image, or network resource. The layout description is [`docs/specifications/ui/browser-requirements-ui.md`](ui/browser-requirements-ui.md); the registry is [`docs/specifications/ui/mockups/README.md`](ui/mockups/README.md).
-
-The approved package is the authoritative layout reference for this increment. Where this specification and MOCK-0001 differ on a layout detail, MOCK-0001 wins and the specification is corrected.
-
-### Screens covered by the approved package
-
-**Historical note:** this block describes the approved MOCK-0001 package as built on 2026-11-03; historical mockup descriptions are not updated to later contracts. For example, its 320 px view draws the sidebar collapsed, while the delivered shell is expanded by default at every width with a persisted toggle.
-
-1. **Requirement list (home, `/`).**
-   - Shared shell: header (product name, project name, static offline/bind note), persistent left sidebar `nav` "Document types", `main`, `footer`.
-   - Two category states: Business requirements (default, `/?type=req`) and Non-functional requirements (`/?type=nfr`), each rendering only its own `h2` section through the shared list contract in `browser-shell-ui.md` §3, with group rows and member rows in one table.
-   - Empty states: project has no records, the selected category is empty, a group has no members.
-   - Long-content state: many groups, long titles that wrap, and a long unbreakable title.
-2. **Record view (`/doc/{id}`).**
-   - Business requirement with user story and multi-paragraph description; non-functional requirement without a story.
-   - Group record with story and description (business) and group record without a story (non-functional), each followed by its "Requirements in this group" member list.
-   - Metadata block: ID (read-only), record form, document type, owning group (link when resolvable); breadcrumb `Requirements › group › ID`; single `Edit` action and no "Back to requirements" action; unresolved-group variant.
-3. **Edit form (`/doc/{id}/edit`).**
-   - Breadcrumb `Requirements › ID › Edit` (current, not a link); the owning group is not in the edit breadcrumb and appears only in the read-only metadata block.
-   - Pristine business-requirement variant (title, user story, description) and non-functional variant (title, description).
-   - Read-only display of ID, record form, document type, and owning group.
-   - Hidden `version` input plus the visible, non-interactive dashed annotation from section 4.23 (shipped label `Hidden field: version (optimistic-concurrency token)`).
-   - Field help text (for example: "A line starting with `## ` is not allowed").
-   - Dirty state (form modified, Save enabled).
-   - Validation error state: form-level summary plus field-level messages, with submitted values preserved; includes an empty-title error and a `## `-line error.
-   - Conflict state (409): the record changed on disk; reload affordance and read-only copy of the attempted values.
-   - Success behavior: the save action returns to the record view; the resulting view state is shown rather than a success banner page.
-4. **Error pages.**
-   - 404 unknown record and 404 deprecated record (identical layout, message may differ).
-   - 400 malformed request, 405 method not allowed, 415 unsupported media type, 500 internal error — one generic error layout with a status code, a short message, and a single recovery link back to the list.
-5. **Responsive and accessibility annotations.**
-   - 320 CSS px list and edit form, with the sidebar collapsed behind the labelled toggle.
-   - Annotation layer on the list and edit form: focus order, label associations, error association, heading levels, contrast note, and the no-JavaScript note.
-
-### States and interactions the approved package covers
-
-- Navigation: list → group view → requirement view → edit → save → view → list.
-- Switching category via the sidebar without losing the category section structure.
-- Validation failure recovery without losing typed content.
-- Conflict recovery: reload the form.
-- Keyboard-only operation of sidebar links, record links, and the form.
-- Empty and error states for every screen listed above.
-- No create, deprecate, restore, delete, search, or Markdown rendering controls appear anywhere.
-
-### Expected artifacts
-
-- One self-contained HTML review package per ticket, named `MOCK-XXXX-<slug>.html` under `docs/specifications/ui/mockups/`, containing the review landing, the design deck, and the clickable per-platform prototype with every view; styles inlined and no external reference. For this ticket: `MOCK-0001-browser-requirements-review.html`.
-- A UI description document `docs/specifications/ui/browser-requirements-ui.md` listing the MOCK id, the screens it covers, the states it covers, and the interaction notes.
-- A registry entry in `docs/specifications/ui/mockups/README.md` with the MOCK id, type, artifact, views, and approval status.
-- MOCK ids are global and assigned sequentially; they are never reused or renumbered. MOCK-0001 is recorded in this specification and in TASK-6, and its status is `approved` (2026-11-03, UTC).
-
-## Acceptance criteria mapping
-
-| Check | Verifies | How it is verified |
-|---|---|---|
-| T-01 | Command shape is exactly `papyrus browser [--host] [--port] [--no-open] [--debug]` | `papyrus browser --help`; parse tests for valid and invalid invocations, including that `--debug` is accepted only by `browser` |
-| T-02 | Defaults are `127.0.0.1`, `6420`, open enabled | Startup line and JSON startup object with no options and no config |
-| T-03 | Precedence is CLI > environment > config > defaults per setting | Matrix test overriding each tier and asserting the effective URL and open flag |
-| T-04 | `--no-open` and `browser_open: false` suppress opening; default opens | Fake opener script on `PATH` writing a marker file; marker present/absent |
-| T-05 | Missing opener is a warning, not fatal, and the server keeps serving | Empty `PATH`, then a successful `GET /` |
-| T-06 | Non-loopback host warns and still binds | `--host 0.0.0.0`, assert `warning:` on stderr and a successful request |
-| T-07 | Port already in use exits 1 with a bind message | Occupy the port, run the binary, assert exit 1 and stderr |
-| T-08 | Invalid port and invalid host exit 2 and 4 respectively | Exit-code assertions for `0`, `70000`, `abc`, `-1`, `bad/host`, empty host |
-| T-09 | The list renders one document category at a time from the sidebar, groups nested with their requirements, ordered by ID | HTML assertions on a fixture with `REQ-001`, `REQ-001.001`, `NFR-001`, `NFR-001.001`: `/?type=req` and `/` contain the business group and its member links in ID order and no non-functional content; `/?type=nfr` the reverse; the selected sidebar link carries `aria-current="page"` |
-| T-10 | Category parameter `req\|nfr` works, default is `req`, `all` and any other value are 400 | HTML and JSON assertions for `/`, `/?type=req`, `/?type=nfr`, `/?type=all`, `/?type=x`, and the same values on `/api/requirements` |
-| T-11 | Deprecated records are absent from the list and return 404 by URL | `req deprecate`/`nfreq deprecate` via CLI, then list and direct GET |
-| T-12 | View shows ID, form, type, group, story (business only), description, escaped; a group view lists its members; no "Back to requirements" action | HTML assertions for each of the four record forms, plus a group page whose member links appear in ID order and a scan confirming the view page has no "Back to requirements" link |
-| T-13 | Edit round-trip persists and is visible through both the UI and the CLI | Form `POST` → 303 → `GET` shows new values; `req view` shows the same file |
-| T-14 | Unknown and editor-added sections are preserved content-identically across a save | Fixture with `## Criticality`, `## Traceability`, `## Open Question`; compare before/after with line endings normalized |
-| T-15 | Field validation returns 422 and does not write | Empty title, 201-character title, control character, `## ` line; each summary entry links to its field and repeats that field's message |
-| T-16 | ID, form, and group membership are immutable through the UI | `POST` with `id`, `group`, and `form` fields; stored file and ID unchanged |
-| T-17 | Stale version token returns 409 and does not write | Render form, modify the file out of band, then `POST` |
-| T-18 | Writes are atomic and leave no temporary file | Directory snapshot before/after a save and after a rejected save |
-| T-19 | Symlink escaping the project returns 404 and never exposes outside content | Symlink fixture to a file outside the project |
-| T-20 | HTML escaping prevents script injection | Record title `"><script>alert(1)</script>`; response contains no literal `<script>` and the escaped form |
-| T-21 | JSON API returns the documented shapes and rejects bad bodies | `GET /api/requirements`, `GET /api/doc/{id}`, `POST /api/doc/{id}`, malformed JSON, wrong types |
-| T-22 | Request limits and status codes | 405, 400, 413, 414, 431, 415, 501, 411, 403, 408, 503 fixtures over raw `TcpStream`; the over-capacity fixture holds 16 connections open, sends nothing on the 17th, and asserts `503`, `Connection: close`, EOF, and the `- - 503` log line |
-| T-23 | One request per connection and `Connection: close` | Second request on the same socket sees EOF |
-| T-24 | Offline operation | Served HTML/CSS/JS contain no external URL; every `url(` in a served stylesheet resolves to an asset-table entry (KaTeX's 60 font paths); no outbound socket code path; server works with an unroutable default route |
-| T-25 | Non-UTF-8 record files are skipped and never rewritten | Fixture with invalid bytes |
-| T-26 | `browser_host`/`browser_port`/`browser_open` are in `config list/get/set/unset` and validated | Config CLI assertions, including `0`, `70000`, `maybe`, invalid host |
-| T-27 | Assets are embedded and served from one exact-match table | Representative `/assets/` `GET`/`HEAD` returns 200 with the documented MIME, `Content-Length`, `Cache-Control: no-store`, and no CSP; a miss is 404 and a non-GET/HEAD is 405; the manifest digest test passes; no served CSS has a remote `url(` or `@import` |
-| T-28 | Accessibility and browser-compatibility basics | Landmarks, labels, single `h1`, `aria-describedby`, the document-type sidebar `nav` with `aria-current="page"` plus a non-colour cue, the `.nav-toggle` with `aria-expanded`/`aria-controls="site-nav"`, expanded default, `papyrus.nav` persistence, collapsed navigation carrying `hidden`, no forbidden CSS/JS features in a source scan |
-| T-29 | Build, tests, clippy, and formatting pass with existing dependencies only | `cargo build`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`; `Cargo.toml` dependency list unchanged |
-| T-30 | No reads or writes outside the project directory | Boundary assertions on every handler path; configuration path checked as for existing commands |
-
-## Assumptions
-
-- Assumption: Rust 1.99.1, edition 2024, and the repository-root single-crate layout are retained (ADR-0001, ADR-0004). The browser is a module and subcommand inside the existing crate; no new crate, application, stack, or dependency is introduced, so no new ADR is required. The blocking `std::net::TcpListener` server is the intended implementation approach.
-- Assumption: the man page (`papyrus(1)` → browser, `papyrus-config(5)` → Web UI) and BR-004 are the behavior contract; where they are silent, this specification fixes explicit defaults, recorded in Open questions.
-- Assumption: "requirement content" in this increment means business-requirement and non-functional-requirement groups and requirements only; all other record types arrive in later tickets (REQ-06.002, NFR-01.002 scope is filled incrementally).
-- Assumption: REQ-06.002 requires the local web interface over both the backlog and documentation stores; that coverage is delivered incrementally, not by a single ticket. This increment serves the documentation store for the requirement record types implemented so far, and TASK-11 delivers the backlog-store part (tasks, milestones, releases) under the same requirement. The missing backlog store here is therefore a planned increment boundary, not a requirement gap or an unmet acceptance criterion of TASK-6.
-- Assumption: the browser exposes a read/write interface but no lifecycle operations; deprecation and restoration remain CLI-only in this increment (REQ-05.007).
-- Assumption: group records are content too, so they are viewable and editable for their documented fields, not merely listed.
-- Assumption: unknown and editor-added sections are preserved on save rather than dropped, because the record files in this repository already contain sections such as `## Criticality` and `## Traceability`.
-- Assumption: a JSON API is part of this increment because the acceptance criteria require machine-checkable behavior and later browser increments reuse it.
-- Assumption: one request per connection is sufficient for a local interface and keeps the server small and deterministic.
-- Assumption: `Config` must gain the three documented browser keys for them to be settable at all, because `deny_unknown_fields` is in effect and `config set` validates the merged configuration.
-- Assumption: no TLS and no authentication, matching the documented loopback default and the "non-loopback is allowed but warned" contract.
-- Assumption: the environment tier uses `PAPYRUS_BROWSER_HOST`, `PAPYRUS_BROWSER_PORT`, and `PAPYRUS_BROWSER_OPEN`; the man page does not document them (OQ-1).
-- Assumption: the approved UI mockup MOCK-0001 (2026-11-03, UTC) is the authoritative layout reference for this increment; it fixes the persistent document-type sidebar with one category at a time, the group member list on the record view, the absence of a "Back to requirements" action on the record view, the edit-page breadcrumb `Requirements › ID › Edit` (no owning-group crumb), and the version token drawn as a visible dashed annotation (sections 4.15, 4.23, 7.12).
-
-## Open questions
-
-Each item has a specified default in this document, so none blocks implementation. OQ-1, OQ-2, and OQ-6 are recommended for user confirmation before release.
-
-- **OQ-1 (recommended default: use the three `PAPYRUS_BROWSER_*` variables)** — `papyrus-config(5)` PRECEDENCE lists only `PAPYRUS_DIR` and `PAPYRUS_CONFIG`, yet the required precedence is CLI > environment > configuration > defaults. This specification defines `PAPYRUS_BROWSER_HOST`, `PAPYRUS_BROWSER_PORT`, and `PAPYRUS_BROWSER_OPEN`; the man page should be updated to document them. If the user prefers not to extend the environment surface, the environment tier is dropped for browser settings and the precedence becomes CLI > configuration > defaults; nothing else in this specification changes.
-- **OQ-2 (recommended default: one startup line, flushed)** — The man page does not define startup output. This specification fixes one text line `Serving http://<host>:<port>/` and one JSON object in `--json` mode, emitted before serving, with warnings and request logs on stderr.
-- **OQ-3 (recommended default: preserve unknown sections)** — The CLI `edit` currently rewrites a record with only its known sections, dropping editor-added sections. The browser preserves them instead. If the user wants identical behavior to the CLI, the browser would limit edits to documented fields and drop unknown sections, which loses content.
-- **OQ-4 (recommended default: 200-character title, 20000-character story/description)** — No length limits are documented. The chosen limits bound the request and the file while remaining far above normal content.
-- **OQ-5 (recommended default: reject lines starting with `## `)** — Multi-line fields are new for the browser, and such a line would be parsed as a new record section. Rejection keeps the record model unambiguous; escaping or section-merging would be an alternative.
-- **OQ-6 (recommended default: include group editing)** — Group records are listed and their content is editable in this increment. Excluding them would leave group content view-only while requirement content is editable.
-- **OQ-7 (recommended default: 404 for deprecated records)** — The man page says deprecated documents are hidden from the web UI; returning `404` for a known deprecated ID matches "hidden" and avoids revealing that the ID exists.
-- **OQ-8 (recommended default: mtime+size version token, 409 on mismatch)** — No concurrency contract is documented. The token is dependency-free and detects the realistic single-user conflict; the residual check-then-rename race is documented.
-- **OQ-9 (recommended default: target the common feature subset)** — NFR-05.001's browser floor is Firefox 115+. This specification targets only features supported well before those baselines, so the browser floor is fixed by the requirement and the feature subset does not change it.
-- **OQ-10 (recommended default: include the JSON API)** — The man page describes a web UI only. The JSON endpoints are an internal contract used by tests and later increments; they add no user-visible navigation.
-- **OQ-11 (recommended default: Origin+Host validation, no CSRF token)** — There is no session or credential to protect. A token would add state and a second source of truth without improving the loopback threat model.
-- **OQ-12 (recommended default: wildcard hosts are allowed and the printed URL uses `127.0.0.1`)** — Binding `0.0.0.0` is a non-loopback bind and therefore allowed with a warning; a wildcard address cannot be navigated to, so the printed and opened URL substitutes `127.0.0.1`.
-- **OQ-13 (recommended default: a disabled document type has no sidebar entry)** — The approved sidebar model lists document types, but no requirement covers a type that is absent from the configuration or `enabled: false`. The default is: no sidebar entry, and a direct `?type=` request renders that category's empty state rather than `400`, consistent with "contributes no records and no error". The approved mockup shows only the two enabled types and does not settle this case.
-
-## Traceability
-
-| Artifact | Reference |
-|---|---|
-| Requirement | REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012, REQ-05.001, REQ-05.002, REQ-05.007, REQ-01.002, REQ-01.003, REQ-01.005 |
-| Non-functional | NFR-01.002, NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001 |
-| Business rule | BR-004 (browser command behavior), BR-016 (configuration keys and precedence) |
-| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky), ADR-0004 (repository-root single crate), ADR-0010, ADR-0012, ADR-0013, ADR-0025, ADR-0026, ADR-0027, ADR-0028 |
-| Related specification | `docs/specifications/browser-shell-ui.md` (shell, shared list, width classes, navigation) |
-| Ticket | TASK-6, TASK-86 |
-| Increment boundary | REQ-06.002 covers both stores; this increment serves the documentation store only. Backlog-store browsing (tasks, milestones, releases) is delivered by TASK-11 under REQ-06.002, so the increment is not a requirement gap. |
-| UI mockups | MOCK-0001 — approved 2026-11-03 (UTC): [`docs/specifications/ui/mockups/MOCK-0001-browser-requirements-review.html`](ui/mockups/MOCK-0001-browser-requirements-review.html) (single self-contained review package: landing, design deck, 25-view web prototype) |
-| UI description | [`docs/specifications/ui/browser-requirements-ui.md`](ui/browser-requirements-ui.md) |
-| Related specification | `docs/specifications/search-requirements.md` (TASK-5) |
-| Related specification | `docs/specifications/business-and-non-functional-requirements-management.md` (TASK-3) |
-| Related specification | `docs/specifications/project-initialization-and-configuration.md` (TASK-2) |
+| Requirement content is served by the unified document surface | `req` and `nfr` list, detail, edit, conflict, and not-found go through the document handler; no per-type branch exists |
+| Field map drives view and edit | A group uses `group.fields`, a member uses `member.fields`; story and description render as sections and form controls; body/front-matter precedence is asserted |
+| Offline access | The page and every asset are same-origin; no external reference exists; the loopback run succeeds |
+| Archive visibility | An archived requirement is absent from lists and API and returns the same `404` as an unknown ID |
+| Status read-only | No form or JSON path writes `status`; a submitted `status` is `422` |
+| Optimistic concurrency | A stale token returns `409` and writes nothing; a matching token writes once and the redirect target proves it |
+| Configuration snapshot | A configuration edit changes pages and routes on the next request; host, port, and open changes take effect at the next start; a failed reload keeps the previous snapshot |
+| Cache classes | App assets return `no-cache` plus `ETag`; vendor assets are immutable and versioned; HTML and JSON are `no-store` |
+| Security | Escaping, boundary checks, request caps, Host/Origin validation, and CSP assertions pass |
+| Browser support | Markup, CSS, and JavaScript use the stated baseline and work without JavaScript |

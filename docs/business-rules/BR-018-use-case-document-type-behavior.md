@@ -2,7 +2,7 @@
 id: "BR-018:"
 title: "Use-Case Document Type Behavior"
 created_date: '2026-11-14T18:39:51Z'
-updated_date: '2026-11-16T16:57:06Z'
+updated_date: '2026-11-20T21:22:05Z'
 labels: []
 references: []
 status: active
@@ -11,33 +11,56 @@ status: active
 
 ## Description
 
-A use case is the ordinary `document_types.use-case` entry managed by `papyrus use-case`; its records carry a required title and description plus an optional applicability, use only the baseline document verbs and the document status model, and become inactive only through `archive`.
+`papyrus use-case` is the command family generated from the `SingleMarkdown` `use-case` descriptor: records use the baseline verbs plus `status` with no type-specific verb, the title is the first positional `TITLE` on create and `--title` on edit, and the seed declares two optional body fields, `description` under `## Description` then `applicability` under `## Applicability`, in that sequence.
 
 ## Rationale
 
-Based on REQ-05.012 — Manage Use Cases, with REQ-05.007 — Manage Document Archive State and Deletion, REQ-05.010 — Record Metadata in YAML Front Matter, REQ-07.002 — Configure Document Types and Slugs, and REQ-07.003 — Dispatch Config-Defined Document Commands, this rule exists because a use case is a first-class document record whose behavioral documentation and traceability depend on a stable ID, the common command family, and the common status model; it adds an applicability field but no verb or lifecycle of its own.
+Based on REQ-05.012 — Manage Use Cases, REQ-07.004 — Provide One Schema-Driven Document Content Model with Three Document Models, REQ-07.002 — Configure Document Types and Slugs, and REQ-07.003 — Dispatch Config-Defined Document Commands, this rule exists because a use case is a stable, traceable document that adds an applicability section to the plain document shape, and deleting `src/use_case.rs` must not lose either section or the command behavior around them. The command family, the `--description` and `--applicability` options, the `## Description` then `## Applicability` body order, and the status model must all be reconstructed from the descriptor, with no per-type module, verb table, or help text. The exact field list is recorded here because the seed is the only definition of a built-in type: changing a field is a requirement or ADR change, and a project must be able to add a field by editing its configuration file alone, without a code change (RE-010 D14).
 
 ## Applicability
 
-Applies to every use-case record and to the command invocations that create, list, view, edit, archive, or delete one, in projects where the `use-case` entry is enabled.
+Applies to every invocation of `papyrus use-case` and to every use-case record, in projects where the `use-case` entry is enabled.
 
 ### Type entry
 
-- Ordinary `document_types` entry (default prefix `UC`, directory `use-cases/`); renameable, removable, disableable, and assignable another prefix or `doc_directory`-relative directory.
+- `use-case` is the seed `SingleMarkdown` entry (prefix `UC`, directory `use-cases/`); its model and field sequence are seed data and are never declared in configuration, and renaming the entry key renames the command without moving an existing file (BR-016).
+- The seed declares exactly the fields in this table, in this sequence; the body headings and field order below are the existing ones and are preserved.
+
+| key | heading | kind | required | verbs | option | frontmatter_key |
+|---|---|---|---|---|---|---|
+| `description` | `## Description` | `multiline` | no | `create`, `edit` | `description` | none |
+| `applicability` | `## Applicability` | `text` | no | `create`, `edit` | `applicability` | none |
+
+- Both fields are optional and body-only: a create that supplies only a title succeeds, an edit may supply or clear either field, and a field's front-matter key is its `frontmatter_key`; none of these fields declares one, so no field value appears in YAML front matter.
+- Field sequence position is the order everywhere — body sections, CLI options and help, and the browser form (ADR-036 decision 20).
 - IDs use the entry prefix and `id_padding` and are preserved on archive.
-- Records carry the general front-matter keys `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, and `status`, plus a `# <ID> <title>` body heading; `description` and `applicability` are body fields.
 
-### Verbs and content
+### Verbs
 
-- Baseline only: `create`, `list`, `view`, `edit`, `archive`, `delete`, plus `status <id> <value>`.
-- No extension verb is declared.
-- Create requires a title and description; applicability is optional. Edit updates title and description.
+- The model generates `create`, `list`, `view`, `edit`, `archive`, `delete`, and `status <id> <value>`; no extension verb, no type-specific verb, and no type-specific module exists (BR-001).
+- `--description` and `--applicability` are the field options in field-sequence order; a `multiline` field accepts `-` to read the value from standard input; `--label` and `--reference` remain the general metadata options, and no create or edit option sets `status`.
+- `papyrus use-case create <TITLE>` takes the first positional `TITLE`, and `--title` is accepted on create and edit; the title is single-line and non-empty, required on create, never clearable by an edit, and supplying both the positional `TITLE` and `--title` is rejected and writes nothing.
+
+### User extensibility and seed contract
+
+- Adding a field is a configuration file edit: a project adds an entry to the type's `fields` sequence, and Papyrus generates the option, help, body section, and browser form input from it with no code change, rebuild, or per-type module (RE-010 D14, REQ-07.002).
+- The field list above is the seed contract for `use-case`; changing a field key, heading, kind, required flag, verbs, option, or front-matter key is a requirement change (ADR-036 decision 30), never a silent behavior change.
+
+### Lists and references
+
+- Reference visibility is `visible`, so a list row renders its reference list; labels render in the Title cell and the single-document view keeps its References disclosure.
 
 ### Status and archive
 
-- Main statuses `active` and `archived` plus optional configured custom statuses; custom statuses are front-matter values only and move no file.
-- A new record starts at the configured `default_status`, or `active` when none is configured.
-- `archive` sets `archived`, moves the file into the entry's `archived/` subfolder, and keeps the ID.
-- Archiving does not retain a previous custom status value, and there is no inverse command.
-- `status` never archives: `status <id> archived` is rejected, naming `archive` as the only way.
-- Decision statuses are a separate lifecycle and never apply to documents; the milestone `open -> closed` and release `planned -> released` lifecycles are fixed and unaffected by `statuses` or `default_status`.
+- Use cases carry front-matter `status` with the value `active`, `archived`, or a configured custom status; creation writes the configured `default_status` or `active`, and only `status` and `archive` write it, so no create, edit, or field option sets it.
+- `archive` sets `archived`, moves the file into the entry's `archived/` subfolder, keeps the ID, discards any previous custom status value, and has no inverse command.
+- `status` never archives: `status <id> archived` is rejected with a validation outcome naming `archive` as the only way, and `status` on an archived record is rejected without a move.
+- Deleting a use case permanently removes it with confirmation, with `--force` skipping the prompt, and decision records and the fixed milestone and release lifecycles are separate and unaffected.
+
+## Requirements
+
+- REQ-05.012
+- REQ-07.004
+- REQ-07.002
+- REQ-07.003
+- REQ-05.007

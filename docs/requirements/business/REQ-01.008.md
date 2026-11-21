@@ -2,9 +2,12 @@
 id: REQ-01.008
 title: "Run Project Diagnostics (`papyrus check`)"
 created_date: '2026-11-15T15:46:30Z'
-updated_date: '2026-11-15T18:37:20Z'
+updated_date: '2026-11-20T20:58:17Z'
 labels: []
-references: []
+references:
+  - RE-010
+  - ADR-0019
+  - ADR-036
 ---
 # REQ-01.008 Run Project Diagnostics (`papyrus check`)
 
@@ -25,7 +28,9 @@ Should have
 - Dependency cycles among task dependencies.
 - Dangling references: a task whose `milestone` does not resolve to an existing milestone, and a milestone whose `release` does not resolve to an existing release.
 - Front-matter/section conflicts, described below.
-- Configuration validity (REQ-01.002, REQ-07.002), including invalid slugs, statuses, prefixes, directories, and duplicate keys.
+- Configuration validity (REQ-01.002, REQ-07.002, REQ-07.004), including invalid slugs, statuses, prefixes, directories, and duplicate slug keys; unknown top-level and field-item keys; unknown enum values (`kind`, `verbs`, `reference_visibility`); reserved field keys used as a field `key` or `frontmatter_key`; duplicate field keys within a role; a field with neither `heading` nor `frontmatter_key`; a field `order` or `enabled` key; and a `model`, `title`, `content`, or `id_shape` key.
+
+A configuration finding names the offending location by the selector path `document_types.<slug>.<path>`, using the keyed `fields[story].heading` or indexed `fields[0].heading` form and naming the field key when one is present. A finding's selector path resolves to the offending leaf. A selector path that cannot resolve uniquely — an unknown key, a keyed selector that matches no unique field because the key is missing or duplicated, or an out-of-range field index — is itself reported as a configuration finding rather than silently skipped.
 
 A front-matter/section conflict is a record that carries front matter and still retains a retired legacy metadata section for a field that front matter also carries, when the section's value disagrees with the front-matter value. The retired sections checked are `## Status`, `## Assignee`, `## Milestone`, `## Labels`, and `## Dependencies` on a task, and `## Release` on a milestone. Each section is read the way the legacy migration reads it — one non-empty line for `status`, `milestone`, and `release`, and a bullet list for `assignee`, `labels`, and `dependencies` — and list values are compared as sets of entries. A section that cannot be read to a single value for its field, for example a `## Status` section holding two non-empty lines, is reported as a conflict because agreement cannot be established. A retained section that agrees with the front matter is not reported. Where the record type keeps a `# <ID> <title>` body heading (REQ-05.010), a heading whose ID or title disagrees with the front matter is reported as the same kind of finding. Decision records are excluded: `## Status`, `## Date`, and `## References` are canonical body sections of a decision (REQ-05.010), not retired metadata.
 
@@ -60,6 +65,13 @@ The command is CLI-only in this release; no browser affordance runs it. Output h
 - A retained legacy section that cannot be read to a single value is reported as a front-matter/section conflict, while a retained section that agrees with the front matter is not reported.
 - A decision's `## Status`, `## Date`, and `## References` sections are not reported as front-matter/section conflicts.
 - Configuration validity is checked and any violation is reported.
+- Configuration validity covers invalid slugs, statuses, prefixes, directories, and duplicate slug keys.
+- Configuration validity covers an unknown top-level key and an unknown field-item key, each reported with a `document_types.<slug>.<path>` location.
+- Configuration validity covers an unknown enum value for `kind`, `verbs`, or `reference_visibility`.
+- Configuration validity covers a reserved field key used as a field `key` or `frontmatter_key`, and a duplicate field key within a role.
+- Configuration validity covers a field with neither `heading` nor `frontmatter_key`, a field `order` or `enabled` key, and a `model`, `title`, `content`, or `id_shape` key.
+- A configuration finding names its location by the selector path `document_types.<slug>.<path>`, using the keyed `fields[story].heading` or indexed `fields[0].heading` form, and names the field key when one is present.
+- A selector path that cannot resolve uniquely — an unknown key, a missing or duplicate field key, or an out-of-range field index — is reported as a configuration finding rather than skipped.
 - A run with no findings exits with code 0.
 - A run with one or more findings exits with code 4, including a run in which `--fix` repaired every repairable finding.
 - An invalid configuration does not stop `check`: the run reports the configuration findings instead of failing before the checks.
@@ -81,19 +93,23 @@ The command is CLI-only in this release; no browser affordance runs it. Output h
 
 ## Traceability
 - README.md, `papyrus(1)` → COMMANDS → check (to be documented)
-- REQ-01.002 — Read and Edit Project Configuration (tolerant repair surfaces)
-- REQ-01.004 — Use Common CLI Controls and Outcomes (exit codes; global `--json`)
-- REQ-01.005 — Assign Stable Record IDs (duplicate-ID detection, allocator used by `--fix`)
-- REQ-02.001 — Create and Describe Tasks (task dependencies)
-- REQ-02.003 — List and Filter Tasks (dependency readiness semantics)
-- REQ-03.001 — Manage Milestones (milestone `release` reference; retired `## Release` section)
-- REQ-03.002 — Manage Releases (release lifecycle; dangling release reference context)
-- REQ-05.007 — Manage Document Archive State and Deletion (inert `deprecated/` folder)
-- REQ-05.010 — Record Metadata in YAML Front Matter (front-matter authority; decision body sections)
-- REQ-07.002 — Configure Document Types and Slugs (configuration validity)
+- RE-010 — Descriptor-driven document engine refactor (accepted, not reopenable): D10 (presentation facts in the seed), D14 (nested group and member blocks, field sequence, selector paths, rejected `model`, `title`, `content`, and `id_shape` keys).
+- ADR-0019 — Fail-Closed Document-Type Configuration Validation (decisions 1-7 validation; decision 10 tolerant repair surfaces; amendment: rejected keys and field invariants, indexed field diagnostics, collection replace, selector paths).
+- ADR-036 — Config-declared document field schema and one descriptor model: decision 23 (reserved field keys), decision 34 (unknown keys and enum values, missing `heading`/`frontmatter_key`, reserved and duplicate field keys, `order`/`enabled`, and `model`/`title`/`content`/`id_shape` diagnostics).
+- ADR-0029 — Read-Only Corpus Diagnostics (`papyrus check`) with Duplicate-ID Repair (keeper order, reassignment, refusal classes including the read/import archive directory, `--force`, one prompt per run, per-repair concurrency re-check).
+- REQ-01.002 — Read and Edit Project Configuration (tolerant repair surfaces, selector paths, validated writes).
+- REQ-01.004 — Use Common CLI Controls and Outcomes (exit codes; global `--json`).
+- REQ-01.005 — Assign Stable Record IDs (duplicate-ID detection, allocator used by `--fix`).
+- REQ-02.001 — Create and Describe Tasks (task dependencies).
+- REQ-02.003 — List and Filter Tasks (dependency readiness semantics).
+- REQ-03.001 — Manage Milestones (milestone `release` reference; retired `## Release` section).
+- REQ-03.002 — Manage Releases (release lifecycle; dangling release reference context).
+- REQ-05.007 — Manage Document Archive State and Deletion (inert `deprecated/` folder).
+- REQ-05.010 — Record Metadata in YAML Front Matter (front-matter authority; decision body sections).
+- REQ-07.002 — Configure Document Types and Slugs (configuration validity, field items, selector paths).
+- REQ-07.004 — Provide One Schema-Driven Document Content Model with Three Document Models (rejected model and `id_shape` keys, field vocabulary).
 - Maintainer decision 2026-11-15 (in-session feedback): `papyrus check` mirrors backlog doctor, scoped to papyrus corpus; `--fix` repairs duplicate IDs only; no legacy folder migration; CLI only; findings exit 4.
 - Project-owner decision 2026-11-15: `check` is a tolerant repair surface — it loads configuration tolerantly like `config get|set|unset|list`, reports configuration findings, still runs the checks that do not need a valid configuration, and exits 4 on findings.
 - Project-owner decision 2026-11-15: `--fix` skips prompts with `--force` (not `--yes`), and `--force` is meaningful only together with `--fix`; a duplicate-ID repair keeps the record with the earliest valid `created_date`, ranks records with a missing or unparsable `created_date` after all dated records, and breaks remaining ties by path; no inbound reference rewriting, and the confirmation lists the affected references; stem/front-matter mismatches, grouped-family group IDs, and duplicates involving a read-only legacy directory are refused; the exit code is 4 when findings were found even if repaired.
-- ADR-0029 — Read-Only Corpus Diagnostics (`papyrus check`) with Duplicate-ID Repair (keeper order, reassignment, refusal classes including the read/import archive directory, `--force`, one prompt per run, per-repair concurrency re-check).
 - Contract clarification 2026-11-15 (ADR-0029 decisions 7, 8, 9; `docs/specifications/project-diagnostics-check.md` §5.1, §10.6, §10.8, §10.9): the read/import archive directory is refused alongside a read-only legacy directory; one confirmation prompt covers the whole plan; a repair whose file changed after the scan is reported as `repair-skipped` and its duplicate-ID finding stays unresolved.
 - Project-owner decision 2026-11-15: `check` never reads or inventories a `deprecated/` folder.
