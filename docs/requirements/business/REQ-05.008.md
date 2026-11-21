@@ -2,7 +2,7 @@
 id: REQ-05.008
 title: "Manage UI Mockups"
 created_date: '2026-11-13T20:21:14Z'
-updated_date: '2026-11-20T20:45:01Z'
+updated_date: '2026-11-21T15:49:37Z'
 labels: []
 references:
   - RE-010
@@ -35,16 +35,17 @@ Must have
 **Fixed metadata.** A mockup's metadata lives in its HTML metadata comment, and the HTML file carries no YAML front matter (REQ-05.010). The metadata keys are fixed:
 
 - `status` — one of `pending`, `approved`, or `archived`. The states are fixed: configuration cannot add, remove, or rename them, and a `statuses` or `default_status` declaration on this type is rejected (REQ-07.002).
-- `task` — the associated task, recorded as its Papyrus ID.
-- `specs` — the list of UI specification spec IDs the mockup realizes.
-- `references` — the list of references to other documents.
-- `superseded_by` — the back-reference to the mockup that superseded this one.
+- `task` — the associated task, recorded as its Papyrus ID; read-only in the edit form.
+- `specs` — the list of UI specification spec IDs the mockup realizes; list-valued and written by the edit form.
+- `refs` — the list of references to other documents; list-valued and written by the edit form.
+- `references` — the record's references, shown read-only in the metadata block and not written by the edit form.
+- `superseded_by` — the back-reference to the mockup that superseded this one; engine-written and read-only.
 
 Because the model has no field sequence, no key of this metadata block is a field, a CLI field option, or a configuration key: the metadata is engine-owned record data read from and written to the HTML metadata comment. The HTML file remains Papyrus-owned: Papyrus creates it and maintains the metadata comment on create, edit, archive, and supersede, and Papyrus does not version a mockup — version control is provided by git.
 
 **Title.** The uniform title contract applies to the title in the HTML metadata (RE-010 D13, ADR-036 decision 10): the title is always present, single-line and non-empty, is required on create, and can never be cleared by an edit. `papyrus ui-mockup create <TITLE> --task <TASK> --spec <SPEC-ID>` creates a mockup; `--title` is accepted on create and edit, and supplying both the positional `TITLE` and `--title` is rejected and writes nothing.
 
-**Create, view, and edit.** Creating a mockup requires the title, the associated task, and at least one UI specification reference; `--spec` and `--ref` are repeatable. A mockup can be listed, viewed, and edited. The view uses the uniform document head and chrome with the fixed metadata block in place of field sections, and the edit form offers the title and the two list-valued metadata controls `specs` and `references` only: `status`, `task`, and `superseded_by` are read-only there, and there is no field sequence and no `status` control (ADR-039 decision 21 and its clarification).
+**Create, view, and edit.** Creating a mockup requires the title, the associated task, and at least one UI specification reference; `--spec` and `--ref` are repeatable. A mockup can be listed, viewed, and edited. The view uses the uniform document head and chrome with the fixed metadata block in place of field sections, and the edit form offers the title and the two list-valued metadata controls `specs` and `refs` only: `status`, `task`, `references`, and `superseded_by` are read-only there, and there is no field sequence and no `status` control (ADR-039 decision 21 and its clarification of 2026-11-20).
 
 **State transitions.** The states follow the linear order `pending` -> `approved` -> `archived`. A new mockup starts `pending`; `archive` and `supersede` are the only commands that set `archived`, and `archive` is the only path to `archived` (REQ-07.001). A transition that goes backwards or skips a state is rejected, and status transitions are blocked for a mockup that has been superseded. An archived mockup has no restore command (REQ-05.007).
 
@@ -58,7 +59,7 @@ Because the model has no field sequence, no key of this metadata block is a fiel
 - The type declares no field sequence (`fields: []`), and its view and edit surface uses the fixed metadata block instead of field sections.
 - The verb family is `create`, `list`, `view`, `edit`, `archive`, `delete`, and `supersede`; no `status` verb exists for this type.
 - A `statuses` or `default_status` declaration on the `ui-mockup` entry is rejected (REQ-07.002).
-- The metadata keys are exactly `status`, `task`, `specs`, `references`, and `superseded_by`, and they are read from and written to the HTML metadata comment.
+- The metadata keys are exactly `status`, `task`, `specs`, `refs`, `references`, and `superseded_by`; all six are read from the HTML metadata comment, and `specs` and `refs` are the two list-valued keys the edit form writes back to it.
 - The metadata states are exactly `pending`, `approved`, and `archived`; configuration cannot add, remove, or rename a state.
 - A mockup HTML file carries no YAML front matter, and the metadata comment is the single source of its metadata (REQ-05.010).
 - The title is the title in the HTML metadata: present, single-line, non-empty, required on create, and never cleared by an edit.
@@ -68,7 +69,7 @@ Because the model has no field sequence, no key of this metadata block is a fiel
 - `archive` and `supersede` are the only commands that set `archived`, and `archive` is the only path to `archived`.
 - Status transitions are blocked for a mockup that has been superseded.
 - `papyrus ui-mockup supersede <old> <new>` sets the superseded mockup to `archived` and records the successor in `superseded_by`; supersession has no form control and no field.
-- The edit form offers the title and the `specs` and `references` list controls only; `status`, `task`, and `superseded_by` are read-only there, and no field sequence or `status` control exists.
+- The edit form offers the title and the `specs` and `refs` list controls only; `status`, `task`, `references`, and `superseded_by` are read-only there, and no field sequence or `status` control exists.
 - A mockup can be listed, viewed, and edited, and its metadata records the associated task and its UI specification references in the HTML metadata comment.
 - A list row for a `ui-mockup` record renders its reference list because the seed reference visibility of the type is `visible`.
 - Archiving a mockup sets its HTML metadata state to `archived`, moves it to the `archived/` subfolder, hides it from lists, search, and the web UI, and preserves its ID.
@@ -87,7 +88,7 @@ Because the model has no field sequence, no key of this metadata block is a fiel
 - Project-owner decision 2026-11-13: mockups keep HTML metadata but adopt the `archived` state in place of `deprecated`; archiving moves the file to `archived/`; no restore command exists.
 - RE-010 — Descriptor-driven document engine refactor (accepted, not reopenable): D6 (only `ui-mockup` is `SingleHtmlMockup`, and the HTML model is seed-only), D8 (reference visibility is seed data), D10 (presentation facts in the seed), D13 (the title contract applies to the HTML metadata).
 - ADR-036 — Config-declared document field schema and one descriptor model: decision 7 (`SingleHtmlMockup` row: one record per plain ID, baseline verbs plus `supersede`, no field sequence, fixed metadata states, HTML body, title contract in the HTML metadata), decision 8 (model-derived verbs, no `status` verb), decision 10 (fixed states, `archive` the only path to `archived`, `supersede` records the superseding ID), decision 29 (seed table: `ui-mockup` has no fields and fixed states).
-- ADR-039 — One descriptor-driven document view and edit surface: decision 7 (the mockup view uses the same head and chrome with the fixed metadata block), decision 15 (no field sequence, fixed metadata), decision 21 and its clarification (fixed metadata block; the form offers the title and the `specs` and `references` controls; `status`, `task`, `references`, and `superseded_by` read-only; supersede is not a form field).
+- ADR-039 — One descriptor-driven document view and edit surface: decision 7 (the mockup view uses the same head and chrome with the fixed metadata block), decision 15 (no field sequence, fixed metadata), decision 21 and its clarification of 2026-11-20 — the clarification governs the fixed-metadata keys: `status`, `task`, `specs`, `refs`, `references`, and `superseded_by`, all read from the HTML metadata comment; the form offers the title and the `specs` and `refs` controls; `status`, `task`, `references`, and `superseded_by` are read-only; supersede is not a form field.
 - ADR-033 — Uniform single-document browser view layout for managed Markdown records, as amended by ADR-039 decision 7 (the mockup view keeps the shared head and chrome).
 - ADR-0017 — Artifact category registry and type descriptors (decisions 5, 6, and 8 remain in force; decisions 1-4, 7, 9, and 10 replaced by ADR-036).
 - ADR-0018 — Generic document content model (superseded in full by ADR-036).
