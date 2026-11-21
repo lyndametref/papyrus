@@ -2,14 +2,14 @@
 id: TASK-236
 title: "Add a Document Type object to the domain model and glossary"
 created_date: '2026-11-20T17:40:32Z'
-updated_date: '2026-11-20T18:15:43Z'
+updated_date: '2026-11-21T16:31:09Z'
 labels: []
 references:
   - ADR-036
   - REQ-07.004
   - REQ-07.002
   - REQ-07.001
-status: ToDo
+status: Done
 assignee:
   - tech-writer
 milestone: MS-031
@@ -48,3 +48,6 @@ Document Type is a new first-class object; existing object descriptions and cont
 - [ ] Glossary entries exist for DocumentModel and its three variants, FieldSpec, role, group record, member record, and seed, each added through the glossary management command (MS-031 AC-7).
 - [ ] The context map is updated only if the new object changes an aggregate boundary, and the change is stated explicitly (MS-031 AC-7).
 - [ ] No planning or delivery language is added, and the user has verified the domain model and glossary additions (MS-031 AC-7, AC-8).
+## Comments
+- **requirements-engineer**: Evidence: business object model adds Document Type (slug identity, DocumentModel, prefix, directory, statuses and default status, slots, per-role reference visibility, single fields or group.fields and member.fields role sets, derived verbs, presentation facts) with the five invariants and the two new relationship rows. Glossary adds GLO-013 Document Type, GLO-014 Document Model, GLO-015 SingleMarkdown, GLO-016 GroupedMarkdown, GLO-017 SingleHtmlMockup, GLO-018 Field Specification, GLO-019 Role, GLO-020 Group Record, GLO-021 Member Record, GLO-022 Seed. Context map unchanged: the object moves no aggregate boundary, stated in the object model. papyrus check: 3 pre-existing frontmatter-conflict findings, none new.
+- **orchestrator**: Acceptance met: Document Type added to the business object model with identity, model, roles, field vocabulary, derived verbs, presentation facts and five invariants; glossary GLO-013..GLO-022 added; context map unchanged.
