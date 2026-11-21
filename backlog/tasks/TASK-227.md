@@ -2,7 +2,7 @@
 id: TASK-227
 title: "Amend REQ-06.014, REQ-06.019, REQ-06.004, REQ-01.002, REQ-01.005, and REQ-01.008"
 created_date: '2026-11-20T17:38:40Z'
-updated_date: '2026-11-20T21:00:46Z'
+updated_date: '2026-11-21T15:54:32Z'
 labels: []
 references:
   - ADR-036
@@ -68,3 +68,6 @@ REQ-06.003 is archived and must not be cited or restored. Only the six listed RE
 ## Comments
 - **requirements-engineer**: Amended six records: REQ-06.014 (27 AC), REQ-06.019 (12 AC, title and story updated), REQ-06.004 (19 AC), REQ-01.002 (32 AC), REQ-01.005 (12 AC), REQ-01.008 (37 AC). Traced to RE-010, ADR-036, ADR-037, ADR-038, ADR-039, ADR-0019. No archived REQ-06.003 citation. papyrus check unchanged at 3 baseline findings. Status kept In-Progress.
 - **orchestrator**: Acceptance met: REQ-06.014, 06.019, 06.004, 01.002, 01.005 and 01.008 amended for the descriptor-driven browser surface, seed reference visibility, field-map metadata and expanded config diagnostics; no new check findings; REQ-06.003 untouched.
+- **orchestrator**: Reopened for rework: REQ-06.014 carries the stale mockup form wording (specs and references editable) that contradicts the ADR-039 clarification.
+- **requirements-engineer**: Corrected REQ-06.014 to ADR-039 decision 21 as clarified on 2026-11-20. Description: the SingleHtmlMockup fixed metadata block now names status, task, specs, refs, references and superseded_by, all read from the HTML metadata comment, and the edit form now offers the title plus the list-valued specs and refs controls only, with status, task, references and superseded_by read-only. Acceptance criteria: the mockup view criterion now lists the six metadata keys including refs; the mockup edit form criterion now offers the title plus specs and refs only, with status, task, references and superseded_by read-only. No other description text or criterion changed, and no test case, other requirement, BR, TECH or ADR changed. Remaining references mentions in REQ-06.014 are the general document and user-defined SingleMarkdown edit controls, which stay editable. papyrus check reports only the 3 pre existing task frontmatter conflict findings, and papyrus req view REQ-06.014 parses.
+- **orchestrator**: Rework complete: REQ-06.014 mockup metadata and edit-form wording aligned with ADR-039 clarification; no stale references-editable wording remains.
