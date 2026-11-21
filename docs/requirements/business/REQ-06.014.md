@@ -2,7 +2,7 @@
 id: REQ-06.014
 title: "Display Config-Defined Document Types in the Browser"
 created_date: '2026-11-13T20:57:05Z'
-updated_date: '2026-11-20T20:59:20Z'
+updated_date: '2026-11-21T15:51:56Z'
 labels: []
 references:
   - RE-010
@@ -31,7 +31,7 @@ Views use the document type's configured folder and prefix, the record field map
 
 **GroupedMarkdown.** A `GroupedMarkdown` record is rendered by its role. A group record renders the `group.fields` sections, then an engine-owned read-only member list (member ID, title, and link) in ID order. A member record renders the `member.fields` sections and a read-only link to its group. Membership is never a form control and never a field, and the group link cannot be changed through the browser. The list renders the group row and its member rows through the shared hierarchical row variant in merged group-then-member order.
 
-**SingleHtmlMockup.** A `SingleHtmlMockup` record uses the same document head, chrome, and reference disclosure as every other document, with a fixed metadata block instead of field sections: `status` (`pending`, `approved`, or `archived`), `task`, `specs`, `references`, and `superseded_by`, all read from the HTML metadata comment. The edit form offers the title and the list-valued `specs` and `references` controls only; `status`, `task`, and `superseded_by` are read-only there, there is no field sequence, and there is no `status` control.
+**SingleHtmlMockup.** A `SingleHtmlMockup` record uses the same document head, chrome, and reference disclosure as every other document, with a fixed metadata block instead of field sections: `status` (`pending`, `approved`, or `archived`), `task`, `specs`, `refs`, `references`, and `superseded_by`, all read from the HTML metadata comment. The edit form offers the title and the list-valued `specs` and `refs` controls only; `status`, `task`, `references`, and `superseded_by` are read-only there, there is no field sequence, and there is no `status` control.
 
 **Presentation facts.** Every presentation fact of a document type comes from the seed descriptor, and a user-defined type uses the documented default presentation values: the label, plural, order, summary, API aliases, type alias, slots, reference visibility, and each field's label, help, sequence position, required flag, kind, and verbs. The list heading, count noun, empty state, inventory note, page title, navigation label, sidebar entry, form label, form hint, view section heading, and required marker are derived from the descriptor. A field's storage `heading` (for example `## User Story`) is never rendered as a display heading; the visible section heading is the field `label`. The browser may format a value it is given, but it may not hold a per-type string or a per-type list.
 
@@ -58,8 +58,8 @@ The document surface is built from one validated configuration and registry snap
 - A `GroupedMarkdown` group record renders its group field sections and a read-only member list in ID order; a member record renders its member field sections and a read-only link to its group.
 - Membership is never a form control or field, and the group link is not editable in the browser.
 - A grouped list renders group rows and member rows through the shared hierarchical row variant in merged group-then-member order.
-- A `SingleHtmlMockup` view uses the shared head, chrome, and reference disclosure with a fixed metadata block of `status`, `task`, `specs`, `references`, and `superseded_by` read from the HTML metadata comment, and no field sections.
-- A `SingleHtmlMockup` edit form offers the title and the `specs` and `references` controls only; `status`, `task`, and `superseded_by` are read-only, and there is no field sequence and no `status` control.
+- A `SingleHtmlMockup` view uses the shared head, chrome, and reference disclosure with a fixed metadata block of `status`, `task`, `specs`, `refs`, `references`, and `superseded_by` read from the HTML metadata comment, and no field sections.
+- A `SingleHtmlMockup` edit form offers the title and the `specs` and `refs` controls only; `status`, `task`, `references`, and `superseded_by` are read-only, and there is no field sequence and no `status` control.
 - Every presentation fact (labels, headings, field order, help, slots, aliases, reference visibility, and required markers) comes from the seed descriptor or the documented default for a user-defined type; the browser holds no per-type string or list for a document.
 - The edit form renders the fixed title control, editable declared fields in sequence order, `labels`, `references`, read-only `status`, `created_date`, and `updated_date`, and the hidden version token; a field whose verbs exclude `edit` is read-only.
 - A stale version token renders the same edit form with the submitted values and a conflict notice and returns `409` without writing.
