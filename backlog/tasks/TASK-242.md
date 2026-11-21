@@ -2,7 +2,7 @@
 id: TASK-242
 title: "Record the corrected renderer and route inventory with file paths"
 created_date: '2026-11-20T17:40:57Z'
-updated_date: '2026-11-21T16:45:43Z'
+updated_date: '2026-11-21T21:01:02Z'
 labels: []
 references:
   - ADR-039
@@ -10,7 +10,7 @@ references:
   - TECH-069
   - REQ-06.014
   - REQ-06.019
-status: ToDo
+status: Done
 assignee:
   - code-analyzer
 milestone: MS-032
@@ -19,6 +19,7 @@ dependencies:
 ordinal: 50
 documentation:
   - docs/audits
+  - docs/audits/AUD-135.md
 type: audit
 ---
 
@@ -68,3 +69,5 @@ Definition of done: the audit record exists, is linked from this task, lists eve
 
 ## Comments
 - **task-refiner**: Refined by task-refiner for MS-032: description grounded in the current routes, renderers, harness conventions and root-cause call sites; acceptance criteria added; references and documentation set. No dependency, ordinal or milestone change. Status left ToDo because papyrus.config.yml declares statuses [ToDo, In-Progress, Done].
+- **code-analyzer**: Code audit AUD-135 issued (type code, status issued; references MS-032, ADR-039, TECH-068, TECH-069, TASK-242, REQ-06.014, REQ-06.019). Linked as task documentation. Confirmed: 9 conflict-page renderers and 5 not-found pages; 23 declared legacy API aliases; 12 document types (11 seed plus the config-defined note); 14 TypedHandler variants; 13 ops builders; 7 route-reachable conflict pages. Reachability correction: conflict_page_test_case and conflict_page_test_report have no call site and delegate to conflict_page_use_case, so 7 pages are selectable (1 generic branch, 5 type-specific branches, 1 fallback) and 2 are dead wrappers. Discrepancy: the TASK-242 wording six type branches plus the generic fallback is imprecise; a prefix-only regex returns 8 rather than 9 because document_conflict_page lacks the conflict_page prefix, so use the .* regex recorded in the audit. Checks: papyrus check unchanged with the same 3 pre-existing frontmatter conflicts; cargo fmt, clippy and lib tests pass. Findings 1 medium and 3 low; verdict pass for the inventory scope. TASK-242 remains In-Progress.
+- **orchestrator**: Acceptance met: AUD-135 records the corrected pre-refactor inventory (9 active routes, 23 legacy API aliases, 9 conflict and 5 not-found renderers with 7 reachable conflict paths, 14 TypedHandler variants and 13 slug comparisons), with exact file locations and reproducibility commands.
