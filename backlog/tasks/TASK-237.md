@@ -2,7 +2,7 @@
 id: TASK-237
 title: "Verify MS-031 governance exit: all artifacts accepted and no code changed"
 created_date: '2026-11-20T17:40:32Z'
-updated_date: '2026-11-20T18:15:44Z'
+updated_date: '2026-11-21T16:34:20Z'
 labels: []
 references:
   - REQ-07.001
@@ -44,7 +44,7 @@ references:
   - TECH-013
   - TECH-024
   - TECH-027
-status: ToDo
+status: Done
 assignee:
   - quality-gatekeeper
 milestone: MS-031
@@ -108,3 +108,6 @@ The milestone is governance-only; TASK-237 produces no artifact other than verif
 - [ ] No changed requirement cites or restores archived REQ-06.003, and the requirement map from TASK-232 is fully covered (MS-031 AC-4, AC-8).
 - [ ] NFR-007.001 to NFR-007.003 are user-approved, and the test-case coverage matrix has zero gaps with all test cases approved (MS-031 AC-5, AC-8).
 - [ ] The exit decision and any failing artifact are recorded as task evidence; on failure, later milestones are blocked (MS-031 AC-1 to AC-10).
+## Comments
+- **quality-gatekeeper**: Phase 5 quality audit AUD-134 issued: governance accepted, no corrections required. AC-1 pass RE-010 D1 to D14 accepted not reopenable; AC-2 pass ADR-036 to ADR-039 accepted with required supersessions; AC-3 pass nine ADRs amended with dated notes; AC-4 pass listed REQs rewritten and no changed REQ cites archived REQ-06.003; AC-5 pass NFR-007.001 to NFR-007.003 targets hardware method and owner approval; AC-6 pass 12 BRs updated consistent; AC-7 pass 16 TECH verified, Document Type and GLO-013 to GLO-022 present; AC-8 pass 94 TCs approved and TASK-232 coverage zero gaps; AC-9 pass equivalence gate and 100 and 1000-record benchmark in TCs and TECH-008 013 024 027; AC-10 pass. Diff 555469c..HEAD: 222 files, only backlog, decisions, docs, papyrus.config.yml; no src tests packaging scripts Cargo. No failing artifact. Low findings: AC-1 text says twelve vs RE-010 fourteen; NFR-007.001 to NFR-007.003 duplicate sections; pre-existing REQ-06.003 citations outside changed set. TASK-237 remains In-Progress.
+- **orchestrator**: Phase 5 verification PASS: AC-1 to AC-10 all pass (AUD-134); diff proof shows only backlog, decisions, docs and config changed; governance accepted.
