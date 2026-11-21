@@ -1,192 +1,147 @@
 ---
 id: TECH-068
-title: "Registry-Derived Browser Views for Config-Defined Document Types"
+title: "Descriptor-Driven Document Browser Surface"
 created_date: '2026-11-16T17:46:54Z'
-updated_date: '2026-11-18T20:22:31Z'
+updated_date: '2026-11-21T07:44:31Z'
 labels: []
 references:
   - ADR-0005
   - ADR-0006
   - ADR-0013
   - ADR-0017
-  - ADR-0018
+  - ADR-0019
   - ADR-0020
   - ADR-0022
-  - MOCK-0001
-  - MOCK-0009
-  - MOCK-0013
+  - ADR-0028
+  - ADR-0033
+  - ADR-0034
+  - ADR-0035
+  - ADR-0036
+  - ADR-0037
+  - ADR-0038
+  - ADR-0039
   - MOCK-0015
+  - NFR-01.003
   - NFR-02.002
-  - NFR-04.002
   - REQ-05.007
   - REQ-05.011
-  - REQ-06.003
   - REQ-06.004
   - REQ-06.012
   - REQ-06.014
+  - REQ-06.016
+  - REQ-06.018
+  - REQ-06.019
   - REQ-07.001
   - REQ-07.002
   - REQ-07.004
-  - TASK-105
-  - TASK-107
-  - TASK-110
-  - TASK-113
-  - TASK-114
-  - ADR-034
-  - REQ-06.018
-  - RE-005
-  - ADR-035
-  - REQ-06.019
-  - RE-006
-  - TASK-178
-status: draft
+status: verified
 ---
-# TECH-068 Registry-Derived Browser Views for Config-Defined Document Types
+# TECH-068 Descriptor-Driven Document Browser Surface
 
-> **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
-
-> **Revised (TASK-178, 2026-11-19):** reference visibility in shared browser list views is per artifact family per ADR-035 and REQ-06.019 (source RE-006). `ContentModel::Generic` (config-defined document types) renders no reference list in any list row; `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep it; labels render for every family. Single-document view, CLI list and view, JSON API, `RecordView`, and front matter are unchanged.
-
-## Description
 ## Purpose
 
-The browser still resolves document types through `browser::records::Category`
-(fifteen variants, per-variant key/config-key/descriptor-name mappings) and a
-hand-written route chain in `src/browser/mod.rs`. A document type added in
-`document_types` therefore has no navigation, list, detail, edit, or API
-surface, and a disabled type remains browsable because directory resolution
-does not consult `enabled` for most types. This increment makes the startup
-`ArtifactRegistry` (ADR-0017) the only source of the browser's document-type
-set and renders every enabled type through the registry's descriptors, while
-preserving the existing built-in page field sets (REQ-06.014, ADR-0020).
+The browser has exactly three category handlers: `Backlog`, `Decision`, and
+`Document`. Backlog and decision records keep their bespoke board, list, view,
+edit, and conflict code. Every document record type — seed or user-defined,
+under any `DocumentModel` — is served by one document surface for list, view,
+edit, conflict, not-found, and form submission.
+
+The document surface has one list builder, one view builder, one edit builder,
+one form submission handler, one conflict builder, and one not-found builder.
+The browser document path contains no per-type dispatch, no slug matching, no
+per-type handler variant, and no document entry in the static presentation
+table. Its only variation comes from the descriptor and the field map built for
+the record's model and role.
+
+The browser serves from the immutable `ServingSnapshot` of ADR-037: one
+validated configuration, one registry, and one route table, rebuilt atomically
+when the configuration file changes. HTML and JSON responses stay
+`Cache-Control: no-store` (ADR-0038).
 
 ## Scope
 
 In scope:
 
-- One startup registry instance and one startup route/navigation table derived
-  from it; `Category` and the per-type routing/API chain are removed.
+- One startup registry and route table derived from it; one document handler for
+  every document descriptor.
 - Registry-derived navigation grouped by the three artifact categories,
-  inventory cards, list pages, detail routing, edit forms, not-found selection,
-  JSON API endpoints, and lifecycle page.
-- The shared list layout from `browser-shell-ui.md` §3 (ID, Title, Status, family slots, Created, Updated, Actions), with no family slot for a config-defined type, and read-only front-matter `created_date` display.
-- Two generic view families (ADR-0020 decision 5): generic config-defined
-  document pages and unchanged typed built-in pages selected by descriptor.
-- Read-only status display and a validated status filter on document list
-  views (REQ-06.014, NFR-02.002).
-- Archived/unknown equivalence and disabled-type invisibility (REQ-05.007).
-- Unit and integration tests; a characterization fixture for one built-in type.
+  inventory cards, list pages, detail routing, edit forms, conflict, not-found,
+  and JSON API endpoints.
+- The shared list layout with its fixed columns and seed-declared slots.
+- Model-neutral field-map rendering for every document model and role, including
+  `GroupedMarkdown` group/member rendering and `SingleHtmlMockup` fixed metadata.
+- Read-only status display and a validated status filter on document list views.
+- Archived, unknown, and disabled equivalence.
+- Unit and integration tests, including the three-category surface boundary.
 
 Out of scope:
 
-- CLI command surface, registry model, record storage, and patch primitives
-  (TASK-105/107/110/113 are complete).
-- Browser create or delete. The browser still does not create records; delete
-  stays CLI-only (REQ-05.007).
-- Browser status writes. The browser never edits status (REQ-05.011).
-- Status filtering on the JSON API and search (deferred to a future release;
-  OQ-2, owner `@planner`).
-- Changing the record content model (ADR-0018) or adding new dependencies,
-  templates engines, or assets (ADR-0005).
-- Changing the layout of non-document lists (the task board and the
-  milestone, release, and decision list layouts) beyond the status behavior
-  already scoped.
-- Repository-wide navigation redesign; only the document-type sidebar is
-  grouped as section 2.1 defines.
+- Browser create or delete. The browser does not create records; delete stays
+  CLI-only.
+- Browser status writes. The browser never edits status.
+- Status filtering on the JSON API and search.
+- Changing the backlog or decision surfaces, their templates, or their output.
+- Adding a dependency, template engine, client script, or asset.
 
 ## Behavior
 
-### 1. Registry and startup route table
+### 1. Registry, snapshot, and route table
 
-1. The registry is the one already built and validated by `cli::dispatch` at
-   startup (the same instance TASK-113 uses); `dispatch` passes it to
-   `browser::run`, which derives one immutable `BrowserRoutes` from it before
-   binding the listener. The browser never calls `ArtifactRegistry::build`
-   again. A registry build error is already a validation outcome (exit 4) and
-   the server does not start.
-2. `ServerState` stores the registry (a clone of the startup handle; add
-   `Clone` to `ArtifactRegistry`) and the route table for the process
-   lifetime. Handlers resolve descriptors from the stored registry and never
-   build a second registry or enumerate document slugs themselves.
-3. The route table remains fixed for the process lifetime (ADR-0020 decision 2,
-   ADR-0005): exact string comparison after single-pass percent-decoding, no
-   path join, no filesystem lookup during route matching.
-4. Document-type configuration is therefore a startup snapshot. A change to
-   `document_types` (add, remove, enable, disable, rename, re-point) takes
-   effect on the next browser start. The `/config` page states this next to
-   the document-type keys (A1).
-5. The table is composed of:
-   - fixed routes unchanged: `/assets/app.css`, `/assets/app.js`, `/`,
-     `/skills`, `/lifecycle`, `/config`, `/config/edit`, `/doc/{id}`,
-     `/doc/{id}/edit`, `/api/doc/{id}`;
-   - one canonical list API route per **enabled** `Document` descriptor:
-     `/api/docs/<slug>`;
-   - the legacy API aliases in section 5.3, generated only for descriptors that
-     exist and are enabled;
-   - one canonical `?type=<slug>` list value per enabled descriptor in **all**
-     three categories, plus the HTML aliases in section 2.2;
-   - one navigation item and one inventory card per enabled `Document`
-     descriptor;
-   - one prefix/ID-shape rule per enabled descriptor for 404 page selection.
-6. No request path is ever joined to a filesystem path. A descriptor's
-   configured directory is resolved against the project directory and passes
-   `Context::ensure_within` before any read (NFR-04.002, ADR-0005).
+1. The browser uses one `ServingSnapshot` built after the listener binds: the
+   effective configuration, the `ArtifactRegistry`, the `BrowserRoutes` table,
+   and the input fingerprint. No handler calls `load_effective_config` per
+   request; every configuration, descriptor, and route lookup in a request
+   resolves through one snapshot handle.
+2. `BrowserRoutes::build(&ArtifactRegistry)` produces the canonical list API
+   routes, legacy API aliases, `?type=` values and HTML aliases, navigation
+   items, inventory entries, and ID rules for enabled descriptors. The seed
+   supplies `api_aliases`, `type_alias`, labels, order, and presentation facts;
+   no static table supplies a document entry.
+3. Routing is exact: a single-pass percent-decoded path compared against the
+   table, with no path join, no prefix match, and no filesystem lookup during
+   matching. An unknown or disabled type is `404`; a known route with a
+   disallowed method is `405` with `Allow`.
+4. A configuration change is picked up by the next request's fingerprint check
+   and published as one new snapshot; pages, navigation, lists, and routes move
+   together. A failed reload keeps the previous snapshot serving.
+5. No request path is ever joined to a filesystem path. A descriptor's
+   directory is resolved against the project directory and passes
+   `Context::ensure_within` before any read.
+6. The route table covers the fixed asset and document routes plus one canonical
+   list API route per enabled descriptor and the seed-declared aliases. A
+   disabled type has no navigation entry, inventory card, list route, detail
+   route, or API route.
 
 ### 2. Navigation and list route
 
 #### 2.1 Sidebar and inventory
 
-1. The sidebar is generated from `BrowserRoutes` and is grouped by the three
-   artifact categories, with group headings in this order: `Backlog`,
-   `Decisions`, `Documents`. Each group contains one entry per enabled
-   descriptor of that category; a config-defined document type appears under
-   `Documents`; a disabled type has no entry in any group.
-2. The `Backlog` group keeps the existing single `Backlog` entry (the task
-   board). The `Decisions` group keeps the existing single `Decisions` entry.
-   Milestone and release records gain no new navigation entry in this
-   increment.
-3. The `Documents` group keeps the existing built-in document entries in their
-   current relative order: Business requirements, Business Rules, Audit
-   Records, Technical Specifications, Use Cases, Test Cases, Test Reports,
-   Non-functional requirements, Glossary, UI Specifications, UI Mockups.
-   Config-defined enabled entries follow UI Mockups in registry order (slug
-   order) and before the trailing utility entries. Labels are unchanged.
-4. Configuration, Managed artifacts &amp; lifecycles, and Agent skills &amp;
-   workflows keep their current labels and order after the three groups; they
-   are utility entries and are not part of a category group.
-5. A selected entry carries `aria-current="page"` and the existing non-colour
-   cue. The selected value is the descriptor slug; legacy `?type=` values
-   select the same entry. A group heading is presentational (not a link, not
-   selectable).
-6. The inventory page is unchanged by this grouping: it renders one card per
-   enabled document type, generated from the same route table. Built-in cards
-   keep their existing titles, notes, and ordering; a config-defined card uses
-   the title-cased label and the note
-   `Config-defined document records in this project.` A disabled type has no
-   card. The lifecycle card count is the registry descriptor count, not the
-   literal `12 types`.
-7. The approved mockup draws the utility entries under a fourth `Project`
-   heading. That heading is presentational only: this specification is
-   authoritative, the sidebar has exactly the three category groups, and the
-   utility entries follow them without a fourth group heading.
+1. The sidebar is generated from the route table and grouped by the three
+   categories in the order `Backlog`, `Decisions`, `Documents`. Each group has
+   one entry per enabled descriptor of that category; a disabled type has no
+   entry.
+2. The `Backlog` group keeps the existing board entry and the `Decisions` group
+   keeps the existing decisions entry. Document entries follow in seed `order`
+   with ties broken by slug; each label comes from the seed.
+3. A selected entry carries `aria-current="page"` and the existing non-colour
+   cue. The selected value is the descriptor slug; a legacy `?type=` value
+   selects the same entry.
+4. The inventory renders one card per enabled document type from the same route
+   table. A card's title, note, and order come from the seed; a disabled type
+   has no card.
+5. The retired configuration, managed-artifacts, lifecycle, and agent-skills
+   entries are absent; the sidebar has exactly the three category groups.
 
 #### 2.2 List route and type aliases
 
 1. `GET|HEAD /?type=<slug>` serves the list view for every enabled descriptor
-   in every category. `GET /` without a `type` still serves the inventory.
-2. `<slug>` is the registry slug (`req`, `nfr`, `glossary`, `rule`, `ui-spec`,
-   `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`,
-   task, milestone, release, decision, or a configured slug).
-3. The existing HTML aliases remain accepted and select the same descriptor:
-   `business-rule` → `rule`, `audit-record` → `audit`. Generated built-in links
-   keep their current alias (`/?type=business-rule`, `/?type=audit-record`) so
-   approved page output is unchanged; config-defined links use the slug.
-4. The virtual values `skills`, `lifecycle`, and `config` are handled before
-   registry lookup and keep their current pages.
-5. An unknown, empty, or disabled `type` value returns `404` with the generic
-   error page, not `400` (ADR-0020 decision 3). The status-code change from
-   `400` to `404` is intentional and documented in the task.
-6. A known route with a disallowed method is `405` with an `Allow` header; an
+   in every category. `GET /` without a `type` serves the inventory.
+2. `<slug>` is the registry slug. The seed `type_alias` values are accepted and
+   select the same descriptor; generated built-in links keep their seed alias,
+   and a user-defined type uses its slug.
+3. An unknown, empty, or disabled `type` value returns `404` with the generic
+   error page, not `400`.
+4. A known route with a disallowed method is `405` with an `Allow` header; an
    unknown path is `404` for every method.
 
 ### 3. List views
@@ -195,527 +150,289 @@ Out of scope:
 
 1. Every document list view renders the enabled records of exactly one type,
    read from that descriptor's active directory only (section 6).
-2. Every document list view uses the shared list contract in
-   `browser-shell-ui.md` §3: the fixed order **ID**, **Title**, **Status**,
-   family slot(s), **Created**, **Updated**, **Actions**. A generic
-   config-defined type declares no family slot; a typed built-in family
-   declares its slots as data. Grouped requirement lists keep their
-   group/member structure inside the shared table.
-   - `Status` renders the stored status read-only, exactly as stored.
-   - `ID` renders the record ID as text.
-   - `Title` links to `/doc/<ID>`.
-   - `Created` renders the front-matter `created_date` as stored, or `(none)`
-     when the key is absent; it is never derived or rewritten by the browser.
-   - `Updated` renders the stored `updated_date`, or `(none)`.
-3. Rows are ordered by ID ascending. The Title cell carries the record labels for every family. It carries references for `ContentModel::Typed` and `ContentModel::HtmlMockup` families; a `ContentModel::Generic` (config-defined document type) list row renders no reference block, omitted rather than emptied (ADR-035, REQ-06.019). Visibility is resolved from the descriptor content model, never from a slug or presentation override. Detail, CLI list and view, JSON API, `RecordView`, and front matter keep references unchanged. The legacy type-specific row metadata is not carried over by the shared contract.
-4. The page shows a count of the records displayed (after filtering) and the
-   existing empty state when there are none.
-5. Built-in typed list pages render through the shared contract of (2) and
-   the shared empty state of `browser-shell-ui.md` §3.6; the status filter
-   (3.2) is added to them. Requirement lists keep their group/member
-   structure (req/nfr), and the task route keeps the board page.
+2. Every document list view uses the shared list layout: the fixed order
+   **ID**, **Title**, **Status**, family slot(s), **Created**, **Updated**,
+   **Actions**. A document descriptor's slots come from its seed entry; no field
+   becomes a list column.
+3. `Status` renders the stored status read-only. `ID` renders the record ID as
+   text. `Title` links to `/doc/<ID>` and carries the record labels for every
+   family. `Created` and `Updated` render the stored front-matter values as
+   stored, or `(none)` when absent; the browser never derives or rewrites them.
+4. Rows are ordered by ID ascending. A grouped type renders the group row and its
+   member rows through the shared hierarchical row variant, in group order and
+   then member order. Role is a property of the row, not a second table.
+5. A row renders its reference list only when the resolved
+   `reference_visibility` for its type and, for a grouped type, its role is
+   `Visible`. `Hidden` omits the reference list entirely, with no collapsed or
+   empty placeholder. Labels still render in the Title cell.
+6. The page shows a count of the displayed records and the existing empty state
+   when there are none.
 
 #### 3.2 Status filter
 
-1. The list view for every document type exposes a status filter built from
-   the descriptor's status model:
-   - `DocumentMain { custom, .. }` → the filterable values are `active`
-     followed by `custom` in configured order. `archived` is never a value.
-   - `HtmlMetadata` (UI mockups) → `pending`, `approved` in lifecycle order.
-     `archived` is never a value.
-2. The filter control is a no-JavaScript GET form: a `Status` select listing
-   exactly the filterable values of (1) in order, an `Apply filter` submit, and
-   a `Show all` reset link. The select has no `All records`/empty-value option:
-   the no-filter state is the absence of a `status` parameter, reached with
-   `Show all`. When no filter is active the select shows a disabled
-   placeholder option selected by default, so an untouched submit omits
-   `status` entirely. The offered `status=` values are exactly the set in (1). `?type=<slug>&status=<value>` remains directly
-   addressable without the form.
+1. The filter values come from the descriptor's status model:
+   `SingleMarkdown` and `GroupedMarkdown` offer `active` followed by the declared
+   custom statuses in configured order; `SingleHtmlMockup` offers `pending` and
+   `approved` in lifecycle order. `archived` is never offered.
+2. The filter is a no-JavaScript GET form with a `Status` select, an
+   `Apply filter` submit, and a `Show all` reset link. The select has no
+   `All records` or empty-value option; the no-filter state is the absence of a
+   `status` parameter.
 3. With no `status` parameter, every record in the active directory is listed,
    including records carrying a custom status. Custom statuses never hide
-   records (ADR-0022 decision 10).
-4. With `status=<value>`, only records whose stored status equals `<value>`
-   exactly are listed. Comparison is byte-exact and case-sensitive; no
-   normalization, aliasing, or fuzzy match.
-5. For grouped requirement lists, filtering is applied to records before
-   grouping: only matching requirement records are listed; a group heading is
-   shown when the group record matches or when at least one of its members
-   matches; a group with neither is omitted. Orphan-member rows are recomputed
-   from the filtered set. Synthesised NFR group headings are display-only and
-   are shown only when they retain at least one matching member.
-6. The selected option is rendered selected in the select and is also a
-   directly addressable URL; the filter remains usable with JavaScript
-   disabled.
-7. A type that declares no custom statuses offers only `active`; no filter and
-   `active` therefore list the same set unless the directory contains a
-   record with an undeclared status value (3.3).
-8. A `status` value outside the set in (1) — including `archived`, an
-   undeclared value, a wrong-case value, or an empty value on an explicit
-   `status=` parameter — returns `400` with the standard error page and no
-   listing. An absent `status` parameter is the no-filter state and is never
-   rejected; only an explicitly supplied empty `status=` is invalid. More than
-   one `status` parameter is rejected the same way (NFR-02.002).
+   records.
+4. With `status=<value>`, only records whose stored status equals the value
+   exactly are listed. Comparison is byte-exact and case-sensitive.
+5. For a grouped type, filtering applies before grouping: a group row is shown
+   when the group record matches or when at least one member matches; a group
+   with neither is omitted. Orphan-member rows are recomputed from the filtered
+   set.
+6. A value outside the offered set — `archived`, an undeclared value, a
+   wrong-case value, an explicit empty `status=`, or duplicate parameters —
+   returns `400` with the standard error page and no listing. An absent
+   `status` parameter is the no-filter state.
 
 #### 3.3 Tolerant status values
 
-1. A stored status outside the type's declared vocabulary is displayed verbatim
-   and never rewritten by a read (ADR-0022 decision 9).
-2. Such a record is listed only when no `status` parameter is present. It is
-   not offered as a filter value and is never matched by `active` or a custom
-   value it does not carry exactly.
-3. A write to such a record keeps the value unless the edit explicitly changes
-   another field; the browser never writes `status`.
+1. A stored status outside the type's declared vocabulary is displayed
+   verbatim and is never rewritten by a read.
+2. Such a record is listed only when no `status` parameter is present. It is not
+   offered as a filter value and is never matched by a value it does not carry
+   exactly.
+3. The browser never writes `status`, so a read or edit does not repair such a
+   value.
 
 ### 4. Detail and edit views
 
 #### 4.1 Detail
 
 1. `GET|HEAD /doc/<ID>` resolves the ID to exactly one enabled descriptor by
-   configured prefix and `id_shape` (`Grouped` accepts group and member IDs;
-   `Dotted` member IDs; `Plain` sequence IDs), then reads the record from that
-   descriptor's active directory. Detail addressing stays ID-based; the URL
-   carries no type.
-2. A generic document detail page renders:
-   - breadcrumb `<type label> > <ID>`;
-   - `h1` `<ID> <title>`, the labels taglist under the title, and a read-only
-     status line;
-   - a summary card containing only the record ID, created date, and updated
-     date (REQ-06.012);
-   - the description section (`No description.` when empty);
-   - a separate read-only metadata list with the remaining `RecordView` values
-     (including status verbatim and any unknown front-matter keys);
-   - references as a native `<details>` disclosure at the end, shown only when
-     the record has at least one reference (REQ-06.012);
+   configured prefix and ID shape, then reads the record from that descriptor's
+   active directory. Detail addressing stays ID-based; the URL carries no type.
+   An unknown, archived, or disabled ID returns the one document not-found page
+   with `404`.
+2. One document view builder renders every document type:
+   - the shared head and chrome and breadcrumb;
+   - a small record ID above the title, the title, and read-only status beside
+     the ID;
+   - the labels taglist;
+   - created and updated dates under the title;
+   - one `<section>` per non-empty field in descriptor sequence order, headed by
+     the field `label`, with the value rendered through the prose pipeline or as
+     a list for `kind = list`;
+   - a required field that is empty renders as an empty section, not omitted;
+   - read-only extra metadata rows after the field sections;
+   - references, dependencies, and dependents as three separate native
+     `<details>` disclosures, each rendered only when non-empty;
    - an `Edit` action linking to `/doc/<ID>/edit`.
-3. A typed built-in detail page keeps its existing sections, metadata rows,
-   related-record links, and actions. Status is visible read-only where the
-   existing `RecordView`/type-specific section already shows it, and is added
-   as a read-only row for types without it.
-4. The sidebar is selected for the record's type; the breadcrumb's type link
-   is the type's list route.
+3. A field's storage `heading` is never rendered as a display heading; the
+   visible section heading is the field `label`. There is no per-type summary
+   card and no repetition of the document type.
+4. A `GroupedMarkdown` group record renders the `group.fields` sections followed
+   by an engine-owned, read-only member list (member ID, title, link, in ID
+   order). A member record renders the `member.fields` sections followed by a
+   read-only link to its group. Membership is never a form control and never a
+   field.
+5. A `SingleHtmlMockup` record uses the same head, chrome, and reference
+   disclosure with a fixed metadata block instead of field sections: `status`,
+   `task`, `specs`, `references`, and `superseded_by`, read from the HTML
+   metadata comment.
 
 #### 4.2 Edit
 
-1. `GET|HEAD /doc/<ID>/edit` renders the edit form selected by descriptor:
-   generic config-defined types get the generic form; typed built-ins get
-   their existing per-type form.
-2. The generic form offers exactly `title` (required, 1–200 characters),
-   `description` (optional, multi-line, no line beginning with `##`),
-   `labels` (repeatable tag list), and `references` (repeatable tag list).
-   It renders `created_date` and `updated_date` disabled/read-only, carries
-   the hidden version token, and offers Save and Cancel.
-3. The generic form never renders a `status` control, a `status_change` control,
-   or any hidden field that can write status. Typed built-in forms keep their
-   existing field sets and likewise contain no status control.
-4. Saving a generic record (`POST /doc/<ID>`, form-encoded):
-   - requires a valid version token present in the form; a missing or malformed
-     token is `400`;
-   - resolves the record and descriptor exactly as a detail request;
-   - returns `415` for a non-form content type and `400` for malformed bodies;
-   - validates title, description, labels, and references with the shared
-     validators; a validation failure is `422` and nothing is written;
-   - patches the front-matter `title` together with the heading line, the
-     `## Description` section, and the `labels`/`references` lists through
-     `record::patch`, then writes once through `record::store::write_atomic`
-     (ADR-0006, ADR-0013); unknown sections and unknown front-matter keys are
-     preserved;
-   - never writes `status` and never changes the file location;
-   - refreshes `updated_date` only when content changed and performs no write
-     when nothing changed;
-   - returns `409` with a conflict page that preserves the submitted values
-     when the version token is stale.
-5. A generic save request that carries a `status` or `status_change` field is
-   rejected with `422` and writes nothing. `status_change` is a task-board
-   control and is accepted only for descriptors whose status model is
-   `TaskConfigurable`.
-6. Typed built-in save behavior is unchanged; each handler is selected by the
-   descriptor's `ContentModel`/`TypedHandler`, not by a slug or `Category`.
+1. `GET|HEAD /doc/<ID>/edit` uses one document edit builder for every document
+   type. It renders, in order: the fixed `title` control; one control per
+   declared field whose `editable` is true, in descriptor sequence order, with
+   the control type from `kind`, the `label` as its label, `help` as the hint
+   text bound with `aria-describedby`, and the required marker from `required`;
+   the general `labels` and `references` controls; read-only `status`,
+   `created_date`, and `updated_date`; and the hidden version token.
+2. A field whose `verbs` exclude `edit` is rendered read-only and is never
+   writable. `status` is never a control.
+3. A `SingleHtmlMockup` form offers the title and the list-valued `specs` and
+   `refs` controls only; `labels`, `references`, `status`, `task`, and
+   `superseded_by` are read-only there, and there is no field sequence and no
+   `status` control.
+4. A grouped page resolves the role from the record: a group record uses
+   `group.fields`, a member record uses `member.fields`. The group link is
+   shown read-only and is never a form control.
+
+#### 4.3 Submit, conflict, and not found
+
+1. One `POST /doc/{id}` handler serves every document type and both grouped
+   roles, in this fixed order:
+   1. reject a media type other than `application/x-www-form-urlencoded` with
+      `415`;
+   2. parse the form and read `version`; a missing or malformed token is `400`;
+   3. resolve the ID through the request index; an unknown, archived, or
+      disabled ID is the one not-found page with `404`;
+   4. read the live record for its version token;
+   5. compare the submitted token with the live token; a mismatch renders the
+      one conflict page with `409`, the submitted values, and the live token,
+      and writes nothing;
+   6. build the field map for the record's model and role; a submitted key that
+      is not `title`, `labels`, `references`, a declared field key, or a fixed
+      metadata key of the record's model is rejected as `422`, including
+      `status`;
+   7. validate every value and collect every error: the title contract, `kind`
+      rules, and the required rule; any error re-renders the edit page with
+      `422`, the submitted values, and the same token, and writes nothing;
+   8. build the patch with the document engine and write once through
+      `record::store`; `updated_date` is refreshed once; answer `303` to
+      `/doc/{id}`.
+2. The conflict page is not a route. Nothing is written on a conflict.
+3. One not-found builder returns `404` for every document type, never echoes the
+   requested ID, and is the same page for an unknown ID, an archived record, and
+   a disabled type.
+4. The status-code surface is exactly `415`, `400`, `404`, `409`, `422`, `303`,
+   and the existing `500` for an unexpected failure. No status is added,
+   removed, or renumbered.
 
 ### 5. JSON API
 
-#### 5.1 Canonical endpoints
-
-1. Every enabled document descriptor has `GET|HEAD /api/docs/<slug>`.
-2. The canonical endpoint returns exactly the JSON its legacy endpoint returns
-   for that type, so an alias is indistinguishable from the canonical form:
-   - generic config-defined type: an array sorted by ID of
-     `{"id", "kind": "<slug>", "title", "status", "labels": [..],
-     "references": [..], "version", "path", "metadata"}`;
-   - `req`/`nfr`: the existing `{"groups": [...], "requirements": [...]}`
-     object;
-   - `ui-mockup`: the existing mockup array;
-   - every other built-in: its existing array shape.
-3. `GET|HEAD /api/doc/<ID>` resolves an enabled descriptor exactly as a detail
-   request and returns the existing record object; a generic record returns
-   `{"id", "kind": "<slug>", "form": "document", "title", "description",
-   "status", "labels", "references", "version", "path", "metadata"}`.
-4. Status filtering is not part of the API in this increment (OQ-2, deferred
-   to a future release; owner `@planner`).
-
-#### 5.2 Errors
-
-1. An unknown or disabled `<slug>` returns `404` with the JSON error object.
-2. Any method other than GET/HEAD on a canonical or alias list route returns
-   `405` with `Allow: GET, HEAD`.
-3. An unknown path returns `404` for every method.
-
-#### 5.3 Legacy aliases (all generated only for an enabled descriptor)
-
-| Canonical | Legacy paths kept |
-|---|---|
-| `/api/docs/req`, `/api/docs/nfr` | `/api/requirements` (`?type=req` / `?type=nfr`) |
-| `/api/docs/glossary` | `/api/glossary` |
-| `/api/docs/ui-spec` | `/api/ui-specs`, `/api/ui-specifications`, `/api/ui-spec` |
-| `/api/docs/ui-mockup` | `/api/ui-mockups`, `/api/ui-mockup`, `/api/mockups` |
-| `/api/docs/rule` | `/api/business-rules`, `/api/business-rule` |
-| `/api/docs/audit` | `/api/audit-records`, `/api/audit-record` |
-| `/api/docs/tech-spec` | `/api/tech-specs`, `/api/tech-spec` |
-| `/api/docs/use-case` | `/api/use-cases`, `/api/use-case` |
-| `/api/docs/test-case` | `/api/test-cases`, `/api/test-case` |
-| `/api/docs/test-report` | `/api/test-reports`, `/api/test-report` |
-| `/api/docs/<configured-slug>` | none |
+1. Every enabled document descriptor has `GET|HEAD /api/docs/<slug>`, and the
+   canonical endpoint returns exactly the JSON its seed-declared legacy alias
+   returns for that type. An alias is indistinguishable from the canonical form.
+2. `GET|HEAD /api/doc/<ID>` resolves an enabled descriptor exactly as a detail
+   request and returns the existing record object. A user-defined document
+   returns the generic document object with its metadata and field values.
+3. Status filtering is not part of the API.
+4. An unknown or disabled `<slug>` returns `404` with the JSON error object. Any
+   method other than GET/HEAD on a list route returns `405` with
+   `Allow: GET, HEAD`. An unknown path returns `404` for every method.
 
 ### 6. Visibility: archived, unknown, disabled
 
 1. `build_index` reads only the descriptor's active directory, top level,
    non-recursively. `archived/`, a legacy `deprecated/` folder, and any other
-   subdirectory are never read (REQ-05.007, ADR-0022 decision 6).
-2. A candidate file is a record only when its extension follows
-   `ContentModel` (`.html` for `HtmlMockup`, `.md` otherwise) and its stem
-   matches the descriptor's `prefix` and `id_shape`. No slug selects the rule.
+   subdirectory are never read.
+2. A candidate file is a record only when its extension follows the model
+   (`.html` for `SingleHtmlMockup`, `.md` otherwise) and its stem matches the
+   descriptor's prefix and ID shape. No slug selects the rule.
 3. On the browser list, detail, and edit paths, a file in the active directory
-   whose front-matter status is `archived` is auto-relocated through
-   `record::store::relocate_if_archived` before the record is returned
-   (ADR-0022 decision 12). A relocated record is omitted from the list and is
-   no longer resolvable; a relocation failure is a `500`/validation outcome
-   with the source intact and the record not listed.
-4. An archived ID and an unknown ID of the same type return the identical
-   `404` page body for list, detail, and edit requests, and the identical JSON
-   error body for `/api/doc/<ID>`. The not-found page never echoes the
-   requested ID, so the two responses are byte-identical.
-5. Archived records never appear in any canonical or legacy list API
-   response: `/api/docs/<slug>` and its aliases are built from the active
-   index. An archived ID is also never resolvable through `/api/doc/<ID>`.
-6. Not-found page selection is presentation-only: an ID matching an enabled
-   built-in descriptor's prefix and shape renders the existing not-found page
-   of its descriptor's `TypedHandler` (`tech-spec`, `use-case`, `test-case`,
-   `test-report`); every other document type (including config-defined types)
-   renders one generic document not-found page. Selection follows the
-   descriptor and its handler; it is not a slug branch in list, detail, or
-   edit logic. Non-document records keep the generic error page.
-7. A disabled type produces no navigation entry in any group, no inventory
-   card, no list page (`404`), no detail or edit page (its prefix is not
-   resolvable), and no canonical or legacy API response (`404`).
-8. A disabled type still appears on the lifecycle page with `enabled: false`
-   (section 7).
+   whose front-matter status is `archived` is auto-relocated before the record
+   is returned. A relocated record is omitted from the list and is no longer
+   resolvable; a relocation failure is a `500`/validation outcome with the source
+   intact and the record not listed.
+4. An archived ID and an unknown ID of the same type return the identical `404`
+   page for list, detail, and edit requests, and the identical JSON error body
+   for `/api/doc/<ID>`.
+5. A disabled type produces no navigation entry, inventory card, list page,
+   detail or edit page, and no canonical or legacy API response.
+6. The one not-found builder serves every document type; backlog and decision
+   not-found pages are unchanged.
 
-### 7. Lifecycle page
+### 7. Retired lifecycle and configuration surfaces
 
-1. `GET|HEAD /lifecycle` (and `/?type=lifecycle`) renders three category
-   groups in this order: `Backlog`, `Decisions`, `Documents` (REQ-06.003).
-2. Each group contains one section per registry descriptor, in registry order:
-   backlog = tasks, milestones, releases; decisions = every decision descriptor;
-   documents = every document descriptor, **enabled and disabled**. The section
-   count is derived, never fixed.
-3. Each section shows:
-   - a curated description for a built-in slug from the static presentation
-     table, or the shared generic description for a config-defined slug;
-   - the lifecycle: task configured status chain; milestone `open → closed`;
-     release `planned → released`; decision
-     `proposed → accepted | rejected; accepted → deprecated | superseded`;
-     document `active → archived` plus the declared custom statuses in
-     configured order, described as front-matter values that do not move files
-     (`(none)` when empty); UI mockup `pending → approved → archived`;
-   - read-only effective configuration: `enabled`, ID prefix, storage folder
-     (`doc_directory` + configured directory for documents), and, for
-     front-matter documents, the declared custom statuses;
-   - a link to `/config` for changes; no form or input control.
-4. Configuration values are HTML-escaped and display-only. The page loads no
-   external resource and works without JavaScript.
-5. The existing page statements about the three categories and the excluded
-   Backlog.md `docs`, `drafts`, and project configuration files are retained.
-6. The fixed twelve-section contract of the earlier lifecycle specification is
-   superseded by this section for this milestone.
+1. `GET /lifecycle` and `GET /?type=lifecycle` return `404`. The former
+   Backlog/Decisions/Documents lifecycle page, its descriptor count, and its
+   links are retired; no page links to it.
+2. The browser serves no configuration view. `GET /config`, `GET /config/edit`,
+   `POST /config`, and `GET /?type=config` return `404`; configuration editing is
+   CLI-only.
+3. The retired managed-artifacts and agent-skills surfaces return `404` and have
+   no sidebar entry.
+4. The asset and document routes remain unchanged; the retired routes add no
+   redirect and no fallback.
 
-### 8. Presentation table and compatibility rules
+### 8. Presentation facts and compatibility
 
-1. A static built-in table maps a built-in slug to its label, list heading and
-   subheading, curated lifecycle description, nav position, legacy `?type=`
-   values, and legacy API path aliases. It is presentation only: it never
-   decides whether a type exists, and a descriptor missing from the table
-   still renders with derived text.
-2. A test asserts that the rendered sidebar document entries across the three
-   category groups, inventory card set, canonical API route set, and `?type=`
-   canonical set each equal
-   `registry.enabled(ArtifactCategory::Document)` for a fixture configuration,
-   so the table cannot become a second authoritative list.
-3. `src/browser/` keeps exactly one document-type source of truth: the startup
-   `ArtifactRegistry`. No second document-type registry, count, or slug list
-   may decide which types exist or which list/detail/edit behavior runs.
-   Behavior branches on descriptor fields only — `ArtifactCategory`,
-   `ContentModel`, `TypedHandler`, `IdShape`, and `StatusModel` — so a typed
-   built-in page or save handler is selected through its descriptor's
-   `TypedHandler`. Slug literals may appear only in the static presentation
-   table of (1), where they map legacy `?type=` values and API path aliases,
-   labels, nav order, and curated text; they never select list, detail, edit,
-   or dispatch behavior.
+1. Every presentation fact of a document type is seed data: the descriptor
+   `label`, `plural`, `order`, `summary`, `api_aliases`, `type_alias`, `slots`,
+   `reference_visibility`, and each field's `label`, `help`, and sequence
+   position. A field's `required`, `kind`, and `verbs` drive validation and
+   control type rather than supplying a display string.
+2. The list heading, count noun, empty state, inventory note, page title,
+   navigation label, sidebar entry, API alias, legacy `?type=` value, form
+   label, form hint, view section heading, and required marker are derived from
+   the descriptor. No document entry remains in the static presentation table,
+   and no slug match supplies a string.
+3. Backlog and decision presentation may stay in the static table. Those
+   surfaces are bespoke and their output is byte-compatible with the existing
+   pages.
+4. The browser document path contains no `match` on a slug, no `TypedHandler`
+   variant, no superseded content model variant, and no document-type lookup table. The
+   only variation is the descriptor and the field map.
 
-## Implementation plan (task level)
+## Implementation contract
 
-1. **New `src/browser/routes.rs`**
-   - `BrowserRoutes::build(&ArtifactRegistry)` produces:
-     `api_lists: BTreeMap<&'static str, String>` (canonical + legacy path →
-       slug), `type_values: BTreeMap<String, String>` (canonical slug and
-       HTML aliases → slug), `nav: Vec<NavItem { slug, label, url_key,
-       group }>` (`group` = the `Backlog`/`Decisions`/`Documents` heading),
-       `inventory: Vec<InventoryEntry>`, and
-       `id_rules: Vec<IdRule { prefix, id_shape, not_found: NotFoundPage }>`
-       for enabled descriptors.
-   - Keep the static presentation table here (built-in labels, list headings,
-     descriptions, nav order, legacy URL keys).
-   - Unit tests: table sets equal the enabled registry set; no disabled slug;
-     no `Category`.
-2. **`ServerState` and startup** (`src/browser/mod.rs`)
-   - Build `ArtifactRegistry` and `BrowserRoutes` in `run()`, store both in
-     `ServerState`, and pass `&BrowserRoutes` to `route`.
-   - Replace `category_from_query` with `type_from_query(&routes, request)`:
-     resolve aliases, return `404` for unknown/disabled, and keep the virtual
-     `skills`/`lifecycle`/`config` handling.
-   - Replace the hand-written per-type API chain with:
-     one lookup for canonical/legacy list routes → `api_doc_list(slug)`;
-     `api_doc_list` loads `state.registry.descriptor(slug)`, builds the index,
-     and serializes by `ContentModel`/`TypedHandler` with the legacy shapes.
-   - Add a `/config` note that document-type changes require a browser restart.
-3. **`src/browser/records.rs`**
-   - Delete `Category` and `Form`. `Record` stores the owning descriptor
-     (slug, category, content model, status model, prefix, id shape) plus
-     `is_group` derived from `IdShape::Grouped` and the resolved ID.
-   - Replace `descriptor_name`, `active_prefixes`, `uri_kind`,
-     `parse_id_for`, `canonical_key`, `matches_stem`, `form_for_stem`, and
-     `record_directory` with descriptor-driven helpers:
-     `resolve_directory(descriptor, cfg, project_dir)` from
-     `DirectorySpec`, `matches_stem(descriptor, stem)` from
-     `prefix`/`id_shape`, and `form(descriptor, id)`.
-   - `build_index(ctx, cfg, descriptor, filter)`: empty for a disabled
-     descriptor; active directory only; extension by `ContentModel`; skip a
-     candidate that auto-relocates out of the active directory; filter by the
-     exact stored status before sorting; derive groups/members after filtering.
-   - `resolve_id(ctx, cfg, registry, id)`: iterate enabled descriptors, match
-     prefix/shape (`Grouped` tries member then group; `Dotted` member only;
-     `Plain` sequence), resolve in that descriptor's active directory, and
-     return the record with its descriptor. No cross-type ambiguous scan.
-   - `load_record`: read the record through
-     `read_document_normalized` (already auto-relocates), project title,
-     description, labels, references, `created_date`, `updated_date`, and
-     status from the shared `RecordView`/front matter for every document type;
-     keep the HTML mockup loader for `HtmlMockup`.
-4. **`src/browser/render.rs`**
-   - Replace every `match kind`/`Category::` branch with
-     `match record.content_model`/`TypedHandler` (requirement, glossary,
-     ui-spec, rule, audit, tech-spec, use-case, test-case, test-report,
-     ui-mockup, task, milestone, release, decision) and keep the existing
-     functions and markup.
-   - `sidebar(selected_slug, routes)` and inventory rendering use the route
-     table grouped by artifact category; remove the hard-coded enabled checks
-     and `category_name` matches; derive labels from the presentation table or
-     title-case the slug.
-   - Add `list_page`, the `document_detail_page`, `document_edit_page`,
-     and `document_conflict_page` renderers for `ContentModel::Generic`; every
-     list route builds a `ListPlan` and renders the shared `list.html` body
-     fragment.
-   - Add one shared list builder (`ListPlan`) and the declared presentation
-     slots for every family, so every list renders the same seven-column order
-     with its declared slots, plus one shared
-     `status_filter_html(descriptor, selected)` helper and a shared
-     `status_text(record)` helper.
-   - Reduce the not-found pages to: the four existing built-in pages selected
-     by handler, one generic document not-found page, and the existing generic
-     error page.
-   - Rewrite `lifecycle_page(routes, registry, cfg, chrome)` to render the
-     three groups and one section per descriptor from registry data.
-5. **`src/browser/mod.rs` handlers**
-   - `list_page`: descriptor from `type_from_query`; task → board; other
-     backlog/decision → existing list; document → typed list (existing
-     function) or generic list, both with the filter applied.
-   - `view_page`: descriptor from `resolve_id`; generic → detail page; typed →
-     existing per-type view, selected by handler.
-   - `edit_page`: descriptor + record; generic → generic edit; typed →
-     existing per-type edit.
-   - `form_post`: dispatch by descriptor content model/handler; add
-     `save_generic_document` using `records::validate_*` +
-     `record::patch` + `save_ops`; reject `status`/`status_change` for
-     non-task descriptors with `422`; generic conflict page on stale version.
-   - `handle_request` 404 mapping: use `routes.id_rules` to choose the
-     built-in not-found page or the generic document page; no ID echo.
-6. **Templates**
-   - The legacy generic list template is superseded by the shared `list.html`
-     body fragment; `document_detail.html` and `document_edit.html` remain body
-     fragments, embedded with `include_str!` and using `render_template`
-     escaping.
-7. **Tests**
-   - New `tests/browser_config_types_cli.rs` for T-114-01..13.
-   - Update `tests/browser_cli.rs` only where this specification deliberately
-     changes output: unknown `?type=` 400→404, grouped sidebar structure,
-     lifecycle section structure and count, inventory count, the shared list
-     column order, and the additive status filter.
-8. **Docs**
-   - This specification; UI mockup/description from the delegated design;
-     ticket updated with the route table and test IDs.
+1. **Routes.** `BrowserRoutes::build(&ArtifactRegistry)` produces the API
+   aliases, type values, navigation, inventory, and ID rules. The static
+   presentation table may hold backlog and decision entries only.
+2. **Record projection.** The loaded document record carries the envelope
+   (`id`, `title`, `status`, `labels`, `references`, `created_date`,
+   `updated_date`, body, version, path) plus one `DocumentFieldMap` with the
+   role, the resolved fields in descriptor order, fixed metadata for
+   `SingleHtmlMockup`, undeclared stored keys as read-only extra metadata, and
+   the resolved reference visibility.
+3. **Field resolution.** A field with only `heading` reads the body section; a
+   field with only `frontmatter_key` reads that key; a field with both reads the
+   body section as the display value and does not merge the two locations. An
+   absent optional value is `Absent`; an absent required value is `Absent` and
+   is flagged on the edit form.
+4. **Templates.** The template set is `shell.html`, `list.html`, `view.html`,
+   `edit.html`, and `error.html`. `view.html` and `edit.html` are single
+   descriptor-driven templates for every document model; the document-specific
+   templates are deleted. The conflict page renders through `edit.html` with a
+   conflict notice, and the not-found page renders through `view.html`.
+5. **Backlog and decision handlers.** They keep their `TypedHandler` dispatch
+   and their existing templates because they are bespoke and unchanged.
 
 ## Test plan
 
-| ID | Scenario | Assertion |
-|---|---|---|
-| T-114-01 | User-added type `note` (prefix `NOTE`, directory `notes/`, statuses `["active","review","approved"]`, default `active`), records created with the CLI | `GET /?type=note` 200 lists both records in the shared list contract with no family slot; the Title cell renders labels but no reference block (ADR-035, REQ-06.019); sidebar shows `Notes` under the `Documents` group; `Created` shows the front-matter `created_date`; detail 200 and keeps the collapsible References section; edit 200; `GET /api/docs/note` 200 array with `id/title/status/labels/references/version/path/metadata` (references unchanged in the API) |
-| T-114-02 | Canonical vs legacy API | `/api/docs/glossary` body equals `/api/glossary`; `/api/docs/rule` equals `/api/business-rules`; `/api/docs/audit` equals `/api/audit-records`; `/api/docs/ui-mockup` equals `/api/mockups`; `/api/docs/req` equals `/api/requirements?type=req` |
-| T-114-03 | Status read-only | List shows the structural Status column in the fixed order and the detail shows `review`; `Created` equals the stored `created_date`; edit form contains no `name="status"`/`name="status_change"`; `POST /doc/NOTE-001` with `status=archived` and a valid version returns 422 and the file is byte-identical |
-| T-114-04 | Filter values and order | The filter select offers exactly `active`, `review`, `approved` in that order and no empty/`All records` option; `Show all` is the only reset and omits `status`; no `status=archived` option; `?status=review` lists only the review record; `?status=approved` shows the empty state; a type with no custom statuses offers only `active` |
-| T-114-05 | Filter rejection | `?status=archived`, `?status=bogus`, `?status=Review`, `?status=` and duplicate `status` parameters return 400 with no record list |
-| T-114-06 | Default listing keeps custom statuses | No `status` parameter (including the `Show all` link) lists active-, review-, and approved-status records together; `All records` is not an offered status value |
-| T-114-07 | Archived vs unknown | Archive `NOTE-001`; `GET /doc/NOTE-001`, `GET /doc/NOTE-001/edit`, and `GET /api/doc/NOTE-001` are 404, and the two page bodies for the archived and unknown `NOTE-999` IDs are identical; list, `/api/docs/note`, and the legacy alias exclude it; archived/ is never indexed |
-| T-114-08 | Archived-in-active auto-relocation | Hand-edit `notes/NOTE-002.md` to `status: archived`; browser list moves it to `notes/archived/`, omits it, and detail, edit, and API requests 404 |
-| T-114-09 | Disabled type invisibility | Start with `document_types.note.enabled false`: no sidebar entry under `Documents`, no inventory card, `/?type=note` 404, `/api/docs/note` 404, `/doc/NOTE-001` 404; lifecycle still shows `Notes` with `enabled: false` |
-| T-114-10 | Generic edit round trip | POST title/description/labels/references: front matter and heading updated, description section updated, labels/references replace the edited lists, unknown `## Notes` section and unknown key preserved, status unchanged, updated_date refreshed, second identical save writes nothing; stale version returns 409 |
-| T-114-11 | Built-in characterization | Glossary (`ContentModel::Typed`) list/detail/edit fixture matches the recorded baseline apart from the shared seven-column list contract and the additive status filter, and its list rows keep the reference block; tech-spec, rule, ui-mockup, req/nfr list/detail/edit keep their existing sections and field sets with the shared row fields; a UI-mockup (`ContentModel::HtmlMockup`) list row keeps references |
-| T-114-12 | Lifecycle page | Default config renders `Backlog`, `Decisions`, `Documents` groups, one section per registry descriptor (16 by default), custom statuses and prefix/folder/enabled per document, shared description for `note`, and no fixed `12` count |
-| T-114-13 | Route/table invariants | Unit test: sidebar document entries across the three groups = inventory slugs = canonical API slugs = `type` canonical values = `registry.enabled(Document)`; the sidebar renders exactly the `Backlog`, `Decisions`, `Documents` groups; grep test: no `enum Category`, no `Category::`, no second document-type registry, and no per-slug list/detail/edit/dispatch branch in `src/browser/`; slug literals occur only in the static presentation table |
-| T-114-14 | Method and safety | `POST /api/docs/note` 405 + `Allow: GET, HEAD`; unknown API slug 404; coded directory escaping the project yields no page and no traversal; `?type=business-rule` and `?type=rule` render the same list |
-
-## Acceptance criteria mapping
-
-- AC 1 (startup registry/route table, no Category) → T-114-13, review.
-- AC 2 (list/detail/edit/sidebar/API per enabled type, aliases) → T-114-01, T-114-02, T-114-14.
-- AC 3 (generic list/detail content) → T-114-01, T-114-03.
-- AC 4 (typed built-ins preserved) → T-114-11.
-- AC 5 (status read-only, no status write) → T-114-03, T-114-10.
-- AC 6 (filter set and default listing) → T-114-04, T-114-06.
-- AC 7 (filter rejection) → T-114-05.
-- AC 8 (archived/unknown/disabled) → T-114-07, T-114-08, T-114-09.
-- AC 9 (lifecycle) → T-114-12.
-- AC 10 (API) → T-114-02, T-114-14.
-- AC 11 (generic edit) → T-114-10.
-- AC 12 (tests) → all of the above.
+| Scenario | Assertion |
+|---|---|
+| User-defined `SingleMarkdown` type | List, detail, edit, conflict, not-found, and JSON work with no per-type code; labels render, reference visibility follows the seed, and the field map drives the form |
+| Canonical vs legacy API | Each canonical list body equals its seed-declared legacy alias body for the same type |
+| Status read-only | List and detail show the stored status; the edit form has no `name="status"` control; a POST with `status` returns `422` and writes nothing |
+| Filter values | The select offers exactly `active` plus the declared custom statuses in order; `archived` is absent; `Show all` omits `status` |
+| Filter rejection | `archived`, an unknown value, a wrong-case value, an empty value, and duplicate parameters return `400` with no listing |
+| Archived vs unknown | A missing, archived, or disabled ID returns the identical `404` page with no ID echo; archived records are absent from lists and the API |
+| Grouped roles | A group record renders `group.fields` and a member list; a member renders `member.fields` and its group link; neither form offers membership |
+| HTML mockup | The view uses the fixed metadata block; the form offers title, `specs`, and `refs` only; `labels`, `references`, `status`, `task`, and `superseded_by` are read-only |
+| Presentation facts | Every rendered document label, heading, form label, help text, empty-state string, and alias equals the seed value; no document slug appears in the presentation table |
+| Surface boundary | A source scan finds no `TypedHandler`, the superseded content model, or slug literal in the document browser path; no document entry remains in `PRESENTATION` |
+| Reload | A configuration edit changes navigation, lists, and routes on the next request; a failed reload keeps the previous page serving |
+| Method and safety | A wrong method returns `405` with `Allow`; an unknown API slug returns `404`; a coded directory escaping the project yields no page and no traversal |
 
 ## Assumptions
 
-- **A1 — Startup snapshot.** ADR-0020 decision 2 fixes the table for the
-  process lifetime. `document_types` edits made through `/config` or externally
-  take effect on the next browser start; `/config` says so. Tests change
-  configuration and start a new server.
+- **A1 — Snapshot.** The browser uses one `ServingSnapshot`; a configuration
+  edit takes effect on the next request, while host, port, and open are fixed at
+  startup.
 - **A2 — Grouped sidebar.** The sidebar is grouped by the three artifact
-  categories (`Backlog`, `Decisions`, `Documents`) rather than presented as one
-  flat list (2026-11-14 owner decision, replacing the earlier flat-sidebar
-  assumption). Built-in labels stay unchanged, document entries keep their
-  relative order inside `Documents`, and config-defined entries follow UI
-  Mockups. This matches the category model already required for the lifecycle
-  page (REQ-06.003) without changing entry labels or page routes.
-- **A3 — Filter default is "all active-directory records".** A custom status
-  must never hide a record (ADR-0022 decision 10), so the resting state is a
-  `Show all` reset link that omits `status`; selecting `active` is a real
-  filter that excludes custom values. `All records` is not an offered status
-  value, and an explicit empty `status=` is rejected like any other invalid
-  value.
-- **A4 — UI mockups use their HTML status model.** Their filter values are
-  `pending`/`approved`, `archived` excluded, because their status is not
-  front-matter and REQ-06.014's `active`-plus-custom list does not apply.
+  categories; document entries follow seed order inside `Documents`.
+- **A3 — Filter default.** A custom status never hides a record; the resting
+  state is a `Show all` link that omits `status`, and an explicit empty `status=`
+  is invalid.
+- **A4 — HTML mockups.** Their filter values are `pending` and `approved`;
+  `archived` is excluded because they are not listed.
 - **A5 — Canonical API equals legacy output.** "Alias" means the same body and
   status code for the same type; the canonical route is not a new schema.
-- **A6 — Browser label/reference editing replaces the edited lists.** The CLI
-  `edit` appends; the browser form shows the current tags and saves the
-  resulting lists so a user can remove a label. Both use the same patch and
+- **A6 — Labels and references.** The browser form saves the resulting lists so
+  a user can remove a label; the CLI edit appends. Both use the same patch and
   writer; status is untouched.
-- **A7 — Status is displayed as stored.** A front-matter record without a
-  `status` key (legacy/incomplete) shows `(none)` read-only and is never
-  rewritten by the browser.
-- **A8 — The filter applies to every document list view,**
-  including typed built-ins, because ADR-0020 decision 5 says list and detail
-  render status read-only "for every document type"; typed pages keep their
-  field sets and sections, and the filter is additive.
-- **A9 — List columns are a document-list contract.** The fixed order
-  ID, Title, Status, family slot(s), Created, Updated, Actions applies to
-  every document list view (generic and typed built-in), with the family
-  slots declared as data and no slot declared for a config-defined type
-  (`browser-shell-ui.md` §3). The task board is unchanged; the milestone,
-  release, and decision lists render through the shared list contract with
-  their declared slots (milestone `Release`, release none, decision `Type` and
-  `Superseded by`). `Created` and `Updated`
-  are read-only front-matter values shown as stored (`(none)` if absent), never
-  derived or rewritten; `created_date` is already part of the shared metadata
-  projection (REQ-06.004).
-
+- **A7 — Status as stored.** A record without a `status` key shows `(none)`
+  read-only and is never rewritten by the browser.
+- **A8 — Shared list contract.** The fixed column order applies to every
+  document list view; the task board and the backlog/decision lists are
+  unchanged.
 
 ## UI notes
 
-- `MOCK-0015` is one self-contained review package with nine views: Notes list
-  (default), filtered list, empty list, detail, edit, validation error,
-  stale-version conflict, lifecycle delta, and the sidebar treatment. The
-  2026-11-14 revision (grouped sidebar and Status/ID/Title/Created/Updated
-  list columns) was approved by the project owner on 2026-11-14; the
-  specification remains authoritative if they disagree.
-- The designed list filter is a no-JavaScript GET form. The approved mockup
-  draws an `All records` select option; because a no-JavaScript select submits
-  an empty `status=` for that option and an explicit empty `status=` is
-  rejected (3.2.8), this specification removes the option: the select lists
-  only the allowed values and `Show all` is the no-filter reset (3.2.2).
-- The list is the shared seven-column table; Status is a structural column and
-  is read-only in list and
-  detail; the edit view has no status control.
-- The sidebar is grouped under `Backlog`, `Decisions`, and `Documents`
-  headings. Every built-in entry keeps its approved label and relative order
-  inside its group; the config-defined `Notes` entry follows `UI Mockups` in
-  the `Documents` group. Configuration, Managed artifacts &amp; lifecycles,
-  and Agent skills &amp; workflows follow the three groups. The approved
-  mockup draws those utility entries under a fourth `Project` heading; that
-  heading is presentational only and the three-group structure is
-  authoritative (2.1.7).
-- The lifecycle delta shows `Notes` (enabled) and `Deploy logs` (disabled) in
-  the `Documents` group with the shared lifecycle, custom statuses, prefix,
-  folder, and enabled state.
-- The package and its 2026-11-14 revision were explicitly approved by the
-  project owner on 2026-11-14. The layout requirements in this specification
-  remain authoritative if the mockup and the specification disagree.
+- `MOCK-0015` is the browser reference package. The specification remains
+  authoritative if the mockup and the specification disagree.
+- The filter is a no-JavaScript GET form. The select lists only allowed values;
+  `Show all` is the no-filter reset.
+- The list is the shared table; Status is a structural, read-only column.
+- The sidebar has exactly the three category groups; retired surfaces have no
+  entry.
 
 ## Open questions
 
-- **OQ-1 (resolved 2026-11-14 by the project owner)** — The sidebar is
-  grouped by the three artifact categories with document types listed inside
-  `Documents`; the earlier flat-sidebar assumption is withdrawn (A2). See
-  ADR-0020's open question on navigation grouping.
-- **OQ-2 (deferred to a future release; owner `@planner` for triage)** — Should
-  `/api/docs/<slug>` accept `?status=<value>`? Not required by REQ-06.014
-  ("list view"); recorded for a later API increment. No implementation in
-  TASK-114.
-- **OQ-3 (owner `@architect` for confirmation)** — Invalid filter values return
-  `400` per NFR-02.002 ("invalid filter values rejected"), which is the current
-  behavior. The alternative `404` would conflate a bad filter with a missing
-  type; the specification keeps `400` for filters and `404` for unknown or
-  disabled types.
-
-## Traceability
-
-- REQ-06.014 — Display config-defined document types in the browser.
-- REQ-06.003 — Describe managed artifacts and their lifecycles.
-- REQ-06.004 — Front-matter metadata projection in CLI and browser views; browser list parity is qualified for `ContentModel::Generic` rows by REQ-06.019.
-- REQ-06.019 — Do not show the reference list in document-type browser list views (source RE-006); labels stay for every family; detail, CLI, API, and front matter unchanged.
-- REQ-06.012 — Single record view layout.
-- REQ-05.007 — Archive state, `archived/` only, auto-relocation, archived
-  invisibility.
-- REQ-05.011 — `status` is not editable.
-- REQ-07.001 / REQ-07.002 / REQ-07.004 — three categories, configured types,
-  generic content model.
-- NFR-02.002 — invalid filter values are rejected.
-- ADR-0020 — registry-derived route table, two view families, canonical API,
-  one 404, generated lifecycle page.
-- ADR-0017 — artifact registry and descriptors (single type model).
-- ADR-0022 — document lifecycle state and archive location.
-- ADR-0005 / ADR-0006 / ADR-0013 — transport, atomic writes, and the shared
-  record layer.
-- ADR-0018 — generic document content model.
-- ADR-035 — per-family reference visibility in the shared browser list layout; amends ADR-0028 decision 2 and constraint 11 and ADR-0020 decision 5 for `ContentModel::Generic` lists.
-- TASK-105 (registry), TASK-107 (record layer), TASK-110 (generic handler),
-  TASK-113 (search) — completed dependencies.
-- TASK-178 — MS-028 specification revision (draft; architect conformance required).
-- Project-owner decision 2026-11-14 — sidebar grouped by the three artifact
-  categories; document list columns ID, Title, Status, family slot(s), Created, Updated, Actions;
-  archived records never listed, reachable, or returned by the API. Withdraws
-  the earlier flat-sidebar assumption and resolves OQ-1.
+- Whether a document type can declare an icon or a display name; the seed
+  presentation facts define none.
+- Whether the JSON API should accept a status filter; not required by the
+  document list contract.
+- Invalid filter values return `400` per the input-sanitization rule; an
+  unknown or disabled type returns `404`. This distinction is intentional.
