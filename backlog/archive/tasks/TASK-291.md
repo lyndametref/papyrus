@@ -2,7 +2,7 @@
 id: TASK-291
 title: "Restore a TECH body edit path and repair TECH-077 after the description-only edit"
 created_date: '2026-11-21T06:11:39Z'
-updated_date: '2026-11-21T06:11:39Z'
+updated_date: '2026-11-21T07:46:09Z'
 labels: []
 references:
   - TECH-077
@@ -62,3 +62,5 @@ a TECH record is body content the CLI cannot address. The configured editor is
 - [ ] TECH-077 contains no duplicated section set and matches the committed body plus the section 6 correction.
 - [ ] TECH-068, TECH-069, and TECH-007 carry the requested corrections in their target sections.
 - [ ] `papyrus tech-spec edit` can replace a whole TECH body without an interactive editor.
+## Comments
+- **planner**: Archived outside planning scope: created by a tooling-blocked tech-writer during TASK-233; the TECH-077 repair was completed within TASK-233 and the CLI body-edit enhancement is not in REL-001 scope.

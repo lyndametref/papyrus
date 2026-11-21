@@ -2,7 +2,7 @@
 id: TASK-234
 title: "Update TECH-040, TECH-042, TECH-043, TECH-066, and TECH-067 for front-matter keys, patch ops, and search"
 created_date: '2026-11-20T17:40:19Z'
-updated_date: '2026-11-20T18:15:43Z'
+updated_date: '2026-11-21T07:45:39Z'
 labels: []
 references:
   - TECH-040
@@ -16,7 +16,7 @@ references:
   - REQ-05.010
   - REQ-06.004
   - REQ-07.002
-status: ToDo
+status: In-Progress
 assignee:
   - tech-writer
 milestone: MS-031
