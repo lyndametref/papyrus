@@ -2,7 +2,7 @@
 id: TECH-024
 title: "CLI Milestone Packaging and Verification"
 created_date: '2026-11-16T17:46:45Z'
-updated_date: '2026-11-16T17:47:10Z'
+updated_date: '2026-11-21T16:27:08Z'
 labels: []
 references:
   - ADR-0001
@@ -11,6 +11,10 @@ references:
   - ADR-0004
   - ADR-0005
   - ADR-0006
+  - ADR-0036
+  - ADR-0037
+  - ADR-0038
+  - ADR-0039
   - BR-004
   - BR-011
   - BR-012
@@ -20,9 +24,6 @@ references:
   - BR-016
   - BR-017
   - GLO-001
-  - MOCK-0001
-  - MOCK-0002
-  - MOCK-0003
   - NFR-01.002
   - NFR-01.003
   - NFR-02.002
@@ -32,6 +33,9 @@ references:
   - NFR-05.001
   - NFR-06.001
   - NFR-06.002
+  - NFR-007.001
+  - NFR-007.002
+  - NFR-007.003
   - REQ-05.003
   - REQ-05.004
   - REQ-05.005
@@ -42,326 +46,285 @@ references:
   - REQ-06
   - REQ-06.001
   - REQ-06.002
-  - TASK-1
-  - TASK-10
-  - TASK-11
-  - TASK-12
-  - TASK-13
-  - TASK-14
-  - TASK-15
-  - TASK-150
-  - TASK-16
-  - TASK-2
-  - TASK-23
-  - TASK-24
-  - TASK-25
-  - TASK-26
-  - TASK-3
-  - TASK-30
-  - TASK-31
-  - TASK-33
-  - TASK-34
-  - TASK-35
-  - TASK-37
-  - TASK-38
-  - TASK-39
-  - TASK-4
-  - TASK-40
-  - TASK-42
-  - TASK-43
-  - TASK-44
-  - TASK-46
-  - TASK-47
-  - TASK-48
-  - TASK-5
-  - TASK-50
-  - TASK-55
-  - TASK-56
-  - TASK-57
-  - TASK-59
-  - TASK-6
-  - TASK-61
-  - TASK-62
-  - TASK-7
-  - TASK-8
-  - TASK-9
-  - TECH-001
-  - UI-001
+  - REQ-06.014
+  - REQ-06.019
+  - REQ-07.001
+  - REQ-07.002
+  - REQ-07.003
+  - REQ-07.004
 status: verified
 ---
 # TECH-024 CLI Milestone Packaging and Verification
 
-## Description
 ## Purpose
 
-Package the current Papyrus feature set (TASK-1 foundation + TASK-2 init/config + TASK-3 req/nfreq + TASK-5 search + TASK-6 browser + TASK-8 milestones/releases + TASK-9 tasks + TASK-10 backlog search + TASK-11 backlog browser + TASK-12 packaging + TASK-13 decision management + TASK-14 decision search + TASK-15 decision browser + TASK-16 packaging + TASK-30 glossary management + TASK-34 UI specifications + TASK-38 UI mockups + TASK-43 business rules + TASK-47 audit records + TASK-55 technical specifications + TASK-61 README fix) as an installable amd64 Debian package, and verify in an isolated Debian Forky environment that the packaged binary installs, uninstalls, and provides the six new record-management command families end to end.
+Verify the document command surface for the glossary, UI specification, UI mockup, business rule, audit record, and technical specification document types as one milestone verification of the descriptor-driven refactor, and record the evidence. The verification covers the installed binary end to end: descriptor-derived commands, field handling, status and archive behaviour, search, and the browser document surface.
 
-This is the last task of milestone m-4 and closes its "each increment is packaged and usable" goal for the CLI record types.
+This is a verification step. No product behaviour is added and no product code is changed here. The six types are seed descriptors; their commands, options, help, field order, status model, and archive behaviour are derived from the descriptor and the document engine. No per-type document module exists to exercise.
 
-This is a packaging and verification task: no new product behavior is added. Work is limited to building, packaging, verifying, documenting, and adding one milestone-level integration test.
+Every milestone verification builds a throwaway verification binary and a throwaway verification package. The package is installed in an isolated root, the installed binary is exercised, and both are deleted. Only the single release boundary produces a retained release package; no milestone verification publishes, promotes, or keeps one, and no intermediate release or release candidate exists.
 
 ## Scope
 
 ### In scope
 
-- Rebuild `target/release/papyrus` and `papyrus_<version>_amd64.deb` from the current source with the pinned Rust 1.99.1 toolchain, using `scripts/build-deb.sh` unchanged.
-- Verify package metadata: `Package: papyrus`, `Architecture: amd64`, `Version` equal to the Cargo package version, `Depends: libc6 (>= 2.34)`, GPL-3.0-or-later copyright.
-- Verify package contents contain only the binary and the copyright file — no runtime asset files (`src/browser/app.css`, `app.js`, templates) are packaged, because they are embedded through the static asset table. First-party and vendored browser assets are embedded through the static asset table, and the single copyright file carries one notice section per bundled asset family (KaTeX code MIT, KaTeX fonts OFL-1.1, Mermaid MIT).
-- Install and uninstall the package in an isolated Debian Forky environment without modifying the host.
+- Build `target/release/papyrus` and one verification package from the current source with the pinned Rust 1.99.1 toolchain, using the packaging script unchanged to produce the package in the project root, then moving the package under `./.tmp/`.
+- Run the verification gates of section 2 and the installed-binary checks of sections 3 and 4.
+- Verify package metadata: `Package: papyrus`, `Architecture: amd64`, `Version` equal to the Cargo package version, `Depends: libc6 (>= 2.34)`, GPL-3.0-or-later copyright, and the documented asset Version binding.
+- Verify the package inventory contains only the binary and the copyright file. No source file and no per-type document module is packaged, alongside no runtime asset file, template, configuration file, or man page.
+- Install and uninstall the verification package in an isolated Debian Forky environment without modifying the host, then delete the isolated roots and the package.
 - Smoke-test the installed binary:
-  - CLI baseline: `--help`, `--version`, `init`.
-  - Management lifecycles for the six m-4 record types (glossary, UI specification, UI mockup, business rule, audit record, technical specification): create/list/view/edit/deprecate/restore where documented, with expected exit codes and persisted files, preserving IDs.
-  - Regression of already-shipped search over requirement/task/milestone/release/decision records: quoted phrase, `--type`, `--limit`, `--json`, archival visibility.
-  - Regression of already-shipped browser over the req/nfr/task/milestone/release/decision categories: startup with `--no-open` on a free port, record view, edit round-trip, JSON API, embedded assets from the static table, the shared shell/list layout, the CSP response classes, and the 12 MiB asset budget.
+  - CLI baseline: `--help`, `--version`, `init`, generated help for every enabled document slug, and exit-code behaviour.
+  - Management lifecycles for the six seed types (glossary, UI specification, UI mockup, business rule, audit record, technical specification): create, list, view, edit, status or supersede where the model offers it, archive, and delete, with generated IDs preserved and only supplied fields written.
+  - Search regression over document records (`doc`) and the bespoke backlog and decision types.
+  - Browser regression over the backlog and decision categories and one document category through the shared document surface, including the edit round-trip, conflict and not-found pages, JSON API, embedded assets and their cache classes, and the CSP response classes.
 - Verify offline operation: search and browser work with no internet access, using only loopback and locally served assets.
 - Verify the browser configuration keys (`browser_host`, `browser_port`, `browser_open`) behave as documented in the installed binary.
-- Re-run the Rust quality gates: `cargo build --release`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check` with Rust 1.99.1.
-- Add one milestone-level integration test file under `tests/` covering the six management lifecycles together against the built binary, without duplicating the existing contract coverage in `tests/glossary_cli.rs`, `tests/ui_spec_cli.rs`, `tests/ui_mockup_cli.rs`, `tests/business_rules_cli.rs` (rule), `tests/audit_records_cli.rs`, `tests/technical_specifications_cli.rs`.
-- Update `docs/packaging.md` with the verified supported release, install/uninstall steps, the extended smoke-test checklist, and observed results (pass/fail, environment, date/timezone).
-- Record verification evidence in the TASK-62 ticket notes.
+- Add one milestone-level integration test under `tests/` covering the six management lifecycles against the built binary, without duplicating the existing contract coverage in the per-feature suites.
+- Record the verification evidence in `docs/packaging.md`, including the gate results, the measurements, the findings, and the statement that the verification build was discarded.
 
 ### Out of scope
 
-- New product features, commands, options, record types, or UI changes.
-- Search integration for the six new record types — those are delivered by TASK-31/TASK-35/TASK-39/TASK-44/TASK-48/TASK-56 (still To Do at refinement time) and verified in their own milestone packaging tasks (TASK-33/TASK-37/TASK-42/TASK-46/TASK-50/TASK-59). TASK-62 does NOT claim or verify search over glossary/UI-spec/UI-mockup/business-rule/audit/tech-spec records.
-- Browser listing, viewing, and editing of the six new record types — those are delivered by TASK-23/TASK-24/TASK-25/TASK-26/TASK-40/TASK-57 and verified in their own milestone packaging tasks. TASK-62 does NOT claim or verify browser categories for the new types.
-- Verification on Debian Trixie or any Debian release other than Forky (ADR-0003, NFR-03.002).
-- Advertising support for any release beyond Forky.
-- Real-GUI rendering checks in Firefox, Edge, or Safari; only markup- and asset-level verification is performed (see OQ-1).
-- Re-running the runtime dependency-license audit (no new runtime dependencies; TASK-1/TASK-4 audit remains valid).
-- Changes to requirements (`docs/requirements/`), business rules (`docs/business-rules/`), ADRs (`docs/architecture/adr/`), or packaging scripts (`scripts/build-deb.sh`, `packaging/deb/**`).
+- New product behaviour, commands, options, record types, or UI changes.
+- A retained release package, a version bump, a tag, a release candidate, or release sign-off. The release boundary owns the one retained package and the release evidence (TECH-069 section 6).
+- New per-type document modules, per-type command blocks, per-type browser renderers, or per-type field tables. The seed table is the only built-in type definition.
+- Verification on a Debian release other than Forky, and support claims beyond Forky.
+- Real-GUI rendering checks in Firefox, Edge, or Safari; verification is HTTP, markup, asset, and console level.
+- Re-running the runtime dependency-license audit; no runtime dependency is added.
+- Changes to requirements, business rules, ADRs, packaging scripts, or packaging metadata.
 - New UI mockups; the shipped browser interface is unchanged.
-- Product code changes, except a minimal bug fix when a verification step exposes a defect; any such fix is reported in the ticket notes and kept separate from the packaging work.
+- Fixing a defect found during verification. The defect is recorded with expected and observed values and a disposition.
 
 ## Behavior
 
-### 1. Build and package
+### 1. Build and verification package
 
 1. `cargo build --release` succeeds with the pinned Rust 1.99.1 toolchain (`rust-toolchain.toml`) and produces `target/release/papyrus`.
-2. `cargo test`, `cargo clippy --all-targets -- -D warnings`, and `cargo fmt --check` pass before packaging.
-3. The freshly built binary exposes the m-4 subcommands: `target/release/papyrus --help` lists `glossary`, `ui-spec`, `ui-mockup`, `rule`, `audit`, `tech-spec` (alongside `init`, `config`, `req`, `nfreq`, `task`, `milestone`, `release`, `decision`, `search`, and `browser`).
-4. `./scripts/build-deb.sh` produces `papyrus_<version>_amd64.deb` in the project root, where `<version>` is read from `Cargo.toml` (0.1.0 at refinement time). The script must be run after `cargo build --release`, because it reuses an existing `target/release/papyrus` instead of rebuilding it.
-5. `dpkg-deb -I papyrus_<version>_amd64.deb` reports:
-   - `Package: papyrus`
-   - `Version: <Cargo version>`
-   - `Architecture: amd64`
-   - `Depends: libc6 (>= 2.34)`
-   - `Section: utils`, `Priority: optional`, a `Maintainer` value, and a `Homepage` value
-   - a `Description` naming Papyrus as a project-level backlog and documentation manager.
-6. The packaged copyright file (`/usr/share/doc/papyrus/copyright`) is in Debian copyright format and declares `GPL-3.0-or-later`, matching `Cargo.toml`'s `license` field (NFR-06.001).
-7. `dpkg-deb -c` lists exactly `/usr/bin/papyrus` (mode `0755`) and `/usr/share/doc/papyrus/copyright`, plus their directories. It lists no `.css`, `.js`, or `.html` file, no configuration file, and no man page.
-8. `target/release/papyrus --version` and the installed binary's `--version` both print `papyrus <version>`, equal to the package version.
+2. `target/release/papyrus --help` lists every enabled document slug, including `glossary`, `ui-spec`, `ui-mockup`, `rule`, `audit`, and `tech-spec`, alongside the built-in non-document commands. A stale binary that lacks a required command is never packaged; the release build runs first.
+3. `./scripts/build-deb.sh` runs after the release build and produces the verification package `papyrus_<version>_amd64.deb` in the project root, where `<version>` is read from `Cargo.toml`. The verification moves the package into a staging directory under `./.tmp/`; the staging directory and the package are deleted when the verification ends, including on failure.
+4. The verification package is never a release artifact. It is not published, tagged, version-bumped, promoted, or copied outside `./.tmp/`; no release candidate is produced from it. Only the release boundary builds the one retained package, once, with its size and SHA-256 recorded.
+5. `dpkg-deb -I papyrus_<version>_amd64.deb` reports `Package: papyrus`, `Version: <Cargo version>`, `Architecture: amd64`, `Depends: libc6 (>= 2.34)`, `Section: utils`, `Priority: optional`, a `Maintainer` value, a `Homepage` value, and a `Description` naming Papyrus as a project-level backlog and documentation manager.
+6. The packaged copyright file (`/usr/share/doc/papyrus/copyright`) is in Debian copyright format and declares `GPL-3.0-or-later`, matching the `license` field in `Cargo.toml`, with one notice section per bundled asset family.
+7. Package inventory: `dpkg-deb -c` lists exactly `/usr/bin/papyrus` (0755) and `/usr/share/doc/papyrus/copyright` (0644), plus their directories. It lists no `.rs` source file and no per-type document module, no `.css`, `.js`, or `.html` file, no template, no configuration file, and no man page.
+8. Asset Version packaging check: the packaging step enumerates the version directories of `src/browser/vendor/<package>/<version>/` and reads the `version` column of `src/browser/vendor/MANIFEST.md`. It fails the build when a package has no version directory, more than one, a manifest row with a different version, or a copyright section citing a different version. The asset Version is unrelated to the Papyrus package version and appears in the versioned asset URL.
+9. Binary size gate: `stat -c %s target/release/papyrus` is at most 12,582,912 bytes (12 MiB). The measured size is recorded. The binary embeds the whole asset table and requires no runtime asset directory.
+10. `target/release/papyrus --version` and the installed binary's `--version` both print `papyrus <version>`, equal to the package Version.
+11. No verification package survives the step: the staging directory, the isolated dpkg root, the isolated admin directory, and the fixture projects are removed before the evidence is finalised.
 
-### 2. Isolated install and uninstall on Debian Forky
+### 2. Verification gates
 
-1. Verification runs on Debian Forky amd64 using an isolated dpkg database and install root, so the host's package database and filesystem are never modified:
-   `fakeroot dpkg --instdir=<root> --admindir=<adm> --force-depends -i papyrus_<version>_amd64.deb`.
-2. The isolated root and admin directories are created under `./.tmp/` in the workspace (project convention: no system temporary directories) and are removed after the run, including on failure.
-3. Before and after the run, the host reports papyrus as not installed (`dpkg -l papyrus` has no installed entry), proving the host was untouched.
-4. `dpkg -i` in the isolated root succeeds, exit 0.
-5. After install, `<root>/usr/bin/papyrus` exists with mode `0755` and owner `root:root`.
+Every milestone verification runs the same gates on the pinned toolchain. A failing gate blocks the verification; the verification build is never retained or handed forward as a release.
+
+| Gate | Pass condition |
+|---|---|
+| Full suite | `cargo test` passes, including the no-drift suites, the document model matrix, the per-feature command suites, and the equivalence replay. Unit and integration counts are recorded as evidence; a count is not itself a gate. |
+| Lints and format | `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` are clean. |
+| No drift | The no-drift suites pass: no literal `deprecated/` in `src/`, no `nfreq` command, no document `deprecate` or `restore` variant, no static per-type document command list, no per-type document module, no document entry in the static presentation table, and no process-global descriptor map. |
+| No new crates | `Cargo.toml` and `Cargo.lock` add no crate and no dependency edge beyond the existing set. Dev-dependencies and build-dependencies are included: any new crate or dependency edge in either file fails the gate. |
+| Zero document `TypedHandler` variants | No document browser path selects behaviour through a `TypedHandler` variant. Backlog and decision handlers keep their bespoke variants; a source scan over the document path finds none. |
+| No document slug dispatch outside the seed | No `match` or `if` on a document slug literal selects behaviour anywhere in `src/`, except the `SEED_DOCUMENT_TYPES` table in `src/config.rs`. The seed table is the only place that names document slugs; tests and documentation are exempt. |
+| Strict record, JSON, and status-code equivalence | Against the captured fixture corpus: record-file bytes are identical, JSON payloads are identical including documented key order, and every HTTP status code is identical. |
+| Semantic HTML equivalence | Rendered document HTML is equivalent by selector, text, navigation, form field, and the absence of per-type wrappers. The backlog and decision surfaces stay byte-compatible with the captured output. Byte equality is not used for document pages. |
+| NFR-007.001 to NFR-007.003 measurements | The inventory p95 is under 250 ms and the view and edit p95 under 100 ms at 1,000 records on the reference hardware; the asset cache-class headers and the repeat-visit transfer match the caching contract. |
+| Binary size | The built binary is at most 12 MiB (12,582,912 bytes). |
+| Production LOC | Reported at every verification as an informational measurement against the 28,000-line internal target, and reported at the release boundary. It is never a gate, acceptance criterion, or blocker: a size above it is a recorded observation, not a failed gate. |
+
+1. The fixture corpus covers one type per `DocumentModel`, a grouped type with several members, an HTML mockup in each fixed metadata state, a user-defined `SingleMarkdown` type, records with resolved and unresolved references, a record at the archived boundary, and a record at a zero-padding ID boundary.
+2. The equivalence comparison is strict only where the contract is byte-exact: record files, JSON, and status codes. Rendered document HTML is compared semantically; backlog and decision pages are compared byte-for-byte with the captured output.
+3. Expected deltas are recorded as expected deltas, never as equivalence failures: the uniform title command shape, the removal of the term option, rewritten help prose, the asset cache headers, and latency changes.
+4. A behaviour change that is not on the expected-delta list is a gate failure until it is recorded with a disposition and the owning surface is named.
+5. Measurement method for NFR-007.001 and NFR-007.002: the documented benchmark harness, the 1,000-record corpus, 10 warm-up requests, then 100 measured sequential requests per route, p50 and p95 as observed by the server, excluding the first cold-start request and any request that triggers a configuration reload. The harness command, corpus, hardware, and p50 and p95 values are recorded.
+6. Measurement method for NFR-007.003: the cache-class header matrix on the installed binary plus the repeat-visit transfer measurement; the second load of a page with a diagram and a page with math transfers no vendor bytes.
+7. The binary size gate and the production LOC figure are measured on the release build. A size above 12 MiB blocks the verification. The production LOC is reported at every verification as information and at the release boundary; a production size above 28,000 lines is recorded and reported, does not fail a gate, and is not an acceptance criterion.
+
+### 3. Isolated install and uninstall
+
+1. Verification runs on Debian Forky amd64 using an isolated dpkg database and install root, so the host's package database and filesystem are never modified: `fakeroot dpkg --instdir=<root> --admindir=<adm> --force-depends -i <staging>/papyrus_<version>_amd64.deb`. A container, chroot, or virtual machine on Forky may be used instead with the same checks.
+2. The isolated root and admin directories are created under `./.tmp/` and are removed after the run, including on failure.
+3. Before and after the run, the host reports papyrus as not installed (`dpkg -l papyrus` has no installed entry).
+4. `dpkg -i` in the isolated root succeeds with exit 0.
+5. After install, `<root>/usr/bin/papyrus` exists with mode 0755 and owner `root:root`.
 6. With `<root>/usr/bin` first on `PATH`, `papyrus --version` resolves to the installed binary and prints `papyrus <version>`.
-7. `dpkg -r papyrus` (isolated) removes the binary; `papyrus` no longer resolves on that `PATH`.
-8. `dpkg --purge papyrus` (isolated) removes the remaining files and the admin entry; `<root>` contains no papyrus files afterwards.
+7. `dpkg -r papyrus` in the isolated root removes the binary; `papyrus` no longer resolves on that `PATH`.
+8. `dpkg --purge papyrus` in the isolated root removes the remaining files and the admin entry; the root contains no papyrus files afterwards.
 
-### 3. Installed-binary smoke tests
+### 4. Installed-binary smoke tests
 
-All commands run against the installed binary with `--dir <project>` pointing at a scratch project under `./.tmp/`. Exit statuses follow the existing contract: 0 success, 1 IO/boundary, 2 usage, 3 not found, 4 validation.
+All commands run against the installed binary with `--dir <project>` pointing at a scratch project under `./.tmp/`. Exit statuses follow the existing contract: 0 success, 1 IO or boundary, 2 usage, 3 not found, 4 validation.
 
-#### 3.1 CLI baseline regression
+#### 4.1 CLI baseline and generated help
 
-1. `papyrus --help` exits 0 and lists `glossary`, `ui-spec`, `ui-mockup`, `rule`, `audit`, `tech-spec`, `decision`, `task`, `milestone`, `release`, `search`, and `browser` among the subcommands.
+1. `papyrus --help` exits 0 and lists every enabled document slug and the built-in non-document commands.
 2. `papyrus --version` exits 0 and prints `papyrus <version>`.
 3. `papyrus --dir <project> init <name> --no-git` creates `papyrus.config.yml` and the configured directory structure.
+4. `<slug> --help` for each of the six seed types exits 0 and lists exactly the verbs the model offers: `create`, `list`, `view`, `edit`, `archive`, `delete`, plus `status` for `SingleMarkdown`, plus `supersede` and no `status` for the HTML mockup.
+5. An unknown slug exits 2, and a disabled type exits 2 for every verb.
 
-#### 3.2 Management lifecycles for the six m-4 record types
+#### 4.2 Management lifecycles for the six seed types
 
-For each of glossary, ui-spec, ui-mockup, rule, audit, tech-spec, run the documented lifecycle against the installed binary:
+For each of glossary, ui-spec, ui-mockup, rule, audit, and tech-spec, run the lifecycle the descriptor offers against the installed binary.
 
-- Create prints the generated ID (for example `GLO-001`, `UI-001`, `MOCK-0001`, `RUL-001`, `AUD-001`, `TECH-001`) and the ID is preserved across list/view/edit/deprecate/restore.
-- `list` shows active records only, in ID order; deprecated records are hidden.
-- `view <id>` prints the full persisted text; viewing an unknown ID exits 3; viewing a deprecated record by ID is allowed where documented.
-- `edit <id>` with supplied fields updates only those fields; omitted fields retain previous values; unknown ID exits 3; unsanitizable values exit 4.
-- `deprecate <id>` moves the file into `deprecated/`; deprecating an already-deprecated or unknown ID exits 4/3.
-- `restore <id>` returns the file to the active folder with the same ID (where the command is documented; note ui-mockup restoration updates the status field in the HTML).
-- Disabled types (`document_types.<type>.enabled = false`) are rejected by `create` and hidden from `list` (BR-016).
+1. `create` prints the generated ID (`GLO-001`, `UI-001`, `MOCK-0001`, `RUL-001`, `AUD-001`, `TECH-001`) and writes the record under the configured directory.
+2. `list` shows active records only, in ID order; archived records are hidden.
+3. `view <id>` prints the heading, the field map in descriptor order, and the persisted metadata; an unknown ID exits 3.
+4. `edit <id>` changes only the supplied fields, preserves undeclared sections and keys, and leaves the ID and path unchanged; an unknown ID exits 3; an unsanitizable value exits 4.
+5. `status <id> <value>` writes a declared custom status in place; `status <id> archived` exits 4 and names `archive`; the file is unchanged.
+6. `archive <id>` moves the record to the archived subfolder, drops it from `list`, and discards any custom status; archiving an already-archived or unknown ID exits 4 or 3.
+7. `delete <id>` prompts without `--force`, and prompting is skipped with `--force`; a declined prompt changes nothing; a confirmed delete archives then removes the file.
+8. `--json` on every verb prints one JSON value on stdout with the documented shape, and errors are JSON as well.
 
-Command shapes (from BR-011..BR-017 and the management specs):
+Command shapes come from the seed descriptors:
 
-- glossary: `create --term <term> --definition <text>`; `edit <id> [--term] [--definition] [--editor]`; `deprecate`/`restore`.
-- ui-spec: `create <title> --view <view> --description <text>`; `edit <id> [--view] [--description] [--editor]`; `deprecate`/`restore`.
-- ui-mockup: `create <title> --task <task> --spec <id>... [--ref <doc>...]`; `edit <id> [--title] [--task] [--spec...] [--ref...] [--status] [--superseded-by] [--editor]`; `deprecate`/`restore`; supersession rules per BR-012/REQ-05.008.
-- rule: `create <title> --description <text> --rationale <text> --applicability <text> [--requirement <id>...]`; `edit <id> [--title] [-d] [--requirement...] [--no-requirement...] [--editor]`; `deprecate`/`restore`.
-- audit: `create --title <title> --content <text> [--audit-type <type>]` (default type `security`); `edit <id> [--title] [--content] [--audit-type] [--editor]`; `deprecate`/`restore`.
-- tech-spec: `create <title> --description <text>`; `edit <id> [--title] [--description] [--editor]`; `deprecate`/`restore`.
+- glossary (`SingleMarkdown`): `create <TITLE> --definition <text>` with a required `## Definition`; `edit <id> --definition`; `status`; `archive`; `delete`.
+- ui-spec (`SingleMarkdown`): `create <TITLE> --view <view> --description <text>`; `edit <id>` with the same optional fields.
+- ui-mockup (`SingleHtmlMockup`): `create <TITLE> --task <id> --spec <id>... --ref <doc>...`; `edit <id>` with title, task, specs, and refs; `supersede <id> --by <id>`; fixed metadata states `pending`, `approved`, and `archived`; no `status` verb.
+- rule (`SingleMarkdown`): `create <TITLE> --description <text> --rationale <text> --applicability <text> --requirement <id>...`; `edit <id>` with description, requirement, and no-requirement; rationale and applicability are create-only.
+- audit (`SingleMarkdown`): `create --title <TITLE> --content <text> --audit-type <type>` with the type stored under the `type` front-matter key; `edit <id>` with title, content, and audit type.
+- tech-spec (`SingleMarkdown`): `create <TITLE> --description <text>`; `edit <id>` with title and description.
 
-#### 3.3 Search regression (already-shipped types)
+A field whose descriptor verbs exclude `edit` is not offered on edit, and a field absent from the verbs of a command is rejected as unknown.
 
-1. A quoted phrase present contiguously in a decision record is found: `papyrus search "<phrase>"` prints `<id> <type> <title>` lines in ascending ID order, including `decision` type alongside `task`, `milestone`, `release`, and `doc`.
-2. The same phrase split into separate words is not treated as a phrase match.
-3. `--type decision|task|milestone|release|doc` restricts results to that type.
-4. `papyrus search <term> --limit 1` prints at most one result line.
-5. `papyrus --json search <term>` prints a JSON array of `{id, type, title, path}` objects; a search with no matches prints `[]` and exits 0.
-6. Archived decision records are absent from search results; release and requirement records follow their own documented visibility rules.
+#### 4.3 Search regression
+
+1. A quoted phrase present contiguously in a document record is found and printed with the `doc` type alongside the bespoke types.
+2. The same words separated in the source are not a phrase match.
+3. `--type doc`, `--type task`, `--type milestone`, `--type release`, and `--type decision` each restrict results to that type.
+4. `papyrus search <term> --limit 1` prints at most one result line; a limit above the match count returns every match.
+5. `papyrus --json search <term>` prints a JSON array of `{id, type, title, path}` objects; no matches prints `[]` and exits 0.
+6. An archived document or backlog record is absent from search results and reappears after `status ... active` or `restore`; a released record follows its own visibility rules.
 7. Usage errors (missing query, unknown `--type`, `--limit 0`) exit 2; an empty or control-character query exits 4; a symlinked record directory escaping the project exits 1.
+8. Search has no per-type document branch: the six seed types and a user-defined type are all found through the same `doc` path.
 
-Search over the six new record types is out of scope (deferred to their milestones) and is not asserted here.
+#### 4.4 Browser regression
 
-#### 3.4 Browser regression (already-shipped categories)
+1. `papyrus --dir <project> browser --no-open --port <free-port>` prints exactly one startup line `Serving http://127.0.0.1:<free-port>/` and serves until stopped. The port is obtained by binding `127.0.0.1:0`, reading the port, and dropping the listener, with a retry if the bind fails.
+2. `--no-open` suppresses the platform opener; the process still serves.
+3. The backlog and decision categories render exactly their own records, and the navigation groups are the three categories with `aria-current="page"` on the selected entry.
+4. One seed document type is exercised through the shared document surface: `GET /?type=<slug>` renders the list, `GET /doc/<id>` renders the view from the field map, and `GET /doc/<id>/edit` renders one descriptor-driven form with the hidden Version token.
+5. Edit round-trip: `POST /doc/<id>` returns `303` to `/doc/<id>`; the follow-up `GET` and the matching CLI `view` show the same persisted file. A stale token returns `409`, an undeclared key including `status` returns `422`, and an unknown or archived ID returns the one not-found page with `404`. None of these writes.
+6. `GET /api/docs/<slug>` and `GET /api/doc/<id>` return the documented payloads for the document type.
+7. Asset cache classes: `GET /assets/app.css` and `GET /assets/app.js` return `200` with the documented MIME type, `Cache-Control: no-cache`, and one strong `ETag` of the form `"<64 lowercase hex characters>"`; a `GET` or `HEAD` whose `If-None-Match` is that exact tag returns a bodyless `304` carrying the same `ETag` and `Cache-Control`, no `Content-Type`, no `Content-Length`, and no CSP; a stale, weak, or unparseable tag returns the full `200`. `/assets/nav-state.js` follows the same class.
+8. Asset cache classes for vendored files: a versioned path such as `/assets/katex/0.16.11/katex.min.css`, a KaTeX font under `/assets/katex/0.16.11/fonts/`, and `/assets/mermaid/11.17.2/mermaid.min.js` return `200` with the documented MIME type and `Cache-Control: public, max-age=31536000, immutable`, no `ETag`, no `Last-Modified`, and no `Vary`; a conditional request returns the full `200`, never `304`; the unversioned vendor paths return `404` for `GET`, `HEAD`, and `POST`.
+9. Every HTML and JSON response carries `Cache-Control: no-store`, no validator, and never `304`. No response of any class carries `Content-Encoding` or `Vary`.
+10. Served HTML, CSS, and JS contain no `http://`, `https://`, protocol-relative `//`, remote `@import`, remote `url(...)`, `<img>`, or CDN reference. Every `url(` in every served stylesheet resolves to an entry of the asset table, and KaTeX's font references resolve under the versioned directory.
+11. Every `text/html` response carries exactly one of the two fixed CSP strings: the strict string when the pre-pass did not set `has_diagram`, and the diagram string only when it did. `/assets/` and non-HTML responses carry no CSP, and `script-src` never gains `'unsafe-inline'`, `'unsafe-eval'`, a nonce, or a hash.
+12. 320 px markup: every page carries the viewport meta, the navigation toggle with `aria-expanded` and `aria-controls`, and no page-level horizontal scrolling at 320, 480, and 720 CSS px.
+13. The manifest test asserts that the manifest row set equals the asset table paths with no duplicate or missing row and recomputes SHA-256 and byte length for every entry; the packaged copyright shows the licence block plus one section per bundled family; `dpkg-deb -c` still lists exactly the binary and the copyright file.
+14. An empty document directory renders its empty state instead of failing, and an archived record is not listed and is unreachable (`404`).
 
-1. `papyrus --dir <project> browser --no-open --port <free-port>` prints exactly one startup line `Serving http://127.0.0.1:<free-port>/` and serves until killed. `<free-port>` is obtained by binding `127.0.0.1:0`, reading the port, and dropping the listener, with a retry if the bind fails.
-2. `--no-open` suppresses the platform opener.
-3. `GET /` and `GET /?type=req` render business requirements; `GET /?type=nfr` renders non-functional; `GET /?type=task`, `?type=milestone`, `?type=release`, `?type=decision` each render exactly their own category. The selected sidebar entry carries `aria-current="page"`; the sidebar entries are Business requirements, Non-functional requirements, Backlog, Decisions.
-4. `GET /doc/<id>` renders the record view for a task, milestone, release, and decision, including ID, form, category, title, and their type-specific fields.
-5. Edit round-trip (task/milestone/release/decision): `GET /doc/<id>/edit` yields the form with its hidden `version` token; `POST /doc/<id>` with the documented form fields returns `303` with `Location: /doc/<id>`; the follow-up `GET` shows the new title, and the matching CLI `view` shows the same persisted file.
-6. `GET /api/requirements?type=task|milestone|release|decision` returns the documented JSON index for one category; `GET /api/decisions` returns the documented summary array; `GET /api/doc/<id>` returns the documented record object.
-7. `GET /assets/app.css` returns `200 text/css` and `GET /assets/app.js` returns `200 text/javascript`, both with `Cache-Control: no-store`; the bodies are non-empty.
-8. 320 px markup: every page carries `<meta name="viewport" content="width=device-width, initial-scale=1">`; the header `.nav-toggle` is present on every page with `aria-expanded` and `aria-controls="site-nav"`, defaults to expanded, and persists in `papyrus.nav`; the shared list and page layouts introduce no page-level horizontal scrolling at 320, 480, and 720 CSS px; the served CSS/JS use no forbidden features from the TASK-6 browser baseline.
-9. Served HTML, CSS, and JS contain no `http://`, `https://`, protocol-relative `//`, remote `@import`, remote `url(...)`, `<img>`, or CDN reference. Every `url(...)` in every served stylesheet resolves to an entry of the asset table, and the only such values are KaTeX's 60 `url(fonts/…)` entries. A math page renders offline with its WOFF2 fonts served from `/assets/katex/fonts/…` under `Cache-Control: no-store`; a diagram page does the same; TASK-150 verifies it.
-10. Every `text/html` response carries exactly one of the two CSP strings fixed in `browser-requirements.md` §9.7: the strict string when the pre-pass did not set `has_diagram`, and the diagram string only when it did. `/assets/` and non-HTML responses carry no CSP; `script-src` never gains `'unsafe-inline'`, `'unsafe-eval'`, a nonce, or a hash.
-11. Asset verification: `cargo test` runs the manifest test and asserts the manifest row set equals `ASSETS[].path` with no duplicate or missing row and recomputes SHA-256 and byte length for every entry; `dpkg-deb --fsys-tarfile papyrus_<version>_amd64.deb | tar -xO ./usr/share/doc/papyrus/copyright` shows the GPL-3.0-or-later block plus one section per bundled family; `dpkg-deb -c` still lists exactly the binary and the copyright file; `stat -c %s` on the built binary is at most 12,582,912 B (12 MiB), with the measured budget recorded in `docs/packaging.md`.
-12. A missing or empty task/milestone/release/decision directory renders its empty state instead of failing (no server error); archived decisions and deprecated requirements are not listed or reachable (404).
+#### 4.5 Offline operation
 
-Browser categories for the six new record types are out of scope (deferred to their milestones) and are not asserted here.
+1. The smoke run is repeated inside an isolated network namespace (`unshare -rn`, loopback brought up with `ip link set lo up`).
+2. Inside the namespace, an outbound TCP connection to a public address fails, proving the namespace is disconnected.
+3. With no network, `search` and the browser checks of sections 4.3 and 4.4 pass over loopback; the browser binds the IP literal `127.0.0.1`.
+4. If `unshare -rn` is unavailable, the offline claim rests on the loopback-only bind, the absence of external references in served content, and the absence of an outbound-connection code path; the limitation is recorded.
 
-#### 3.5 Offline operation
+#### 4.6 Browser configuration keys and embedded assets
 
-1. The smoke run is repeated inside an isolated network namespace (`unshare -rn`, loopback brought up with `ip link set lo up`) so no external network is reachable.
-2. Inside that namespace, an outbound TCP connection to a public address fails, proving the namespace is disconnected.
-3. With no network available, search and the browser checks of sections 3.3 and 3.4 pass over loopback; the browser binds an IP literal (`127.0.0.1`) so no name resolution is required.
-4. If `unshare -rn` is unavailable in the verification environment, the offline claim is supported instead by: loopback-only bind, no external references in served content, and no outbound-connection code path — and the limitation is recorded explicitly in `docs/packaging.md` and the ticket notes.
+1. `config list` includes `browser_host`, `browser_port`, and `browser_open` with effective values; `config get` prints each effective value.
+2. A configured port is used when `browser` starts without `--port`; `--port` still overrides it. A configured `browser_open: false` suppresses opening without `--no-open`, and removing the key restores the default.
+3. An invalid port or an invalid boolean exits 4 and leaves the configuration file unchanged.
+4. The installed binary serves `/assets/app.css` and `/assets/app.js` from a project directory that contains no asset files and from a working directory that contains no source tree.
+5. The package contains no asset, template, or documentation file beyond the copyright file, and the installed binary needs only `/usr/bin/papyrus` and the project directory.
 
-#### 3.6 Browser configuration keys
+### 5. Automated integration test
 
-1. `config list` includes `browser_host`, `browser_port`, and `browser_open` after the `document_types.*` entries, with effective values.
-2. `config get browser_host|browser_port|browser_open` prints the effective value.
-3. `config set browser_port <free-port>` then starting `browser` without `--port` uses that port in the startup line; `--port` still overrides it.
-4. `config set browser_open false` suppresses opening without `--no-open`; `config unset browser_open` restores the default `true`.
-5. `config set browser_port 0`, `70000`, or `config set browser_open maybe` exits 4 and leaves the configuration file unchanged.
-6. `config unset browser_port` restores the default `6420`.
+1. A milestone-level test file under `tests/` drives the built binary (`CARGO_BIN_EXE_papyrus`) with temporary project directories and the shared patterns of the existing suites.
+2. The test creates one record of each of the six seed types carrying a unique multi-word phrase where the model has a prose field, asserts the lifecycle (create, list, view, edit, status or supersede, archive, delete) and ID preservation, and asserts the exit codes for an unknown ID, an invalid value, and an unknown slug.
+3. The test asserts search over the created document records through the `doc` type and the JSON shape, and restarts the browser to assert one document category through the shared surface.
+4. The tests do not duplicate the contract coverage in the per-feature suites: ID generation, sanitisation, the exit-code matrix, editor round-trip, supersession rules, and disabled-type behaviour remain authoritative there.
+5. The tests need no internet access, bind only loopback, and leave no child process running. `cargo test` passes with the new tests.
+6. The tests assert the strict equivalence expectations they can observe: persisted bytes through the CLI, JSON shape, and HTTP status codes. Rendered HTML is asserted semantically.
 
-#### 3.7 Embedded assets and no runtime file dependency
+### 6. Documentation and evidence
 
-1. The installed binary serves `/assets/app.css` and `/assets/app.js` from a project directory that contains no asset files and from a working directory that contains no source tree, proving the assets are compiled in.
-2. The package contains no asset, template, or documentation files beyond the copyright file (section 1.7).
-3. The installed binary runs with only `/usr/bin/papyrus` and the project directory.
-
-### 4. Automated integration test
-
-1. A new file `tests/cli_milestone_smoke.rs` provides a milestone-level end-to-end test against the built binary (`CARGO_BIN_EXE_papyrus`), using temporary project directories, a free loopback port, and the same startup-line wait and child-kill-on-drop pattern as `tests/browser_cli.rs`.
-2. Test 1 — `milestone_cli_records_flow`: initialize a project, create one record of each of the six m-4 types carrying a unique multi-word phrase where the record supports a body field, assert the management lifecycle (create/list/view/edit/deprecate/restore where documented) and ID preservation; then run the offline browser checks of section 3.4 only as regression over the already-shipped categories (no new categories are asserted).
-3. Test 2 — `installed_layout_has_no_runtime_asset_dependency`: run the binary with its working directory set to an empty directory and the project directory containing no asset files; assert `search` (over a shipped type) and `browser` still work and served assets are non-empty.
-4. The new tests must not duplicate the TASK-30/TASK-34/TASK-38/TASK-43/TASK-47/TASK-55 contract coverage in their respective `*_cli.rs` files (ID generation, sanitization, exit-code matrix, editor round-trip, supersession rules, disabled-type behavior). Those remain authoritative there.
-5. Tests require no internet access, bind only loopback, and leave no child process running.
-6. `cargo test` passes with the new tests. Baseline at refinement: the m-4 test suite (unit + `cli` + `milestone_cli` + `milestone_smoke` + `req_cli` + `task_cli` + `decision_cli` + `glossary_cli` + `ui_spec_cli` + `ui_mockup_cli` + `business_rules_cli` + `audit_records_cli` + `technical_specifications_cli` + `search_cli` + `search_backlog_cli` + `browser_cli` + `backlog_discovery_smoke` + `decision_records_smoke` + `search_browser_smoke`) all passing.
-
-### 5. Documentation and evidence
-
-1. `docs/packaging.md` states the supported release as Debian Forky only (amd64), per ADR-0003 and NFR-03.002, and explicitly states that Trixie and other releases are not claimed or verified.
-2. `docs/packaging.md` contains the build/package commands, the isolated install and uninstall procedure (scratch directories under `./.tmp/`, removed afterwards), and the extended smoke-test checklist covering sections 3.1–3.7.
-3. `docs/packaging.md` records observed results as a pass/fail table with the environment (Debian Forky version, glibc, `rustc`/`cargo` 1.99.1, `dpkg` version, isolation method, whether `unshare -rn` was available) and the date with timezone (UTC).
-4. The TASK-62 ticket notes record the same evidence: environment, date/timezone, package file name and size, quality-gate outcomes with test counts, smoke-test outcomes, and any deviation or bug fix found.
-5. The runtime dependency-license audit from TASK-1/TASK-4 is referenced as unchanged; no re-run is required because no runtime dependency was added.
+1. `docs/packaging.md` states the supported release as Debian Forky only (amd64) and states that other releases are not claimed or verified.
+2. `docs/packaging.md` contains the build and package commands, the isolated install and uninstall procedure, and the smoke-test checklist covering sections 4.1 to 4.6, with the staging paths under `./.tmp/`.
+3. The verification record states the date with timezone, the environment (distribution, glibc, Rust and Cargo, clippy, `dpkg`, `fakeroot`, `unshare`), the isolation method, the gate table, the test counts, the verification package name and size, the binary size, the production LOC as an informational measurement against the internal target, and the NFR-007.001 to NFR-007.003 measurements with p50 and p95.
+4. The record states that the verification build was discarded, names any expected delta, and lists every finding with its expected and observed values and a disposition.
+5. The record states release readiness for this increment only as an input to the release boundary; it does not claim a release.
+6. The runtime dependency-license audit is referenced as unchanged; no runtime dependency was added.
+7. A defect in product code, a stale documentation statement, or a verification limitation is recorded with a disposition and attributed to its owning surface; this step fixes none of them.
 
 ## Inputs and outputs
 
-| Input / output | Description |
+| Input or output | Description |
 |---|---|
-| Source tree | Post-TASK-61 state: all m-4 management commands (glossary, ui-spec, ui-mockup, rule, audit, tech-spec) plus earlier milestones (req/nfreq, task/milestone/release, decision, search, browser, init/config). |
-| Toolchain | Rust 1.99.1 via `rust-toolchain.toml`; `dpkg-deb`, `fakeroot`; Debian Forky amd64. |
-| `scripts/build-deb.sh` | Unchanged packaging script; reads the version from `Cargo.toml`. |
-| `papyrus_<version>_amd64.deb` | Built package in the project root. |
-| Isolated root/admin | `./.tmp/` directories for `dpkg --instdir/--admindir`; removed after the run. |
-| `tests/cli_milestone_smoke.rs` | New milestone-level integration test. |
-| `docs/packaging.md` | Updated procedures, checklist, and observed results. |
-| Ticket notes | Verification evidence for TASK-62. |
+| Source tree | The descriptor-driven document engine, the seed table, the six seed document types, and the bespoke backlog and decision surfaces. |
+| Toolchain | Rust 1.99.1 via `rust-toolchain.toml`; `dpkg-deb`, `dpkg`, `fakeroot`, `unshare` and `ip`; Debian Forky amd64. |
+| Packaging script | `scripts/build-deb.sh`, used unchanged for the milestone verification and the single release boundary; reads the version from `Cargo.toml`. |
+| Verification package | `papyrus_<version>_amd64.deb` produced in the project root and moved under `./.tmp/`; installed, exercised, and deleted. |
+| Isolated root and admin | `./.tmp/` directories for `dpkg --instdir` and `--admindir`; removed after the run. |
+| Fixture corpus and harness | The captured equivalence fixtures and the benchmark harness, reused unchanged. |
+| Integration test | The milestone-level CLI test under `tests/`. |
+| Verification record | The gate table, measurements, findings, and discarded-build statement in `docs/packaging.md`. |
 
 ## Validation and error behavior
 
 | Condition | Consequence |
 |---|---|
-| `cargo build --release`, `cargo test`, clippy, or `fmt --check` fails | Blocked; fix before packaging. |
-| `target/release/papyrus --help` lacks `glossary`/`ui-spec`/`ui-mockup`/`rule`/`audit`/`tech-spec`/`decision`/`task`/`milestone`/`release`/`search`/`browser` (stale binary packaged) | Blocked; rebuild before `build-deb.sh`. |
-| `dpkg-deb -I` metadata mismatch (name, version, architecture, depends, copyright) | Blocked. |
-| Package contains asset/config/man files | Blocked. |
-| `dpkg -i` fails in the isolated Forky root | Blocked. |
-| Host package database or filesystem modified | Blocked; isolation is mandatory. |
-| Installed binary missing from `PATH` after install, or still present after purge | Blocked. |
-| Any smoke check of sections 3.1–3.7 fails | Blocked; record the failing command and output. |
-| Outbound connection succeeds inside the offline namespace | Offline claim not verified; investigate before completion. |
-| Served content references an external origin, or an asset request returns 404/empty | Blocked. |
-| `cargo test` fails, including the new test | Blocked. |
-| A defect in product code is found | Fix minimally, record it in the notes, keep the fix separate from packaging changes. |
-| A failure is caused by a requirement/spec conflict (not by the package) | Record as an open question and escalate; do not change requirements in this ticket. |
+| `cargo build --release`, the full suite, clippy, or `fmt --check` fails | Blocked; fix before packaging. |
+| A verification gate of section 2 fails | Blocked; record the gate, command, and output. |
+| A new crate or dependency appears in `Cargo.toml` or `Cargo.lock` | Blocked; the no-new-crates gate fails. |
+| A document `TypedHandler` variant or document slug dispatch outside the seed exists | Blocked; record the file and line. |
+| A record, JSON, or status-code comparison differs | Blocked; capture the fixture, expected value, and observed value. |
+| A document HTML comparison differs semantically, or a backlog page differs byte-wise | Blocked; record the diverging selector, text, or field. |
+| The binary exceeds 12 MiB (12,582,912 bytes) | Blocked; the binary size gate fails. |
+| Production LOC exceeds 28,000 lines | Recorded and reported as an informational measurement; not a gate failure and not an acceptance criterion. |
+| The inventory or view and edit p95 exceeds its target | Gate fails; record the measurement and escalate for a decision. |
+| The asset cache classes or the repeat-visit transfer differ | Gate fails; record the path and the observed headers or bytes. |
+| `target/release/papyrus --help` lacks a required slug or command (stale binary packaged) | Blocked; rebuild before packaging. |
+| `dpkg-deb -I` metadata mismatch, including the asset Version binding | Blocked. |
+| The package inventory lists a source file, a per-type document module, an asset, a template, a configuration file, or a man page | Blocked. |
+| `dpkg -i` fails in the isolated root, or the host state changes | Blocked; isolation is mandatory. |
+| The installed binary is missing from `PATH` after install, or remains after purge | Blocked. |
+| Any smoke check fails | Blocked; record the failing command and output. |
+| Outbound traffic succeeds inside the offline namespace | Offline claim not verified; investigate and record the limitation. |
+| A verification package or an intermediate release candidate is retained | Blocked; a milestone verification keeps no package. |
+| A defect or a requirement, rule, or ADR conflict is found | Record with a disposition; do not edit requirements, rules, ADRs, or product code here. |
 
-## Acceptance criteria mapping
+## Verification matrix
 
 | Check | Verifies | How it is verified |
 |---|---|---|
-| T-01 | Pinned 1.99.1 release build succeeds and exposes all m-4 subcommands | `cargo build --release`; `--help` subcommand list |
-| T-02 | Quality gates pass | `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`; recorded test counts |
-| T-03 | `.deb` builds with the Cargo version and amd64 architecture | `./scripts/build-deb.sh`; `dpkg-deb -I` |
-| T-04 | Metadata: `Package: papyrus`, `Version`, `Architecture: amd64`, `Depends: libc6 (>= 2.34)`, GPL-3.0-or-later copyright | `dpkg-deb -I`; copyright file inspection |
-| T-04b | Bundled asset digests, notices, offline rendering, and the 12 MiB budget | Manifest digest test; package copyright inspection; served-stylesheet `url(` scan; `stat -c %s` on the binary |
-| T-05 | Package contains only the binary and copyright; assets are embedded | `dpkg-deb -c`; asset requests from the installed binary |
-| T-06 | Installs and uninstalls in an isolated Debian Forky environment, host untouched | `fakeroot dpkg --instdir/--admindir -i`, `-r`, `--purge`; host `dpkg -l` before/after |
-| T-07 | Installed binary is on `PATH` at `/usr/bin/papyrus` and runs | `PATH`-prefixed `papyrus --version` |
-| T-08 | Baseline CLI, `init` | Installed-binary smoke commands and exit codes |
-| T-09 | Management lifecycles for the six m-4 record types | Installed-binary smoke commands and exit codes |
-| T-10 | Search regression over already-shipped types | Installed-binary search commands |
-| T-11 | Browser regression over already-shipped categories | Installed-binary browser commands plus HTTP requests |
-| T-12 | Shell/list layout, CSP classes, asset digests, and the 12 MiB budget | Markup/asset assertions on served content; manifest test; `stat -c %s` |
-| T-13 | Offline operation with no internet access | `unshare -rn` run with a failing outbound connection, then search + browser smoke |
-| T-14 | Browser configuration keys work in the installed binary | `config list/get/set/unset` and startup-line assertions |
-| T-15 | Embedded assets and no runtime file dependency | Asset requests from an empty working directory |
-| T-16 | Milestone-level integration test added without duplicating management contract tests | `tests/cli_milestone_smoke.rs`; `cargo test` |
-| T-17 | Documentation states Forky only and records procedures and results with date/timezone | `docs/packaging.md` review |
-| T-18 | Evidence recorded in the ticket | TASK-62 notes review |
+| T-01 | Release build succeeds and exposes every enabled slug | `cargo build --release`; `--help` output |
+| T-02 | Every verification gate of section 2 passes | Gate table output recorded in the verification record |
+| T-03 | Verification package builds with the Cargo version and amd64 architecture | `./scripts/build-deb.sh`; move the package into `./.tmp/`; `dpkg-deb -I` |
+| T-04 | Metadata, copyright, and the asset Version binding | `dpkg-deb -I`; copyright inspection; version-directory and manifest check |
+| T-05 | Inventory holds only the binary and the copyright file; no per-type document module | `dpkg-deb -c`; asset requests from the installed binary |
+| T-06 | Installs and uninstalls in an isolated Forky root, host untouched | Isolated `dpkg -i`, `-r`, `--purge`; host `dpkg -l` before and after |
+| T-07 | Installed binary resolves on `PATH` and prints the package version | `PATH`-prefixed `papyrus --version` |
+| T-08 | Generated help matches each model's derived verb set | `<slug> --help` for every seed type |
+| T-09 | Six management lifecycles, field preservation, and exit codes | Installed-binary commands and exit codes |
+| T-10 | Search over document and bespoke records through one path | Installed-binary search commands |
+| T-11 | Browser document surface and backlog regression | Installed-binary browser commands plus HTTP requests |
+| T-12 | Asset cache classes, CSP classes, layout, and the manifest | Header and markup assertions; manifest test; binary size |
+| T-13 | Offline operation | Isolated network namespace run with a failing outbound connection |
+| T-14 | Browser configuration keys and embedded assets | `config` commands; asset requests from an empty working directory |
+| T-15 | Milestone-level integration test without duplicate contract coverage | The new test file; `cargo test` |
+| T-16 | Verification record complete, including expected deltas, LOC, and discarded build | `docs/packaging.md` review |
 
 ## Assumptions
 
-- Assumption: the verification host is Debian Forky amd64. At refinement it reports `Debian GNU/Linux forky/sid`, glibc 2.43, `dpkg` 1.23.11, with `fakeroot`, `dpkg-deb`, `ip`, and `unshare -rn` available, and `rustc`/`cargo` 1.99.1 pinned by `rust-toolchain.toml`. The isolated `dpkg --instdir/--admindir` install therefore runs against Forky's glibc and dpkg, satisfying the NFR-03.002 verification method without a container.
-- Assumption: isolation via `fakeroot dpkg --instdir/--admindir` is acceptable; a Forky container, chroot, or VM may substitute with the same checks (OQ-2).
-- Assumption: scratch directories live under `./.tmp/` and are removed before the task ends (project convention forbids system temporary directories).
-- Assumption: the package version stays `0.1.0`; no version bump is defined for m-4 and release versioning belongs to release orchestration.
-- Assumption: `scripts/build-deb.sh` is used unchanged and does not force a rebuild; `cargo build --release` must run first. The repository may contain a stale `target/release/papyrus` and `papyrus_0.1.0_amd64.deb` built before TASK-30/TASK-34/TASK-38/TASK-43/TASK-47/TASK-55/TASK-61, so packaging without a rebuild would ship a binary lacking the m-4 command families. AC #2 guards this.
-- Assumption: `glossary`, `ui-spec`, `ui-mockup`, `rule`, `audit`, `tech-spec`, `decision`, `task`, `milestone`, `release`, `search`, and `browser` require no new runtime dependency; the TASK-1/TASK-4 dependency-license audit remains valid (NFR-06.002).
-- Assumption: no UI change ships in this ticket, so MOCK-0001, MOCK-0002, and MOCK-0003 remain the layout references and no new mockup is produced.
-- Assumption: NFR-05.001 browser-version support was verified at markup/feature-subset level by TASK-6/TASK-11/TASK-15 and is not re-verified in a real GUI browser here (OQ-1).
-- Assumption: the new integration test runs the built binary, not the installed package; the installed-package checks are the manual/scripted checklist in sections 2–3, recorded in `docs/packaging.md`.
-- Assumption: the offline check is environment-dependent; `unshare -rn` is available at refinement, with the documented fallback if not.
-- Assumption: the six m-4 record types have no browser or search coverage at m-4 time (search/browser for them are delivered by later milestones). TASK-62 therefore verifies only their management lifecycles and regresses already-shipped search/browser over req/task/milestone/release/decision. Search/browser smoke over the new types is explicitly out of scope and is verified by TASK-33/TASK-37/TASK-42/TASK-46/TASK-50/TASK-59.
-- Assumption: disabled document types are rejected by `create` and hidden from `list` per BR-016; the smoke test asserts this at the CLI level for at least one of the six types.
+- Assumption: the verification host is Debian Forky amd64 with the pinned toolchain, `fakeroot`, `dpkg-deb`, `ip`, and `unshare -rn` available.
+- Assumption: isolated install via `fakeroot dpkg --instdir/--admindir` is sufficient; a Forky container, chroot, or virtual machine may substitute with the same checks.
+- Assumption: scratch directories live under `./.tmp/` and are removed before the step ends.
+- Assumption: the package Version is the `Cargo.toml` version; a version bump belongs to the release boundary.
+- Assumption: `scripts/build-deb.sh` is the packaging script for both the milestone verification and the single release boundary, is used unchanged, and does not force a rebuild; no separate build-package script exists, and the release build runs first.
+- Assumption: the production LOC figure is reported at every verification as information and at the release boundary; it never blocks verification or release.
+- Assumption: the six document types are seed data and their commands, options, and field order are derived from the descriptor; a change to a field, heading, or label is a seed change rather than a per-type module change.
+- Assumption: the glossary title is the fixed positional title; the former term option is removed and is not accepted.
+- Assumption: the UI mockup keeps fixed metadata states and has no status verb; supersede remains a separate verb.
+- Assumption: the document, search, and browser paths add no runtime dependency, so the dependency-license audit remains valid.
+- Assumption: no UI change ships, so the approved mockups remain the layout reference and no new mockup is produced.
+- Assumption: browser-version support is verified at markup, feature-subset, and HTTP level, not in a real GUI browser.
+- Assumption: the offline check is environment-dependent; the documented fallback applies when `unshare -rn` is unavailable.
+- Assumption: the retained release package and the release evidence are produced only at the single release boundary.
 
 ## Open questions
 
-None of these blocks implementation; each has a specified default. OQ-1 is recommended for user confirmation before release.
+None of these blocks verification; each has a default.
 
-- **OQ-1 (recommended default: markup/asset-level verification only)** — NFR-05.001's verification method asks for checks in Firefox 115+. This headless packaging task verifies the served markup, asset set, viewport hooks, and absence of forbidden features, but does not drive a real GUI browser. Default: record the limitation in `docs/packaging.md` and rely on TASK-6/TASK-11/TASK-15 markup-level verification plus the approved MOCK-0001/MOCK-0002 and pending MOCK-0003; schedule a manual browser pass outside this ticket if the user requires one. Non-blocking.
-- **OQ-2 (recommended default: fakeroot `dpkg --instdir/--admindir` on the Forky build host)** — Whether a full Forky container/VM is mandatory. Default: use the fakeroot isolated install, which exercises Forky's glibc and dpkg and never touches the host; if the user requires container-level isolation, the same checklist applies unchanged. Non-blocking.
-- **OQ-3 (recommended default: a new `tests/cli_milestone_smoke.rs`)** — Whether the milestone test belongs in an existing smoke file or a new file. Default: a new file keeps each milestone's smoke coverage separate and avoids growing an already consolidated file. Non-blocking.
-- **OQ-4 (recommended default: keep version 0.1.0)** — No m-4 release version is defined in the requirements. Default: package the current Cargo version unchanged; a bump belongs to release orchestration. Non-blocking.
-- **OQ-5 (resolved by user choice during refinement)** — Smoke-test scope for the six new record types. Resolution: management-only (create/list/view/edit/deprecate/restore). Search and browser smoke over the new types are out of scope and deferred to their own milestone packaging tasks, because search (SearchType) and browser (Category) do not yet cover them at m-4 time. Non-blocking.
-
-## Traceability
-
-| Artifact | Reference |
-|---|---|
-| Requirement | REQ-05.003, REQ-05.004, REQ-05.005, REQ-05.006, REQ-05.007, REQ-05.008, REQ-05.009, REQ-06, REQ-06.001, REQ-06.002 |
-| Non-functional | NFR-01.002, NFR-01.003, NFR-02.002, NFR-03.002, NFR-04.001, NFR-04.002, NFR-05.001, NFR-06.001, NFR-06.002 |
-| Business rule | BR-004 (browser command behavior), BR-011 (glossary), BR-012 (ui-spec), BR-013 (rule), BR-014 (audit), BR-015 (search), BR-016 (configuration keys and precedence), BR-017 (tech-spec) |
-| ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002), ADR-0004 (repository-root single crate), ADR-0005 (embedded HTTP server and server-rendered UI), ADR-0006 (optimistic concurrency and atomic writes) |
-| Ticket | TASK-62 |
-| UI mockups | none new; MOCK-0001 and MOCK-0002 remain approved layout references; MOCK-0003 (pending approval, TASK-15) covers the decision category |
-| Related specification | `docs/specifications/glossary-terms-management.md` (TASK-30) |
-| Related specification | `docs/specifications/ui-specifications-management.md` (TASK-34) |
-| Related specification | `docs/specifications/ui-mockups-management.md` (TASK-38) |
-| Related specification | `docs/specifications/business-rules-management.md` (TASK-43) |
-| Related specification | `docs/specifications/audit-records-management.md` (TASK-47) |
-| Related specification | `docs/specifications/technical-specifications-management.md` (TASK-55) |
-| Related specification | `docs/specifications/decision-records-milestone-packaging-and-verification.md` (TASK-16 precedent) |
-| Related specification | `docs/specifications/backlog-discovery-milestone-packaging-and-verification.md` (TASK-12 precedent) |
-| Related specification | `docs/specifications/search-browser-milestone-packaging-and-verification.md` (TASK-7 precedent) |
-| Related specification | `docs/specifications/requirements-management-milestone-packaging-and-verification.md` (TASK-4 precedent) |
-| Packaging documentation | `docs/packaging.md` |
-path: string,
+- **OQ-1 (default: markup, asset, and HTTP level)** — Is a real-GUI browser run required? Default: no. The verification checks served markup, assets, headers, and viewport hooks, and records the limitation.
+- **OQ-2 (default: isolated dpkg root on the build host)** — Is a full Forky container required? Default: no. The isolated install exercises Forky's glibc and dpkg and never touches the host.
+- **OQ-3 (default: record, do not fix)** — Should a defect or a stale statement be fixed inside the verification step? Default: no. It is recorded with a disposition and attributed to its owning surface.
