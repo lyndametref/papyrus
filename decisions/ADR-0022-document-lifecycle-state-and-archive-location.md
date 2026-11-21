@@ -2,7 +2,7 @@
 id: ADR-0022
 title: "Document Lifecycle State and Archive Location"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-16T21:08:36Z'
+updated_date: '2026-11-21T15:42:01Z'
 labels: []
 references: []
 ---
@@ -30,7 +30,6 @@ Current code and ADRs contradict the new state:
 Forces: one identity and one file name across state changes (REQ-01.005); no data loss on failure; the on-disk location must remain derivable from configuration (ADR-0010 decision 2); writes must stay on the single path (`record::store`, ADR-0013 decision 4); archive must not delete; legacy `deprecated/` content must not be silently presented as archived; and the state value must be visible in the same `RecordView` projection used by CLI, JSON, and browser (ADR-0013 decision 5).
 
 ## Decision
-
 1. **`status` is a registry key for three record families, with two different state models.** ADR-0012 decision 6 is used: the key registry gains `status` for
    - milestone: fixed states `open | closed`;
    - release: fixed states `planned | released`;
@@ -63,6 +62,8 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
 
    *Revision (2026-11-15, owner decision): milestones no longer keep archive/restore. The milestone lifecycle is fixed to `open -> closed` by `papyrus milestone close <id>`; the archive and restore verbs and the milestone archive location are removed. Only tasks keep archive/restore, because REQ-01.005 requires task IDs to survive that cycle. `close` writes `status` and `updated_date` in place and does not move the record.*
 
+   *Amendment (2026-11-21): the milestone clause of the 2026-11-15 revision is superseded by ADR-032 decisions 2, 4 and 5 — the milestone lifecycle is `open -> closed -> archived`, a milestone has an archive location (the backlog archive milestones folder, also the legacy read/import location) and `papyrus milestone archive <id>` is the only path to `archived`; no milestone restore exists, and every other statement in this decision stands.*
+
 6. **`archived/` is the only recognized inactive location.** Directory resolution gains `resolve_archived_directory`; `resolve_deprecated_directory` and every read alias for `deprecated/` are deleted. A `deprecated/` folder is therefore invisible to listing, view, search, and the browser, exactly as REQ-05.007 states, and is never migrated, moved, or rewritten. Its files remain on disk until a human moves them. Orphaned `deprecated/` folders stay inert: no inventory, listing, or migration command is provided (decision 12).
 
 7. **Delete is archive-then-unlink.** `delete` on an active document performs decision 2's archive, then removes the archived file; on an already-archived document it removes the file directly. Confirmation and `--force` are CLI concerns (REQ-05.007), not store concerns. Allocation stays `max(number present) + 1` over active and archived locations and never recomputes, so a gap is left where a file was removed. Reuse of the highest deleted number when the highest-numbered record is deleted is accepted behavior and is documented; no persisted high-water mark is introduced (decision 12; ADR-0010 decision 5 unchanged).
@@ -83,7 +84,6 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
     - **Auto-relocate on read.** When a read path (list, view, search, browser resolution, or any ID lookup) encounters a file in the active directory whose `status` reads `archived`, Papyrus auto-relocates that file to `archived/` using decision 2's sequence: write the destination via the ADR-0006 atomic write, then unlink the source. On success the read returns the archived record. On failure (destination write or source unlink fails) the source remains intact and the read returns a read-only record together with a validation outcome describing the failure; no source write occurs and no partial state is left. This is the only permitted write during a read path. It replaces the prior "refuse writes and report" behavior for the archived-in-active-folder case.
     - **Deleted IDs.** Allocation stays `max(number present) + 1` over active and archived locations with no recomputation; reuse of the highest deleted number when the highest-numbered record is deleted is accepted behavior and is documented. No persisted high-water mark is introduced (ADR-0010 decision 5 unchanged).
     - **Orphaned `deprecated/` folders.** They stay inert: not read, migrated, inventoried, or reported. No inventory command is provided; a human moves the files. Consistent with decision 6.
-
 ## Consequences
 
 **Positive:**

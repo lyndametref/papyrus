@@ -2,7 +2,7 @@
 id: TASK-229
 title: "Update BR-009 to BR-014 for the unified document engine"
 created_date: '2026-11-20T17:39:27Z'
-updated_date: '2026-11-20T18:15:40Z'
+updated_date: '2026-11-20T21:15:20Z'
 labels: []
 references:
   - BR-009
@@ -21,7 +21,7 @@ references:
   - REQ-05.002
   - REQ-05.004
   - REQ-05.008
-status: ToDo
+status: Done
 assignee:
   - requirements-engineer
 milestone: MS-031
@@ -66,3 +66,6 @@ Each rule must keep every user-visible invariant of its old hand-written command
 - [ ] BR-011 states the positional title, --term removal, required definition with heading "## Definition", and survival of existing term values as titles (MS-031 AC-6, RE-010 D13).
 - [ ] BR-012 states the SingleMarkdown baseline and seed-sourced fields; BR-013 states required description, create-only rationale and applicability, and the list requirements field; BR-014 states positional title, audit_type option and frontmatter_key, and required content (MS-031 AC-6).
 - [ ] The six rules remain consistent with BR-001, BR-016, REQ-05.001 to REQ-05.009, and ADR-036, and the user has verified them (MS-031 AC-6, AC-8).
+## Comments
+- **requirements-engineer**: Updated BR-009 BR-010 BR-011 BR-012 BR-013 BR-014 so each describes the generated document command surface without losing user-visible invariants. papyrus check: no new findings, the three pre-existing frontmatter-conflict findings in archived tasks remain. Only the six business-rule files changed; no requirement, TECH, source or test change.
+- **orchestrator**: Acceptance met: BR-009..014 rewritten as generated descriptor behavior, preserving group, title, field and lifecycle invariants; open items recorded (audit-type default location, rule reference removal option, legacy group link migration).

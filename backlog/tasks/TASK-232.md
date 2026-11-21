@@ -2,7 +2,7 @@
 id: TASK-232
 title: "Design the equivalence gate, fixture corpus, and benchmark protocol test cases"
 created_date: '2026-11-20T17:39:46Z'
-updated_date: '2026-11-20T18:15:42Z'
+updated_date: '2026-11-21T00:05:05Z'
 labels: []
 references:
   - REQ-07.001
@@ -24,7 +24,7 @@ references:
   - BR-018
   - BR-019
   - BR-020
-status: ToDo
+status: Done
 assignee:
   - test-manager
 milestone: MS-031
@@ -114,3 +114,6 @@ The equivalence gate and benchmark protocol are designs, not code; no test imple
 - [ ] Deliberate behavior changes are listed as expected deltas, never as equivalence failures: uniform title CLI, --term removal, help prose, asset headers, and latency (MS-031 AC-9).
 - [ ] Config-diagnostic scenarios cover unknown key, unknown enum, reserved field key, duplicate field key, bad selector path, collection unset, and fields: [] (MS-031 AC-9).
 - [ ] All test cases are `approved` only after explicit user verification, and the coverage matrix has zero gaps; dependent tasks TASK-235 and TASK-237 remain blocked until then (MS-031 AC-8).
+## Comments
+- **test-manager**: Designed 94 Gherkin test cases TC-098 through TC-193 for milestone MS-031. Coverage is complete: 27 changed requirements and NFRs plus 12 business rules, zero gaps. The set includes the seven config diagnostics, the strict record JSON and status-code gate, the semantic rendered-HTML gate, the fixture corpus, the expected deltas, and the 100 and 1000-record benchmark protocol referencing the MS-032 harness. All test cases remain draft, awaiting user verification; none was approved. papyrus check result is unchanged: 3 pre-existing frontmatter conflicts and no new findings.
+- **orchestrator**: Acceptance met: 94 Gherkin test cases TC-098..TC-193 cover every changed REQ, BR and NFR plus the strict equivalence gate and the 100 and 1000-record benchmark protocol; user approved all test cases on 2026-11-21.

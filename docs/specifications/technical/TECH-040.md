@@ -2,178 +2,252 @@
 id: TECH-040
 title: "Shared Record Envelope and Front-Matter Patcher"
 created_date: '2026-11-16T17:46:48Z'
-updated_date: '2026-11-16T17:47:17Z'
+updated_date: '2026-11-21T08:11:33Z'
 labels: []
 references:
   - ADR-0004
   - ADR-0005
   - ADR-0006
-  - ADR-0009
-  - ADR-0010
-  - ADR-0012
   - ADR-0013
+  - ADR-0023
+  - ADR-0036
+  - ADR-0039
   - NFR-04.001
   - NFR-04.002
   - NFR-04.004
   - REQ-05.010
   - REQ-05.011
   - REQ-06.004
-  - TASK-63
-  - TASK-64
-  - TASK-65
-  - TASK-66
-  - TASK-67
-  - TASK-68
-  - TASK-69
-  - TASK-70
-  - TASK-72
-  - TASK-83
-  - TASK-98
+  - REQ-07.004
 status: verified
 ---
 # TECH-040 Shared Record Envelope and Front-Matter Patcher
 
 ## Description
+
+One loadable envelope, one model-neutral field map, one patch API, and one atomic
+writer serve every managed Markdown record. No module formats a front-matter
+block, renders a record body, or writes a record file on its own.
+
 ## Purpose
 
-Deliver ADR-0013 Stage 1 (superseding ADR-0009): a single shared record implementation inside the existing Rust crate so every managed record type has one front-matter parser, one lossless document envelope, one patch API, and one atomic store. This ticket implements the infrastructure required by REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.001, NFR-04.002, and NFR-04.004. It does not migrate the corpus (TASK-68, TASK-69), does not implement Papyrus identity (TASK-64), and does not change any record command surface (TASK-65).
+A record has to be readable and writable without any module knowing a document
+type's fields. The envelope carries the general record data, the field map
+carries the type-declared content, and every change is expressed as a list of
+patch operations that the single writer applies. Type knowledge therefore lives
+in the descriptor and its field sequence, not in per-type code.
 
 ## Scope
 
-### In scope
+In scope:
 
-- A new `src/record/` module with four submodules:
-  - `record::frontmatter` — detect, parse, patch, and serialize the leading YAML block; own the key registry (general keys plus per-type keys) from ADR-0012.
-  - `record::document` — the lossless envelope: front matter plus ordered body units (optional heading line, preamble lines, `## ` sections with raw bodies).
-  - `record::patch` — the only mutation API: a list of `PatchOp` values.
-  - `record::store` — record location, safe path resolution, read, atomic write, and the ADR-0006 version token.
-- Record descriptors for every managed record type: task, milestone, release, decision, business requirement, non-functional requirement, glossary term, UI specification, technical specification, business rule, and audit record. UI mockup HTML is excluded.
-- Readers that accept both legacy files without front matter and files with front matter, using front matter first and section/heading fallback.
-- Unit and integration tests for no-op byte identity, unknown-key preservation, unknown-section preservation, and both read shapes.
-- No-drift grep checks for this stage (no `fs::write` on record paths, no `format!("---` outside the shared module, no ID formatting outside `record::identity` where applicable).
+- `record::frontmatter` - detection, parsing, patching, and serialization of the
+  leading YAML block, with typed accessors for the general keys.
+- `record::document` - the lossless envelope: optional front matter, optional
+  heading line, preamble lines, and ordered level-2 sections with raw bodies.
+- `record::patch` - the only mutation API, a list of `PatchOp` values.
+- `record::store` - record location, containment, read, atomic write, and the
+  optimistic-concurrency version token.
+- The model-neutral field map and its PatchOp mapping.
+- Descriptors for every managed Markdown record type; HTML mockups are excluded
+  from front-matter handling and keep their metadata in the HTML comment.
 
-### Out of scope
+Out of scope:
 
-- Papyrus IDs only — TASK-64 (ID translation removed by ADR-0010/ADR-0013).
-- CLI option exposure for front-matter fields — TASK-65.
-- Lazy migration of document record types — TASK-68.
-- Lazy migration of tasks and milestones to the native layout and one-way import — TASK-83 (see `papyrus-native-record-layout-and-single-id-space.md`, `import-backlog-md-records.md`).
-- Removal of legacy per-module parsers/writers and no-drift enforcement beyond this stage — TASK-70.
-- Native layout and one-way import verification — TASK-98.
-- Browser UI changes and metadata projection — TASK-66, TASK-67, TASK-72.
-- UI mockups and other HTML files — excluded by REQ-05.010 and ADR-0012 decision 11.
-- Backlog.md `docs` and `drafts` records — out of scope (REQ-05.010).
-- Corpus migration or any write that changes an existing record body.
+- Lazy adoption of an existing record that lacks front matter, and the
+  descriptor source used for it.
+- The option surface generated from a field sequence.
+- Record layout, ID shapes, status vocabularies, archive and delete behaviour.
+- Browser rendering and search.
 
 ## Behavior
 
-### 1. Module layout and ownership
+### 1. Module ownership
 
-1. All record parsing, metadata formatting, and record writing live under `src/record/`. No other module may hand-format a `---` block, re-serialize an untouched block, or parse front matter with ad-hoc string splitting.
-2. `record::frontmatter`, `record::document`, `record::patch`, and `record::store` are the only entry points used by later tasks.
-3. `record::identity` is not part of this ticket; it is delivered by TASK-64. Descriptors carry Papyrus IDs only; no foreign-ID fields are reserved or translated here.
-4. Every record module becomes a descriptor consumer in later tasks; this ticket only defines the descriptor shape and the shared implementation.
+1. All record parsing, metadata formatting, and record writing live under
+   `src/record/`. No other module may hand-format a `---` block, re-serialize an
+   untouched block, or split front matter with ad-hoc string scanning.
+2. `record::frontmatter`, `record::document`, `record::patch`, and
+   `record::store` are the only entry points.
+3. Descriptors carry Papyrus IDs only. No second identity, no foreign-ID field,
+   and no translation at a storage boundary.
 
-### 2. `record::frontmatter`
+### 2. Record envelope
 
-1. Detection: a leading YAML block is recognized only when the file's first byte is the start of a line containing exactly `---`, followed by a closing line containing exactly `---`. Nothing may precede the opening delimiter.
-2. Parsing uses `yaml_serde`. The parse result preserves key order, raw scalar text, and unknown keys.
-3. Typed accessors cover the general keys (`id`, `title`, `created_date`, `updated_date`, `labels`, `references`) and the per-type extras declared in the key registry from ADR-0012.
-4. Serialization emits the canonical key order and Papyrus-native quoting. General keys precede type-specific keys.
-5. Patching rewrites only changed keys and preserves unknown keys, key order, and comments. A full document re-serialization that reorders or requotes foreign keys is prohibited.
-6. Timestamps are quoted ISO-8601 UTC strings of the form `'YYYY-MM-DDTHH:MM:SSZ'`.
-7. For tasks and milestones, YAML key order and quoting follow the Papyrus-native serialization. `assignee` is a YAML list.
-### 3. `record::document`
+1. A loaded Markdown record exposes: `id`, `title`, `status`, `labels`,
+   `references`, `created_date`, `updated_date`, the body units, the version
+   token, the file path, and one field map.
+2. `labels`, `references`, `created_date`, and `updated_date` are general record
+   metadata, never fields. `title` is fixed and is not a field. `status` is
+   reserved and read-only outside the verbs that own it.
+3. An undeclared front-matter key found on disk is preserved as stored and is
+   surfaced read-only as extra metadata. It is never repaired, merged, renamed,
+   or removed.
+4. A body and front-matter value that already disagree on disk are left as
+   stored. A read displays the body value; a write sets both locations from the
+   submitted value.
 
-1. The envelope splits a file into:
-   - an optional front-matter block;
-   - an optional heading line (`# <ID> <title>`) where the record type keeps one;
-   - preamble lines before the first `## ` section;
-   - ordered `## ` sections, each retaining its heading line and raw body lines.
-2. Section text and unknown content are kept as raw lines and are never re-rendered.
-3. Every unmodified line is preserved byte-for-byte, including line endings as stored.
-4. Tasks and milestones have no `# <ID> <title>` heading. All other Markdown record types keep a body title line.
-5. Frozen ADR bodies keep their existing heading and sections; the envelope does not alter them.
+### 3. Field map
 
-### 4. `record::patch`
+1. The field map is built once per loaded record from the descriptor and the
+   record's role. It is the only content projection: no typed content field and
+   no second field table is consulted.
+2. The map carries the role, the resolved fields in descriptor sequence order,
+   the fixed metadata block (HTML mockup only), the undeclared stored keys, and
+   the resolved reference visibility.
+3. A resolved field carries its key, label, help, kind (`text`, `multiline`,
+   `list`), required flag, editability, and value. The value is text, a list of
+   items, or absent.
+4. Role resolution is per model:
 
-1. `PatchOp` supports at least:
-   - `SetFrontMatter(key, value)`
-   - `ClearFrontMatter(key)`
-   - `SetSection(heading, value)`
-   - `ClearSection(heading)`
-   - `SetHeadingTitle(title)`
+   | Model | Field sequence | Role |
+   |---|---|---|
+   | `SingleMarkdown` | top-level `fields` | single |
+   | `GroupedMarkdown` | `group.fields` for a group record, `member.fields` for a member record | group or member |
+   | `SingleHtmlMockup` | none; `fields` is empty | single, with the fixed metadata block |
+
+5. Value resolution is deterministic:
+
+   - a field with only `heading` reads the body section with that heading;
+   - a field with only `frontmatter_key` reads that front-matter key;
+   - a field with both reads the body section as the display value and does not
+     merge the two locations.
+
+6. An absent optional value is absent. An absent required value is absent and is
+   flagged on an edit surface; the record is not repaired.
+
+### 4. `record::frontmatter`
+
+1. Detection: a leading YAML block is recognized only when the first line is
+   exactly `---` and a later line is exactly `---`. Nothing may precede the
+   opening delimiter.
+2. Parsing preserves key order, raw scalar text, and unknown keys.
+3. Typed accessors cover the general keys and the keys named by declared fields.
+4. Serialization emits the canonical order: the general keys first, then
+   `status` for a model that stores status in front matter, then the
+   declared-field keys in field sequence order, then any preserved undeclared
+   keys in their stored order.
+5. Patching rewrites only the changed keys and preserves unknown keys, key
+   order, comments, and quoting. A full re-serialization that reorders or
+   requotes foreign keys is prohibited.
+6. Timestamps are quoted ISO-8601 UTC strings of the form
+   `'YYYY-MM-DDTHH:MM:SSZ'`.
+7. `assignee` is a YAML list on task records.
+
+### 5. `record::document`
+
+1. The envelope splits a file into an optional front-matter block, an optional
+   heading line, preamble lines, and ordered `## ` sections that each retain
+   their heading and raw body lines.
+2. Section text and unknown content are kept as raw lines and are never
+   re-rendered.
+3. Every unmodified line is preserved byte-for-byte, including its line endings.
+4. Task and milestone records have no `# <ID> <title>` heading. Every other
+   Markdown record type keeps one, generated from the front-matter `id` and
+   `title` so the two cannot diverge.
+5. Frozen decision bodies keep their existing heading and sections; the envelope
+   never alters them.
+
+### 6. `record::patch`
+
+1. `PatchOp` supports at least: `SetFrontMatter`, `SetFrontMatterValue`,
+   `ClearFrontMatter`, `SetSection`, `ClearSection`, `SetHeadingTitle`, the
+   heading/ID operations, and the model-specific HTML-metadata operations.
 2. Applying a patch returns the new file text.
-3. Applying an empty patch returns byte-identical text.
-4. Applying a patch whose values equal the current values returns byte-identical text.
-5. A patch that changes no byte does not result in a write; `updated_date` is therefore not refreshed by a no-op.
-6. `record::patch` is the only mutation API. Lazy migration in later tasks must be expressed as patches through this API.
+3. An empty patch, and a patch whose values equal the stored values, return
+   byte-identical text.
+4. A patch that changes no byte causes no write, so `updated_date` is not
+   refreshed by a no-op.
+5. `record::patch` is the only mutation API.
 
-### 5. `record::store`
+### 7. Field-to-PatchOp mapping
 
-1. Provides safe path resolution using `Context::ensure_within` before any read or write.
-2. Provides read of a record file, returning the document envelope and the ADR-0006 version token.
-3. Provides atomic write using the ADR-0006 sequence: create a new temporary file in the same directory, write, `sync_all`, set permissions, rename over the target, and clean up on failure.
-4. Provides the version token derived from file metadata as `seconds.nanos.length`.
-5. No record module calls `fs::write` on a record path; all writes go through `record::store::write_atomic` or an equivalent store method.
-6. Read accepts both legacy files without front matter and files with front matter. When front matter is present it is used first; otherwise the store falls back to section and heading parsing.
-7. Read does not migrate or modify the file in this ticket. Migration is added by TASK-68 and TASK-69.
+The engine builds operations from the field sequence and the submitted values.
+The mapping is fixed by the field's storage shape and kind:
 
-### 6. Record descriptors
+| Field shape | Kind | Create/edit operations |
+|---|---|---|
+| `heading` only | `text`, `multiline` | `SetSection(heading, value)`; an optional cleared value uses `ClearSection(heading)` |
+| `frontmatter_key` only | `text`, `multiline` | `SetFrontMatter(key, value)`; an optional cleared value uses `ClearFrontMatter(key)` |
+| `frontmatter_key` only | `list` | `SetFrontMatterValue(key, sequence)` with one scalar item per submitted value, in submission order |
+| `heading` and `frontmatter_key` | any | both operations above, built from the same submitted value |
 
-1. A descriptor exists for each managed record type listed in scope.
-2. Each descriptor declares:
-   - record type name;
-   - Papyrus ID pattern and directory;
-   - type-specific front-matter keys and their order after the general keys;
-   - known body sections and their order;
-   - field validation rules.
-3. UI mockup HTML is excluded; no descriptor claims `.html` mockup files.
-4. Backlog.md `docs` and `drafts` records are not claimed by any descriptor.
-5. Prose Markdown that no descriptor claims is never migrated or modified.
+1. A field whose kind is `list` and whose only storage is a heading writes one
+   list item per line under its section.
+2. A field with both locations writes both; neither location is left stale.
+3. A required field missing on create produces one validation outcome listing
+   every missing key, and no patch is built.
+4. A required field cleared on edit produces one validation outcome and no
+   patch. An optional field may be cleared by the operation for its shape.
+5. Fixed operations outside the field sequence:
 
-### 7. Error behavior
+   | Value | Operations |
+   |---|---|
+   | Title | `SetHeadingTitle(title)` plus the front-matter `title` |
+   | `status` | `SetFrontMatter` from the status and archive verbs only; never from a field option |
+   | `group` link | `SetFrontMatter("group", group-id)` at member create only; never on edit |
+   | HTML mockup metadata | HTML-metadata operations for the fixed keys; no YAML key is written |
+   | Supersession | HTML-metadata operations that set the state and the back-reference |
 
-1. A file that cannot be read or whose path escapes the project directory produces a runtime error (exit code 1) consistent with existing commands.
-2. A malformed front-matter block that cannot be parsed produces a validation error (exit code 4) rather than a panic.
-3. A missing record produces a not-found error (exit code 3) consistent with existing commands.
-4. Atomic write failures leave the original file byte-identical and remove any temporary file.
+6. A field whose verbs exclude a verb contributes no operation for that verb.
+
+### 8. Only patch operations write a record
+
+1. The engine never writes a record body. It does not format a `---` block,
+   re-render a body, call `fs::write`, or hold a per-type writer.
+2. A create and an edit each produce exactly one patch, applied by
+   `record::store::write_atomic`.
+3. A patch that changes nothing performs no write and exits successfully.
+4. A validation failure writes nothing and leaves the file byte-identical.
+5. A write preserves every key, section, comment, and line ending that the
+   operation does not change.
+6. `updated_date` is refreshed once per write that changes at least one byte,
+   including the archive and delete writes, and is never touched by a read or a
+   no-op patch.
+
+### 9. `record::store`
+
+1. Resolves every path through the project-containment check before a read or a
+   write.
+2. Returns the document envelope and the version token on read.
+3. Writes atomically: create a temporary file in the same directory, write,
+   `sync_all`, set permissions, rename over the target, and clean up on failure.
+4. Derives the version token from file metadata as `seconds.nanos.length`.
+5. Accepts both a record without front matter and a record with front matter;
+   front matter is used first, otherwise the reader falls back to section and
+   heading parsing.
+6. Reading does not modify the file. Adoption of a record that lacks front
+   matter is a separate, idempotent path.
+
+### 10. Error behavior
+
+1. An unreadable file, or a path that escapes the project directory, is a
+   runtime error (exit code 1).
+2. Malformed or unparseable front matter is a validation error (exit code 4),
+   never a panic.
+3. A missing record is a not-found error (exit code 3).
+4. An atomic-write failure leaves the original file byte-identical and removes
+   any temporary file.
 5. No partial write is reported as success.
 
 ## Inputs and outputs
 
-- Input: a project `Context` and a record path or descriptor-claimed location.
-- Output: a `Document` envelope (front matter plus body units) and a version token on read; new file text on patch; success or error on write.
-- No user-facing command output is added by this ticket.
-
-## Validation and error behavior
-
-- Path escape or symlink traversal → exit code 1.
-- Missing file → exit code 3.
-- Malformed front matter or invalid YAML → exit code 4.
-- IO failure during atomic write → exit code 1; original file unchanged.
+- Input: a project context, a record path or a descriptor-claimed location, and
+  a list of patch operations.
+- Output: the envelope, the field map, and the version token on read; new file
+  text on patch; success or a typed error on write.
 
 ## Assumptions
 
-- Assumption: `yaml_serde` 0.10 remains the only YAML dependency; no new crate is added (ADR-0005).
-- Assumption: the existing `Context::ensure_within` implementation is reused for path safety (NFR-04.002).
-- Assumption: the existing `browser::records::write_atomic` sequence is the reference for atomic writes; `record::store` may wrap or reimplement it without changing the contract (ADR-0006).
-- Assumption: no corpus migration occurs in this ticket; readers must tolerate both shapes, and migration is delivered later.
-- Assumption: UI mockups remain HTML-only and are not represented by a record descriptor.
-- Assumption: the single-crate layout is retained; `src/record/` is a module inside the existing crate (ADR-0004, ADR-0005).
+- Assumption: `yaml_serde` stays the only YAML dependency; no new crate is
+  added.
+- Assumption: the existing project-containment check is reused for path safety.
+- Assumption: `record::store` may wrap or reimplement the existing atomic-write
+  sequence without changing its contract.
+- Assumption: HTML mockups remain HTML-only and are not claimed by a
+  front-matter descriptor.
 
 ## Open questions
 
-- OQ-1: Whether `record::store` should expose a separate `read` function returning a borrowed document or an owned envelope; the implementation may choose, provided the byte-identity and fallback contracts hold.
-- OQ-2: Whether descriptors are static constants or constructed values; either is acceptable as long as the no-drift checks and later tasks can consume them.
-
-## Traceability
-
-| Artifact | Reference |
-|---|---|
-| Ticket | TASK-63 |
-| Requirements | REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.001, NFR-04.002, NFR-04.004 |
-| ADRs | ADR-0006, ADR-0012, ADR-0013 |
-| Related tickets | TASK-64, TASK-65, TASK-68, TASK-69, TASK-70 |
-| Source | src/browser/records.rs (`parse_doc`, `apply_*_edit`, `write_atomic`, `version_token`), src/context.rs (`ensure_within`) |
-| Tests | tests/browser_cli.rs, src/browser/records.rs unit tests |
+- Whether a descriptor is built per load or resolved once per command is not
+  fixed here, provided the byte-identity and preservation contracts hold.

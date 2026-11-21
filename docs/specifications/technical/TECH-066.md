@@ -2,223 +2,243 @@
 id: TECH-066
 title: "Refactor the Record Layer for Document Archive and Status"
 created_date: '2026-11-16T17:46:53Z'
-updated_date: '2026-11-16T17:47:29Z'
+updated_date: '2026-11-21T15:36:11Z'
 labels: []
 references:
   - ADR-0006
-  - ADR-0010
-  - ADR-0012
   - ADR-0013
-  - ADR-0017
   - ADR-0022
   - ADR-0023
+  - ADR-0036
+  - ADR-0039
   - REQ-05.007
+  - REQ-05.008
   - REQ-05.010
   - REQ-05.011
   - REQ-07.001
   - REQ-07.002
-  - TASK-105
-  - TASK-107
-  - TASK-108
-  - TASK-110
-  - TASK-113
-  - TASK-114
+  - REQ-07.003
+  - REQ-07.004
+  - ADR-032
+  - REQ-03.001
 status: verified
 ---
 # TECH-066 Refactor the Record Layer for Document Archive and Status
 
 ## Description
-## Status
+Archive, delete, status storage, and visibility are defined once in the record
+layer and are the same for every document model. A type's field sequence adds no
+state, no lifecycle, and no storage location.
+## Behavior
 
-Specification for TASK-107 (record layer refactor; ADR-0022 and ADR-0023).
+### 1. Status is independent of the content model
 
-## Scope
+1. A `SingleMarkdown` or `GroupedMarkdown` record stores its main status in the
+   front-matter `status` key. The value is `active`, `archived`, or a custom
+   status declared for the type.
+2. A `SingleHtmlMockup` record stores its state in the HTML metadata comment.
+   The states are fixed to `pending`, `approved`, and `archived`; no custom or
+   default status is declared for that model.
+3. A declared field, a role field set, and a field sequence add no state. They
+   change no status location, introduce no per-type lifecycle, and define no
+   folder per status.
+4. Only `active` and `archived` affect storage location. A custom status is a
+   front-matter value only: it causes no move and has no folder.
+5. The only writers of a document status are the `status` verb and the `archive`
+   verb, plus `supersede` for the HTML model. No create, edit, or field option
+   writes it.
+6. A non-conforming status value already on disk is preserved verbatim, reported
+   in diagnostics, and blocks status writes until the value or the configuration
+   is corrected. Archive and delete still work.
 
-This specification defines the storage and front-matter contract for document archive and status that TASK-107 establishes in `src/record/`. It is consumed by TASK-110 (generic document handler), TASK-113 (search), and TASK-114 (browser). It does not change command names, output, exit codes, or the on-disk layout beyond the `archived/` location already mandated by ADR-0022/ADR-0023.
+### 2. Directory resolution
 
-In scope:
-- `src/record/descriptor.rs`: directory resolution, `frontmatter_keys`, allocation inputs.
-- `src/record/store.rs`: document `archive` and `delete`, atomic destination-write-then-unlink sequence, idempotency, disagreement validation.
-- `src/record/migrate.rs`: lazy adoption seeds `status`; deprecated locations stop being managed/read.
-- `src/record/identity.rs`: allocation scans active + archived only.
-- `src/record/frontmatter.rs` and `src/record/resolve.rs`: tolerant preservation of non-conforming status and duplicate detection.
+1. Every document descriptor resolves its active directory, its `archived/`
+   subdirectory, and its read directories from configuration, contained by the
+   project-boundary check.
+2. Read directories are the active directory plus `archived/`. A legacy inactive
+   folder is not a read directory.
+3. No production path resolves, reads, scans, lists, migrates, or inventories a
+   legacy inactive folder.
+4. A task descriptor keeps its own archive location, and its legacy read-only
+   alias remains readable where it already exists.
+5. A milestone lifecycle is fixed `open -> closed -> archived` and is not
+   configurable. `close` is the only `open -> closed` transition: it writes
+   status and `updated_date` in place and moves no file.
+6. `milestone archive` is the only transition to `archived`. It closes an open
+   milestone first, then patches `status` to `archived`, refreshes
+   `updated_date`, preserves the title, description, labels, references, and
+   release assignment, and writes atomically into the backlog archive milestones
+   folder. An already archived milestone is a no-op success. Any other status,
+   including a non-conforming value, is refused with the file left untouched.
+7. The milestone descriptor gains the archive verb and the backlog archive
+   milestones folder as its archive location, and declares `open`, `closed`, and
+   `archived` as its status vocabulary; its archive policy is no longer `none`.
+   Configuration cannot change the milestone lifecycle, its verbs, or its
+   archive location.
+8. The backlog archive milestones folder serves two roles: it is the lifecycle
+   archive destination and the legacy read and import location. It stays
+   readable by list, view, search, and browser resolution, and it participates in
+   allocation. The one-way import remains its only other writer.
+9. Archived milestones are hidden from active listings because a listing reads
+   only the active directory. They remain viewable by ID and editable in place as
+   legacy data.
+10. No restore command exists for milestones: nothing returns an archived
+    milestone to `open` or `closed`. Only tasks keep archive and restore.
+11. A decision descriptor has no archive directory: a decision is never moved and
+    its state stays in its status section.
 
-Out of scope:
-- Static per-type command modules keep their current verbs until TASK-108/TASK-110; TASK-107 only changes the shared record contract they will later consume.
-- No UI mockup design.
-- Deleted-ID reuse, auto-relocation on read, and inert orphaned `deprecated/` are settled defaults (ADR-0022 decision 12); TASK-107 implements the auto-relocate-on-read path and documents the other two. No high-water mark is introduced and no repair or inventory command is added.
-## Source authority
+### 3. Archive contract
 
-- ADR-0022 (Accepted): lifecycle operations, archive sequence, status command, no restore, tolerant read, visibility.
-- ADR-0023 (Accepted): consolidated layout and field map.
-- ADR-0010, ADR-0012 (Superseded where contradicted): allocation and metadata rationale.
-- ADR-0006 (atomic writes), ADR-0013 (patch/single writer), ADR-0017 (registry/status models).
-- REQ-05.007, REQ-05.010, REQ-05.011, REQ-07.001, REQ-07.002.
+`store::archive(ctx, descriptor, id)` behaves as follows:
 
-## Directory resolution contract
+1. It resolves the record from the active and archived locations.
+2. If the record is already archived, it returns the existing path with no write
+   and no `updated_date` change. Archive is therefore idempotent.
+3. If the record is active with status `archived`, it relocates the file to the
+   archived directory using the destination-write-then-unlink sequence, leaves
+   the status value as it is, and returns the archived path. This is the store
+   counterpart of the read-path relocation.
+4. Otherwise it patches `status` to `archived`, writes the destination
+   atomically, and removes the source only after that write succeeds.
+5. On a destination-write failure the source is untouched and the error is
+   returned. On a source-unlink failure after a successful destination write the
+   source is untouched and the destination exists; the runtime error names both
+   paths, and duplicate detection then makes the record unreadable for writes
+   until one copy is removed.
+6. It creates the destination directory when absent, contained in the project.
+7. It preserves the record ID and refreshes `updated_date` only because the
+   content changed.
+8. A custom status is replaced by `archived` and the previous value is not
+   retained anywhere.
 
-`RecordDescriptor`:
+### 4. Read-path relocation
 
-- Retain `resolve_directory` (active) and `resolve_archive_directory` (tasks/milestones).
-- Add `resolve_archived_directory(cfg, project_dir) -> Option<Result<PathBuf>>`:
-  - Document descriptors: `Some(Ok(active_dir.join("archived")))`, contained via `Context::ensure_within`.
-  - Task/milestone descriptors: `Some(Ok(.../archive/<subpath>))` (same as their archive location) so downstream has one method.
-  - Decision and other families: `None`.
-- Delete `resolve_deprecated_directory` entirely.
-- `resolve_read_directories` returns active + archived + task/milestone legacy alias only. No deprecated branch.
-- `resolve_legacy_archive_directory` remains read-only for tasks/milestones.
+1. When a read, list, view, search, or browser lookup finds a record in the
+   active directory whose stored status is `archived`, it relocates the file
+   with the sequence of section 3 before returning the record.
+2. A successful relocation is reported in diagnostics.
+3. If the relocation fails, the source stays intact, no partial state is left,
+   the record is returned read-only with a validation outcome naming both paths,
+   and writes to it are refused until the conflict is resolved.
+4. Relocation on read is the only write permitted on a read path.
+5. A record carrying a custom status is not relocated.
 
-No production code in `src/record/` may resolve or read `deprecated/`.
+### 5. Delete contract
 
-## Front-matter key contract
+`store::delete(ctx, descriptor, id)` behaves as follows:
 
-`GENERAL_FRONTMATTER_KEYS` order unchanged. `frontmatter_keys`:
+1. An active record is archived first, then the archived file is removed.
+2. An archived record is removed directly.
+3. No confirmation and no force flag belong to the store; they are a command
+   concern.
+4. A deleted record leaves no file. Allocation is `max(observed) + 1` over active
+   and archived locations with no high-water mark, so deleted numbers generally
+   remain gaps while the highest number can be reused.
+5. No document restore operation exists: no command returns an archived record to
+   `active`.
 
-- milestone: general keys, then `status`, then `release` (canonical order per ADR-0023).
-- release: general keys, then `status`.
-- every document descriptor: general keys, then `status`, then existing type-specific keys.
-- audit: general keys, then `status`, then `type`.
-- decision: unchanged (`superseded_by` only; status stays in document core).
-- UI mockup: no front-matter keys.
-- task: unchanged (status already present).
+### 6. Group records
 
-`migrate::migrate_content` must seed:
-- task: existing behavior (status from legacy section or config default).
-- milestone: `release` + `status = "open"`.
-- release: `status = "planned"`.
-- document: general keys + `status = <default_status or "active">` + type-specific keys.
-- audit: general keys + `status = <default or active>` + `type`.
+1. Archive and delete apply per record. Archiving or deleting a group record
+   changes no member's file, status, or ID, and archiving or deleting a member
+   changes no other member and no group record.
+2. Each record is archived or deleted only by a command that names it.
+3. Archiving a member preserves its ID, and the engine-owned group link is
+   unchanged by an archive or a delete of either role.
+4. An archived group cannot accept a new member; a member create requires an
+   existing active group of the same type.
+5. A list shows the surviving group records and their members in group order,
+   then member order; archived records are not listed.
 
-## Public API consumed by downstream tasks
+### 7. HTML mockup
 
-`src/record/store.rs`:
+1. The type has no `status` verb and no front-matter block. Its metadata lives in
+   the HTML metadata comment.
+2. The fixed metadata keys are `status`, `task`, `specs`, `refs`, `references`,
+   and `superseded_by`, and all of them are read from the HTML metadata comment.
+   `specs` and `refs` are the two list-valued keys the edit surface writes;
+   `status` and `superseded_by` are engine-written, and `task` and `references`
+   are read-only.
+3. The states are fixed to `pending`, `approved`, and `archived`; configuration
+   cannot add, remove, or rename one, and a status list or default status on this
+   model is rejected.
+4. `archive` is the only path to `archived`; `supersede` also sets `archived` and
+   records the successor in `superseded_by`. Supersession has no form control
+   and no field.
+5. `archive` moves the file to the `archived/` subdirectory, keeps the ID, and
+   hides the record from lists, search, and the browser.
+6. A superseded mockup refuses status transitions.
+7. The edit surface offers the title and the `specs` and `refs` controls only;
+   `status`, `task`, `references`, and `superseded_by` are read-only there.
+8. No restore operation exists for a mockup.
 
-- `pub fn archive(ctx, descriptor: &RecordDescriptor, id: &str) -> Result<PathBuf, AppError>`
-  - Resolves the active record using descriptor prefixes and dotted shape.
-  - If already archived (resolved location is the archived directory), returns `Ok(existing_path)` without write or `updated_date` change.
-  - If active and `status == "archived"`, relocates the file to the archived directory using the same destination-write-then-unlink sequence (the status patch is a no-op on the value) and returns the archived path; on failure the source stays intact and an error is returned. This is the store-level counterpart of read-path auto-relocate.
-  - Otherwise patches `status` to `"archived"` (plus descriptor-required back-reference where applicable), writes the destination through `write_atomic`, and removes the source only after the destination write succeeds.
-  - On destination write failure: source untouched; error returned.
-  - On source unlink failure after successful destination write: returns runtime error naming both paths; duplicate detection then makes the record unreadable-for-write until a human removes one copy.
-  - Creates the destination directory if needed, contained in the project.
-  - Returns the archived path.
-- Read-path auto-relocate: when a read, list, view, search, or browser/ID-lookup path encounters a file in the active directory whose `status` is `archived`, it calls `store::archive` (or an equivalent relocate) using decision 2's sequence before returning the record; the relocation is reported in diagnostics. On destination-write or source-unlink failure the source stays intact, no partial state is left, and the read returns a read-only record together with `AppError::Validation` naming both paths; writes to that record are refused until the conflict is resolved. This is the only permitted write on a read path.
-- `pub fn delete(ctx, descriptor: &RecordDescriptor, id: &str) -> Result<(), AppError>`
-  - Active record: calls `archive`, then removes the archived file.
-  - Archived record: removes the file directly.
-  - No confirmation or `--force` (CLI concerns).
-- `pub fn archive_content(ctx, source: &Path, destination: &Path, content: &str) -> Result<(), AppError>`
-  - For callers that patch their own content (UI mockup supersede): atomic destination write, then source unlink; same failure semantics as `archive`.
-- No `restore` for documents. `move_record` and `write_atomic` remain.
+### 8. Front-matter key contract
 
-`src/record/descriptor.rs`:
+1. The general keys keep their canonical order.
+2. For a record whose model stores status in front matter, the key order is: the
+   general keys, then `status`, then the declared-field keys in field sequence
+   order.
+3. For a task record, the existing key set is unchanged and `assignee` remains a
+   YAML list.
+4. For a milestone, the declared key `release` follows `status`. For a release,
+   the declared keys follow `status`.
+5. For a decision, the only type-specific key is `superseded_by`; status and type
+   stay in the document core.
+6. For an HTML mockup, there are no front-matter keys.
+7. A key that no field declares and that already exists on disk is preserved in
+   its stored position and surfaced read-only.
 
-- `resolve_archived_directory`, `resolve_read_directories` as above.
-- `frontmatter_keys` changes above.
+### 9. Surface consumed downstream
 
-`src/record/identity.rs`:
+1. Descriptor resolution supplies the archived directory, the read directories,
+   the front-matter key order, and the declared status vocabulary.
+2. Record-store operations supply archive, delete, and content-level archive for
+   a caller that patches its own content before moving it, plus atomic write and
+   the version token.
+3. Duplicate detection spans every passed directory; callers pass the active and
+   archived locations only.
+4. Allocation helpers scan active and archived locations only.
+5. Adoption seeds `status` for a model that stores it, and never normalizes a
+   non-conforming value.
 
-- Allocation scans active and archived locations only. Replace deprecated-parameter helpers:
-  - `next_number_in_dirs(dirs, prefix)` remains the primitive.
-  - `next_number(active, archived, prefix)` (or remove and update callers to `next_number_in_dirs`).
-  - `next_html_number(active, archived, prefix)` / `next_seq_number(active, archived, group_id)` similarly.
-- `allocate_next` unchanged (`max + 1`, minimum 1). Deleted numbers remain gaps; deleting the highest number makes it reusable under `max + 1`. High-water mark is an open question, not implemented.
+### 10. Validation and error behavior
 
-`src/record/migrate.rs`:
+1. A record in the archived directory whose status is `active` or a custom value
+   is a validation outcome (exit code 4) naming the value and the location, with
+   no write and no relocation.
+2. A record in the active directory whose status is `archived` is relocated on
+   read; a relocation failure yields the read-only plus validation outcome of
+   section 4.
+3. A non-conforming status is preserved and flagged; the status verb refuses it.
+4. The `status` verb rejects `archived` and names `archive` as the only archiving
+   path, and it rejects an archived record.
+5. The `status` verb performs no move and creates no directory.
+6. Duplicate copies of one ID across active and archived locations are a
+   validation outcome naming both paths.
+7. Archive is idempotent and reports success without a write for an already
+   archived record.
+8. A milestone archive of an already archived milestone reports success without
+   a write; any other status value is refused with no write and no relocation.
 
-- `managed_descriptor` no longer matches `deprecated/`.
-- `ensure_front_matter*` remains lazy and non-relocating.
-- Adoption seeds `status` as above.
-- No normalization of non-conforming status on read or write.
+## Inputs and outputs
 
-`src/record/resolve.rs`:
-
-- Duplicate detection remains across all passed directories (active + archived + legacy aliases).
-- No deprecated directories are passed by record-layer callers.
-- Tolerant read preserves `status` verbatim; a non-conforming value is flagged by downstream diagnostics.
-
-`src/record/frontmatter.rs`:
-
-- No change to parsing/serialization.
-- `current_value_string` remains the read path for status.
-- No automatic status normalization.
-
-## ADR-0022 decision mapping
-
-1. `status` registry key for milestones/releases/documents: static `frontmatter_keys` and registry already model it; migrate seeds it; decisions/mockups excluded.
-2. Archive = patch + relocate: `store::archive` and `store::archive_content`.
-3. Idempotent archive and auto-relocate: `store::archive` is a no-op for already-archived records and relocates active-folder archived-status records (ADR-0022 decision 12); validation path for an archived-folder record whose status is `active` or a custom status.4. `status` command front-matter only: handler/commands use `write_atomic`, no move/folder; rejects `archived` and archived records. Record layer provides tolerant read and write primitive.
-5. No document restore: no `restore` in `store`; document baseline verbs exclude restore (registry already enforces).
-6. `archived/` only: `resolve_archived_directory` added; `resolve_deprecated_directory` deleted; no deprecated reads.
-7. Delete = archive-then-unlink: `store::delete`.
-8. Supersession uses same sequence: `store::archive_content` consumed by UI mockup supersede.
-9. Tolerant, non-destructive read: migrate/resolve/frontmatter preserve value; diagnostics flag it; writes refused until fixed.
-10. Visibility follows location: search/browser index only active directory; `archived/` never indexed/resolvable by ID.
-11. Clause-level supersession: ADR-0010/0012 deprecated clauses not implemented; this spec is authoritative delta with ADR-0023.
-
-## ADR-0023 mapping
-
-- Active/archive layout: `resolve_directory`, `resolve_archived_directory`, `resolve_archive_directory`.
-- Allocation scope: identity helpers scan active + archived only.
-- Field map: `frontmatter_keys` updates.
-- `status` exemption from create/edit options: record layer does not expose status as a create/edit option; only `status` and `archive` write it (enforced by commands/registry).
-
-## Validation and error behavior
-
-- A file in the active folder whose `status` reads `archived` is auto-relocated to `archived/` on read using the archive sequence (see Read-path auto-relocate). It is not a validation error on its own; on relocation failure the source stays intact and the read returns a read-only record plus a validation outcome, and writes are refused until the conflict is resolved.
-- A file in the `archived/` folder whose `status` is `active` or a custom status is `AppError::Validation` (exit 4), naming value and file location, with no write and no relocation.- Non-conforming status (outside declared vocabulary) is preserved verbatim, flagged in diagnostics, and `status` writes are refused until value or configuration is fixed. Archive and delete still work.
-- Archive is idempotent: already archived returns success without write or `updated_date` change.
-- `status` rejects `archived` with a message naming `archive` as the only archiving path.
-- `status` rejects an archived record.
-- `status` performs no move and creates no folder.
-
-## Test plan
-
-Unit (`src/record/`):
-- Descriptor resolution: archived path for documents; no deprecated method; read directories exclude deprecated; front-matter key order/content.
-- Store archive ordering: simulate destination write failure (destination path is existing directory) and assert source survives and error returned.
-- Store idempotency: archived record returns Ok and content/bytes unchanged.
-- Store auto-relocate: active record with `status: archived` is relocated to `archived/` and the archived path is returned; simulated destination write failure leaves the source intact and returns an error; simulated source-unlink failure leaves both copies and returns a runtime error naming both paths.
-- Read-path auto-relocate failure: returns a read-only record with a validation outcome and refuses writes.- Store delete: active archives then unlinks; archived unlinks directly.
-- Identity allocation: scans active + archived only; deprecated files ignored; deleted highest number reusable under max+1 (gap behavior).
-- Migrate adoption: document/milestone/release records receive status on first write.
-- Tolerant read: undeclared status preserved verbatim and flagged; no normalization.
-- Resolve duplicates: active + archived copies of same ID returns validation error naming both paths.
-
-Integration:
-- `papyrus <type> archive <id>` (existing document types) moves file to `archived/`, patches status, leaves no source.
-- Process interruption between destination write and source unlink leaves both copies; record becomes duplicate/unreadable-for-write until one copy is removed.
-- No restore command exists for documents (command tree/registry invariant).
-- `papyrus <type> status` changes front matter only; no move/folder.
-- Archived records are absent from list/search/browser index.
-- UI mockup supersede moves to `archived/` and sets HTML status to archived using the same sequence.
+- Input: a project context, a record descriptor, and a record ID or path.
+- Output: the resolved or written path on archive; success on delete; the record
+  envelope and version token on read.
 
 ## Assumptions
 
-- Assumption: static `RecordDescriptor` remains the read/migration identity source until TASK-108/TASK-110; TASK-107 updates it to the new contract rather than deleting it.
 - Assumption: `store::archive` creates the destination directory when absent.
-- Assumption: archived records are not resolvable by ID for view/list/search; read-directory inclusion is limited to migration/conflict/duplicate detection.
-- Assumption: no high-water mark is added; allocation remains `max(observed) + 1`.
-- Assumption: `deprecated/` folders remain on disk untouched and are not migrated.
-- Assumption: read-path auto-relocate uses `store::archive`'s destination-write-then-unlink sequence; on failure the source stays intact and the read returns a read-only record with a validation outcome.
-## Dependencies
-
-- Depends on: TASK-105 (completed).
-- Blocks: TASK-110, TASK-113, TASK-114 (and their dependents).
-- Scope risk: changing identity helper signatures ripples to audit, glossary, req, rule, tech_spec, test_case, test_report, ui_spec, use_case, and ui_mockup modules. Either update callers in this task or introduce archived-parameter wrappers; recommended to update callers to avoid deprecated reads.
+- Assumption: archived records other than milestones are not resolvable for
+  view, list, or search; archived directories are read only for adoption,
+  duplicate detection, conflict resolution, and milestone view by ID.
+- Assumption: allocation remains `max(observed) + 1` with no high-water mark.
+- Assumption: a legacy inactive folder stays on disk untouched and inert.
 
 ## Open questions
 
-1. Configuration-status shrink: removing a declared custom status leaves records that read but cannot be written; whether to provide a read-only inventory of affected records is open (ADR-0022 Open Questions). Not implemented here.
-2. Whether `archived/` is gitignored or version-controlled: kept under version control, current behaviour (ADR-0022 Open Questions). Not changed here.
-
-Settled defaults (ADR-0022 decision 12), not open: deleted-ID reuse under `max + 1` with no high-water mark; auto-relocate on read with failure handling (source intact, read-only record plus validation outcome on failure); orphaned `deprecated/` folders stay inert with no inventory command.
-
-## Definition of done
-
-- `cargo build`, `cargo test`, `cargo clippy` pass, including `tests/no_drift.rs`.
-- No `resolve_deprecated_directory` or deprecated read path remains in `src/record/`.
-- No hardcoded `deprecated/` record-directory literal in production code outside historical ADRs/upgrade notes.
-- Front-matter key order assertions pass for milestone, release, documents, audit.
-- Tests listed in Test plan exist and pass.
-- Open questions remain explicitly recorded; no silent resolution.
+- Whether an inventory of records left unreadable by a removed custom status
+  should be provided.
+- Whether the archive directory is version-controlled or ignored by the version
+  control system.

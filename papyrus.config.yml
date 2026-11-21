@@ -4,7 +4,7 @@ milestone_prefix: MS
 release_prefix: REL
 id_padding: 3
 date_format: yyyy-mm-dd
-editor: null
+browser_open: true
 backlog_directory: backlog/
 decision_directory: decisions/
 doc_directory: docs/
@@ -76,4 +76,3 @@ document_types:
     default_status: open
 browser_host: 127.0.0.1
 browser_port: 5420
-browser_open: true

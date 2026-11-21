@@ -2,7 +2,7 @@
 id: ADR-0023
 title: "Consolidated Record Layout and Front-Matter Field Map"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-20T20:09:05Z'
+updated_date: '2026-11-21T15:44:59Z'
 labels: []
 references: []
 ---
@@ -49,6 +49,8 @@ Forces: one identity, one file, one name (ADR-0010 decision 1); configuration-dr
    A milestone likewise has no archive location and no milestone command moves the record: `papyrus milestone close <id>` rewrites `status` from `open` to `closed` and refreshes `updated_date` in place through the single write path (REQ-03.001, ADR-0022 decision 5), and the milestone descriptor carries `ArchivePolicy::None`. The legacy `<backlog_directory>/archive/milestones/` folder is a **read/import location only**: the milestone resolver still reads it, and the one-way Backlog.md import writes archived source milestones there (ADR-0011). No milestone command archives, restores, migrates, or relocates a record into or out of that folder, and no milestone command creates it; the import is the only writer that creates archived milestone records there. A milestone file under that folder remains readable legacy data: this ADR introduces no migration, relocation, or deletion of it, and no command archives or restores a milestone.
 
    *Revision (2026-11-15, owner decision): the Milestone row previously listed `<backlog_directory>/archive/milestones/` as its archive location. Milestones never move — `papyrus milestone close <id>` writes `status` and `updated_date` in place, and the milestone archive and restore verbs were removed (ADR-0022 decision 5). The row and the paragraph above now record the delivered contract, including the legacy read/import exception for `<backlog_directory>/archive/milestones/`.*
+
+   *Amendment (2026-11-21) — milestone archive: the Milestone row and the milestone sentence above, including both 2026-11-15 revisions, are superseded by ADR-032 decisions 2, 4 and 5. The milestone lifecycle is `open -> closed -> archived`, the milestone has an archive location (the backlog archive milestones folder, which also remains the legacy read and import location), and `papyrus milestone archive <id>` is the only path to `archived`. Every other statement in this decision stands unchanged.*
 
 3. **`archived/` is the only inactive location for document records.**
    - A `deprecated/` folder is **not** read, listed, searched, indexed by the browser, migrated, moved, or renamed. Its files stay exactly where they are until a human acts outside Papyrus. No code path may resolve it, and no descriptor may name it.
@@ -102,6 +104,14 @@ Forces: one identity, one file, one name (ADR-0010 decision 1); configuration-dr
 - **Decision 5 — document front-matter keys.** The document rows of the field map are completed by the descriptor. A document type's additional front-matter keys are the general keys plus `status` plus every key declared by a field `frontmatter_key` in that type's field sequence (ADR-036 decisions 14 and 21). The audit row's `type` is the seed field `audit_type` declared with `frontmatter_key: type` (ADR-036 decision 29), not a fixed map entry; a config-declared document type gains `status` and its declared front-matter keys. `group` remains engine-owned and reserved and is never a field. The general keys, their canonical order, and their protection are unchanged, and a field may not declare a reserved key (ADR-036 decision 23).
 - **Downstream constraint 4.** Decision 5 remains authoritative for the general keys, the reserved keys, and the status vocabulary: adding or removing one of those still requires a key-registry change and an update to this ADR. Adding or removing a *document* front-matter key is a field declaration in the descriptor — a configuration file edit for a config-declared type, a seed edit for a built-in — validated by ADR-0019, and it needs no amendment to this ADR.
 - **Not changed:** decisions 1-4 and 6-9, the layout, ID allocation, the delegation of lifecycle operations to ADR-0022, and this record's accepted status.
+
+### Amendment (2026-11-21) — milestone archive
+
+- **Decision 3.** The milestone sentence in decision 3 and the milestone clause of its 2026-11-15 revision are superseded by ADR-032 decisions 2, 4 and 5 — the milestone lifecycle is `open -> closed -> archived`, a milestone has an archive location (the backlog archive milestones folder, also the legacy read/import location) and `papyrus milestone archive <id>` is the only path to `archived`; every other statement in decision 3 stands.
+- **Decision 4.** The no-milestone-command-writes sentence in decision 4 and the matching clause of its 2026-11-15 revision are superseded by ADR-032 decisions 2, 4 and 5 — the milestone lifecycle is `open -> closed -> archived`, a milestone has an archive location (the backlog archive milestones folder, also the legacy read/import location) and `papyrus milestone archive <id>` is the only path to `archived`; every other statement in decision 4 stands.
+- **Decision 5.** The milestone status vocabulary in the decision 5 field-map row (`open` or `closed`) is superseded by ADR-032 decisions 2, 4 and 5 — the milestone lifecycle is `open -> closed -> archived`, a milestone has an archive location (the backlog archive milestones folder, also the legacy read/import location) and `papyrus milestone archive <id>` is the only path to `archived`; every other statement in decision 5 stands.
+- **Downstream constraint 2.** The milestone clause is superseded by ADR-032 decisions 2, 4 and 5 — the milestone lifecycle is `open -> closed -> archived`, a milestone has an archive location (the backlog archive milestones folder, also the legacy read/import location) and `papyrus milestone archive <id>` is the only path to `archived`; every other statement in downstream constraint 2 stands.
+- **Decision 9.** The sentence restating milestones as close-only with no archive or restore is superseded by ADR-032 decisions 2, 4 and 5; the milestone lifecycle is `open -> closed -> archived`, a milestone has an archive location (the backlog archive milestones folder, also the legacy read/import location) and `papyrus milestone archive <id>` is the only path to `archived`. The rest of this clause stands.
 ## Consequences
 
 **Positive:**
