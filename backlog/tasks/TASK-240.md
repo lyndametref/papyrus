@@ -2,7 +2,7 @@
 id: TASK-240
 title: "Build characterization fixtures and the behavior snapshot corpus"
 created_date: '2026-11-20T17:40:57Z'
-updated_date: '2026-11-21T16:46:27Z'
+updated_date: '2026-11-21T17:03:47Z'
 labels: []
 references:
   - REQ-07.002
@@ -15,7 +15,7 @@ references:
   - TC-184
   - REQ-05.001
   - BR-001
-status: ToDo
+status: Done
 assignee:
   - test-manager
 milestone: MS-032
@@ -91,3 +91,12 @@ Definition of done: a second capture run is idempotent (`git status --porcelain 
 - [ ] #15 Rendered page captures normalise the shell bind note to a fixed token, because every page embeds the bound host and port through the shell template, so no ephemeral port appears in any expected page.
 ## Comments
 - **task-refiner**: Refined by task-refiner for MS-032: description grounded in the current routes, renderers, harness conventions and root-cause call sites; acceptance criteria added; references and documentation set. No dependency, ordinal or milestone change. Status left ToDo because papyrus.config.yml declares statuses [ToDo, In-Progress, Done].
+- **test-manager**: test-manager evidence corpus: 233 cases in cases.json - 134 CLI and 99 HTTP. 12 document types across all three DocumentModels, 9 stale-version conflict pages, 5 not-found pages, and the two conflict renderers without a call site recorded as unreachable. 746 expected artifacts under tests fixtures characterization corpus.
+- **test-manager**: test-manager evidence stability: three consecutive capture runs produced an identical sha256 listing of the expected tree, and a scan found no wall-clock timestamp, port, absolute path or pid in any artifact. Capture command: set PAPYRUS_CAPTURE_COMMIT, then run cargo test --test characterization_capture -- --ignored.
+- **test-manager**: test-manager evidence replay: characterization_replay runs in the default cargo test suite in about 4.5 s and passes all 3 tests; the negative test proves one changed byte and one extra artifact both fail the comparison. HTML is compared byte for byte in this milestone.
+- **test-manager**: test-manager evidence suite: cargo test 1133 passed, 24 ignored, 2 failed. Both failures pre-date TASK-240 and touch no file this task owns: list_characterization_replay expects the pinned empty decision fixture to render no table while the tracked ADR-001 record makes it render one, and no_drift reports a heuristic false positive on src import.rs line 1202. Run with EDITOR unset because config_editor_json_null_when_unset picks up the session editor. cargo clippy --all-targets is clean and no src file was modified.
+- **test-manager**: test-manager evidence snapshot: per case record md or html, stdout txt, stderr txt, exit json, payload json, http json with status and ordered headers, page html, and body txt for assets. Tokens normalised: TIMESTAMP for every ISO-8601 UTC value, BIND for the shell host and port, PROJECT for the absolute project path, VERSION for the mtime version token. Nothing else is normalised.
+- **test-manager**: test-manager evidence CLI help: golden set now has 144 snapshots, 27 of them added - config and its four subcommands, help, browser, search, init, import, plus the previously missing task, milestone, release and decision verbs. Completeness and regeneration tests pass.
+- **test-manager**: test-manager evidence correction: the final corpus has 236 cases - 137 CLI and 99 HTTP - and 752 expected artifacts. Three empty-state cases run against project-empty for inventory, the requirement list and the board. The earlier count of 233 predates those empty-state cases.
+- **test-manager**: test-manager evidence correction 2: the exact split is 134 CLI and 102 HTTP, where the HTTP block is 99 populated cases plus 3 empty-state cases. Total 236 cases and 752 artifacts, corpus directory 3.8 MB.
+- **orchestrator**: Acceptance met: 236-case characterization corpus and 752 frozen expectation artifacts over 12 document types, every route class including 7 reachable conflict pages and 5 not-found variants, 27 new CLI help goldens, replay harness stable across consecutive captures.

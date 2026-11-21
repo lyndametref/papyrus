@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Papyrus — Notes</title>
+<link rel="stylesheet" href="/assets/app.css">
+<script src="/assets/nav-state.js"></script>
+<script src="/assets/app.js" defer></script>
+</head>
+<body>
+<div class="app">
+<header class="site-header">
+<div class="header-lead"><button class="nav-toggle" type="button" aria-expanded="true" aria-controls="site-nav" hidden>Navigation</button><div class="brand"><span class="mark" aria-hidden="true">P</span><span><span class="brand-name">Papyrus</span><span class="project">Characterization</span></span></div></div>
+<p class="top-meta">Local browser<br>offline &middot; {{BIND}}</p>
+</header>
+<div class="layout">
+<aside class="sidebar"><nav id="site-nav" aria-label="Document types"><p class="sidebar-label" aria-hidden="true">Document types</p><ul id="type-list"><li class="sidebar-group"><p class="sidebar-label">Backlog</p><ul class="sidebar-group-list"><li><a href="/?type=task">Backlog</a></li></ul></li><li class="sidebar-group"><p class="sidebar-label">Decisions</p><ul class="sidebar-group-list"><li><a href="/?type=decision">Decisions</a></li></ul></li><li class="sidebar-group"><p class="sidebar-label">Documents</p><ul class="sidebar-group-list"><li><a href="/?type=req">Business requirements</a></li><li><a href="/?type=business-rule">Business Rules</a></li><li><a href="/?type=audit-record">Audit Records</a></li><li><a href="/?type=tech-spec">Technical Specifications</a></li><li><a href="/?type=use-case">Use Cases</a></li><li><a href="/?type=test-case">Test Cases</a></li><li><a href="/?type=test-report">Test Reports</a></li><li><a href="/?type=nfr">Non-functional requirements</a></li><li><a href="/?type=glossary">Glossary</a></li><li><a href="/?type=ui-spec">UI Specifications</a></li><li><a href="/?type=ui-mockup">UI Mockups</a></li><li><a href="/?type=note" aria-current="page">Notes</a></li></ul></li></ul></nav></aside>
+<main class="main">
+<h1 class="h1">Notes</h1>
+<p class="sub">Config-defined document records in this project.</p>
+<div class="filter-wrap"><form class="filter" method="get" action="/"><input type="hidden" name="type" value="note"><div class="field"><label for="status">Status</label><select class="input" id="status" name="status"><option value="" disabled selected>Status</option><option value="active">active</option><option value="draft">draft</option></select></div><div class="form-actions"><button class="btn btn-primary" type="submit">Apply filter</button><a class="link" href="/?type=note">Show all</a></div></form></div><section class="section" aria-label="Notes"><div class="section-head"><h2 class="h2">Notes</h2><p class="count">3 notes</p></div><div class="table-scroll" role="region" aria-label="Notes" tabindex="0"><table class="table list list--shared" data-list-layout="shared" aria-label="Notes"><thead><tr><th scope="col" data-column="id">ID</th><th scope="col" data-column="title">Title</th><th scope="col" data-column="status">Status</th><th scope="col" data-column="created">Created</th><th scope="col" data-column="updated">Updated</th><th scope="col" data-column="actions">Actions</th></tr></thead><tbody><tr data-row-id="NOTE-001"><td class="id-cell">NOTE-001</td><td class="title-cell"><a class="link" href="/doc/NOTE-001">Note one</a><ul class="row-tags"><li class="tag">note</li></ul></td><td class="status-cell"><span class="row-status tag">active</span></td><td class="created-cell">{{TIMESTAMP}}</td><td class="updated-cell">{{TIMESTAMP}}</td><td class="actions-cell"><a class="link" href="/doc/NOTE-001" aria-label="View NOTE-001">View</a> <a class="link" href="/doc/NOTE-001/edit" aria-label="Edit NOTE-001">Edit</a></td></tr><tr data-row-id="NOTE-002"><td class="id-cell">NOTE-002</td><td class="title-cell"><a class="link" href="/doc/NOTE-002">Note two</a></td><td class="status-cell"><span class="row-status tag">active</span></td><td class="created-cell">{{TIMESTAMP}}</td><td class="updated-cell">{{TIMESTAMP}}</td><td class="actions-cell"><a class="link" href="/doc/NOTE-002" aria-label="View NOTE-002">View</a> <a class="link" href="/doc/NOTE-002/edit" aria-label="Edit NOTE-002">Edit</a></td></tr><tr data-row-id="NOTE-1000"><td class="id-cell">NOTE-1000</td><td class="title-cell"><a class="link" href="/doc/NOTE-1000">Note one thousand</a></td><td class="status-cell"><span class="row-status tag">active</span></td><td class="created-cell">{{TIMESTAMP}}</td><td class="updated-cell">{{TIMESTAMP}}</td><td class="actions-cell"><a class="link" href="/doc/NOTE-1000" aria-label="View NOTE-1000">View</a> <a class="link" href="/doc/NOTE-1000/edit" aria-label="Edit NOTE-1000">Edit</a></td></tr></tbody></table></div></section>
+
+</main>
+</div>
+<footer class="site-footer"><span class="footer-long">Papyrus local browser &mdash; every page is served from this project; no network access.</span><span class="footer-short">Papyrus local browser &mdash; served from this project only.</span></footer>
+</div>
+</body>
+</html>

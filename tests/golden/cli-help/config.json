@@ -1,0 +1,5 @@
+{
+  "exit": 0,
+  "stdout": "Read and edit configuration\n\nUsage: papyrus config [OPTIONS] <COMMAND>\n\nCommands:\n  list   Print all effective keys\n  get    Print one effective value\n  set    Persist one value\n  unset  Remove one key\n  help   Print this message or the help of the given subcommand(s)\n\nOptions:\n      --json           Emit stable, machine-readable JSON.\n      --dir <path>     Project directory. Default: the current working directory.\n      --config <file>  Configuration file. Default: papyrus.config.yml in the project directory.\n      --no-color       Disable ANSI color output.\n  -h, --help           Print help\n",
+  "stderr": ""
+}

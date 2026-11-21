@@ -1,0 +1,2 @@
+TECH-001 Technical specification one | created_date={{TIMESTAMP}} updated_date={{TIMESTAMP}} labels=design references=TECH-REF-1 status=active
+TECH-002 Technical specification two | created_date={{TIMESTAMP}} updated_date={{TIMESTAMP}} labels= references= status=active
