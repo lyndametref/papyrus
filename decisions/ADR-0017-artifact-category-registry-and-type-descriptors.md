@@ -2,7 +2,7 @@
 id: ADR-0017
 title: "Artifact Category Registry and Per-Type Behavior Descriptors"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-20T19:26:48Z'
+updated_date: '2026-11-21T15:45:11Z'
 labels: []
 references: []
 ---
@@ -55,6 +55,8 @@ Forces: one structural model for CLI, record layer, search, and browser (otherwi
 
    *Revision (2026-11-15, owner decision): the milestone entry in the `verbs` row previously read `create/list/view/edit/archive/delete`. The milestone lifecycle is fixed to `open -> closed` (REQ-03.001, REQ-07.001) and is delivered by `papyrus milestone close <id>`, which rewrites `status` and `updated_date` in place through the single write path; milestone archive and milestone restore do not exist. No other category's verb set in that row changes, and ADR-0022 decision 5 and ADR-0023 decision 2 record the same contract.*
 
+   *Amendment (2026-11-21): the milestone clause of the 2026-11-15 revision is superseded by ADR-032 decisions 2, 4 and 5 — the milestone lifecycle is `open -> closed -> archived`, a milestone has an archive location (the backlog archive milestones folder, also the legacy read/import location) and `papyrus milestone archive <id>` is the only path to `archived`; the milestone entry in the `verbs` row is superseded to `create/list/view/edit/close/archive/delete` and no milestone restore exists, and every other statement in this decision stands.*
+
    Only tasks are `TaskConfigurable`. Milestones, releases, and decisions are `Fixed`. A document descriptor is `DocumentMain`: `active` and `archived` are always present and cannot be removed, renamed, or replaced; every other declared value is a custom status; `custom` is empty when the entry declares no `statuses`; `default` is the entry's `default_status` or `active`. The registry never stores a second copy of the status list — it reads it from the validated configuration (ADR-0019). Configuration cannot change a descriptor's category, fixed lifecycle, verbs, content model, or id shape (REQ-07.001).
 
 3. **The baseline verbs are a lower bound; `verbs` is a field of every descriptor, and document extensions are declared on a built-in descriptor.** `verbs` is **not** a document-only field: it is present on every descriptor in every category (decision 2), so a task, milestone, release, or decision descriptor states its own verb set. Within the `Document` category the baseline family `create`, `list`, `view`, `edit`, `archive`, `delete` remains a **lower bound** present on every descriptor; `status` is present only when the descriptor's status model stores a front-matter `status` (so every front-matter-backed document type, but not UI mockups). A built-in document descriptor may add a verb (`create-group`, `supersede`) and may add a required argument (`--group`), with its handler named by the descriptor. A config-defined descriptor has exactly the baseline plus `status`, and no extension point: REQ-07.004 forbids per-type schema and REQ-07.002 forbids per-type code. This is the owner's decision of 2026-11-13 (D1) on REQ-07.003's "same command family" wording: the shared family is the baseline, and the `req`/`nfr`/`ui-mockup` groups are unchanged.
@@ -81,6 +83,10 @@ Forces: one structural model for CLI, record layer, search, and browser (otherwi
 10. **No new dependency, no new process model.** The registry is plain data built in-process; it introduces no index file, no background scan, and no serialization format.
 
    *Revision (2026-11-20, amended by ADR-037): the no-cache clause of this decision is superseded; the rest remains in force. The registry is still plain data built in-process, with no new dependency, no new process model, no index file, no background scan, and no serialization format. ADR-037 adds one in-server serving snapshot that holds the validated configuration, the registry, and the route table, is invalidated by input-file modification time, and is swapped atomically; that snapshot is the only cache this decision now permits.*
+
+### Amendment (2026-11-21) — milestone archive
+
+- **Downstream constraint 3.** The clauses assigning milestones `ArchivePolicy::None` and naming `<backlog_directory>/archive/milestones/` a read/import location only, including the 2026-11-15 revision, are superseded by ADR-032 decisions 2, 4 and 5; the milestone lifecycle is `open -> closed -> archived`, a milestone has an archive location (the backlog archive milestones folder, also the legacy read/import location) and `papyrus milestone archive <id>` is the only path to `archived`. The rest of this clause stands.
 ## Consequences
 
 **Positive:**
