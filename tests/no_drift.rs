@@ -257,6 +257,17 @@ fn no_frontmatter_delimiter_construction_outside_record() {
     .unwrap();
 }
 
+/// A `format!("{}-…")` call builds a prefix-shaped ID only when the dash is
+/// immediately followed by a placeholder. A dash followed by a literal (for
+/// example YAML quoting, `format!("{}- '{}'", …)`) is formatting text, not an
+/// ID, and must not trip the heuristic.
+fn builds_prefix_shaped_id(line: &str) -> bool {
+    let Some(rest) = line.split("format!(\"{}-").nth(1) else {
+        return false;
+    };
+    rest.starts_with("{}") || rest.starts_with("{:") || rest.starts_with('"')
+}
+
 #[test]
 fn no_id_formatting_or_prefix_parsing_outside_identity() {
     let allowed = &["src/record/identity.rs"];
@@ -275,9 +286,23 @@ fn no_id_formatting_or_prefix_parsing_outside_identity() {
     check(
         "prefix-shaped ID parsing outside src/record/identity.rs:",
         allowed,
-        |line| line.contains("format!(\"{}-") || line.contains("strip_prefix(&format!(\"{}-"),
+        builds_prefix_shaped_id,
     )
     .unwrap();
+}
+
+#[test]
+fn prefix_shaped_id_detection_ignores_literal_dashes() {
+    assert!(builds_prefix_shaped_id(
+        "format!(\"{}-{}\", prefix, number)"
+    ));
+    assert!(builds_prefix_shaped_id(
+        "strip_prefix(&format!(\"{}-\", prefix))"
+    ));
+    assert!(!builds_prefix_shaped_id(
+        "return format!(\"{}- '{}'\", indent, val.replace('\\'', \"''\"));"
+    ));
+    assert!(!builds_prefix_shaped_id("let x = format!(\"{}-text\");"));
 }
 
 #[test]
