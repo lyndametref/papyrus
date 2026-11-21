@@ -1,0 +1,4068 @@
+{
+  "schema": "papyrus.characterization-cases/1",
+  "unreachable": [
+    {
+      "renderer": "conflict_page_test_case",
+      "reason": "no call site: the stale-version branch routes TestCase through conflict_page_use_case"
+    },
+    {
+      "renderer": "conflict_page_test_report",
+      "reason": "no call site: the stale-version branch routes TestReport through conflict_page_use_case"
+    }
+  ],
+  "cases": [
+    {
+      "id": "req/create",
+      "kind": "cli",
+      "argv": [
+        "req",
+        "create",
+        "Corpus requirement",
+        "--group",
+        "REQ-002"
+      ],
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/requirements/business/REQ-002.001.md"
+    },
+    {
+      "id": "req/create-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "req",
+        "create",
+        "Corpus requirement",
+        "--group",
+        "REQ-002"
+      ],
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/requirements/business/REQ-002.001.md"
+    },
+    {
+      "id": "req/list",
+      "kind": "cli",
+      "argv": [
+        "req",
+        "list"
+      ],
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "req/list-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "req",
+        "list"
+      ],
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "req/view",
+      "kind": "cli",
+      "argv": [
+        "req",
+        "view",
+        "REQ-001.001"
+      ],
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/requirements/business/REQ-001.001.md"
+    },
+    {
+      "id": "req/view-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "req",
+        "view",
+        "REQ-001.001"
+      ],
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/requirements/business/REQ-001.001.md"
+    },
+    {
+      "id": "req/edit",
+      "kind": "cli",
+      "argv": [
+        "req",
+        "edit",
+        "REQ-001.001",
+        "--title",
+        "Edited requirement"
+      ],
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/requirements/business/REQ-001.001.md"
+    },
+    {
+      "id": "req/edit-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "req",
+        "edit",
+        "REQ-001.001",
+        "--title",
+        "Edited requirement"
+      ],
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/requirements/business/REQ-001.001.md"
+    },
+    {
+      "id": "req/archive",
+      "kind": "cli",
+      "argv": [
+        "req",
+        "archive",
+        "REQ-001.001"
+      ],
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/requirements/business/archived/REQ-001.001.md"
+    },
+    {
+      "id": "req/delete",
+      "kind": "cli",
+      "argv": [
+        "req",
+        "delete",
+        "REQ-001.001",
+        "--force"
+      ],
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "req/status",
+      "kind": "cli",
+      "argv": [
+        "req",
+        "status",
+        "REQ-001.001",
+        "draft"
+      ],
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/requirements/business/REQ-001.001.md"
+    },
+    {
+      "id": "req/create-group",
+      "kind": "cli",
+      "argv": [
+        "req",
+        "create-group",
+        "--title",
+        "Corpus requirement group"
+      ],
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/requirements/business/REQ-003.md"
+    },
+    {
+      "id": "nfr/create",
+      "kind": "cli",
+      "argv": [
+        "nfr",
+        "create",
+        "Corpus nfr",
+        "--group",
+        "NFR-001"
+      ],
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/requirements/non-functional/NFR-001.003.md"
+    },
+    {
+      "id": "nfr/create-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "nfr",
+        "create",
+        "Corpus nfr",
+        "--group",
+        "NFR-001"
+      ],
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/requirements/non-functional/NFR-001.003.md"
+    },
+    {
+      "id": "nfr/list",
+      "kind": "cli",
+      "argv": [
+        "nfr",
+        "list"
+      ],
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "nfr/list-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "nfr",
+        "list"
+      ],
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "nfr/view",
+      "kind": "cli",
+      "argv": [
+        "nfr",
+        "view",
+        "NFR-001.001"
+      ],
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/requirements/non-functional/NFR-001.001.md"
+    },
+    {
+      "id": "nfr/view-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "nfr",
+        "view",
+        "NFR-001.001"
+      ],
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/requirements/non-functional/NFR-001.001.md"
+    },
+    {
+      "id": "nfr/edit",
+      "kind": "cli",
+      "argv": [
+        "nfr",
+        "edit",
+        "NFR-001.001",
+        "--title",
+        "Edited nfr"
+      ],
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/requirements/non-functional/NFR-001.001.md"
+    },
+    {
+      "id": "nfr/edit-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "nfr",
+        "edit",
+        "NFR-001.001",
+        "--title",
+        "Edited nfr"
+      ],
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/requirements/non-functional/NFR-001.001.md"
+    },
+    {
+      "id": "nfr/archive",
+      "kind": "cli",
+      "argv": [
+        "nfr",
+        "archive",
+        "NFR-001.001"
+      ],
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/requirements/non-functional/archived/NFR-001.001.md"
+    },
+    {
+      "id": "nfr/delete",
+      "kind": "cli",
+      "argv": [
+        "nfr",
+        "delete",
+        "NFR-001.001",
+        "--force"
+      ],
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "nfr/status",
+      "kind": "cli",
+      "argv": [
+        "nfr",
+        "status",
+        "NFR-001.001",
+        "draft"
+      ],
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/requirements/non-functional/NFR-001.001.md"
+    },
+    {
+      "id": "nfr/create-group",
+      "kind": "cli",
+      "argv": [
+        "nfr",
+        "create-group",
+        "--title",
+        "Corpus nfr group"
+      ],
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/requirements/non-functional/NFR-002.md"
+    },
+    {
+      "id": "glossary/create",
+      "kind": "cli",
+      "argv": [
+        "glossary",
+        "create",
+        "--term",
+        "Corpus term",
+        "--definition",
+        "Corpus definition"
+      ],
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/glossary/GLO-003.md"
+    },
+    {
+      "id": "glossary/create-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "glossary",
+        "create",
+        "--term",
+        "Corpus term",
+        "--definition",
+        "Corpus definition"
+      ],
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/glossary/GLO-003.md"
+    },
+    {
+      "id": "glossary/list",
+      "kind": "cli",
+      "argv": [
+        "glossary",
+        "list"
+      ],
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "glossary/list-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "glossary",
+        "list"
+      ],
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "glossary/view",
+      "kind": "cli",
+      "argv": [
+        "glossary",
+        "view",
+        "GLO-001"
+      ],
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/glossary/GLO-001.md"
+    },
+    {
+      "id": "glossary/view-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "glossary",
+        "view",
+        "GLO-001"
+      ],
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/glossary/GLO-001.md"
+    },
+    {
+      "id": "glossary/edit",
+      "kind": "cli",
+      "argv": [
+        "glossary",
+        "edit",
+        "GLO-001",
+        "--term",
+        "Edited glossary term"
+      ],
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/glossary/GLO-001.md"
+    },
+    {
+      "id": "glossary/edit-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "glossary",
+        "edit",
+        "GLO-001",
+        "--term",
+        "Edited glossary term"
+      ],
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/glossary/GLO-001.md"
+    },
+    {
+      "id": "glossary/archive",
+      "kind": "cli",
+      "argv": [
+        "glossary",
+        "archive",
+        "GLO-001"
+      ],
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/glossary/archived/GLO-001.md"
+    },
+    {
+      "id": "glossary/delete",
+      "kind": "cli",
+      "argv": [
+        "glossary",
+        "delete",
+        "GLO-001",
+        "--force"
+      ],
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "glossary/status",
+      "kind": "cli",
+      "argv": [
+        "glossary",
+        "status",
+        "GLO-001",
+        "draft"
+      ],
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/glossary/GLO-001.md"
+    },
+    {
+      "id": "rule/create",
+      "kind": "cli",
+      "argv": [
+        "rule",
+        "create",
+        "Corpus rule",
+        "--description",
+        "Corpus rule description",
+        "--rationale",
+        "Corpus rule rationale",
+        "--applicability",
+        "Corpus applicability"
+      ],
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/business-rules/BR-003.md"
+    },
+    {
+      "id": "rule/create-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "rule",
+        "create",
+        "Corpus rule",
+        "--description",
+        "Corpus rule description",
+        "--rationale",
+        "Corpus rule rationale",
+        "--applicability",
+        "Corpus applicability"
+      ],
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/business-rules/BR-003.md"
+    },
+    {
+      "id": "rule/list",
+      "kind": "cli",
+      "argv": [
+        "rule",
+        "list"
+      ],
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "rule/list-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "rule",
+        "list"
+      ],
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "rule/view",
+      "kind": "cli",
+      "argv": [
+        "rule",
+        "view",
+        "BR-001"
+      ],
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/business-rules/BR-001.md"
+    },
+    {
+      "id": "rule/view-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "rule",
+        "view",
+        "BR-001"
+      ],
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/business-rules/BR-001.md"
+    },
+    {
+      "id": "rule/edit",
+      "kind": "cli",
+      "argv": [
+        "rule",
+        "edit",
+        "BR-001",
+        "--title",
+        "Edited rule"
+      ],
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/business-rules/BR-001.md"
+    },
+    {
+      "id": "rule/edit-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "rule",
+        "edit",
+        "BR-001",
+        "--title",
+        "Edited rule"
+      ],
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/business-rules/BR-001.md"
+    },
+    {
+      "id": "rule/archive",
+      "kind": "cli",
+      "argv": [
+        "rule",
+        "archive",
+        "BR-001"
+      ],
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/business-rules/archived/BR-001.md"
+    },
+    {
+      "id": "rule/delete",
+      "kind": "cli",
+      "argv": [
+        "rule",
+        "delete",
+        "BR-001",
+        "--force"
+      ],
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "rule/status",
+      "kind": "cli",
+      "argv": [
+        "rule",
+        "status",
+        "BR-001",
+        "draft"
+      ],
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/business-rules/BR-001.md"
+    },
+    {
+      "id": "audit/create",
+      "kind": "cli",
+      "argv": [
+        "audit",
+        "create",
+        "--title",
+        "Corpus audit",
+        "--content",
+        "Corpus audit content",
+        "--audit-type",
+        "quality"
+      ],
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/audit-records/AUD-003.md"
+    },
+    {
+      "id": "audit/create-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "audit",
+        "create",
+        "--title",
+        "Corpus audit",
+        "--content",
+        "Corpus audit content",
+        "--audit-type",
+        "quality"
+      ],
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/audit-records/AUD-003.md"
+    },
+    {
+      "id": "audit/list",
+      "kind": "cli",
+      "argv": [
+        "audit",
+        "list"
+      ],
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "audit/list-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "audit",
+        "list"
+      ],
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "audit/view",
+      "kind": "cli",
+      "argv": [
+        "audit",
+        "view",
+        "AUD-001"
+      ],
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/audit-records/AUD-001.md"
+    },
+    {
+      "id": "audit/view-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "audit",
+        "view",
+        "AUD-001"
+      ],
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/audit-records/AUD-001.md"
+    },
+    {
+      "id": "audit/edit",
+      "kind": "cli",
+      "argv": [
+        "audit",
+        "edit",
+        "AUD-001",
+        "--title",
+        "Edited audit"
+      ],
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/audit-records/AUD-001.md"
+    },
+    {
+      "id": "audit/edit-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "audit",
+        "edit",
+        "AUD-001",
+        "--title",
+        "Edited audit"
+      ],
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/audit-records/AUD-001.md"
+    },
+    {
+      "id": "audit/archive",
+      "kind": "cli",
+      "argv": [
+        "audit",
+        "archive",
+        "AUD-001"
+      ],
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/audit-records/archived/AUD-001.md"
+    },
+    {
+      "id": "audit/delete",
+      "kind": "cli",
+      "argv": [
+        "audit",
+        "delete",
+        "AUD-001",
+        "--force"
+      ],
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "audit/status",
+      "kind": "cli",
+      "argv": [
+        "audit",
+        "status",
+        "AUD-001",
+        "draft"
+      ],
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/audit-records/AUD-001.md"
+    },
+    {
+      "id": "tech-spec/create",
+      "kind": "cli",
+      "argv": [
+        "tech-spec",
+        "create",
+        "Corpus tech spec",
+        "--description",
+        "Corpus technical description"
+      ],
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/technical/TECH-003.md"
+    },
+    {
+      "id": "tech-spec/create-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "tech-spec",
+        "create",
+        "Corpus tech spec",
+        "--description",
+        "Corpus technical description"
+      ],
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/technical/TECH-003.md"
+    },
+    {
+      "id": "tech-spec/list",
+      "kind": "cli",
+      "argv": [
+        "tech-spec",
+        "list"
+      ],
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "tech-spec/list-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "tech-spec",
+        "list"
+      ],
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "tech-spec/view",
+      "kind": "cli",
+      "argv": [
+        "tech-spec",
+        "view",
+        "TECH-001"
+      ],
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/technical/TECH-001.md"
+    },
+    {
+      "id": "tech-spec/view-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "tech-spec",
+        "view",
+        "TECH-001"
+      ],
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/technical/TECH-001.md"
+    },
+    {
+      "id": "tech-spec/edit",
+      "kind": "cli",
+      "argv": [
+        "tech-spec",
+        "edit",
+        "TECH-001",
+        "--title",
+        "Edited tech spec"
+      ],
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/technical/TECH-001.md"
+    },
+    {
+      "id": "tech-spec/edit-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "tech-spec",
+        "edit",
+        "TECH-001",
+        "--title",
+        "Edited tech spec"
+      ],
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/technical/TECH-001.md"
+    },
+    {
+      "id": "tech-spec/archive",
+      "kind": "cli",
+      "argv": [
+        "tech-spec",
+        "archive",
+        "TECH-001"
+      ],
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/technical/archived/TECH-001.md"
+    },
+    {
+      "id": "tech-spec/delete",
+      "kind": "cli",
+      "argv": [
+        "tech-spec",
+        "delete",
+        "TECH-001",
+        "--force"
+      ],
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "tech-spec/status",
+      "kind": "cli",
+      "argv": [
+        "tech-spec",
+        "status",
+        "TECH-001",
+        "draft"
+      ],
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/technical/TECH-001.md"
+    },
+    {
+      "id": "ui-spec/create",
+      "kind": "cli",
+      "argv": [
+        "ui-spec",
+        "create",
+        "Corpus ui spec",
+        "--view",
+        "list",
+        "--description",
+        "Corpus ui description"
+      ],
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/specifications/ui/UI-003.md"
+    },
+    {
+      "id": "ui-spec/create-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "ui-spec",
+        "create",
+        "Corpus ui spec",
+        "--view",
+        "list",
+        "--description",
+        "Corpus ui description"
+      ],
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/specifications/ui/UI-003.md"
+    },
+    {
+      "id": "ui-spec/list",
+      "kind": "cli",
+      "argv": [
+        "ui-spec",
+        "list"
+      ],
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "ui-spec/list-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "ui-spec",
+        "list"
+      ],
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "ui-spec/view",
+      "kind": "cli",
+      "argv": [
+        "ui-spec",
+        "view",
+        "UI-001"
+      ],
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/specifications/ui/UI-001.md"
+    },
+    {
+      "id": "ui-spec/view-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "ui-spec",
+        "view",
+        "UI-001"
+      ],
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/specifications/ui/UI-001.md"
+    },
+    {
+      "id": "ui-spec/edit",
+      "kind": "cli",
+      "argv": [
+        "ui-spec",
+        "edit",
+        "UI-001",
+        "--title",
+        "Edited ui spec"
+      ],
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/specifications/ui/UI-001.md"
+    },
+    {
+      "id": "ui-spec/edit-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "ui-spec",
+        "edit",
+        "UI-001",
+        "--title",
+        "Edited ui spec"
+      ],
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/specifications/ui/UI-001.md"
+    },
+    {
+      "id": "ui-spec/archive",
+      "kind": "cli",
+      "argv": [
+        "ui-spec",
+        "archive",
+        "UI-001"
+      ],
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/specifications/ui/archived/UI-001.md"
+    },
+    {
+      "id": "ui-spec/delete",
+      "kind": "cli",
+      "argv": [
+        "ui-spec",
+        "delete",
+        "UI-001",
+        "--force"
+      ],
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "ui-spec/status",
+      "kind": "cli",
+      "argv": [
+        "ui-spec",
+        "status",
+        "UI-001",
+        "draft"
+      ],
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/specifications/ui/UI-001.md"
+    },
+    {
+      "id": "ui-mockup/create",
+      "kind": "cli",
+      "argv": [
+        "ui-mockup",
+        "create",
+        "Corpus mockup",
+        "--task",
+        "TASK-001",
+        "--spec",
+        "UI-001"
+      ],
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "record.html",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/specifications/ui/mockups/MOCK-004.html"
+    },
+    {
+      "id": "ui-mockup/create-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "ui-mockup",
+        "create",
+        "Corpus mockup",
+        "--task",
+        "TASK-001",
+        "--spec",
+        "UI-001"
+      ],
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "record.html",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/specifications/ui/mockups/MOCK-004.html"
+    },
+    {
+      "id": "ui-mockup/list",
+      "kind": "cli",
+      "argv": [
+        "ui-mockup",
+        "list"
+      ],
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "ui-mockup/list-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "ui-mockup",
+        "list"
+      ],
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "ui-mockup/view",
+      "kind": "cli",
+      "argv": [
+        "ui-mockup",
+        "view",
+        "MOCK-002"
+      ],
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "record.html",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/specifications/ui/mockups/MOCK-002.html"
+    },
+    {
+      "id": "ui-mockup/view-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "ui-mockup",
+        "view",
+        "MOCK-002"
+      ],
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "record.html",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/specifications/ui/mockups/MOCK-002.html"
+    },
+    {
+      "id": "ui-mockup/edit",
+      "kind": "cli",
+      "argv": [
+        "ui-mockup",
+        "edit",
+        "MOCK-002",
+        "--title",
+        "Edited mockup"
+      ],
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "record.html",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/specifications/ui/mockups/MOCK-002.html"
+    },
+    {
+      "id": "ui-mockup/edit-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "ui-mockup",
+        "edit",
+        "MOCK-002",
+        "--title",
+        "Edited mockup"
+      ],
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "record.html",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/specifications/ui/mockups/MOCK-002.html"
+    },
+    {
+      "id": "ui-mockup/archive",
+      "kind": "cli",
+      "argv": [
+        "ui-mockup",
+        "archive",
+        "MOCK-002"
+      ],
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "record.html",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/specifications/ui/mockups/archived/MOCK-002.html"
+    },
+    {
+      "id": "ui-mockup/delete",
+      "kind": "cli",
+      "argv": [
+        "ui-mockup",
+        "delete",
+        "MOCK-002",
+        "--force"
+      ],
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "ui-mockup/supersede",
+      "kind": "cli",
+      "argv": [
+        "ui-mockup",
+        "supersede",
+        "MOCK-001",
+        "MOCK-002"
+      ],
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "record.html",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/specifications/ui/mockups/archived/MOCK-001.html"
+    },
+    {
+      "id": "use-case/create",
+      "kind": "cli",
+      "argv": [
+        "use-case",
+        "create",
+        "Corpus use case",
+        "--description",
+        "Corpus use case description"
+      ],
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/use-cases/UC-003.md"
+    },
+    {
+      "id": "use-case/create-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "use-case",
+        "create",
+        "Corpus use case",
+        "--description",
+        "Corpus use case description"
+      ],
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/use-cases/UC-003.md"
+    },
+    {
+      "id": "use-case/list",
+      "kind": "cli",
+      "argv": [
+        "use-case",
+        "list"
+      ],
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "use-case/list-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "use-case",
+        "list"
+      ],
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "use-case/view",
+      "kind": "cli",
+      "argv": [
+        "use-case",
+        "view",
+        "UC-001"
+      ],
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/use-cases/UC-001.md"
+    },
+    {
+      "id": "use-case/view-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "use-case",
+        "view",
+        "UC-001"
+      ],
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/use-cases/UC-001.md"
+    },
+    {
+      "id": "use-case/edit",
+      "kind": "cli",
+      "argv": [
+        "use-case",
+        "edit",
+        "UC-001",
+        "--title",
+        "Edited use case"
+      ],
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/use-cases/UC-001.md"
+    },
+    {
+      "id": "use-case/edit-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "use-case",
+        "edit",
+        "UC-001",
+        "--title",
+        "Edited use case"
+      ],
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/use-cases/UC-001.md"
+    },
+    {
+      "id": "use-case/archive",
+      "kind": "cli",
+      "argv": [
+        "use-case",
+        "archive",
+        "UC-001"
+      ],
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/use-cases/archived/UC-001.md"
+    },
+    {
+      "id": "use-case/delete",
+      "kind": "cli",
+      "argv": [
+        "use-case",
+        "delete",
+        "UC-001",
+        "--force"
+      ],
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "use-case/status",
+      "kind": "cli",
+      "argv": [
+        "use-case",
+        "status",
+        "UC-001",
+        "draft"
+      ],
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/use-cases/UC-001.md"
+    },
+    {
+      "id": "test-case/create",
+      "kind": "cli",
+      "argv": [
+        "test-case",
+        "create",
+        "Corpus test case",
+        "--description",
+        "Corpus test case description"
+      ],
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/test-cases/TC-003.md"
+    },
+    {
+      "id": "test-case/create-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "test-case",
+        "create",
+        "Corpus test case",
+        "--description",
+        "Corpus test case description"
+      ],
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/test-cases/TC-003.md"
+    },
+    {
+      "id": "test-case/list",
+      "kind": "cli",
+      "argv": [
+        "test-case",
+        "list"
+      ],
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "test-case/list-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "test-case",
+        "list"
+      ],
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "test-case/view",
+      "kind": "cli",
+      "argv": [
+        "test-case",
+        "view",
+        "TC-001"
+      ],
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/test-cases/TC-001.md"
+    },
+    {
+      "id": "test-case/view-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "test-case",
+        "view",
+        "TC-001"
+      ],
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/test-cases/TC-001.md"
+    },
+    {
+      "id": "test-case/edit",
+      "kind": "cli",
+      "argv": [
+        "test-case",
+        "edit",
+        "TC-001",
+        "--title",
+        "Edited test case"
+      ],
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/test-cases/TC-001.md"
+    },
+    {
+      "id": "test-case/edit-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "test-case",
+        "edit",
+        "TC-001",
+        "--title",
+        "Edited test case"
+      ],
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/test-cases/TC-001.md"
+    },
+    {
+      "id": "test-case/archive",
+      "kind": "cli",
+      "argv": [
+        "test-case",
+        "archive",
+        "TC-001"
+      ],
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/test-cases/archived/TC-001.md"
+    },
+    {
+      "id": "test-case/delete",
+      "kind": "cli",
+      "argv": [
+        "test-case",
+        "delete",
+        "TC-001",
+        "--force"
+      ],
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "test-case/status",
+      "kind": "cli",
+      "argv": [
+        "test-case",
+        "status",
+        "TC-001",
+        "draft"
+      ],
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/test-cases/TC-001.md"
+    },
+    {
+      "id": "test-report/create",
+      "kind": "cli",
+      "argv": [
+        "test-report",
+        "create",
+        "Corpus test report",
+        "--description",
+        "Corpus test report description"
+      ],
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/test-reports/TR-003.md"
+    },
+    {
+      "id": "test-report/create-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "test-report",
+        "create",
+        "Corpus test report",
+        "--description",
+        "Corpus test report description"
+      ],
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/test-reports/TR-003.md"
+    },
+    {
+      "id": "test-report/list",
+      "kind": "cli",
+      "argv": [
+        "test-report",
+        "list"
+      ],
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "test-report/list-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "test-report",
+        "list"
+      ],
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "test-report/view",
+      "kind": "cli",
+      "argv": [
+        "test-report",
+        "view",
+        "TR-001"
+      ],
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/test-reports/TR-001.md"
+    },
+    {
+      "id": "test-report/view-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "test-report",
+        "view",
+        "TR-001"
+      ],
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/test-reports/TR-001.md"
+    },
+    {
+      "id": "test-report/edit",
+      "kind": "cli",
+      "argv": [
+        "test-report",
+        "edit",
+        "TR-001",
+        "--title",
+        "Edited test report"
+      ],
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/test-reports/TR-001.md"
+    },
+    {
+      "id": "test-report/edit-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "test-report",
+        "edit",
+        "TR-001",
+        "--title",
+        "Edited test report"
+      ],
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/test-reports/TR-001.md"
+    },
+    {
+      "id": "test-report/archive",
+      "kind": "cli",
+      "argv": [
+        "test-report",
+        "archive",
+        "TR-001"
+      ],
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/test-reports/archived/TR-001.md"
+    },
+    {
+      "id": "test-report/delete",
+      "kind": "cli",
+      "argv": [
+        "test-report",
+        "delete",
+        "TR-001",
+        "--force"
+      ],
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "test-report/status",
+      "kind": "cli",
+      "argv": [
+        "test-report",
+        "status",
+        "TR-001",
+        "draft"
+      ],
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/test-reports/TR-001.md"
+    },
+    {
+      "id": "note/create",
+      "kind": "cli",
+      "argv": [
+        "note",
+        "create",
+        "Corpus note",
+        "--description",
+        "Corpus note body"
+      ],
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/notes/NOTE-1001.md"
+    },
+    {
+      "id": "note/create-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "note",
+        "create",
+        "Corpus note",
+        "--description",
+        "Corpus note body"
+      ],
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/notes/NOTE-1001.md"
+    },
+    {
+      "id": "note/list",
+      "kind": "cli",
+      "argv": [
+        "note",
+        "list"
+      ],
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "note/list-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "note",
+        "list"
+      ],
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "note/view",
+      "kind": "cli",
+      "argv": [
+        "note",
+        "view",
+        "NOTE-001"
+      ],
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/notes/NOTE-001.md"
+    },
+    {
+      "id": "note/view-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "note",
+        "view",
+        "NOTE-001"
+      ],
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/notes/NOTE-001.md"
+    },
+    {
+      "id": "note/edit",
+      "kind": "cli",
+      "argv": [
+        "note",
+        "edit",
+        "NOTE-001",
+        "--title",
+        "Edited note"
+      ],
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/notes/NOTE-001.md"
+    },
+    {
+      "id": "note/edit-json",
+      "kind": "cli",
+      "argv": [
+        "--json",
+        "note",
+        "edit",
+        "NOTE-001",
+        "--title",
+        "Edited note"
+      ],
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json",
+        "payload.json"
+      ],
+      "record": "docs/notes/NOTE-001.md"
+    },
+    {
+      "id": "note/archive",
+      "kind": "cli",
+      "argv": [
+        "note",
+        "archive",
+        "NOTE-001"
+      ],
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/notes/archived/NOTE-001.md"
+    },
+    {
+      "id": "note/delete",
+      "kind": "cli",
+      "argv": [
+        "note",
+        "delete",
+        "NOTE-001",
+        "--force"
+      ],
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
+    },
+    {
+      "id": "note/status",
+      "kind": "cli",
+      "argv": [
+        "note",
+        "status",
+        "NOTE-001",
+        "draft"
+      ],
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "record.md",
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ],
+      "record": "docs/notes/NOTE-001.md"
+    },
+    {
+      "id": "http/list-req",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=req"
+      },
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "list_page"
+    },
+    {
+      "id": "http/view-req",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/REQ-001.001"
+      },
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "view_page"
+    },
+    {
+      "id": "http/edit-req",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/REQ-001.001/edit"
+      },
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "edit_page"
+    },
+    {
+      "id": "http/api-list-req",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/docs/req"
+      },
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/api-doc-req",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/doc/REQ-001.001"
+      },
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/list-nfr",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=nfr"
+      },
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "list_page"
+    },
+    {
+      "id": "http/view-nfr",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/NFR-001.001"
+      },
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "view_page"
+    },
+    {
+      "id": "http/edit-nfr",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/NFR-001.001/edit"
+      },
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "edit_page"
+    },
+    {
+      "id": "http/api-list-nfr",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/docs/nfr"
+      },
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/api-doc-nfr",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/doc/NFR-001.001"
+      },
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/list-glossary",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=glossary"
+      },
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "list_page"
+    },
+    {
+      "id": "http/view-glossary",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/GLO-001"
+      },
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "view_page"
+    },
+    {
+      "id": "http/edit-glossary",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/GLO-001/edit"
+      },
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "edit_page_glossary"
+    },
+    {
+      "id": "http/api-list-glossary",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/docs/glossary"
+      },
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/api-doc-glossary",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/doc/GLO-001"
+      },
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/list-rule",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=business-rule"
+      },
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "list_page"
+    },
+    {
+      "id": "http/view-rule",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/BR-001"
+      },
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "view_page"
+    },
+    {
+      "id": "http/edit-rule",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/BR-001/edit"
+      },
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "edit_page_business_rule"
+    },
+    {
+      "id": "http/api-list-rule",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/docs/rule"
+      },
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/api-doc-rule",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/doc/BR-001"
+      },
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-business-rules",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/business-rules"
+      },
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-business-rule",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/business-rule"
+      },
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/list-audit",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=audit-record"
+      },
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "list_page"
+    },
+    {
+      "id": "http/view-audit",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/AUD-001"
+      },
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "view_page"
+    },
+    {
+      "id": "http/edit-audit",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/AUD-001/edit"
+      },
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "edit_page_audit_record"
+    },
+    {
+      "id": "http/api-list-audit",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/docs/audit"
+      },
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/api-doc-audit",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/doc/AUD-001"
+      },
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-audit-records",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/audit-records"
+      },
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-audit-record",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/audit-record"
+      },
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/list-tech-spec",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=tech-spec"
+      },
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "list_page"
+    },
+    {
+      "id": "http/view-tech-spec",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/TECH-001"
+      },
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "view_page"
+    },
+    {
+      "id": "http/edit-tech-spec",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/TECH-001/edit"
+      },
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "edit_page_tech_spec"
+    },
+    {
+      "id": "http/api-list-tech-spec",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/docs/tech-spec"
+      },
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/api-doc-tech-spec",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/doc/TECH-001"
+      },
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-tech-specs",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/tech-specs"
+      },
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-tech-spec",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/tech-spec"
+      },
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/list-ui-spec",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=ui-spec"
+      },
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "list_page"
+    },
+    {
+      "id": "http/view-ui-spec",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/UI-001"
+      },
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "view_page"
+    },
+    {
+      "id": "http/edit-ui-spec",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/UI-001/edit"
+      },
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "edit_page_ui_spec"
+    },
+    {
+      "id": "http/api-list-ui-spec",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/docs/ui-spec"
+      },
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/api-doc-ui-spec",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/doc/UI-001"
+      },
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-ui-specs",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/ui-specs"
+      },
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-ui-specifications",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/ui-specifications"
+      },
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-ui-spec",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/ui-spec"
+      },
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/list-ui-mockup",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=ui-mockup"
+      },
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "list_page"
+    },
+    {
+      "id": "http/view-ui-mockup",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/MOCK-002"
+      },
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "view_page"
+    },
+    {
+      "id": "http/edit-ui-mockup",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/MOCK-002/edit"
+      },
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "edit_page_ui_mockup"
+    },
+    {
+      "id": "http/api-list-ui-mockup",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/docs/ui-mockup"
+      },
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/api-doc-ui-mockup",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/doc/MOCK-002"
+      },
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-ui-mockups",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/ui-mockups"
+      },
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-ui-mockup",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/ui-mockup"
+      },
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-mockups",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/mockups"
+      },
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/list-use-case",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=use-case"
+      },
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "list_page"
+    },
+    {
+      "id": "http/view-use-case",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/UC-001"
+      },
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "view_page"
+    },
+    {
+      "id": "http/edit-use-case",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/UC-001/edit"
+      },
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "edit_page_use_case"
+    },
+    {
+      "id": "http/api-list-use-case",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/docs/use-case"
+      },
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/api-doc-use-case",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/doc/UC-001"
+      },
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-use-cases",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/use-cases"
+      },
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-use-case",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/use-case"
+      },
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/list-test-case",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=test-case"
+      },
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "list_page"
+    },
+    {
+      "id": "http/view-test-case",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/TC-001"
+      },
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "view_page"
+    },
+    {
+      "id": "http/edit-test-case",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/TC-001/edit"
+      },
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "edit_page_use_case"
+    },
+    {
+      "id": "http/api-list-test-case",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/docs/test-case"
+      },
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/api-doc-test-case",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/doc/TC-001"
+      },
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-test-cases",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/test-cases"
+      },
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-test-case",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/test-case"
+      },
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/list-test-report",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=test-report"
+      },
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "list_page"
+    },
+    {
+      "id": "http/view-test-report",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/TR-001"
+      },
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "view_page"
+    },
+    {
+      "id": "http/edit-test-report",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/TR-001/edit"
+      },
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "edit_page_use_case"
+    },
+    {
+      "id": "http/api-list-test-report",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/docs/test-report"
+      },
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/api-doc-test-report",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/doc/TR-001"
+      },
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-test-reports",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/test-reports"
+      },
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/legacy-api-test-report",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/test-report"
+      },
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/list-note",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=note"
+      },
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "list_page"
+    },
+    {
+      "id": "http/view-note",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/NOTE-001"
+      },
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "document_detail_page"
+    },
+    {
+      "id": "http/edit-note",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/NOTE-001/edit"
+      },
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "document_edit_page"
+    },
+    {
+      "id": "http/api-list-note",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/docs/note"
+      },
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/api-doc-note",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/doc/NOTE-001"
+      },
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/inventory",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/"
+      },
+      "document_type": "shared",
+      "model": null,
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "inventory_page"
+    },
+    {
+      "id": "http/board",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=task"
+      },
+      "document_type": "shared",
+      "model": null,
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "board_page"
+    },
+    {
+      "id": "http/asset-app-css",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/assets/app.css"
+      },
+      "document_type": "shared",
+      "model": null,
+      "artifacts": [
+        "http.json",
+        "body.txt"
+      ]
+    },
+    {
+      "id": "http/asset-app-js",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/assets/app.js"
+      },
+      "document_type": "shared",
+      "model": null,
+      "artifacts": [
+        "http.json",
+        "body.txt"
+      ]
+    },
+    {
+      "id": "http/asset-nav-state-js",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/assets/nav-state.js"
+      },
+      "document_type": "shared",
+      "model": null,
+      "artifacts": [
+        "http.json",
+        "body.txt"
+      ]
+    },
+    {
+      "id": "http/not-found-path",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/no-such-path"
+      },
+      "document_type": "shared",
+      "model": null,
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "error_page"
+    },
+    {
+      "id": "http/method-not-allowed",
+      "kind": "http",
+      "request": {
+        "method": "PUT",
+        "path": "/doc/REQ-001.001"
+      },
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "error_page"
+    },
+    {
+      "id": "http/conflict-note",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/doc/NOTE-001",
+        "body": "version=1.0.1&title=Conflict+probe&description=Stale+description&labels=stale&references=REQ-999"
+      },
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "document_conflict_page"
+    },
+    {
+      "id": "http/conflict-ui-mockup",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/doc/MOCK-002",
+        "body": "version=1.0.1&title=Conflict+probe&specs=UI-001&refs=CONFLICT-REF"
+      },
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "conflict_page_ui_mockup"
+    },
+    {
+      "id": "http/conflict-rule",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/doc/BR-001",
+        "body": "version=1.0.1&title=Conflict+probe&description=Stale&rationale=Stale+rationale&applicability=Stale+applicability&requirements=REQ-001.001"
+      },
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "conflict_page_business_rule"
+    },
+    {
+      "id": "http/conflict-audit",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/doc/AUD-001",
+        "body": "version=1.0.1&title=Conflict+probe&audit_type=quality&content=Stale+content"
+      },
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "conflict_page_audit_record"
+    },
+    {
+      "id": "http/conflict-tech-spec",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/doc/TECH-001",
+        "body": "version=1.0.1&title=Conflict+probe&description=Stale+description"
+      },
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "conflict_page_tech_spec"
+    },
+    {
+      "id": "http/conflict-use-case",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/doc/UC-001",
+        "body": "version=1.0.1&title=Conflict+probe&description=Stale&applicability=Stale&labels=stale&references=UC-REF-1"
+      },
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "conflict_page_use_case"
+    },
+    {
+      "id": "http/conflict-test-case",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/doc/TC-001",
+        "body": "version=1.0.1&title=Conflict+probe&description=Stale&applicability=Stale&labels=stale&references=TC-REF-1"
+      },
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "conflict_page_use_case"
+    },
+    {
+      "id": "http/conflict-test-report",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/doc/TR-001",
+        "body": "version=1.0.1&title=Conflict+probe&description=Stale&applicability=Stale&labels=stale&references=TR-REF-1"
+      },
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "conflict_page_use_case"
+    },
+    {
+      "id": "http/conflict-req",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/doc/REQ-001.001",
+        "body": "version=1.0.1&title=Conflict+probe&story=Stale+story&description=Stale+description"
+      },
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "conflict_page"
+    },
+    {
+      "id": "http/not-found-tech-spec",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/TECH-999"
+      },
+      "document_type": "tech-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "tech_spec_not_found_page"
+    },
+    {
+      "id": "http/not-found-use-case",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/UC-999"
+      },
+      "document_type": "use-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "use_case_not_found_page"
+    },
+    {
+      "id": "http/not-found-test-case",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/TC-999"
+      },
+      "document_type": "test-case",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "test_case_not_found_page"
+    },
+    {
+      "id": "http/not-found-test-report",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/TR-999"
+      },
+      "document_type": "test-report",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "test_report_not_found_page"
+    },
+    {
+      "id": "http/not-found-note",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/NOTE-999"
+      },
+      "document_type": "note",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "document_not_found_page"
+    },
+    {
+      "id": "http/empty-inventory",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/"
+      },
+      "document_type": "shared",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "inventory_page",
+      "project": "project-empty"
+    },
+    {
+      "id": "http/empty-list-req",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=req"
+      },
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "list_page",
+      "project": "project-empty"
+    },
+    {
+      "id": "http/empty-board",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/?type=task"
+      },
+      "document_type": "shared",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "board_page",
+      "project": "project-empty"
+    }
+  ]
+}

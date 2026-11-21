@@ -1,0 +1,3 @@
+NFR-001 Non-functional group one
+NFR-001.001 Latency budget | created_date={{TIMESTAMP}} updated_date={{TIMESTAMP}} labels=performance references=NFR-REF-1 status=active
+NFR-001.002 Availability | created_date={{TIMESTAMP}} updated_date={{TIMESTAMP}} labels= references= status=active

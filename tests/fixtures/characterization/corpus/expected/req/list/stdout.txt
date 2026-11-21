@@ -1,0 +1,5 @@
+REQ-001 Requirement group one
+REQ-001.001 Resolved dependency | created_date={{TIMESTAMP}} updated_date={{TIMESTAMP}} labels=core references=REQ-002 status=active
+REQ-001.002 Unresolved dependency | created_date={{TIMESTAMP}} updated_date={{TIMESTAMP}} labels=edge references=REQ-999 status=active
+REQ-001.003 Plain member | created_date={{TIMESTAMP}} updated_date={{TIMESTAMP}} labels= references= status=active
+REQ-002 Requirement group two

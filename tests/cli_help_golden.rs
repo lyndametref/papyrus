@@ -78,13 +78,46 @@ fn cases() -> Vec<(String, Vec<String>)> {
             ));
         }
     }
-    for slug in ["task", "milestone", "decision"] {
-        for verb in ["create", "edit"] {
+    // Backlog, decision, and project command surfaces (TASK-240, MS-032 AC-5).
+    let project_verbs: [(&str, &[&str]); 4] = [
+        (
+            "task",
+            &[
+                "create", "list", "view", "edit", "archive", "restore", "delete",
+            ],
+        ),
+        (
+            "milestone",
+            &[
+                "create", "list", "view", "edit", "close", "archive", "delete",
+            ],
+        ),
+        ("release", &["create", "list", "view", "close", "edit"]),
+        ("decision", &["create", "list", "view", "edit"]),
+    ];
+    for (slug, verbs) in project_verbs {
+        for verb in verbs {
             out.push((
                 format!("verb-{slug}-{verb}"),
-                vec![slug.to_string(), verb.to_string(), "--help".to_string()],
+                vec![slug.to_string(), (*verb).to_string(), "--help".to_string()],
             ));
         }
+    }
+    for command in [
+        "config",
+        "config-get",
+        "config-set",
+        "config-unset",
+        "config-list",
+        "help",
+        "browser",
+        "search",
+        "init",
+        "import",
+    ] {
+        let mut args: Vec<String> = command.split('-').map(|part| part.to_string()).collect();
+        args.push("--help".to_string());
+        out.push((command.to_string(), args));
     }
     let error_cases: [(&str, &[&str]); 10] = [
         ("err-unknown-slug", &["nosuch", "--help"]),

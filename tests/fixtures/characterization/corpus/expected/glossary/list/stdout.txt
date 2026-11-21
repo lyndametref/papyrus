@@ -1,0 +1,2 @@
+GLO-001 Glossary term one | created_date={{TIMESTAMP}} updated_date={{TIMESTAMP}} labels=domain references=GLO-REF-1 status=active
+GLO-002 Glossary term two | created_date={{TIMESTAMP}} updated_date={{TIMESTAMP}} labels= references= status=active

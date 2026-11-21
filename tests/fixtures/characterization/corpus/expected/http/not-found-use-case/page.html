@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Papyrus — Record not found</title>
+<link rel="stylesheet" href="/assets/app.css">
+<script src="/assets/nav-state.js"></script>
+<script src="/assets/app.js" defer></script>
+</head>
+<body>
+<div class="app">
+<header class="site-header">
+<div class="header-lead"><button class="nav-toggle" type="button" aria-expanded="true" aria-controls="site-nav" hidden>Navigation</button><div class="brand"><span class="mark" aria-hidden="true">P</span><span><span class="brand-name">Papyrus</span><span class="project">Characterization</span></span></div></div>
+<p class="top-meta">Local browser<br>offline &middot; {{BIND}}</p>
+</header>
+<div class="layout">
+<aside class="sidebar"><nav id="site-nav" aria-label="Document types"><p class="sidebar-label" aria-hidden="true">Document types</p><ul id="type-list"><li class="sidebar-group"><p class="sidebar-label">Backlog</p><ul class="sidebar-group-list"><li><a href="/?type=task">Backlog</a></li></ul></li><li class="sidebar-group"><p class="sidebar-label">Decisions</p><ul class="sidebar-group-list"><li><a href="/?type=decision">Decisions</a></li></ul></li><li class="sidebar-group"><p class="sidebar-label">Documents</p><ul class="sidebar-group-list"><li><a href="/?type=req">Business requirements</a></li><li><a href="/?type=business-rule">Business Rules</a></li><li><a href="/?type=audit-record">Audit Records</a></li><li><a href="/?type=tech-spec">Technical Specifications</a></li><li><a href="/?type=use-case" aria-current="page">Use Cases</a></li><li><a href="/?type=test-case">Test Cases</a></li><li><a href="/?type=test-report">Test Reports</a></li><li><a href="/?type=nfr">Non-functional requirements</a></li><li><a href="/?type=glossary">Glossary</a></li><li><a href="/?type=ui-spec">UI Specifications</a></li><li><a href="/?type=ui-mockup">UI Mockups</a></li><li><a href="/?type=note">Notes</a></li></ul></li></ul></nav></aside>
+<main class="main">
+<div class="error-page">
+<div class="error-card">
+<p class="status-code">404</p>
+<h1>Record not found</h1>
+<p>That record does not exist or is not available.</p>
+<p class="help">Archived use cases are not listed and cannot be opened. The same page is used for an unknown address.</p>
+<a class="link" href="/?type=use-case">Back to Use Cases</a>
+</div>
+</div>
+
+</main>
+</div>
+<footer class="site-footer"><span class="footer-long">Papyrus local browser &mdash; every page is served from this project; no network access.</span><span class="footer-short">Papyrus local browser &mdash; served from this project only.</span></footer>
+</div>
+</body>
+</html>
