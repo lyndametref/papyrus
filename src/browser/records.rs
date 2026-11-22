@@ -435,7 +435,18 @@ pub fn load_record(
             record.title = non_empty_or(heading_title(&record.doc), &stem);
             record.story = section_or_none(&record.doc, "User Story");
             record.description = section_or_none(&record.doc, "Description");
-            if let Some(group) = section_or_none(&record.doc, "Group") {
+            // The group link is the reserved engine-owned front-matter key. A
+            // legacy record still carries the link in a `## Group` section.
+            let frontmatter_group = record
+                .doc
+                .front_matter
+                .as_ref()
+                .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, "group"))
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty());
+            if let Some(group_id) = frontmatter_group {
+                record.group_id = Some(group_id);
+            } else if let Some(group) = section_or_none(&record.doc, "Group") {
                 let mut parts = group
                     .lines()
                     .next()

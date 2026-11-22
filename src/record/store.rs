@@ -376,6 +376,32 @@ pub fn write_atomic(
     result
 }
 
+/// Resolve a document record by ID across the family directories.
+///
+/// A `GroupedMarkdown` family carries both plain group IDs and dotted member
+/// IDs, so a dotted descriptor resolves a plain ID with one fallback pass.
+fn resolve_family_record(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    dirs: &[PathBuf],
+    id: &str,
+    prefixes: &[String],
+    dotted: bool,
+) -> Result<Option<crate::record::resolve::ResolvedRecord>, AppError> {
+    if let Some(found) =
+        crate::record::resolve::resolve_in_dirs(ctx, cfg, registry, dirs, id, prefixes, dotted)?
+    {
+        return Ok(Some(found));
+    }
+    if dotted {
+        return crate::record::resolve::resolve_in_dirs(
+            ctx, cfg, registry, dirs, id, prefixes, false,
+        );
+    }
+    Ok(None)
+}
+
 /// Archive a record: patch status to `archived`, write the destination via the
 /// atomic sequence, and remove the source only after the destination write
 /// succeeds.
@@ -402,10 +428,8 @@ pub fn archive_inner(
     let read_dirs = descriptor.resolve_read_directories(cfg, &ctx.project_dir);
     let prefixes = descriptor.configured_prefixes(cfg);
     let dotted = descriptor.is_dotted_id();
-    let resolved = crate::record::resolve::resolve_in_dirs(
-        ctx, cfg, registry, &read_dirs, id, &prefixes, dotted,
-    )
-    .map_err(RelocateError::Other)?;
+    let resolved = resolve_family_record(ctx, cfg, registry, &read_dirs, id, &prefixes, dotted)
+        .map_err(RelocateError::Other)?;
     let record = resolved.ok_or_else(|| {
         RelocateError::Other(AppError::NotFound(format!("record not found: {}", id)))
     })?;
@@ -606,9 +630,7 @@ pub fn delete(
     let read_dirs = descriptor.resolve_read_directories(cfg, &ctx.project_dir);
     let prefixes = descriptor.configured_prefixes(cfg);
     let dotted = descriptor.is_dotted_id();
-    let resolved = crate::record::resolve::resolve_in_dirs(
-        ctx, cfg, registry, &read_dirs, id, &prefixes, dotted,
-    )?;
+    let resolved = resolve_family_record(ctx, cfg, registry, &read_dirs, id, &prefixes, dotted)?;
     let record = resolved.ok_or_else(|| AppError::NotFound(format!("record not found: {}", id)))?;
     let path = record.path;
 
@@ -655,9 +677,7 @@ pub fn set_status(
     let read_dirs = descriptor.resolve_read_directories(cfg, &ctx.project_dir);
     let prefixes = descriptor.configured_prefixes(cfg);
     let dotted = descriptor.is_dotted_id();
-    let resolved = crate::record::resolve::resolve_in_dirs(
-        ctx, cfg, registry, &read_dirs, id, &prefixes, dotted,
-    )?;
+    let resolved = resolve_family_record(ctx, cfg, registry, &read_dirs, id, &prefixes, dotted)?;
     let record = resolved.ok_or_else(|| AppError::NotFound(format!("record not found: {}", id)))?;
     let path = record.path.clone();
 

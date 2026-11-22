@@ -28,4 +28,17 @@ and the post-refactor behaviour. Any other difference is a regression.
    `http/conflict-*`, `http/not-found-*`, `http/not-found-path`. Source:
    ADR-039, proof in MS-035.
 
+7. **Grouped member group link.** A newly created grouped member stores its
+   engine-owned group link in the reserved front-matter `group` key instead of
+   the legacy `## Group` body section. Existing records are not migrated and
+   keep their stored section. Bytes: `req/create`, `req/create-json`,
+   `nfr/create`, `nfr/create-json`. Source: REQ-05.001, REQ-05.002,
+   REQ-05.010, ADR-036 decision 9.
+
+Corrected behaviour without a byte delta: `nfr create` and `nfr create-group`
+now write the `## User Story` section when `--story` is supplied. The seed
+declares `story` for both nfr roles (REQ-05.002) and the pre-refactor module
+ignored it; no corpus case supplies `--story` to nfr, so the snapshot is
+unchanged. Source: REQ-05.002, ADR-036 decisions 26-29.
+
 No other difference is expected.

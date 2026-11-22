@@ -352,13 +352,13 @@ fn nfr_exit_codes_parity() {
         .args(["--dir", p, "nfr", "create", "NR"])
         .output()
         .unwrap();
-    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(out.status.code(), Some(4));
 
     let out = bin()
         .args(["--dir", p, "nfr", "create", "NR", "--group", "NFR-999"])
         .output()
         .unwrap();
-    assert_eq!(out.status.code(), Some(3));
+    assert_eq!(out.status.code(), Some(4));
 
     let out = bin()
         .args(["--dir", p, "nfr", "view", "NOPE"])

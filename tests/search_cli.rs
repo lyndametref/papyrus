@@ -191,13 +191,12 @@ fn t02_default_search_covers_req_nfr_and_groups() {
     assert_eq!(out.status.code(), Some(0));
     assert_eq!(stdout(&out).trim(), "NFR-001.001 doc Latency budget");
 
-    // Group documents are records in their own right.
+    // Group documents are records in their own right. A member stores its
+    // group link in the front-matter `group` key, so the group title is not
+    // part of the member's searchable content.
     let out = search(&d, &["Payments"]);
     assert_eq!(out.status.code(), Some(0));
-    assert_eq!(
-        stdout(&out).trim(),
-        "REQ-001 doc Payments Group\nREQ-001.001 doc Capture payment"
-    );
+    assert_eq!(stdout(&out).trim(), "REQ-001 doc Payments Group");
 }
 
 // ---------------------------------------------------------------------------
@@ -404,8 +403,10 @@ fn t09_archive_and_restore_visibility() {
     assert_ok(run(&d, &["req", "archive", "REQ-001"]));
     let out = search(&d, &["capture"]);
     assert_eq!(stdout(&out).trim(), "REQ-001.001 doc Capture payment");
+    // The archived group is hidden; its member keeps no copy of the group
+    // title, so only the member's own text remains searchable.
     let out = search(&d, &["Payments Group"]);
-    assert_eq!(stdout(&out).trim(), "REQ-001.001 doc Capture payment");
+    assert_eq!(stdout(&out), "");
 }
 
 // ---------------------------------------------------------------------------
