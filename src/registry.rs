@@ -9,7 +9,10 @@
 //! layer), TASK-108 (command tree), TASK-110 (generic handler), TASK-113
 //! (search), and TASK-114 (browser).
 
-use crate::config::{Config, DocTypeEntry, TypeEntry};
+use crate::config::{
+    Config, DocTypeEntry, FieldSpec, RoleFields, Slot, TypeEntry, Visibility,
+    is_seed_document_slug, resolved_document_entry, seed_document_type,
+};
 use crate::error::AppError;
 use crate::record::descriptor::RecordDescriptor;
 
@@ -241,12 +244,7 @@ impl DocumentModel {
     /// `req` and `nfr` are grouped, `ui-mockup` is an HTML mockup, every other
     /// seed slug and every slug with no seed entry is single markdown.
     pub fn for_slug(slug: &str) -> DocumentModel {
-        DOCUMENT_TEMPLATES
-            .iter()
-            .find(|template| template.slug == slug)
-            .map_or(DocumentModel::SingleMarkdown, |template| {
-                template.content.document_model()
-            })
+        seed_document_type(slug).map_or(DocumentModel::SingleMarkdown, |seed| seed.model)
     }
 }
 
@@ -273,7 +271,7 @@ impl TypeDescriptor {
     /// Transitional bridge until MS-034/MS-035 read the seed-derived model and
     /// `reference_visibility` instead.
     pub fn is_config_defined_document(&self) -> bool {
-        self.category == ArtifactCategory::Document && !is_builtin_document_slug(&self.slug)
+        self.category == ArtifactCategory::Document && !is_seed_document_slug(&self.slug)
     }
 
     /// The verb spec for `verb`, when the descriptor declares one.
@@ -320,6 +318,19 @@ pub struct TypeDescriptor {
     /// `None` is the generic config-defined document path retained until the
     /// same task.
     pub schema: Option<TypedSchema>,
+    /// Resolved single-role field sequence (ADR-036 decision 26).
+    ///
+    /// Empty for a grouped type; a user-defined type carries its default
+    /// `description` field.
+    pub fields: Vec<FieldSpec>,
+    /// Resolved group role of a grouped type.
+    pub group: Option<RoleFields>,
+    /// Resolved member role of a grouped type.
+    pub member: Option<RoleFields>,
+    /// Reference visibility of a single-role type (ADR-035).
+    pub reference_visibility: Option<Visibility>,
+    /// Resolved browser list slots (ADR-041).
+    pub slots: Vec<Slot>,
     pub frontmatter_keys: Vec<String>,
     pub id_shape: IdShape,
     pub archive_policy: ArchivePolicy,
@@ -514,20 +525,6 @@ const TASK_SECTIONS: &[&str] = &["## Description", "## Acceptance Criteria", "##
 const MILESTONE_SECTIONS: &[&str] = &["## Description"];
 const RELEASE_SECTIONS: &[&str] = &["## Description"];
 const DECISION_SECTIONS: &[&str] = &["## Status", "## Decision", "## Context", "## Consequences"];
-const REQUIREMENT_SECTIONS: &[&str] = &["## User Story", "## Group", "## Description"];
-const GLOSSARY_SECTIONS: &[&str] = &["## Definition"];
-const RULE_SECTIONS: &[&str] = &[
-    "## Description",
-    "## Rationale",
-    "## Applicability",
-    "## Requirements",
-];
-const UI_SPEC_SECTIONS: &[&str] = &["## View", "## Description"];
-const AUDIT_SECTIONS: &[&str] = &["## Audit Type", "## Content"];
-const TECH_SPEC_SECTIONS: &[&str] = &["## Description"];
-const USE_CASE_SECTIONS: &[&str] = &["## Description", "## Applicability"];
-const TEST_CASE_SECTIONS: &[&str] = &["## Description", "## Applicability"];
-const TEST_REPORT_SECTIONS: &[&str] = &["## Description", "## Applicability"];
 
 /// Build one argument spec with the common defaults.
 #[allow(clippy::too_many_arguments)]
@@ -1990,7 +1987,7 @@ fn decision_schema() -> TypedSchema {
 fn requirement_business_schema() -> TypedSchema {
     TypedSchema {
         handler: TypedHandler::Requirement(RequirementKind::Business),
-        sections: owned_sections(REQUIREMENT_SECTIONS),
+        sections: Vec::new(),
         extensions: vec![Verb::CreateGroup],
         verbs: requirement_verbs(),
     }
@@ -1998,7 +1995,7 @@ fn requirement_business_schema() -> TypedSchema {
 fn requirement_non_functional_schema() -> TypedSchema {
     TypedSchema {
         handler: TypedHandler::Requirement(RequirementKind::NonFunctional),
-        sections: owned_sections(REQUIREMENT_SECTIONS),
+        sections: Vec::new(),
         extensions: vec![Verb::CreateGroup],
         verbs: requirement_verbs(),
     }
@@ -2006,7 +2003,7 @@ fn requirement_non_functional_schema() -> TypedSchema {
 fn glossary_schema() -> TypedSchema {
     TypedSchema {
         handler: TypedHandler::Glossary,
-        sections: owned_sections(GLOSSARY_SECTIONS),
+        sections: Vec::new(),
         extensions: Vec::new(),
         verbs: glossary_verbs(),
     }
@@ -2014,7 +2011,7 @@ fn glossary_schema() -> TypedSchema {
 fn rule_schema() -> TypedSchema {
     TypedSchema {
         handler: TypedHandler::Rule,
-        sections: owned_sections(RULE_SECTIONS),
+        sections: Vec::new(),
         extensions: Vec::new(),
         verbs: rule_verbs(),
     }
@@ -2022,7 +2019,7 @@ fn rule_schema() -> TypedSchema {
 fn ui_spec_schema() -> TypedSchema {
     TypedSchema {
         handler: TypedHandler::UiSpec,
-        sections: owned_sections(UI_SPEC_SECTIONS),
+        sections: Vec::new(),
         extensions: Vec::new(),
         verbs: ui_spec_verbs(),
     }
@@ -2038,7 +2035,7 @@ fn ui_mockup_schema() -> TypedSchema {
 fn audit_schema() -> TypedSchema {
     TypedSchema {
         handler: TypedHandler::Audit,
-        sections: owned_sections(AUDIT_SECTIONS),
+        sections: Vec::new(),
         extensions: Vec::new(),
         verbs: audit_verbs(),
     }
@@ -2046,7 +2043,7 @@ fn audit_schema() -> TypedSchema {
 fn tech_spec_schema() -> TypedSchema {
     TypedSchema {
         handler: TypedHandler::TechSpec,
-        sections: owned_sections(TECH_SPEC_SECTIONS),
+        sections: Vec::new(),
         extensions: Vec::new(),
         verbs: tech_spec_verbs(),
     }
@@ -2054,7 +2051,7 @@ fn tech_spec_schema() -> TypedSchema {
 fn use_case_schema() -> TypedSchema {
     TypedSchema {
         handler: TypedHandler::UseCase,
-        sections: owned_sections(USE_CASE_SECTIONS),
+        sections: Vec::new(),
         extensions: Vec::new(),
         verbs: use_case_verbs(),
     }
@@ -2062,7 +2059,7 @@ fn use_case_schema() -> TypedSchema {
 fn test_case_schema() -> TypedSchema {
     TypedSchema {
         handler: TypedHandler::TestCase,
-        sections: owned_sections(TEST_CASE_SECTIONS),
+        sections: Vec::new(),
         extensions: Vec::new(),
         verbs: test_case_verbs(),
     }
@@ -2070,7 +2067,7 @@ fn test_case_schema() -> TypedSchema {
 fn test_report_schema() -> TypedSchema {
     TypedSchema {
         handler: TypedHandler::TestReport,
-        sections: owned_sections(TEST_REPORT_SECTIONS),
+        sections: Vec::new(),
         extensions: Vec::new(),
         verbs: test_report_verbs(),
     }
@@ -2090,10 +2087,6 @@ const MOCKUP_STATES: &[&str] = &["pending", "approved", "archived"];
 const NO_CREATE_OPTIONS: CreateOptions = CreateOptions {
     group: GroupRequirement::Absent,
 };
-const REQUIRED_GROUP: CreateOptions = CreateOptions {
-    group: GroupRequirement::Required,
-};
-
 const FRONTMATTER_ARCHIVE: ArchivePolicy = ArchivePolicy::ArchivedFolder {
     state_field: Some("status"),
 };
@@ -2106,7 +2099,6 @@ enum PrefixSource {
     Milestone,
     Release,
     Decision,
-    Entry,
 }
 
 /// The status model a template declares, before configuration is applied.
@@ -2114,15 +2106,12 @@ enum PrefixSource {
 enum TemplateStatus {
     TaskConfigurable,
     Fixed(&'static [&'static str]),
-    DocumentMain,
-    HtmlMetadata(&'static [&'static str]),
 }
 
 /// The verb family a template declares.
 #[derive(Clone, Copy, Debug)]
 enum TemplateVerbs {
     Fixed(&'static [Verb]),
-    DocumentBaseline { extensions: &'static [Verb] },
 }
 
 /// The typed schema shape a template names.
@@ -2136,17 +2125,6 @@ enum SchemaKind {
     Milestone,
     Release,
     Decision,
-    RequirementBusiness,
-    RequirementNonFunctional,
-    Glossary,
-    Rule,
-    UiSpec,
-    UiMockup,
-    Audit,
-    TechSpec,
-    UseCase,
-    TestCase,
-    TestReport,
 }
 
 impl SchemaKind {
@@ -2156,29 +2134,12 @@ impl SchemaKind {
             SchemaKind::Milestone => milestone_schema(),
             SchemaKind::Release => release_schema(),
             SchemaKind::Decision => decision_schema(),
-            SchemaKind::RequirementBusiness => requirement_business_schema(),
-            SchemaKind::RequirementNonFunctional => requirement_non_functional_schema(),
-            SchemaKind::Glossary => glossary_schema(),
-            SchemaKind::Rule => rule_schema(),
-            SchemaKind::UiSpec => ui_spec_schema(),
-            SchemaKind::UiMockup => ui_mockup_schema(),
-            SchemaKind::Audit => audit_schema(),
-            SchemaKind::TechSpec => tech_spec_schema(),
-            SchemaKind::UseCase => use_case_schema(),
-            SchemaKind::TestCase => test_case_schema(),
-            SchemaKind::TestReport => test_report_schema(),
         }
     }
 
     /// The document model this seed kind resolves to (ADR-036 decisions 6, 31).
     fn document_model(self) -> DocumentModel {
-        match self {
-            SchemaKind::RequirementBusiness | SchemaKind::RequirementNonFunctional => {
-                DocumentModel::GroupedMarkdown
-            }
-            SchemaKind::UiMockup => DocumentModel::SingleHtmlMockup,
-            _ => DocumentModel::SingleMarkdown,
-        }
+        DocumentModel::SingleMarkdown
     }
 }
 
@@ -2206,23 +2167,6 @@ struct DescriptorTemplate {
     frontmatter_extra: &'static [&'static str],
     archive: ArchivePolicy,
     create_options: CreateOptions,
-    /// Record-layer facts of a document type. Backlog and decision templates
-    /// leave this `None`; their record descriptors stay static.
-    record: Option<RecordFacts>,
-}
-
-/// The record-level facts a document template contributes to the record layer.
-///
-/// These are the values that used to live in the parallel static document
-/// table in `record::descriptor` (ADR-0017 decision 1).
-#[derive(Clone, Copy, Debug)]
-struct RecordFacts {
-    record_name: &'static str,
-    record_type: &'static str,
-    type_name: &'static str,
-    display_id_pattern: &'static str,
-    /// Type-specific front-matter keys only, in written order.
-    frontmatter_keys: &'static [&'static str],
 }
 
 const TASK_VERBS: &[Verb] = &[
@@ -2275,7 +2219,6 @@ const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
         ],
         archive: FRONTMATTER_ARCHIVE,
         create_options: NO_CREATE_OPTIONS,
-        record: None,
     },
     DescriptorTemplate {
         slug: "milestone",
@@ -2296,7 +2239,6 @@ const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
         // archive destination and the legacy read/import location.
         archive: FRONTMATTER_ARCHIVE,
         create_options: NO_CREATE_OPTIONS,
-        record: None,
     },
     DescriptorTemplate {
         slug: "release",
@@ -2313,7 +2255,6 @@ const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_extra: &[],
         archive: ArchivePolicy::None,
         create_options: NO_CREATE_OPTIONS,
-        record: None,
     },
 ];
 
@@ -2333,270 +2274,7 @@ const DECISION_TEMPLATE: DescriptorTemplate = DescriptorTemplate {
     frontmatter_extra: &["superseded_by"],
     archive: ArchivePolicy::None,
     create_options: NO_CREATE_OPTIONS,
-    record: None,
 };
-
-const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
-    DescriptorTemplate {
-        slug: "req",
-        category: ArtifactCategory::Document,
-        label: "Business requirement",
-        prefix: PrefixSource::Entry,
-        directory_key: DOC_DIRECTORY_KEY,
-        subpath: None,
-        id_shape: IdShape::Grouped,
-        status: TemplateStatus::DocumentMain,
-        verbs: TemplateVerbs::DocumentBaseline {
-            extensions: &[Verb::CreateGroup],
-        },
-        content: SchemaKind::RequirementBusiness,
-        frontmatter_status: Some("status"),
-        frontmatter_extra: &[],
-        archive: FRONTMATTER_ARCHIVE,
-        create_options: REQUIRED_GROUP,
-        record: Some(RecordFacts {
-            record_name: "business requirement",
-            record_type: "requirement",
-            type_name: "requirement",
-            display_id_pattern: "REQ-###.###",
-            frontmatter_keys: &["status"],
-        }),
-    },
-    DescriptorTemplate {
-        slug: "nfr",
-        category: ArtifactCategory::Document,
-        label: "Non-functional requirement",
-        prefix: PrefixSource::Entry,
-        directory_key: DOC_DIRECTORY_KEY,
-        subpath: None,
-        id_shape: IdShape::Grouped,
-        status: TemplateStatus::DocumentMain,
-        verbs: TemplateVerbs::DocumentBaseline {
-            extensions: &[Verb::CreateGroup],
-        },
-        content: SchemaKind::RequirementNonFunctional,
-        frontmatter_status: Some("status"),
-        frontmatter_extra: &[],
-        archive: FRONTMATTER_ARCHIVE,
-        create_options: REQUIRED_GROUP,
-        record: Some(RecordFacts {
-            record_name: "non-functional requirement",
-            record_type: "nfr",
-            type_name: "nfr",
-            display_id_pattern: "NFR-###.###",
-            frontmatter_keys: &["status"],
-        }),
-    },
-    DescriptorTemplate {
-        slug: "glossary",
-        category: ArtifactCategory::Document,
-        label: "Glossary term",
-        prefix: PrefixSource::Entry,
-        directory_key: DOC_DIRECTORY_KEY,
-        subpath: None,
-        id_shape: IdShape::Plain,
-        status: TemplateStatus::DocumentMain,
-        verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: SchemaKind::Glossary,
-        frontmatter_status: Some("status"),
-        frontmatter_extra: &[],
-        archive: FRONTMATTER_ARCHIVE,
-        create_options: NO_CREATE_OPTIONS,
-        record: Some(RecordFacts {
-            record_name: "glossary term",
-            record_type: "glossary",
-            type_name: "glossary",
-            display_id_pattern: "GLO-###",
-            frontmatter_keys: &["status"],
-        }),
-    },
-    DescriptorTemplate {
-        slug: "rule",
-        category: ArtifactCategory::Document,
-        label: "Business rule",
-        prefix: PrefixSource::Entry,
-        directory_key: DOC_DIRECTORY_KEY,
-        subpath: None,
-        id_shape: IdShape::Plain,
-        status: TemplateStatus::DocumentMain,
-        verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: SchemaKind::Rule,
-        frontmatter_status: Some("status"),
-        frontmatter_extra: &[],
-        archive: FRONTMATTER_ARCHIVE,
-        create_options: NO_CREATE_OPTIONS,
-        record: Some(RecordFacts {
-            record_name: "business rule",
-            record_type: "rule",
-            type_name: "rule",
-            display_id_pattern: "RUL-###",
-            frontmatter_keys: &["status"],
-        }),
-    },
-    DescriptorTemplate {
-        slug: "ui-spec",
-        category: ArtifactCategory::Document,
-        label: "UI specification",
-        prefix: PrefixSource::Entry,
-        directory_key: DOC_DIRECTORY_KEY,
-        subpath: None,
-        id_shape: IdShape::Plain,
-        status: TemplateStatus::DocumentMain,
-        verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: SchemaKind::UiSpec,
-        frontmatter_status: Some("status"),
-        frontmatter_extra: &[],
-        archive: FRONTMATTER_ARCHIVE,
-        create_options: NO_CREATE_OPTIONS,
-        record: Some(RecordFacts {
-            record_name: "ui specification",
-            record_type: "ui-spec",
-            type_name: "ui_spec",
-            display_id_pattern: "UI-###",
-            frontmatter_keys: &["status"],
-        }),
-    },
-    DescriptorTemplate {
-        slug: "ui-mockup",
-        category: ArtifactCategory::Document,
-        label: "UI mockup",
-        prefix: PrefixSource::Entry,
-        directory_key: DOC_DIRECTORY_KEY,
-        subpath: None,
-        id_shape: IdShape::Plain,
-        status: TemplateStatus::HtmlMetadata(MOCKUP_STATES),
-        verbs: TemplateVerbs::DocumentBaseline {
-            extensions: &[Verb::Supersede],
-        },
-        content: SchemaKind::UiMockup,
-        frontmatter_status: None,
-        frontmatter_extra: &[],
-        archive: HTML_METADATA_ARCHIVE,
-        create_options: NO_CREATE_OPTIONS,
-        record: Some(RecordFacts {
-            record_name: "ui mockup",
-            record_type: "ui-mockup",
-            type_name: "ui_mockup",
-            display_id_pattern: "UI-###",
-            frontmatter_keys: &[],
-        }),
-    },
-    DescriptorTemplate {
-        slug: "audit",
-        category: ArtifactCategory::Document,
-        label: "Audit record",
-        prefix: PrefixSource::Entry,
-        directory_key: DOC_DIRECTORY_KEY,
-        subpath: None,
-        id_shape: IdShape::Plain,
-        status: TemplateStatus::DocumentMain,
-        verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: SchemaKind::Audit,
-        frontmatter_status: Some("status"),
-        frontmatter_extra: &["type"],
-        archive: FRONTMATTER_ARCHIVE,
-        create_options: NO_CREATE_OPTIONS,
-        record: Some(RecordFacts {
-            record_name: "audit record",
-            record_type: "audit",
-            type_name: "audit",
-            display_id_pattern: "AUD-###",
-            frontmatter_keys: &["status", "type"],
-        }),
-    },
-    DescriptorTemplate {
-        slug: "tech-spec",
-        category: ArtifactCategory::Document,
-        label: "Technical specification",
-        prefix: PrefixSource::Entry,
-        directory_key: DOC_DIRECTORY_KEY,
-        subpath: None,
-        id_shape: IdShape::Plain,
-        status: TemplateStatus::DocumentMain,
-        verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: SchemaKind::TechSpec,
-        frontmatter_status: Some("status"),
-        frontmatter_extra: &[],
-        archive: FRONTMATTER_ARCHIVE,
-        create_options: NO_CREATE_OPTIONS,
-        record: Some(RecordFacts {
-            record_name: "technical specification",
-            record_type: "tech-spec",
-            type_name: "tech_spec",
-            display_id_pattern: "TECH-###",
-            frontmatter_keys: &["status"],
-        }),
-    },
-    DescriptorTemplate {
-        slug: "use-case",
-        category: ArtifactCategory::Document,
-        label: "Use case",
-        prefix: PrefixSource::Entry,
-        directory_key: DOC_DIRECTORY_KEY,
-        subpath: None,
-        id_shape: IdShape::Plain,
-        status: TemplateStatus::DocumentMain,
-        verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: SchemaKind::UseCase,
-        frontmatter_status: Some("status"),
-        frontmatter_extra: &[],
-        archive: FRONTMATTER_ARCHIVE,
-        create_options: NO_CREATE_OPTIONS,
-        record: Some(RecordFacts {
-            record_name: "use case",
-            record_type: "use-case",
-            type_name: "use_case",
-            display_id_pattern: "UC-###",
-            frontmatter_keys: &["status"],
-        }),
-    },
-    DescriptorTemplate {
-        slug: "test-case",
-        category: ArtifactCategory::Document,
-        label: "Test case",
-        prefix: PrefixSource::Entry,
-        directory_key: DOC_DIRECTORY_KEY,
-        subpath: None,
-        id_shape: IdShape::Plain,
-        status: TemplateStatus::DocumentMain,
-        verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: SchemaKind::TestCase,
-        frontmatter_status: Some("status"),
-        frontmatter_extra: &[],
-        archive: FRONTMATTER_ARCHIVE,
-        create_options: NO_CREATE_OPTIONS,
-        record: Some(RecordFacts {
-            record_name: "test case",
-            record_type: "test-case",
-            type_name: "test_case",
-            display_id_pattern: "TC-###",
-            frontmatter_keys: &["status"],
-        }),
-    },
-    DescriptorTemplate {
-        slug: "test-report",
-        category: ArtifactCategory::Document,
-        label: "Test report",
-        prefix: PrefixSource::Entry,
-        directory_key: DOC_DIRECTORY_KEY,
-        subpath: None,
-        id_shape: IdShape::Plain,
-        status: TemplateStatus::DocumentMain,
-        verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: SchemaKind::TestReport,
-        frontmatter_status: Some("status"),
-        frontmatter_extra: &[],
-        archive: FRONTMATTER_ARCHIVE,
-        create_options: NO_CREATE_OPTIONS,
-        record: Some(RecordFacts {
-            record_name: "test report",
-            record_type: "test-report",
-            type_name: "test_report",
-            display_id_pattern: "TR-###",
-            frontmatter_keys: &["status"],
-        }),
-    },
-];
 
 /// The built-in registry: every configured type with its behavior.
 #[derive(Clone, Debug)]
@@ -2674,13 +2352,6 @@ impl ArtifactRegistry {
     }
 }
 
-/// Whether a document slug is declared by a built-in template.
-pub fn is_builtin_document_slug(slug: &str) -> bool {
-    DOCUMENT_TEMPLATES
-        .iter()
-        .any(|template| template.slug == slug)
-}
-
 /// Build descriptors in the canonical order, without validating invariants.
 fn assemble(cfg: &Config) -> Result<Vec<TypeDescriptor>, RegistryError> {
     let mut descriptors = Vec::new();
@@ -2718,8 +2389,8 @@ fn backlog_descriptor(cfg: &Config, template: &DescriptorTemplate) -> TypeDescri
         PrefixSource::Task => cfg.task_prefix.clone(),
         PrefixSource::Milestone => cfg.milestone_prefix.clone(),
         PrefixSource::Release => cfg.release_prefix.clone(),
-        // Backlog templates never read a decision or entry prefix.
-        PrefixSource::Decision | PrefixSource::Entry => String::new(),
+        // Backlog templates never read a decision prefix.
+        PrefixSource::Decision => String::new(),
     };
     let status_model = match template.status {
         TemplateStatus::TaskConfigurable => StatusModel::TaskConfigurable {
@@ -2727,14 +2398,9 @@ fn backlog_descriptor(cfg: &Config, template: &DescriptorTemplate) -> TypeDescri
             default: cfg.default_status.clone(),
         },
         TemplateStatus::Fixed(states) => StatusModel::Fixed { states },
-        // Document status models are built by `document_descriptor`.
-        TemplateStatus::DocumentMain => StatusModel::Fixed { states: &[] },
-        TemplateStatus::HtmlMetadata(states) => StatusModel::Fixed { states },
     };
-    let verbs = match template.verbs {
-        TemplateVerbs::Fixed(verbs) => verbs.to_vec(),
-        TemplateVerbs::DocumentBaseline { .. } => DOCUMENT_BASELINE_VERBS.to_vec(),
-    };
+    let TemplateVerbs::Fixed(verbs) = template.verbs;
+    let verbs = verbs.to_vec();
     TypeDescriptor {
         slug: template.slug.to_string(),
         category: template.category,
@@ -2750,6 +2416,11 @@ fn backlog_descriptor(cfg: &Config, template: &DescriptorTemplate) -> TypeDescri
         create_options: template.create_options,
         document_model: template.content.document_model(),
         schema: Some(template.content.schema()),
+        fields: Vec::new(),
+        group: None,
+        member: None,
+        reference_visibility: None,
+        slots: Vec::new(),
         frontmatter_keys: frontmatter_keys(template),
         id_shape: template.id_shape,
         archive_policy: template.archive,
@@ -2775,6 +2446,11 @@ fn decision_descriptor(slug: &str, entry: &TypeEntry) -> TypeDescriptor {
         create_options: NO_CREATE_OPTIONS,
         document_model: SchemaKind::Decision.document_model(),
         schema: Some(SchemaKind::Decision.schema()),
+        fields: Vec::new(),
+        group: None,
+        member: None,
+        reference_visibility: None,
+        slots: Vec::new(),
         frontmatter_keys: frontmatter_keys(&DECISION_TEMPLATE),
         id_shape: IdShape::Plain,
         archive_policy: ArchivePolicy::None,
@@ -2782,141 +2458,263 @@ fn decision_descriptor(slug: &str, entry: &TypeEntry) -> TypeDescriptor {
     }
 }
 
-/// Build one document descriptor, typed when a template exists and generic
-/// otherwise (REQ-07.004, ADR-0018).
-fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescriptor, RegistryError> {
-    let template = DOCUMENT_TEMPLATES
-        .iter()
-        .find(|template| template.slug == slug);
-
-    let document_model = template.map_or(DocumentModel::SingleMarkdown, |template| {
-        template.content.document_model()
-    });
-    let schema = template.map(|template| template.content.schema());
-
-    let (status_model, verbs, id_shape, create_options, archive_policy, frontmatter_keys) =
-        match template {
-            Some(template) => {
-                let status_model = document_status_model(slug, entry, template.status)?;
-                let mut verbs = DOCUMENT_BASELINE_VERBS.to_vec();
-                if matches!(status_model, StatusModel::DocumentMain { .. }) {
-                    verbs.push(Verb::Status);
-                }
-                if let TemplateVerbs::DocumentBaseline { extensions } = template.verbs {
-                    verbs.extend(extensions.iter().copied());
-                }
-                let keys = if document_model == DocumentModel::SingleHtmlMockup {
-                    // UI mockups are HTML records and carry no front matter.
-                    Vec::new()
-                } else {
-                    frontmatter_keys(template)
-                };
-                (
-                    status_model,
-                    verbs,
-                    template.id_shape,
-                    template.create_options,
-                    template.archive,
-                    keys,
-                )
-            }
-            None => {
-                let status_model =
-                    document_status_model(slug, entry, TemplateStatus::DocumentMain)?;
-                let mut verbs = DOCUMENT_BASELINE_VERBS.to_vec();
-                verbs.push(Verb::Status);
-                let mut keys: Vec<String> = GENERAL_FRONTMATTER_KEYS
-                    .iter()
-                    .map(|key| (*key).to_string())
-                    .collect();
-                keys.push("status".to_string());
-                (
-                    status_model,
-                    verbs,
-                    IdShape::Plain,
-                    NO_CREATE_OPTIONS,
-                    FRONTMATTER_ARCHIVE,
-                    keys,
-                )
-            }
-        };
-
-    let record = match template {
-        Some(template) => template
-            .record
-            .map(|facts| document_record(template, schema.as_ref(), facts)),
-        // A config-defined type has no static template, so the registry builds
-        // its record facts inline from the type it already owns. The registry
-        // owns the descriptor; nothing is leaked or cached (ADR-0017 D10).
-        None => Some(RecordDescriptor {
-            name: Cow::Owned(slug.to_string()),
-            record_type: Cow::Borrowed("document"),
-            type_name: Cow::Borrowed("document"),
-            label: Cow::Owned(slug.to_string()),
-            display_id_pattern: Cow::Borrowed("GEN-###"),
-            directory: Cow::Borrowed("doc"),
-            subpath: Cow::Borrowed(""),
-            doc_type_key: Some(Cow::Owned(slug.to_string())),
-            frontmatter_keys: vec![Cow::Borrowed("status")],
-            sections: vec![Cow::Borrowed("## Description")],
-        }),
+/// The transitional typed schema a seed slug still exposes to the CLI until
+/// MS-034 derives its command from the field sequence.
+fn document_schema(slug: &str) -> Option<TypedSchema> {
+    let mut schema = match slug {
+        "req" => requirement_business_schema(),
+        "nfr" => requirement_non_functional_schema(),
+        "glossary" => glossary_schema(),
+        "rule" => rule_schema(),
+        "ui-spec" => ui_spec_schema(),
+        "ui-mockup" => ui_mockup_schema(),
+        "audit" => audit_schema(),
+        "tech-spec" => tech_spec_schema(),
+        "use-case" => use_case_schema(),
+        "test-case" => test_case_schema(),
+        "test-report" => test_report_schema(),
+        _ => return None,
     };
+    // Sections are seed data: the transitional schema carries only the CLI
+    // verb metadata until MS-034 derives the commands from the same fields.
+    let seed = seed_document_type(slug)?;
+    let fields = match seed.model {
+        DocumentModel::GroupedMarkdown => seed.member.map(|role| role.fields).unwrap_or(&[]),
+        DocumentModel::SingleMarkdown | DocumentModel::SingleHtmlMockup => seed.fields,
+    };
+    schema.sections = fields
+        .iter()
+        .filter_map(|field| field.heading)
+        .map(Cow::Borrowed)
+        .collect();
+    Some(schema)
+}
+
+/// One field-derived CLI option (ADR-036 decisions 15 to 20).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FieldOption {
+    pub verb: Verb,
+    pub key: String,
+    /// Long option name without the leading `--`.
+    pub long: String,
+    pub label: String,
+    pub help: Option<String>,
+}
+
+/// The option each field offers on each of its verbs, in sequence order.
+pub fn field_options(fields: &[FieldSpec]) -> Vec<FieldOption> {
+    let mut options = Vec::new();
+    for field in fields {
+        let long = field
+            .option
+            .clone()
+            .unwrap_or_else(|| field.key.replace('_', "-"));
+        for field_verb in &field.verbs {
+            let verb = match field_verb {
+                crate::config::FieldVerb::Create => Verb::Create,
+                crate::config::FieldVerb::Edit => Verb::Edit,
+            };
+            options.push(FieldOption {
+                verb,
+                key: field.key.clone(),
+                long: long.clone(),
+                label: field.label.clone().unwrap_or_else(|| field.key.clone()),
+                help: field.help.clone(),
+            });
+        }
+    }
+    options
+}
+
+/// The verb set of a document model (ADR-036 decision 8).
+fn document_verbs(model: DocumentModel) -> Vec<Verb> {
+    let mut verbs = DOCUMENT_BASELINE_VERBS.to_vec();
+    match model {
+        DocumentModel::SingleMarkdown => verbs.push(Verb::Status),
+        DocumentModel::GroupedMarkdown => {
+            verbs.push(Verb::Status);
+            verbs.push(Verb::CreateGroup);
+        }
+        DocumentModel::SingleHtmlMockup => verbs.push(Verb::Supersede),
+    }
+    verbs
+}
+
+/// Build one document descriptor from the seed entry and the effective
+/// configuration entry (ADR-036 decisions 28 to 33).
+fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescriptor, RegistryError> {
+    let seed = seed_document_type(slug);
+    let effective = resolved_document_entry(slug, entry);
+    let document_model = seed.map_or(DocumentModel::SingleMarkdown, |seed| seed.model);
+    let schema = if seed.is_some() {
+        document_schema(slug)
+    } else {
+        None
+    };
+
+    let status_model = document_status_model(slug, &effective, document_model)?;
+    let verbs = document_verbs(document_model);
+    let id_shape = match document_model {
+        DocumentModel::GroupedMarkdown => IdShape::Grouped,
+        DocumentModel::SingleMarkdown | DocumentModel::SingleHtmlMockup => IdShape::Plain,
+    };
+    let create_options = match document_model {
+        DocumentModel::GroupedMarkdown => CreateOptions {
+            group: GroupRequirement::Required,
+        },
+        DocumentModel::SingleMarkdown | DocumentModel::SingleHtmlMockup => NO_CREATE_OPTIONS,
+    };
+    let archive_policy = match document_model {
+        DocumentModel::SingleHtmlMockup => HTML_METADATA_ARCHIVE,
+        DocumentModel::SingleMarkdown | DocumentModel::GroupedMarkdown => FRONTMATTER_ARCHIVE,
+    };
+
+    let fields = effective.fields.clone().unwrap_or_default();
+    let group = effective.group.clone();
+    let member = effective.member.clone();
+    let label = effective.label.clone().unwrap_or_else(|| slug.to_string());
+    let frontmatter_keys =
+        document_frontmatter_keys(document_model, &fields, group.as_ref(), member.as_ref());
+    let record = document_record(
+        slug,
+        &label,
+        seed,
+        document_model,
+        &fields,
+        group.as_ref(),
+        member.as_ref(),
+    );
 
     Ok(TypeDescriptor {
         slug: slug.to_string(),
         category: ArtifactCategory::Document,
-        label: match template {
-            Some(template) => template.label.to_string(),
-            None => slug.to_string(),
-        },
-        prefix: entry.prefix.clone(),
+        label,
+        prefix: effective.prefix.clone(),
         directory: DirectorySpec {
             config_key: DOC_DIRECTORY_KEY,
-            relative: entry.directory.clone(),
+            relative: effective.directory.clone(),
         },
-        enabled: entry.enabled,
+        enabled: effective.enabled,
         status_model,
         verbs,
         create_options,
         document_model,
         schema,
+        fields,
+        group,
+        member,
+        reference_visibility: effective.reference_visibility,
+        slots: effective.slots.clone().unwrap_or_default(),
         frontmatter_keys,
         id_shape,
         archive_policy,
-        record,
+        record: Some(record),
     })
 }
 
-/// Project a document template's record facts into the record-layer shape.
+fn push_field_frontmatter(keys: &mut Vec<String>, fields: &[FieldSpec]) {
+    for field in fields {
+        if let Some(key) = &field.frontmatter_key
+            && !keys.contains(key)
+        {
+            keys.push(key.clone());
+        }
+    }
+}
+
+/// General keys, then `status` where the model stores it, then each declared
+/// field's `frontmatter_key` in sequence order (TECH-071 field-source matrix).
+fn document_frontmatter_keys(
+    model: DocumentModel,
+    fields: &[FieldSpec],
+    group: Option<&RoleFields>,
+    member: Option<&RoleFields>,
+) -> Vec<String> {
+    if model == DocumentModel::SingleHtmlMockup {
+        return Vec::new();
+    }
+    let mut keys: Vec<String> = GENERAL_FRONTMATTER_KEYS
+        .iter()
+        .map(|key| (*key).to_string())
+        .collect();
+    keys.push("status".to_string());
+    push_field_frontmatter(&mut keys, fields);
+    if let Some(group) = group
+        && let Some(role_fields) = &group.fields
+    {
+        push_field_frontmatter(&mut keys, role_fields);
+    }
+    if let Some(member) = member
+        && let Some(role_fields) = &member.fields
+    {
+        push_field_frontmatter(&mut keys, role_fields);
+    }
+    keys
+}
+
+/// Project the seed and effective entry into the record-layer shape.
 ///
 /// `directory` and `subpath` stay at the record-layer defaults: the concrete
 /// location comes from the `document_types.<slug>.directory` entry that
 /// `RecordDescriptor::resolve_directory` reads through `doc_type_key`.
 fn document_record(
-    template: &DescriptorTemplate,
-    schema: Option<&TypedSchema>,
-    facts: RecordFacts,
+    slug: &str,
+    label: &str,
+    seed: Option<&crate::config::SeedDocumentType>,
+    model: DocumentModel,
+    fields: &[FieldSpec],
+    group: Option<&RoleFields>,
+    member: Option<&RoleFields>,
 ) -> RecordDescriptor {
+    let (name, record_type, type_name, display_id_pattern) = match seed {
+        Some(seed) => (
+            Cow::Borrowed(seed.record.name),
+            Cow::Borrowed(seed.record.record_type),
+            Cow::Borrowed(seed.record.type_name),
+            Cow::Borrowed(seed.record.display_id_pattern),
+        ),
+        None => (
+            Cow::Owned(slug.to_string()),
+            Cow::Borrowed("document"),
+            Cow::Borrowed("document"),
+            Cow::Borrowed("GEN-###"),
+        ),
+    };
+    let role_fields = match model {
+        DocumentModel::GroupedMarkdown => member
+            .and_then(|role| role.fields.as_deref())
+            .unwrap_or(&[]),
+        DocumentModel::SingleMarkdown | DocumentModel::SingleHtmlMockup => fields,
+    };
+    let mut frontmatter_keys: Vec<Cow<'static, str>> = Vec::new();
+    if model != DocumentModel::SingleHtmlMockup {
+        frontmatter_keys.push(Cow::Borrowed("status"));
+    }
+    for field in role_fields {
+        if let Some(key) = &field.frontmatter_key
+            && !frontmatter_keys.iter().any(|k| k == key)
+        {
+            frontmatter_keys.push(Cow::Owned(key.clone()));
+        }
+    }
+    let mut sections: Vec<Cow<'static, str>> = Vec::new();
+    for field in role_fields {
+        if let Some(heading) = &field.heading {
+            sections.push(Cow::Owned(heading.clone()));
+        }
+    }
+    let _ = group;
     RecordDescriptor {
-        name: Cow::Owned(facts.record_name.to_string()),
-        record_type: Cow::Borrowed(facts.record_type),
-        type_name: Cow::Borrowed(facts.type_name),
-        label: Cow::Borrowed(template.label),
-        display_id_pattern: Cow::Borrowed(facts.display_id_pattern),
+        name,
+        record_type,
+        type_name,
+        label: Cow::Owned(label.to_string()),
+        display_id_pattern,
         directory: Cow::Borrowed("doc"),
         subpath: Cow::Borrowed(""),
-        doc_type_key: Some(Cow::Borrowed(template.slug)),
-        frontmatter_keys: facts
-            .frontmatter_keys
-            .iter()
-            .copied()
-            .map(Cow::Borrowed)
-            .collect(),
-        sections: match schema {
-            Some(schema) => schema.sections.clone(),
-            // Unreachable for a template, but keeps the projection total.
-            None => vec![Cow::Borrowed("## Description")],
-        },
+        doc_type_key: Some(Cow::Owned(slug.to_string())),
+        frontmatter_keys,
+        sections,
     }
 }
 
@@ -2929,9 +2727,9 @@ fn document_record(
 fn document_status_model(
     slug: &str,
     entry: &DocTypeEntry,
-    template_status: TemplateStatus,
+    model: DocumentModel,
 ) -> Result<StatusModel, RegistryError> {
-    if let TemplateStatus::HtmlMetadata(states) = template_status {
+    if model == DocumentModel::SingleHtmlMockup {
         if entry.statuses.is_some() {
             return Err(RegistryError::StatusesNotAllowed {
                 slug: slug.to_string(),
@@ -2944,7 +2742,9 @@ fn document_status_model(
                 field: "default_status",
             });
         }
-        return Ok(StatusModel::HtmlMetadata { states });
+        return Ok(StatusModel::HtmlMetadata {
+            states: MOCKUP_STATES,
+        });
     }
 
     let custom = match &entry.statuses {
@@ -3435,8 +3235,8 @@ mod tests {
         ] {
             assert_eq!(DocumentModel::for_slug(slug), expected, "{slug}");
         }
-        assert!(!is_builtin_document_slug("deploy"));
-        assert!(is_builtin_document_slug("req"));
+        assert!(!is_seed_document_slug("deploy"));
+        assert!(is_seed_document_slug("req"));
 
         let registry = ArtifactRegistry::build(&config_with(
             "deploy",
@@ -3911,9 +3711,29 @@ mod tests {
                 "{slug} status key"
             );
 
-            let expected_sections: &[Cow<'static, str>] =
-                &descriptor.schema.as_ref().expect("typed schema").sections;
-            assert_eq!(record.sections, expected_sections, "{slug} sections");
+            let role_fields = match descriptor.document_model {
+                DocumentModel::GroupedMarkdown => descriptor
+                    .member
+                    .as_ref()
+                    .and_then(|role| role.fields.as_deref())
+                    .unwrap_or(&[]),
+                DocumentModel::SingleMarkdown | DocumentModel::SingleHtmlMockup => {
+                    descriptor.fields.as_slice()
+                }
+            };
+            let expected_sections: Vec<&str> = role_fields
+                .iter()
+                .filter_map(|field| field.heading.as_deref())
+                .collect();
+            assert_eq!(
+                record
+                    .sections
+                    .iter()
+                    .map(|s| s.as_ref())
+                    .collect::<Vec<_>>(),
+                expected_sections,
+                "{slug} sections"
+            );
 
             let expected_dir = project
                 .join(&cfg.doc_directory)
@@ -3948,7 +3768,7 @@ mod tests {
         assert_eq!(glossary.doc_type_key.as_deref(), Some("glossary"));
         assert_eq!(glossary.configured_prefixes(&cfg), vec!["GLO"]);
         assert!(glossary.has_frontmatter_key("status"));
-        assert_eq!(glossary.sections, GLOSSARY_SECTIONS);
+        assert_eq!(glossary.sections, &["## Definition"]);
         assert_eq!(glossary.record_type, "glossary");
 
         let note = registry.record_descriptor("note").expect("note record");
@@ -4603,5 +4423,237 @@ mod tests {
         assert_eq!(moved.about.as_ref(), "Create a business requirement");
         assert_eq!(moved.args.len(), 7);
         assert_eq!(moved.args[0].id.as_ref(), "title");
+    }
+
+    // 59
+    #[test]
+    fn document_verbs_are_derived_from_the_model() {
+        let registry = default_registry();
+        for descriptor in registry.in_category(ArtifactCategory::Document) {
+            let mut expected = DOCUMENT_BASELINE_VERBS.to_vec();
+            match descriptor.document_model {
+                DocumentModel::SingleMarkdown => expected.push(Verb::Status),
+                DocumentModel::GroupedMarkdown => {
+                    expected.push(Verb::Status);
+                    expected.push(Verb::CreateGroup);
+                }
+                DocumentModel::SingleHtmlMockup => expected.push(Verb::Supersede),
+            }
+            assert_eq!(descriptor.verbs, expected, "{} verbs", descriptor.slug);
+            let grouped = descriptor.document_model == DocumentModel::GroupedMarkdown;
+            assert_eq!(
+                descriptor.create_options.group,
+                if grouped {
+                    GroupRequirement::Required
+                } else {
+                    GroupRequirement::Absent
+                },
+                "{} group requirement",
+                descriptor.slug
+            );
+            assert_eq!(
+                descriptor.has_verb(Verb::CreateGroup),
+                grouped,
+                "{} create-group",
+                descriptor.slug
+            );
+            assert_eq!(
+                descriptor.has_verb(Verb::Status),
+                descriptor.document_model != DocumentModel::SingleHtmlMockup,
+                "{} status",
+                descriptor.slug
+            );
+            assert_eq!(
+                descriptor.has_verb(Verb::Supersede),
+                descriptor.document_model == DocumentModel::SingleHtmlMockup,
+                "{} supersede",
+                descriptor.slug
+            );
+        }
+    }
+
+    // 60
+    #[test]
+    fn field_options_follow_sequence_and_per_field_verbs() {
+        let registry = default_registry();
+        let rule = registry.descriptor("rule").expect("rule");
+        let options = field_options(&rule.fields);
+        let sequence: Vec<(&str, Verb)> = options
+            .iter()
+            .map(|option| (option.long.as_str(), option.verb))
+            .collect();
+        assert_eq!(
+            sequence,
+            vec![
+                ("description", Verb::Create),
+                ("description", Verb::Edit),
+                ("rationale", Verb::Create),
+                ("applicability", Verb::Create),
+                ("requirement", Verb::Create),
+                ("requirement", Verb::Edit),
+            ]
+        );
+        assert_eq!(options[2].label, "Rationale");
+        assert_eq!(
+            options[2].help.as_deref(),
+            Some("Explain why the rule exists")
+        );
+
+        let req = registry.descriptor("req").expect("req");
+        let group = req.group.as_ref().expect("group role");
+        let member = req.member.as_ref().expect("member role");
+        let group_options = field_options(group.fields.as_deref().unwrap_or(&[]));
+        let member_options = field_options(member.fields.as_deref().unwrap_or(&[]));
+        assert_eq!(
+            group_options
+                .iter()
+                .map(|o| o.long.as_str())
+                .collect::<Vec<_>>(),
+            vec!["story", "story", "description", "description"]
+        );
+        assert_eq!(
+            member_options
+                .iter()
+                .map(|o| o.long.as_str())
+                .collect::<Vec<_>>(),
+            vec!["story", "story", "description", "description"]
+        );
+    }
+
+    // 61
+    #[test]
+    fn group_membership_is_immutable_and_never_a_field_or_option() {
+        let registry = default_registry();
+        for descriptor in registry.in_category(ArtifactCategory::Document) {
+            let roles = [descriptor.fields.as_slice()];
+            for fields in roles {
+                assert!(
+                    fields.iter().all(|field| field.key != "group"),
+                    "{} exposes group as a field",
+                    descriptor.slug
+                );
+            }
+            for role in [descriptor.group.as_ref(), descriptor.member.as_ref()]
+                .into_iter()
+                .flatten()
+            {
+                assert!(
+                    role.fields
+                        .as_deref()
+                        .unwrap_or(&[])
+                        .iter()
+                        .all(|field| field.key != "group"),
+                    "{} exposes group as a role field",
+                    descriptor.slug
+                );
+            }
+            let edit = descriptor
+                .verb_spec(Verb::Edit)
+                .expect("every document has edit");
+            assert!(
+                edit.args
+                    .iter()
+                    .all(|arg| arg.long.as_deref() != Some("group")),
+                "{} edit exposes --group",
+                descriptor.slug
+            );
+            for verb in [Verb::Archive, Verb::Delete] {
+                let spec = descriptor.verb_spec(verb).expect("baseline verb");
+                assert!(
+                    spec.args
+                        .iter()
+                        .all(|arg| arg.long.as_deref() != Some("cascade")),
+                    "{} {} exposes cascade",
+                    descriptor.slug,
+                    verb.as_str()
+                );
+            }
+            assert_eq!(
+                descriptor.has_verb(Verb::CreateGroup),
+                descriptor.document_model == DocumentModel::GroupedMarkdown,
+                "{} create-group",
+                descriptor.slug
+            );
+        }
+    }
+
+    // 62
+    #[test]
+    fn seed_models_are_seed_only_and_user_defined_types_are_single_markdown() {
+        assert_eq!(
+            DocumentModel::for_slug("req"),
+            DocumentModel::GroupedMarkdown
+        );
+        assert_eq!(
+            DocumentModel::for_slug("nfr"),
+            DocumentModel::GroupedMarkdown
+        );
+        assert_eq!(
+            DocumentModel::for_slug("ui-mockup"),
+            DocumentModel::SingleHtmlMockup
+        );
+        for seed in crate::config::SEED_DOCUMENT_TYPES {
+            if !matches!(seed.slug, "req" | "nfr" | "ui-mockup") {
+                assert_eq!(seed.model, DocumentModel::SingleMarkdown, "{}", seed.slug);
+            }
+        }
+        for slug in ["note", "request", "release-reports", "req-copy"] {
+            assert_eq!(
+                DocumentModel::for_slug(slug),
+                DocumentModel::SingleMarkdown,
+                "{} must not inherit a seed model",
+                slug
+            );
+        }
+    }
+
+    // 63
+    #[test]
+    fn user_defined_descriptor_gets_the_decision_33_defaults() {
+        let cfg = config_with("note", entry("NOTE", "notes/"));
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        let note = registry.descriptor("note").expect("note");
+        assert!(note.schema.is_none());
+        assert_eq!(note.label, "note");
+        assert_eq!(note.document_model, DocumentModel::SingleMarkdown);
+        assert_eq!(note.id_shape, IdShape::Plain);
+        assert_eq!(
+            note.reference_visibility,
+            Some(Visibility::Visible),
+            "user-defined types default to visible"
+        );
+        assert_eq!(note.fields.len(), 1);
+        assert_eq!(note.fields[0].key, "description");
+        assert_eq!(note.fields[0].heading.as_deref(), Some("## Description"));
+        assert_eq!(note.fields[0].kind, crate::config::FieldKind::Multiline);
+        assert!(!note.fields[0].required);
+        assert_eq!(
+            note.status_model,
+            StatusModel::DocumentMain {
+                custom: Vec::new(),
+                default: "active".to_string(),
+            }
+        );
+        let record = registry.record_descriptor("note").expect("note record");
+        assert_eq!(record.record_type, "document");
+        assert_eq!(record.sections, &["## Description"]);
+    }
+
+    // 64
+    #[test]
+    fn derived_record_keys_follow_general_status_then_fields() {
+        let registry = default_registry();
+        let audit = registry.record_descriptor("audit").expect("audit");
+        assert_eq!(audit.frontmatter_keys, &["status", "type"]);
+        let req = registry.record_descriptor("req").expect("req");
+        assert_eq!(req.frontmatter_keys, &["status"]);
+        assert_eq!(
+            req.sections,
+            &["## User Story", "## Description"],
+            "the engine-owned group heading is not a field section"
+        );
+        let mockup = registry.record_descriptor("ui-mockup").expect("ui-mockup");
+        assert!(mockup.frontmatter_keys.is_empty());
+        assert!(mockup.sections.is_empty());
     }
 }

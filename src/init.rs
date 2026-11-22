@@ -830,8 +830,8 @@ mod tests {
 
     #[test]
     fn document_artifacts_match_config_default_document_types() {
-        let seeded = crate::config::DEFAULT_DOCUMENT_TYPES;
-        let seeded_slugs: Vec<&str> = seeded.iter().map(|entry| entry.0).collect();
+        let seeded = crate::config::SEED_DOCUMENT_TYPES;
+        let seeded_slugs: Vec<&str> = seeded.iter().map(|entry| entry.slug).collect();
 
         // Position-by-position equality against the canonical seeding order,
         // so an add, remove, reorder, or rename on either side fails.

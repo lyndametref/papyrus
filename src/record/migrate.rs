@@ -104,7 +104,7 @@ pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<RecordDescr
         };
         // Config-defined types stay inert unless enabled; built-in types were
         // managed regardless of their activation state.
-        if !crate::registry::is_builtin_document_slug(&descriptor.slug) && !descriptor.enabled {
+        if !crate::config::is_seed_document_slug(&descriptor.slug) && !descriptor.enabled {
             continue;
         }
         if !desc.matches_stem(&cfg, stem) {

@@ -333,25 +333,715 @@ impl Default for DocTypeEntry {
     }
 }
 
-/// Canonical ordered seeding table for the eleven default document types:
-/// `(slug, prefix, directory, has_front_matter_status)`.
-///
-/// The order is the schema declaration order and is asserted against the
-/// interactive `init` artifact list. `statuses` is seeded for every type with
-/// front-matter status; `ui-mockup` has none (REQ-05.008).
-pub(crate) const DEFAULT_DOCUMENT_TYPES: [(&str, &str, &str, bool); 11] = [
-    ("req", "REQ", "requirements/business/", true),
-    ("nfr", "NFR", "requirements/non-functional/", true),
-    ("glossary", "GLO", "glossary/", true),
-    ("rule", "RUL", "business-rules/", true),
-    ("ui-spec", "UI", "specifications/ui/", true),
-    ("ui-mockup", "MOCK", "specifications/ui/mockups/", false),
-    ("audit", "AUD", "audit-records/", true),
-    ("tech-spec", "TECH", "technical/", true),
-    ("use-case", "UC", "use-cases/", true),
-    ("test-case", "TC", "test-cases/", true),
-    ("test-report", "TR", "test-reports/", true),
+const CREATE_AND_EDIT: &[FieldVerb] = &[FieldVerb::Create, FieldVerb::Edit];
+const CREATE_ONLY: &[FieldVerb] = &[FieldVerb::Create];
+
+const REQ_FIELDS: &[SeedField] = &[
+    SeedField {
+        key: "story",
+        heading: Some("## User Story"),
+        frontmatter_key: None,
+        option: None,
+        label: "User story",
+        kind: FieldKind::Text,
+        required: false,
+        verbs: CREATE_AND_EDIT,
+        help: Some("User story"),
+    },
+    SeedField {
+        key: "description",
+        heading: Some("## Description"),
+        frontmatter_key: None,
+        option: None,
+        label: "Description",
+        kind: FieldKind::Multiline,
+        required: false,
+        verbs: CREATE_AND_EDIT,
+        help: Some("Description"),
+    },
 ];
+
+const GLOSSARY_FIELDS: &[SeedField] = &[SeedField {
+    key: "definition",
+    heading: Some("## Definition"),
+    frontmatter_key: None,
+    option: None,
+    label: "Definition",
+    kind: FieldKind::Multiline,
+    required: true,
+    verbs: CREATE_AND_EDIT,
+    help: Some("Definition of the term."),
+}];
+
+const RULE_FIELDS: &[SeedField] = &[
+    SeedField {
+        key: "description",
+        heading: Some("## Description"),
+        frontmatter_key: None,
+        option: None,
+        label: "Description",
+        kind: FieldKind::Multiline,
+        required: true,
+        verbs: CREATE_AND_EDIT,
+        help: Some("Description"),
+    },
+    SeedField {
+        key: "rationale",
+        heading: Some("## Rationale"),
+        frontmatter_key: None,
+        option: None,
+        label: "Rationale",
+        kind: FieldKind::Text,
+        required: true,
+        verbs: CREATE_ONLY,
+        help: Some("Explain why the rule exists"),
+    },
+    SeedField {
+        key: "applicability",
+        heading: Some("## Applicability"),
+        frontmatter_key: None,
+        option: None,
+        label: "Applicability",
+        kind: FieldKind::Text,
+        required: true,
+        verbs: CREATE_ONLY,
+        help: Some("Describe when and where the rule applies"),
+    },
+    SeedField {
+        key: "requirements",
+        heading: Some("## Requirements"),
+        frontmatter_key: None,
+        option: Some("requirement"),
+        label: "Requirements",
+        kind: FieldKind::List,
+        required: false,
+        verbs: CREATE_AND_EDIT,
+        help: Some("Reference a business requirement. Repeatable"),
+    },
+];
+
+const UI_SPEC_FIELDS: &[SeedField] = &[
+    SeedField {
+        key: "view",
+        heading: Some("## View"),
+        frontmatter_key: None,
+        option: None,
+        label: "View",
+        kind: FieldKind::Text,
+        required: false,
+        verbs: CREATE_AND_EDIT,
+        help: Some("View"),
+    },
+    SeedField {
+        key: "description",
+        heading: Some("## Description"),
+        frontmatter_key: None,
+        option: None,
+        label: "Description",
+        kind: FieldKind::Multiline,
+        required: false,
+        verbs: CREATE_AND_EDIT,
+        help: Some("Description"),
+    },
+];
+
+const AUDIT_FIELDS: &[SeedField] = &[
+    SeedField {
+        key: "audit_type",
+        heading: Some("## Audit Type"),
+        frontmatter_key: Some("type"),
+        option: Some("audit-type"),
+        label: "Audit type",
+        kind: FieldKind::Text,
+        required: false,
+        verbs: CREATE_AND_EDIT,
+        help: Some("Audit type"),
+    },
+    SeedField {
+        key: "content",
+        heading: Some("## Content"),
+        frontmatter_key: None,
+        option: None,
+        label: "Content",
+        kind: FieldKind::Multiline,
+        required: true,
+        verbs: CREATE_AND_EDIT,
+        help: Some("Content"),
+    },
+];
+
+const DESCRIPTION_APPLICABILITY_FIELDS: &[SeedField] = &[
+    SeedField {
+        key: "description",
+        heading: Some("## Description"),
+        frontmatter_key: None,
+        option: None,
+        label: "Description",
+        kind: FieldKind::Multiline,
+        required: false,
+        verbs: CREATE_AND_EDIT,
+        help: Some("Description"),
+    },
+    SeedField {
+        key: "applicability",
+        heading: Some("## Applicability"),
+        frontmatter_key: None,
+        option: None,
+        label: "Applicability",
+        kind: FieldKind::Text,
+        required: false,
+        verbs: CREATE_AND_EDIT,
+        help: Some("Applicability"),
+    },
+];
+
+const TECH_SPEC_FIELDS: &[SeedField] = &[SeedField {
+    key: "description",
+    heading: Some("## Description"),
+    frontmatter_key: None,
+    option: None,
+    label: "Description",
+    kind: FieldKind::Multiline,
+    required: false,
+    verbs: CREATE_AND_EDIT,
+    help: Some("Description"),
+}];
+
+const SEED_ACTIVE_ARCHIVED: &[&str] = &["active", "archived"];
+
+const GROUP_SLOT: &[SeedSlot] = &[SeedSlot {
+    key: "group",
+    label: "Group",
+}];
+const APPLICABILITY_SLOT: &[SeedSlot] = &[SeedSlot {
+    key: "applicability",
+    label: "Applicability",
+}];
+const AUDIT_SLOT: &[SeedSlot] = &[SeedSlot {
+    key: "audit_type",
+    label: "Audit type",
+}];
+const MOCKUP_SLOTS: &[SeedSlot] = &[
+    SeedSlot {
+        key: "task",
+        label: "Task",
+    },
+    SeedSlot {
+        key: "specs",
+        label: "Specs",
+    },
+];
+const NO_SLOTS: &[SeedSlot] = &[];
+
+const RULE_API_ALIASES: &[&str] = &["/api/business-rules", "/api/business-rule"];
+const AUDIT_API_ALIASES: &[&str] = &["/api/audit-records", "/api/audit-record"];
+const TECH_SPEC_API_ALIASES: &[&str] = &["/api/tech-specs", "/api/tech-spec"];
+const USE_CASE_API_ALIASES: &[&str] = &["/api/use-cases", "/api/use-case"];
+const TEST_CASE_API_ALIASES: &[&str] = &["/api/test-cases", "/api/test-case"];
+const TEST_REPORT_API_ALIASES: &[&str] = &["/api/test-reports", "/api/test-report"];
+const UI_SPEC_API_ALIASES: &[&str] = &["/api/ui-specs", "/api/ui-specifications", "/api/ui-spec"];
+const UI_MOCKUP_API_ALIASES: &[&str] = &["/api/ui-mockups", "/api/ui-mockup", "/api/mockups"];
+const GLOSSARY_API_ALIASES: &[&str] = &["/api/glossary"];
+const NO_API_ALIASES: &[&str] = &[];
+
+/// One field of a seed document type (ADR-036 decision 29).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SeedField {
+    pub key: &'static str,
+    pub heading: Option<&'static str>,
+    pub frontmatter_key: Option<&'static str>,
+    pub option: Option<&'static str>,
+    pub label: &'static str,
+    pub kind: FieldKind,
+    pub required: bool,
+    pub verbs: &'static [FieldVerb],
+    pub help: Option<&'static str>,
+}
+
+/// One role's seed field sequence and reference visibility.
+#[derive(Clone, Copy, Debug)]
+pub struct SeedRole {
+    pub fields: &'static [SeedField],
+    pub reference_visibility: Visibility,
+}
+
+/// One seed list column (ADR-041 decision 4).
+#[derive(Clone, Copy, Debug)]
+pub struct SeedSlot {
+    pub key: &'static str,
+    pub label: &'static str,
+}
+
+/// The record-layer facts of a seed document type.
+#[derive(Clone, Copy, Debug)]
+pub struct SeedRecord {
+    pub name: &'static str,
+    pub record_type: &'static str,
+    pub type_name: &'static str,
+    pub display_id_pattern: &'static str,
+}
+
+/// One entry of the single seed table for built-in document types.
+#[derive(Clone, Copy, Debug)]
+pub struct SeedDocumentType {
+    pub slug: &'static str,
+    pub prefix: &'static str,
+    pub directory: &'static str,
+    pub label: &'static str,
+    pub plural: &'static str,
+    pub order: u32,
+    pub summary: &'static str,
+    pub type_alias: Option<&'static str>,
+    pub api_aliases: &'static [&'static str],
+    pub reference_visibility: Option<Visibility>,
+    pub slots: &'static [SeedSlot],
+    pub statuses: &'static [&'static str],
+    pub default_status: Option<&'static str>,
+    pub model: crate::registry::DocumentModel,
+    pub fields: &'static [SeedField],
+    pub group: Option<SeedRole>,
+    pub member: Option<SeedRole>,
+    pub record: SeedRecord,
+}
+
+/// The single production definition of the eleven built-in document types
+/// (ADR-036 decisions 28 and 29, ADR-041 decision 4).
+///
+/// `Config::default`, `init`, and the registry derive from this table. The
+/// declaration order is the schema order asserted by `init`; registry
+/// enumeration stays the configuration `BTreeMap` order until a later
+/// milestone adopts `order`.
+pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
+    SeedDocumentType {
+        slug: "req",
+        prefix: "REQ",
+        directory: "requirements/business/",
+        label: "Business requirement",
+        plural: "business requirements",
+        order: 10,
+        summary: "Business requirements in this project.",
+        type_alias: None,
+        api_aliases: NO_API_ALIASES,
+        reference_visibility: None,
+        slots: GROUP_SLOT,
+        statuses: SEED_ACTIVE_ARCHIVED,
+        default_status: None,
+        model: crate::registry::DocumentModel::GroupedMarkdown,
+        fields: &[],
+        group: Some(SeedRole {
+            fields: REQ_FIELDS,
+            reference_visibility: Visibility::Hidden,
+        }),
+        member: Some(SeedRole {
+            fields: REQ_FIELDS,
+            reference_visibility: Visibility::Hidden,
+        }),
+        record: SeedRecord {
+            name: "business requirement",
+            record_type: "requirement",
+            type_name: "requirement",
+            display_id_pattern: "REQ-###.###",
+        },
+    },
+    SeedDocumentType {
+        slug: "nfr",
+        prefix: "NFR",
+        directory: "requirements/non-functional/",
+        label: "Non-functional requirement",
+        plural: "non-functional requirements",
+        order: 80,
+        summary: "Non-functional requirements in this project.",
+        type_alias: None,
+        api_aliases: NO_API_ALIASES,
+        reference_visibility: None,
+        slots: GROUP_SLOT,
+        statuses: SEED_ACTIVE_ARCHIVED,
+        default_status: None,
+        model: crate::registry::DocumentModel::GroupedMarkdown,
+        fields: &[],
+        group: Some(SeedRole {
+            fields: REQ_FIELDS,
+            reference_visibility: Visibility::Hidden,
+        }),
+        member: Some(SeedRole {
+            fields: REQ_FIELDS,
+            reference_visibility: Visibility::Hidden,
+        }),
+        record: SeedRecord {
+            name: "non-functional requirement",
+            record_type: "nfr",
+            type_name: "nfr",
+            display_id_pattern: "NFR-###.###",
+        },
+    },
+    SeedDocumentType {
+        slug: "glossary",
+        prefix: "GLO",
+        directory: "glossary/",
+        label: "Glossary term",
+        plural: "glossary terms",
+        order: 90,
+        summary: "Glossary terms in this project.",
+        type_alias: None,
+        api_aliases: GLOSSARY_API_ALIASES,
+        reference_visibility: Some(Visibility::Visible),
+        slots: NO_SLOTS,
+        statuses: SEED_ACTIVE_ARCHIVED,
+        default_status: None,
+        model: crate::registry::DocumentModel::SingleMarkdown,
+        fields: GLOSSARY_FIELDS,
+        group: None,
+        member: None,
+        record: SeedRecord {
+            name: "glossary term",
+            record_type: "glossary",
+            type_name: "glossary",
+            display_id_pattern: "GLO-###",
+        },
+    },
+    SeedDocumentType {
+        slug: "rule",
+        prefix: "RUL",
+        directory: "business-rules/",
+        label: "Business rule",
+        plural: "business rules",
+        order: 20,
+        summary: "Business rules in this project.",
+        type_alias: Some("business-rule"),
+        api_aliases: RULE_API_ALIASES,
+        reference_visibility: Some(Visibility::Visible),
+        slots: APPLICABILITY_SLOT,
+        statuses: SEED_ACTIVE_ARCHIVED,
+        default_status: None,
+        model: crate::registry::DocumentModel::SingleMarkdown,
+        fields: RULE_FIELDS,
+        group: None,
+        member: None,
+        record: SeedRecord {
+            name: "business rule",
+            record_type: "rule",
+            type_name: "rule",
+            display_id_pattern: "RUL-###",
+        },
+    },
+    SeedDocumentType {
+        slug: "ui-spec",
+        prefix: "UI",
+        directory: "specifications/ui/",
+        label: "UI specification",
+        plural: "UI specifications",
+        order: 100,
+        summary: "UI specifications in this project.",
+        type_alias: None,
+        api_aliases: UI_SPEC_API_ALIASES,
+        reference_visibility: Some(Visibility::Visible),
+        slots: NO_SLOTS,
+        statuses: SEED_ACTIVE_ARCHIVED,
+        default_status: None,
+        model: crate::registry::DocumentModel::SingleMarkdown,
+        fields: UI_SPEC_FIELDS,
+        group: None,
+        member: None,
+        record: SeedRecord {
+            name: "ui specification",
+            record_type: "ui-spec",
+            type_name: "ui_spec",
+            display_id_pattern: "UI-###",
+        },
+    },
+    SeedDocumentType {
+        slug: "ui-mockup",
+        prefix: "MOCK",
+        directory: "specifications/ui/mockups/",
+        label: "UI mockup",
+        plural: "UI mockups",
+        order: 110,
+        summary: "UI mockups in this project.",
+        type_alias: None,
+        api_aliases: UI_MOCKUP_API_ALIASES,
+        reference_visibility: Some(Visibility::Visible),
+        slots: MOCKUP_SLOTS,
+        statuses: &[],
+        default_status: None,
+        model: crate::registry::DocumentModel::SingleHtmlMockup,
+        fields: &[],
+        group: None,
+        member: None,
+        record: SeedRecord {
+            name: "ui mockup",
+            record_type: "ui-mockup",
+            type_name: "ui_mockup",
+            display_id_pattern: "UI-###",
+        },
+    },
+    SeedDocumentType {
+        slug: "audit",
+        prefix: "AUD",
+        directory: "audit-records/",
+        label: "Audit record",
+        plural: "audit records",
+        order: 30,
+        summary: "Audit records in this project.",
+        type_alias: Some("audit-record"),
+        api_aliases: AUDIT_API_ALIASES,
+        reference_visibility: Some(Visibility::Visible),
+        slots: AUDIT_SLOT,
+        statuses: SEED_ACTIVE_ARCHIVED,
+        default_status: None,
+        model: crate::registry::DocumentModel::SingleMarkdown,
+        fields: AUDIT_FIELDS,
+        group: None,
+        member: None,
+        record: SeedRecord {
+            name: "audit record",
+            record_type: "audit",
+            type_name: "audit",
+            display_id_pattern: "AUD-###",
+        },
+    },
+    SeedDocumentType {
+        slug: "tech-spec",
+        prefix: "TECH",
+        directory: "technical/",
+        label: "Technical specification",
+        plural: "technical specifications",
+        order: 40,
+        summary: "Technical specifications in this project.",
+        type_alias: None,
+        api_aliases: TECH_SPEC_API_ALIASES,
+        reference_visibility: Some(Visibility::Visible),
+        slots: NO_SLOTS,
+        statuses: SEED_ACTIVE_ARCHIVED,
+        default_status: None,
+        model: crate::registry::DocumentModel::SingleMarkdown,
+        fields: TECH_SPEC_FIELDS,
+        group: None,
+        member: None,
+        record: SeedRecord {
+            name: "technical specification",
+            record_type: "tech-spec",
+            type_name: "tech_spec",
+            display_id_pattern: "TECH-###",
+        },
+    },
+    SeedDocumentType {
+        slug: "use-case",
+        prefix: "UC",
+        directory: "use-cases/",
+        label: "Use case",
+        plural: "use cases",
+        order: 50,
+        summary: "Use cases in this project.",
+        type_alias: None,
+        api_aliases: USE_CASE_API_ALIASES,
+        reference_visibility: Some(Visibility::Visible),
+        slots: NO_SLOTS,
+        statuses: SEED_ACTIVE_ARCHIVED,
+        default_status: None,
+        model: crate::registry::DocumentModel::SingleMarkdown,
+        fields: DESCRIPTION_APPLICABILITY_FIELDS,
+        group: None,
+        member: None,
+        record: SeedRecord {
+            name: "use case",
+            record_type: "use-case",
+            type_name: "use_case",
+            display_id_pattern: "UC-###",
+        },
+    },
+    SeedDocumentType {
+        slug: "test-case",
+        prefix: "TC",
+        directory: "test-cases/",
+        label: "Test case",
+        plural: "test cases",
+        order: 60,
+        summary: "Test cases in this project.",
+        type_alias: None,
+        api_aliases: TEST_CASE_API_ALIASES,
+        reference_visibility: Some(Visibility::Visible),
+        slots: NO_SLOTS,
+        statuses: SEED_ACTIVE_ARCHIVED,
+        default_status: None,
+        model: crate::registry::DocumentModel::SingleMarkdown,
+        fields: DESCRIPTION_APPLICABILITY_FIELDS,
+        group: None,
+        member: None,
+        record: SeedRecord {
+            name: "test case",
+            record_type: "test-case",
+            type_name: "test_case",
+            display_id_pattern: "TC-###",
+        },
+    },
+    SeedDocumentType {
+        slug: "test-report",
+        prefix: "TR",
+        directory: "test-reports/",
+        label: "Test report",
+        plural: "test reports",
+        order: 70,
+        summary: "Test reports in this project.",
+        type_alias: None,
+        api_aliases: TEST_REPORT_API_ALIASES,
+        reference_visibility: Some(Visibility::Visible),
+        slots: NO_SLOTS,
+        statuses: SEED_ACTIVE_ARCHIVED,
+        default_status: None,
+        model: crate::registry::DocumentModel::SingleMarkdown,
+        fields: DESCRIPTION_APPLICABILITY_FIELDS,
+        group: None,
+        member: None,
+        record: SeedRecord {
+            name: "test report",
+            record_type: "test-report",
+            type_name: "test_report",
+            display_id_pattern: "TR-###",
+        },
+    },
+];
+
+/// The seed entry for a built-in slug.
+pub fn seed_document_type(slug: &str) -> Option<&'static SeedDocumentType> {
+    SEED_DOCUMENT_TYPES.iter().find(|seed| seed.slug == slug)
+}
+
+/// Whether a slug is a built-in (seed) document type.
+pub fn is_seed_document_slug(slug: &str) -> bool {
+    seed_document_type(slug).is_some()
+}
+
+fn field_spec(field: &SeedField) -> FieldSpec {
+    FieldSpec {
+        key: field.key.to_string(),
+        heading: field.heading.map(str::to_string),
+        frontmatter_key: field.frontmatter_key.map(str::to_string),
+        option: field.option.map(str::to_string),
+        label: Some(field.label.to_string()),
+        kind: field.kind,
+        required: field.required,
+        verbs: field.verbs.to_vec(),
+        help: field.help.map(str::to_string),
+    }
+}
+
+fn seed_entry(seed: &SeedDocumentType) -> DocTypeEntry {
+    let fields = seed.fields.iter().map(field_spec).collect::<Vec<_>>();
+    let role = |role: SeedRole| RoleFields {
+        fields: Some(role.fields.iter().map(field_spec).collect()),
+        reference_visibility: Some(role.reference_visibility),
+    };
+    DocTypeEntry {
+        prefix: seed.prefix.to_string(),
+        directory: seed.directory.to_string(),
+        enabled: true,
+        statuses: (!seed.statuses.is_empty())
+            .then(|| seed.statuses.iter().map(|s| (*s).to_string()).collect()),
+        default_status: seed.default_status.map(str::to_string),
+        label: Some(seed.label.to_string()),
+        plural: Some(seed.plural.to_string()),
+        order: Some(seed.order),
+        summary: Some(seed.summary.to_string()),
+        type_alias: seed.type_alias.map(str::to_string),
+        reference_visibility: seed.reference_visibility,
+        slots: Some(
+            seed.slots
+                .iter()
+                .map(|slot| Slot {
+                    key: slot.key.to_string(),
+                    label: slot.label.to_string(),
+                })
+                .collect(),
+        ),
+        api_aliases: Some(seed.api_aliases.iter().map(|a| (*a).to_string()).collect()),
+        fields: if seed.group.is_some() {
+            None
+        } else {
+            Some(fields)
+        },
+        group: seed.group.map(role),
+        member: seed.member.map(role),
+    }
+}
+
+/// The defaults of a user-defined document type (ADR-036 decision 33).
+fn user_defined_entry(_slug: &str) -> DocTypeEntry {
+    let order = SEED_DOCUMENT_TYPES
+        .iter()
+        .map(|seed| seed.order)
+        .max()
+        .unwrap_or(0)
+        + 1;
+    DocTypeEntry {
+        prefix: String::new(),
+        directory: String::new(),
+        enabled: true,
+        statuses: Some(vec!["active".to_string(), "archived".to_string()]),
+        default_status: None,
+        label: None,
+        plural: None,
+        order: Some(order),
+        summary: None,
+        type_alias: None,
+        reference_visibility: Some(Visibility::Visible),
+        slots: None,
+        api_aliases: Some(Vec::new()),
+        fields: Some(vec![FieldSpec {
+            key: "description".to_string(),
+            heading: Some("## Description".to_string()),
+            frontmatter_key: None,
+            option: None,
+            label: None,
+            kind: FieldKind::Multiline,
+            required: false,
+            verbs: vec![FieldVerb::Create, FieldVerb::Edit],
+            help: None,
+        }]),
+        group: None,
+        member: None,
+    }
+}
+
+fn merge_entry(default: DocTypeEntry, declared: DocTypeEntry) -> DocTypeEntry {
+    DocTypeEntry {
+        // `prefix` and `directory` are required declarations and are never
+        // filled from the seed (ADR-036 decision 32).
+        prefix: declared.prefix,
+        directory: declared.directory,
+        enabled: declared.enabled,
+        statuses: declared.statuses.or(default.statuses),
+        default_status: declared.default_status.or(default.default_status),
+        label: declared.label.or(default.label),
+        plural: declared.plural.or(default.plural),
+        order: declared.order.or(default.order),
+        summary: declared.summary.or(default.summary),
+        type_alias: declared.type_alias.or(default.type_alias),
+        reference_visibility: declared
+            .reference_visibility
+            .or(default.reference_visibility),
+        slots: declared.slots.or(default.slots),
+        api_aliases: declared.api_aliases.or(default.api_aliases),
+        fields: declared.fields.or(default.fields),
+        group: declared.group.or(default.group),
+        member: declared.member.or(default.member),
+    }
+}
+
+/// Resolve one declared entry against the seed (or the user-defined defaults).
+///
+/// Scalars fill when absent and collections replace wholesale; `prefix` and
+/// `directory` always come from the declaration (ADR-036 decision 32).
+pub fn resolved_document_entry(slug: &str, declared: &DocTypeEntry) -> DocTypeEntry {
+    let default = match seed_document_type(slug) {
+        Some(seed) => seed_entry(seed),
+        None => user_defined_entry(slug),
+    };
+    let mut merged = merge_entry(default, declared.clone());
+    if merged.label.is_none() {
+        merged.label = Some(slug.to_string());
+    }
+    merged
+}
 
 fn mapping_get<'a>(mapping: &'a yaml_serde::Mapping, key: &str) -> Option<&'a yaml_serde::Value> {
     mapping.get(yaml_serde::Value::String(key.to_string()))
@@ -698,15 +1388,16 @@ pub fn resolve_document_types(declared: &yaml_serde::Value) -> yaml_serde::Value
     let yaml_serde::Value::Mapping(entries) = declared else {
         return declared.clone();
     };
-    let seed = Config::default();
     let mut resolved = yaml_serde::Mapping::new();
     for (key, declared_entry) in entries {
         let slug = key_name(key);
-        let value = match seed.document_types.get(&slug) {
-            Some(seed_entry) => match yaml_serde::to_value(seed_entry) {
+        let value = match seed_document_type(&slug) {
+            Some(seed) => match yaml_serde::to_value(seed_entry(seed)) {
                 Ok(seed_value) => fill_entry_from_seed(&seed_value, declared_entry),
                 Err(_) => declared_entry.clone(),
             },
+            // A user-defined entry keeps exactly what the file declares; its
+            // defaults are applied when the registry resolves the entry.
             None => declared_entry.clone(),
         };
         resolved.insert(key.clone(), value);
@@ -882,26 +1573,12 @@ impl Default for Config {
             },
         );
 
+        // One seed table is the only definition of the built-in document
+        // types (ADR-036 decision 28). `ui-mockup` seeds no status list
+        // (REQ-05.008).
         let mut document_types = BTreeMap::new();
-        // `has_status` marks the front-matter-backed types that declare the
-        // seeded status vocabulary. `ui-mockup` has no front-matter status, so
-        // a `statuses` key on it is invalid configuration (REQ-05.008).
-        for (k, p, d, has_status) in DEFAULT_DOCUMENT_TYPES {
-            document_types.insert(
-                k.to_string(),
-                DocTypeEntry {
-                    prefix: p.to_string(),
-                    directory: d.to_string(),
-                    enabled: true,
-                    statuses: if has_status {
-                        Some(vec!["active".to_string(), "archived".to_string()])
-                    } else {
-                        None
-                    },
-                    default_status: None,
-                    ..Default::default()
-                },
-            );
+        for seed in &SEED_DOCUMENT_TYPES {
+            document_types.insert(seed.slug.to_string(), seed_entry(seed));
         }
 
         Self {
@@ -1882,6 +2559,26 @@ pub fn write_config_file(path: &Path, content: &str) -> Result<(), AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    type ExpectedField<'a> = (
+        &'a str,
+        &'a str,
+        Option<&'a str>,
+        Option<&'a str>,
+        FieldKind,
+        bool,
+        &'static [FieldVerb],
+    );
+    type ExpectedSlot<'a> = (&'a str, &'a str);
+    type ExpectedPresentation<'a> = (
+        &'a str,
+        &'a str,
+        &'a str,
+        u32,
+        Option<&'a str>,
+        &'a [&'a str],
+        &'a [ExpectedSlot<'a>],
+    );
 
     #[test]
     fn defaults_valid() {
@@ -3224,5 +3921,567 @@ mod tests {
         assert_eq!(keyed, indexed);
         assert!(resolve_selector(&value, "document_types.deploy.fields[9].heading").is_err());
         assert!(resolve_selector(&value, "document_types.deploy.fields[unknown].heading").is_err());
+    }
+
+    #[test]
+    fn seed_table_has_the_eleven_default_types_and_their_models() {
+        let slugs: Vec<&str> = SEED_DOCUMENT_TYPES.iter().map(|seed| seed.slug).collect();
+        assert_eq!(
+            slugs,
+            vec![
+                "req",
+                "nfr",
+                "glossary",
+                "rule",
+                "ui-spec",
+                "ui-mockup",
+                "audit",
+                "tech-spec",
+                "use-case",
+                "test-case",
+                "test-report",
+            ]
+        );
+        assert_eq!(Config::default().document_types.len(), 11);
+
+        for seed in &SEED_DOCUMENT_TYPES {
+            let expected_model = match seed.slug {
+                "req" | "nfr" => crate::registry::DocumentModel::GroupedMarkdown,
+                "ui-mockup" => crate::registry::DocumentModel::SingleHtmlMockup,
+                _ => crate::registry::DocumentModel::SingleMarkdown,
+            };
+            assert_eq!(seed.model, expected_model, "{} model", seed.slug);
+            let entry = resolved_document_entry(
+                seed.slug,
+                &DocTypeEntry {
+                    prefix: seed.prefix.to_string(),
+                    directory: seed.directory.to_string(),
+                    ..Default::default()
+                },
+            );
+            assert_eq!(entry.prefix, seed.prefix);
+            assert_eq!(entry.directory, seed.directory);
+            assert!(entry.enabled);
+            if seed.slug == "ui-mockup" {
+                assert_eq!(entry.statuses, None, "ui-mockup declares no statuses");
+                assert_eq!(entry.default_status, None);
+            } else {
+                assert_eq!(
+                    entry.statuses,
+                    Some(vec!["active".to_string(), "archived".to_string()]),
+                    "{} statuses",
+                    seed.slug
+                );
+                assert_eq!(entry.default_status, None, "{} default status", seed.slug);
+            }
+        }
+    }
+
+    #[test]
+    fn seed_fields_match_adr_036_decision_29() {
+        let expected: [(&str, &[ExpectedField<'_>]); 11] = [
+            (
+                "req",
+                &[
+                    (
+                        "story",
+                        "## User Story",
+                        None,
+                        None,
+                        FieldKind::Text,
+                        false,
+                        CREATE_AND_EDIT,
+                    ),
+                    (
+                        "description",
+                        "## Description",
+                        None,
+                        None,
+                        FieldKind::Multiline,
+                        false,
+                        CREATE_AND_EDIT,
+                    ),
+                ],
+            ),
+            (
+                "nfr",
+                &[
+                    (
+                        "story",
+                        "## User Story",
+                        None,
+                        None,
+                        FieldKind::Text,
+                        false,
+                        CREATE_AND_EDIT,
+                    ),
+                    (
+                        "description",
+                        "## Description",
+                        None,
+                        None,
+                        FieldKind::Multiline,
+                        false,
+                        CREATE_AND_EDIT,
+                    ),
+                ],
+            ),
+            (
+                "glossary",
+                &[(
+                    "definition",
+                    "## Definition",
+                    None,
+                    None,
+                    FieldKind::Multiline,
+                    true,
+                    CREATE_AND_EDIT,
+                )],
+            ),
+            (
+                "rule",
+                &[
+                    (
+                        "description",
+                        "## Description",
+                        None,
+                        None,
+                        FieldKind::Multiline,
+                        true,
+                        CREATE_AND_EDIT,
+                    ),
+                    (
+                        "rationale",
+                        "## Rationale",
+                        None,
+                        None,
+                        FieldKind::Text,
+                        true,
+                        CREATE_ONLY,
+                    ),
+                    (
+                        "applicability",
+                        "## Applicability",
+                        None,
+                        None,
+                        FieldKind::Text,
+                        true,
+                        CREATE_ONLY,
+                    ),
+                    (
+                        "requirements",
+                        "## Requirements",
+                        None,
+                        Some("requirement"),
+                        FieldKind::List,
+                        false,
+                        CREATE_AND_EDIT,
+                    ),
+                ],
+            ),
+            (
+                "ui-spec",
+                &[
+                    (
+                        "view",
+                        "## View",
+                        None,
+                        None,
+                        FieldKind::Text,
+                        false,
+                        CREATE_AND_EDIT,
+                    ),
+                    (
+                        "description",
+                        "## Description",
+                        None,
+                        None,
+                        FieldKind::Multiline,
+                        false,
+                        CREATE_AND_EDIT,
+                    ),
+                ],
+            ),
+            ("ui-mockup", &[]),
+            (
+                "audit",
+                &[
+                    (
+                        "audit_type",
+                        "## Audit Type",
+                        Some("type"),
+                        Some("audit-type"),
+                        FieldKind::Text,
+                        false,
+                        CREATE_AND_EDIT,
+                    ),
+                    (
+                        "content",
+                        "## Content",
+                        None,
+                        None,
+                        FieldKind::Multiline,
+                        true,
+                        CREATE_AND_EDIT,
+                    ),
+                ],
+            ),
+            (
+                "tech-spec",
+                &[(
+                    "description",
+                    "## Description",
+                    None,
+                    None,
+                    FieldKind::Multiline,
+                    false,
+                    CREATE_AND_EDIT,
+                )],
+            ),
+            (
+                "use-case",
+                &[
+                    (
+                        "description",
+                        "## Description",
+                        None,
+                        None,
+                        FieldKind::Multiline,
+                        false,
+                        CREATE_AND_EDIT,
+                    ),
+                    (
+                        "applicability",
+                        "## Applicability",
+                        None,
+                        None,
+                        FieldKind::Text,
+                        false,
+                        CREATE_AND_EDIT,
+                    ),
+                ],
+            ),
+            (
+                "test-case",
+                &[
+                    (
+                        "description",
+                        "## Description",
+                        None,
+                        None,
+                        FieldKind::Multiline,
+                        false,
+                        CREATE_AND_EDIT,
+                    ),
+                    (
+                        "applicability",
+                        "## Applicability",
+                        None,
+                        None,
+                        FieldKind::Text,
+                        false,
+                        CREATE_AND_EDIT,
+                    ),
+                ],
+            ),
+            (
+                "test-report",
+                &[
+                    (
+                        "description",
+                        "## Description",
+                        None,
+                        None,
+                        FieldKind::Multiline,
+                        false,
+                        CREATE_AND_EDIT,
+                    ),
+                    (
+                        "applicability",
+                        "## Applicability",
+                        None,
+                        None,
+                        FieldKind::Text,
+                        false,
+                        CREATE_AND_EDIT,
+                    ),
+                ],
+            ),
+        ];
+
+        for (slug, fields) in expected {
+            let seed = seed_document_type(slug).unwrap_or_else(|| panic!("seed {slug}"));
+            let actual: &[SeedField] = match seed.model {
+                crate::registry::DocumentModel::GroupedMarkdown => {
+                    assert_eq!(seed.fields.len(), 0);
+                    let group = seed.group.expect("group role");
+                    let member = seed.member.expect("member role");
+                    assert_eq!(group.reference_visibility, Visibility::Hidden);
+                    assert_eq!(member.reference_visibility, Visibility::Hidden);
+                    assert_eq!(group.fields, member.fields);
+                    group.fields
+                }
+                _ => {
+                    assert!(seed.group.is_none() && seed.member.is_none());
+                    seed.fields
+                }
+            };
+            assert_eq!(actual.len(), fields.len(), "{slug} field count");
+            for (index, expected_field) in fields.iter().enumerate() {
+                let field = &actual[index];
+                assert_eq!(field.key, expected_field.0, "{slug}[{index}] key");
+                assert_eq!(
+                    field.heading,
+                    Some(expected_field.1),
+                    "{slug}[{index}] heading"
+                );
+                assert_eq!(
+                    field.frontmatter_key, expected_field.2,
+                    "{slug}[{index}] frontmatter"
+                );
+                assert_eq!(field.option, expected_field.3, "{slug}[{index}] option");
+                assert_eq!(field.kind, expected_field.4, "{slug}[{index}] kind");
+                assert_eq!(field.required, expected_field.5, "{slug}[{index}] required");
+                assert_eq!(field.verbs, expected_field.6, "{slug}[{index}] verbs");
+            }
+        }
+    }
+
+    #[test]
+    fn seed_presentation_and_slots_reproduce_the_legacy_table() {
+        let expected: [ExpectedPresentation<'_>; 11] = [
+            (
+                "req",
+                "Business requirement",
+                "business requirements",
+                10,
+                None,
+                &[],
+                &[("group", "Group")],
+            ),
+            (
+                "nfr",
+                "Non-functional requirement",
+                "non-functional requirements",
+                80,
+                None,
+                &[],
+                &[("group", "Group")],
+            ),
+            (
+                "glossary",
+                "Glossary term",
+                "glossary terms",
+                90,
+                None,
+                &["/api/glossary"],
+                &[],
+            ),
+            (
+                "rule",
+                "Business rule",
+                "business rules",
+                20,
+                Some("business-rule"),
+                &["/api/business-rules", "/api/business-rule"],
+                &[("applicability", "Applicability")],
+            ),
+            (
+                "ui-spec",
+                "UI specification",
+                "UI specifications",
+                100,
+                None,
+                &["/api/ui-specs", "/api/ui-specifications", "/api/ui-spec"],
+                &[],
+            ),
+            (
+                "ui-mockup",
+                "UI mockup",
+                "UI mockups",
+                110,
+                None,
+                &["/api/ui-mockups", "/api/ui-mockup", "/api/mockups"],
+                &[("task", "Task"), ("specs", "Specs")],
+            ),
+            (
+                "audit",
+                "Audit record",
+                "audit records",
+                30,
+                Some("audit-record"),
+                &["/api/audit-records", "/api/audit-record"],
+                &[("audit_type", "Audit type")],
+            ),
+            (
+                "tech-spec",
+                "Technical specification",
+                "technical specifications",
+                40,
+                None,
+                &["/api/tech-specs", "/api/tech-spec"],
+                &[],
+            ),
+            (
+                "use-case",
+                "Use case",
+                "use cases",
+                50,
+                None,
+                &["/api/use-cases", "/api/use-case"],
+                &[],
+            ),
+            (
+                "test-case",
+                "Test case",
+                "test cases",
+                60,
+                None,
+                &["/api/test-cases", "/api/test-case"],
+                &[],
+            ),
+            (
+                "test-report",
+                "Test report",
+                "test reports",
+                70,
+                None,
+                &["/api/test-reports", "/api/test-report"],
+                &[],
+            ),
+        ];
+        for (slug, label, plural, order, type_alias, aliases, slots) in expected {
+            let seed = seed_document_type(slug).unwrap();
+            assert_eq!(seed.label, label, "{slug} label");
+            assert_eq!(seed.plural, plural, "{slug} plural");
+            assert_eq!(seed.order, order, "{slug} order");
+            assert_eq!(seed.type_alias, type_alias, "{slug} type alias");
+            assert_eq!(
+                seed.api_aliases.to_vec(),
+                aliases.to_vec(),
+                "{slug} api aliases"
+            );
+            let actual_slots: Vec<(&str, &str)> = seed
+                .slots
+                .iter()
+                .map(|slot| (slot.key, slot.label))
+                .collect();
+            assert_eq!(actual_slots, slots, "{slug} slots");
+        }
+        assert_eq!(
+            seed_document_type("req").unwrap().reference_visibility,
+            None
+        );
+        assert_eq!(
+            seed_document_type("ui-mockup")
+                .unwrap()
+                .reference_visibility,
+            Some(Visibility::Visible)
+        );
+    }
+
+    #[test]
+    fn user_defined_entry_defaults_follow_decision_33() {
+        let declared = DocTypeEntry {
+            prefix: "NOTE".to_string(),
+            directory: "notes/".to_string(),
+            ..Default::default()
+        };
+        let entry = resolved_document_entry("note", &declared);
+        let max_seed_order = SEED_DOCUMENT_TYPES
+            .iter()
+            .map(|seed| seed.order)
+            .max()
+            .unwrap();
+        assert!(entry.order.unwrap() > max_seed_order);
+        assert_eq!(entry.label.as_deref(), Some("note"));
+        assert_eq!(entry.plural, None);
+        assert_eq!(entry.summary, None);
+        assert_eq!(entry.type_alias, None);
+        assert_eq!(entry.api_aliases, Some(Vec::new()));
+        assert_eq!(entry.reference_visibility, Some(Visibility::Visible));
+        assert_eq!(
+            entry.statuses,
+            Some(vec!["active".to_string(), "archived".to_string()])
+        );
+        assert_eq!(entry.default_status, None);
+        let fields = entry.fields.expect("default field");
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].key, "description");
+        assert_eq!(fields[0].heading.as_deref(), Some("## Description"));
+        assert_eq!(fields[0].kind, FieldKind::Multiline);
+        assert!(!fields[0].required);
+    }
+
+    #[test]
+    fn selector_paths_resolve_group_and_member_fields_in_both_forms() {
+        let value = yaml_serde::to_value(Config::default()).unwrap();
+        for (role, key, index) in [("group", "story", 0), ("member", "description", 1)] {
+            let keyed = resolve_selector(
+                &value,
+                &format!("document_types.req.{}.fields[{key}].heading", role),
+            )
+            .unwrap();
+            let indexed = resolve_selector(
+                &value,
+                &format!("document_types.req.{}.fields[{index}].heading", role),
+            )
+            .unwrap();
+            assert_eq!(keyed, indexed, "{role}[{key}]");
+        }
+        assert!(resolve_selector(&value, "document_types.req.group.fields[9].heading").is_err());
+        assert!(
+            resolve_selector(&value, "document_types.req.member.fields[unknown].heading").is_err()
+        );
+        assert!(selector_targets_field(
+            "document_types.req.group.fields[story].heading"
+        ));
+    }
+
+    #[test]
+    fn seed_is_the_only_production_field_table() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut stack = vec![root];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    stack.push(path);
+                    continue;
+                }
+                if path.extension().and_then(|ext| ext.to_str()) != Some("rs") {
+                    continue;
+                }
+                let source = std::fs::read_to_string(&path).unwrap();
+                let production = source.split("#[cfg(test)]").next().unwrap_or("");
+                assert!(
+                    !production.contains("DEFAULT_DOCUMENT_TYPES"),
+                    "{} still declares DEFAULT_DOCUMENT_TYPES",
+                    path.display()
+                );
+                if path.file_name().and_then(|name| name.to_str()) == Some("config.rs") {
+                    assert!(
+                        production.contains("SEED_DOCUMENT_TYPES"),
+                        "config.rs must own the seed table"
+                    );
+                    continue;
+                }
+                assert!(
+                    !production.contains("SeedField {"),
+                    "{} declares a second seed field table",
+                    path.display()
+                );
+                assert!(
+                    !production.contains("FieldSpec {"),
+                    "{} constructs a second field table",
+                    path.display()
+                );
+                assert!(
+                    !production.contains("RoleFields {"),
+                    "{} constructs a second role set",
+                    path.display()
+                );
+            }
+        }
     }
 }
