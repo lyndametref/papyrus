@@ -166,7 +166,12 @@ fn tech_spec_create_requires_all_arguments() {
     assert!(d.join("docs/technical/TECH-001.md").exists());
 
     let out = run(&d, &["tech-spec", "create"]);
-    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(out.status.code(), Some(4));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("title"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let out = run(&d, &["tech-spec", "create", "T2", "--bogus", "x"]);
     assert_eq!(out.status.code(), Some(2));
 

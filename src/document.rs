@@ -265,7 +265,10 @@ pub fn run(
     // engine patch path cannot reproduce the HTML metadata block byte-for-byte,
     // so MS-035 owns the consolidation with the browser.
     if descriptor.document_model == DocumentModel::SingleHtmlMockup {
-        return crate::ui_mockup::handle(ctx, &scope, registry, invocation.verb, &invocation.args);
+        // The HTML model keeps its own writer, but it reads the same title
+        // contract as every Markdown model.
+        let args = merge_invocation_args(&invocation, &[]);
+        return crate::ui_mockup::handle(ctx, &scope, registry, invocation.verb, &args);
     }
 
     match invocation.verb {
@@ -439,7 +442,6 @@ fn merge_invocation_args(invocation: &DocumentInvocation, fields: &[FieldSpec]) 
     }
     if args.get("title").is_none()
         && args.get("title_flag").is_none()
-        && args.get("term").is_none()
         && let Some(title) = &invocation.title
     {
         args.insert("title", vec![title.clone()]);
@@ -505,56 +507,45 @@ fn sanitize_references(raw: &[String]) -> Result<Vec<String>, AppError> {
     Ok(references)
 }
 
-fn title_from_args(
-    args: &DocumentArgs,
-    invocation: &DocumentInvocation,
-) -> Result<String, AppError> {
-    let positional = args.get("title");
-    let flag = args.get("title_flag");
-    let value = match (positional, flag) {
-        (Some(left), Some(right)) => {
-            if left != right {
-                return Err(AppError::Validation(
-                    "conflicting title sources".to_string(),
-                ));
-            }
-            Some(left)
-        }
-        (Some(value), None) | (None, Some(value)) => Some(value),
-        (None, None) => args.get("term").or(invocation.title.as_deref()),
-    };
-    let raw = value.ok_or_else(|| AppError::Validation("title is required".to_string()))?;
-    sanitize_field(raw)
+/// The one title value a verb accepts: the positional `TITLE` or `--title`.
+///
+/// Supplying both forms on one invocation is rejected rather than compared, so
+/// a create that names the title twice never writes a file (ADR-036 decision
+/// 24, TC-125).
+fn title_source(args: &DocumentArgs) -> Result<Option<&str>, AppError> {
+    match (args.get("title"), args.get("title_flag")) {
+        (Some(_), Some(_)) => Err(AppError::Validation(
+            "conflicting title sources".to_string(),
+        )),
+        (Some(value), None) | (None, Some(value)) => Ok(Some(value)),
+        (None, None) => Ok(None),
+    }
 }
 
-fn optional_title_from_args(
-    args: &DocumentArgs,
-    invocation: &DocumentInvocation,
-) -> Result<Option<String>, AppError> {
-    let positional = args.get("title");
-    let flag = args.get("title_flag");
-    let value = match (positional, flag) {
-        (Some(left), Some(right)) => {
-            if left != right {
-                return Err(AppError::Validation(
-                    "conflicting title sources".to_string(),
-                ));
-            }
-            Some(left)
-        }
-        (Some(value), None) | (None, Some(value)) => Some(value),
-        (None, None) => args.get("term").or(invocation.title.as_deref()),
-    };
-    match value {
-        Some(raw) => {
-            let title = sanitize_field(raw)?;
-            if title.trim().is_empty() {
-                return Err(AppError::Validation("title must not be empty".to_string()));
-            }
-            Ok(Some(title))
-        }
-        None => Ok(None),
+/// Validate one title: non-empty, single-line, and free of control characters.
+///
+/// The title is not a field and never a path component; it therefore reuses
+/// the shared single-line sanitizer.
+fn sanitize_title(raw: &str) -> Result<String, AppError> {
+    if raw.trim().is_empty() {
+        return Err(AppError::Validation("title must not be empty".to_string()));
     }
+    sanitize::sanitize_name(raw)
+        .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))
+}
+
+/// The required title of a create or create-group (TC-126).
+pub(crate) fn required_title(args: &DocumentArgs) -> Result<String, AppError> {
+    let raw =
+        title_source(args)?.ok_or_else(|| AppError::Validation("title is required".to_string()))?;
+    sanitize_title(raw)
+}
+
+/// The optional title of an edit. `None` leaves the stored title unchanged; a
+/// supplied title that is empty, whitespace-only, multi-line, or conflicting is
+/// rejected, so an edit can never clear the title.
+pub(crate) fn optional_title(args: &DocumentArgs) -> Result<Option<String>, AppError> {
+    title_source(args)?.map(sanitize_title).transpose()
 }
 
 fn scalar_value(args: &DocumentArgs, field: &FieldSpec) -> Result<Option<String>, AppError> {
@@ -737,7 +728,7 @@ fn create_document(
     let fields = document_fields_for_verb(descriptor, DocumentVerb::Create);
     let mut args = merge_invocation_args(invocation, &fields);
     resolve_field_stdin(&fields, &mut args)?;
-    let title = title_from_args(&args, invocation)?;
+    let title = required_title(&args)?;
     ensure_required_fields(&fields, &args, &descriptor.field_defaults)?;
 
     let active = scope.active.clone();
@@ -845,7 +836,7 @@ fn create_group_document(
 ) -> Result<crate::CommandOutput, AppError> {
     let fields = document_fields_for_verb(descriptor, DocumentVerb::CreateGroup);
     let args = merge_invocation_args(invocation, &fields);
-    let title = title_from_args(&args, invocation)?;
+    let title = required_title(&args)?;
 
     let active = scope.active.clone();
     let archived = scope.archived.clone();
@@ -1206,7 +1197,7 @@ fn edit_document(
     let content = doc.source.clone();
     let mut ops: Vec<PatchOp> = Vec::new();
 
-    if let Some(title) = optional_title_from_args(&args, invocation)? {
+    if let Some(title) = optional_title(&args)? {
         ops.push(PatchOp::SetFrontMatter("title".into(), title.clone()));
         ops.push(PatchOp::SetHeadingTitle(title.clone()));
     }

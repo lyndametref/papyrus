@@ -1,7 +1,0 @@
-error: unexpected argument '--title' found
-
-  tip: to pass '--title' as a value, use '-- --title'
-
-Usage: papyrus ui-spec edit <ID>
-
-For more information, try '--help'.

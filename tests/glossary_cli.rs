@@ -37,7 +37,6 @@ fn glossary_basic_lifecycle() {
             p,
             "glossary",
             "create",
-            "--term",
             "First Term",
             "--definition",
             "def text",
@@ -75,7 +74,7 @@ fn glossary_basic_lifecycle() {
             "glossary",
             "edit",
             "GLO-001",
-            "--term",
+            "--title",
             "First Term Updated",
         ])
         .output()
@@ -158,16 +157,7 @@ fn glossary_edit_archived_allowed() {
     init(&d);
     let p = d.to_str().unwrap();
     let _ = bin()
-        .args([
-            "--dir",
-            p,
-            "glossary",
-            "create",
-            "--term",
-            "T",
-            "--definition",
-            "d",
-        ])
+        .args(["--dir", p, "glossary", "create", "T", "--definition", "d"])
         .output()
         .unwrap();
     let _ = bin()
@@ -181,7 +171,7 @@ fn glossary_edit_archived_allowed() {
             "glossary",
             "edit",
             "GLO-001",
-            "--term",
+            "--title",
             "T2",
             "--definition",
             "d2",
@@ -213,16 +203,7 @@ fn glossary_sanitization() {
 
     for bad in ["a/b", "x\\y", "   ", "a\nb"] {
         let out = bin()
-            .args([
-                "--dir",
-                p,
-                "glossary",
-                "create",
-                "--term",
-                bad,
-                "--definition",
-                "ok",
-            ])
+            .args(["--dir", p, "glossary", "create", bad, "--definition", "ok"])
             .output()
             .unwrap();
         assert_eq!(out.status.code(), Some(4), "term bad={}", bad);
@@ -234,7 +215,6 @@ fn glossary_sanitization() {
             p,
             "glossary",
             "create",
-            "--term",
             "OK",
             "--definition",
             "x/y",
@@ -244,16 +224,7 @@ fn glossary_sanitization() {
     assert_eq!(out.status.code(), Some(4));
 
     let _ = bin()
-        .args([
-            "--dir",
-            p,
-            "glossary",
-            "create",
-            "--term",
-            "OK",
-            "--definition",
-            "ok",
-        ])
+        .args(["--dir", p, "glossary", "create", "OK", "--definition", "ok"])
         .output()
         .unwrap();
 
@@ -264,7 +235,7 @@ fn glossary_sanitization() {
     assert_eq!(out.status.code(), Some(4));
 
     let out = bin()
-        .args(["--dir", p, "glossary", "edit", "GLO-001", "--term", "x\\y"])
+        .args(["--dir", p, "glossary", "edit", "GLO-001", "--title", "x\\y"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(4));
@@ -313,16 +284,7 @@ fn glossary_project_directory_boundary() {
 
     let p = proj.to_str().unwrap();
     let _ = bin()
-        .args([
-            "--dir",
-            p,
-            "glossary",
-            "create",
-            "--term",
-            "D",
-            "--definition",
-            "d",
-        ])
+        .args(["--dir", p, "glossary", "create", "D", "--definition", "d"])
         .output()
         .unwrap();
 
@@ -362,7 +324,6 @@ fn glossary_json_output() {
             "--json",
             "glossary",
             "create",
-            "--term",
             "Foo",
             "--definition",
             "def",
@@ -395,22 +356,172 @@ fn glossary_json_output() {
 }
 
 #[test]
-fn glossary_missing_args_exit_2() {
+fn glossary_missing_args_exit_4() {
     let d = tmpdir("missing");
     init(&d);
     let p = d.to_str().unwrap();
+    // Title is a record invariant validated by the engine (TC-126 form).
     let out = bin()
         .args(["--dir", p, "glossary", "create", "--definition", "d"])
         .output()
         .unwrap();
-    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(out.status.code(), Some(4));
+    let message = String::from_utf8_lossy(&out.stderr);
+    assert!(message.contains("title"), "{message}");
+    // A missing required field is the same validation outcome.
     let out = bin()
-        .args(["--dir", p, "glossary", "create", "--term", "t"])
+        .args(["--dir", p, "glossary", "create", "t"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(4));
     let message = String::from_utf8_lossy(&out.stderr);
     assert!(message.contains("definition"), "{message}");
+    assert!(!d.join("docs/glossary/GLO-001.md").exists());
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn glossary_term_is_the_record_title() {
+    // TC-138: the term is the record title and the definition its field.
+    let d = tmpdir("term-title");
+    init(&d);
+    let p = d.to_str().unwrap();
+    let out = bin()
+        .args([
+            "--dir",
+            p,
+            "glossary",
+            "create",
+            "Cache",
+            "--definition",
+            "A store of reusable results",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "GLO-001");
+
+    let content = fs::read_to_string(d.join("docs/glossary/GLO-001.md")).unwrap();
+    assert!(content.contains("id: GLO-001"), "{content}");
+    assert!(content.contains("title: Cache"), "{content}");
+    // The seed create path does not write `status`; the term/title contract
+    // adds no status key, so only the stored title and body are asserted here.
+    assert!(!content.contains("term:"), "{content}");
+    assert!(content.contains("# GLO-001 Cache"), "{content}");
+    assert!(
+        content.contains("## Definition\nA store of reusable results"),
+        "{content}"
+    );
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn glossary_title_sources_are_exclusive_and_term_is_a_usage_error() {
+    // TC-125: both title sources on one create is one validation outcome.
+    let d = tmpdir("term-title-conflict");
+    init(&d);
+    let p = d.to_str().unwrap();
+    let out = bin()
+        .args([
+            "--dir",
+            p,
+            "glossary",
+            "create",
+            "Cache",
+            "--title",
+            "Caching",
+            "--definition",
+            "def",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(4));
+    let message = String::from_utf8_lossy(&out.stderr);
+    assert!(message.contains("conflicting title sources"), "{message}");
+    assert!(!d.join("docs/glossary/GLO-001.md").exists());
+
+    // `--term` is gone from every document command: it is a usage error.
+    let out = bin()
+        .args([
+            "--dir",
+            p,
+            "glossary",
+            "create",
+            "--term",
+            "Cache",
+            "--definition",
+            "def",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert!(!d.join("docs/glossary/GLO-001.md").exists());
+
+    let out = bin()
+        .args([
+            "--dir",
+            p,
+            "glossary",
+            "create",
+            "Cache",
+            "--definition",
+            "def",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+
+    let out = bin()
+        .args(["--dir", p, "glossary", "edit", "GLO-001", "--term", "X"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let content = fs::read_to_string(d.join("docs/glossary/GLO-001.md")).unwrap();
+    assert!(content.contains("title: Cache"), "{content}");
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn glossary_edit_cannot_clear_the_title() {
+    let d = tmpdir("term-title-clear");
+    init(&d);
+    let p = d.to_str().unwrap();
+    let _ = bin()
+        .args([
+            "--dir",
+            p,
+            "glossary",
+            "create",
+            "Cache",
+            "--definition",
+            "def",
+        ])
+        .output()
+        .unwrap();
+    let path = d.join("docs/glossary/GLO-001.md");
+    let before = fs::read_to_string(&path).unwrap();
+    for bad in ["", "   ", "two\nlines"] {
+        let out = bin()
+            .args(["--dir", p, "glossary", "edit", "GLO-001", "--title", bad])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(4), "bad title {bad:?}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), before);
+    }
+    let out = bin()
+        .args([
+            "--dir", p, "glossary", "edit", "GLO-001", "--title", "Cache 2",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let content = fs::read_to_string(&path).unwrap();
+    assert!(content.contains("title: \"Cache 2\""), "{content}");
+    assert!(content.contains("# GLO-001 Cache 2"), "{content}");
     let _ = fs::remove_dir_all(&d);
 }
 

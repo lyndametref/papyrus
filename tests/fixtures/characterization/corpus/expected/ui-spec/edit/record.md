@@ -1,6 +1,6 @@
 ---
 id: UI-001
-title: "UI specification one"
+title: "Edited ui spec"
 created_date: '{{TIMESTAMP}}'
 updated_date: '{{TIMESTAMP}}'
 labels:
@@ -9,7 +9,7 @@ references:
   - UI-REF-1
 status: active
 ---
-# UI-001 UI specification one
+# UI-001 Edited ui spec
 
 ## View
 list

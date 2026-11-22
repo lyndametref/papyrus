@@ -112,10 +112,12 @@ pinned to commit `d60f71c9` and must not change.
 - CLI per type: `create`, `create --json`, `list`, `list --json`, `view`,
   `view --json`, `edit`, `edit --json`, `archive`, `delete --force`, `status`
   where declared, `supersede` for `ui-mockup`, and `create-group` for `req` and
-  `nfr`. Create uses the positional `TITLE` form where the command accepts it
-  (`audit` requires `--title`); edit uses today's `--title` form. Glossary
-  create and edit use the pre-refactor `--term` form so the title migration is
-  measurable from bytes.
+  `nfr`. Create uses the uniform positional `TITLE` form; `audit create` also
+  keeps `--title` because the positional is additive there. Glossary create
+  uses the positional term and glossary edit uses `--title`, because the term
+  is the record title. Separate `glossary/create-term-removed` and
+  `glossary/edit-term-removed` cases record that the removed `--term` form is
+  an exit-2 usage error.
 
 ## Determinism and normalisation
 

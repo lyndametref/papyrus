@@ -242,7 +242,7 @@ fn cli_json_metadata_for_every_managed_type() {
         &d,
         "glossary",
         "create",
-        "--term",
+        "--title",
         "Term",
         "--definition",
         "defs",

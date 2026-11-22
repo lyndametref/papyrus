@@ -629,7 +629,7 @@ fn glossary_definition_create_and_edit_read_multiline_stdin() {
         &[
             "glossary",
             "create",
-            "--term",
+            "--title",
             "Multiline term",
             "--definition",
             "-",
@@ -719,7 +719,7 @@ fn glossary_definition_stdin_failures_exit_4_without_writing() {
             &[
                 "glossary",
                 "create",
-                "--term",
+                "--title",
                 "Empty term",
                 "--definition",
                 "-",
@@ -733,7 +733,7 @@ fn glossary_definition_stdin_failures_exit_4_without_writing() {
         &[
             "glossary",
             "create",
-            "--term",
+            "--title",
             "Invalid term",
             "--definition",
             "-",
@@ -748,7 +748,7 @@ fn glossary_definition_stdin_failures_exit_4_without_writing() {
         &[
             "glossary",
             "create",
-            "--term",
+            "--title",
             "Seed term",
             "--definition",
             "-",
@@ -797,7 +797,7 @@ fn audit_and_glossary_literal_values_do_not_read_stdin() {
         &[
             "glossary",
             "create",
-            "--term",
+            "--title",
             "Literal term",
             "--definition",
             "literal definition",

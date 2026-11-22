@@ -327,7 +327,7 @@ fn t114_02_canonical_api_equals_legacy() {
         &[
             "glossary",
             "create",
-            "--term",
+            "--title",
             "Term",
             "--definition",
             "Definition",
@@ -455,7 +455,7 @@ fn t114_04_filter_values_order_and_default() {
         &[
             "glossary",
             "create",
-            "--term",
+            "--title",
             "Term",
             "--definition",
             "Definition",
@@ -647,7 +647,7 @@ fn t114_11_builtin_list_uses_shared_columns_and_keeps_sections() {
         &[
             "glossary",
             "create",
-            "--term",
+            "--title",
             "Term",
             "--definition",
             "Definition",
@@ -1093,7 +1093,7 @@ fn t182_03_glossary_landing_page_display_is_unchanged() {
         &[
             "glossary",
             "create",
-            "--term",
+            "--title",
             "Term One",
             "--definition",
             "Definition One",
@@ -1106,7 +1106,7 @@ fn t182_03_glossary_landing_page_display_is_unchanged() {
         &[
             "glossary",
             "create",
-            "--term",
+            "--title",
             "Term Two",
             "--definition",
             "Definition Two",

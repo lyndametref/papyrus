@@ -413,11 +413,22 @@ fn t117_02_cli_lifecycle_persistence_and_validation() {
     assert_eq!(missing.status.code(), Some(3));
 
     let count_before = fs::read_dir(project.join("docs/notes")).unwrap().count();
-    for bad in ["", "\n", "\r", "path/separator"] {
+    for bad in ["", "\n", "\r"] {
         let out = run(&project, &["note", "create", bad]);
         assert_eq!(out.status.code(), Some(4), "invalid title {bad:?}");
-        assert!(stderr(&out).contains("cannot be normalized"));
+        assert!(
+            stderr(&out).contains("title must not be empty"),
+            "{}",
+            stderr(&out)
+        );
     }
+    let out = run(&project, &["note", "create", "path/separator"]);
+    assert_eq!(out.status.code(), Some(4));
+    assert!(
+        stderr(&out).contains("cannot be normalized"),
+        "{}",
+        stderr(&out)
+    );
     let count_after = fs::read_dir(project.join("docs/notes")).unwrap().count();
     assert_eq!(count_before, count_after, "invalid titles write nothing");
 

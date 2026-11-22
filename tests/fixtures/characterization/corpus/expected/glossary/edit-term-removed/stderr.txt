@@ -1,0 +1,7 @@
+error: unexpected argument '--term' found
+
+  tip: to pass '--term' as a value, use '-- --term'
+
+Usage: papyrus glossary edit <ID>
+
+For more information, try '--help'.

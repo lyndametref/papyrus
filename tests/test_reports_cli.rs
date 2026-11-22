@@ -166,7 +166,12 @@ fn test_report_create_requires_all_arguments() {
     assert!(d.join("docs/test-reports/TR-001.md").exists());
 
     let out = run(&d, &["test-report", "create"]);
-    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(out.status.code(), Some(4));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("title"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let out = run(&d, &["test-report", "create", "T2", "--bogus", "x"]);
     assert_eq!(out.status.code(), Some(2));
 

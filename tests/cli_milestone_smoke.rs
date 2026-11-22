@@ -196,7 +196,7 @@ fn milestone_cli_records_flow() {
             &[
                 "glossary",
                 "create",
-                "--term",
+                "--title",
                 PHRASE,
                 "--definition",
                 "def"
@@ -215,7 +215,7 @@ fn milestone_cli_records_flow() {
             "glossary",
             "edit",
             "GLO-001",
-            "--term",
+            "--title",
             "Updated Term"
         ]),
         ""
