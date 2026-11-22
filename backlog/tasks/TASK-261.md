@@ -2,7 +2,7 @@
 id: TASK-261
 title: "Verify MS-034 CLI engine: command equivalence and help attribution"
 created_date: '2026-11-20T17:42:17Z'
-updated_date: '2026-11-22T16:21:14Z'
+updated_date: '2026-11-22T16:44:40Z'
 labels: []
 references:
   - REQ-07.003
@@ -69,7 +69,7 @@ Every criterion has a pass or a recorded finding with evidence; the suite and qu
 - [ ] #7 AC-4 verified: the nine typed modules are gone; ui_mockup remains; no transitional document CLI schema or verb table remains; the eight document ops builders and the document TypedHandler variants are retained and their deletion is deferred to MS-035 TASK-266/TASK-269 as recorded; backlog and decision modules, commands, help, and behavior are unchanged. (MS-034 AC-4; ADR-042)
 - [ ] #8 AC-5 verified: the CLI help goldens are regenerated, every difference from the MS-032 snapshot is attributed in the recorded report, and help is deterministic across two runs. (MS-034 AC-5)
 - [ ] #9 AC-6 verified: field-derived options appear exactly where the seed allows, in sequence order and only on the field verbs; create-group, --group, and supersede appear exactly where the DocumentModel allows. (MS-034 AC-6)
-- [ ] #10 AC-7 verified: the MS-032 CLI fixture replay passes with the four glossary --term usage-error cases and any other documented deltas; every other record file and exit code matches. (MS-034 AC-7)
+- [ ] #10 AC-7 verified: the MS-032 CLI fixture replay passes with the two glossary --term usage-error cases and the four migrated glossary cases, plus any other documented deltas; every other record file and exit code matches. (MS-034 AC-7)
 - [ ] #11 The full test suite is green, cargo clippy --all-targets -- -D warnings and cargo fmt --check are clean, and the verification evidence records the suite counts and commands run. (DoD)
 - [ ] #12 AUD-140 follow-ups are recorded with status and owner: L-1 field string type-error diagnostics (TASK-258), L-3 TECH-077 section 6 step 4 wording (architect with the MS-034 spec pass, recorded with TASK-257), and L-4 REQ-07.002 and TC-114 seed-materialization wording (requirements-engineer, Phase 2). (AUD-140)
 - [ ] #13 Every finding is recorded with expected and observed values, the owning surface, and a disposition; this task fixes no defect and adds no product behavior. (DoD)
@@ -81,3 +81,4 @@ Every criterion has a pass or a recorded finding with evidence; the suite and qu
 - **planner**: Planner: TASK-307 archived as premise invalid (build-deb.sh is the single build script per the TASK-235 architect ruling; MS-037 AC-6 corrected) and removed from this task's dependencies; MS-034 AC-8 corrected to the internal-checkpoint rule. Verification scope remains MS-034 AC-1 to AC-7.
 - **code-auditor**: AUD-142 re-audit: corrections required, AUD-141 not fully closed; F7 help-option panic and F15 edit sentinel remain open, TASK-310 needs two corrections.
 - **orchestrator**: Verification PASS (AUD-144): AC-1 to AC-8 met, 0 blocker, 0 high, 0 medium, 2 low; code gate clear via AUD-143; suite 1289 passed; clippy and fmt clean; packaging waived per the MS-037 single-release rule.
+- **planner**: planner: AUD-144 finding 1 alignment. AC-10 now states the correct glossary counts: two usage-error cases and four migrated cases. AUD-144 finding 2 is recorded as closed: the TASK-261 rerun transcripts are attached to this task's evidence. Status unchanged.
