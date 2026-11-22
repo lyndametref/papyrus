@@ -157,6 +157,42 @@ fn set_statuses(dir: &Path, statuses: &[&str], default_status: &str) {
     fs::write(&path, out).unwrap();
 }
 
+/// Enable or disable one decision type in the project configuration file.
+///
+/// `config set` only accepts scalars, so the nested `decision_types` block is
+/// rewritten directly.
+fn set_decision_type_enabled(dir: &Path, slug: &str, enabled: bool) {
+    let path = dir.join("papyrus.config.yml");
+    let text = fs::read_to_string(&path).unwrap();
+    let mut out = String::new();
+    let mut in_section = false;
+    let mut in_slug = false;
+    for line in text.lines() {
+        if line == "decision_types:" {
+            in_section = true;
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        }
+        if in_section && !line.starts_with(' ') {
+            in_section = false;
+        }
+        if in_section {
+            let trimmed = line.trim();
+            if let Some(name) = trimmed.strip_suffix(':') {
+                in_slug = name == slug;
+            } else if in_slug && trimmed.starts_with("enabled:") {
+                let indent = &line[..line.len() - line.trim_start().len()];
+                out.push_str(&format!("{}enabled: {}\n", indent, enabled));
+                continue;
+            }
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    fs::write(&path, out).unwrap();
+}
+
 fn free_port() -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -234,6 +270,22 @@ impl Server {
         panic!(
             "stderr did not contain {:?}: {}",
             needle,
+            self.stderr_text()
+        );
+    }
+
+    fn wait_for_stderr_count(&self, needle: &str, count: usize) {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < deadline {
+            if self.stderr_text().matches(needle).count() >= count {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        panic!(
+            "stderr did not contain {:?} {} times: {}",
+            needle,
+            count,
             self.stderr_text()
         );
     }
@@ -8025,7 +8077,7 @@ fn debug_flag_is_rejected_outside_browser() {
     let _ = fs::remove_dir_all(&dir);
 }
 
-// TASK-96 AC #3: quiet by default for 2xx, 3xx, 4xx, and 5xx responses.
+// TASK-96 AC #3: quiet by default for 2xx, 3xx, and 4xx responses.
 #[test]
 fn browser_console_is_quiet_by_default() {
     let dir = fixture("quiet-default");
@@ -8039,16 +8091,24 @@ fn browser_console_is_quiet_by_default() {
     assert_eq!(get(&server, "/").status, 200);
     assert_eq!(get(&server, "/nope").status, 404);
 
-    // Corrupting the configuration after startup makes a parsed request fail
-    // with 500, proving a 5xx response is a response and not a console error.
+    // TASK-274: a broken configuration is fail-closed. It never becomes a
+    // served 5xx; the last known good snapshot keeps answering and the reload
+    // failure is the only diagnostic line.
     fs::write(dir.join("papyrus.config.yml"), "browser_port: 0\n").unwrap();
-    assert_eq!(get(&server, "/").status, 500);
+    assert_eq!(get(&server, "/").status, 200);
+    server.wait_for_stderr("warning: cannot reload configuration");
 
     std::thread::sleep(Duration::from_millis(150));
     let stderr = server.stderr_text();
-    assert!(
-        stderr.is_empty(),
+    let lines: Vec<&str> = stderr.lines().collect();
+    assert_eq!(
+        lines.len(),
+        1,
         "default browser run must not write per-request lines: {stderr:?}"
+    );
+    assert!(
+        lines[0].starts_with("warning: cannot reload configuration"),
+        "unexpected stderr: {stderr:?}"
     );
     let rest = server.finish_stdout();
     assert!(rest.is_empty(), "unexpected stdout: {rest:?}");
@@ -9499,4 +9559,178 @@ fn tc097_no_cli_cleanup_command() {
     let help_rel = run_ok(&["release", "--help"]);
     assert!(!help_ms.to_lowercase().contains("cleanup"));
     assert!(!help_rel.to_lowercase().contains("cleanup"));
+}
+
+// TASK-274: the serving snapshot is invalidated by one configuration edit and
+// publishes the new configuration and registry together.
+#[test]
+fn task274_config_edit_between_requests_reloads_config_and_registry_together() {
+    let dir = fixture("task274-together");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let before = get(&server, "/");
+    assert_eq!(before.status, 200);
+    let before_html = before.text();
+    assert!(before_html.contains("Proj"), "{before_html}");
+    assert!(before_html.contains("Decisions"), "{before_html}");
+
+    // One edit changes both the configuration (project name) and the registry
+    // inputs (decision types), with a different byte length so the fingerprint
+    // changes even on a coarse-timestamp filesystem.
+    set_config_value(&dir, "project_name", "ReloadedProject");
+    set_decision_type_enabled(&dir, "adr", false);
+    set_decision_type_enabled(&dir, "bdr", false);
+
+    let after = get(&server, "/");
+    assert_eq!(after.status, 200);
+    let after_html = after.text();
+    assert!(after_html.contains("ReloadedProject"), "{after_html}");
+    assert!(!after_html.contains("Decisions"), "{after_html}");
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-274: a broken configuration never becomes served state, is reported
+// once per distinct failing input state, and a fixed file retries.
+#[test]
+fn task274_invalid_config_keeps_last_good_snapshot_and_warns_once() {
+    let dir = fixture("task274-fail-closed");
+    let original = fs::read_to_string(dir.join("papyrus.config.yml")).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let good = get(&server, "/?type=req");
+    assert_eq!(good.status, 200);
+
+    let config_path = dir.join("papyrus.config.yml");
+    fs::write(
+        &config_path,
+        "project_name: Broken Configuration\nbrowser_port: 0\n",
+    )
+    .unwrap();
+    let first = get(&server, "/?type=req");
+    assert_eq!(first.status, 200);
+    assert_eq!(first.text(), good.text(), "last known good page is served");
+    server.wait_for_stderr("warning: cannot reload configuration");
+
+    // The same failing input state is not reported again.
+    let second = get(&server, "/?type=req");
+    assert_eq!(second.status, 200);
+    assert_eq!(second.text(), good.text());
+    assert_eq!(
+        server
+            .stderr_text()
+            .matches("warning: cannot reload configuration")
+            .count(),
+        1,
+        "{}",
+        server.stderr_text()
+    );
+
+    // A fixed file retries and publishes the new snapshot without a warning.
+    fs::write(
+        &config_path,
+        original.replace("project_name: Proj", "project_name: RecoveredProject"),
+    )
+    .unwrap();
+    let recovered = get(&server, "/?type=req");
+    assert_eq!(recovered.status, 200);
+    assert!(recovered.text().contains("RecoveredProject"));
+    assert_eq!(
+        server
+            .stderr_text()
+            .matches("warning: cannot reload configuration")
+            .count(),
+        1
+    );
+
+    // A different failing input state is reported again.
+    fs::write(
+        &config_path,
+        "project_name: Broken Again\nbrowser_port: nope\n",
+    )
+    .unwrap();
+    let third = get(&server, "/?type=req");
+    assert_eq!(third.status, 200);
+    assert!(third.text().contains("RecoveredProject"));
+    server.wait_for_stderr_count("warning: cannot reload configuration", 2);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-274: concurrent observers of one change cause one rebuild and one warning.
+#[test]
+fn task274_concurrent_observers_cause_one_failed_reload() {
+    let dir = fixture("task274-concurrent");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    assert_eq!(get(&server, "/").status, 200);
+    fs::write(
+        dir.join("papyrus.config.yml"),
+        "project_name: Concurrent Broken\nbrowser_port: 0\n",
+    )
+    .unwrap();
+
+    let port = server.port;
+    let mut handles = Vec::new();
+    for _ in 0..8 {
+        handles.push(std::thread::spawn(move || {
+            request(port, "GET", "/", &[], None).status
+        }));
+    }
+    for handle in handles {
+        assert_eq!(handle.join().unwrap(), 200);
+    }
+    server.wait_for_stderr_count("warning: cannot reload configuration", 1);
+    assert_eq!(
+        server
+            .stderr_text()
+            .matches("warning: cannot reload configuration")
+            .count(),
+        1,
+        "{}",
+        server.stderr_text()
+    );
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-274: a reload does not rebind the socket or change the Host allowlist.
+#[test]
+fn task274_config_reload_does_not_rebind_or_change_host_allowlist() {
+    let dir = fixture("task274-norebind");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    assert_eq!(get(&server, "/").status, 200);
+    let other_port = free_port();
+    set_config_value(&dir, "browser_port", &other_port.to_string());
+    set_decision_type_enabled(&dir, "adr", false);
+    set_decision_type_enabled(&dir, "bdr", false);
+
+    // The bound port and the startup Host allowlist still serve the reloaded page.
+    let after = get(&server, "/");
+    assert_eq!(after.status, 200);
+    assert!(!after.text().contains("Decisions"));
+    assert!(
+        TcpStream::connect(("127.0.0.1", other_port)).is_err(),
+        "a reload must not bind the new configuration port"
+    );
+    let raw = format!(
+        "GET / HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\n\r\n",
+        server.port
+    );
+    let allowed = send_raw(server.port, raw.as_bytes());
+    assert_eq!(allowed.status, 200);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-274: startup has no last-known-good snapshot.
+#[test]
+fn task274_missing_configuration_exits_one() {
+    let dir = test_root("task274-missing-config");
+    let out = bin()
+        .arg("--dir")
+        .arg(&dir)
+        .args(["browser", "--no-open"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("configuration file not found"));
+    let _ = fs::remove_dir_all(&dir);
 }

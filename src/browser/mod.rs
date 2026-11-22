@@ -27,10 +27,11 @@ use records::Record;
 use routes::BrowserRoutes;
 use std::io::Write;
 use std::net::{IpAddr, TcpListener, TcpStream};
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::ops::Deref;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex, RwLock};
+use std::time::{Duration, Instant, SystemTime};
 
 const MAX_CONNECTIONS: usize = 16;
 const IO_TIMEOUT: Duration = Duration::from_secs(5);
@@ -129,47 +130,204 @@ fn display_host(host: &str) -> String {
     }
 }
 
+/// The modification time and byte length of one input file (ADR-037 decision 8).
+///
+/// `None` means the file's metadata could not be read; that state never matches
+/// a published snapshot, so the next request attempts one reload.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct FileFingerprint {
+    length: u64,
+    modified: Option<SystemTime>,
+}
+
+fn file_fingerprint(path: &Path) -> Option<FileFingerprint> {
+    let metadata = std::fs::metadata(path).ok()?;
+    Some(FileFingerprint {
+        length: metadata.len(),
+        modified: metadata.modified().ok(),
+    })
+}
+
+/// One immutable configuration, registry, and route version (ADR-037 decisions 4-6).
+///
+/// All three parts are built together and published together; nothing is
+/// mutable after construction, so a request that holds a handle sees one
+/// consistent version for its whole lifetime.
+#[derive(Debug)]
+struct ServingSnapshot {
+    config: Config,
+    registry: ArtifactRegistry,
+    routes: BrowserRoutes,
+    fingerprint: Option<FileFingerprint>,
+}
+
+/// The startup construction path, reused verbatim for every reload (ADR-037 decision 13).
+fn load_serving_snapshot(
+    config_path: &Path,
+    project_dir: &Path,
+) -> Result<ServingSnapshot, AppError> {
+    let fingerprint = file_fingerprint(config_path);
+    let config = load_effective_config(config_path, project_dir)?;
+    let registry = ArtifactRegistry::build(&config).map_err(AppError::from)?;
+    let routes = BrowserRoutes::build(&registry);
+    Ok(ServingSnapshot {
+        config,
+        registry,
+        routes,
+        fingerprint,
+    })
+}
+
+/// The fingerprint of the last failed reload, if any.
+///
+/// The inner `Option` mirrors [`file_fingerprint`]: `Some(None)` records that
+/// the configuration could not even be stat'ed.
+type LastReloadFailure = Option<Option<FileFingerprint>>;
+
+fn fingerprint_matches(
+    snapshot: Option<FileFingerprint>,
+    observed: Option<FileFingerprint>,
+) -> bool {
+    snapshot.is_some() && snapshot == observed
+}
+
+/// Server state: startup-only settings plus one swap point for the serving snapshot.
+///
+/// `current` is the single-writer, multi-reader cell, and `reload` serialises
+/// rebuilds. Neither part holds a copy of the configuration, registry, or
+/// routes outside a [`ServingSnapshot`].
 struct ServerState {
     project_dir: PathBuf,
     config_path: PathBuf,
     host: String,
     port: u16,
     debug: bool,
-    registry: ArtifactRegistry,
-    routes: BrowserRoutes,
+    current: RwLock<Arc<ServingSnapshot>>,
+    reload: Mutex<LastReloadFailure>,
 }
 
 impl ServerState {
+    fn current_snapshot(&self) -> Arc<ServingSnapshot> {
+        self.current
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
+    /// One request handle: the fingerprint check runs once, then every part of
+    /// the request resolves through the same immutable snapshot.
+    fn request_state(&self) -> RequestState<'_> {
+        RequestState {
+            snapshot: self.serving_snapshot(),
+            project_dir: &self.project_dir,
+            config_path: &self.config_path,
+            host: &self.host,
+            port: self.port,
+            debug: self.debug,
+        }
+    }
+
+    fn serving_snapshot(&self) -> Arc<ServingSnapshot> {
+        let current = self.current_snapshot();
+        let observed = file_fingerprint(&self.config_path);
+        if fingerprint_matches(current.fingerprint, observed) {
+            return current;
+        }
+        self.reload_if_changed(current)
+    }
+
+    /// Attempt one reload when the fingerprint changed.
+    ///
+    /// The reload lock is tried without waiting: a request that cannot take it
+    /// serves the snapshot it already holds. Under the lock the fingerprint is
+    /// re-checked, so a burst of observers causes one rebuild. A failed reload
+    /// keeps the previous snapshot current and is reported once per distinct
+    /// failing input state.
+    fn reload_if_changed(&self, stale: Arc<ServingSnapshot>) -> Arc<ServingSnapshot> {
+        let mut last_failure = match self.reload.try_lock() {
+            Ok(guard) => guard,
+            Err(std::sync::TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
+            Err(std::sync::TryLockError::WouldBlock) => return stale,
+        };
+        let current = self.current_snapshot();
+        let observed = file_fingerprint(&self.config_path);
+        if fingerprint_matches(current.fingerprint, observed) {
+            return current;
+        }
+        if *last_failure == Some(observed) {
+            return current;
+        }
+        match load_serving_snapshot(&self.config_path, &self.project_dir) {
+            Ok(snapshot) => {
+                let snapshot = Arc::new(snapshot);
+                *self
+                    .current
+                    .write()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = Arc::clone(&snapshot);
+                *last_failure = None;
+                snapshot
+            }
+            Err(error) => {
+                eprintln!(
+                    "warning: cannot reload configuration {}: {}",
+                    self.config_path.display(),
+                    error
+                );
+                *last_failure = Some(observed);
+                current
+            }
+        }
+    }
+}
+
+/// A request's immutable serving snapshot plus the startup-only settings.
+///
+/// Dereferencing exposes the snapshot's configuration, registry, and routes as
+/// one unit, so no accessor can return one part without the others.
+struct RequestState<'a> {
+    snapshot: Arc<ServingSnapshot>,
+    project_dir: &'a Path,
+    config_path: &'a Path,
+    host: &'a str,
+    port: u16,
+    debug: bool,
+}
+
+impl Deref for RequestState<'_> {
+    type Target = ServingSnapshot;
+
+    fn deref(&self) -> &ServingSnapshot {
+        &self.snapshot
+    }
+}
+
+impl RequestState<'_> {
     fn context(&self) -> Context {
         Context {
-            project_dir: self.project_dir.clone(),
-            config_path: self.config_path.clone(),
+            project_dir: self.project_dir.to_path_buf(),
+            config_path: self.config_path.to_path_buf(),
             json: false,
             no_color: true,
         }
     }
 
     fn bind_note(&self) -> String {
-        format!("{}:{}", display_host(&self.host), self.port)
-    }
-
-    fn config(&self) -> Result<Config, AppError> {
-        load_effective_config(&self.config_path, &self.project_dir)
+        format!("{}:{}", display_host(self.host), self.port)
     }
 }
 
 /// Run the browser command until the process is interrupted.
 pub fn run(
     ctx: &Context,
-    registry: &ArtifactRegistry,
     cli_host: Option<&str>,
     cli_port: Option<u16>,
     no_open: bool,
     debug: bool,
 ) -> Result<CommandOutput, AppError> {
-    let cfg = load_effective_config(&ctx.config_path, &ctx.project_dir)?;
-    let browser_routes = BrowserRoutes::build(registry);
-    let options = resolve_options(cli_host, cli_port, no_open, &read_env(), &cfg)?;
+    // The first snapshot must build: startup has no last-known-good version
+    // (ADR-037 decision 19), so missing or invalid configuration still aborts.
+    let snapshot = load_serving_snapshot(&ctx.config_path, &ctx.project_dir)?;
+    let options = resolve_options(cli_host, cli_port, no_open, &read_env(), &snapshot.config)?;
 
     if !is_loopback_host(&options.host) {
         eprintln!(
@@ -214,8 +372,8 @@ pub fn run(
         host: options.host.clone(),
         port: options.port,
         debug,
-        registry: registry.clone(),
-        routes: browser_routes,
+        current: RwLock::new(Arc::new(snapshot)),
+        reload: Mutex::new(None),
     });
     serve(listener, state)?;
     Ok(CommandOutput {
@@ -291,11 +449,15 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) {
     let _ = stream.set_read_timeout(Some(IO_TIMEOUT));
     let _ = stream.set_write_timeout(Some(IO_TIMEOUT));
 
+    // One fingerprint check and one immutable handle per request. Everything
+    // below — validation, routing, handlers, and rendering — uses this handle.
+    let state = state.request_state();
+
     let request = match http::read_request(&mut stream) {
         Ok(request) => request,
         Err(error) => {
             eprintln!("- - {}", error.status);
-            let response = error_response(error.status, false, state);
+            let response = error_response(error.status, false, &state);
             let _ = http::write_response(&mut stream, &response, false);
             return;
         }
@@ -306,12 +468,12 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) {
     let head_only = request.method == Method::Head;
     let api = request.target.path.starts_with("/api/");
 
-    let response = match validate_host(&request, state) {
-        Ok(_host_header) => match validate_origin(&request, state) {
-            Ok(()) => handle_request(request, state),
-            Err(error) => error_response(error.status, api, state),
+    let response = match validate_host(&request, &state) {
+        Ok(_host_header) => match validate_origin(&request, &state) {
+            Ok(()) => handle_request(request, &state),
+            Err(error) => error_response(error.status, api, &state),
         },
-        Err(error) => error_response(error.status, api, state),
+        Err(error) => error_response(error.status, api, &state),
     };
 
     let _ = http::write_response(&mut stream, &response, head_only);
@@ -321,9 +483,8 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) {
     }
 }
 
-fn allowed_host_values(state: &ServerState) -> Vec<String> {
-    let effective = state.host.to_ascii_lowercase();
-    let port = state.port;
+fn allowed_host_values(host: &str, port: u16) -> Vec<String> {
+    let effective = host.to_ascii_lowercase();
     let mut values = vec![
         format!("{}:{}", effective, port),
         format!("localhost:{}", port),
@@ -346,7 +507,7 @@ fn allowed_host_values(state: &ServerState) -> Vec<String> {
     values
 }
 
-fn validate_host(request: &Request, state: &ServerState) -> Result<String, HttpError> {
+fn validate_host(request: &Request, state: &RequestState<'_>) -> Result<String, HttpError> {
     if request.header_count("host") != 1 {
         return Err(HttpError::new(400));
     }
@@ -355,14 +516,14 @@ fn validate_host(request: &Request, state: &ServerState) -> Result<String, HttpE
         return Err(HttpError::new(400));
     }
     let lower = host.to_ascii_lowercase();
-    if allowed_host_values(state).contains(&lower) {
+    if allowed_host_values(state.host, state.port).contains(&lower) {
         Ok(host)
     } else {
         Err(HttpError::new(400))
     }
 }
 
-fn validate_origin(request: &Request, state: &ServerState) -> Result<(), HttpError> {
+fn validate_origin(request: &Request, state: &RequestState<'_>) -> Result<(), HttpError> {
     if request.method != Method::Post {
         return Ok(());
     }
@@ -448,12 +609,14 @@ fn validate_origin(request: &Request, state: &ServerState) -> Result<(), HttpErr
     };
 
     let candidate = format!("{}:{}", host_norm, port);
-    if allowed_host_values(state).contains(&candidate) {
+    if allowed_host_values(state.host, state.port).contains(&candidate) {
         return Ok(());
     }
     // Also allow portless allowed entries when origin port is the default and the
     // allowed set contains a portless form (port 80 case).
-    if (port == 80 || port == 443) && allowed_host_values(state).contains(&host_norm) {
+    if (port == 80 || port == 443)
+        && allowed_host_values(state.host, state.port).contains(&host_norm)
+    {
         return Ok(());
     }
     Err(HttpError::new(403))
@@ -466,9 +629,9 @@ fn error_message(status: u16) -> &'static str {
     }
 }
 
-fn error_response(status: u16, api: bool, state: &ServerState) -> Response {
-    let cfg = state.config().unwrap_or_default();
-    let project = cfg.effective_project_name(&state.project_dir);
+fn error_response(status: u16, api: bool, state: &RequestState<'_>) -> Response {
+    let cfg = &state.config;
+    let project = cfg.effective_project_name(state.project_dir);
     let bind_note = state.bind_note();
     let chrome = render::Chrome {
         project: &project,
@@ -488,7 +651,7 @@ fn error_response(status: u16, api: bool, state: &ServerState) -> Response {
         }
         response
     } else {
-        let mut response = Response::html(status, render::error_page(status, &cfg, chrome, None));
+        let mut response = Response::html(status, render::error_page(status, cfg, chrome, None));
         if status == 405 {
             response = response.with_header("Allow", "GET, HEAD, POST");
         }
@@ -510,7 +673,7 @@ fn json_error(status: u16, message: &str) -> Response {
 
 /// Resolve the `?type=` value to an enabled descriptor slug. Unknown,
 /// empty, and disabled values are 404 (ADR-0020 decision 3).
-fn type_from_query(request: &Request, state: &ServerState) -> Result<String, HttpError> {
+fn type_from_query(request: &Request, state: &RequestState<'_>) -> Result<String, HttpError> {
     let value = http::query_param(&request.target.query, "type")?
         .unwrap_or_else(|| state.routes.default_type.clone());
     state
@@ -520,7 +683,10 @@ fn type_from_query(request: &Request, state: &ServerState) -> Result<String, Htt
         .ok_or_else(|| HttpError::new(404))
 }
 
-fn descriptor<'a>(state: &'a ServerState, slug: &str) -> Result<&'a TypeDescriptor, HttpError> {
+fn descriptor<'a>(
+    state: &'a RequestState<'_>,
+    slug: &str,
+) -> Result<&'a TypeDescriptor, HttpError> {
     state
         .registry
         .descriptor(slug)
@@ -531,7 +697,7 @@ fn descriptor<'a>(state: &'a ServerState, slug: &str) -> Result<&'a TypeDescript
 fn enabled_index(
     ctx: &Context,
     cfg: &Config,
-    state: &ServerState,
+    state: &RequestState<'_>,
     slug: &str,
     snapshot: &records::RecordSnapshot<'_>,
 ) -> records::Index {
@@ -575,7 +741,7 @@ fn enabled_index(
 fn enabled_index_for_handler(
     ctx: &Context,
     cfg: &Config,
-    state: &ServerState,
+    state: &RequestState<'_>,
     handler: TypedHandler,
     snapshot: &records::RecordSnapshot<'_>,
 ) -> records::Index {
@@ -598,7 +764,7 @@ fn enabled_index_for_handler(
 
 /// The descriptor used to render a `?type=` view. The decision category is a
 /// single browser type covering every enabled decision descriptor.
-fn view_descriptor(state: &ServerState, slug: &str) -> Option<TypeDescriptor> {
+fn view_descriptor(state: &RequestState<'_>, slug: &str) -> Option<TypeDescriptor> {
     if state.routes.is_decision_view(slug) {
         let mut descriptor = state
             .registry
@@ -637,9 +803,9 @@ fn status_filter(
     }
 }
 
-fn chrome_for(cfg: &Config, state: &ServerState) -> (String, String) {
+fn chrome_for(cfg: &Config, state: &RequestState<'_>) -> (String, String) {
     (
-        cfg.effective_project_name(&state.project_dir),
+        cfg.effective_project_name(state.project_dir),
         state.bind_note(),
     )
 }
@@ -654,7 +820,7 @@ fn html_doc_id(path: &str) -> Option<&str> {
     Some(id)
 }
 
-fn handle_request(request: Request, state: &ServerState) -> Response {
+fn handle_request(request: Request, state: &RequestState<'_>) -> Response {
     let api = request.target.path.starts_with("/api/");
     let path = request.target.path.clone();
     let result = route(request, state);
@@ -664,25 +830,22 @@ fn handle_request(request: Request, state: &ServerState) -> Response {
             // One document not-found builder for every document route and
             // every unknown, archived, or disabled ID (ADR-039 decision 24).
             // JSON responses keep the baseline error object.
-            if error.status == 404
-                && !api
-                && html_doc_id(&path).is_some()
-                && let Ok(cfg) = state.config()
-            {
-                let (project, bind_note) = chrome_for(&cfg, state);
+            if error.status == 404 && !api && html_doc_id(&path).is_some() {
+                let cfg = &state.config;
+                let (project, bind_note) = chrome_for(cfg, state);
                 let chrome = render::Chrome {
                     project: &project,
                     bind_note: &bind_note,
                     routes: &state.routes,
                 };
-                return Response::html(404, render::document_not_found_page(&cfg, chrome));
+                return Response::html(404, render::document_not_found_page(cfg, chrome));
             }
             error_response(error.status, api, state)
         }
     }
 }
 
-fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
+fn route(request: Request, state: &RequestState<'_>) -> Result<Response, HttpError> {
     let path = request.target.path.clone();
     let method = request.method;
 
@@ -769,11 +932,11 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
     Err(HttpError::new(404))
 }
 
-fn inventory_page(state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+fn inventory_page(state: &RequestState<'_>) -> Result<Response, HttpError> {
+    let cfg = &state.config;
     let ctx = state.context();
-    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
-    let (project, bind_note) = chrome_for(&cfg, state);
+    let snapshot = records::RecordSnapshot::new(&ctx, cfg, &state.registry);
+    let (project, bind_note) = chrome_for(cfg, state);
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
@@ -787,7 +950,7 @@ fn inventory_page(state: &ServerState) -> Result<Response, HttpError> {
             .inventory
             .iter()
             .find(|entry| entry.slug == slug)?;
-        let count = enabled_index(&ctx, &cfg, state, slug, &snapshot)
+        let count = enabled_index(&ctx, cfg, state, slug, &snapshot)
             .records
             .len();
         Some(render::InventoryCard {
@@ -805,7 +968,7 @@ fn inventory_page(state: &ServerState) -> Result<Response, HttpError> {
     let mut aggregates: Vec<render::InventoryCard> = Vec::new();
     for group in [routes::NavGroup::Backlog, routes::NavGroup::Decisions] {
         if let Some(item) = state.routes.nav.iter().find(|item| item.group == group) {
-            let count = enabled_index(&ctx, &cfg, state, &item.slug, &snapshot)
+            let count = enabled_index(&ctx, cfg, state, &item.slug, &snapshot)
                 .records
                 .len();
             aggregates.push(render::InventoryCard {
@@ -836,7 +999,7 @@ fn inventory_page(state: &ServerState) -> Result<Response, HttpError> {
 
     Ok(Response::html(
         200,
-        render::inventory_page(&cfg, chrome, &cards),
+        render::inventory_page(cfg, chrome, &cards),
     ))
 }
 
@@ -844,7 +1007,7 @@ fn inventory_page(state: &ServerState) -> Result<Response, HttpError> {
 /// indexes. Used by both the GET route and every failed status submission.
 #[allow(clippy::too_many_arguments)]
 fn render_board_page(
-    state: &ServerState,
+    state: &RequestState<'_>,
     cfg: &Config,
     snapshot: &records::RecordSnapshot<'_>,
     expand: Option<&str>,
@@ -885,7 +1048,7 @@ fn render_board_page(
 }
 
 /// The task type slug backing the Backlog board.
-fn board_task_slug(state: &ServerState) -> &str {
+fn board_task_slug<'a, 'b>(state: &'a RequestState<'b>) -> &'a str {
     state
         .routes
         .nav
@@ -896,7 +1059,7 @@ fn board_task_slug(state: &ServerState) -> &str {
 }
 
 /// The legacy `?type=` key for the Backlog board's descriptor.
-fn board_type_key(state: &ServerState) -> String {
+fn board_type_key(state: &RequestState<'_>) -> String {
     let slug = board_task_slug(state);
     state
         .registry
@@ -921,7 +1084,7 @@ const RELEASE_CLEANUP_PARAMS: &[&str] = &["release_cleanup"];
 /// named milestone stays expanded and the column action is replaced by the
 /// confirmation region.
 fn board_cleanup_preview(
-    state: &ServerState,
+    state: &RequestState<'_>,
     cfg: &Config,
     snapshot: &records::RecordSnapshot<'_>,
     milestone_id: &str,
@@ -964,7 +1127,7 @@ fn board_cleanup_preview(
 }
 
 fn board_milestone_cleanup_preview(
-    state: &ServerState,
+    state: &RequestState<'_>,
     cfg: &Config,
     snapshot: &records::RecordSnapshot<'_>,
     milestone_id: &str,
@@ -996,7 +1159,7 @@ fn board_milestone_cleanup_preview(
 }
 
 fn board_release_cleanup_preview(
-    state: &ServerState,
+    state: &RequestState<'_>,
     cfg: &Config,
     snapshot: &records::RecordSnapshot<'_>,
     release_id: &str,
@@ -1045,7 +1208,7 @@ fn board_release_cleanup_preview(
 
 /// `POST /?type=...` is the `Clean up all` confirm action, and only on the task
 /// board. Every other `?type=` view keeps rejecting POST with `405`.
-fn board_cleanup_post(request: &Request, state: &ServerState) -> Result<Response, HttpError> {
+fn board_cleanup_post(request: &Request, state: &RequestState<'_>) -> Result<Response, HttpError> {
     let slug = type_from_query(request, state)?;
     let descriptor = view_descriptor(state, &slug).ok_or_else(|| HttpError::new(404))?;
     if handler_of(&descriptor) != Some(TypedHandler::Task) {
@@ -1055,9 +1218,9 @@ fn board_cleanup_post(request: &Request, state: &ServerState) -> Result<Response
         return Err(HttpError::new(415));
     }
     let fields = parse_form(&request.body)?;
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let cfg = &state.config;
     let ctx = state.context();
-    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
+    let snapshot = records::RecordSnapshot::new(&ctx, cfg, &state.registry);
     let has_ms = MILESTONE_CLEANUP_PARAMS
         .iter()
         .any(|name| fields.iter().any(|(k, v)| k == *name && v.trim() == "1"));
@@ -1078,7 +1241,7 @@ fn board_cleanup_post(request: &Request, state: &ServerState) -> Result<Response
 /// entry point and report per-task failures without aborting the rest.
 fn board_cleanup_submit(
     request: &Request,
-    state: &ServerState,
+    state: &RequestState<'_>,
     snapshot: &records::RecordSnapshot<'_>,
 ) -> Result<Response, HttpError> {
     if media_type(request) != "application/x-www-form-urlencoded" {
@@ -1092,12 +1255,12 @@ fn board_cleanup_submit(
     if milestone_id.is_empty() {
         return Err(HttpError::new(400));
     }
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let Some(status) = cleanup_final_status(&cfg) else {
+    let cfg = &state.config;
+    let Some(status) = cleanup_final_status(cfg) else {
         let message = "Clean up all is not available for this status configuration.";
         let html = render_board_page(
             state,
-            &cfg,
+            cfg,
             snapshot,
             Some(milestone_id),
             Some(render::BoardAlert {
@@ -1113,8 +1276,7 @@ fn board_cleanup_submit(
         return Ok(Response::html(422, html));
     };
     let ctx = state.context();
-    let milestones =
-        enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Milestone, snapshot);
+    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone, snapshot);
     if !milestones
         .records
         .iter()
@@ -1124,7 +1286,7 @@ fn board_cleanup_submit(
     }
     // Re-derive the set from the current stored data, so the preview is a
     // warning and not a fixed list of submitted IDs.
-    let tasks = enabled_index(&ctx, &cfg, state, board_task_slug(state), snapshot);
+    let tasks = enabled_index(&ctx, cfg, state, board_task_slug(state), snapshot);
     let selected: Vec<String> = tasks
         .records
         .iter()
@@ -1138,7 +1300,7 @@ fn board_cleanup_submit(
     let mut archived = 0usize;
     let mut failures: Vec<String> = Vec::new();
     for id in &selected {
-        match crate::task::archive(&ctx, &cfg, &state.registry, id) {
+        match crate::task::archive(&ctx, cfg, &state.registry, id) {
             Ok(_) => archived += 1,
             Err(error) => failures.push(format!("{} \u{2014} {}", id, error)),
         }
@@ -1156,7 +1318,7 @@ fn board_cleanup_submit(
     );
     let html = render_board_page(
         state,
-        &cfg,
+        cfg,
         snapshot,
         Some(milestone_id),
         Some(render::BoardAlert {
@@ -1174,7 +1336,7 @@ fn board_cleanup_submit(
 
 fn board_milestone_cleanup_submit(
     _request: &Request,
-    state: &ServerState,
+    state: &RequestState<'_>,
     fields: &[(String, String)],
     snapshot: &records::RecordSnapshot<'_>,
 ) -> Result<Response, HttpError> {
@@ -1182,10 +1344,9 @@ fn board_milestone_cleanup_submit(
     if milestone_id.is_empty() {
         return Err(HttpError::new(400));
     }
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let cfg = &state.config;
     let ctx = state.context();
-    let milestones =
-        enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Milestone, snapshot);
+    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone, snapshot);
     let milestone = milestones
         .records
         .iter()
@@ -1194,7 +1355,7 @@ fn board_milestone_cleanup_submit(
     if milestone.status.as_deref() != Some("closed") {
         return Err(HttpError::new(404));
     }
-    match crate::milestone::archive(&ctx, &cfg, &state.registry, milestone_id) {
+    match crate::milestone::archive(&ctx, cfg, &state.registry, milestone_id) {
         Ok(_) => {
             let type_key = board_type_key(state);
             Ok(Response::redirect(&format!(
@@ -1207,7 +1368,7 @@ fn board_milestone_cleanup_submit(
             let failures = vec![format!("{} \u{2014} {}", milestone_id, error)];
             let html = render_board_page(
                 state,
-                &cfg,
+                cfg,
                 snapshot,
                 Some(milestone_id),
                 Some(render::BoardAlert {
@@ -1227,7 +1388,7 @@ fn board_milestone_cleanup_submit(
 
 fn board_release_cleanup_submit(
     _request: &Request,
-    state: &ServerState,
+    state: &RequestState<'_>,
     fields: &[(String, String)],
     snapshot: &records::RecordSnapshot<'_>,
 ) -> Result<Response, HttpError> {
@@ -1235,9 +1396,9 @@ fn board_release_cleanup_submit(
     if release_id.is_empty() {
         return Err(HttpError::new(400));
     }
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let cfg = &state.config;
     let ctx = state.context();
-    let releases = enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Release, snapshot);
+    let releases = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Release, snapshot);
     let release = releases
         .records
         .iter()
@@ -1246,8 +1407,7 @@ fn board_release_cleanup_submit(
     if release.status.as_deref() != Some("released") {
         return Err(HttpError::new(404));
     }
-    let milestones =
-        enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Milestone, snapshot);
+    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone, snapshot);
     let closed: Vec<String> = milestones
         .records
         .iter()
@@ -1276,7 +1436,7 @@ fn board_release_cleanup_submit(
     let total = closed.len();
     let mut failures: Vec<String> = Vec::new();
     for id in &closed {
-        match crate::milestone::archive(&ctx, &cfg, &state.registry, id) {
+        match crate::milestone::archive(&ctx, cfg, &state.registry, id) {
             Ok(_) => archived += 1,
             Err(error) => failures.push(format!("{} \u{2014} {}", id, error)),
         }
@@ -1297,7 +1457,7 @@ fn board_release_cleanup_submit(
     );
     let html = render_board_page(
         state,
-        &cfg,
+        cfg,
         snapshot,
         expand_target.as_deref(),
         Some(render::BoardAlert {
@@ -1313,11 +1473,11 @@ fn board_release_cleanup_submit(
     Ok(Response::html(200, html))
 }
 
-fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpError> {
+fn list_page(request: &Request, state: &RequestState<'_>) -> Result<Response, HttpError> {
     let slug = type_from_query(request, state)?;
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let cfg = &state.config;
     let ctx = state.context();
-    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
+    let snapshot = records::RecordSnapshot::new(&ctx, cfg, &state.registry);
     let descriptor = view_descriptor(state, &slug).ok_or_else(|| HttpError::new(404))?;
     let descriptor = &descriptor;
     if handler_of(descriptor) == Some(TypedHandler::Task) {
@@ -1325,14 +1485,14 @@ fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpErr
             if let Some(value) = http::query_param(&request.target.query, name)?
                 && !value.trim().is_empty()
             {
-                return board_milestone_cleanup_preview(state, &cfg, &snapshot, &value);
+                return board_milestone_cleanup_preview(state, cfg, &snapshot, &value);
             }
         }
         for name in RELEASE_CLEANUP_PARAMS {
             if let Some(value) = http::query_param(&request.target.query, name)?
                 && !value.trim().is_empty()
             {
-                return board_release_cleanup_preview(state, &cfg, &snapshot, &value);
+                return board_release_cleanup_preview(state, cfg, &snapshot, &value);
             }
         }
         if let Some(milestone) = http::query_param(&request.target.query, "cleanup")?
@@ -1341,20 +1501,20 @@ fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpErr
             if let Some(scope) = http::query_param(&request.target.query, "scope")? {
                 let scope = scope.to_lowercase();
                 if scope == "milestone" || scope == "ms" {
-                    return board_milestone_cleanup_preview(state, &cfg, &snapshot, &milestone);
+                    return board_milestone_cleanup_preview(state, cfg, &snapshot, &milestone);
                 }
                 if scope == "release" || scope == "rel" {
-                    return board_release_cleanup_preview(state, &cfg, &snapshot, &milestone);
+                    return board_release_cleanup_preview(state, cfg, &snapshot, &milestone);
                 }
             }
-            return board_cleanup_preview(state, &cfg, &snapshot, &milestone);
+            return board_cleanup_preview(state, cfg, &snapshot, &milestone);
         }
         let expand = http::query_param(&request.target.query, "expand")?;
         return Ok(Response::html(
             200,
             render_board_page(
                 state,
-                &cfg,
+                cfg,
                 &snapshot,
                 expand.as_deref(),
                 None,
@@ -1372,24 +1532,24 @@ fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpErr
         None
     };
     let index = if state.routes.is_decision_view(&descriptor.slug) {
-        enabled_index(&ctx, &cfg, state, &descriptor.slug, &snapshot)
+        enabled_index(&ctx, cfg, state, &descriptor.slug, &snapshot)
     } else {
         records::build_index_with_snapshot(
             &ctx,
-            &cfg,
+            cfg,
             &state.registry,
             descriptor,
             status.as_deref(),
             &snapshot,
         )
     };
-    let (project, bind_note) = chrome_for(&cfg, state);
+    let (project, bind_note) = chrome_for(cfg, state);
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
         routes: &state.routes,
     };
-    let html = render::list_page(descriptor, &index, status.as_deref(), &cfg, chrome);
+    let html = render::list_page(descriptor, &index, status.as_deref(), cfg, chrome);
     Ok(Response::html(200, html))
 }
 
@@ -1448,14 +1608,14 @@ fn resolved_group<'a>(record: &Record, index: &'a records::Index) -> Option<&'a 
     index.groups.iter().find(|group| group.id == group_id)
 }
 
-fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+fn view_page(id: &str, state: &RequestState<'_>) -> Result<Response, HttpError> {
+    let cfg = &state.config;
     let ctx = state.context();
-    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
+    let snapshot = records::RecordSnapshot::new(&ctx, cfg, &state.registry);
     let record = display_record(id, &snapshot)?;
     let index = records::build_index_with_snapshot(
         &ctx,
-        &cfg,
+        cfg,
         &state.registry,
         &record.descriptor,
         None,
@@ -1532,7 +1692,7 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
     } else {
         Vec::new()
     };
-    let (project, bind_note) = chrome_for(&cfg, state);
+    let (project, bind_note) = chrome_for(cfg, state);
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
@@ -1546,7 +1706,7 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
             &resolved_deps,
             &resolved_refs,
             &dependents,
-            &cfg,
+            cfg,
             chrome,
         )
     } else {
@@ -1558,7 +1718,7 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
             &resolved_deps,
             &resolved_refs,
             &dependents,
-            &cfg,
+            cfg,
             chrome,
         )
     };
@@ -1569,21 +1729,21 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
     }
 }
 
-fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+fn edit_page(id: &str, state: &RequestState<'_>) -> Result<Response, HttpError> {
+    let cfg = &state.config;
     let ctx = state.context();
-    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
+    let snapshot = records::RecordSnapshot::new(&ctx, cfg, &state.registry);
     let record = display_record(id, &snapshot)?;
     let index = records::build_index_with_snapshot(
         &ctx,
-        &cfg,
+        cfg,
         &state.registry,
         &record.descriptor,
         None,
         &snapshot,
     );
     let group = resolved_group(&record, &index);
-    let (project, bind_note) = chrome_for(&cfg, state);
+    let (project, bind_note) = chrome_for(cfg, state);
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
@@ -1596,7 +1756,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
             &render::DocumentFormValues::from_record(&record),
             &render::DocumentFormErrors::default(),
             &record.version,
-            &cfg,
+            cfg,
             chrome,
         )
     } else {
@@ -1617,7 +1777,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                     &values,
                     &render::TaskFieldErrors::default(),
                     &record.version,
-                    &cfg,
+                    cfg,
                     chrome,
                 )
             }
@@ -1632,7 +1792,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                     &values,
                     &render::MilestoneFieldErrors::default(),
                     &record.version,
-                    &cfg,
+                    cfg,
                     chrome,
                 )
             }
@@ -1646,7 +1806,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                     &values,
                     &render::ReleaseFieldErrors::default(),
                     &record.version,
-                    &cfg,
+                    cfg,
                     chrome,
                 )
             }
@@ -1664,7 +1824,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                     &values,
                     &render::DecisionFieldErrors::default(),
                     &record.version,
-                    &cfg,
+                    cfg,
                     chrome,
                 )
             }
@@ -1790,7 +1950,7 @@ fn document_submitted_values(
 fn save_mockup_document(
     record: &Record,
     cfg: &Config,
-    state: &ServerState,
+    state: &RequestState<'_>,
     fields: &[(String, String)],
     group: Option<&Record>,
     chrome: render::Chrome<'_>,
@@ -1859,7 +2019,7 @@ fn save_mockup_document(
 fn document_form_post(
     record: &Record,
     cfg: &Config,
-    state: &ServerState,
+    state: &RequestState<'_>,
     snapshot: &records::RecordSnapshot<'_>,
     fields: &[(String, String)],
     chrome: render::Chrome<'_>,
@@ -2015,7 +2175,7 @@ fn document_form_post(
 /// one); every card is re-read from disk so no failed value is shown.
 fn board_failure_response(
     status_code: u16,
-    state: &ServerState,
+    state: &RequestState<'_>,
     cfg: &Config,
     snapshot: &records::RecordSnapshot<'_>,
     record: &Record,
@@ -2051,7 +2211,7 @@ fn board_failure_response(
 fn board_status_submit(
     record: &Record,
     cfg: &Config,
-    state: &ServerState,
+    state: &RequestState<'_>,
     snapshot: &records::RecordSnapshot<'_>,
     fields: &[(String, String)],
 ) -> Result<Response, HttpError> {
@@ -2116,7 +2276,7 @@ fn board_status_submit(
     Ok(Response::redirect(&location))
 }
 
-fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response, HttpError> {
+fn form_post(id: &str, request: Request, state: &RequestState<'_>) -> Result<Response, HttpError> {
     if media_type(&request) != "application/x-www-form-urlencoded" {
         return Err(HttpError::new(415));
     }
@@ -2125,11 +2285,11 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
     if !crate::record::store::valid_version_token(version) {
         return Err(HttpError::new(400));
     }
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let cfg = &state.config;
     let ctx = state.context();
-    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
+    let snapshot = records::RecordSnapshot::new(&ctx, cfg, &state.registry);
     let record = live_record(id, &snapshot)?;
-    let (project, bind_note) = chrome_for(&cfg, state);
+    let (project, bind_note) = chrome_for(cfg, state);
     let chrome = render::Chrome {
         project: &project,
         bind_note: &bind_note,
@@ -2137,11 +2297,11 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
     };
 
     if record.descriptor.category == CategoryKind::Document {
-        return document_form_post(&record, &cfg, state, &snapshot, &fields, chrome);
+        return document_form_post(&record, cfg, state, &snapshot, &fields, chrome);
     }
 
     if form_field(&fields, "status_change") == Some("1") {
-        return board_status_submit(&record, &cfg, state, &snapshot, &fields);
+        return board_status_submit(&record, cfg, state, &snapshot, &fields);
     }
 
     if version != record.version {
@@ -2153,7 +2313,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
         };
         return Ok(Response::html(
             409,
-            render::backlog_decision_conflict_page(&record, &submitted, &cfg, chrome),
+            render::backlog_decision_conflict_page(&record, &submitted, cfg, chrome),
         ));
     }
 
@@ -2276,14 +2436,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 };
                 return Ok(Response::html(
                     422,
-                    render::edit_page_task(
-                        &record,
-                        &values,
-                        &errors,
-                        &record.version,
-                        &cfg,
-                        chrome,
-                    ),
+                    render::edit_page_task(&record, &values, &errors, &record.version, cfg, chrome),
                 ));
             }
 
@@ -2302,7 +2455,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 deps,
                 acs,
             );
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
+            save_ops(&ctx, cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Some(TypedHandler::Milestone) => {
@@ -2351,14 +2504,14 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                         &values,
                         &errors,
                         &record.version,
-                        &cfg,
+                        cfg,
                         chrome,
                     ),
                 ));
             }
             let title = title.unwrap_or_default();
             let ops = edit::milestone_ops(&record.doc, &title, description_change, release_change);
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
+            save_ops(&ctx, cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Some(TypedHandler::Release) => {
@@ -2391,14 +2544,14 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                         &values,
                         &errors,
                         &record.version,
-                        &cfg,
+                        cfg,
                         chrome,
                     ),
                 ));
             }
             let title = title.unwrap_or_default();
             let ops = edit::release_ops(&record.doc, &title, description_change);
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
+            save_ops(&ctx, cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Some(TypedHandler::Decision) => {
@@ -2486,12 +2639,12 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 let sup_id = superseded_trimmed;
                 if sup_id == record.id {
                     errors.superseded_by = Some("A decision cannot supersede itself.".to_string());
-                } else if !records::decision_exists(&ctx, &cfg, &state.registry, sup_id) {
+                } else if !records::decision_exists(&ctx, cfg, &state.registry, sup_id) {
                     errors.superseded_by = Some("Decision not found.".to_string());
                 } else {
                     let current_type = record.decision_type.clone().unwrap_or_default();
                     let sup_type =
-                        crate::decision::type_key_for_id(&cfg, sup_id).unwrap_or_default();
+                        crate::decision::type_key_for_id(cfg, sup_id).unwrap_or_default();
                     if current_type != sup_type {
                         errors.superseded_by = Some("Decision type mismatch.".to_string());
                     } else {
@@ -2516,7 +2669,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                         &values,
                         &errors,
                         &record.version,
-                        &cfg,
+                        cfg,
                         chrome,
                     ),
                 ));
@@ -2543,7 +2696,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 context_change,
                 consequences_change,
             );
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
+            save_ops(&ctx, cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         _ => Err(HttpError::new(400)),
@@ -2821,33 +2974,27 @@ fn record_metadata_json(record: &Record) -> serde_json::Value {
         .unwrap_or(serde_json::json!({}))
 }
 
-fn api_requirements(request: &Request, state: &ServerState) -> Result<Response, HttpError> {
+fn api_requirements(request: &Request, state: &RequestState<'_>) -> Result<Response, HttpError> {
     let slug = type_from_query(request, state)?;
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let cfg = &state.config;
     let descriptor = descriptor(state, &slug)?;
     if descriptor.document_model != DocumentModel::GroupedMarkdown {
         return Err(HttpError::new(404));
     }
     let ctx = state.context();
-    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
-    let index = records::build_index_with_snapshot(
-        &ctx,
-        &cfg,
-        &state.registry,
-        descriptor,
-        None,
-        &snapshot,
-    );
+    let snapshot = records::RecordSnapshot::new(&ctx, cfg, &state.registry);
+    let index =
+        records::build_index_with_snapshot(&ctx, cfg, &state.registry, descriptor, None, &snapshot);
     Ok(Response::json(200, requirements_json(descriptor, &index)))
 }
 
-fn api_doc_list(slug: &str, state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+fn api_doc_list(slug: &str, state: &RequestState<'_>) -> Result<Response, HttpError> {
+    let cfg = &state.config;
     let descriptor = view_descriptor(state, slug).ok_or_else(|| HttpError::new(404))?;
     let descriptor = &descriptor;
     let ctx = state.context();
-    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
-    let index = enabled_index(&ctx, &cfg, state, slug, &snapshot);
+    let snapshot = records::RecordSnapshot::new(&ctx, cfg, &state.registry);
+    let index = enabled_index(&ctx, cfg, state, slug, &snapshot);
     if descriptor.category == CategoryKind::Document {
         return Ok(Response::json(200, document_list_json(descriptor, &index)));
     }
@@ -2970,14 +3117,14 @@ fn requirements_json(descriptor: &TypeDescriptor, index: &records::Index) -> ser
     serde_json::json!({"groups": groups, "requirements": requirements})
 }
 
-fn api_get(id: &str, state: &ServerState) -> Result<Response, HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+fn api_get(id: &str, state: &RequestState<'_>) -> Result<Response, HttpError> {
+    let cfg = &state.config;
     let ctx = state.context();
-    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
+    let snapshot = records::RecordSnapshot::new(&ctx, cfg, &state.registry);
     let record = display_record(id, &snapshot)?;
     let index = records::build_index_with_snapshot(
         &ctx,
-        &cfg,
+        cfg,
         &state.registry,
         &record.descriptor,
         None,
@@ -3016,7 +3163,7 @@ fn document_group<'a>(record: &Record, index: &'a records::Index) -> Option<&'a 
     index.groups.iter().find(|group| group.id == group_id)
 }
 
-fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response, HttpError> {
+fn api_post(id: &str, request: Request, state: &RequestState<'_>) -> Result<Response, HttpError> {
     if media_type(&request) != "application/json" {
         return Err(HttpError::new(415));
     }
@@ -3031,16 +3178,16 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
     if !crate::record::store::valid_version_token(version) {
         return Err(HttpError::new(400));
     }
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let cfg = &state.config;
     let ctx = state.context();
-    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
+    let snapshot = records::RecordSnapshot::new(&ctx, cfg, &state.registry);
     let record = live_record(id, &snapshot)?;
     if version != record.version {
         return Ok(json_error(409, "record changed on disk; reload the form"));
     }
 
     if record.descriptor.category == CategoryKind::Document {
-        return api_post_document(id, object, &record, &cfg, state, &snapshot);
+        return api_post_document(id, object, &record, cfg, state, &snapshot);
     }
     match record.handler() {
         Some(TypedHandler::Task) => {
@@ -3235,7 +3382,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 deps,
                 acs,
             );
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
+            save_ops(&ctx, cfg, &state.registry, &record, ops)?;
             let updated = live_record(id, &snapshot)?;
             let related = updated
                 .milestone_id
@@ -3292,7 +3439,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 }
             }
             let ops = edit::milestone_ops(&record.doc, &title, description_change, release_change);
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
+            save_ops(&ctx, cfg, &state.registry, &record, ops)?;
             let updated = live_record(id, &snapshot)?;
             let related = updated
                 .release_id
@@ -3327,7 +3474,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 }
             }
             let ops = edit::release_ops(&record.doc, &title, description_change);
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
+            save_ops(&ctx, cfg, &state.registry, &record, ops)?;
             let updated = live_record(id, &snapshot)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -3436,12 +3583,12 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                             if sup_id == record.id {
                                 return Ok(json_error(422, "A decision cannot supersede itself."));
                             }
-                            if !records::decision_exists(&ctx, &cfg, &state.registry, sup_id) {
+                            if !records::decision_exists(&ctx, cfg, &state.registry, sup_id) {
                                 return Ok(json_error(422, "Decision not found."));
                             }
                             let current_type = record.decision_type.clone().unwrap_or_default();
                             let sup_type =
-                                crate::decision::type_key_for_id(&cfg, sup_id).unwrap_or_default();
+                                crate::decision::type_key_for_id(cfg, sup_id).unwrap_or_default();
                             if current_type != sup_type {
                                 return Ok(json_error(422, "Decision type mismatch."));
                             }
@@ -3477,7 +3624,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 context_change,
                 consequences_change,
             );
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
+            save_ops(&ctx, cfg, &state.registry, &record, ops)?;
             let updated = live_record(id, &snapshot)?;
             let superseded_title = updated
                 .superseded_by
@@ -3503,7 +3650,7 @@ fn api_post_document(
     object: &serde_json::Map<String, serde_json::Value>,
     record: &Record,
     cfg: &Config,
-    state: &ServerState,
+    state: &RequestState<'_>,
     snapshot: &records::RecordSnapshot<'_>,
 ) -> Result<Response, HttpError> {
     // The JSON API has never accepted a write for a config-defined document;
@@ -3666,7 +3813,7 @@ fn api_post_mockup(
     object: &serde_json::Map<String, serde_json::Value>,
     record: &Record,
     cfg: &Config,
-    state: &ServerState,
+    state: &RequestState<'_>,
     snapshot: &records::RecordSnapshot<'_>,
     title: &str,
 ) -> Result<Response, HttpError> {
@@ -3901,6 +4048,132 @@ mod tests {
         assert_eq!(form_fields(&fields, "specs"), vec!["UI-001", "UI-002", ""]);
         assert_eq!(form_fields(&fields, "refs"), vec!["docs/a.md"]);
         assert_eq!(form_fields(&fields, "missing"), Vec::<String>::new());
+    }
+
+    fn snapshot_project(name: &str) -> PathBuf {
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join(format!("browser-snapshot-{}-{}", name, std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn write_snapshot_config(dir: &Path, body: &str) {
+        std::fs::write(dir.join("papyrus.config.yml"), body).unwrap();
+    }
+
+    fn snapshot_state(dir: &Path) -> ServerState {
+        let config_path = dir.join("papyrus.config.yml");
+        let snapshot = load_serving_snapshot(&config_path, dir).expect("startup snapshot");
+        ServerState {
+            project_dir: dir.to_path_buf(),
+            config_path,
+            host: "127.0.0.1".to_string(),
+            port: 6420,
+            debug: false,
+            current: RwLock::new(Arc::new(snapshot)),
+            reload: Mutex::new(None),
+        }
+    }
+
+    #[test]
+    fn serving_snapshot_reuses_the_same_handle_when_the_fingerprint_is_unchanged() {
+        let dir = snapshot_project("fast-path");
+        write_snapshot_config(&dir, "project_name: Stable\n");
+        let state = snapshot_state(&dir);
+        let first = state.serving_snapshot();
+        let second = state.serving_snapshot();
+        assert!(Arc::ptr_eq(&first, &second));
+        assert_eq!(first.config.project_name.as_deref(), Some("Stable"));
+        assert!(state.reload.try_lock().expect("reload lock").is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn serving_snapshot_reloads_config_and_registry_together() {
+        let dir = snapshot_project("reload");
+        write_snapshot_config(
+            &dir,
+            "project_name: Before\ndecision_types:\n  adr:\n    enabled: true\n",
+        );
+        let state = snapshot_state(&dir);
+        let before = state.serving_snapshot();
+        assert_eq!(before.config.project_name.as_deref(), Some("Before"));
+        assert!(
+            before
+                .routes
+                .nav
+                .iter()
+                .any(|item| item.group == routes::NavGroup::Decisions)
+        );
+
+        write_snapshot_config(
+            &dir,
+            "project_name: After-Reload\ndecision_types:\n  adr:\n    enabled: false\n  bdr:\n    enabled: false\n",
+        );
+        let after = state.serving_snapshot();
+        assert!(!Arc::ptr_eq(&before, &after));
+        // One handle, one generation: the new name and the new registry are
+        // observable through the same snapshot.
+        assert_eq!(after.config.project_name.as_deref(), Some("After-Reload"));
+        assert!(
+            after
+                .registry
+                .enabled(CategoryKind::Decision)
+                .next()
+                .is_none()
+        );
+        assert!(
+            !after
+                .routes
+                .nav
+                .iter()
+                .any(|item| item.group == routes::NavGroup::Decisions)
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn failed_reload_keeps_last_known_good_snapshot_and_is_remembered() {
+        let dir = snapshot_project("fail-closed");
+        write_snapshot_config(&dir, "project_name: Good\n");
+        let state = snapshot_state(&dir);
+        let good = state.serving_snapshot();
+
+        write_snapshot_config(&dir, "project_name: Broken-Again\nbrowser_port: 0\n");
+        let served = state.serving_snapshot();
+        assert!(Arc::ptr_eq(&good, &served));
+        assert_eq!(served.config.project_name.as_deref(), Some("Good"));
+        assert!(
+            state.reload.try_lock().expect("reload lock").is_some(),
+            "the failing fingerprint is remembered"
+        );
+
+        // The same failing input state is not retried and keeps serving.
+        let served_again = state.serving_snapshot();
+        assert!(Arc::ptr_eq(&good, &served_again));
+
+        // A changed file retries the reload and publishes the fixed snapshot.
+        write_snapshot_config(&dir, "project_name: Fixed-Again\n");
+        let fixed = state.serving_snapshot();
+        assert!(!Arc::ptr_eq(&good, &fixed));
+        assert_eq!(fixed.config.project_name.as_deref(), Some("Fixed-Again"));
+        assert!(state.reload.try_lock().expect("reload lock").is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn startup_snapshot_must_build_from_a_valid_configuration() {
+        let dir = snapshot_project("startup");
+        let missing = load_serving_snapshot(&dir.join("papyrus.config.yml"), &dir)
+            .expect_err("missing configuration must fail");
+        assert_eq!(missing.code(), 1);
+        write_snapshot_config(&dir, "browser_port: 0\n");
+        let invalid = load_serving_snapshot(&dir.join("papyrus.config.yml"), &dir)
+            .expect_err("invalid configuration must fail");
+        assert_eq!(invalid.code(), 4);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
