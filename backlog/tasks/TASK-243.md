@@ -2,7 +2,7 @@
 id: TASK-243
 title: "Verify MS-032 baseline: reproducible benchmarks, fixtures, and frozen behavior"
 created_date: '2026-11-20T17:41:02Z'
-updated_date: '2026-11-21T16:44:50Z'
+updated_date: '2026-11-22T01:32:24Z'
 labels: []
 references:
   - NFR-007.001
@@ -14,13 +14,14 @@ references:
   - TC-183
   - TC-184
   - ADR-039
-status: ToDo
+status: In-Progress
 assignee:
   - quality-gatekeeper
 milestone: MS-032
 dependencies:
   - TASK-241
   - TASK-242
+  - TASK-292
 ordinal: 60
 documentation:
   - docs/audits
