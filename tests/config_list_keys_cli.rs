@@ -489,11 +489,11 @@ fn document_default_status_is_listed_after_statuses() {
         "default_status follows the same slug's statuses"
     );
 
-    let enabled = line_index(&lines, "document_types.draft.enabled: true");
+    let draft_statuses = line_index(&lines, "document_types.draft.statuses: [active, archived]");
     assert_eq!(
-        lines[enabled + 1],
+        lines[draft_statuses + 1],
         "document_types.draft.default_status: open",
-        "default_status follows enabled when no status list is declared"
+        "the decision-33 default status list is projected for a user-defined type"
     );
 
     assert!(

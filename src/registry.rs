@@ -2508,7 +2508,7 @@ pub fn field_options(fields: &[FieldSpec]) -> Vec<FieldOption> {
         let long = field
             .option
             .clone()
-            .unwrap_or_else(|| field.key.replace('_', "-"));
+            .unwrap_or_else(|| crate::sanitize::kebab_slug(&field.key));
         for field_verb in &field.verbs {
             let verb = match field_verb {
                 crate::config::FieldVerb::Create => Verb::Create,
@@ -2680,17 +2680,27 @@ fn document_record(
             Cow::Borrowed("GEN-###"),
         ),
     };
-    let role_fields = match model {
-        DocumentModel::GroupedMarkdown => member
+    // A grouped type carries role-specific facts from both the group and the
+    // member sequences; the single record descriptor is the union of the two
+    // roles, deduplicated in sequence order (L-7, ADR-036 decision 27).
+    let role_fields: Vec<&FieldSpec> = match model {
+        DocumentModel::GroupedMarkdown => group
             .and_then(|role| role.fields.as_deref())
-            .unwrap_or(&[]),
-        DocumentModel::SingleMarkdown | DocumentModel::SingleHtmlMockup => fields,
+            .unwrap_or(&[])
+            .iter()
+            .chain(
+                member
+                    .and_then(|role| role.fields.as_deref())
+                    .unwrap_or(&[]),
+            )
+            .collect(),
+        DocumentModel::SingleMarkdown | DocumentModel::SingleHtmlMockup => fields.iter().collect(),
     };
     let mut frontmatter_keys: Vec<Cow<'static, str>> = Vec::new();
     if model != DocumentModel::SingleHtmlMockup {
         frontmatter_keys.push(Cow::Borrowed("status"));
     }
-    for field in role_fields {
+    for field in &role_fields {
         if let Some(key) = &field.frontmatter_key
             && !frontmatter_keys.iter().any(|k| k == key)
         {
@@ -2698,12 +2708,13 @@ fn document_record(
         }
     }
     let mut sections: Vec<Cow<'static, str>> = Vec::new();
-    for field in role_fields {
-        if let Some(heading) = &field.heading {
+    for field in &role_fields {
+        if let Some(heading) = &field.heading
+            && !sections.iter().any(|section| section == heading)
+        {
             sections.push(Cow::Owned(heading.clone()));
         }
     }
-    let _ = group;
     RecordDescriptor {
         name,
         record_type,
@@ -4715,5 +4726,53 @@ mod tests {
         let mockup = registry.record_descriptor("ui-mockup").expect("ui-mockup");
         assert!(mockup.frontmatter_keys.is_empty());
         assert!(mockup.sections.is_empty());
+    }
+
+    #[test]
+    fn grouped_record_carries_role_specific_fields_from_both_roles() {
+        let group_field = FieldSpec {
+            key: "group_note".to_string(),
+            heading: Some("## Group Note".to_string()),
+            frontmatter_key: Some("group_meta".to_string()),
+            option: None,
+            label: None,
+            kind: crate::config::FieldKind::Text,
+            required: false,
+            verbs: vec![crate::config::FieldVerb::Create],
+            help: None,
+        };
+        let member_field = FieldSpec {
+            key: "member_note".to_string(),
+            heading: Some("## Member Note".to_string()),
+            frontmatter_key: Some("member_meta".to_string()),
+            option: None,
+            label: None,
+            kind: crate::config::FieldKind::Text,
+            required: false,
+            verbs: vec![crate::config::FieldVerb::Create],
+            help: None,
+        };
+        let mut req = entry("REQ", "requirements/business/");
+        req.group = Some(RoleFields {
+            fields: Some(vec![group_field]),
+            reference_visibility: None,
+        });
+        req.member = Some(RoleFields {
+            fields: Some(vec![member_field]),
+            reference_visibility: None,
+        });
+        let cfg = config_with("req", req);
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        let record = registry.record_descriptor("req").expect("req record");
+        assert_eq!(
+            record.sections,
+            &["## Group Note", "## Member Note"],
+            "both role field sequences reach the record descriptor"
+        );
+        assert_eq!(
+            record.frontmatter_keys,
+            &["status", "group_meta", "member_meta"],
+            "both roles contribute their front-matter keys"
+        );
     }
 }

@@ -2,7 +2,7 @@
 id: ADR-041
 title: "Seed list slots for the eleven built-in document types"
 created_date: '2026-11-22T08:55:18Z'
-updated_date: '2026-11-22T09:42:39Z'
+updated_date: '2026-11-22T12:02:28Z'
 labels: []
 references:
   - RE-010
@@ -61,6 +61,11 @@ accepted
 9. This ADR amends ADR-039 decisions 5, 6, and 25 to the extent set out in decisions 2, 4, and 8 above: a document descriptor's slots come from its seed entry and the seed sets are the table of decision 4, so the clauses "the seed declares none" and "currently none" no longer hold. Dated notes record this in ADR-039. Every other decision, downstream constraint, and clarification of ADR-039 stands unchanged.
 
 10. This ADR supersedes no ADR. ADR-036, ADR-0028, and ADR-039 keep their accepted status.
+
+### Clarification (2026-11-22) — seed slot sets are always effective
+
+- **Decision 4:** the seed slot sets are part of every effective configuration. The eleven seed slugs resolve from the seed table whether or not the project file declares them, so a `document_types` map that declares only one entry does not remove the other seed types or their slots. A declared entry still replaces a present `slots` collection wholesale (decision 5); no slot value, label, or order changes.
+- No other decision, downstream constraint, or status changes.
 ## Consequences
 **Positive:**
 
