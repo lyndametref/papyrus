@@ -5,12 +5,12 @@
   "corpus_hash": "46d64349137f7017f6ee04bcfd6a3d3042b7b6bc23245749dac400804581988f",
   "corpus_files": 1001,
   "harness_command": "cargo test --release --test benchmark_baseline -- --ignored --nocapture",
-  "git_commit": "9eee1f86eea324b2e03603ffc6efe34bb040c831",
-  "production_tree_commit": "3305a3110bdefd7412893cdea6c4a31a2d6c9b49",
-  "production_worktree_modified": true,
-  "production_diff_hash": "b7852f3ad3eb128bab3fec3efb9b764b38a708a114d6d931db1bb3c39b6b76b5",
-  "harness_commit": "6e071ca277f2095c5ff1c22c7a5352a38dc40f19",
-  "harness_worktree_modified": true,
+  "git_commit": "bb9c15230c9983488972fde25a07fbd467b7068b",
+  "production_tree_commit": "bb9c15230c9983488972fde25a07fbd467b7068b",
+  "production_worktree_modified": false,
+  "production_diff_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "harness_commit": "1fa39a478e154e0f2c844c47060636e93597f013",
+  "harness_worktree_modified": false,
   "purpose": "recorded baseline run",
   "rustc_version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
   "build_profile": "release (lto=true, strip=true)",
@@ -23,7 +23,7 @@
     "kernel": "Linux 7.2.15+deb14-amd64 x86_64",
     "distribution": "Debian GNU/Linux forky/sid"
   },
-  "date": "2026-11-22T23:54:46+01:00",
+  "date": "2026-11-23T00:11:56+01:00",
   "run": "b",
   "protocol": {
     "reduced_sample_protocol": true,
@@ -60,18 +60,18 @@
       "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
       "baseline_only_p95": false,
       "server_observed_ms": {
-        "p50": 242,
-        "p95": 248,
-        "min": 238,
-        "max": 261,
-        "mean": 242.85
+        "p50": 241,
+        "p95": 247,
+        "min": 237,
+        "max": 258,
+        "mean": 241.77
       },
       "wall_us": {
-        "p50": 242871,
-        "p95": 248553,
-        "min": 238695,
-        "max": 261850,
-        "mean": 243514.87
+        "p50": 241804,
+        "p95": 247732,
+        "min": 237408,
+        "max": 258818,
+        "mean": 242480.69
       }
     },
     {
@@ -90,14 +90,14 @@
         "p95": 8,
         "min": 7,
         "max": 8,
-        "mean": 7.99
+        "mean": 7.92
       },
       "wall_us": {
-        "p50": 8501,
-        "p95": 8833,
-        "min": 8167,
-        "max": 9053,
-        "mean": 8506.39
+        "p50": 8292,
+        "p95": 8545,
+        "min": 8139,
+        "max": 8768,
+        "mean": 8305.43
       }
     },
     {
@@ -112,18 +112,18 @@
       "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
       "baseline_only_p95": false,
       "server_observed_ms": {
-        "p50": 65,
-        "p95": 65,
-        "min": 64,
-        "max": 67,
-        "mean": 64.63
+        "p50": 64,
+        "p95": 66,
+        "min": 63,
+        "max": 74,
+        "mean": 64.53
       },
       "wall_us": {
-        "p50": 65331,
-        "p95": 66237,
-        "min": 64303,
-        "max": 67616,
-        "mean": 65379.04
+        "p50": 64969,
+        "p95": 66881,
+        "min": 64124,
+        "max": 74818,
+        "mean": 65270.04
       }
     },
     {
@@ -141,15 +141,15 @@
         "p50": 63,
         "p95": 64,
         "min": 62,
-        "max": 68,
+        "max": 66,
         "mean": 63.18
       },
       "wall_us": {
-        "p50": 63661,
-        "p95": 65282,
-        "min": 62817,
-        "max": 68698,
-        "mean": 63878.83
+        "p50": 63873,
+        "p95": 64877,
+        "min": 62902,
+        "max": 66520,
+        "mean": 63914.08
       }
     },
     {
@@ -164,18 +164,18 @@
       "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
       "baseline_only_p95": false,
       "server_observed_ms": {
-        "p50": 1,
+        "p50": 2,
         "p95": 2,
         "min": 1,
         "max": 2,
-        "mean": 1.07
+        "mean": 1.79
       },
       "wall_us": {
-        "p50": 1864,
-        "p95": 2318,
-        "min": 1796,
-        "max": 2731,
-        "mean": 1902.63
+        "p50": 3036,
+        "p95": 3125,
+        "min": 1781,
+        "max": 3175,
+        "mean": 2762.71
       }
     },
     {
@@ -191,17 +191,17 @@
       "baseline_only_p95": false,
       "server_observed_ms": {
         "p50": 63,
-        "p95": 65,
-        "min": 63,
-        "max": 75,
-        "mean": 63.65
+        "p95": 64,
+        "min": 62,
+        "max": 69,
+        "mean": 63.14
       },
       "wall_us": {
-        "p50": 64153,
-        "p95": 65315,
-        "min": 63302,
-        "max": 75679,
-        "mean": 64378.77
+        "p50": 63693,
+        "p95": 64658,
+        "min": 62729,
+        "max": 69468,
+        "mean": 63831.02
       }
     },
     {
@@ -220,14 +220,14 @@
         "p95": 8,
         "min": 7,
         "max": 8,
-        "mean": 7.9
+        "mean": 7.54
       },
       "wall_us": {
-        "p50": 8236,
-        "p95": 8355,
-        "min": 8114,
-        "max": 8426,
-        "mean": 8243.41
+        "p50": 8172,
+        "p95": 8335,
+        "min": 8005,
+        "max": 8453,
+        "mean": 8182.67
       }
     },
     {
@@ -242,18 +242,18 @@
       "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
       "baseline_only_p95": false,
       "server_observed_ms": {
-        "p50": 1,
-        "p95": 1,
+        "p50": 2,
+        "p95": 2,
         "min": 1,
         "max": 2,
-        "mean": 1.02
+        "mean": 1.85
       },
       "wall_us": {
-        "p50": 2051,
-        "p95": 2103,
-        "min": 1908,
-        "max": 2187,
-        "mean": 2040.01
+        "p50": 2839,
+        "p95": 2914,
+        "min": 1898,
+        "max": 2946,
+        "mean": 2686.25
       }
     },
     {
@@ -269,17 +269,17 @@
       "baseline_only_p95": false,
       "server_observed_ms": {
         "p50": 63,
-        "p95": 64,
+        "p95": 65,
         "min": 62,
-        "max": 66,
-        "mean": 63.29
+        "max": 80,
+        "mean": 63.32
       },
       "wall_us": {
-        "p50": 63961,
-        "p95": 64921,
-        "min": 63085,
-        "max": 66670,
-        "mean": 64020.23
+        "p50": 63732,
+        "p95": 65503,
+        "min": 62769,
+        "max": 81187,
+        "mean": 64039.46
       }
     },
     {
@@ -294,18 +294,18 @@
       "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
       "baseline_only_p95": false,
       "server_observed_ms": {
-        "p50": 1,
+        "p50": 2,
         "p95": 2,
         "min": 1,
         "max": 2,
-        "mean": 1.31
+        "mean": 1.67
       },
       "wall_us": {
-        "p50": 1932,
-        "p95": 2222,
-        "min": 1840,
-        "max": 2326,
-        "mean": 2005.05
+        "p50": 2333,
+        "p95": 2403,
+        "min": 1846,
+        "max": 2532,
+        "mean": 2223.55
       }
     },
     {
@@ -321,17 +321,17 @@
       "baseline_only_p95": false,
       "server_observed_ms": {
         "p50": 63,
-        "p95": 64,
-        "min": 63,
-        "max": 77,
-        "mean": 63.62
+        "p95": 66,
+        "min": 62,
+        "max": 69,
+        "mean": 63.34
       },
       "wall_us": {
-        "p50": 64179,
-        "p95": 65197,
-        "min": 63336,
-        "max": 77945,
-        "mean": 64341.19
+        "p50": 63808,
+        "p95": 66943,
+        "min": 62676,
+        "max": 69832,
+        "mean": 64078.81
       }
     }
   ],

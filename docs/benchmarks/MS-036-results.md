@@ -2,11 +2,11 @@
 
 Status: recorded measurement. The harness adds no production behaviour; the measured production tree is identified by the commit, worktree flag, and diff hash below. The full NFR-007 protocol was run on the available host, which deviates from the NFR-007 reference hardware (6 physical / 12 logical cores and 15.3 GiB instead of 4 vCPU / 8 GiB). **NFR-007.001 and NFR-007.002 are not marked satisfied by this run.** A pass below means only that the measured p95 was within the threshold on the available host.
 
-- Run dates: `2026-11-22T23:51:35+01:00` to `2026-11-22T23:54:46+01:00`
-- Measured production tree commit: `3305a3110bdefd7412893cdea6c4a31a2d6c9b49` (last commit that changed `src`, `packaging`, `scripts`, `Cargo.toml` or `Cargo.lock`)
-- Measured production worktree: dirty `true`; diff hash `b7852f3ad3eb128bab3fec3efb9b764b38a708a114d6d931db1bb3c39b6b76b5` (SHA-256 of `git diff --binary <production commit>` over the measured production tree)
-- Harness commit: `6e071ca277f2095c5ff1c22c7a5352a38dc40f19` (last committed revision of `tests/benchmark_baseline.rs`; working tree modified during this run: true)
-- Measured HEAD: `9eee1f86eea324b2e03603ffc6efe34bb040c831`
+- Run dates: `2026-11-23T00:08:45+01:00` to `2026-11-23T00:11:56+01:00`
+- Measured production tree commit: `bb9c15230c9983488972fde25a07fbd467b7068b` (last commit that changed `src`, `packaging`, `scripts`, `Cargo.toml` or `Cargo.lock`)
+- Measured production worktree: dirty `false`; diff hash `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` (SHA-256 of `git diff --binary <production commit>` over the measured production tree)
+- Harness commit: `1fa39a478e154e0f2c844c47060636e93597f013` (last committed revision of `tests/benchmark_baseline.rs`; working tree modified during this run: false)
+- Measured HEAD: `bb9c15230c9983488972fde25a07fbd467b7068b`
 - rustc: `rustc 1.99.1 (58cf8f9c3 2026-10-13)`
 - Build profile: release (lto=true, strip=true)
 - Harness command: `cargo test --release --test benchmark_baseline -- --ignored --nocapture benchmark_ms036`
@@ -88,14 +88,14 @@ Measured on 6 physical / 12 logical cores, 15.3 GiB RAM, SSD (mapper/linux-root)
 | Route | Band | n | Server p50 (ms) | Server p95 (ms) | MS-032 baseline p50 | MS-032 baseline p95 | Δ p50 (ms) | Δ p95 (ms) |
 |---|---|---|---|---|---|---|---|---|
 | inventory | A | 100 | 25 | 26 | 1048 (B, n=20) | 1060 | -1023 | -1034 |
-| view-single-markdown | A | 100 | 1 | 1 | 44 (A, n=100) | 45 | -43 | -44 |
-| view-grouped-group | A | 100 | 7 | 10 | 311 (A, n=100) | 320 | -304 | -310 |
+| view-single-markdown | A | 100 | 4 | 4 | 44 (A, n=100) | 45 | -40 | -41 |
+| view-grouped-group | A | 100 | 7 | 8 | 311 (A, n=100) | 320 | -304 | -312 |
 | view-grouped-member | A | 100 | 7 | 7 | 341 (A, n=100) | 345 | -334 | -338 |
-| view-single-html-mockup | A | 100 | 0 | 2 | 1 (A, n=100) | 1 | -1 | +1 |
-| view-unresolved-reference | A | 100 | 7 | 11 | 343 (A, n=100) | 346 | -336 | -335 |
-| edit-single-markdown | A | 100 | 2 | 3 | 44 (A, n=100) | 45 | -42 | -42 |
+| view-single-html-mockup | A | 100 | 0 | 1 | 1 (A, n=100) | 1 | -1 | +0 |
+| view-unresolved-reference | A | 100 | 7 | 9 | 343 (A, n=100) | 346 | -336 | -337 |
+| edit-single-markdown | A | 100 | 1 | 1 | 44 (A, n=100) | 45 | -43 | -44 |
 | edit-grouped-group | A | 100 | 1 | 2 | 310 (A, n=100) | 318 | -309 | -316 |
-| edit-grouped-member | A | 100 | 7 | 15 | 342 (A, n=100) | 351 | -335 | -336 |
+| edit-grouped-member | A | 100 | 7 | 8 | 342 (A, n=100) | 351 | -335 | -343 |
 | edit-single-html-mockup | A | 100 | 0 | 2 | 1 (A, n=100) | 3 | -1 | -1 |
 | edit-unresolved-reference | A | 100 | 7 | 11 | 343 (A, n=100) | 351 | -336 | -340 |
 
@@ -108,15 +108,15 @@ Measured on 6 physical / 12 logical cores, 15.3 GiB RAM, SSD (mapper/linux-root)
 | Route | Band | n | Server p50 (ms) | Server p95 (ms) | MS-032 baseline p50 | MS-032 baseline p95 | Δ p50 (ms) | Δ p95 (ms) |
 |---|---|---|---|---|---|---|---|---|
 | inventory | A | 100 | 93 | 95 | 11776 (B, n=20) | 11971 | -11683 | -11876 |
-| view-single-markdown | A | 100 | 4 | 4 | 555 (A, n=100) | 565 | -551 | -561 |
+| view-single-markdown | A | 100 | 3 | 5 | 555 (A, n=100) | 565 | -552 | -560 |
 | view-grouped-group | A | 100 | 26 | 26 | 3552 (B, n=20) | 3629 | -3526 | -3603 |
-| view-grouped-member | A | 100 | 25 | 25 | 3666 (B, n=20) | 3736 | -3641 | -3711 |
-| view-single-html-mockup | A | 100 | 1 | 2 | 1 (A, n=100) | 1 | +0 | +1 |
-| view-unresolved-reference | A | 100 | 25 | 25 | 3680 (B, n=20) | 3723 | -3655 | -3698 |
+| view-grouped-member | A | 100 | 25 | 26 | 3666 (B, n=20) | 3736 | -3641 | -3710 |
+| view-single-html-mockup | A | 100 | 1 | 3 | 1 (A, n=100) | 1 | +0 | +2 |
+| view-unresolved-reference | A | 100 | 25 | 27 | 3680 (B, n=20) | 3723 | -3655 | -3696 |
 | edit-single-markdown | A | 100 | 3 | 3 | 557 (A, n=100) | 564 | -554 | -561 |
 | edit-grouped-group | A | 100 | 1 | 1 | 3553 (B, n=20) | 3611 | -3552 | -3610 |
-| edit-grouped-member | A | 100 | 25 | 25 | 3692 (B, n=20) | 3734 | -3667 | -3709 |
-| edit-single-html-mockup | A | 100 | 1 | 2 | 1 (A, n=100) | 1 | +0 | +1 |
+| edit-grouped-member | A | 100 | 25 | 26 | 3692 (B, n=20) | 3734 | -3667 | -3708 |
+| edit-single-html-mockup | A | 100 | 1 | 3 | 1 (A, n=100) | 1 | +0 | +2 |
 | edit-unresolved-reference | A | 100 | 25 | 25 | 3665 (B, n=20) | 3735 | -3640 | -3710 |
 
 The MS-032 382-record baseline used band B and 20 samples for several routes, so its p95 is baseline-only; the deltas are indicative, not a threshold verdict.
@@ -129,23 +129,23 @@ A pass means the measured p95 was below the threshold on the available host. It 
 
 | Route | Band | n | Server p50 (ms) | Server p95 (ms) | Threshold (ms) | Measured verdict | MS-032 baseline p50 | MS-032 baseline p95 | Δ p50 | Δ p95 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| inventory | A | 100 | 242 | 248 | 250 | pass (measured) | 75546 (B, n=20) | 76532 | -75304 | -76284 |
+| inventory | A | 100 | 243 | 247 | 250 | pass (measured) | 75546 (B, n=20) | 76532 | -75303 | -76285 |
 | view-single-markdown | A | 100 | 8 | 8 | 100 | pass (measured) | 2939 (B, n=20) | 2998 | -2931 | -2990 |
-| view-grouped-group | A | 100 | 65 | 65 | 100 | pass (measured) | 23142 (B, n=20) | 23648 | -23077 | -23583 |
-| view-grouped-member | A | 100 | 63 | 64 | 100 | pass (measured) | 23431 (B, n=20) | 23950 | -23368 | -23886 |
-| view-single-html-mockup | A | 100 | 2 | 2 | 100 | pass (measured) | 2 (A, n=100) | 2 | +0 | +0 |
-| view-unresolved-reference | A | 100 | 63 | 65 | 100 | pass (measured) | 23651 (B, n=20) | 23861 | -23588 | -23796 |
-| edit-single-markdown | A | 100 | 8 | 8 | 100 | pass (measured) | 2942 (B, n=20) | 2973 | -2934 | -2965 |
-| edit-grouped-group | A | 100 | 1 | 2 | 100 | pass (measured) | 23200 (B, n=20) | 23642 | -23199 | -23640 |
-| edit-grouped-member | A | 100 | 63 | 64 | 100 | pass (measured) | 23596 (B, n=20) | 23820 | -23533 | -23756 |
-| edit-single-html-mockup | A | 100 | 1 | 4 | 100 | pass (measured) | 3 (A, n=100) | 3 | -2 | +1 |
-| edit-unresolved-reference | A | 100 | 63 | 64 | 100 | pass (measured) | 23504 (B, n=20) | 23777 | -23441 | -23713 |
+| view-grouped-group | A | 100 | 65 | 66 | 100 | pass (measured) | 23142 (B, n=20) | 23648 | -23077 | -23582 |
+| view-grouped-member | A | 100 | 63 | 66 | 100 | pass (measured) | 23431 (B, n=20) | 23950 | -23368 | -23884 |
+| view-single-html-mockup | A | 100 | 1 | 1 | 100 | pass (measured) | 2 (A, n=100) | 2 | -1 | -1 |
+| view-unresolved-reference | A | 100 | 64 | 65 | 100 | pass (measured) | 23651 (B, n=20) | 23861 | -23587 | -23796 |
+| edit-single-markdown | A | 100 | 8 | 9 | 100 | pass (measured) | 2942 (B, n=20) | 2973 | -2934 | -2964 |
+| edit-grouped-group | A | 100 | 1 | 1 | 100 | pass (measured) | 23200 (B, n=20) | 23642 | -23199 | -23641 |
+| edit-grouped-member | A | 100 | 63 | 65 | 100 | pass (measured) | 23596 (B, n=20) | 23820 | -23533 | -23755 |
+| edit-single-html-mockup | A | 100 | 2 | 2 | 100 | pass (measured) | 3 (A, n=100) | 3 | -1 | -1 |
+| edit-unresolved-reference | A | 100 | 64 | 65 | 100 | pass (measured) | 23504 (B, n=20) | 23777 | -23440 | -23712 |
 
 The MS-032 1,000-record baseline used band B (20 samples) for every route except the two HTML mockup routes, so its p95 values are baseline-only. The 1,000-record inventory baseline was 75,546 ms p50 / 76,532 ms p95.
 
 ## NFR verdicts
 
-- **NFR-007.001 (inventory p95 < 250 ms at 1,000 records): measured pass.** Measured server p95 248 ms on the available host. Measured on 6 physical / 12 logical cores, 15.3 GiB RAM, SSD (mapper/linux-root), kernel `Linux 7.2.15+deb14-amd64 x86_64`; NFR-007 reference is 4 vCPU / 8 GiB. Every figure below is a measured figure on the available host, not NFR-007.001 or NFR-007.002 satisfaction. Headroom to the 250 ms threshold is 2 ms on a host faster than the NFR-007 reference; that headroom is thin and is not evidence of reference-hardware compliance.
+- **NFR-007.001 (inventory p95 < 250 ms at 1,000 records): measured pass.** Measured server p95 247 ms on the available host. Measured on 6 physical / 12 logical cores, 15.3 GiB RAM, SSD (mapper/linux-root), kernel `Linux 7.2.15+deb14-amd64 x86_64`; NFR-007 reference is 4 vCPU / 8 GiB. Every figure below is a measured figure on the available host, not NFR-007.001 or NFR-007.002 satisfaction. Headroom to the 250 ms threshold is 3 ms on a host faster than the NFR-007 reference; that headroom is thin and is not evidence of reference-hardware compliance.
 - **NFR-007.002 (view and edit p95 < 100 ms at 1,000 records): measured pass on every measured route.** Every SingleMarkdown, GroupedMarkdown group, GroupedMarkdown member, SingleHtmlMockup, and unresolved-reference view and edit route measured below 100 ms. This is a measured pass on the available host, not NFR-007.002 satisfaction.
 - **NFR-007.003 (cache contract and repeat visit): measured pass.** The second-load measurement below records zero vendor body bytes on the second load, bodyless 304 responses for the first-party app assets, and full `no-store` HTML and JSON bodies on every repeat load. The vendor second-load figure is a browser-cache simulation, not a measured network transfer: each immutable vendor URL is treated as a cache hit and the recorded basis is the full first-load `200` bytes returned to a conditional `If-None-Match`, never a `304`. This is a measured pass on the available host, not a claim about the reference hardware.
 
@@ -220,21 +220,21 @@ The run is reproducible from the recorded command and corpus hashes. The corpus 
 
 ## TASK-314 correction re-measurement (AUD-148)
 
-Status: post-correction measurement. AUD-148 F1 (an externally archived record is absent from counts and grouped rows) and F3 (one shared front-matter title projection) changed the read path before this run; no other measured behaviour changed. The full NFR-007 protocol was re-run on the available host after those corrections, and every raw file below was regenerated by this run.
+Status: clean-tree re-measurement that closes the TASK-314 reopen residual (the benchmark had to be re-measured on a committed tree so the provenance matches). AUD-148 F1 and F3 changed the read path before this run, and TASK-314 additionally made an empty or whitespace-only front-matter title fall back to the heading; no other measured behaviour changed. The full NFR-007 protocol was re-run on the available host on the committed production tree, and every raw file above was regenerated by this run.
 
-- Measured production tree commit: `3305a3110bdefd7412893cdea6c4a31a2d6c9b49`; production worktree dirty: `true`; production diff hash: `b7852f3ad3eb128bab3fec3efb9b764b38a708a114d6d931db1bb3c39b6b76b5` (SHA-256 of `git diff --binary <production commit>` over `src`, `packaging`, `scripts`, `Cargo.toml`, `Cargo.lock`).
-- Measured HEAD: `9eee1f86eea324b2e03603ffc6efe34bb040c831`; harness commit: `6e071ca277f2095c5ff1c22c7a5352a38dc40f19`; harness worktree modified: `true`.
+- Measured production tree commit: `bb9c15230c9983488972fde25a07fbd467b7068b`; production worktree dirty: `false`; production diff hash: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` (SHA-256 of the empty `git diff --binary <production commit>` over `src`, `packaging`, `scripts`, `Cargo.toml`, `Cargo.lock`).
+- Measured HEAD: `bb9c15230c9983488972fde25a07fbd467b7068b`; harness commit: `1fa39a478e154e0f2c844c47060636e93597f013`; harness worktree modified: `false`.
 - The same commit and harness provenance, plus the dirty flag and diff hash, are recorded in every run JSON and in `docs/benchmarks/raw/ms036-second-load.json`.
-- Run dates: `2026-11-22T23:51:35+01:00` to `2026-11-22T23:54:46+01:00`; harness command and build profile as recorded above.
+- Run dates: `2026-11-23T00:08:45+01:00` to `2026-11-23T00:11:56+01:00`; harness command and build profile as recorded above.
 
-Measured 1,000-record p50 / p95 against the TASK-313 run:
+Measured 1,000-record p50 / p95 against the TASK-313 run (ms):
 
-| Route | TASK-313 p50 / p95 (ms) | TASK-314 p50 / p95 (ms) |
+| Route | TASK-313 p50 / p95 (ms) | TASK-314 clean-tree p50 / p95 (ms) |
 |---|---|---|
-| inventory | 242 / 248 | 242 / 248 |
-| view-grouped-group | 65 / 65 | 65 / 65 |
-| view-grouped-member | 63 / 65 | 63 / 64 |
-| view-unresolved-reference | 63 / 64 | 63 / 65 |
-| edit-grouped-member | 63 / 67 | 63 / 64 |
+| inventory | 242 / 248 | 243 / 247 |
+| view-grouped-group | 65 / 65 | 65 / 66 |
+| view-grouped-member | 63 / 65 | 63 / 66 |
+| view-unresolved-reference | 63 / 64 | 64 / 65 |
+| edit-grouped-member | 63 / 67 | 63 / 65 |
 
-The F1 and F3 corrections add no measurable cost: every grouped route stays within 1 ms of the TASK-313 figures, inventory is unchanged, and the view and edit p95 stays below the 100 ms threshold. NFR-007.001 remains a measured pass with 2 ms of headroom on a host faster than the reference (F11). NFR-007.003 remains a measured pass, with its vendor second load recorded as a browser-cache simulation rather than a measured transfer (F10). The Connection behaviour wording is corrected: the server sends `Connection: close` and always has, with no keep-alive in place (F12).
+The F1, F3 and empty-title corrections add no measurable cost: every grouped route stays within 2 ms of the TASK-313 figures, inventory is unchanged within 1 ms, and the view and edit p95 stays below the 100 ms threshold. NFR-007.001 remains a measured pass at 247 ms p95 with 3 ms of headroom on a host faster than the reference; that headroom is thin and is not evidence of reference-hardware compliance (F11). NFR-007.003 remains a measured pass, with its vendor second load recorded as a browser-cache simulation rather than a measured transfer (F10). The Connection behaviour wording is corrected: the server sends `Connection: close` and always has, with no keep-alive in place (F12).

@@ -5,12 +5,12 @@
   "corpus_hash": "16852d24b236c29d9a109ec5c706645bf3ab5a60615c120a3dcf6e76cb816a15",
   "corpus_files": 383,
   "harness_command": "cargo test --release --test benchmark_baseline -- --ignored --nocapture",
-  "git_commit": "9eee1f86eea324b2e03603ffc6efe34bb040c831",
-  "production_tree_commit": "3305a3110bdefd7412893cdea6c4a31a2d6c9b49",
-  "production_worktree_modified": true,
-  "production_diff_hash": "b7852f3ad3eb128bab3fec3efb9b764b38a708a114d6d931db1bb3c39b6b76b5",
-  "harness_commit": "6e071ca277f2095c5ff1c22c7a5352a38dc40f19",
-  "harness_worktree_modified": true,
+  "git_commit": "bb9c15230c9983488972fde25a07fbd467b7068b",
+  "production_tree_commit": "bb9c15230c9983488972fde25a07fbd467b7068b",
+  "production_worktree_modified": false,
+  "production_diff_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "harness_commit": "1fa39a478e154e0f2c844c47060636e93597f013",
+  "harness_worktree_modified": false,
   "purpose": "recorded baseline run",
   "rustc_version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
   "build_profile": "release (lto=true, strip=true)",
@@ -23,7 +23,7 @@
     "kernel": "Linux 7.2.15+deb14-amd64 x86_64",
     "distribution": "Debian GNU/Linux forky/sid"
   },
-  "date": "2026-11-22T23:52:10+01:00",
+  "date": "2026-11-23T00:09:20+01:00",
   "run": "a",
   "protocol": {
     "reduced_sample_protocol": true,
@@ -62,16 +62,16 @@
       "server_observed_ms": {
         "p50": 93,
         "p95": 95,
-        "min": 92,
+        "min": 91,
         "max": 98,
-        "mean": 93.26
+        "mean": 93.05
       },
       "wall_us": {
-        "p50": 93704,
-        "p95": 96043,
-        "min": 92296,
-        "max": 99026,
-        "mean": 93948.35
+        "p50": 93578,
+        "p95": 95938,
+        "min": 91867,
+        "max": 98281,
+        "mean": 93743.9
       }
     },
     {
@@ -86,18 +86,18 @@
       "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
       "baseline_only_p95": false,
       "server_observed_ms": {
-        "p50": 4,
-        "p95": 4,
+        "p50": 3,
+        "p95": 5,
         "min": 3,
-        "max": 4,
-        "mean": 3.63
+        "max": 5,
+        "mean": 3.81
       },
       "wall_us": {
-        "p50": 4236,
-        "p95": 4329,
-        "min": 3902,
-        "max": 4626,
-        "mean": 4177.53
+        "p50": 4102,
+        "p95": 5424,
+        "min": 3818,
+        "max": 5565,
+        "mean": 4529.39
       }
     },
     {
@@ -115,15 +115,15 @@
         "p50": 26,
         "p95": 26,
         "min": 25,
-        "max": 26,
-        "mean": 25.64
+        "max": 27,
+        "mean": 25.66
       },
       "wall_us": {
-        "p50": 26261,
-        "p95": 26704,
-        "min": 25904,
-        "max": 26851,
-        "mean": 26319.73
+        "p50": 26344,
+        "p95": 26943,
+        "min": 25774,
+        "max": 27891,
+        "mean": 26411.27
       }
     },
     {
@@ -139,17 +139,17 @@
       "baseline_only_p95": false,
       "server_observed_ms": {
         "p50": 25,
-        "p95": 25,
+        "p95": 26,
         "min": 24,
-        "max": 26,
-        "mean": 24.96
+        "max": 28,
+        "mean": 25.05
       },
       "wall_us": {
-        "p50": 25492,
-        "p95": 26129,
-        "min": 24974,
-        "max": 26848,
-        "mean": 25567.5
+        "p50": 25438,
+        "p95": 26534,
+        "min": 24949,
+        "max": 28621,
+        "mean": 25600.84
       }
     },
     {
@@ -165,17 +165,17 @@
       "baseline_only_p95": false,
       "server_observed_ms": {
         "p50": 1,
-        "p95": 2,
+        "p95": 3,
         "min": 0,
-        "max": 2,
-        "mean": 1.28
+        "max": 3,
+        "mean": 1.4
       },
       "wall_us": {
-        "p50": 2160,
-        "p95": 2948,
-        "min": 1101,
-        "max": 3134,
-        "mean": 2083.94
+        "p50": 1775,
+        "p95": 3399,
+        "min": 1079,
+        "max": 4196,
+        "mean": 2209.15
       }
     },
     {
@@ -191,17 +191,17 @@
       "baseline_only_p95": false,
       "server_observed_ms": {
         "p50": 25,
-        "p95": 25,
+        "p95": 27,
         "min": 24,
-        "max": 26,
-        "mean": 24.87
+        "max": 33,
+        "mean": 25.18
       },
       "wall_us": {
-        "p50": 25445,
-        "p95": 25930,
-        "min": 24953,
-        "max": 26394,
-        "mean": 25458.97
+        "p50": 25476,
+        "p95": 27195,
+        "min": 24906,
+        "max": 34009,
+        "mean": 25753.53
       }
     },
     {
@@ -219,15 +219,15 @@
         "p50": 3,
         "p95": 3,
         "min": 3,
-        "max": 3,
-        "mean": 3.0
+        "max": 4,
+        "mean": 3.02
       },
       "wall_us": {
-        "p50": 3951,
-        "p95": 3996,
-        "min": 3845,
-        "max": 4084,
-        "mean": 3949.57
+        "p50": 3958,
+        "p95": 4088,
+        "min": 3840,
+        "max": 4399,
+        "mean": 3972.05
       }
     },
     {
@@ -249,11 +249,11 @@
         "mean": 1.0
       },
       "wall_us": {
-        "p50": 1812,
-        "p95": 2062,
-        "min": 1193,
-        "max": 2098,
-        "mean": 1677.31
+        "p50": 1221,
+        "p95": 1696,
+        "min": 1186,
+        "max": 1938,
+        "mean": 1291.7
       }
     },
     {
@@ -269,17 +269,17 @@
       "baseline_only_p95": false,
       "server_observed_ms": {
         "p50": 25,
-        "p95": 25,
+        "p95": 26,
         "min": 24,
-        "max": 25,
-        "mean": 24.83
+        "max": 28,
+        "mean": 25.09
       },
       "wall_us": {
-        "p50": 25380,
-        "p95": 25809,
-        "min": 25024,
-        "max": 26022,
-        "mean": 25410.24
+        "p50": 25587,
+        "p95": 26498,
+        "min": 25113,
+        "max": 28810,
+        "mean": 25708.52
       }
     },
     {
@@ -295,17 +295,17 @@
       "baseline_only_p95": false,
       "server_observed_ms": {
         "p50": 1,
-        "p95": 2,
+        "p95": 3,
         "min": 0,
-        "max": 2,
-        "mean": 1.03
+        "max": 3,
+        "mean": 0.87
       },
       "wall_us": {
-        "p50": 2067,
-        "p95": 2435,
-        "min": 1099,
-        "max": 2694,
-        "mean": 1812.08
+        "p50": 1184,
+        "p95": 3470,
+        "min": 1068,
+        "max": 3649,
+        "mean": 1485.24
       }
     },
     {
@@ -322,16 +322,16 @@
       "server_observed_ms": {
         "p50": 25,
         "p95": 25,
-        "min": 25,
-        "max": 27,
-        "mean": 25.06
+        "min": 24,
+        "max": 26,
+        "mean": 24.86
       },
       "wall_us": {
-        "p50": 25514,
-        "p95": 26078,
-        "min": 25195,
-        "max": 27408,
-        "mean": 25585.15
+        "p50": 25432,
+        "p95": 26057,
+        "min": 24939,
+        "max": 26323,
+        "mean": 25462.02
       }
     }
   ],
