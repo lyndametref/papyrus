@@ -1356,7 +1356,7 @@ fn save_content(
 }
 
 fn resolved_group<'a>(record: &Record, index: &'a records::Index) -> Option<&'a Record> {
-    if !record.is_requirement() || record.is_group {
+    if record.descriptor.document_model != DocumentModel::GroupedMarkdown || record.is_group {
         return None;
     }
     let group_id = record.group_id.as_deref()?;
@@ -1429,18 +1429,6 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                         .map(|r| r.record)
                 })
                 .collect()
-        } else if record.handler() == Some(TypedHandler::Rule) {
-            record
-                .requirements
-                .iter()
-                .map(|rid| {
-                    records::resolve_id(&ctx, &cfg, &state.registry, rid)
-                        .ok()
-                        .flatten()
-                        .filter(|r| r.record.is_requirement())
-                        .map(|r| r.record)
-                })
-                .collect()
         } else if !record.refs.is_empty() {
             record
                 .refs
@@ -1488,7 +1476,6 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
         render::view_page(
             &record,
             group,
-            &members,
             related_milestone.as_ref(),
             related_release.as_ref(),
             &resolved_deps,
@@ -1595,15 +1582,7 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
                     chrome,
                 )
             }
-            _ => render::document_edit_page(
-                &record,
-                group,
-                &render::DocumentFormValues::from_record(&record),
-                &render::DocumentFormErrors::default(),
-                &record.version,
-                &cfg,
-                chrome,
-            ),
+            None => return Err(HttpError::new(404)),
         }
     };
     Ok(Response::html(200, html))
@@ -1769,8 +1748,17 @@ fn save_mockup_document(
         ));
     }
     // An unchanged submission performs no write, so the HTML record stays
-    // byte-identical.
-    if title == record.title && specs == record.specs && refs == record.refs {
+    // byte-identical. Both stored lists come from the field map.
+    let stored = |key: &str| -> Vec<String> {
+        record
+            .field_map
+            .display_value(key)
+            .unwrap_or_default()
+            .split_whitespace()
+            .map(str::to_string)
+            .collect()
+    };
+    if title == record.title && specs == stored("specs") && refs == stored("refs") {
         return Ok(Response::redirect(&format!("/doc/{}", record.id)));
     }
     let original = std::fs::read_to_string(&record.path).unwrap_or_default();
@@ -3806,15 +3794,9 @@ mod tests {
             field_map: crate::record::field_map::DocumentFieldMap::default(),
             is_group: false,
             title: "Login".to_string(),
-            story: None,
             group_id: None,
             group_title: None,
             description: None,
-            rationale: None,
-            applicability: None,
-            requirements: Vec::new(),
-            definition: None,
-            view: None,
             status: Some("pending".to_string()),
             ordinal: None,
             milestone_id: None,
@@ -3832,10 +3814,7 @@ mod tests {
             decision_type: None,
             superseded_by: None,
             superseded_title: None,
-            specs: vec!["UI-001".to_string(), "UI-002".to_string()],
             refs: vec!["docs/a.md".to_string()],
-            mockup_task: "TASK-1".to_string(),
-            audit_type: None,
             doc: crate::record::document::parse("# MOCK-001 Login\n").unwrap(),
             stored_source: String::new(),
             path: std::path::PathBuf::from("docs/specifications/ui/mockups/MOCK-001.html"),
@@ -3849,8 +3828,8 @@ mod tests {
                     "status".to_string(),
                     record.status.clone().unwrap_or_default(),
                 ),
-                ("task".to_string(), record.mockup_task.clone()),
-                ("specs".to_string(), record.specs.join(" ")),
+                ("task".to_string(), "TASK-1".to_string()),
+                ("specs".to_string(), "UI-001 UI-002".to_string()),
                 ("refs".to_string(), record.refs.join(" ")),
                 (
                     "superseded_by".to_string(),
@@ -3899,15 +3878,9 @@ mod tests {
             field_map: crate::record::field_map::DocumentFieldMap::default(),
             is_group: false,
             title: "Offline architecture".to_string(),
-            story: None,
             group_id: None,
             group_title: None,
             description: Some("Defines the local browser.".to_string()),
-            rationale: None,
-            applicability: None,
-            requirements: Vec::new(),
-            definition: None,
-            view: None,
             status: None,
             ordinal: None,
             milestone_id: None,
@@ -3925,10 +3898,7 @@ mod tests {
             decision_type: None,
             superseded_by: None,
             superseded_title: None,
-            specs: Vec::new(),
             refs: Vec::new(),
-            mockup_task: String::new(),
-            audit_type: None,
             doc: crate::record::document::parse(
                 "# TECH-001 Offline architecture\n\n## Description\nDefines the local browser.\n",
             )

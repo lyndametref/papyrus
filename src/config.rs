@@ -634,11 +634,14 @@ pub struct SeedDocumentType {
     pub member: Option<SeedRole>,
     /// Values written on create when the field is absent (ADR-042 ruling 1).
     pub field_defaults: &'static [(&'static str, &'static str)],
-    /// The browser-facing typed handler this seed slug keeps until MS-035.
-    ///
-    /// Carrying the handler here keeps one seed table authoritative (F13): the
-    /// descriptor never re-derives a slug-to-handler map.
-    pub handler: Option<crate::registry::TypedHandler>,
+    /// Whether the editor re-adopts front matter after an external editor
+    /// rewrites the record (the ui-spec engine rule; TECH-040).
+    pub editor_readopts_front_matter: bool,
+    /// Whether `view` keeps the record's trailing newline (the legacy
+    /// requirement and glossary CLI projection).
+    pub preserve_trailing_newline: bool,
+    /// Whether the list JSON shape carries the glossary `term` alias.
+    pub list_json_term_alias: bool,
     pub record: SeedRecord,
 }
 
@@ -674,9 +677,9 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
             fields: REQ_FIELDS,
             reference_visibility: Visibility::Hidden,
         }),
-        handler: Some(crate::registry::TypedHandler::Requirement(
-            crate::registry::RequirementKind::Business,
-        )),
+        editor_readopts_front_matter: false,
+        preserve_trailing_newline: true,
+        list_json_term_alias: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "business requirement",
@@ -709,9 +712,9 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
             fields: REQ_FIELDS,
             reference_visibility: Visibility::Hidden,
         }),
-        handler: Some(crate::registry::TypedHandler::Requirement(
-            crate::registry::RequirementKind::NonFunctional,
-        )),
+        editor_readopts_front_matter: false,
+        preserve_trailing_newline: true,
+        list_json_term_alias: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "non-functional requirement",
@@ -738,7 +741,9 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: GLOSSARY_FIELDS,
         group: None,
         member: None,
-        handler: Some(crate::registry::TypedHandler::Glossary),
+        editor_readopts_front_matter: false,
+        preserve_trailing_newline: true,
+        list_json_term_alias: true,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "glossary term",
@@ -765,7 +770,9 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: RULE_FIELDS,
         group: None,
         member: None,
-        handler: Some(crate::registry::TypedHandler::Rule),
+        editor_readopts_front_matter: false,
+        preserve_trailing_newline: false,
+        list_json_term_alias: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "business rule",
@@ -792,7 +799,9 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: UI_SPEC_FIELDS,
         group: None,
         member: None,
-        handler: Some(crate::registry::TypedHandler::UiSpec),
+        editor_readopts_front_matter: true,
+        preserve_trailing_newline: false,
+        list_json_term_alias: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "ui specification",
@@ -819,7 +828,9 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: &[],
         group: None,
         member: None,
-        handler: Some(crate::registry::TypedHandler::UiMockup),
+        editor_readopts_front_matter: false,
+        preserve_trailing_newline: false,
+        list_json_term_alias: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "ui mockup",
@@ -846,7 +857,9 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: AUDIT_FIELDS,
         group: None,
         member: None,
-        handler: Some(crate::registry::TypedHandler::Audit),
+        editor_readopts_front_matter: false,
+        preserve_trailing_newline: false,
+        list_json_term_alias: false,
         field_defaults: AUDIT_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "audit record",
@@ -873,7 +886,9 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: TECH_SPEC_FIELDS,
         group: None,
         member: None,
-        handler: Some(crate::registry::TypedHandler::TechSpec),
+        editor_readopts_front_matter: false,
+        preserve_trailing_newline: false,
+        list_json_term_alias: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "technical specification",
@@ -900,7 +915,9 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: DESCRIPTION_APPLICABILITY_FIELDS,
         group: None,
         member: None,
-        handler: Some(crate::registry::TypedHandler::UseCase),
+        editor_readopts_front_matter: false,
+        preserve_trailing_newline: false,
+        list_json_term_alias: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "use case",
@@ -927,7 +944,9 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: DESCRIPTION_APPLICABILITY_FIELDS,
         group: None,
         member: None,
-        handler: Some(crate::registry::TypedHandler::TestCase),
+        editor_readopts_front_matter: false,
+        preserve_trailing_newline: false,
+        list_json_term_alias: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "test case",
@@ -954,7 +973,9 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: DESCRIPTION_APPLICABILITY_FIELDS,
         group: None,
         member: None,
-        handler: Some(crate::registry::TypedHandler::TestReport),
+        editor_readopts_front_matter: false,
+        preserve_trailing_newline: false,
+        list_json_term_alias: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "test report",

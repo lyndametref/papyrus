@@ -192,20 +192,10 @@ fn breadcrumb_label(record: &Record) -> String {
         return routes::label(&record.descriptor);
     }
     match record.handler() {
-        Some(TypedHandler::Requirement(_)) => "Requirements".to_string(),
         Some(TypedHandler::Task) => "Tasks".to_string(),
         Some(TypedHandler::Milestone) => "Milestones".to_string(),
         Some(TypedHandler::Release) => "Releases".to_string(),
         Some(TypedHandler::Decision) => "Decisions".to_string(),
-        Some(TypedHandler::Glossary) => "Glossary".to_string(),
-        Some(TypedHandler::UiSpec) => "UI Specifications".to_string(),
-        Some(TypedHandler::UiMockup) => "UI Mockups".to_string(),
-        Some(TypedHandler::Rule) => "Business Rules".to_string(),
-        Some(TypedHandler::Audit) => "Audit Records".to_string(),
-        Some(TypedHandler::TechSpec) => "Technical Specifications".to_string(),
-        Some(TypedHandler::UseCase) => "Use Cases".to_string(),
-        Some(TypedHandler::TestCase) => "Test Cases".to_string(),
-        Some(TypedHandler::TestReport) => "Test Reports".to_string(),
         None => record.type_label(),
     }
 }
@@ -253,34 +243,6 @@ fn edit_breadcrumb(record: &Record, _resolved_group: Option<&Record>) -> String 
         "<nav class=\"breadcrumb\" aria-label=\"Breadcrumb\"><ol>{}</ol></nav>",
         items
     )
-}
-
-fn owning_group_dd(record: &Record, resolved_group: Option<&Record>) -> String {
-    if record.is_group {
-        return "<dd class=\"link-muted\">None (group record)</dd>".to_string();
-    }
-    if !record.is_requirement() {
-        return "<dd class=\"link-muted\">(none)</dd>".to_string();
-    }
-    match (record.group_id.as_deref(), resolved_group) {
-        (Some(id), Some(group)) => format!(
-            "<dd><a href=\"/doc/{}\">{} {}</a></dd>",
-            escape(&group.id),
-            escape(id),
-            escape(&group.title)
-        ),
-        (Some(id), None) => {
-            let stored = match &record.group_title {
-                Some(title) => format!("{} {}", id, title),
-                None => id.to_string(),
-            };
-            format!(
-                "<dd>{} <span class=\"unresolved\">(not an active group)</span></dd>",
-                escape(&stored)
-            )
-        }
-        (None, _) => "<dd class=\"link-muted\">None</dd>".to_string(),
-    }
 }
 
 fn record_view(record: &Record) -> Option<crate::record::view::RecordView> {
@@ -384,28 +346,6 @@ fn read_only_timestamps(record: &Record) -> String {
 }
 
 fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_only: bool) -> String {
-    let owning = if group_id_only {
-        if record.is_group {
-            "<dd class=\"link-muted\">None (group record)</dd>".to_string()
-        } else if record.is_requirement() {
-            match (record.group_id.as_deref(), resolved_group) {
-                (Some(id), Some(group)) => format!(
-                    "<dd><a href=\"/doc/{}\">{}</a></dd>",
-                    escape(&group.id),
-                    escape(id)
-                ),
-                (Some(id), None) => format!(
-                    "<dd>{} <span class=\"unresolved\">(not an active group)</span></dd>",
-                    escape(id)
-                ),
-                (None, _) => "<dd class=\"link-muted\">None</dd>".to_string(),
-            }
-        } else {
-            "<dd class=\"link-muted\">(none)</dd>".to_string()
-        }
-    } else {
-        owning_group_dd(record, resolved_group)
-    };
     let view = record_view(record);
     let created = view
         .as_ref()
@@ -425,9 +365,29 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
     } else {
         updated
     };
-    let include_owning = record.is_requirement() && !record.is_group;
-    let owning_row = if include_owning {
-        format!("<div><dt>Owning group</dt>{}</div>", owning)
+    let owning_row = if record.descriptor.document_model
+        == crate::registry::DocumentModel::GroupedMarkdown
+        && !record.is_group
+        && let Some(group_id) = record.group_id.as_deref()
+    {
+        let link = match resolved_group {
+            Some(group) if group_id_only => format!(
+                "<dd><a href=\"/doc/{}\">{}</a></dd>",
+                escape(&group.id),
+                escape(group_id)
+            ),
+            Some(group) => format!(
+                "<dd><a href=\"/doc/{}\">{} {}</a></dd>",
+                escape(&group.id),
+                escape(group_id),
+                escape(&group.title)
+            ),
+            None => format!(
+                "<dd>{} <span class=\"unresolved\">(not an active group)</span></dd>",
+                escape(group_id)
+            ),
+        };
+        format!("<div><dt>Owning group</dt>{link}</div>")
     } else {
         String::new()
     };
@@ -443,6 +403,14 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
         escape(&updated),
         owning_row
     )
+}
+
+fn metadata_block_backlog(
+    record: &Record,
+    _related_milestone: Option<&Record>,
+    _related_release: Option<&Record>,
+) -> String {
+    metadata_block(record, None, false)
 }
 
 fn requirement_link(record: &Record) -> String {
@@ -1172,7 +1140,6 @@ pub fn list_page(
 pub fn view_page(
     record: &Record,
     resolved_group: Option<&Record>,
-    members: &[Record],
     related_milestone: Option<&Record>,
     related_release: Option<&Record>,
     resolved_dependencies: &[Option<Record>],
@@ -1187,36 +1154,6 @@ pub fn view_page(
     let mut has_diagram = false;
     let mut next_diagram = 1u32;
     match record.handler() {
-        Some(TypedHandler::Requirement(_)) => {
-            if record.supports_story()
-                && let Some(story) = &record.story
-            {
-                let prose = math::prose_with_diagrams(story, "", &mut next_diagram);
-                has_math |= prose.has_math;
-                has_diagram |= prose.has_diagram;
-                content.push_str(&format!(
-                    "<section class=\"record-section\"><h2>User story</h2>{}</section>",
-                    prose.html
-                ));
-            }
-            content.push_str("<section class=\"record-section\"><h2>Description</h2>");
-            match &record.description {
-                Some(description) => {
-                    let prose = math::prose_with_diagrams(description, "", &mut next_diagram);
-                    has_math |= prose.has_math;
-                    has_diagram |= prose.has_diagram;
-                    content.push_str(&prose.html);
-                }
-                None => content.push_str("<p class=\"text empty-text\">No description.</p>"),
-            }
-            content.push_str("</section>");
-            if record.is_group {
-                content.push_str(&format!(
-                    "<section class=\"record-section\"><h2>Requirements in this group</h2>{}</section>",
-                    member_list(members)
-                ));
-            }
-        }
         Some(TypedHandler::Task) => {
             // Status
             content.push_str(&format!(
@@ -1410,210 +1347,6 @@ pub fn view_page(
             }
             content.push_str("</section>");
         }
-        Some(TypedHandler::Glossary) => {
-            content.push_str("<section class=\"record-section\"><h2>Definition</h2>");
-            match &record.definition {
-                Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose_with_diagrams(
-                        t,
-                        " style=\"white-space: pre-wrap\"",
-                        &mut next_diagram,
-                    );
-                    has_math |= prose.has_math;
-                    has_diagram |= prose.has_diagram;
-                    content.push_str(&prose.html);
-                }
-                _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
-            }
-            content.push_str("</section>");
-        }
-        Some(TypedHandler::UiSpec) => {
-            content.push_str("<section class=\"record-section\"><h2>View</h2>");
-            match &record.view {
-                Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose_with_diagrams(
-                        t,
-                        " style=\"white-space: pre-wrap\"",
-                        &mut next_diagram,
-                    );
-                    has_math |= prose.has_math;
-                    has_diagram |= prose.has_diagram;
-                    content.push_str(&prose.html);
-                }
-                _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
-            }
-            content.push_str("</section>");
-            content.push_str("<section class=\"record-section\"><h2>Description</h2>");
-            match &record.description {
-                Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose_with_diagrams(
-                        t,
-                        " style=\"white-space: pre-wrap\"",
-                        &mut next_diagram,
-                    );
-                    has_math |= prose.has_math;
-                    has_diagram |= prose.has_diagram;
-                    content.push_str(&prose.html);
-                }
-                _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
-            }
-            content.push_str("</section>");
-        }
-        Some(TypedHandler::UiMockup) => {
-            // Shared parser values loaded with the record (section 3);
-            // the stored package itself is never rendered or embedded.
-            let specs = record.specs.join(" ");
-            let refs = record.refs.join(" ");
-            content.push_str("<section class=\"record-section\"><h2>UI specifications</h2>");
-            if specs.is_empty() {
-                content.push_str("<p class=\"text empty-text\">(none)</p>");
-            } else {
-                content.push_str(&format!(
-                    "<p class=\"text\" style=\"white-space: pre-wrap\">{}</p>",
-                    escape(&specs)
-                ));
-            }
-            content.push_str("</section>");
-            if !refs.is_empty() {
-                content.push_str(&format!(
-                    "<section class=\"record-section\"><h2>References</h2><p class=\"text\" style=\"white-space: pre-wrap\">{}</p></section>",
-                    escape(&refs)
-                ));
-            }
-        }
-        Some(TypedHandler::Rule) => {
-            // Description
-            content.push_str("<section class=\"record-section\"><h2>Description</h2>");
-            match &record.description {
-                Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose_with_diagrams(
-                        t,
-                        " style=\"white-space: pre-wrap\"",
-                        &mut next_diagram,
-                    );
-                    has_math |= prose.has_math;
-                    has_diagram |= prose.has_diagram;
-                    content.push_str(&prose.html);
-                }
-                _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
-            }
-            content.push_str("</section>");
-            // Rationale
-            content.push_str("<section class=\"record-section\"><h2>Rationale</h2>");
-            match &record.rationale {
-                Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose_with_diagrams(
-                        t,
-                        " style=\"white-space: pre-wrap\"",
-                        &mut next_diagram,
-                    );
-                    has_math |= prose.has_math;
-                    has_diagram |= prose.has_diagram;
-                    content.push_str(&prose.html);
-                }
-                _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
-            }
-            content.push_str("</section>");
-            // Applicability
-            content.push_str("<section class=\"record-section\"><h2>Applicability</h2>");
-            match &record.applicability {
-                Some(t) if !t.trim().is_empty() => {
-                    let prose = math::prose_with_diagrams(
-                        t,
-                        " style=\"white-space: pre-wrap\"",
-                        &mut next_diagram,
-                    );
-                    has_math |= prose.has_math;
-                    has_diagram |= prose.has_diagram;
-                    content.push_str(&prose.html);
-                }
-                _ => content.push_str("<p class=\"text empty-text\">(none)</p>"),
-            }
-            content.push_str("</section>");
-            // Requirements (rendered at the end as a disclosure section)
-            if !record.requirements.is_empty() {
-                details.push_str(&format!(
-                    "<details><summary>Requirements ({})</summary><ul class=\"req-list\">",
-                    record.requirements.len()
-                ));
-                for (i, req) in record.requirements.iter().enumerate() {
-                    let resolved = resolved_refs.get(i).and_then(|r| r.as_ref());
-                    match resolved {
-                        Some(rel) => details.push_str(&format!(
-                            "<li><a href=\"/doc/{}\">{}</a></li>",
-                            escape(&rel.id),
-                            escape(req)
-                        )),
-                        None => details.push_str(&format!("<li>{}</li>", escape(req))),
-                    }
-                }
-                details.push_str("</ul></details>");
-            }
-        }
-        Some(TypedHandler::Audit) => {
-            content.push_str(&format!(
-                "<p class=\"text\">Audit type: {}</p>",
-                escape(record.audit_type.as_deref().unwrap_or("security"))
-            ));
-            let content_text = record.description.as_deref().unwrap_or("");
-            if content_text.trim().is_empty() {
-                content.push_str("<p class=\"text empty-text\">(none)</p>");
-            } else {
-                let prose = math::prose_with_diagrams(
-                    content_text,
-                    " style=\"white-space: pre-wrap\"",
-                    &mut next_diagram,
-                );
-                has_math |= prose.has_math;
-                has_diagram |= prose.has_diagram;
-                content.push_str(&prose.html);
-            }
-        }
-        Some(TypedHandler::TechSpec) => {
-            // The description is body text: no "Description" heading. The
-            // shared `.text` class already applies `white-space: pre-wrap`.
-            let content_text = record.description.as_deref().unwrap_or("");
-            if content_text.trim().is_empty() {
-                content.push_str("<p class=\"text empty-text\">(none)</p>");
-            } else {
-                let prose = math::prose_with_diagrams(content_text, "", &mut next_diagram);
-                has_math |= prose.has_math;
-                has_diagram |= prose.has_diagram;
-                content.push_str(&prose.html);
-            }
-        }
-        Some(TypedHandler::UseCase)
-        | Some(TypedHandler::TestCase)
-        | Some(TypedHandler::TestReport) => {
-            let content_text = record.description.as_deref().unwrap_or("");
-            if content_text.trim().is_empty() {
-                content.push_str("<p class=\"text empty-text\">(none)</p>");
-            } else {
-                let prose = math::prose_with_diagrams(
-                    content_text,
-                    " style=\"white-space: pre-wrap\"",
-                    &mut next_diagram,
-                );
-                has_math |= prose.has_math;
-                has_diagram |= prose.has_diagram;
-                content.push_str(&prose.html);
-            }
-            if let Some(app) = &record.applicability
-                && !app.trim().is_empty()
-            {
-                let prose = math::prose_with_diagrams(
-                    app,
-                    " style=\"white-space: pre-wrap\"",
-                    &mut next_diagram,
-                );
-                has_math |= prose.has_math;
-                has_diagram |= prose.has_diagram;
-                content.push_str(&format!(
-                    "<section class=\"record-section\"><h2>Applicability</h2>{}</section>",
-                    prose.html
-                ));
-            }
-        }
         None => {
             content.push_str("<section class=\"record-section\"><h2>Description</h2>");
             match &record.description {
@@ -1629,7 +1362,7 @@ pub fn view_page(
         }
     }
 
-    if !resolved_refs.is_empty() && record.handler() != Some(TypedHandler::Rule) {
+    if !resolved_refs.is_empty() {
         details.push_str(&format!(
             "<details><summary>References ({})</summary><ul class=\"req-list\">",
             resolved_refs.len()
@@ -1662,24 +1395,6 @@ pub fn view_page(
         }
         details.push_str("</ul></details>");
     }
-    if record.is_requirement()
-        && !record.is_group
-        && let Some(group_id) = record.group_id.as_deref()
-    {
-        if let Some(group) = resolved_group {
-            details.push_str(&format!(
-                    "<details><summary>Owning group</summary><p><a href=\"/doc/{}\">{} {}</a></p></details>",
-                    escape(&group.id),
-                    escape(group_id),
-                    escape(&group.title)
-                ));
-        } else {
-            details.push_str(&format!(
-                    "<details><summary>Owning group</summary><p>{} <span class=\"unresolved\">(not an active group)</span></p></details>",
-                    escape(group_id)
-                ));
-        }
-    }
     // Decision type and Status are surfaced through the page_head (rendered
     // under the content per ADR-033); they are not prepended above the
     // artifact content. UiMockup records no longer re-add a document type
@@ -1692,7 +1407,6 @@ pub fn view_page(
             "labels",
             "status",
             "decision_type",
-            "audit_type",
         ],
     );
     if !extra.is_empty() {
@@ -1707,17 +1421,6 @@ pub fn view_page(
         }
         out.push_str("</div>");
         out
-    };
-    // UI mockups store their status in HTML metadata rather than in a
-    // rendered section, so surface it with the same read-only status line as
-    // the generic document detail page (specification 4.1.3).
-    let status_line = if record.handler() == Some(TypedHandler::UiMockup) {
-        format!(
-            "<p class=\"status-line\"><span class=\"badge\">Status</span> {}</p>",
-            escape(&record.status_text())
-        )
-    } else {
-        String::new()
     };
     let view = record_view(record);
     let created = view
@@ -1746,22 +1449,7 @@ pub fn view_page(
     } else {
         details.clone()
     };
-    let page_head = if record.handler() == Some(TypedHandler::Audit) {
-        let audit_type = record.audit_type.as_deref().unwrap_or("security");
-        format!(
-            "<div class=\"page-head\"><div><p class=\"id\">{} <span class=\"badge\">{}</span> <span class=\"badge\">{}</span></p><h1 class=\"h1\">{}</h1><p class=\"sub\">Created date: {} \u{00b7} Updated date: {}</p>{}{}</div>\
-<div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Edit</a></div></div>",
-            id,
-            escape(audit_type),
-            status,
-            title,
-            escape(&created),
-            escape(&updated),
-            taglist,
-            details_html,
-            id
-        )
-    } else if record.handler() == Some(TypedHandler::Decision) {
+    let page_head = if record.handler() == Some(TypedHandler::Decision) {
         let decision_type = record.decision_type.as_deref().unwrap_or("(none)");
         format!(
             "<div class=\"page-head\"><div><p class=\"id\">{} <span class=\"badge\">{}</span></p><h1 class=\"h1\">{}</h1><p class=\"sub\">Decision type: {} \u{00b7} Created date: {} \u{00b7} Updated date: {}</p>{}{}</div>\
@@ -1775,12 +1463,6 @@ pub fn view_page(
             taglist,
             details_html,
             id
-        )
-    } else if record.handler() == Some(TypedHandler::UiMockup) {
-        format!(
-            "<div class=\"page-head\"><div><p class=\"id\">{}</p><h1 class=\"h1\">{}</h1>{}{}</div>\
-<div class=\"actions\"><a class=\"btn btn-primary\" href=\"/doc/{}/edit\">Edit</a></div></div>",
-            id, title, taglist, status_line, id
         )
     } else {
         format!(
@@ -1798,11 +1480,7 @@ pub fn view_page(
     };
     let title = format!("Papyrus \u{2014} {} {}", record.id, record.title);
     let breadcrumb_html = breadcrumb(record, resolved_group, related_milestone, related_release);
-    let meta_html = if record.handler() == Some(TypedHandler::UiMockup) {
-        metadata_block_backlog(record, related_milestone, related_release)
-    } else {
-        String::new()
-    };
+    let meta_html = String::new();
     let body = render_template(
         VIEW_TEMPLATE,
         &[],
@@ -1824,14 +1502,6 @@ pub fn view_page(
     RecordPage { html, has_diagram }
 }
 
-fn metadata_block_backlog(
-    record: &Record,
-    _related_milestone: Option<&Record>,
-    _related_release: Option<&Record>,
-) -> String {
-    metadata_block(record, None, false)
-}
-
 /// Submitted values shown on the edit form (pristine or after a 422).
 #[derive(Clone, Debug, Default)]
 pub struct EditValues {
@@ -1841,19 +1511,6 @@ pub struct EditValues {
 }
 
 /// Field-level validation messages.
-#[derive(Clone, Debug, Default)]
-pub struct FieldErrors {
-    pub title: Option<String>,
-    pub story: Option<String>,
-    pub description: Option<String>,
-}
-
-impl FieldErrors {
-    pub fn any(&self) -> bool {
-        self.title.is_some() || self.story.is_some() || self.description.is_some()
-    }
-}
-
 #[derive(Clone, Debug, Default)]
 pub struct TaskEditValues {
     pub title: String,
@@ -1958,44 +1615,6 @@ impl DecisionFieldErrors {
     }
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct GlossaryEditValues {
-    pub title: String,
-    pub definition: String,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct GlossaryFieldErrors {
-    pub title: Option<String>,
-    pub definition: Option<String>,
-}
-
-impl GlossaryFieldErrors {
-    pub fn any(&self) -> bool {
-        self.title.is_some() || self.definition.is_some()
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct UiSpecEditValues {
-    pub title: String,
-    pub view: String,
-    pub description: String,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct UiSpecFieldErrors {
-    pub title: Option<String>,
-    pub view: Option<String>,
-    pub description: Option<String>,
-}
-
-impl UiSpecFieldErrors {
-    pub fn any(&self) -> bool {
-        self.title.is_some() || self.view.is_some() || self.description.is_some()
-    }
-}
-
 fn field_error(id: &str, message: Option<&str>) -> String {
     match message {
         Some(message) => format!(
@@ -2012,108 +1631,6 @@ fn invalid_attrs(id: &str, message: Option<&str>) -> String {
         Some(_) => format!(" aria-invalid=\"true\" aria-describedby=\"{}-error\"", id),
         None => String::new(),
     }
-}
-
-/// Render the edit form, including validation recovery.
-pub fn edit_page(
-    record: &Record,
-    resolved_group: Option<&Record>,
-    values: &EditValues,
-    errors: &FieldErrors,
-    version: &str,
-    cfg: &Config,
-    chrome: Chrome<'_>,
-) -> String {
-    let mut form = String::new();
-    form.push_str(&format!(
-        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard>\
-<input type=\"hidden\" name=\"version\" value=\"{}\">",
-        escape(&record.id),
-        escape(version)
-    ));
-
-    if errors.any() {
-        form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
-        for (field, message) in [
-            ("title", errors.title.as_deref()),
-            ("story", errors.story.as_deref()),
-            ("description", errors.description.as_deref()),
-        ] {
-            if let Some(message) = message {
-                form.push_str(&format!(
-                    "<li><a href=\"#{}\">{}</a></li>",
-                    field,
-                    escape(message)
-                ));
-            }
-        }
-        form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
-    }
-
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"title\">Title <span class=\"req\">(required)</span></label>\
-<input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}>\
-<p class=\"help\">Required \u{b7} 1 to 200 characters \u{b7} shown in lists and headings.</p>{}</div>",
-        escape(&values.title),
-        invalid_attrs("title", errors.title.as_deref()),
-        field_error("title", errors.title.as_deref())
-    ));
-
-    if record.supports_story() {
-        form.push_str(&format!(
-            "<div class=\"field\"><label for=\"story\">User story</label>\
-<textarea class=\"textarea\" id=\"story\" name=\"story\" rows=\"4\"{}>{}</textarea>\
-<p class=\"help\">Optional \u{b7} plain text \u{b7} line breaks are preserved.</p>{}</div>",
-            invalid_attrs("story", errors.story.as_deref()),
-            escape(&values.story),
-            field_error("story", errors.story.as_deref())
-        ));
-    }
-
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"description\">Description</label>\
-<textarea class=\"textarea\" id=\"description\" name=\"description\" rows=\"6\"{}>{}</textarea>\
-<p class=\"help\">Optional \u{b7} a line starting with ## is not allowed.</p>{}</div>",
-        invalid_attrs("description", errors.description.as_deref()),
-        escape(&values.description),
-        field_error("description", errors.description.as_deref())
-    ));
-
-    form.push_str(&read_only_timestamps(record));
-    form.push_str(
-        "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
-    );
-    form.push_str(&format!(
-        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button>\
-<a class=\"link\" href=\"/doc/{}\">Cancel</a>\
-<span class=\"form-note\" data-form-note>Returns to the record view without saving.</span></div></form>",
-        escape(&record.id)
-    ));
-
-    let page_head = format!(
-        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div>\
-<p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
-        escape(&record.id),
-        escape(&record.title)
-    );
-    let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    let body = render_template(
-        EDIT_TEMPLATE,
-        &[],
-        &[
-            ("breadcrumb", &edit_breadcrumb(record, resolved_group)),
-            ("page_head", &page_head),
-            ("meta", &metadata_block(record, resolved_group, true)),
-            ("form", &form),
-        ],
-    );
-    page(
-        chrome,
-        PageRoute::Other,
-        &title,
-        &sidebar(Some(record.slug()), cfg, chrome.routes),
-        body,
-    )
 }
 
 pub fn edit_page_task(
@@ -2492,845 +2009,6 @@ pub fn edit_page_decision(
     )
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct UiMockupEditValues {
-    pub title: String,
-    pub specs: Vec<String>,
-    pub refs: Vec<String>,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct UiMockupFieldErrors {
-    pub title: Option<String>,
-    pub specs: Option<String>,
-    pub refs: Option<String>,
-}
-
-impl UiMockupFieldErrors {
-    pub fn any(&self) -> bool {
-        self.title.is_some() || self.specs.is_some() || self.refs.is_some()
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct BusinessRuleEditValues {
-    pub title: String,
-    pub description: String,
-    pub rationale: String,
-    pub applicability: String,
-    pub requirements: Vec<String>,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct BusinessRuleFieldErrors {
-    pub title: Option<String>,
-    pub description: Option<String>,
-    pub rationale: Option<String>,
-    pub applicability: Option<String>,
-    pub requirements: Option<String>,
-}
-
-impl BusinessRuleFieldErrors {
-    pub fn any(&self) -> bool {
-        self.title.is_some()
-            || self.description.is_some()
-            || self.rationale.is_some()
-            || self.applicability.is_some()
-            || self.requirements.is_some()
-    }
-}
-
-pub fn edit_page_glossary(
-    record: &Record,
-    values: &GlossaryEditValues,
-    errors: &GlossaryFieldErrors,
-    version: &str,
-    cfg: &Config,
-    chrome: Chrome<'_>,
-) -> String {
-    let mut form = String::new();
-    form.push_str(&format!(
-        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard><input type=\"hidden\" name=\"version\" value=\"{}\">",
-        escape(&record.id),
-        escape(version)
-    ));
-    if errors.any() {
-        form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
-        for (field, msg) in [
-            ("title", errors.title.as_deref()),
-            ("definition", errors.definition.as_deref()),
-        ] {
-            if let Some(m) = msg {
-                form.push_str(&format!(
-                    "<li><a href=\"#{}\">{}</a></li>",
-                    field,
-                    escape(m)
-                ));
-            }
-        }
-        form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
-    }
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"title\">Term <span class=\"req\">(required)</span></label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}><p class=\"help\">Required.</p>{}</div>",
-        escape(&values.title),
-        invalid_attrs("title", errors.title.as_deref()),
-        field_error("title", errors.title.as_deref())
-    ));
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"definition\">Definition</label><textarea class=\"textarea\" id=\"definition\" name=\"definition\" rows=\"6\"{}>{}</textarea><p class=\"help\">Optional.</p>{}</div>",
-        invalid_attrs("definition", errors.definition.as_deref()),
-        escape(&values.definition),
-        field_error("definition", errors.definition.as_deref())
-    ));
-    form.push_str(&read_only_timestamps(record));
-    form.push_str(
-        "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
-    );
-    form.push_str(&format!(
-        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
-        escape(&record.id)
-    ));
-
-    let page_head = format!(
-        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div><p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
-        escape(&record.id),
-        escape(&record.title)
-    );
-    let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    let body = render_template(
-        EDIT_TEMPLATE,
-        &[],
-        &[
-            ("breadcrumb", &edit_breadcrumb(record, None)),
-            ("page_head", &page_head),
-            ("meta", &metadata_block_backlog(record, None, None)),
-            ("form", &form),
-        ],
-    );
-    page(
-        chrome,
-        PageRoute::Other,
-        &title,
-        &sidebar(Some(record.slug()), cfg, chrome.routes),
-        body,
-    )
-}
-
-pub fn edit_page_ui_spec(
-    record: &Record,
-    values: &UiSpecEditValues,
-    errors: &UiSpecFieldErrors,
-    version: &str,
-    cfg: &Config,
-    chrome: Chrome<'_>,
-) -> String {
-    let mut form = String::new();
-    form.push_str(&format!(
-        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard><input type=\"hidden\" name=\"version\" value=\"{}\">",
-        escape(&record.id),
-        escape(version)
-    ));
-    if errors.any() {
-        form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
-        for (field, msg) in [
-            ("title", errors.title.as_deref()),
-            ("view", errors.view.as_deref()),
-            ("description", errors.description.as_deref()),
-        ] {
-            if let Some(m) = msg {
-                form.push_str(&format!(
-                    "<li><a href=\"#{}\">{}</a></li>",
-                    field,
-                    escape(m)
-                ));
-            }
-        }
-        form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
-    }
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"title\">Title <span class=\"req\">(required)</span></label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}><p class=\"help\">Required.</p>{}</div>",
-        escape(&values.title),
-        invalid_attrs("title", errors.title.as_deref()),
-        field_error("title", errors.title.as_deref())
-    ));
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"view\">View <span class=\"req\">(required)</span></label><input class=\"input\" id=\"view\" name=\"view\" type=\"text\" required value=\"{}\"{}><p class=\"help\">Required.</p>{}</div>",
-        escape(&values.view),
-        invalid_attrs("view", errors.view.as_deref()),
-        field_error("view", errors.view.as_deref())
-    ));
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"description\">Description</label><textarea class=\"textarea\" id=\"description\" name=\"description\" rows=\"6\"{}>{}</textarea><p class=\"help\">Optional.</p>{}</div>",
-        invalid_attrs("description", errors.description.as_deref()),
-        escape(&values.description),
-        field_error("description", errors.description.as_deref())
-    ));
-    form.push_str(&read_only_timestamps(record));
-    form.push_str(
-        "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
-    );
-    form.push_str(&format!(
-        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
-        escape(&record.id)
-    ));
-
-    let page_head = format!(
-        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div><p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
-        escape(&record.id),
-        escape(&record.title)
-    );
-    let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    let body = render_template(
-        EDIT_TEMPLATE,
-        &[],
-        &[
-            ("breadcrumb", &edit_breadcrumb(record, None)),
-            ("page_head", &page_head),
-            ("meta", &metadata_block_backlog(record, None, None)),
-            ("form", &form),
-        ],
-    );
-    page(
-        chrome,
-        PageRoute::Other,
-        &title,
-        &sidebar(Some(record.slug()), cfg, chrome.routes),
-        body,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn tag_field(
-    field_id: &str,
-    add_id: &str,
-    label_html: &str,
-    values: &[String],
-    placeholder: &str,
-    help: &str,
-    error: Option<&str>,
-    value_noun: &str,
-) -> String {
-    let mut tags = String::new();
-    for (index, value) in values.iter().enumerate() {
-        tags.push_str(&format!(
-            "<span class=\"tag\"><input class=\"tag-input\" id=\"{}-tag-{}\" name=\"{}\" type=\"text\" value=\"{}\" aria-label=\"{} {}\"><button class=\"tag-remove\" type=\"button\" aria-label=\"Remove {}\" data-remove>&times;</button></span>",
-            field_id,
-            index,
-            field_id,
-            escape(value),
-            value_noun,
-            index + 1,
-            escape(value)
-        ));
-    }
-    let described = document_described_by(field_id, Some(help), error);
-    let add_input = format!(
-        "<input class=\"tag-input tag-add\" id=\"{}\" name=\"{}\" type=\"text\" placeholder=\"{}\"{}>",
-        add_id,
-        field_id,
-        escape(placeholder),
-        described
-    );
-    let help_html = if help.trim().is_empty() {
-        String::new()
-    } else {
-        format!(
-            "<p class=\"help\" id=\"{}-help\">{}</p>",
-            field_id,
-            escape(help)
-        )
-    };
-    format!(
-        "<div class=\"field\" id=\"{}\"><label for=\"{}\">{}</label><div class=\"tagbox\" data-tagbox=\"{}\">{}{}</div><div class=\"add-line\"><button class=\"btn\" type=\"button\" data-add=\"{}\">Add</button></div>{}{}</div>",
-        field_id,
-        add_id,
-        label_html,
-        field_id,
-        tags,
-        add_input,
-        field_id,
-        help_html,
-        field_error(field_id, error)
-    )
-}
-
-pub fn edit_page_ui_mockup(
-    record: &Record,
-    values: &UiMockupEditValues,
-    errors: &UiMockupFieldErrors,
-    version: &str,
-    cfg: &Config,
-    chrome: Chrome<'_>,
-) -> String {
-    let mut form = String::new();
-    form.push_str(&format!(
-        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard><input type=\"hidden\" name=\"version\" value=\"{}\">",
-        escape(&record.id),
-        escape(version)
-    ));
-    if errors.any() {
-        form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
-        for (field, msg) in [
-            ("title", errors.title.as_deref()),
-            ("specs", errors.specs.as_deref()),
-            ("refs", errors.refs.as_deref()),
-        ] {
-            if let Some(m) = msg {
-                form.push_str(&format!(
-                    "<li><a href=\"#{}\">{}</a></li>",
-                    field,
-                    escape(m)
-                ));
-            }
-        }
-        form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
-    }
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"title\">Title <span class=\"req\">(required)</span></label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}><p class=\"help\">Required \u{b7} 1 to 200 characters \u{b7} shown in lists and headings.</p>{}</div>",
-        escape(&values.title),
-        invalid_attrs("title", errors.title.as_deref()),
-        field_error("title", errors.title.as_deref())
-    ));
-    form.push_str(&tag_field(
-        "specs",
-        "specs-add",
-        "UI specifications <span class=\"req\">(required)</span>",
-        &values.specs,
-        "Add UI specification id (e.g. UI-003)",
-        "Required \u{b7} one or more UI specification ids \u{b7} added one at a time.",
-        errors.specs.as_deref(),
-        "UI specification",
-    ));
-    form.push_str(&tag_field(
-        "refs",
-        "refs-add",
-        "References",
-        &values.refs,
-        "Add a reference (e.g. docs/specifications/ui-mockups-management.md)",
-        "Optional \u{b7} references to other documents.",
-        errors.refs.as_deref(),
-        "Reference",
-    ));
-    form.push_str(&read_only_timestamps(record));
-    form.push_str(
-        "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
-    );
-    form.push_str(&format!(
-        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
-        escape(&record.id)
-    ));
-
-    let page_head = format!(
-        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div><p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
-        escape(&record.id),
-        escape(&record.title)
-    );
-    let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    let body = render_template(
-        EDIT_TEMPLATE,
-        &[],
-        &[
-            ("breadcrumb", &edit_breadcrumb(record, None)),
-            ("page_head", &page_head),
-            ("meta", &metadata_block_backlog(record, None, None)),
-            ("form", &form),
-        ],
-    );
-    page(
-        chrome,
-        PageRoute::Other,
-        &title,
-        &sidebar(Some(record.slug()), cfg, chrome.routes),
-        body,
-    )
-}
-
-pub fn edit_page_business_rule(
-    record: &Record,
-    values: &BusinessRuleEditValues,
-    errors: &BusinessRuleFieldErrors,
-    version: &str,
-    cfg: &Config,
-    chrome: Chrome<'_>,
-) -> String {
-    let mut form = String::new();
-    form.push_str(&format!(
-        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard><input type=\"hidden\" name=\"version\" value=\"{}\">",
-        escape(&record.id),
-        escape(version)
-    ));
-    if errors.any() {
-        form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
-        for (field, msg) in [
-            ("title", errors.title.as_deref()),
-            ("description", errors.description.as_deref()),
-            ("rationale", errors.rationale.as_deref()),
-            ("applicability", errors.applicability.as_deref()),
-            ("requirements", errors.requirements.as_deref()),
-        ] {
-            if let Some(m) = msg {
-                form.push_str(&format!(
-                    "<li><a href=\"#{}\">{}</a></li>",
-                    field,
-                    escape(m)
-                ));
-            }
-        }
-        form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
-    }
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"title\">Title <span class=\"req\">(required)</span></label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}><p class=\"help\">Required.</p>{}</div>",
-        escape(&values.title),
-        invalid_attrs("title", errors.title.as_deref()),
-        field_error("title", errors.title.as_deref())
-    ));
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"description\">Description</label><textarea class=\"textarea\" id=\"description\" name=\"description\" rows=\"6\"{}>{}</textarea><p class=\"help\">Optional.</p>{}</div>",
-        invalid_attrs("description", errors.description.as_deref()),
-        escape(&values.description),
-        field_error("description", errors.description.as_deref())
-    ));
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"rationale\">Rationale</label><textarea class=\"textarea\" id=\"rationale\" name=\"rationale\" rows=\"6\"{}>{}</textarea><p class=\"help\">Optional.</p>{}</div>",
-        invalid_attrs("rationale", errors.rationale.as_deref()),
-        escape(&values.rationale),
-        field_error("rationale", errors.rationale.as_deref())
-    ));
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"applicability\">Applicability</label><textarea class=\"textarea\" id=\"applicability\" name=\"applicability\" rows=\"6\"{}>{}</textarea><p class=\"help\">Optional.</p>{}</div>",
-        invalid_attrs("applicability", errors.applicability.as_deref()),
-        escape(&values.applicability),
-        field_error("applicability", errors.applicability.as_deref())
-    ));
-    form.push_str(&tag_field(
-        "requirements",
-        "requirements-add",
-        "Requirements",
-        &values.requirements,
-        "Add a requirement id (e.g. REQ-001.001)",
-        "Optional \\u{b7} business requirement ids.",
-        errors.requirements.as_deref(),
-        "Requirement",
-    ));
-    form.push_str(&read_only_timestamps(record));
-    form.push_str(
-        "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
-    );
-    form.push_str(&format!(
-        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
-        escape(&record.id)
-    ));
-
-    let page_head = format!(
-        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div><p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
-        escape(&record.id),
-        escape(&record.title)
-    );
-    let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    let body = render_template(
-        EDIT_TEMPLATE,
-        &[],
-        &[
-            ("breadcrumb", &edit_breadcrumb(record, None)),
-            ("page_head", &page_head),
-            ("meta", &metadata_block_backlog(record, None, None)),
-            ("form", &form),
-        ],
-    );
-    page(
-        chrome,
-        PageRoute::Other,
-        &title,
-        &sidebar(Some(record.slug()), cfg, chrome.routes),
-        body,
-    )
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct AuditEditValues {
-    pub title: String,
-    pub audit_type: String,
-    pub content: String,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct AuditFieldErrors {
-    pub title: Option<String>,
-    pub audit_type: Option<String>,
-    pub content: Option<String>,
-}
-
-impl AuditFieldErrors {
-    pub fn any(&self) -> bool {
-        self.title.is_some() || self.audit_type.is_some() || self.content.is_some()
-    }
-}
-
-pub fn edit_page_audit_record(
-    record: &Record,
-    values: &AuditEditValues,
-    errors: &AuditFieldErrors,
-    version: &str,
-    cfg: &Config,
-    chrome: Chrome<'_>,
-) -> String {
-    let mut form = String::new();
-    form.push_str(&format!(
-        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard><input type=\"hidden\" name=\"version\" value=\"{}\">",
-        escape(&record.id),
-        escape(version)
-    ));
-    if errors.any() {
-        form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
-        for (field, msg) in [
-            ("title", errors.title.as_deref()),
-            ("audit_type", errors.audit_type.as_deref()),
-            ("content", errors.content.as_deref()),
-        ] {
-            if let Some(m) = msg {
-                form.push_str(&format!(
-                    "<li><a href=\"#{}\">{}</a></li>",
-                    field,
-                    escape(m)
-                ));
-            }
-        }
-        form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
-    }
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"title\">Title <span class=\"req\">(required)</span></label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}><p class=\"help\">Required \u{b7} 1 to 200 characters.</p>{}</div>",
-        escape(&values.title),
-        invalid_attrs("title", errors.title.as_deref()),
-        field_error("title", errors.title.as_deref())
-    ));
-    // audit type select
-    let mut select = String::new();
-    select.push_str(&format!(
-        "<div class=\"field\"><label for=\"audit_type\">Audit type <span class=\"req\">(required)</span></label><select class=\"select\" id=\"audit_type\" name=\"audit_type\"{}>",
-        invalid_attrs("audit_type", errors.audit_type.as_deref())
-    ));
-    for (val, label) in [
-        ("security", "security"),
-        ("licence", "licence"),
-        ("architecture", "architecture"),
-    ] {
-        let selected = if values.audit_type == val {
-            " selected"
-        } else {
-            ""
-        };
-        select.push_str(&format!(
-            "<option value=\"{}\"{}>{}</option>",
-            val, selected, label
-        ));
-    }
-    // allow custom stored value not in built-ins
-    if !values.audit_type.is_empty()
-        && !["security", "licence", "architecture"].contains(&values.audit_type.as_str())
-    {
-        select.push_str(&format!(
-            "<option value=\"{}\" selected>{}</option>",
-            escape(&values.audit_type),
-            escape(&values.audit_type)
-        ));
-    }
-    select.push_str("</select>");
-    select.push_str(&field_error("audit_type", errors.audit_type.as_deref()));
-    select.push_str("</div>");
-    form.push_str(&select);
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"content\">Content</label><textarea class=\"textarea\" id=\"content\" name=\"content\" rows=\"10\"{}>{}</textarea><p class=\"help\">Optional \u{b7} up to 20000 characters.</p>{}</div>",
-        invalid_attrs("content", errors.content.as_deref()),
-        escape(&values.content),
-        field_error("content", errors.content.as_deref())
-    ));
-    form.push_str(&read_only_timestamps(record));
-    form.push_str(
-        "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
-    );
-    form.push_str(&format!(
-        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
-        escape(&record.id)
-    ));
-
-    let page_head = format!(
-        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div><p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
-        escape(&record.id),
-        escape(&record.title)
-    );
-    let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    let body = render_template(
-        EDIT_TEMPLATE,
-        &[],
-        &[
-            ("breadcrumb", &edit_breadcrumb(record, None)),
-            ("page_head", &page_head),
-            ("meta", &metadata_block_backlog(record, None, None)),
-            ("form", &form),
-        ],
-    );
-    page(
-        chrome,
-        PageRoute::Other,
-        &title,
-        &sidebar(Some(record.slug()), cfg, chrome.routes),
-        body,
-    )
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct TechSpecEditValues {
-    pub title: String,
-    pub description: String,
-}
-
-pub struct UseCaseEditValues {
-    pub title: String,
-    pub description: String,
-    pub applicability: String,
-    pub labels: Vec<String>,
-    pub references: Vec<String>,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct UseCaseFieldErrors {
-    pub title: Option<String>,
-    pub description: Option<String>,
-    pub applicability: Option<String>,
-    pub labels: Option<String>,
-    pub references: Option<String>,
-}
-
-impl UseCaseFieldErrors {
-    pub fn any(&self) -> bool {
-        self.title.is_some()
-            || self.description.is_some()
-            || self.applicability.is_some()
-            || self.labels.is_some()
-            || self.references.is_some()
-    }
-}
-
-pub type TestCaseEditValues = UseCaseEditValues;
-pub type TestReportEditValues = UseCaseEditValues;
-pub type TestCaseFieldErrors = UseCaseFieldErrors;
-pub type TestReportFieldErrors = UseCaseFieldErrors;
-
-#[derive(Clone, Debug, Default)]
-pub struct TechSpecFieldErrors {
-    pub title: Option<String>,
-    pub description: Option<String>,
-}
-
-impl TechSpecFieldErrors {
-    pub fn any(&self) -> bool {
-        self.title.is_some() || self.description.is_some()
-    }
-}
-
-pub fn edit_page_tech_spec(
-    record: &Record,
-    values: &TechSpecEditValues,
-    errors: &TechSpecFieldErrors,
-    version: &str,
-    cfg: &Config,
-    chrome: Chrome<'_>,
-) -> String {
-    let mut form = String::new();
-    form.push_str(&format!(
-        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard><input type=\"hidden\" name=\"version\" value=\"{}\">",
-        escape(&record.id),
-        escape(version)
-    ));
-    if errors.any() {
-        form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
-        for (field, msg) in [
-            ("title", errors.title.as_deref()),
-            ("description", errors.description.as_deref()),
-        ] {
-            if let Some(m) = msg {
-                form.push_str(&format!(
-                    "<li><a href=\"#{}\">{}</a></li>",
-                    field,
-                    escape(m)
-                ));
-            }
-        }
-        form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
-    }
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"title\">Title <span class=\"req\">(required)</span></label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}><p class=\"help\">Required \u{b7} whitespace is trimmed \u{b7} line breaks and control characters are not allowed.</p>{}</div>",
-        escape(&values.title),
-        invalid_attrs("title", errors.title.as_deref()),
-        field_error("title", errors.title.as_deref())
-    ));
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"description\">Description <span class=\"req\">(required)</span></label><textarea class=\"textarea\" id=\"description\" name=\"description\" rows=\"12\" required{}>{}</textarea><p class=\"help\">Required \u{b7} multi-line \u{b7} line breaks are preserved when saved.</p>{}</div>",
-        invalid_attrs("description", errors.description.as_deref()),
-        escape(&values.description),
-        field_error("description", errors.description.as_deref())
-    ));
-    form.push_str(&read_only_timestamps(record));
-    form.push_str(
-        "<p class=\"hidden-field version-note\">Hidden field: version (optimistic-concurrency token)</p>",
-    );
-    form.push_str(&format!(
-        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
-        escape(&record.id)
-    ));
-
-    let page_head = format!(
-        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div><p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
-        escape(&record.id),
-        escape(&record.title)
-    );
-    let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    let body = render_template(
-        EDIT_TEMPLATE,
-        &[],
-        &[
-            ("breadcrumb", &edit_breadcrumb(record, None)),
-            ("page_head", &page_head),
-            ("meta", &metadata_block_backlog(record, None, None)),
-            ("form", &form),
-        ],
-    );
-    page(
-        chrome,
-        PageRoute::Other,
-        &title,
-        &sidebar(Some(record.slug()), cfg, chrome.routes),
-        body,
-    )
-}
-
-pub fn edit_page_use_case(
-    record: &Record,
-    values: &UseCaseEditValues,
-    errors: &UseCaseFieldErrors,
-    version: &str,
-    cfg: &Config,
-    chrome: Chrome<'_>,
-) -> String {
-    let mut form = String::new();
-    form.push_str(&format!(
-        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard><input type=\"hidden\" name=\"version\" value=\"{}\">",
-        escape(&record.id),
-        escape(version)
-    ));
-    if errors.any() {
-        form.push_str("<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>");
-        for (field, msg) in [
-            ("title", errors.title.as_deref()),
-            ("description", errors.description.as_deref()),
-            ("applicability", errors.applicability.as_deref()),
-            ("labels", errors.labels.as_deref()),
-            ("references", errors.references.as_deref()),
-        ] {
-            if let Some(m) = msg {
-                form.push_str(&format!(
-                    "<li><a href=\"#{}\">{}</a></li>",
-                    field,
-                    escape(m)
-                ));
-            }
-        }
-        form.push_str("</ul><p>Nothing was saved. Your typed values are kept below.</p></div>");
-    }
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"title\">Title <span class=\"req\">(required)</span></label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}><p class=\"help\">Required.</p>{}</div>",
-        escape(&values.title),
-        invalid_attrs("title", errors.title.as_deref()),
-        field_error("title", errors.title.as_deref())
-    ));
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"description\">Description <span class=\"req\">(required)</span></label><textarea class=\"textarea\" id=\"description\" name=\"description\" rows=\"12\" required{}>{}</textarea><p class=\"help\">Required \u{b7} multi-line.</p>{}</div>",
-        invalid_attrs("description", errors.description.as_deref()),
-        escape(&values.description),
-        field_error("description", errors.description.as_deref())
-    ));
-    form.push_str(&format!(
-        "<div class=\"field\"><label for=\"applicability\">Applicability</label><textarea class=\"textarea\" id=\"applicability\" name=\"applicability\" rows=\"6\"{}>{}</textarea><p class=\"help\">Optional.</p>{}</div>",
-        invalid_attrs("applicability", errors.applicability.as_deref()),
-        escape(&values.applicability),
-        field_error("applicability", errors.applicability.as_deref())
-    ));
-    form.push_str(&tag_field(
-        "labels",
-        "labels-add",
-        "Labels",
-        &values.labels,
-        "Add a label",
-        "Optional.",
-        errors.labels.as_deref(),
-        "Label",
-    ));
-    form.push_str(&tag_field(
-        "references",
-        "references-add",
-        "References",
-        &values.references,
-        "Add a reference",
-        "Optional.",
-        errors.references.as_deref(),
-        "Reference",
-    ));
-    form.push_str(&read_only_timestamps(record));
-    form.push_str(
-        "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>",
-    );
-    form.push_str(&format!(
-        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{}\">Cancel</a></div></form>",
-        escape(&record.id)
-    ));
-
-    let page_head = format!(
-        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div><p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
-        escape(&record.id),
-        escape(&record.title)
-    );
-    let title = format!("Papyrus \u{2014} Edit {}", record.id);
-    let body = render_template(
-        EDIT_TEMPLATE,
-        &[],
-        &[
-            ("breadcrumb", &edit_breadcrumb(record, None)),
-            ("page_head", &page_head),
-            ("meta", &metadata_block_backlog(record, None, None)),
-            ("form", &form),
-        ],
-    );
-    page(
-        chrome,
-        PageRoute::Other,
-        &title,
-        &sidebar(Some(record.slug()), cfg, chrome.routes),
-        body,
-    )
-}
-
-pub fn edit_page_test_case(
-    record: &Record,
-    values: &TestCaseEditValues,
-    errors: &TestCaseFieldErrors,
-    version: &str,
-    cfg: &Config,
-    chrome: Chrome<'_>,
-) -> String {
-    edit_page_use_case(record, values, errors, version, cfg, chrome)
-}
-
-pub fn edit_page_test_report(
-    record: &Record,
-    values: &TestReportEditValues,
-    errors: &TestReportFieldErrors,
-    version: &str,
-    cfg: &Config,
-    chrome: Chrome<'_>,
-) -> String {
-    edit_page_use_case(record, values, errors, version, cfg, chrome)
-}
-
 /// Error-page copy for a status code.
 pub fn error_copy(status: u16) -> (&'static str, &'static str, &'static str) {
     match status {
@@ -3470,12 +2148,6 @@ pub fn backlog_decision_conflict_page(
         "<div class=\"readonly-block\"><h2>Your unsaved changes (read-only, not saved)</h2><dl>",
     );
     content.push_str(&format!("<dt>Title</dt><dd>{}</dd>", escape(&values.title)));
-    if record.supports_story() {
-        content.push_str(&format!(
-            "<dt>User story</dt><dd class=\"text\">{}</dd>",
-            escape(&values.story)
-        ));
-    }
     content.push_str(&format!(
         "<dt>Description</dt><dd class=\"text\">{}</dd>",
         escape(&values.description)
@@ -3875,7 +2547,13 @@ impl DocumentFormValues {
             } else {
                 record.refs.clone()
             },
-            specs: record.specs.clone(),
+            specs: record
+                .field_map
+                .display_value("specs")
+                .unwrap_or_default()
+                .split_whitespace()
+                .map(str::to_string)
+                .collect(),
             refs: record.refs.clone(),
         }
     }
@@ -4007,6 +2685,61 @@ fn document_scalar_field(
         control,
         document_help(id, field.help.as_deref()),
         field_error(id, error)
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn tag_field(
+    field_id: &str,
+    add_id: &str,
+    label_html: &str,
+    values: &[String],
+    placeholder: &str,
+    help: &str,
+    error: Option<&str>,
+    value_noun: &str,
+) -> String {
+    let mut tags = String::new();
+    for (index, value) in values.iter().enumerate() {
+        tags.push_str(&format!(
+            "<span class=\"tag\"><input class=\"tag-input\" id=\"{}-tag-{}\" name=\"{}\" type=\"text\" value=\"{}\" aria-label=\"{} {}\"><button class=\"tag-remove\" type=\"button\" aria-label=\"Remove {}\" data-remove>&times;</button></span>",
+            field_id,
+            index,
+            field_id,
+            escape(value),
+            value_noun,
+            index + 1,
+            escape(value)
+        ));
+    }
+    let described = document_described_by(field_id, Some(help), error);
+    let add_input = format!(
+        "<input class=\"tag-input tag-add\" id=\"{}\" name=\"{}\" type=\"text\" placeholder=\"{}\"{}>",
+        add_id,
+        field_id,
+        escape(placeholder),
+        described
+    );
+    let help_html = if help.trim().is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<p class=\"help\" id=\"{}-help\">{}</p>",
+            field_id,
+            escape(help)
+        )
+    };
+    format!(
+        "<div class=\"field\" id=\"{}\"><label for=\"{}\">{}</label><div class=\"tagbox\" data-tagbox=\"{}\">{}{}</div><div class=\"add-line\"><button class=\"btn\" type=\"button\" data-add=\"{}\">Add</button></div>{}{}</div>",
+        field_id,
+        add_id,
+        label_html,
+        field_id,
+        tags,
+        add_input,
+        field_id,
+        help_html,
+        field_error(field_id, error)
     )
 }
 

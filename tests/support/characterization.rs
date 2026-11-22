@@ -547,6 +547,29 @@ fn write_case(directory: &Path, observed: &BTreeMap<String, Vec<u8>>) {
     }
 }
 
+/// Whether this case renders a descriptor-driven document HTML page.
+fn document_html_case(case: &Case) -> bool {
+    matches!(
+        case.renderer.as_deref(),
+        Some(
+            "list_page"
+                | "view_page"
+                | "edit_page"
+                | "edit_page_glossary"
+                | "edit_page_ui_spec"
+                | "edit_page_ui_mockup"
+                | "edit_page_business_rule"
+                | "edit_page_audit_record"
+                | "edit_page_tech_spec"
+                | "edit_page_use_case"
+                | "document_detail_page"
+                | "document_edit_page"
+                | "document_conflict_page"
+                | "document_not_found_page"
+        )
+    )
+}
+
 /// Compare one expected directory against an observation. Public so the
 /// replay suite can prove that a one-byte change fails.
 pub fn compare_case(
@@ -585,6 +608,17 @@ pub fn compare_case(
         // carry `{{VERSION}}`; the two normalisations are idempotent.
         let expected_text = normalise_versions(&String::from_utf8_lossy(&expected));
         let actual_text = normalise_versions(&String::from_utf8_lossy(actual));
+        if name == "page.html" && document_html_case(case) {
+            // Document HTML is compared semantically (TC-184); backlog and
+            // decision pages stay byte-for-byte above.
+            crate::semantic_html::compare_document_html(
+                &case.id,
+                &expected_text,
+                &actual_text,
+                &crate::semantic_html::Allowlist::empty(),
+            )?;
+            continue;
+        }
         if expected_text.as_bytes() != actual_text.as_bytes() {
             return Err(first_difference(
                 name,

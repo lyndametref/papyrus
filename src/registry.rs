@@ -112,31 +112,17 @@ impl Verb {
     }
 }
 
-/// The requirement family a typed handler belongs to.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RequirementKind {
-    Business,
-    NonFunctional,
-}
-
-/// Names the module family that owns validation and patch building for a typed
-/// descriptor. Dispatch matches on this value, never on a slug string.
+/// Names the module family that owns validation and patch building for a
+/// typed descriptor. Dispatch matches on this value, never on a slug string.
+///
+/// Only backlog and decision types carry a handler after MS-035; every
+/// document is descriptor- and field-map driven.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TypedHandler {
     Task,
     Milestone,
     Release,
     Decision,
-    Requirement(RequirementKind),
-    Glossary,
-    UiSpec,
-    Rule,
-    UiMockup,
-    Audit,
-    TechSpec,
-    UseCase,
-    TestCase,
-    TestReport,
 }
 
 /// The typed content model of a built-in type (ADR-0018).
@@ -146,7 +132,8 @@ pub enum TypedHandler {
 /// process-global storage (TECH-071 section 1).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TypedSchema {
-    pub handler: TypedHandler,
+    /// The backlog or decision handler; `None` for a document schema.
+    pub handler: Option<TypedHandler>,
     /// Body sections in written order; empty for HTML mockups.
     pub sections: Vec<Cow<'static, str>>,
     /// Extension verbs this family owns; must equal the descriptor's extensions.
@@ -268,9 +255,9 @@ impl TypeDescriptor {
     /// has no handler.
     pub fn handler(&self) -> Option<TypedHandler> {
         if self.category == ArtifactCategory::Document {
-            crate::config::seed_document_type(&self.slug).and_then(|seed| seed.handler)
+            None
         } else {
-            self.schema.as_ref().map(|schema| schema.handler)
+            self.schema.as_ref().and_then(|schema| schema.handler)
         }
     }
 
@@ -362,6 +349,12 @@ pub struct TypeDescriptor {
     /// `Some` for every document descriptor, `None` for backlog and decision
     /// descriptors, whose record descriptors stay static.
     pub record: Option<RecordDescriptor>,
+    /// Whether an external editor rewrite re-adopts front matter (seed flag).
+    pub editor_readopts_front_matter: bool,
+    /// Whether `view` keeps the record's trailing newline (seed flag).
+    pub preserve_trailing_newline: bool,
+    /// Whether the list JSON shape carries the glossary `term` alias (seed flag).
+    pub list_json_term_alias: bool,
 }
 
 impl TypeDescriptor {
@@ -994,7 +987,7 @@ fn owned_sections(sections: &'static [&'static str]) -> Vec<Cow<'static, str>> {
 
 fn task_schema() -> TypedSchema {
     TypedSchema {
-        handler: TypedHandler::Task,
+        handler: Some(TypedHandler::Task),
         sections: owned_sections(TASK_SECTIONS),
         extensions: Vec::new(),
         verbs: Vec::new(),
@@ -1002,7 +995,7 @@ fn task_schema() -> TypedSchema {
 }
 fn milestone_schema() -> TypedSchema {
     TypedSchema {
-        handler: TypedHandler::Milestone,
+        handler: Some(TypedHandler::Milestone),
         sections: owned_sections(MILESTONE_SECTIONS),
         extensions: Vec::new(),
         verbs: Vec::new(),
@@ -1010,7 +1003,7 @@ fn milestone_schema() -> TypedSchema {
 }
 fn release_schema() -> TypedSchema {
     TypedSchema {
-        handler: TypedHandler::Release,
+        handler: Some(TypedHandler::Release),
         sections: owned_sections(RELEASE_SECTIONS),
         extensions: Vec::new(),
         verbs: Vec::new(),
@@ -1018,7 +1011,7 @@ fn release_schema() -> TypedSchema {
 }
 fn decision_schema() -> TypedSchema {
     TypedSchema {
-        handler: TypedHandler::Decision,
+        handler: Some(TypedHandler::Decision),
         sections: owned_sections(DECISION_SECTIONS),
         extensions: Vec::new(),
         verbs: Vec::new(),
@@ -1026,7 +1019,7 @@ fn decision_schema() -> TypedSchema {
 }
 fn ui_mockup_schema() -> TypedSchema {
     TypedSchema {
-        handler: TypedHandler::UiMockup,
+        handler: None,
         sections: Vec::new(),
         extensions: vec![Verb::Supersede],
         verbs: ui_mockup_verbs(),
@@ -1381,6 +1374,9 @@ fn backlog_descriptor(cfg: &Config, template: &DescriptorTemplate) -> TypeDescri
         id_shape: template.id_shape,
         archive_policy: template.archive,
         record: None,
+        editor_readopts_front_matter: false,
+        preserve_trailing_newline: false,
+        list_json_term_alias: false,
     }
 }
 
@@ -1416,6 +1412,9 @@ fn decision_descriptor(slug: &str, entry: &TypeEntry) -> TypeDescriptor {
         id_shape: IdShape::Plain,
         archive_policy: ArchivePolicy::None,
         record: None,
+        editor_readopts_front_matter: false,
+        preserve_trailing_newline: false,
+        list_json_term_alias: false,
     }
 }
 
@@ -1914,6 +1913,9 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
         id_shape,
         archive_policy,
         record: Some(record),
+        editor_readopts_front_matter: seed.is_some_and(|seed| seed.editor_readopts_front_matter),
+        preserve_trailing_newline: seed.is_some_and(|seed| seed.preserve_trailing_newline),
+        list_json_term_alias: seed.is_some_and(|seed| seed.list_json_term_alias),
     })
 }
 
@@ -2534,24 +2536,10 @@ mod tests {
                     _ => DocumentModel::SingleMarkdown,
                 }
             );
-            let expected = match *slug {
-                "req" => Some(TypedHandler::Requirement(RequirementKind::Business)),
-                "nfr" => Some(TypedHandler::Requirement(RequirementKind::NonFunctional)),
-                "glossary" => Some(TypedHandler::Glossary),
-                "rule" => Some(TypedHandler::Rule),
-                "ui-spec" => Some(TypedHandler::UiSpec),
-                "ui-mockup" => Some(TypedHandler::UiMockup),
-                "audit" => Some(TypedHandler::Audit),
-                "tech-spec" => Some(TypedHandler::TechSpec),
-                "use-case" => Some(TypedHandler::UseCase),
-                "test-case" => Some(TypedHandler::TestCase),
-                "test-report" => Some(TypedHandler::TestReport),
-                other => panic!("unexpected seed slug {other}"),
-            };
             assert_eq!(
                 descriptor.handler(),
-                expected,
-                "{slug} keeps its concrete browser handler"
+                None,
+                "{slug} has no document TypedHandler after MS-035"
             );
             if *slug == "ui-mockup" {
                 assert!(descriptor.schema.is_some(), "{slug} keeps its schema");
@@ -2705,7 +2693,7 @@ mod tests {
         assert_eq!(mockup.frontmatter_status_key(), None);
         assert_eq!(mockup.document_model, DocumentModel::SingleHtmlMockup);
         assert!(schema(mockup).sections.is_empty());
-        assert_eq!(schema(mockup).handler, TypedHandler::UiMockup);
+        assert_eq!(schema(mockup).handler, None);
     }
 
     // 9

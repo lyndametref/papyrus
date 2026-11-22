@@ -15,6 +15,8 @@
 
 #[path = "support/characterization.rs"]
 mod characterization;
+#[path = "support/semantic_html.rs"]
+mod semantic_html;
 
 use characterization::{Ctx, Runner, corpus_root};
 

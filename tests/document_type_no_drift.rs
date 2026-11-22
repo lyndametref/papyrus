@@ -291,24 +291,25 @@ fn d05_no_slug_literal_dispatch_outside_type_modules() {
     let mut violations = Vec::new();
     for path in src_files() {
         let rel = relative(&path);
+        // Browser and CLI surfaces and the document engine must never name a
+        // document slug: the seed table in `src/config.rs` and its derivation
+        // in `src/registry.rs` are the only production definitions.
         let scanned = rel.starts_with("src/browser/")
-            || matches!(
-                rel.as_str(),
-                "src/cli/dispatch.rs" | "src/cli/tree.rs" | "src/document.rs" | "src/search.rs"
-            );
+            || rel.starts_with("src/cli/")
+            || rel == "src/document.rs";
         if !scanned {
             continue;
         }
         let content = fs::read_to_string(&path).unwrap_or_default();
         for (lineno, line) in production_lines_in(&content) {
-            if is_dispatch_line(&line, &DOCUMENT_SLUGS) {
+            if has_slug_literal(&line, &DOCUMENT_SLUGS) {
                 violations.push(format!("{}:{}: {}", rel, lineno, line.trim()));
             }
         }
     }
     assert!(
         violations.is_empty(),
-        "D-05 slug-literal behaviour dispatch outside the type module/registry:\n{}",
+        "D-05 any document slug literal in the browser, CLI, or document engine:\n{}",
         violations.join("\n")
     );
 }
@@ -559,7 +560,7 @@ const REMOVED_DOCUMENT_COMMAND_BUILDERS: [&str; 20] = [
     "fn test_report_schema(",
 ];
 
-/// The eight document ops builders retained for the browser until MS-035.
+/// The eight document ops builders deleted by MS-035 TASK-269.
 const DEFERRED_DOCUMENT_OPS_BUILDERS: [&str; 8] = [
     "generic_document_ops",
     "requirement_ops",
@@ -768,7 +769,7 @@ fn d14_transitional_document_command_tables_are_gone() {
 
 // D-15 ---------------------------------------------------------------------
 #[test]
-fn d15_deferred_document_ops_builders_remain_until_ms035() {
+fn d15_deferred_document_ops_builders_are_absent() {
     let edit = fs::read_to_string("src/record/edit.rs").expect("edit.rs");
     let production: String = production_lines_in(&edit)
         .into_iter()
@@ -777,8 +778,8 @@ fn d15_deferred_document_ops_builders_remain_until_ms035() {
         .join("\n");
     for builder in DEFERRED_DOCUMENT_OPS_BUILDERS {
         assert!(
-            production.contains(&format!("pub fn {builder}(")),
-            "the browser still calls {builder}; MS-035 TASK-266/TASK-269 deletes it"
+            !production.contains(&format!("pub fn {builder}(")),
+            "document ops builder must be deleted after MS-035 TASK-269: {builder}"
         );
     }
     for builder in [
@@ -797,30 +798,118 @@ fn d15_deferred_document_ops_builders_remain_until_ms035() {
 
 // D-16 ---------------------------------------------------------------------
 #[test]
-fn d16_document_typed_handlers_remain_until_ms035() {
+fn d16_only_backlog_and_decision_typed_handlers_exist() {
     let registry = fs::read_to_string("src/registry.rs").expect("registry.rs");
     let production: String = production_lines_in(&registry)
         .into_iter()
         .map(|(_, line)| line)
         .collect::<Vec<_>>()
         .join("\n");
-    for variant in [
-        "Requirement(RequirementKind)",
-        "Glossary",
-        "UiSpec",
-        "Rule",
-        "UiMockup",
-        "Audit",
-        "TechSpec",
-        "UseCase",
-        "TestCase",
-        "TestReport",
-    ] {
-        assert!(
-            production.contains(variant),
-            "document TypedHandler variant must remain until MS-035 TASK-269: {variant}"
-        );
+    let enum_start = production.find("pub enum TypedHandler").expect("enum");
+    let enum_text = &production[enum_start..];
+    let enum_end = enum_text.find('}').expect("enum end");
+    let variants: Vec<&str> = enum_text[..enum_end]
+        .lines()
+        .skip(1)
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("///"))
+        .collect();
+    assert_eq!(
+        variants,
+        vec!["Task,", "Milestone,", "Release,", "Decision,"],
+        "TypedHandler has exactly the four backlog/decision variants"
+    );
+}
+
+// D-17 ---------------------------------------------------------------------
+#[test]
+fn d17_no_document_typed_handler_or_requirement_kind_in_production() {
+    let mut violations = Vec::new();
+    for path in src_files() {
+        let rel = relative(&path);
+        let content = fs::read_to_string(&path).unwrap_or_default();
+        for (lineno, line) in production_lines_in(&content) {
+            if [
+                "TypedHandler::Requirement",
+                "TypedHandler::Glossary",
+                "TypedHandler::UiSpec",
+                "TypedHandler::Rule",
+                "TypedHandler::UiMockup",
+                "TypedHandler::Audit",
+                "TypedHandler::TechSpec",
+                "TypedHandler::UseCase",
+                "TypedHandler::TestCase",
+                "TypedHandler::TestReport",
+                "RequirementKind",
+            ]
+            .iter()
+            .any(|needle| line.contains(needle))
+            {
+                violations.push(format!("{}:{}: {}", rel, lineno, line.trim()));
+            }
+        }
     }
+    assert!(
+        violations.is_empty(),
+        "D-17 document TypedHandler/RequirementKind in production code:\n{}",
+        violations.join("\n")
+    );
+}
+
+/// Whether `line` reads `record.<field>` (not e.g. `meta_record.specs`).
+fn field_read(line: &str, field: &str) -> bool {
+    let needle = format!("record.{field}");
+    let bytes = line.as_bytes();
+    let mut from = 0;
+    while let Some(found) = line[from..].find(&needle) {
+        let at = from + found;
+        let before = at
+            .checked_sub(1)
+            .and_then(|index| bytes.get(index))
+            .copied();
+        let boundary = before.is_none_or(|byte| !(byte.is_ascii_alphanumeric() || byte == b'_'));
+        if boundary {
+            return true;
+        }
+        from = at + needle.len();
+    }
+    false
+}
+
+// D-18 ---------------------------------------------------------------------
+#[test]
+fn d18_document_renderers_do_not_read_typed_record_fields() {
+    let mut violations = Vec::new();
+    for path in src_files() {
+        let rel = relative(&path);
+        if !(rel.starts_with("src/browser/") || rel == "src/document.rs") {
+            continue;
+        }
+        let content = fs::read_to_string(&path).unwrap_or_default();
+        for (lineno, line) in production_lines_in(&content) {
+            if [
+                "story",
+                "rationale",
+                "applicability",
+                "requirements",
+                "audit_type",
+                "definition",
+                "view",
+                "specs",
+                "mockup_task",
+            ]
+            .iter()
+            .any(|field| field_read(&line, field))
+            {
+                violations.push(format!("{}:{}: {}", rel, lineno, line.trim()));
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "D-18 typed document field read in a document renderer:\n{}",
+        violations.join("\n")
+    );
 }
 
 // D-05 (TASK-268) ----------------------------------------------------------
