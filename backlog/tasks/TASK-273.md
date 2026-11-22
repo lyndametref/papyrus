@@ -2,7 +2,7 @@
 id: TASK-273
 title: "Implement the request-scoped record snapshot for resolution"
 created_date: '2026-11-20T17:43:07Z'
-updated_date: '2026-11-22T20:20:20Z'
+updated_date: '2026-11-22T20:45:27Z'
 labels: []
 references:
   - ADR-037
@@ -13,7 +13,7 @@ references:
   - NFR-007.001
   - TC-178
   - TC-179
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-036
@@ -70,3 +70,6 @@ All acceptance criteria pass; targeted tests, the full suite, `cargo clippy --al
 - [ ] #7 An ID that is absent from the snapshot returns the same None or unresolved-reference outcome that records::resolve_id returns today for an unknown, archived, or disabled ID; no path falls back to a directory rescan or a second parse, and a record claimed by the listing but unreadable at parse time keeps the existing error and diagnostic behaviour.
 - [ ] #8 Existing browser, record, characterization, and no-drift suites pass; CLI output, JSON payloads, record bytes, HTML semantics, status codes, and headers other than the TASK-276 asset cache headers are unchanged; cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check are clean.
 - [ ] #9 Tests cover the listing and parse counts, the display-only write contract, the stale-token 409, and the no-rescan path; evidence is recorded on this task.
+## Comments
+- **rust-dev**: TASK-273 implementation evidence (rust-dev). Snapshot API: RecordSnapshot::{new, resolve, resolve_live, resolve_title, listing_count, parse_count, is_built}; build_index_with_snapshot shares the per-request parse cache; load_record_with(RecordTitles) keeps the public load_record contract. Call sites converted: inventory_page; list_page board and document paths; board cleanup preview, submit, status submit, and failure re-render; view_page; edit_page; document_form_post; api_requirements; api_doc_list; api_get; api_post plus api_post_document and api_post_mockup. No records::resolve_id call remains in browser mod.rs. form_post, api_post, and save_ops use resolve_live plus record::store for bytes and version. Effect (records-382 smoke, release LTO, 1 warm-up + 3 measured, baseline-only): inventory server p50 1764 ms and p95 1777 ms vs recorded 11776 and 11971 ms; view-grouped-member 749 and 749 ms vs recorded 23431 and 23950 ms. Not an NFR verdict; TASK-275 and TASK-278 own the final numbers. Checks: cargo test 1359 passed, 0 failed across 69 suites; characterization_replay 17, list_characterization_replay 3, no_drift 11, document_type_no_drift 21; cargo clippy --all-targets -- -D warnings clean; cargo fmt --check clean. Full suite needs env -u EDITOR because host EDITOR=nano breaks unrelated config_editor_json_null_when_unset. Tests: browser records.rs unit tests prove one listing per enabled type, one parse per distinct record, shared index and snapshot parse cache, unknown-ID no-rescan, unreadable-record diagnostic, and live bytes and token after an out-of-band edit. Existing t17 and t18 and API conflict tests cover stale-token 409; browser_cli 214 passed. Files: browser records.rs, browser mod.rs. Branch task TASK-273; no commit per subagent instruction.
+- **orchestrator**: Acceptance met: RecordSnapshot per request with lazy listing and memoised parse, threaded through inventory, list, view, edit, form_post and all API routes; live reads retained for writes; no cross-request cache; 1359 tests pass; measured 382-record inventory 11776 to 1764 ms p50 and grouped member view 23950 to 749 ms p95 (baseline-only).

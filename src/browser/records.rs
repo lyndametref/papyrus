@@ -18,6 +18,7 @@ use crate::registry::{
     ArtifactCategory as CategoryKind, ArtifactRegistry, DocumentModel, IdShape, StatusModel,
     TypeDescriptor, TypedHandler,
 };
+use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -124,6 +125,246 @@ impl Index {
 #[derive(Clone, Debug)]
 pub struct Resolved {
     pub record: Record,
+}
+
+/// A request-scoped, display-only record snapshot.
+///
+/// The snapshot indexes the enabled descriptors' active directories once, on
+/// the first ID lookup, and records file names only. Resolving an ID reads the
+/// file-name map and parses a matching record at most once, memoising it for
+/// the rest of the request. It lives only for the request that owns it and is
+/// never stored in `ServerState`.
+pub struct RecordSnapshot<'a> {
+    ctx: &'a Context,
+    cfg: &'a Config,
+    registry: &'a ArtifactRegistry,
+    descriptors: Vec<&'a TypeDescriptor>,
+    listing: RefCell<Option<SnapshotListing>>,
+    records: RefCell<BTreeMap<PathBuf, Option<Record>>>,
+    listing_count: Cell<usize>,
+    parse_count: Cell<usize>,
+}
+
+#[derive(Default)]
+struct SnapshotListing {
+    /// The canonical numeric key of every listed record, per descriptor index.
+    by_descriptor: BTreeMap<usize, BTreeMap<String, Vec<PathBuf>>>,
+}
+
+/// Display-only title lookup used while projecting one record.
+trait RecordTitles {
+    fn title(&self, id: &str) -> Option<String>;
+}
+
+struct LegacyTitles<'a> {
+    ctx: &'a Context,
+    cfg: &'a Config,
+    registry: &'a ArtifactRegistry,
+}
+
+impl RecordTitles for LegacyTitles<'_> {
+    fn title(&self, id: &str) -> Option<String> {
+        resolve_title(self.ctx, self.cfg, self.registry, id)
+    }
+}
+
+impl RecordTitles for RecordSnapshot<'_> {
+    fn title(&self, id: &str) -> Option<String> {
+        self.resolve_title(id)
+    }
+}
+
+impl<'a> RecordSnapshot<'a> {
+    pub fn new(ctx: &'a Context, cfg: &'a Config, registry: &'a ArtifactRegistry) -> Self {
+        RecordSnapshot {
+            ctx,
+            cfg,
+            registry,
+            descriptors: registry.descriptors().collect(),
+            listing: RefCell::new(None),
+            records: RefCell::new(BTreeMap::new()),
+            listing_count: Cell::new(0),
+            parse_count: Cell::new(0),
+        }
+    }
+
+    /// Number of `read_dir` attempts made while building the file-name index.
+    pub fn listing_count(&self) -> usize {
+        self.listing_count.get()
+    }
+
+    /// Number of distinct record files parsed through this snapshot.
+    pub fn parse_count(&self) -> usize {
+        self.parse_count.get()
+    }
+
+    /// Whether the file-name index has been built.
+    pub fn is_built(&self) -> bool {
+        self.listing.borrow().is_some()
+    }
+
+    fn ensure_listing(&self) {
+        if self.listing.borrow().is_some() {
+            return;
+        }
+        let mut listing = SnapshotListing::default();
+        for (index, descriptor) in self.descriptors.iter().enumerate() {
+            if !descriptor.enabled {
+                continue;
+            }
+            let Some(dir) = descriptor_directory(self.ctx, self.cfg, descriptor) else {
+                continue;
+            };
+            let extension = content_extension(descriptor);
+            self.listing_count.set(self.listing_count.get() + 1);
+            let Ok(read_dir) = fs::read_dir(&dir) else {
+                continue;
+            };
+            for entry in read_dir.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|value| value.to_str()) != Some(extension) {
+                    continue;
+                }
+                let Some(stem) = path.file_stem().and_then(|value| value.to_str()) else {
+                    continue;
+                };
+                if !matches_stem(descriptor, stem) {
+                    continue;
+                }
+                for key in lookup_keys(descriptor, stem) {
+                    listing
+                        .by_descriptor
+                        .entry(index)
+                        .or_default()
+                        .entry(key)
+                        .or_default()
+                        .push(path.clone());
+                }
+            }
+        }
+        *self.listing.borrow_mut() = Some(listing);
+    }
+
+    fn candidates(&self, id: &str) -> Vec<(usize, PathBuf)> {
+        let listing = self.listing.borrow();
+        let Some(listing) = listing.as_ref() else {
+            return Vec::new();
+        };
+        let mut candidates: Vec<(usize, PathBuf)> = Vec::new();
+        for (index, descriptor) in self.descriptors.iter().enumerate() {
+            if !descriptor.enabled {
+                continue;
+            }
+            let keys = lookup_keys(descriptor, id);
+            if keys.is_empty() {
+                continue;
+            }
+            let Some(by_key) = listing.by_descriptor.get(&index) else {
+                continue;
+            };
+            for key in keys {
+                let Some(paths) = by_key.get(&key) else {
+                    continue;
+                };
+                // Several files with the same canonical ID are the existing
+                // duplicate-ID outcome: unresolved, never a directory rescan.
+                if paths.len() == 1 && !candidates.iter().any(|(_, path)| path == &paths[0]) {
+                    candidates.push((index, paths[0].clone()));
+                }
+            }
+        }
+        candidates
+    }
+
+    fn load_cached(
+        &self,
+        descriptor: &TypeDescriptor,
+        path: &Path,
+    ) -> Result<Option<Record>, AppError> {
+        if let Some(cached) = self.records.borrow().get(path) {
+            return Ok(cached.clone());
+        }
+        self.parse_count.set(self.parse_count.get() + 1);
+        let record = load_record_with(self.ctx, self.cfg, self.registry, descriptor, path, self)?;
+        self.records
+            .borrow_mut()
+            .insert(path.to_path_buf(), record.clone());
+        Ok(record)
+    }
+
+    /// Resolve one record ID against the snapshot, memoising the parsed record.
+    ///
+    /// Unknown, archived, and disabled IDs stay absent from the file-name map
+    /// and return `Ok(None)`. A listed record that cannot be read or parsed
+    /// keeps the existing diagnostic.
+    pub fn resolve(&self, id: &str) -> Result<Option<Resolved>, AppError> {
+        self.resolve_inner(id, true)
+    }
+
+    /// Resolve one record ID for a write path: same identity rules and file
+    /// names, but the returned record is a fresh live read. The snapshot
+    /// supplies no bytes or version token to this result.
+    pub fn resolve_live(&self, id: &str) -> Result<Option<Resolved>, AppError> {
+        self.resolve_inner(id, false)
+    }
+
+    fn resolve_inner(&self, id: &str, cached: bool) -> Result<Option<Resolved>, AppError> {
+        if !identity::is_valid_id_component(id) {
+            return Ok(None);
+        }
+        self.ensure_listing();
+        for (index, path) in self.candidates(id) {
+            let descriptor = self.descriptors[index];
+            let loaded = if cached {
+                self.load_cached(descriptor, &path)?
+            } else {
+                load_record_with(self.ctx, self.cfg, self.registry, descriptor, &path, self)?
+            };
+            if let Some(record) = loaded {
+                // A record auto-relocated out of the active directory by the
+                // read path is no longer part of the display snapshot.
+                if !record.path.exists() {
+                    continue;
+                }
+                return Ok(Some(Resolved { record }));
+            }
+            // A candidate that resolves outside the project is invisible,
+            // exactly as it is for the pre-snapshot resolver.
+            let Ok(safe) = Context::ensure_within(&self.ctx.project_dir, &path) else {
+                continue;
+            };
+            if fs::read_to_string(&safe).is_err() {
+                return Err(AppError::Runtime("record is not valid UTF-8".to_string()));
+            }
+        }
+        Ok(None)
+    }
+
+    /// The title of a resolved record, or `None` when it is unknown.
+    pub fn resolve_title(&self, id: &str) -> Option<String> {
+        self.resolve(id)
+            .ok()
+            .flatten()
+            .map(|resolved| resolved.record.title)
+    }
+}
+
+fn lookup_keys(descriptor: &TypeDescriptor, value: &str) -> Vec<String> {
+    let shapes: &[bool] = match descriptor.id_shape {
+        IdShape::Grouped => &[true, false],
+        IdShape::Dotted => &[true],
+        IdShape::Plain => &[false],
+    };
+    let mut keys: Vec<String> = Vec::new();
+    for &dotted in shapes {
+        if let Some(parts) = identity::parse_id_parts(value, &descriptor.prefix, dotted) {
+            let key = parts.key(&descriptor.prefix);
+            if !keys.contains(&key) {
+                keys.push(key);
+            }
+        }
+    }
+    keys
 }
 
 /// Resolve a descriptor's active directory against the project boundary.
@@ -261,6 +502,18 @@ pub fn load_record(
     registry: &ArtifactRegistry,
     descriptor: &TypeDescriptor,
     path: &Path,
+) -> Result<Option<Record>, AppError> {
+    let titles = LegacyTitles { ctx, cfg, registry };
+    load_record_with(ctx, cfg, registry, descriptor, path, &titles)
+}
+
+fn load_record_with(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    descriptor: &TypeDescriptor,
+    path: &Path,
+    titles: &dyn RecordTitles,
 ) -> Result<Option<Record>, AppError> {
     if descriptor.document_model == DocumentModel::SingleHtmlMockup {
         return load_ui_mockup(ctx, cfg, descriptor, path);
@@ -446,13 +699,13 @@ pub fn load_record(
             DocumentFieldMap::build(&record.descriptor, is_group, &record.doc, view.as_ref());
     }
     if let Some(mid) = record.milestone_id.clone() {
-        record.milestone_title = resolve_title(ctx, cfg, registry, &mid);
+        record.milestone_title = titles.title(&mid);
     }
     if let Some(rid) = record.release_id.clone() {
-        record.release_title = resolve_title(ctx, cfg, registry, &rid);
+        record.release_title = titles.title(&rid);
     }
     if let Some(sid) = record.superseded_by.clone() {
-        record.superseded_title = resolve_title(ctx, cfg, registry, &sid);
+        record.superseded_title = titles.title(&sid);
     }
     Ok(Some(record))
 }
@@ -557,6 +810,30 @@ pub fn build_index(
     descriptor: &TypeDescriptor,
     status: Option<&str>,
 ) -> Index {
+    build_index_impl(ctx, cfg, registry, descriptor, status, None)
+}
+
+/// Build one descriptor's index, sharing the request record snapshot's parse
+/// cache and title resolution.
+pub fn build_index_with_snapshot(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    descriptor: &TypeDescriptor,
+    status: Option<&str>,
+    snapshot: &RecordSnapshot<'_>,
+) -> Index {
+    build_index_impl(ctx, cfg, registry, descriptor, status, Some(snapshot))
+}
+
+fn build_index_impl(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    descriptor: &TypeDescriptor,
+    status: Option<&str>,
+    snapshot: Option<&RecordSnapshot<'_>>,
+) -> Index {
     let mut index = Index::default();
     if !descriptor.enabled {
         return index;
@@ -579,7 +856,11 @@ pub fn build_index(
         if !matches_stem(descriptor, stem) {
             continue;
         }
-        if let Ok(Some(record)) = load_record(ctx, cfg, registry, descriptor, &path) {
+        let loaded = match snapshot {
+            Some(snapshot) => snapshot.load_cached(descriptor, &path),
+            None => load_record(ctx, cfg, registry, descriptor, &path),
+        };
+        if let Ok(Some(record)) = loaded {
             // A record auto-relocated out of the active directory by the read
             // path is no longer listed.
             if !record.path.exists() {
@@ -1204,6 +1485,198 @@ pub fn decision_exists(ctx: &Context, cfg: &Config, registry: &ArtifactRegistry,
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct SnapshotProject {
+        root: PathBuf,
+        ctx: Context,
+        cfg: Config,
+        registry: ArtifactRegistry,
+    }
+
+    impl SnapshotProject {
+        fn new(name: &str) -> SnapshotProject {
+            let stamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|duration| duration.as_nanos())
+                .unwrap_or_default();
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join(".tmp")
+                .join(format!(
+                    "record-snapshot-{}-{}-{}",
+                    name,
+                    std::process::id(),
+                    stamp
+                ));
+            let _ = fs::remove_dir_all(&root);
+            fs::create_dir_all(root.join("backlog/tasks")).unwrap();
+            fs::create_dir_all(root.join("backlog/milestones")).unwrap();
+            fs::create_dir_all(root.join("backlog/releases")).unwrap();
+            fs::write(
+                root.join("backlog/milestones/MS-001.md"),
+                "---\nid: MS-001\ntitle: \"Milestone one\"\ncreated_date: '2026-01-02T03:04:05Z'\nupdated_date: '2026-01-02T03:04:05Z'\nlabels: []\nreferences: []\nstatus: open\nrelease: \"\"\n---\n# MS-001 Milestone one\n\n## Description\nMilestone.\n",
+            )
+            .unwrap();
+            for (id, title) in [("TASK-001", "Task one"), ("TASK-002", "Task two")] {
+                fs::write(
+                    root.join(format!("backlog/tasks/{}.md", id)),
+                    format!(
+                        "---\nid: {id}\ntitle: \"{title}\"\ncreated_date: '2026-01-03T04:05:06Z'\nupdated_date: '2026-01-03T04:05:06Z'\nlabels: []\nreferences: []\nstatus: ToDo\nassignee: []\nmilestone: MS-001\ndependencies: []\nordinal: 1\ndocumentation: []\ntype: null\n---\n\n## Description\n{title}.\n"
+                    ),
+                )
+                .unwrap();
+            }
+            let cfg = Config::default();
+            let registry = ArtifactRegistry::build(&cfg).unwrap();
+            let ctx = Context {
+                project_dir: root.clone(),
+                config_path: root.join("papyrus.config.yml"),
+                json: false,
+                no_color: true,
+            };
+            SnapshotProject {
+                root,
+                ctx,
+                cfg,
+                registry,
+            }
+        }
+
+        fn enabled_directory_count(&self) -> usize {
+            self.registry
+                .descriptors()
+                .filter(|descriptor| {
+                    descriptor.enabled
+                        && descriptor_directory(&self.ctx, &self.cfg, descriptor).is_some()
+                })
+                .count()
+        }
+    }
+
+    impl Drop for SnapshotProject {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    #[test]
+    fn snapshot_lists_once_and_parses_each_record_once() {
+        let project = SnapshotProject::new("counts");
+        let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
+        assert_eq!(snapshot.parse_count(), 0);
+
+        let task = snapshot.resolve("TASK-001").unwrap().expect("task");
+        assert_eq!(
+            task.record.milestone_title.as_deref(),
+            Some("Milestone one")
+        );
+        let listings = snapshot.listing_count();
+        assert_eq!(listings, project.enabled_directory_count());
+        let parses = snapshot.parse_count();
+        assert!(parses >= 2, "task and milestone parsed: {parses}");
+
+        // Memoised for the rest of the request: no listing and no re-parse.
+        snapshot.resolve("TASK-001").unwrap().expect("task again");
+        assert_eq!(snapshot.listing_count(), listings);
+        assert_eq!(snapshot.parse_count(), parses);
+
+        // A second distinct record parses once; its milestone is already cached.
+        snapshot.resolve("TASK-002").unwrap().expect("second task");
+        assert_eq!(snapshot.listing_count(), listings);
+        assert_eq!(snapshot.parse_count(), parses + 1);
+
+        // Unknown IDs are one map read: no rescan and no parse.
+        assert!(snapshot.resolve("TASK-999").unwrap().is_none());
+        assert_eq!(snapshot.listing_count(), listings);
+        assert_eq!(snapshot.parse_count(), parses + 1);
+    }
+
+    #[test]
+    fn snapshot_parse_cache_is_shared_with_index_building() {
+        let project = SnapshotProject::new("index");
+        let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
+        let descriptor = project
+            .registry
+            .descriptor("task")
+            .expect("task descriptor")
+            .clone();
+        let index = build_index_with_snapshot(
+            &project.ctx,
+            &project.cfg,
+            &project.registry,
+            &descriptor,
+            None,
+            &snapshot,
+        );
+        assert_eq!(index.records.len(), 2);
+        let listings = snapshot.listing_count();
+        let parses = snapshot.parse_count();
+        assert_eq!(listings, project.enabled_directory_count());
+
+        // Records parsed while building the index are already memoised.
+        snapshot.resolve("TASK-001").unwrap().expect("task");
+        snapshot.resolve("MS-001").unwrap().expect("milestone");
+        assert_eq!(snapshot.listing_count(), listings);
+        assert_eq!(snapshot.parse_count(), parses);
+    }
+
+    #[test]
+    fn snapshot_reports_a_listed_but_unreadable_record() {
+        let project = SnapshotProject::new("unreadable");
+        fs::write(
+            project.root.join("backlog/tasks/TASK-003.md"),
+            [0xff, 0xfe, 0x00, 0x01],
+        )
+        .unwrap();
+        let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
+        let error = snapshot.resolve("TASK-003").expect_err("diagnostic");
+        assert_eq!(error.to_string(), "record is not valid UTF-8");
+    }
+
+    #[test]
+    fn snapshot_is_display_only_and_writes_still_read_live_bytes() {
+        let project = SnapshotProject::new("display-only");
+        let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
+        let cached = snapshot.resolve("TASK-001").unwrap().expect("task").record;
+        let path = cached.path.clone();
+        let before = crate::record::store::read_document_normalized(
+            &project.ctx,
+            &project.cfg,
+            &project.registry,
+            &path,
+        )
+        .unwrap();
+        assert_eq!(before.version, cached.version);
+
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        fs::write(
+            &path,
+            "---\nid: TASK-001\ntitle: \"Live title\"\ncreated_date: '2026-01-03T04:05:06Z'\nupdated_date: '2026-01-03T04:05:07Z'\nlabels: []\nreferences: []\nstatus: ToDo\nassignee: []\nmilestone: MS-001\ndependencies: []\nordinal: 1\ndocumentation: []\ntype: null\n---\n\n## Description\nLive.\n",
+        )
+        .unwrap();
+
+        // The display snapshot keeps the record it parsed earlier.
+        let memoised = snapshot
+            .resolve("TASK-001")
+            .unwrap()
+            .expect("memoised")
+            .record;
+        assert_eq!(memoised.title, "Task one");
+        // A write-path read always sees the live bytes and token.
+        let live = crate::record::store::read_document_normalized(
+            &project.ctx,
+            &project.cfg,
+            &project.registry,
+            &path,
+        )
+        .unwrap();
+        assert_eq!(
+            live.version,
+            crate::record::store::version_token(&fs::metadata(&path).unwrap())
+        );
+        assert_ne!(live.version, memoised.version);
+        assert!(live.stored_source.contains("Live title"));
+    }
 
     #[test]
     fn title_and_multiline_validation() {
