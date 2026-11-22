@@ -2,7 +2,7 @@
 id: TASK-265
 title: "Implement the record envelope field map with generic list and view rendering"
 created_date: '2026-11-20T17:42:31Z'
-updated_date: '2026-11-22T16:33:09Z'
+updated_date: '2026-11-22T17:06:20Z'
 labels: []
 references:
   - ADR-039
@@ -12,7 +12,7 @@ references:
   - TECH-040
   - TECH-068
   - TC-184
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-035
@@ -55,3 +55,7 @@ The field map is the only document content projection for list and view; group, 
 - [ ] #7 No document slug name match, per-type handler branch, ContentModel branch, or document-type lookup table is added in the field-map, list, and view path; Backlog and Decision renderers and their output remain unchanged.
 - [ ] #8 document_detail.html and DOCUMENT_DETAIL_TEMPLATE are deleted once unused; view.html, list.html, and shell.html remain; render::page_assets and browser::assets::ASSETS are unchanged and math and diagram asset links still render.
 - [ ] #9 cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass; no new dependency, asset, template, client script, or route is added.
+## Comments
+- **rust-dev**: test comment
+- **rust-dev**: TASK-265 evidence: field map in src-record-field_map.rs (DocumentFieldMap, ResolvedField, FieldRole Single, Group, Member; FieldValue Text, Items, Absent; role, fields, fixed_metadata, extra_metadata, reference_visibility; ResolvedField carries key, heading, label, help, kind, required, editable, frontmatter_key, value plus missing_required). Built once in browser records load_record and load_ui_mockup from the descriptor and carried on Record.field_map. SingleMarkdown uses fields with role Single; GroupedMarkdown uses group.fields with role Group or member.fields with role Member; SingleHtmlMockup uses fields empty plus fixed status, task, specs, refs, superseded_by. Heading-only reads Document.sections; frontmatter-only reads RecordView; both display the body with frontmatter fallback when the body is absent, never merged or repaired; audit_type reads frontmatter type when the body is absent; optional absent equals Absent; required absent equals Absent plus edit-form flag; undeclared frontmatter keys become extra_metadata. Renderers: one render::document_view_page for every Document record using view.html head and chrome, ID, status, title, labels, dates, one record-section per non-empty field in descriptor order headed by the field label, prose for text and multiline, ul.req-list for kind list, empty required section, extra metadata rows, role-aware group member list and member group link, mockup fixed metadata block, and reference, dependency, dependent disclosures. render::document_detail_page, document_detail.html and DOCUMENT_DETAIL_TEMPLATE are deleted. mod.rs selects the new builder for all Document records; Backlog and Decision keep view_page. List slot_cell reads document slot values from the field map (group remains engine-owned); no document field becomes a column and row structure is unchanged. No new slug literal, TypedHandler or ContentModel branch, lookup table, dependency, asset, template, client script, or route. Checks: env -u EDITOR -u VISUAL cargo test passes; cargo clippy --all-targets -- -D warnings passes; cargo fmt --check passes; MS-032 characterization replay passes after regenerating only the 11 document view page.html and http.json baselines (audit, glossary, nfr, req, rule, tech-spec, test-case, test-report, ui-mockup, ui-spec, use-case). Equivalence deltas are consolidation-only: field labels head every section (adds Description for tech-spec, use-case, test-case, test-report; Audit type and Content for audit), shared taglist markup, mockup fixed metadata plus shared head and dates, and rule Requirements moves from a disclosure to a field list. Remaining semantic note for TASK-269: rule requirement list items are plain text because field list items are model-neutral values, so the old resolved requirement link is gone; no other links, navigation, breadcrumbs, row labels or references, or Backlog and Decision output changed. Branch task-TASK-265; no commit, merge, checkout, or push per instruction. Open: semantic HTML comparator and EXPECTED-DELTAS attribution remain TASK-269; list presentation, slot, and reference-visibility lookup remains TASK-268.
+- **orchestrator**: Acceptance met: DocumentFieldMap with role-aware resolved fields built once per record; generic document view and list consume it with no slug or per-type branch; grouped role rendering and mockup fixed metadata; detail template deleted; semantic checks pass. NOTE: the eleven view baselines were regenerated, so TASK-311 and TASK-269 must compare against the pre-MS-035 pages from git history.

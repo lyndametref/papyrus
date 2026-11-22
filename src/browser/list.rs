@@ -9,7 +9,7 @@ use crate::browser::records::{Index, Record};
 use crate::browser::render::escape;
 use crate::browser::render::render_template;
 use crate::browser::routes;
-use crate::registry::{IdShape, TypeDescriptor};
+use crate::registry::{ArtifactCategory as CategoryKind, IdShape, TypeDescriptor};
 
 /// The list section template: heading, count note, then the table or empty state.
 const LIST_TEMPLATE: &str = "<section class=\"section\" aria-label=\"{{heading}}\">\
@@ -362,19 +362,30 @@ fn status_cell(status: Option<&str>) -> String {
 
 /// One family slot value. This is a match on the slot key only — never on a
 /// slug, a handler, or a template.
+///
+/// A document row reads its slot values from the record's field map: a
+/// document field is never a list column of its own, and no document content
+/// is read from a typed `Record` field.
 fn slot_cell(key: &str, record: &Record) -> String {
-    let value = match key {
-        "milestone" => record.milestone_id.clone(),
-        "assignee" => record.assignee.clone(),
-        "release" => record.release_id.clone(),
-        "type" => record.decision_type.clone(),
-        "superseded_by" => record.superseded_by.clone(),
-        "group" => record.group_id.clone(),
-        "audit_type" => record.audit_type.clone(),
-        "applicability" => record.applicability.clone(),
-        "task" => Some(record.mockup_task.clone()),
-        "specs" => Some(record.specs.join(", ")),
-        _ => None,
+    let value = if record.descriptor.category == CategoryKind::Document {
+        match key {
+            "group" => record.group_id.clone(),
+            other => record.field_map.display_value(other),
+        }
+    } else {
+        match key {
+            "milestone" => record.milestone_id.clone(),
+            "assignee" => record.assignee.clone(),
+            "release" => record.release_id.clone(),
+            "type" => record.decision_type.clone(),
+            "superseded_by" => record.superseded_by.clone(),
+            "group" => record.group_id.clone(),
+            "audit_type" => record.audit_type.clone(),
+            "applicability" => record.applicability.clone(),
+            "task" => Some(record.mockup_task.clone()),
+            "specs" => Some(record.specs.join(", ")),
+            _ => None,
+        }
     };
     match value.as_deref().filter(|value| !value.is_empty()) {
         Some(value) => escape(value),
@@ -816,6 +827,7 @@ mod tests {
         Record {
             id: id.to_string(),
             descriptor: descriptor("req"),
+            field_map: crate::record::field_map::DocumentFieldMap::default(),
             is_group,
             title: format!("{id} title"),
             story: None,
@@ -954,9 +966,11 @@ mod tests {
     #[test]
     fn decision_superseded_by_slot_renders_the_value_or_muted_text() {
         let mut superseded = record("ADR-001", false, None);
+        superseded.descriptor = descriptor("adr");
         superseded.decision_type = Some("adr".to_string());
         superseded.superseded_by = Some("ADR-002".to_string());
         let mut open = record("BDR-001", false, None);
+        open.descriptor = descriptor("bdr");
         open.decision_type = Some("bdr".to_string());
         let index = Index {
             records: vec![superseded, open],

@@ -1434,7 +1434,18 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
             Vec::new()
         };
     let resolved_refs: Vec<Option<records::Record>> =
-        if record.handler() == Some(TypedHandler::Rule) {
+        if record.descriptor.category == CategoryKind::Document {
+            record
+                .refs
+                .iter()
+                .map(|rid| {
+                    records::resolve_id(&ctx, &cfg, &state.registry, rid)
+                        .ok()
+                        .flatten()
+                        .map(|r| r.record)
+                })
+                .collect()
+        } else if record.handler() == Some(TypedHandler::Rule) {
             record
                 .requirements
                 .iter()
@@ -1478,8 +1489,17 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
         bind_note: &bind_note,
         routes: &state.routes,
     };
-    let page = if record.is_generic() {
-        render::document_detail_page(&record, &cfg, chrome)
+    let page = if record.descriptor.category == CategoryKind::Document {
+        render::document_view_page(
+            &record,
+            group,
+            &members,
+            &resolved_deps,
+            &resolved_refs,
+            &dependents,
+            &cfg,
+            chrome,
+        )
     } else {
         render::view_page(
             &record,
@@ -4330,6 +4350,7 @@ mod tests {
                 .descriptor("ui-mockup")
                 .expect("ui-mockup")
                 .clone(),
+            field_map: crate::record::field_map::DocumentFieldMap::default(),
             is_group: false,
             title: "Login".to_string(),
             story: None,
@@ -4406,6 +4427,7 @@ mod tests {
                 .descriptor("tech-spec")
                 .expect("tech-spec")
                 .clone(),
+            field_map: crate::record::field_map::DocumentFieldMap::default(),
             is_group: false,
             title: "Offline architecture".to_string(),
             story: None,
