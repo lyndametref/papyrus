@@ -2,7 +2,7 @@
 id: TASK-250
 title: "Remove per-record configuration and registry construction from the read path"
 created_date: '2026-11-20T17:41:37Z'
-updated_date: '2026-11-20T17:41:37Z'
+updated_date: '2026-11-22T08:49:51Z'
 labels: []
 references:
   - ADR-037
@@ -10,6 +10,9 @@ references:
   - TECH-043
   - TECH-040
   - NFR-007.001
+  - TC-160
+  - TC-171
+  - TC-193
 status: ToDo
 assignee:
   - rust-dev
@@ -17,12 +20,52 @@ milestone: MS-033
 dependencies:
   - TASK-249
 ordinal: 70
-documentation: []
+documentation:
+  - src/record/migrate.rs
+  - src/record/store.rs
+  - src/record/resolve.rs
+  - src/browser/records.rs
+  - docs/specifications/technical/TECH-043.md
 type: implementation
 ---
 
 ## Description
-Context: migrate::ensure_front_matter calls managed_descriptor and load_cfg_for, which read the config, parse YAML, validate, and build an ArtifactRegistry at least twice per record; load_record then resolves titles through resolve_id, which rescans descriptor directories.
+Context: MS-033 start commit c3103fc. The read path rebuilds configuration and the registry for every record:
+- `src/record/migrate.rs:81 managed_descriptor(project_dir, path)` calls `load_cfg_for` (line 1206), which runs `commands::load_effective_config` and then `ArtifactRegistry::build`; `ensure_front_matter_internal` (line 187) calls it on every read, and `is_managed_path` (line 71) calls it too.
+- `src/record/store.rs` calls `ensure_front_matter_quiet` at lines 155, 385, and 630 and `managed_descriptor` at lines 157, 231, and 473, each time rebuilding the configuration and the registry. `src/record/resolve.rs:124` does the same and also calls `load_effective_config` directly at line 118.
+- `src/browser/records.rs::load_record` (line 308) already takes `cfg: &Config` and `registry: &ArtifactRegistry`, but `resolve_id` (line 697) calls `descriptor_directory` and `fs::read_dir` once per looked-up ID, and `build_index` walks each descriptor directory.
+- `src/lib.rs` builds the configuration and registry once at phase 2 and passes only the registry to `cli::dispatch`, so callers cannot supply both.
+- Benchmark root cause recorded in `docs/benchmarks/`: `migrate::ensure_front_matter` calls `managed_descriptor` and `load_cfg_for` at least twice per record (TECH-043 sections 2 and 3).
 
-Scope: pass &Config and &ArtifactRegistry into the read path; require callers to supply them; delete the per-record load entry points; make title resolution read from the supplied registry instead of rescanning. Keep the mtime cache as the only reload point (owner decision 11). Do not introduce the request-scoped snapshot yet; that belongs to MS-036. Behavior and output bytes must be unchanged.
-Do not start until MS-031 governance is accepted.
+Scope:
+1. Change `managed_descriptor` and `is_managed_path` in `src/record/migrate.rs` to take `&Config` and `&ArtifactRegistry`, and delete `load_cfg_for` and every per-record `load_effective_config` and `ArtifactRegistry::build` call from `src/record/`.
+2. Thread `&Config` and `&ArtifactRegistry` into `ensure_front_matter`, `ensure_front_matter_quiet`, `ensure_front_matter_canonical`, the read and write entry points of `src/record/store.rs`, and `src/record/resolve.rs`. Callers supply the one registry built at `src/lib.rs` phase 2; `cli::dispatch` receives the `Config` alongside the registry as internal plumbing only.
+3. Update the callers that today pass only `ctx`: the document modules (`src/requirement.rs`, `src/glossary.rs`, `src/rule.rs`, `src/audit.rs`, `src/ui_spec.rs`, `src/ui_mockup.rs`, `src/tech_spec.rs`, `src/use_case.rs`, `src/test_case.rs`, `src/test_report.rs`, `src/task.rs`, `src/milestone.rs`, `src/release.rs`, `src/decision.rs`) and `src/browser/records.rs`. Typed module signatures may change internally; their user-visible behaviour may not.
+4. Title resolution uses the supplied registry: `browser::records::resolve_id` resolves the descriptor through `registry.descriptor` and `registry.record_descriptor` and never builds a registry or loads configuration. The per-ID directory scan remains in this milestone and is TASK-273's scope (ADR-037 decisions 21 to 25), so no index, request snapshot, or cache is added here.
+5. Keep the mtime cache as the only reload point (owner decision 11). This task adds no cache and no snapshot; the serving snapshot is TASK-274 in MS-036.
+6. Behaviour and output bytes are unchanged: adoption keys and order, migration and conflict outcomes, list, view, edit, and JSON payloads, status codes, and browser pages.
+
+Invariants:
+- No read path builds a configuration or a registry per record. One configuration load and one registry build per process or request serve every record in that pass (MS-033 AC-5, TECH-043 section 2).
+- Old configuration files must parse to the same effective document-type descriptor set, and no record or page content changes (MS-033 AC-1, AC-7).
+- Every write still re-reads the live file for its version token, and `record::store` stays the only writer (ADR-006, ADR-013).
+
+Out of scope: the request-scoped record snapshot, a config fingerprint, and the serving snapshot (TASK-273 and TASK-274, MS-036); the inventory scan (TASK-275); the document engine and typed module deletion (MS-034). No dependency, ordinal, milestone, or assignee changes.
+
+Assumptions:
+- Passing `&Config` and `&ArtifactRegistry` from `lib.rs` through `cli::dispatch` is acceptable internal plumbing; no command, option, output, or exit code changes.
+- `RecordDescriptor::declared_statuses` and the other record facts keep reading the supplied `Config`, not a reloaded one.
+- A record of a configuration-defined type still resolves after the configuration file changes between building the registry and the read, because the supplied registry is the descriptor source for that pass.
+
+Definition of done: `src/record/` contains no configuration load or registry build; the read-path signatures require both values; the full suite, the characterization replay, and the browser and CLI suites pass unchanged; `cargo clippy --all-targets -- -D warnings` is clean.
+## Acceptance Criteria
+- [ ] The record module contains no production call to `load_effective_config`, `load_effective_value`, `ArtifactRegistry::build`, or `load_cfg_for`; a source-guard test fails if one returns, and it passes on the final tree (MS-033 AC-5, TECH-043 section 2).
+- [ ] `managed_descriptor`, `is_managed_path`, `ensure_front_matter`, `ensure_front_matter_quiet`, `ensure_front_matter_canonical`, the store read and write entry points, and `record::resolve` require `&Config` and `&ArtifactRegistry`; the crate does not compile when either is omitted (TECH-043 section 2).
+- [ ] A record of a configuration-defined type still reads after `papyrus.config.yml` is removed or made invalid between building the registry and the read: the read resolves through the supplied `Config` and registry and does not reload configuration (MS-033 AC-5).
+- [ ] `browser::records::resolve_id` and `load_record` resolve their descriptor through the supplied registry and never build a registry or load configuration; the per-ID directory scan is unchanged and remains TASK-273's scope (ADR-037 decisions 21 to 25).
+- [ ] No cache, snapshot, fingerprint, or reload point is introduced: the mtime cache stays the only reload point (owner decision 11), and the serving snapshot remains TASK-274 in MS-036.
+- [ ] The characterization replay, the list replay, the CLI-help goldens, and the browser, CLI, JSON, and migration suites pass byte-identically, so adoption keys and order, record bytes, page output, JSON payloads, and status codes are unchanged (MS-033 AC-7, TC-160, TC-193).
+- [ ] Every write still reads the live file for its version token and writes through `record::store`; the stale-token case still returns 409 and writes nothing (ADR-006, ADR-013, TC-171).
+- [ ] `cargo test` reports zero failures and `cargo clippy --all-targets -- -D warnings` is clean.
+## Comments
+- **task-refiner**: Refined for MS-033: description grounded in migrate.rs managed_descriptor and load_cfg_for, the per-record loads in store.rs and resolve.rs, browser records load_record and resolve_id, and lib.rs phase 2; 8 testable acceptance criteria added; TECH-043 documented. The request-scoped record snapshot and the serving snapshot are explicitly deferred to MS-036. No dependency, ordinal, milestone, or assignee change.
