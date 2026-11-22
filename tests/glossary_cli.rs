@@ -408,14 +408,72 @@ fn glossary_term_is_the_record_title() {
     let content = fs::read_to_string(d.join("docs/glossary/GLO-001.md")).unwrap();
     assert!(content.contains("id: GLO-001"), "{content}");
     assert!(content.contains("title: Cache"), "{content}");
-    // The seed create path does not write `status`; the term/title contract
-    // adds no status key, so only the stored title and body are asserted here.
+    // TC-138: a created document record carries the type's default status.
+    assert!(content.contains("status: active"), "{content}");
     assert!(!content.contains("term:"), "{content}");
     assert!(content.contains("# GLO-001 Cache"), "{content}");
     assert!(
         content.contains("## Definition\nA store of reusable results"),
         "{content}"
     );
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn created_glossary_status_is_visible_on_list_and_view() {
+    let d = tmpdir("status-surfaces");
+    init(&d);
+    let p = d.to_str().unwrap();
+    let out = bin()
+        .args([
+            "--dir",
+            p,
+            "glossary",
+            "create",
+            "Cache",
+            "--definition",
+            "A store of reusable results",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = bin()
+        .args(["--dir", p, "glossary", "list"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let list = String::from_utf8_lossy(&out.stdout);
+    assert!(list.contains("status=active"), "{list}");
+
+    let out = bin()
+        .args(["--dir", p, "--json", "glossary", "list"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let list_json = String::from_utf8_lossy(&out.stdout);
+    assert!(list_json.contains("\"status\":\"active\""), "{list_json}");
+
+    let out = bin()
+        .args(["--dir", p, "glossary", "view", "GLO-001"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let view = String::from_utf8_lossy(&out.stdout);
+    assert!(view.contains("status: active"), "{view}");
+
+    let out = bin()
+        .args(["--dir", p, "--json", "glossary", "view", "GLO-001"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let view_json = String::from_utf8_lossy(&out.stdout);
+    assert!(view_json.contains("\"status\":\"active\""), "{view_json}");
+
     let _ = fs::remove_dir_all(&d);
 }
 

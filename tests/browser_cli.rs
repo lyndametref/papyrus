@@ -7953,11 +7953,16 @@ fn t93_nfr_active_filter_excludes_the_group_and_keeps_the_member_top_level() {
     init_project(&dir);
     let group = create_nfr_group(&dir, "Filtered Group");
     create_nfr(&dir, "Restrict access", &group);
-    // The group has no status, so `status=active` filters it out. Give the
-    // member an active status so it remains in the filtered index.
-    let member_path = record_path(&dir, "nfr", &format!("{group}.001"));
-    let content = fs::read_to_string(&member_path).unwrap();
-    fs::write(&member_path, format!("---\nstatus: active\n---\n{content}")).unwrap();
+    // The group starts at `active`, so it appears in an `active` filter. Move
+    // it to another stored status to prove the filter excludes it; the member
+    // keeps the `active` status seeded at create and stays top-level.
+    let group_path = record_path(&dir, "nfr", &group);
+    let group_content = fs::read_to_string(&group_path).unwrap();
+    fs::write(
+        &group_path,
+        group_content.replace("status: active", "status: draft"),
+    )
+    .unwrap();
     let member = format!("{group}.001");
 
     let server = Server::start(&dir, &["--no-open"], &[]);
