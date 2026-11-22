@@ -184,8 +184,10 @@ fn static_allowlist_entries_are_documented_node_parts() {
     }
 }
 
+/// No entry may hide a page container's content. Element-level entries on a
+/// container are allowed because they remove only the container's own tokens.
 #[test]
-fn static_allowlist_has_no_page_container_entry() {
+fn static_allowlist_has_no_page_container_subtree() {
     let pages: BTreeMap<String, (String, String)> = document_pages()
         .into_iter()
         .map(|(case, baseline, actual)| (case, (baseline, actual)))
@@ -196,8 +198,8 @@ fn static_allowlist_has_no_page_container_entry() {
             && let Some(tag) = semantic_html::element_tag_at_path(baseline, path)
         {
             assert!(
-                !is_page_container(&tag, entry.kind),
-                "{}: allowance targets the {tag} container at {path}",
+                !is_page_container_subtree(&tag, entry.kind),
+                "{}: allowance hides the {tag} container subtree at {path}",
                 entry.case
             );
         }
@@ -205,17 +207,18 @@ fn static_allowlist_has_no_page_container_entry() {
             && let Some(tag) = semantic_html::element_tag_at_path(actual, path)
         {
             assert!(
-                !is_page_container(&tag, entry.kind),
-                "{}: allowance targets the {tag} container at {path}",
+                !is_page_container_subtree(&tag, entry.kind),
+                "{}: allowance hides the {tag} container subtree at {path}",
                 entry.case
             );
         }
     }
 }
 
-fn is_page_container(tag: &str, kind: semantic_html::AllowKind) -> bool {
-    // An element entry allows only the node's own start/end tokens; a subtree
-    // entry would hide the container's whole content and is forbidden.
+/// Element, attribute, and text entries on a page container are allowed: they
+/// remove only that node part. A subtree entry is forbidden because it would
+/// hide the container's whole content, including any changed title or field.
+fn is_page_container_subtree(tag: &str, kind: semantic_html::AllowKind) -> bool {
     matches!(tag, "form" | "main" | "section") && kind == semantic_html::AllowKind::Subtree
 }
 
@@ -294,6 +297,41 @@ fn each_page_kind_fails_a_single_label_text_field_or_link_mutation() {
             "http/not-found-req",
             "href=\"/?type=task\"",
             "href=\"/?type=task-changed\"",
+        ),
+        (
+            "http/list-req",
+            "class=\"h1\">Business requirements</h1>",
+            "class=\"h1\">Business requirements changed</h1>",
+        ),
+        (
+            "http/view-req",
+            "class=\"h1\">Resolved dependency</h1>",
+            "class=\"h1\">Resolved dependency changed</h1>",
+        ),
+        (
+            "http/edit-req",
+            "class=\"h1\">Edit REQ-001.001</h1>",
+            "class=\"h1\">Edit REQ-001.001 changed</h1>",
+        ),
+        (
+            "http/conflict-req",
+            "class=\"h1\">Edit REQ-001.001</h1>",
+            "class=\"h1\">Edit REQ-001.001 changed</h1>",
+        ),
+        (
+            "http/not-found-req",
+            "class=\"h1\">Not found</h1>",
+            "class=\"h1\">Not found changed</h1>",
+        ),
+        (
+            "http/empty-list-req",
+            "class=\"h1\">Business requirements</h1>",
+            "class=\"h1\">Business requirements changed</h1>",
+        ),
+        (
+            "http/form-post-validation",
+            "class=\"h1\">Edit REQ-001.002</h1>",
+            "class=\"h1\">Edit REQ-001.002 changed</h1>",
         ),
     ];
     let pages: BTreeMap<String, (String, String)> = document_pages()

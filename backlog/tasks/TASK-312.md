@@ -2,7 +2,7 @@
 id: TASK-312
 title: "Correct MS-035 audit findings from AUD-145"
 created_date: '2026-11-22T19:08:46Z'
-updated_date: '2026-11-22T19:37:27Z'
+updated_date: '2026-11-22T19:57:10Z'
 labels: []
 references:
   - AUD-145
@@ -16,7 +16,7 @@ references:
   - TECH-040
   - REQ-06.014
   - REQ-06.019
-status: Done
+status: In-Progress
 assignee:
   - rust-dev
 milestone: MS-035
@@ -76,3 +76,9 @@ Each AUD-145 item has a recorded result and its regression test; the full suite,
 ## Comments
 - **rust-dev**: -
 - **orchestrator**: Acceptance met: static node-level semantic allowlist with per-page mutation tests, scoped packaging out policy with guard tests, one field-domain validator for HTML and JSON, reserved envelope field keys, dead document reads removed with tighter guards, single visibility source, plus L1 to L6 cleanups; 1349 tests pass.
+- **orchestrator**: Reopened for the close-out residuals: H1-a title mutation still passes on view, conflict and not-found pages; H1-b reason applicability; H2-a HOME subtree; H1-c guard naming; H2-b force-refusal test.
+- **rust-dev**: Residual H1-a: compare_relocated_title now compares the accepted h1 with the document title suffix outside the allowlist and rechecks the baseline heading when the title did not change. Added title mutations for list, view, edit, conflict, not-found, empty-list and form page kinds; all now fail. New unit test a_relocated_page_title_is_compared_even_when_a_subtree_allowance_hides_it.
+- **rust-dev**: Residual H1-b: is_documented now requires an allowed reason, item and page-kind combination. Corrected 30 entries: 27 list aria-label label entries moved from uniform-title-block item-9 to seed-presentation item-16, and 3 list li subtree reference entries moved to seed-presentation item-18. New negative unit test a_list_page_seed_label_allowance_must_not_cite_item_9.
+- **rust-dev**: Residual H2-a: package_validate_out now refuses the whole HOME subtree except the project-local .tmp directory. New guard test h2_home_subdirectory_is_refused_even_with_force proves a HOME subdirectory and its marker survive a forced run.
+- **rust-dev**: Residual H1-c: renamed the guard to static_allowlist_has_no_page_container_subtree and clarified that element-level entries are allowed while no form, main or section subtree may hide content. Updated the comparator and expected-deltas documentation.
+- **rust-dev**: Residual H2-b: new guard test h2_force_refuses_an_unsafe_non_empty_path_before_cleaning proves a non-empty repository target is refused with force and the marker is retained. Full suite 1355 passed, clippy all targets with denied warnings and fmt check pass.

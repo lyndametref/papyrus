@@ -84,9 +84,12 @@ The allowed differences are a static per-case, node-level table in
 node part (an element, an attribute, a text node, or a subtree of a non-container
 node) on the baseline side, the accepted side, or both. An entry is never
 derived from the page under test, and the table contains no page-container
-allowance: no `form.form`, `section.section`, or `main.main` subtree may be
-hidden. A mutation of one label, text node, field, or link is therefore compared
-normally and must fail the gate.
+subtree: no `form.form`, `section.section`, or `main.main` subtree may be
+hidden. Element-level entries on a container are allowed because they remove
+only that element's own tokens. The page heading is compared against the
+document title independently of the table, so a relocated title cannot hide a
+mutation. A mutation of one label, text node, field, or link is therefore
+compared normally and must fail the gate.
 
 Every entry carries one of the three TASK-269 reason codes and the item below
 that attributes it:

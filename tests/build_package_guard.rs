@@ -26,6 +26,15 @@ fn build_package(out: &Path) -> Output {
         .expect("run build-package.sh")
 }
 
+fn build_package_forced(out: &Path) -> Output {
+    Command::new(root().join("scripts/build-package.sh"))
+        .args(["--version", "1.2.3", "--out"])
+        .arg(out)
+        .arg("--force")
+        .output()
+        .expect("run build-package.sh --force")
+}
+
 fn assert_refused(out: &Path, label: &str) -> Output {
     let output = build_package(out);
     assert_eq!(
@@ -65,6 +74,63 @@ fn h2_home_system_and_root_out_paths_are_refused() {
     ] {
         assert_refused(&path, label);
     }
+}
+
+#[test]
+fn h2_home_subdirectory_is_refused_even_with_force() {
+    let home = std::env::var("HOME").expect("HOME");
+    let target = PathBuf::from(home).join(format!("papyrus-guard-home-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&target);
+    fs::create_dir_all(&target).expect("create HOME subdirectory");
+    let marker = target.join("keep.txt");
+    fs::write(&marker, b"do not clean").expect("write marker");
+    let output = build_package_forced(&target);
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "a HOME subdirectory must be refused: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("HOME"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        fs::read(&marker).expect("marker retained"),
+        b"do not clean",
+        "--force must not clean a refused HOME subdirectory"
+    );
+    let _ = fs::remove_dir_all(&target);
+}
+
+#[test]
+fn h2_force_refuses_an_unsafe_non_empty_path_before_cleaning() {
+    let target = root()
+        .join("target")
+        .join(format!("package-guard-force-evil-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&target);
+    fs::create_dir_all(&target).expect("create unsafe workspace");
+    let marker = target.join("keep.txt");
+    fs::write(&marker, b"do not clean").expect("write marker");
+    let output = build_package_forced(&target);
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "an unsafe path must be refused even with --force: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("project-local .tmp"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        fs::read(&marker).expect("marker retained"),
+        b"do not clean",
+        "--force must validate the path before cleaning"
+    );
+    let _ = fs::remove_dir_all(&target);
 }
 
 #[test]

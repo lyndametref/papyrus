@@ -11,10 +11,11 @@
 //!
 //! The allowlist is static data in
 //! `tests/fixtures/characterization/semantic-allowlist.json`. It is never
-//! derived from the page under test, and it contains no page-container entry
-//! (`form.form`, `section.section`, `main.main`). Every entry names one node, a
-//! reason code from MS-035 TASK-269, and the `EXPECTED-DELTAS.md` item that
-//! attributes it.
+//! derived from the page under test, and it contains no page-container subtree
+//! (`form.form`, `section.section`, `main.main`). Element-level entries on a
+//! container are allowed because they remove only the container's own tokens.
+//! Every entry names one node, a reason code from MS-035 TASK-269, and the
+//! `EXPECTED-DELTAS.md` item that attributes it.
 
 use std::sync::OnceLock;
 
@@ -52,14 +53,72 @@ pub enum AllowKind {
     Subtree,
 }
 
+/// The page family a case belongs to. The allowed reason/item combinations
+/// depend on it: a title relocation is meaningful on view, edit, conflict, and
+/// form pages, but a list page must not cite it to hide a seed label.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PageKind {
+    List,
+    View,
+    Edit,
+    Conflict,
+    NotFound,
+    Form,
+    EmptyList,
+}
+
+fn page_kind(case: &str) -> Option<PageKind> {
+    let tail = case.split_once('/')?.1;
+    if tail.starts_with("not-found-") {
+        return Some(PageKind::NotFound);
+    }
+    if tail.starts_with("empty-list-") {
+        return Some(PageKind::EmptyList);
+    }
+    match tail.split('-').next()? {
+        "list" => Some(PageKind::List),
+        "view" => Some(PageKind::View),
+        "edit" => Some(PageKind::Edit),
+        "conflict" => Some(PageKind::Conflict),
+        "form" => Some(PageKind::Form),
+        _ => None,
+    }
+}
+
 impl AllowedDelta {
-    pub fn is_documented(&self, expected_deltas: &str) -> bool {
-        let reason = match self.reason.as_str() {
-            "uniform-title-block" => "uniform-title-block",
-            "seed-presentation" => "seed-presentation",
-            "expected-delta-6" => "expected-delta-6",
-            _ => return false,
+    /// The only reason/item/case-kind combinations the expected-delta document
+    /// authorises. The reason must also appear in that document, and the item
+    /// must be a numbered entry there.
+    fn is_allowed_combination(&self) -> bool {
+        let Some(kind) = page_kind(&self.case) else {
+            return false;
         };
+        matches!(
+            (self.reason.as_str(), self.delta.as_str(), kind),
+            (
+                "uniform-title-block",
+                "item-9",
+                PageKind::View | PageKind::Edit | PageKind::Conflict | PageKind::Form
+            ) | (
+                "seed-presentation",
+                "item-16",
+                PageKind::List
+                    | PageKind::View
+                    | PageKind::Edit
+                    | PageKind::Conflict
+                    | PageKind::NotFound
+                    | PageKind::Form
+                    | PageKind::EmptyList
+            ) | ("seed-presentation", "item-18", PageKind::List)
+                | (
+                    "expected-delta-6",
+                    "item-6",
+                    PageKind::Conflict | PageKind::NotFound
+                )
+        )
+    }
+
+    pub fn is_documented(&self, expected_deltas: &str) -> bool {
         let item = match self.delta.as_str() {
             "item-6" => "6",
             "item-9" => "9",
@@ -67,7 +126,9 @@ impl AllowedDelta {
             "item-18" => "18",
             _ => return false,
         };
-        expected_deltas.contains(reason) && expected_deltas.contains(&format!("\n{item}. "))
+        self.is_allowed_combination()
+            && expected_deltas.contains(&self.reason)
+            && expected_deltas.contains(&format!("\n{item}. "))
     }
 }
 
@@ -170,9 +231,72 @@ pub fn compare_document_html(
         }
     }
 
+    compare_relocated_title(case, &expected_tokens, &actual_tokens)?;
+
     same_keys(&expected_visible, &actual_visible)
         .then_some(())
         .ok_or_else(|| first_difference(case, &expected_visible, &actual_visible))
+}
+
+/// Compare the page heading with the document title independently of the node
+/// allowlist. A subtree allowance may hide the relocated `h1` from the generic
+/// token walk, but the accepted heading must still be the title text: either
+/// the whole `<title>` suffix (list, edit, conflict, not-found) or its trailing
+/// record-title segment (view). When the document title itself did not change,
+/// the baseline heading and the accepted heading must also match. Conflict
+/// pages are the documented exception (item 6): their heading moves from the
+/// conflict notice to the edit title, so they are pinned to their own title.
+fn compare_relocated_title(
+    case: &str,
+    expected_tokens: &[Token],
+    actual_tokens: &[Token],
+) -> Result<(), String> {
+    let Some(actual_heading) = element_text(actual_tokens, "h1") else {
+        return Ok(());
+    };
+    let Some(actual_title) = title_suffix(actual_tokens) else {
+        return Ok(());
+    };
+    if !title_matches_heading(&actual_title, &actual_heading) {
+        return Err(format!(
+            "{case}: page title text {actual_heading:?} does not match the document title {actual_title:?}"
+        ));
+    }
+    if let (Some(expected_heading), Some(expected_title)) = (
+        element_text(expected_tokens, "h1"),
+        title_suffix(expected_tokens),
+    ) && title_matches_heading(&expected_title, &expected_heading)
+        && expected_title == actual_title
+        && expected_heading != actual_heading
+    {
+        return Err(format!(
+            "{case}: relocated page title changed from {expected_heading:?} to {actual_heading:?}"
+        ));
+    }
+    Ok(())
+}
+
+fn title_matches_heading(title: &str, heading: &str) -> bool {
+    !heading.is_empty() && (title == heading || title.ends_with(&format!(" {heading}")))
+}
+
+fn element_text(tokens: &[Token], tag: &str) -> Option<String> {
+    let start = tokens
+        .iter()
+        .find(|token| token.kind == TokenKind::Start && token.key == format!("start:{tag}"))?;
+    let text_path = format!("{}#text0", start.path);
+    tokens
+        .iter()
+        .find(|token| token.path == text_path && token.kind == TokenKind::Text)
+        .and_then(|token| token.key.strip_prefix("text:"))
+        .map(str::to_string)
+}
+
+fn title_suffix(tokens: &[Token]) -> Option<String> {
+    let title = element_text(tokens, "title")?;
+    title
+        .split_once(" \u{2014} ")
+        .map(|(_, suffix)| suffix.to_string())
 }
 
 /// Parse a page into path-addressed semantic tokens.
@@ -682,6 +806,86 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains("/doc/REQ-002"));
+    }
+
+    #[test]
+    fn a_relocated_page_title_is_compared_even_when_a_subtree_allowance_hides_it() {
+        let expected = page("<main><span></span><h1>Stable</h1></main>");
+        let actual = page("<main><h1>Stable</h1></main>");
+        let allow = Allowlist::new(vec![
+            AllowedDelta {
+                case: "synthetic".to_string(),
+                kind: AllowKind::Element,
+                expected: Some(element_path_with_key(&expected, "start:span")),
+                actual: None,
+                name: None,
+                reason: "seed-presentation".to_string(),
+                delta: "item-16".to_string(),
+            },
+            AllowedDelta {
+                case: "synthetic".to_string(),
+                kind: AllowKind::Subtree,
+                expected: Some(element_path_with_key(&expected, "start:h1")),
+                actual: None,
+                name: None,
+                reason: "seed-presentation".to_string(),
+                delta: "item-16".to_string(),
+            },
+            AllowedDelta {
+                case: "synthetic".to_string(),
+                kind: AllowKind::Subtree,
+                expected: None,
+                actual: Some(element_path_with_key(&actual, "start:h1")),
+                name: None,
+                reason: "seed-presentation".to_string(),
+                delta: "item-16".to_string(),
+            },
+        ]);
+        // The page helper's title is "T", so give both pages a matching title.
+        let expected =
+            expected.replace("<title>T</title>", "<title>Papyrus \u{2014} Stable</title>");
+        let actual = actual.replace("<title>T</title>", "<title>Papyrus \u{2014} Stable</title>");
+        assert_eq!(
+            compare_document_html("synthetic", &expected, &actual, &allow),
+            Ok(())
+        );
+        let mutated = actual.replace(">Stable<", ">Changed<");
+        let error = compare_document_html("synthetic", &expected, &mutated, &allow).unwrap_err();
+        assert!(error.contains("page title text"), "{error}");
+    }
+
+    fn element_path_with_key(html: &str, key: &str) -> String {
+        tokenize(html)
+            .into_iter()
+            .find(|token| token.key == key && token.kind == TokenKind::Start)
+            .map(|token| token.path)
+            .unwrap_or_else(|| panic!("missing {key}"))
+    }
+
+    #[test]
+    fn a_list_page_seed_label_allowance_must_not_cite_item_9() {
+        let deltas = include_str!("../fixtures/characterization/corpus/EXPECTED-DELTAS.md");
+        let list_label = |reason: &str, delta: &str| AllowedDelta {
+            case: "http/list-req".to_string(),
+            kind: AllowKind::Attr,
+            expected: Some("0.1.0.1.1.3".to_string()),
+            actual: Some("0.1.0.1.1.3".to_string()),
+            name: Some("aria-label".to_string()),
+            reason: reason.to_string(),
+            delta: delta.to_string(),
+        };
+        assert!(
+            !list_label("seed-presentation", "item-9").is_documented(deltas),
+            "a list-page seed label must not cite the edit-form title delta"
+        );
+        assert!(
+            !list_label("uniform-title-block", "item-9").is_documented(deltas),
+            "a list page has no title relocation allowance"
+        );
+        assert!(
+            list_label("seed-presentation", "item-16").is_documented(deltas),
+            "a seed-label change is documented by item 16"
+        );
     }
 
     #[test]

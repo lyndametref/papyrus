@@ -38,14 +38,6 @@ package_validate_out() {
         echo "error: refusing to use the filesystem root as --out" >&2
         return 2
     fi
-    if [[ -n "${HOME:-}" ]]; then
-        local home_real
-        home_real="$(package_canonical_out "$HOME")"
-        if [[ "$out" == "$home_real" ]]; then
-            echo "error: refusing to use HOME as --out" >&2
-            return 2
-        fi
-    fi
     local system
     for system in "${PACKAGE_SYSTEM_DIRS[@]}"; do
         if [[ "$out" == "$system" || "$out" == "$system/"* ]]; then
@@ -64,6 +56,17 @@ package_validate_out() {
     if [[ "$out" == "$root_real/"* && "$out" != "$tmp_real/"* ]]; then
         echo "error: --out inside the repository is allowed only under the project-local .tmp directory" >&2
         return 2
+    fi
+    if [[ -n "${HOME:-}" ]]; then
+        local home_real
+        home_real="$(package_canonical_out "$HOME")"
+        # Refuse HOME and its whole subtree, but keep the project-local .tmp
+        # directory usable even when the repository lives under HOME.
+        if [[ ( "$out" == "$home_real" || "$out" == "$home_real/"* ) \
+            && "$out" != "$tmp_real" && "$out" != "$tmp_real/"* ]]; then
+            echo "error: refusing to use HOME or a subdirectory of HOME as --out" >&2
+            return 2
+        fi
     fi
     printf '%s\n' "$out"
 }
