@@ -2,7 +2,7 @@
 id: TASK-278
 title: "Re-run the benchmark suite and record NFR-007.001 and NFR-007.002 results"
 created_date: '2026-11-20T17:43:20Z'
-updated_date: '2026-11-22T20:25:01Z'
+updated_date: '2026-11-22T21:48:20Z'
 labels: []
 references:
   - NFR-007.001
@@ -18,7 +18,7 @@ references:
   - TC-189
   - MS-036
   - MS-037
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-036
@@ -77,3 +77,4 @@ Every acceptance criterion passes; the run is reproducible from the recorded com
 - [ ] #13 Hardware deviation decision (resolves and supersedes the reference-hardware clause of AC 2): the run uses the available host of 6 physical and 12 logical cores with 15.3 GiB RAM instead of the 4 vCPU and 8 GiB NFR-007 reference hardware; the full 10 warm-up and 100 measured protocol is unchanged; the hardware deviation is recorded beside every route result and in the run header; each threshold comparison is recorded as a measured pass or miss on the available host and is never presented as satisfying NFR-007.001 or NFR-007.002; the milestone does not mark either NFR satisfied, and the figures with the deviation are handed to MS-037 for the release report and the owner decision.
 ## Comments
 - **planner**: planner: hardware decision, 2026-11-22T20:22:22Z. NFR-007.001 and NFR-007.002 name 4 vCPU and 8 GiB; the available host is 6 physical and 12 logical cores with 15.3 GiB. Measure on the available host with the full 10 warm-up and 100 measured protocol, record the deviation beside every result, report measured figures with the deviation, and do not mark either NFR satisfied (AC #13 supersedes the reference-hardware clause of AC #2). MS-037 presents the figures with the caveat for the owner. Second-load measurement stays in this task: one diagram page, one math page, and a cache simulation honouring the served Cache-Control and ETag, for NFR-007.003.
+- **orchestrator**: Acceptance met: full NFR-007 protocol measured on the available host with the deviation recorded; inventory 1000 p95 550 ms (miss vs 250), grouped view and edit 118 to 126 ms (miss vs 100), single-markdown 38 ms and mockup 4 ms pass, NFR-007.003 pass with zero second-load vendor bytes; raw JSON and MS-036-results.md recorded.
