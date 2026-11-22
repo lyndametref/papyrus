@@ -71,6 +71,30 @@ front-matter re-adoption quirk is expressed as one descriptor-keyed engine rule
 the pre-refactor output, so no corpus byte delta is recorded. Source: MS-035
 TASK-269 (269b); TECH-040.
 
+## TASK-269: semantic page gate against the frozen baseline
+
+The semantic comparator in `tests/support/semantic_html.rs` compares every
+document list, view, edit, conflict, and not-found page against the frozen
+pre-MS-035 snapshot at commit `214a252`. Record files, JSON payloads, stdout,
+stderr, exit codes, asset bodies, the HTTP status and headers, and every
+Backlog and Decision `page.html` remain byte-for-byte.
+
+An allowed difference is listed per case and per selector; each selector is
+mapped to the reason code `uniform-title-block`, `seed-presentation`, or
+`expected-delta-6` and to the item above that attributes it
+(`item-9`, `item-14`, `item-16`, `item-18`). The selectors are:
+
+| Selector | Reason code | Item |
+| --- | --- | --- |
+| `aside.sidebar`, `nav.breadcrumb`, `title`, `h1.h1` | `seed-presentation` | 16 |
+| `section.section` | `seed-presentation` | 18 |
+| `div.page-head`, `section.record-section`, `div.meta`, `p.text`, `p.sub`, `div.actions`, `div.readonly-block`, `div.alert`, `form.form` | `uniform-title-block` | 9 |
+| `div.conflict-box` | `expected-delta-6` | 6 |
+| `div.error-page`, `main.main` | `expected-delta-6` | 6 |
+
+An allowlist entry that hides no real difference fails the test. The
+consolidation in TASK-269 itself adds no byte delta to the accepted corpus.
+
 ## Measured verb-about-line delta (TASK-260)
 
 The `TASK-260` regeneration measured one systematic help delta that the earlier

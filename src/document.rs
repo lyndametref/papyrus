@@ -10,7 +10,7 @@ use crate::record::document::{self, Document};
 use crate::record::patch::{self, PatchOp};
 use crate::registry::{
     ArtifactCategory, ArtifactRegistry, DocumentModel, DocumentRole, StatusModel, TypeDescriptor,
-    TypedHandler, fields_for_verb, role_fields,
+    fields_for_verb, role_fields,
 };
 use crate::sanitize;
 
@@ -972,7 +972,7 @@ fn list_documents(
             .iter()
             .map(|(id, title, content)| {
                 let metadata = record::view::RecordView::lenient(content, id).metadata_json();
-                if matches!(descriptor.handler(), Some(TypedHandler::Glossary)) {
+                if descriptor.list_json_term_alias {
                     json!({
                         "id": id,
                         "term": title,
@@ -1032,13 +1032,9 @@ fn resolve_document(
 }
 
 fn preserves_trailing_newline(descriptor: &TypeDescriptor) -> bool {
-    // Seed-inexpressible quirk retained deliberately (TASK-255, TASK-259): the
-    // glossary and requirement modules historically printed the record with its
-    // trailing newline. The handler mapping keeps it until MS-035.
-    matches!(
-        descriptor.handler(),
-        Some(TypedHandler::Glossary) | Some(TypedHandler::Requirement(_))
-    )
+    // Seed flag carried on the descriptor: the glossary and requirement
+    // modules historically printed the record with its trailing newline.
+    descriptor.preserve_trailing_newline
 }
 
 fn view_document(
@@ -1331,9 +1327,10 @@ fn edit_document(
     if let Some(command) = editor_command {
         let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
         run_editor(&command, &safe_path)?;
-        // Seed-inexpressible quirk retained deliberately (TASK-255, TASK-259):
-        // a ui-spec body rewritten by the editor re-adopts front matter.
-        if matches!(descriptor.handler(), Some(TypedHandler::UiSpec)) {
+        // One documented engine rule keyed on the descriptor flag the seed
+        // sets for ui-spec: a body rewritten by the editor re-adopts front
+        // matter. No slug literal and no name comparison.
+        if descriptor.editor_readopts_front_matter {
             record::migrate::ensure_front_matter(ctx, cfg, registry, &safe_path)?;
         }
     }
@@ -3454,7 +3451,7 @@ mod tests {
     }
 
     #[test]
-    fn handler_mapping_keeps_the_view_trailing_newline_quirk() {
+    fn seed_flag_keeps_the_view_trailing_newline_quirk() {
         let dir = tmpdir("newline-quirk");
         default_config(&dir);
         let c = ctx(&dir);

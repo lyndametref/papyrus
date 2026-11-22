@@ -39,16 +39,9 @@ pub struct Record {
     /// A grouped family's group record (`REQ-001`) rather than a member.
     pub is_group: bool,
     pub title: String,
-    pub story: Option<String>,
     pub group_id: Option<String>,
     pub group_title: Option<String>,
     pub description: Option<String>,
-    pub rationale: Option<String>,
-    pub applicability: Option<String>,
-    pub requirements: Vec<String>,
-    pub audit_type: Option<String>,
-    pub definition: Option<String>,
-    pub view: Option<String>,
     pub status: Option<String>,
     pub ordinal: Option<i64>,
     pub milestone_id: Option<String>,
@@ -66,9 +59,7 @@ pub struct Record {
     pub decision_type: Option<String>,
     pub superseded_by: Option<String>,
     pub superseded_title: Option<String>,
-    pub specs: Vec<String>,
     pub refs: Vec<String>,
-    pub mockup_task: String,
     pub doc: Document,
     /// Record content exactly as stored on disk, before line-ending
     /// normalization. It is the byte comparison baseline for a save.
@@ -95,17 +86,6 @@ impl Record {
 
     pub fn is_html_mockup(&self) -> bool {
         self.descriptor.document_model == DocumentModel::SingleHtmlMockup
-    }
-
-    pub fn is_requirement(&self) -> bool {
-        matches!(self.handler(), Some(TypedHandler::Requirement(_)))
-    }
-
-    pub fn supports_story(&self) -> bool {
-        self.handler()
-            == Some(TypedHandler::Requirement(
-                crate::registry::RequirementKind::Business,
-            ))
     }
 
     pub fn type_label(&self) -> String {
@@ -182,28 +162,6 @@ fn section_or_none(doc: &Document, name: &str) -> Option<String> {
     document::section_text(doc, name)
 }
 
-fn list_from_section(doc: &Document, name: &str) -> Vec<String> {
-    let Some(text) = document::section_text(doc, name) else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    for line in text.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        let item = trimmed
-            .strip_prefix("- ")
-            .or_else(|| trimmed.strip_prefix('-'))
-            .unwrap_or(trimmed)
-            .trim();
-        if !item.is_empty() && !out.contains(&item.to_string()) {
-            out.push(item.to_string());
-        }
-    }
-    out
-}
-
 fn heading_title(doc: &Document) -> String {
     document::heading_id_title(doc).1
 }
@@ -267,16 +225,9 @@ fn default_record(
         field_map: DocumentFieldMap::default(),
         is_group,
         title: String::new(),
-        story: None,
         group_id: None,
         group_title: None,
         description: None,
-        rationale: None,
-        applicability: None,
-        requirements: Vec::new(),
-        audit_type: None,
-        definition: None,
-        view: None,
         status: None,
         ordinal: None,
         milestone_id: None,
@@ -294,9 +245,7 @@ fn default_record(
         decision_type: None,
         superseded_by: None,
         superseded_title: None,
-        specs: Vec::new(),
         refs: Vec::new(),
-        mockup_task: String::new(),
         doc,
         stored_source: String::new(),
         path,
@@ -435,83 +384,39 @@ pub fn load_record(
             record.context = section_or_none(&record.doc, "Context");
             record.consequences = section_or_none(&record.doc, "Consequences");
         }
-        Some(TypedHandler::Requirement(_)) => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
-            record.story = section_or_none(&record.doc, "User Story");
-            record.description = section_or_none(&record.doc, "Description");
-            // The group link is the reserved engine-owned front-matter key. A
-            // legacy record still carries the link in a `## Group` section.
-            let frontmatter_group = record
-                .doc
-                .front_matter
-                .as_ref()
-                .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, "group"))
-                .map(|value| value.trim().to_string())
-                .filter(|value| !value.is_empty());
-            if let Some(group_id) = frontmatter_group {
-                record.group_id = Some(group_id);
-            } else if let Some(group) = section_or_none(&record.doc, "Group") {
-                let mut parts = group
-                    .lines()
-                    .next()
-                    .unwrap_or("")
-                    .splitn(2, char::is_whitespace);
-                record.group_id = parts
-                    .next()
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty());
-                record.group_title = parts
-                    .next()
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty());
-            }
-        }
-        Some(TypedHandler::Glossary) => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
-            record.definition = section_or_none(&record.doc, "Definition");
-        }
-        Some(TypedHandler::UiSpec) => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
-            record.view = section_or_none(&record.doc, "View");
-            record.description = section_or_none(&record.doc, "Description");
-        }
-        Some(TypedHandler::Rule) => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
-            record.description = section_or_none(&record.doc, "Description");
-            record.rationale = section_or_none(&record.doc, "Rationale");
-            record.applicability = section_or_none(&record.doc, "Applicability");
-            record.requirements = list_from_section(&record.doc, "Requirements");
-        }
-        Some(TypedHandler::Audit) => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
-            let fm_type =
-                record.doc.front_matter.as_ref().and_then(|fm| {
-                    crate::record::frontmatter::current_value_string(&fm.raw, "type")
-                });
-            record.audit_type = Some(
-                fm_type
-                    .filter(|t| !t.trim().is_empty())
-                    .or_else(|| section_or_none(&record.doc, "Audit Type"))
-                    .map(|t| t.trim().to_string())
-                    .unwrap_or_else(|| "security".to_string()),
-            );
-            record.description = section_or_none(&record.doc, "Content");
-        }
-        Some(TypedHandler::TechSpec) => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
-            record.description = section_or_none(&record.doc, "Description");
-        }
-        Some(TypedHandler::UseCase)
-        | Some(TypedHandler::TestCase)
-        | Some(TypedHandler::TestReport) => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
-            record.description = section_or_none(&record.doc, "Description");
-            record.applicability = section_or_none(&record.doc, "Applicability");
-        }
-        Some(TypedHandler::UiMockup) => {}
         None => {
             record.title = non_empty_or(heading_title(&record.doc), &stem);
             record.description = section_or_none(&record.doc, "Description");
+        }
+    }
+
+    // The group link is descriptor-driven for every grouped member, not a
+    // per-type branch: a record's group is the reserved engine-owned
+    // front-matter key, with a legacy `## Group` section as fallback.
+    if record.descriptor.document_model == DocumentModel::GroupedMarkdown && !is_group {
+        let frontmatter_group = record
+            .doc
+            .front_matter
+            .as_ref()
+            .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, "group"))
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        if let Some(group_id) = frontmatter_group {
+            record.group_id = Some(group_id);
+        } else if let Some(group) = section_or_none(&record.doc, "Group") {
+            let mut parts = group
+                .lines()
+                .next()
+                .unwrap_or("")
+                .splitn(2, char::is_whitespace);
+            record.group_id = parts
+                .next()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+            record.group_title = parts
+                .next()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
         }
     }
 
@@ -605,9 +510,7 @@ fn load_ui_mockup(
     record.title = meta_record.title.clone();
     record.status = (!meta_record.status.is_empty()).then_some(meta_record.status.clone());
     record.superseded_by = meta_record.superseded_by.clone();
-    record.specs = meta_record.specs.clone();
     record.refs = meta_record.refs.clone();
-    record.mockup_task = meta_record.task.clone();
     record.field_map = DocumentFieldMap::for_mockup(
         &record.descriptor,
         vec![
@@ -615,9 +518,9 @@ fn load_ui_mockup(
                 "status".to_string(),
                 record.status.clone().unwrap_or_default(),
             ),
-            ("task".to_string(), record.mockup_task.clone()),
-            ("specs".to_string(), record.specs.join(" ")),
-            ("refs".to_string(), record.refs.join(" ")),
+            ("task".to_string(), meta_record.task.clone()),
+            ("specs".to_string(), meta_record.specs.join(" ")),
+            ("refs".to_string(), meta_record.refs.join(" ")),
             (
                 "superseded_by".to_string(),
                 record.superseded_by.clone().unwrap_or_default(),
