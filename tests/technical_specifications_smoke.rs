@@ -621,6 +621,8 @@ fn milestone_technical_specifications_flow() {
     assert_eq!(doc["title"], "quick brown fox browser edited");
     assert_eq!(doc["description"], "New body\nsecond line");
     assert!(doc["version"].is_string());
+    assert_eq!(res.header("Cache-Control"), Some("no-store"));
+    assert!(res.header("ETag").is_none());
     let path = doc["path"].as_str().unwrap();
     assert!(path.ends_with("TECH-001.md"));
     assert!(!path.starts_with('/'));
@@ -629,7 +631,8 @@ fn milestone_technical_specifications_flow() {
     let res = server.get("/assets/app.css");
     assert_eq!(res.status, 200);
     assert!(res.header("Content-Type").unwrap().starts_with("text/css"));
-    assert_eq!(res.header("Cache-Control"), Some("no-store"));
+    assert_eq!(res.header("Cache-Control"), Some("no-cache"));
+    assert!(res.header("ETag").is_some());
     assert!(!res.body.is_empty());
     let css = res.text();
     assert!(css.contains("white-space: pre-wrap"));
@@ -644,7 +647,8 @@ fn milestone_technical_specifications_flow() {
             .unwrap()
             .starts_with("text/javascript")
     );
-    assert_eq!(res.header("Cache-Control"), Some("no-store"));
+    assert_eq!(res.header("Cache-Control"), Some("no-cache"));
+    assert!(res.header("ETag").is_some());
     assert!(!res.body.is_empty());
     assert_no_external_refs(&res.text(), "script");
 
@@ -734,6 +738,8 @@ fn installed_layout_has_no_runtime_asset_dependency() {
     let server = Server::start(&dir, Some(&empty_cwd));
     let res = server.get("/?type=tech-spec");
     assert_eq!(res.status, 200);
+    assert_eq!(res.header("Cache-Control"), Some("no-store"));
+    assert!(res.header("ETag").is_none());
     assert!(res.text().contains("TECH-001"));
     let res = server.get("/assets/app.css");
     assert_eq!(res.status, 200);

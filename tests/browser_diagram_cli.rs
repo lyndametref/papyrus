@@ -15,7 +15,7 @@ use std::process::{Child, Command, Stdio};
 const CSP: &str = "default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
 const CSP_DIAGRAM: &str = "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
 
-const BUNDLE: &str = "/assets/mermaid/mermaid.min.js";
+const BUNDLE: &str = "/assets/mermaid/11.17.2/mermaid.min.js";
 const LIMIT_NOTE: &str =
     "Diagram not rendered: source exceeds the 100,000-byte or 1,000-line limit.";
 const PLANTUML_NOTE: &str = "PlantUML diagrams are not supported in this release; showing source.";
@@ -838,7 +838,7 @@ fn vendored_pin_and_manifest_match_app_js() {
     let manifest = include_str!("../src/browser/vendor/MANIFEST.md");
     assert!(
         manifest.contains(
-            "| `/assets/mermaid/mermaid.min.js` | mermaid | 11.17.2 | MIT | https://registry.npmjs.org/mermaid/-/mermaid-11.17.2.tgz | 3572661 | `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8` |"
+            "| `/assets/mermaid/11.17.2/mermaid.min.js` | mermaid | 11.17.2 | MIT | https://registry.npmjs.org/mermaid/-/mermaid-11.17.2.tgz | 3572661 | `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8` |"
         ),
         "the Mermaid pin, size, and digest are unchanged"
     );
@@ -1006,9 +1006,13 @@ fn bundle_is_linked_once_on_diagram_pages_only_in_script_order() {
 
     let html = server.get("/doc/REQ-001.001");
     assert_eq!(html.matches(BUNDLE).count(), 1, "bundle exactly once");
+    assert!(
+        !html.contains("/assets/mermaid/mermaid.min.js"),
+        "the diagram page references the unversioned Mermaid bundle"
+    );
     let app_css = html.find("/assets/app.css").unwrap();
-    let katex_css = html.find("/assets/katex/katex.min.css").unwrap();
-    let katex_js = html.find("/assets/katex/katex.min.js").unwrap();
+    let katex_css = html.find("/assets/katex/0.16.11/katex.min.css").unwrap();
+    let katex_js = html.find("/assets/katex/0.16.11/katex.min.js").unwrap();
     let mermaid = html.find(BUNDLE).unwrap();
     let app_js = html.find("/assets/app.js").unwrap();
     assert!(app_css < katex_css, "KaTeX CSS after app.css");

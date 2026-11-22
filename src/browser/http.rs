@@ -45,6 +45,33 @@ pub enum Version {
     Http11,
 }
 
+/// The cache class of a response (ADR-038 decision 5).
+///
+/// The response kind decides the class. [`CacheClass::NoStore`] is the default
+/// for every constructor that names no class, so a new page cannot become
+/// cacheable by omission.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CacheClass {
+    /// HTML, JSON, errors, not-found, and anything not in the asset table.
+    #[default]
+    NoStore,
+    /// A versioned vendor file; the URL is the validator.
+    Immutable,
+    /// A first-party file revalidated by a strong `ETag`.
+    Revalidated,
+}
+
+impl CacheClass {
+    /// The exact `Cache-Control` value for this class.
+    pub fn header_value(self) -> &'static str {
+        match self {
+            CacheClass::NoStore => "no-store",
+            CacheClass::Immutable => "public, max-age=31536000, immutable",
+            CacheClass::Revalidated => "no-cache",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Target {
     pub path: String,
@@ -76,6 +103,28 @@ impl Request {
             .iter()
             .filter(|(key, _)| key.eq_ignore_ascii_case(name))
             .count()
+    }
+
+    /// Evaluate `If-None-Match` with the strong comparison function.
+    ///
+    /// Every header line is combined into one comma-separated list. `*` and a
+    /// byte-identical strong tag match; a weak, unknown, or malformed element
+    /// does not. The caller applies this only to a first-party asset on `GET`
+    /// or `HEAD`, after the method check and exact lookup.
+    pub fn if_none_match_matches(&self, etag: &str) -> bool {
+        for (name, value) in &self.headers {
+            if !name.eq_ignore_ascii_case("if-none-match") {
+                continue;
+            }
+            for element in value.split(',') {
+                let element =
+                    element.trim_matches(|character| character == ' ' || character == '\t');
+                if element == "*" || element == etag {
+                    return true;
+                }
+            }
+        }
+        false
     }
 }
 
@@ -415,6 +464,10 @@ pub struct Response {
     pub extra_headers: Vec<(String, String)>,
     /// The CSP value printed for `text/html` responses; unused for assets.
     pub csp: &'static str,
+    /// The cache class the writer emits for this response.
+    pub cache: CacheClass,
+    /// The strong validator for the revalidated class.
+    pub etag: Option<String>,
 }
 
 impl Response {
@@ -425,6 +478,8 @@ impl Response {
             body: body.into_bytes(),
             extra_headers: Vec::new(),
             csp: CSP,
+            cache: CacheClass::NoStore,
+            etag: None,
         }
     }
 
@@ -444,6 +499,8 @@ impl Response {
             body,
             extra_headers: Vec::new(),
             csp: CSP,
+            cache: CacheClass::NoStore,
+            etag: None,
         }
     }
 
@@ -454,6 +511,8 @@ impl Response {
             body: body.as_bytes().to_vec(),
             extra_headers: Vec::new(),
             csp: CSP,
+            cache: CacheClass::NoStore,
+            etag: None,
         }
     }
 
@@ -464,6 +523,38 @@ impl Response {
             body: body.to_vec(),
             extra_headers: Vec::new(),
             csp: CSP,
+            cache: CacheClass::NoStore,
+            etag: None,
+        }
+    }
+
+    /// An immutable vendor asset: the URL is the validator, so no `ETag`.
+    pub fn immutable_asset(content_type: &'static str, body: &'static [u8]) -> Self {
+        Self {
+            cache: CacheClass::Immutable,
+            ..Self::bytes(200, content_type, body)
+        }
+    }
+
+    /// A revalidated first-party asset with one strong `ETag`.
+    pub fn revalidated_asset(content_type: &'static str, body: &'static [u8], etag: &str) -> Self {
+        Self {
+            cache: CacheClass::Revalidated,
+            etag: Some(etag.to_string()),
+            ..Self::bytes(200, content_type, body)
+        }
+    }
+
+    /// The bodyless `304` for a matching first-party conditional request.
+    pub fn not_modified(etag: &str) -> Self {
+        Self {
+            status: 304,
+            content_type: "",
+            body: Vec::new(),
+            extra_headers: Vec::new(),
+            csp: CSP,
+            cache: CacheClass::Revalidated,
+            etag: Some(etag.to_string()),
         }
     }
 
@@ -475,9 +566,24 @@ impl Response {
         response
     }
 
+    /// Add or replace one extra header.
+    ///
+    /// `Cache-Control` and `ETag` are writer-owned and are ignored here, so no
+    /// handler or route can choose a cache class (ADR-038 decision 20).
     pub fn with_header(mut self, name: &str, value: &str) -> Self {
-        self.extra_headers
-            .push((name.to_string(), value.to_string()));
+        if name.eq_ignore_ascii_case("cache-control") || name.eq_ignore_ascii_case("etag") {
+            return self;
+        }
+        if let Some(existing) = self
+            .extra_headers
+            .iter_mut()
+            .find(|(key, _)| key.eq_ignore_ascii_case(name))
+        {
+            existing.1 = value.to_string();
+        } else {
+            self.extra_headers
+                .push((name.to_string(), value.to_string()));
+        }
         self
     }
 }
@@ -519,14 +625,22 @@ pub fn write_response(
         reason(response.status)
     ));
     head.push_str("Server: papyrus\r\n");
-    head.push_str(&format!("Content-Type: {}\r\n", response.content_type));
-    head.push_str(&format!("Content-Length: {}\r\n", response.body.len()));
+    if response.status != 304 {
+        head.push_str(&format!("Content-Type: {}\r\n", response.content_type));
+        head.push_str(&format!("Content-Length: {}\r\n", response.body.len()));
+    }
     head.push_str("Connection: close\r\n");
-    head.push_str("Cache-Control: no-store\r\n");
+    head.push_str(&format!(
+        "Cache-Control: {}\r\n",
+        response.cache.header_value()
+    ));
+    if let Some(etag) = &response.etag {
+        head.push_str(&format!("ETag: {etag}\r\n"));
+    }
     head.push_str("X-Content-Type-Options: nosniff\r\n");
     head.push_str("Referrer-Policy: no-referrer\r\n");
     head.push_str("X-Frame-Options: DENY\r\n");
-    if response.content_type.starts_with("text/html") {
+    if response.status != 304 && response.content_type.starts_with("text/html") {
         head.push_str(&format!("Content-Security-Policy: {}\r\n", response.csp));
     }
     for (name, value) in &response.extra_headers {
@@ -628,6 +742,98 @@ mod tests {
             assert!(!script.contains("sha"));
         }
         assert!(!CSP.contains("unsafe"));
+    }
+
+    fn request_with(headers: &[(&str, &str)]) -> Request {
+        Request {
+            method: Method::Get,
+            raw_method: "GET".to_string(),
+            target: Target {
+                path: "/assets/app.css".to_string(),
+                query: None,
+                raw: "/assets/app.css".to_string(),
+            },
+            version: Version::Http11,
+            headers: headers
+                .iter()
+                .map(|(name, value)| (name.to_string(), value.to_string()))
+                .collect(),
+            body: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn cache_classes_have_one_exact_value_each() {
+        assert_eq!(CacheClass::default(), CacheClass::NoStore);
+        assert_eq!(CacheClass::NoStore.header_value(), "no-store");
+        assert_eq!(CacheClass::Revalidated.header_value(), "no-cache");
+        assert_eq!(
+            CacheClass::Immutable.header_value(),
+            "public, max-age=31536000, immutable"
+        );
+        assert_eq!(
+            Response::html(200, String::new()).cache,
+            CacheClass::NoStore
+        );
+        assert_eq!(
+            Response::json(200, serde_json::json!({})).cache,
+            CacheClass::NoStore
+        );
+        assert_eq!(
+            Response::text(200, "text/plain", "x").cache,
+            CacheClass::NoStore
+        );
+        assert_eq!(
+            Response::bytes(200, "font/woff2", b"x").cache,
+            CacheClass::NoStore
+        );
+    }
+
+    #[test]
+    fn extra_headers_cannot_supply_a_cache_class() {
+        let response = Response::text(200, "text/plain; charset=utf-8", "x")
+            .with_header("Cache-Control", "public, max-age=60")
+            .with_header("cache-control", "no-cache")
+            .with_header("ETag", "\"deadbeef\"")
+            .with_header("Allow", "GET, HEAD");
+        assert!(
+            response
+                .extra_headers
+                .iter()
+                .all(|(name, _)| !name.eq_ignore_ascii_case("cache-control"))
+        );
+        assert!(
+            response
+                .extra_headers
+                .iter()
+                .all(|(name, _)| !name.eq_ignore_ascii_case("etag"))
+        );
+        assert_eq!(response.cache, CacheClass::NoStore);
+        assert!(response.etag.is_none());
+        assert_eq!(
+            response.extra_headers,
+            vec![("Allow".to_string(), "GET, HEAD".to_string())]
+        );
+    }
+
+    #[test]
+    fn if_none_match_uses_strong_comparison_and_combines_lines() {
+        let etag = "\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"";
+        let weak = format!("W/{etag}");
+        assert!(!request_with(&[]).if_none_match_matches(etag));
+        assert!(request_with(&[("If-None-Match", "*")]).if_none_match_matches(etag));
+        assert!(request_with(&[("If-None-Match", etag)]).if_none_match_matches(etag));
+        assert!(
+            request_with(&[("If-None-Match", &format!("\"stale\", {etag}"))])
+                .if_none_match_matches(etag)
+        );
+        assert!(
+            request_with(&[("If-None-Match", "\"stale\""), ("If-None-Match", etag)])
+                .if_none_match_matches(etag)
+        );
+        assert!(!request_with(&[("If-None-Match", &weak)]).if_none_match_matches(etag));
+        assert!(!request_with(&[("If-None-Match", "not-a-tag")]).if_none_match_matches(etag));
+        assert!(!request_with(&[("If-None-Match", "\"unknown\"")]).if_none_match_matches(etag));
     }
 
     #[test]

@@ -37,10 +37,11 @@ pub struct Prose {
 }
 
 /// The head fragment for a page that contains math; `""` otherwise.
-pub const HEAD_ASSETS: &str = "<link rel=\"stylesheet\" href=\"/assets/katex/katex.min.css\">\n<script src=\"/assets/katex/katex.min.js\" defer></script>";
+pub const HEAD_ASSETS: &str = "<link rel=\"stylesheet\" href=\"/assets/katex/0.16.11/katex.min.css\">\n<script src=\"/assets/katex/0.16.11/katex.min.js\" defer></script>";
 
 /// The head fragment for a page that contains a renderable diagram.
-pub const MERMAID_ASSETS: &str = "<script src=\"/assets/mermaid/mermaid.min.js\" defer></script>";
+pub const MERMAID_ASSETS: &str =
+    "<script src=\"/assets/mermaid/11.17.2/mermaid.min.js\" defer></script>";
 
 /// Maximum diagram source size in UTF-8 bytes.
 pub const MAX_DIAGRAM_BYTES: usize = 100_000;
@@ -739,8 +740,8 @@ mod tests {
 
     #[test]
     fn head_assets_reference_only_vendored_paths() {
-        assert!(HEAD_ASSETS.contains("href=\"/assets/katex/katex.min.css\""));
-        assert!(HEAD_ASSETS.contains("src=\"/assets/katex/katex.min.js\" defer"));
+        assert!(HEAD_ASSETS.contains("href=\"/assets/katex/0.16.11/katex.min.css\""));
+        assert!(HEAD_ASSETS.contains("src=\"/assets/katex/0.16.11/katex.min.js\" defer"));
         assert!(HEAD_ASSETS.find("katex.min.css") < HEAD_ASSETS.find("katex.min.js"));
     }
 
@@ -1015,13 +1016,13 @@ mod tests {
     fn mermaid_assets_reference_only_the_vendored_bundle() {
         assert_eq!(
             MERMAID_ASSETS,
-            "<script src=\"/assets/mermaid/mermaid.min.js\" defer></script>"
+            "<script src=\"/assets/mermaid/11.17.2/mermaid.min.js\" defer></script>"
         );
         assert_eq!(MERMAID_ASSETS.matches("/assets/").count(), 1);
         assert!(MERMAID_ASSETS.contains("defer"));
         assert_eq!(
             HEAD_ASSETS,
-            "<link rel=\"stylesheet\" href=\"/assets/katex/katex.min.css\">\n<script src=\"/assets/katex/katex.min.js\" defer></script>"
+            "<link rel=\"stylesheet\" href=\"/assets/katex/0.16.11/katex.min.css\">\n<script src=\"/assets/katex/0.16.11/katex.min.js\" defer></script>"
         );
     }
 }

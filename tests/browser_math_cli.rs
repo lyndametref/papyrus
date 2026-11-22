@@ -506,17 +506,25 @@ fn katex_assets_appear_once_only_on_math_pages() {
     for path in ["/doc/REQ-001.001", "/doc/NOTE-001", "/doc/NOTE-005"] {
         let html = server.get(path);
         assert_eq!(
-            html.matches("/assets/katex/katex.min.css").count(),
+            html.matches("/assets/katex/0.16.11/katex.min.css").count(),
             1,
             "{path} stylesheet exactly once"
         );
         assert_eq!(
-            html.matches("/assets/katex/katex.min.js").count(),
+            html.matches("/assets/katex/0.16.11/katex.min.js").count(),
             1,
             "{path} script exactly once"
         );
-        let css = html.find("/assets/katex/katex.min.css").unwrap();
-        let js = html.find("/assets/katex/katex.min.js").unwrap();
+        assert!(
+            !html.contains("/assets/katex/katex.min.css"),
+            "{path} references the unversioned KaTeX stylesheet"
+        );
+        assert!(
+            !html.contains("/assets/katex/katex.min.js"),
+            "{path} references the unversioned KaTeX script"
+        );
+        let css = html.find("/assets/katex/0.16.11/katex.min.css").unwrap();
+        let js = html.find("/assets/katex/0.16.11/katex.min.js").unwrap();
         let app = html.find("/assets/app.js").unwrap();
         let app_css = html.find("/assets/app.css").unwrap();
         assert!(app_css < css, "{path} math CSS follows app.css");
@@ -558,12 +566,18 @@ fn asset_responses_have_types_and_no_csp() {
     let server = Server::start(&project.path);
     for (path, mime) in [
         ("/assets/app.css", "text/css; charset=utf-8"),
-        ("/assets/katex/katex.min.css", "text/css; charset=utf-8"),
         (
-            "/assets/katex/katex.min.js",
+            "/assets/katex/0.16.11/katex.min.css",
+            "text/css; charset=utf-8",
+        ),
+        (
+            "/assets/katex/0.16.11/katex.min.js",
             "text/javascript; charset=utf-8",
         ),
-        ("/assets/katex/fonts/KaTeX_Main-Regular.woff2", "font/woff2"),
+        (
+            "/assets/katex/0.16.11/fonts/KaTeX_Main-Regular.woff2",
+            "font/woff2",
+        ),
     ] {
         let raw = server.get_raw(path);
         assert!(status(&raw).contains(" 200"), "{path}: {}", status(&raw));
@@ -754,7 +768,10 @@ fn serve_smoke_math_page_and_math_free_page() {
     let server = Server::start(&project.path);
     for path in ["/doc/REQ-001.001", "/doc/MS-001", "/doc/NOTE-001"] {
         let html = server.get(path);
-        assert!(html.contains("/assets/katex/katex.min.js"), "{path}");
+        assert!(
+            html.contains("/assets/katex/0.16.11/katex.min.js"),
+            "{path}"
+        );
         assert_fallback_equals_source(&html);
     }
     let plain = server.get("/doc/NOTE-002");
