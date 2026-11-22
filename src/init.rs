@@ -440,9 +440,11 @@ pub fn run_init_with_io<R: BufRead, W: Write>(
         }
     }
 
-    // Write config file (full replace under --force or when absent). Lists are
+    // Write config file (full replace under --force or when absent). Each
+    // document entry is minimal: `prefix` and `directory`, plus `enabled` only
+    // when the walkthrough disables it (REQ-07.002, RE-010 D14). Lists are
     // rendered as flow sequences by the shared config renderer (ADR-0024).
-    let value = yaml_serde::to_value(&config).map_err(|e| AppError::Runtime(e.to_string()))?;
+    let value = config.init_value().map_err(AppError::Runtime)?;
     let yaml = crate::config::to_config_yaml(&value).map_err(AppError::Runtime)?;
     fs::write(&config_path, yaml.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
 
@@ -914,17 +916,25 @@ mod tests {
             assert!(raw.contains(&format!("\n  {}:\n", slug)), "{}", raw);
         }
         assert!(!raw.contains("\n  deploy:\n"), "{}", raw);
-        assert_eq!(
-            raw.matches("statuses: [active, archived]").count(),
-            10,
-            "{}",
+        assert!(
+            !raw.contains("statuses: [active, archived]"),
+            "init must not write seed-filled collections: {}",
             raw
         );
         assert!(!raw.contains("    default_status"), "{}", raw);
+        assert!(!raw.contains("    fields:"), "{}", raw);
 
         let config: Config = yaml_serde::from_str(&raw).unwrap();
+        assert_eq!(config.document_types["req"].statuses, None);
         assert_eq!(config.document_types["ui-mockup"].statuses, None);
         config.validate(Some(&dir)).unwrap();
+
+        let effective =
+            crate::commands::load_effective_config(&dir.join("papyrus.config.yml"), &dir).unwrap();
+        assert_eq!(
+            effective.document_types["req"].statuses,
+            Some(vec!["active".to_string(), "archived".to_string()])
+        );
     }
 
     #[test]

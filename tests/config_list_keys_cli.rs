@@ -177,7 +177,6 @@ fn set_document_statuses_preserves_entry_fields() {
         "{}",
         audit_block
     );
-    assert!(audit_block.contains("enabled: true"), "{}", audit_block);
     assert!(
         audit_block.contains("statuses: [active, archived, open]"),
         "{}",
@@ -393,12 +392,12 @@ fn unset_restores_defaults_and_refuses_a_dependent_default_status() {
     project.ok(&["config", "unset", "document_types.audit.statuses"]);
     let config = project.read_config();
     assert!(!config.contains("statuses: []"), "{}", config);
-    let out = project.run(&["config", "get", "document_types.audit.statuses"]);
     assert_eq!(
-        out.status.code(),
-        Some(3),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
+        project
+            .ok(&["config", "get", "document_types.audit.statuses"])
+            .trim(),
+        "[active, archived]",
+        "unset restores the seed collection"
     );
 
     // A declaration whose removal would orphan default_status is refused.
@@ -563,12 +562,13 @@ fn unset_removes_the_listed_default_status() {
             .get("default_status")
             .is_none()
     );
-    assert_eq!(
-        project
-            .run(&["config", "get", "document_types.audit.default_status"])
-            .status
-            .code(),
-        Some(3)
+    let unset_default = project.run(&["config", "get", "document_types.audit.default_status"]);
+    assert_eq!(unset_default.status.code(), Some(4));
+    assert!(
+        String::from_utf8_lossy(&unset_default.stderr)
+            .contains("document_types.audit.default_status"),
+        "{}",
+        String::from_utf8_lossy(&unset_default.stderr)
     );
 }
 
