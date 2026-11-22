@@ -2,7 +2,7 @@
 id: TASK-249
 title: "Add the seed table, derivation, and selector-path resolution"
 created_date: '2026-11-20T17:41:37Z'
-updated_date: '2026-11-22T08:53:21Z'
+updated_date: '2026-11-22T10:51:17Z'
 labels: []
 references:
   - ADR-036
@@ -22,7 +22,7 @@ references:
   - TC-128
   - TC-172
   - TC-191
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-033
@@ -83,3 +83,5 @@ Definition of done: the seed table is the only production source of document mod
 - [ ] `cargo test` reports zero failures and `cargo clippy --all-targets -- -D warnings` is clean.
 ## Comments
 - **task-refiner**: Refined for MS-033: description grounded in DEFAULT_DOCUMENT_TYPES, DOCUMENT_TEMPLATES, the typed schemas and PRESENTATION; 11 testable acceptance criteria added; TECH-070 and TECH-077 documented. Blocked on one architect question: ADR-039 decisions 6 and 25 say document seed slots are none and forbid a group slot, while PRESENTATION renders five document slot columns including group for req and nfr. The task text also named request as a seed entry; corrected to user-defined per ADR-036 decision 30. No dependency, ordinal, milestone, or assignee change.
+- **rust-dev**: TASK-249 implemented (no commit per instruction; status In-Progress). Seed: SEED_DOCUMENT_TYPES in src config.rs, 11 entries, declaration order req nfr glossary rule ui-spec ui-mockup audit tech-spec use-case test-case test-report, carrying prefix directory label plural order summary type_alias api_aliases reference_visibility per role, ADR-041 slots, statuses default_status DocumentModel fields group member and record facts. req and nfr are GroupedMarkdown with story and description in group and member and hidden visibility; glossary has required definition; rule has required description rationale applicability with rationale and applicability create-only and list requirements option requirement; ui-spec view description; audit audit_type stored as type with option audit-type plus required content; tech-spec description; use-case test-case test-report description applicability; ui-mockup SingleHtmlMockup empty fields no statuses slots task specs; other seed types empty slots statuses active archived no default status. DEFAULT_DOCUMENT_TYPES removed, RecordFacts and document DOCUMENT_TEMPLATES entries removed, is_builtin_document_slug replaced by config is_seed_document_slug. Derivation: Config::default loops the seed, init_value writes minimal entries, resolve_document_types fills seed slugs and leaves user-defined declared, registry resolved_document_entry applies seed fill or decision 33 defaults; document_descriptor derives status model verbs (baseline plus status, create-group for grouped, supersede only mockup), id shape, group requirement, archive policy, fields roles slots visibility, frontmatter keys general then status then field keys, and record sections from field headings. User-defined defaults: slug label, order 111, visible, active archived, no default status, optional multiline description. Delta: only documented user-defined reference visibility Visible. Transitional: document TypedSchema retained so MS-033 help and CLI output stay byte-identical; MS-034 deletes it. Tests added for seed contents derivation user defaults immutable group membership seed-only models selector group and member both forms source guard. env -u EDITOR -u VISUAL cargo test 1186 passed 65 suites 0 failed; cargo clippy all-targets -D warnings clean; cargo fmt check clean.
+- **orchestrator**: Acceptance met: SEED_DOCUMENT_TYPES is the single seed table for the 11 types with ADR-041 slots and decision-29 fields; Config default, init and registry derive from it; verbs, options and record descriptors derive from model and sequence; selectors resolve keyed and indexed; 1186 tests pass and characterization, list and help goldens unchanged.
