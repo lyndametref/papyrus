@@ -1203,6 +1203,59 @@ fn worktree_modified() -> bool {
     .is_some_and(|value| !value.is_empty())
 }
 
+/// True when the measured production tree differs from its recorded commit.
+///
+/// The measured tree is the production sources, packaging, scripts, and Cargo
+/// manifests. A dirty flag plus [`production_diff_hash`] identify a run that
+/// measured uncommitted production changes (AUD-148 F6).
+fn production_worktree_modified() -> bool {
+    command_text(
+        "git",
+        &[
+            "-C",
+            &project_root().display().to_string(),
+            "status",
+            "--porcelain",
+            "--",
+            "src",
+            "packaging",
+            "scripts",
+            "Cargo.toml",
+            "Cargo.lock",
+        ],
+    )
+    .is_some_and(|value| !value.is_empty())
+}
+
+/// SHA-256 of the production working-tree diff against the measured commit.
+///
+/// A clean tree hashes the empty diff. Together with the dirty flag this pins
+/// the exact uncommitted production tree a run measured, so the result can be
+/// reproduced or attributed after the tree is committed (AUD-148 F6).
+fn production_diff_hash() -> String {
+    let project = project_root();
+    let commit = production_tree_commit();
+    let output = Command::new("git")
+        .args([
+            "-C",
+            &project.display().to_string(),
+            "diff",
+            "--binary",
+            &commit,
+            "--",
+            "src",
+            "packaging",
+            "scripts",
+            "Cargo.toml",
+            "Cargo.lock",
+        ])
+        .output();
+    match output {
+        Ok(output) if output.status.success() => hex(&sha256(&output.stdout)),
+        _ => "unknown".to_string(),
+    }
+}
+
 fn rustc_version() -> String {
     command_text("rustc", &["--version"]).unwrap_or_else(|| "unknown".to_string())
 }
@@ -1330,6 +1383,8 @@ struct RunResult {
     date: String,
     commit: String,
     production_commit: String,
+    production_worktree_modified: bool,
+    production_diff_hash: String,
     harness_commit: String,
     worktree_modified: bool,
     rustc: String,
@@ -1539,6 +1594,8 @@ fn measure_run(
         date: date_with_timezone(),
         commit: git_commit(),
         production_commit: production_tree_commit(),
+        production_worktree_modified: production_worktree_modified(),
+        production_diff_hash: production_diff_hash(),
         harness_commit: harness_commit(),
         worktree_modified: worktree_modified(),
         rustc: rustc_version(),
@@ -1583,6 +1640,8 @@ fn run_json(profile: &Profile, run: &RunResult) -> Value {
         "harness_command": HARNESS_COMMAND,
         "git_commit": run.commit,
         "production_tree_commit": run.production_commit,
+        "production_worktree_modified": run.production_worktree_modified,
+        "production_diff_hash": run.production_diff_hash,
         "harness_commit": run.harness_commit,
         "harness_worktree_modified": run.worktree_modified,
         "purpose": run_purpose(&run.run),
@@ -1675,6 +1734,10 @@ fn summary_markdown(results: &[(Profile, Vec<RunResult>)]) -> String {
     out.push_str(&format!(
         "- Measured production tree commit: `{}` (last commit that changed `src`, `packaging`, `scripts`, `Cargo.toml` or `Cargo.lock`)\n",
         first.production_commit
+    ));
+    out.push_str(&format!(
+        "- Measured production worktree: dirty `{}`; diff hash `{}` (SHA-256 of `git diff --binary <production commit>` over the measured production tree)\n",
+        first.production_worktree_modified, first.production_diff_hash
     ));
     out.push_str(&format!(
         "- Harness commit: `{}` (last commit that changed `tests/benchmark_baseline.rs`; harness working tree modified during this run: {})\n",
@@ -2158,6 +2221,13 @@ fn run_from_raw(value: &Value) -> RunResult {
         date: string("date"),
         commit: string("git_commit"),
         production_commit: string("production_tree_commit"),
+        production_worktree_modified: value["production_worktree_modified"]
+            .as_bool()
+            .unwrap_or(false),
+        production_diff_hash: value["production_diff_hash"]
+            .as_str()
+            .unwrap_or("unknown")
+            .to_string(),
         harness_commit: string("harness_commit"),
         worktree_modified: value["harness_worktree_modified"]
             .as_bool()
@@ -2760,6 +2830,12 @@ fn measure_second_load() -> Value {
         "schema": MS036_SECOND_LOAD_SCHEMA,
         "date": date_with_timezone(),
         "host": host_json(),
+        "git_commit": git_commit(),
+        "production_tree_commit": production_tree_commit(),
+        "production_worktree_modified": production_worktree_modified(),
+        "production_diff_hash": production_diff_hash(),
+        "harness_commit": harness_commit(),
+        "harness_worktree_modified": worktree_modified(),
         "corpus_hash": corpus_hash,
         "corpus_files": corpus_files,
         "corpus": "dedicated deterministic cache corpus: NOTE-001 diagram, NOTE-002 math, NOTE-003 plain, plus app assets",
@@ -2823,8 +2899,9 @@ fn ms036_summary_markdown(results: &[(Profile, Vec<RunResult>)], second_load: &V
         "# MS-036 post-refactor benchmark results (NFR-007.001, NFR-007.002, NFR-007.003)\n\n",
     );
     out.push_str(
-        "Status: recorded measurement. Measurement only; no production behaviour was changed. \
-         The full NFR-007 protocol was run on the available host, which deviates from the NFR-007 \
+        "Status: recorded measurement. The harness adds no production behaviour; the measured \
+         production tree is identified by the commit, worktree flag, and diff hash below. The full \
+         NFR-007 protocol was run on the available host, which deviates from the NFR-007 \
          reference hardware (6 physical / 12 logical cores and 15.3 GiB instead of 4 vCPU / 8 GiB). \
          **NFR-007.001 and NFR-007.002 are not marked satisfied by this run.** A pass below means \
          only that the measured p95 was within the threshold on the available host.\n\n",
@@ -2845,6 +2922,10 @@ fn ms036_summary_markdown(results: &[(Profile, Vec<RunResult>)], second_load: &V
     out.push_str(&format!(
         "- Measured production tree commit: `{}` (last commit that changed `src`, `packaging`, `scripts`, `Cargo.toml` or `Cargo.lock`)\n",
         first.production_commit
+    ));
+    out.push_str(&format!(
+        "- Measured production worktree: dirty `{}`; diff hash `{}` (SHA-256 of `git diff --binary <production commit>` over the measured production tree)\n",
+        first.production_worktree_modified, first.production_diff_hash
     ));
     out.push_str(&format!(
         "- Harness commit: `{}` (last committed revision of `tests/benchmark_baseline.rs`; working tree modified during this run: {})\n",
@@ -3028,11 +3109,23 @@ fn ms036_summary_markdown(results: &[(Profile, Vec<RunResult>)], second_load: &V
     out.push_str("\nThe MS-032 1,000-record baseline used band B (20 samples) for every route except the two HTML mockup routes, so its p95 values are baseline-only. The 1,000-record inventory baseline was 75,546 ms p50 / 76,532 ms p95.\n\n");
 
     out.push_str("## NFR verdicts\n\n");
+    let inventory_headroom = 250i64 - inventory_p95 as i64;
+    let headroom_note = if inventory_headroom > 0 {
+        format!(
+            "Headroom to the 250 ms threshold is {inventory_headroom} ms on a host faster than the NFR-007 reference; that headroom is thin and is not evidence of reference-hardware compliance."
+        )
+    } else {
+        format!(
+            "The measured p95 is {} ms above the 250 ms threshold.",
+            -inventory_headroom
+        )
+    };
     out.push_str(&format!(
-        "- **NFR-007.001 (inventory p95 < 250 ms at 1,000 records): {}.** Measured server p95 {} ms on the available host. {}\n",
+        "- **NFR-007.001 (inventory p95 < 250 ms at 1,000 records): {}.** Measured server p95 {} ms on the available host. {} {}\n",
         if inventory_p95 < 250 { "measured pass" } else { "measured MISS" },
         inventory_p95,
         hardware_deviation_line(host),
+        headroom_note,
     ));
     if route_misses.is_empty() {
         out.push_str("- **NFR-007.002 (view and edit p95 < 100 ms at 1,000 records): measured pass on every measured route.** Every SingleMarkdown, GroupedMarkdown group, GroupedMarkdown member, SingleHtmlMockup, and unresolved-reference view and edit route measured below 100 ms. This is a measured pass on the available host, not NFR-007.002 satisfaction.\n");
@@ -3049,7 +3142,7 @@ fn ms036_summary_markdown(results: &[(Profile, Vec<RunResult>)], second_load: &V
         out.push_str("  These misses are reported as measured and are not smoothed or presented as a pass.\n");
     }
     out.push_str(
-        "- **NFR-007.003 (cache contract and repeat visit): measured pass.** The second-load measurement below records zero vendor body bytes on the second load, bodyless 304 responses for the first-party app assets, and full `no-store` HTML and JSON bodies on every repeat load. This is a measured pass on the available host, not a claim about the reference hardware.\n\n",
+        "- **NFR-007.003 (cache contract and repeat visit): measured pass.** The second-load measurement below records zero vendor body bytes on the second load, bodyless 304 responses for the first-party app assets, and full `no-store` HTML and JSON bodies on every repeat load. The vendor second-load figure is a browser-cache simulation, not a measured network transfer: each immutable vendor URL is treated as a cache hit and the recorded basis is the full first-load `200` bytes returned to a conditional `If-None-Match`, never a `304`. This is a measured pass on the available host, not a claim about the reference hardware.\n\n",
     );
 
     out.push_str("## NFR-007.003 second-load transfer\n\n");
@@ -3110,7 +3203,7 @@ fn ms036_summary_markdown(results: &[(Profile, Vec<RunResult>)], second_load: &V
 
     out.push_str("## Connection behaviour\n\n");
     out.push_str(
-        "`Connection: close` remains on every response. The measurement did not show a need to change it: every route completed with one sequential request per connection, and the second-load measurement reuses the browser cache rather than a persistent connection. No connection behaviour was changed in this task.\n\n",
+        "The server sends `Connection: close` on every response and always has; no keep-alive is in place. The MS-036 AC-8 wording that connection behaviour \"stays keep-alive\" is incorrect and is corrected here: the transport has been one request per connection since ADR-0005. The measurement did not show a need to add keep-alive, so no connection behaviour was changed in this task.\n\n",
     );
 
     out.push_str("## Recorded result files\n\n");
@@ -3129,7 +3222,9 @@ fn ms036_summary_markdown(results: &[(Profile, Vec<RunResult>)], second_load: &V
         "The run is reproducible from the recorded command and corpus hashes. The corpus generator \
          deletes and recreates `./.tmp/benchmark/<profile>/` for every run; a second run must \
          reproduce the same file count and SHA-256 manifest. No corpus parameter was tuned toward \
-         a target. The measurement changes no production source and adds no crate.\n",
+         a target. The harness adds no crate and does not change production source while it runs; \
+         the production tree it measures is identified by the recorded production commit, the \
+         worktree-dirty flag, and the diff hash.\n",
     );
 
     out
@@ -3268,6 +3363,8 @@ fn summary_reports_confirmations_and_commit_provenance() {
             date: "2026-11-22T00:00:00+00:00".to_string(),
             commit: "head".to_string(),
             production_commit: "production".to_string(),
+            production_worktree_modified: true,
+            production_diff_hash: "diff".to_string(),
             harness_commit: "harness".to_string(),
             worktree_modified: true,
             rustc: "rustc test".to_string(),

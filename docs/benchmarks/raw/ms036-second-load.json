@@ -1,6 +1,6 @@
 {
   "schema": "papyrus.ms036-second-load/1",
-  "date": "2026-11-22T23:22:14+01:00",
+  "date": "2026-11-22T23:54:47+01:00",
   "host": {
     "cpu_model": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
     "physical_cores": 6,
@@ -10,6 +10,12 @@
     "kernel": "Linux 7.2.15+deb14-amd64 x86_64",
     "distribution": "Debian GNU/Linux forky/sid"
   },
+  "git_commit": "9eee1f86eea324b2e03603ffc6efe34bb040c831",
+  "production_tree_commit": "3305a3110bdefd7412893cdea6c4a31a2d6c9b49",
+  "production_worktree_modified": true,
+  "production_diff_hash": "b7852f3ad3eb128bab3fec3efb9b764b38a708a114d6d931db1bb3c39b6b76b5",
+  "harness_commit": "6e071ca277f2095c5ff1c22c7a5352a38dc40f19",
+  "harness_worktree_modified": true,
   "corpus_hash": "dca390095965e3239a7d6bcecc26300bb9b040c6e3a94c427cf51473aeb11913",
   "corpus_files": 4,
   "corpus": "dedicated deterministic cache corpus: NOTE-001 diagram, NOTE-002 math, NOTE-003 plain, plus app assets",

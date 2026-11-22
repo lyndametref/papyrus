@@ -208,3 +208,126 @@ fn l4_version_regex_rejects_a_non_three_component_version() {
     );
     let _ = fs::remove_dir_all(&workspace);
 }
+
+// AUD-148 F2: the asset-version guard runs on the normal assembly path, so
+// each mismatch class is rejected before any assembly work starts.
+
+fn asset_tree(name: &str) -> PathBuf {
+    let tree = root()
+        .join(".tmp")
+        .join(format!("asset-guard-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&tree);
+    fs::create_dir_all(tree.join("scripts")).expect("create script directory");
+    for script in ["build-deb.sh", "package-out.sh"] {
+        fs::copy(
+            root().join("scripts").join(script),
+            tree.join("scripts").join(script),
+        )
+        .expect("copy packaging script");
+    }
+    tree
+}
+
+fn write_asset_version_tree(
+    tree: &Path,
+    version_dirs: &[&str],
+    manifest_version: &str,
+    copyright_version: &str,
+) {
+    let vendor = tree.join("src/browser/vendor");
+    for version in version_dirs {
+        fs::create_dir_all(vendor.join("mermaid").join(version)).expect("create vendor version");
+    }
+    fs::write(
+        vendor.join("MANIFEST.md"),
+        format!(
+            "| path | package | version | licence |\n|---|---|---|---|\n| `/assets/mermaid/{manifest_version}/mermaid.min.js` | mermaid | {manifest_version} | MIT |\n"
+        ),
+    )
+    .expect("write manifest");
+    let copyright = tree.join("packaging/deb/usr/share/doc/papyrus");
+    fs::create_dir_all(&copyright).expect("create copyright directory");
+    fs::write(
+        copyright.join("copyright"),
+        format!("Files: src/browser/vendor/mermaid/{copyright_version}/mermaid.min.js\n"),
+    )
+    .expect("write copyright");
+}
+
+fn run_normal_deb_build(tree: &Path) -> (std::process::Output, PathBuf) {
+    let out = tree.join("out");
+    let output = Command::new(tree.join("scripts/build-deb.sh"))
+        .args(["--version", "1.2.3", "--out"])
+        .arg(&out)
+        .output()
+        .expect("run normal build-deb.sh");
+    (output, out)
+}
+
+fn assert_guard_rejected(
+    name: &str,
+    version_dirs: &[&str],
+    manifest: &str,
+    copyright: &str,
+    expected: &str,
+) {
+    let tree = asset_tree(name);
+    write_asset_version_tree(&tree, version_dirs, manifest, copyright);
+    let (output, out) = run_normal_deb_build(&tree);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "{name}: a normal build must reject the mismatch, stderr: {stderr}"
+    );
+    assert!(
+        stderr.contains("asset version check failed"),
+        "{name}: {stderr}"
+    );
+    assert!(
+        stderr.contains(expected),
+        "{name}: expected {expected:?} in {stderr}"
+    );
+    assert!(
+        !out.exists(),
+        "{name}: the guard runs before any assembly output is created"
+    );
+    let _ = fs::remove_dir_all(&tree);
+}
+
+#[test]
+fn f2_vendor_version_directory_mismatch_fails_a_normal_build() {
+    let tree = asset_tree("vendor");
+    write_asset_version_tree(&tree, &["11.17.2", "11.18.0"], "11.17.2", "11.17.2");
+    let (output, out) = run_normal_deb_build(&tree);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(1), "{stderr}");
+    assert!(
+        stderr.contains("more than one version directory"),
+        "{stderr}"
+    );
+    assert!(!out.exists(), "the guard runs before assembly");
+    let _ = fs::remove_dir_all(&tree);
+}
+
+#[test]
+fn f2_manifest_version_mismatch_fails_a_normal_build() {
+    assert_guard_rejected(
+        "manifest",
+        &["11.17.2"],
+        "11.17.1",
+        "11.17.2",
+        "manifest version '11.17.1'",
+    );
+}
+
+#[test]
+fn f2_copyright_version_mismatch_fails_a_normal_build() {
+    assert_guard_rejected(
+        "copyright",
+        &["11.17.2"],
+        "11.17.2",
+        "11.17.1",
+        "copyright version '11.17.1'",
+    );
+}

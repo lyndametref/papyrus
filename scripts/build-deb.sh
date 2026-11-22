@@ -169,8 +169,11 @@ check_asset_versions() {
     return 0
 }
 
+# The guard runs on every assembly path, not only with the opt-in flag
+# (AUD-148 F2), so a normal package build rejects any version mismatch.
+check_asset_versions || exit 1
+
 if (( CHECK_ASSETS_ONLY )); then
-    check_asset_versions || exit 1
     exit 0
 fi
 

@@ -157,6 +157,13 @@ struct SnapshotListing {
     by_descriptor: BTreeMap<usize, BTreeMap<String, Vec<PathBuf>>>,
 }
 
+/// One listed record's validated source, accepted for every front-matter-only path.
+struct AcceptedSource {
+    path: PathBuf,
+    source: String,
+    front_matter: Option<crate::record::frontmatter::FrontMatter>,
+}
+
 /// Display-only title lookup used while projecting one record.
 trait RecordTitles {
     fn title(&self, id: &str) -> Option<String>;
@@ -210,11 +217,6 @@ impl<'a> RecordSnapshot<'a> {
     /// Number of descriptor-family conflict scans made through this snapshot.
     pub fn conflict_scan_count(&self) -> usize {
         self.conflict_scan_count.get()
-    }
-
-    /// Whether the file-name index has been built.
-    pub fn is_built(&self) -> bool {
-        self.listing.borrow().is_some()
     }
 
     fn ensure_listing(&self) {
@@ -370,34 +372,53 @@ impl<'a> RecordSnapshot<'a> {
         Ok(record)
     }
 
-    /// Whether one listed path contributes a record to its descriptor's index.
+    /// Read and validate one listed record for a front-matter-only path.
     ///
-    /// This mirrors [`load_record_with`]'s acceptance rules (readable, UTF-8,
-    /// valid front matter, declared decision type, still present after any
-    /// read-path relocation) without parsing the document body, the CQRS read
-    /// projection, or the field map.
-    fn record_counted(&self, descriptor: &TypeDescriptor, path: &Path) -> bool {
+    /// This is the single acceptance rule for inventory counts and the
+    /// front-matter-only index (AUD-148 F1/F7). It mirrors [`load_record_with`]:
+    /// the stem must match the descriptor, a decision record needs a declared
+    /// type, the file must be readable UTF-8 with valid front matter, and the
+    /// listed target must still exist. A record the read path relocated to the
+    /// archive is absent, exactly as the full loader's existence check rejects
+    /// it, so a count and a group row cannot disagree with the full index.
+    fn accept_listed(&self, descriptor: &TypeDescriptor, path: &Path) -> Option<AcceptedSource> {
         if descriptor.document_model == DocumentModel::SingleHtmlMockup {
             return matches!(
                 load_ui_mockup(self.ctx, self.cfg, descriptor, path),
                 Ok(Some(_))
-            );
+            )
+            .then(|| AcceptedSource {
+                path: path.to_path_buf(),
+                source: String::new(),
+                front_matter: None,
+            });
         }
-        let Some(stem) = path.file_stem().and_then(|value| value.to_str()) else {
-            return false;
-        };
+        let stem = path.file_stem().and_then(|value| value.to_str())?;
         if !matches_stem(descriptor, stem) {
-            return false;
+            return None;
         }
         if descriptor.category == CategoryKind::Decision
             && crate::decision::type_key_for_id(self.cfg, stem).is_none()
         {
-            return false;
+            return None;
         }
-        let Ok((safe, _source, _front_matter)) = self.read_snapshot_source(path) else {
-            return false;
-        };
-        safe.exists()
+        let (safe, normalized, front_matter) = self.read_snapshot_source(path).ok()?;
+        // The read path can relocate an active-folder archived-status record
+        // out of the listed directory; the listed target then no longer exists
+        // and the record is not part of the active inventory.
+        if !path.exists() || !safe.exists() {
+            return None;
+        }
+        Some(AcceptedSource {
+            path: safe,
+            source: normalized,
+            front_matter,
+        })
+    }
+
+    /// Whether one listed path contributes a record to its descriptor's index.
+    fn record_counted(&self, descriptor: &TypeDescriptor, path: &Path) -> bool {
+        self.accept_listed(descriptor, path).is_some()
     }
 
     /// Fallback store read for a rare or stateful record, returning the parsed
@@ -530,8 +551,13 @@ impl<'a> RecordSnapshot<'a> {
     /// Resolve one record ID against the snapshot, memoising the parsed record.
     ///
     /// Unknown, archived, and disabled IDs stay absent from the file-name map
-    /// and return `Ok(None)`. A listed record that cannot be read or parsed
-    /// keeps the existing diagnostic.
+    /// and return `Ok(None)`. Resolution is by canonical file-stem key only, so
+    /// a record whose front-matter `id` disagrees with its stem is not
+    /// addressable by that front-matter ID. That is a recorded narrowing from
+    /// the pre-snapshot resolver, which also matched the front-matter key
+    /// (AUD-148 F5); `frontmatter_id_mismatch_is_not_addressable_by_the_frontmatter_id`
+    /// pins it. A listed record that cannot be read or parsed keeps the
+    /// existing diagnostic.
     pub fn resolve(&self, id: &str) -> Result<Option<Resolved>, AppError> {
         self.resolve_inner(id, true)
     }
@@ -589,44 +615,6 @@ impl<'a> RecordSnapshot<'a> {
             .ok()
             .flatten()
             .map(|resolved| resolved.record.title)
-    }
-
-    /// Build every enabled descriptor's index from one registry-wide scan.
-    ///
-    /// The file-name listing lists each enabled descriptor's active directory
-    /// at most once, and each listed record is parsed at most once through the
-    /// shared parse cache. Every inventory card count and aggregate count is
-    /// derived from this one result; no card or aggregate rescans a directory.
-    pub fn scan_indexes(&self) -> BTreeMap<String, Index> {
-        self.ensure_listing();
-        let listing = self.listing.borrow();
-        let Some(listing) = listing.as_ref() else {
-            return BTreeMap::new();
-        };
-        let mut indexes = BTreeMap::new();
-        for (index, descriptor) in self.descriptors.iter().enumerate() {
-            if !descriptor.enabled {
-                continue;
-            }
-            // A grouped stem can appear under both its group and its member
-            // lookup key; each file still belongs to the index exactly once.
-            let mut paths: BTreeSet<PathBuf> = BTreeSet::new();
-            if let Some(by_key) = listing.by_descriptor.get(&index) {
-                for path in by_key.values().flatten() {
-                    paths.insert(path.clone());
-                }
-            }
-            let mut records = Vec::new();
-            for path in paths {
-                if let Ok(Some(record)) = self.load_cached(descriptor, &path)
-                    && record.path.exists()
-                {
-                    records.push(record);
-                }
-            }
-            indexes.insert(descriptor.slug.clone(), finalize_index(records, descriptor));
-        }
-        indexes
     }
 }
 
@@ -686,10 +674,6 @@ fn section_or_none(doc: &Document, name: &str) -> Option<String> {
 
 fn heading_title(doc: &Document) -> String {
     document::heading_id_title(doc).1
-}
-
-fn frontmatter_title(doc: &Document) -> String {
-    document::heading_id_title_with_frontmatter(doc).1
 }
 
 fn non_empty_or(value: String, fallback: &str) -> String {
@@ -840,14 +824,27 @@ fn load_record_with(
     );
     record.stored_source = read.stored_source;
 
+    // One shared front-matter projection supplies the display title, labels,
+    // references, status fallback and owning-group link for both this full
+    // loader and the front-matter-only index (AUD-148 F3/F7).
+    let heading = heading_title(&record.doc);
+    let legacy_group = (record.descriptor.document_model == DocumentModel::GroupedMarkdown
+        && !is_group)
+        .then(|| section_or_none(&record.doc, "Group"))
+        .flatten();
+    let projection = project_front_matter(
+        descriptor,
+        &stem,
+        &heading,
+        record.doc.front_matter.as_ref(),
+        view.as_ref(),
+        legacy_group,
+    );
+    record.title = projection.title.clone();
+
     match record.handler() {
         Some(TypedHandler::Task) => {
             let td = crate::task::task_from_document(&record.doc);
-            record.title = if td.title.is_empty() {
-                stem.to_string()
-            } else {
-                td.title
-            };
             record.description = td.description;
             record.status = (!td.status.is_empty()).then_some(td.status);
             record.ordinal = td.ordinal;
@@ -859,7 +856,6 @@ fn load_record_with(
             record.comments = td.comments;
         }
         Some(TypedHandler::Milestone) => {
-            record.title = non_empty_or(frontmatter_title(&record.doc), &stem);
             record.description = section_or_none(&record.doc, "Description");
             record.status = record
                 .doc
@@ -885,7 +881,6 @@ fn load_record_with(
             };
         }
         Some(TypedHandler::Release) => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
             record.description = section_or_none(&record.doc, "Description");
             record.status = record
                 .doc
@@ -903,7 +898,6 @@ fn load_record_with(
                 .or_else(|| Some("planned".to_string()));
         }
         Some(TypedHandler::Decision) => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
             let status = section_or_none(&record.doc, "Status").unwrap_or_default();
             record.status = Some(if status.trim().is_empty() {
                 "proposed".to_string()
@@ -921,62 +915,28 @@ fn load_record_with(
             record.context = section_or_none(&record.doc, "Context");
             record.consequences = section_or_none(&record.doc, "Consequences");
         }
-        None => {
-            record.title = non_empty_or(heading_title(&record.doc), &stem);
-        }
+        None => {}
     }
 
     // The group link is descriptor-driven for every grouped member, not a
-    // per-type branch: a record's group is the reserved engine-owned
-    // front-matter key, with a legacy `## Group` section as fallback.
+    // per-type branch: the projection reads the reserved engine-owned
+    // front-matter key with a legacy `## Group` section as fallback.
     if record.descriptor.document_model == DocumentModel::GroupedMarkdown && !is_group {
-        let frontmatter_group = record
-            .doc
-            .front_matter
-            .as_ref()
-            .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, "group"))
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty());
-        if let Some(group_id) = frontmatter_group {
-            record.group_id = Some(group_id);
-        } else if let Some(group) = section_or_none(&record.doc, "Group") {
-            let mut parts = group
-                .lines()
-                .next()
-                .unwrap_or("")
-                .splitn(2, char::is_whitespace);
-            record.group_id = parts
-                .next()
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty());
-            record.group_title = parts
-                .next()
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty());
-        }
+        record.group_id = projection.group_id.clone();
+        record.group_title = projection.group_title.clone();
     }
 
     // Every document type, including generic config-defined types, projects
     // the front-matter `labels` and `references` lists. A handler that already
     // owns a field (task labels, UI mockup references) keeps its value.
     if record.labels.is_empty() {
-        record.labels = view
-            .as_ref()
-            .map(|v| v.list_value("labels"))
-            .unwrap_or_default();
+        record.labels = projection.labels.clone();
     }
     if record.refs.is_empty() {
-        record.refs = view
-            .as_ref()
-            .map(|v| v.list_value("references"))
-            .unwrap_or_default();
+        record.refs = projection.refs.clone();
     }
     if record.status.is_none() {
-        record.status = view
-            .as_ref()
-            .and_then(|v| v.str_value("status"))
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty());
+        record.status = projection.status.clone();
     }
     if record.descriptor.category == CategoryKind::Document {
         record.field_map =
@@ -1009,50 +969,41 @@ fn load_light_record(
     if descriptor.document_model == DocumentModel::SingleHtmlMockup {
         return load_ui_mockup(snapshot.ctx, snapshot.cfg, descriptor, path);
     }
-    let Some(stem) = path.file_stem().and_then(|value| value.to_str()) else {
+    let Some(accepted) = snapshot.accept_listed(descriptor, path) else {
         return Ok(None);
     };
-    if !matches_stem(descriptor, stem) {
-        return Ok(None);
-    }
-    if descriptor.category == CategoryKind::Decision
-        && crate::decision::type_key_for_id(snapshot.cfg, stem).is_none()
-    {
-        return Ok(None);
-    }
-    let Ok((safe, normalized, front_matter)) = snapshot.read_snapshot_source(path) else {
-        return Ok(None);
-    };
-    // A record auto-relocated out of the active directory by the read path is
-    // no longer part of the display snapshot.
-    if !safe.exists() {
-        return Ok(None);
-    }
-    let id = canonical_id(descriptor, stem).unwrap_or_else(|| stem.to_string());
-    let is_group = is_group_id(descriptor, stem);
-    let rel_path = relative_path(&snapshot.ctx.project_dir, &safe);
-    let version = fs::metadata(&safe)
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_string();
+    let id = canonical_id(descriptor, &stem).unwrap_or_else(|| stem.clone());
+    let is_group = is_group_id(descriptor, &stem);
+    let rel_path = relative_path(&snapshot.ctx.project_dir, &accepted.path);
+    let version = fs::metadata(&accepted.path)
         .map(|meta| crate::record::store::version_token(&meta))
         .unwrap_or_default();
-    let heading = heading_line(&normalized);
-    let title = front_matter
+    let heading = heading_line(&accepted.source);
+    let heading_title = heading_title_from(heading.as_deref());
+    let legacy_group = (descriptor.document_model == DocumentModel::GroupedMarkdown && !is_group)
+        .then(|| group_section_line(&accepted.source))
+        .flatten();
+    let view = accepted
+        .front_matter
         .as_ref()
-        .and_then(|front_matter| {
-            crate::record::frontmatter::value_string(&front_matter.data, "title")
-        })
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| heading_title_from(heading.as_deref()));
-    let group = front_matter
-        .as_ref()
-        .and_then(|front_matter| {
-            crate::record::frontmatter::value_string(&front_matter.data, "group")
-        })
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty());
+        .map(|front_matter| RecordView::from_front_matter(front_matter, &id, &version));
+    let projection = project_front_matter(
+        descriptor,
+        &stem,
+        &heading_title,
+        accepted.front_matter.as_ref(),
+        view.as_ref(),
+        legacy_group,
+    );
     let document = Document {
-        source: normalized,
-        front_matter: front_matter.clone(),
-        frontmatter: front_matter,
+        source: accepted.source,
+        front_matter: accepted.front_matter.clone(),
+        frontmatter: accepted.front_matter,
         heading,
         preamble: Vec::new(),
         sections: Vec::new(),
@@ -1062,38 +1013,117 @@ fn load_light_record(
         descriptor.clone(),
         is_group,
         document,
-        safe,
+        accepted.path,
         rel_path,
         version,
     );
-    record.title = non_empty_or(title, stem);
-    let view = record.doc.front_matter.as_ref().map(|front_matter| {
-        RecordView::from_front_matter(front_matter, &record.id, &record.version)
-    });
-    if let Some(view) = &view {
-        record.labels = view.list_value("labels");
-        record.refs = view.list_value("references");
-        record.status = view
-            .str_value("status")
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty());
-    }
-    if record.descriptor.document_model == DocumentModel::GroupedMarkdown && !is_group {
-        if let Some(group_id) = group {
-            record.group_id = Some(group_id);
-        } else if let Some(group) = group_section_line(&record.doc.source) {
-            let mut parts = group.splitn(2, char::is_whitespace);
-            record.group_id = parts
-                .next()
-                .map(|part| part.trim().to_string())
-                .filter(|part| !part.is_empty());
-            record.group_title = parts
-                .next()
-                .map(|part| part.trim().to_string())
-                .filter(|part| !part.is_empty());
-        }
+    record.title = projection.title;
+    record.labels = projection.labels;
+    record.refs = projection.refs;
+    record.status = projection.status;
+    if descriptor.document_model == DocumentModel::GroupedMarkdown && !is_group {
+        record.group_id = projection.group_id;
+        record.group_title = projection.group_title;
     }
     Ok(Some(record))
+}
+
+/// The display fields a list or grouped-member row projects from front matter.
+struct FrontMatterProjection {
+    title: String,
+    labels: Vec<String>,
+    refs: Vec<String>,
+    status: Option<String>,
+    group_id: Option<String>,
+    group_title: Option<String>,
+}
+
+/// Project the display fields derivable from a record's front matter.
+///
+/// The full loader and the front-matter-only index both call this one function,
+/// so title precedence, labels, references, the status fallback and the
+/// owning-group link cannot diverge between the list and a grouped-member row
+/// (AUD-148 F3/F7). `legacy_group` is the text of a legacy `## Group` section
+/// when the record has no front-matter group key.
+fn project_front_matter(
+    descriptor: &TypeDescriptor,
+    stem: &str,
+    heading_title: &str,
+    front_matter: Option<&crate::record::frontmatter::FrontMatter>,
+    view: Option<&RecordView>,
+    legacy_group: Option<String>,
+) -> FrontMatterProjection {
+    let front_matter_title =
+        front_matter.and_then(|fm| crate::record::frontmatter::value_string(&fm.data, "title"));
+    let title = projected_title(
+        descriptor,
+        stem,
+        heading_title,
+        front_matter_title.as_deref(),
+    );
+    let labels = view
+        .map(|view| view.list_value("labels"))
+        .unwrap_or_default();
+    let refs = view
+        .map(|view| view.list_value("references"))
+        .unwrap_or_default();
+    let status = view
+        .and_then(|view| view.str_value("status"))
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let frontmatter_group = front_matter
+        .and_then(|fm| crate::record::frontmatter::value_string(&fm.data, "group"))
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let (group_id, group_title) = match frontmatter_group {
+        Some(group_id) => (Some(group_id), None),
+        None => split_group_line(legacy_group.as_deref()),
+    };
+    FrontMatterProjection {
+        title,
+        labels,
+        refs,
+        status,
+        group_id,
+        group_title,
+    }
+}
+
+/// The display title for one document, using the loader's precedence.
+///
+/// Tasks and milestones give the front-matter `title` precedence; every other
+/// document type uses the markdown heading. Empty values fall back to the file
+/// stem, exactly as the full loader's title fallback does.
+fn projected_title(
+    descriptor: &TypeDescriptor,
+    stem: &str,
+    heading_title: &str,
+    front_matter_title: Option<&str>,
+) -> String {
+    let title = match descriptor.handler() {
+        Some(TypedHandler::Task) | Some(TypedHandler::Milestone) => {
+            front_matter_title.unwrap_or(heading_title)
+        }
+        _ => heading_title,
+    };
+    non_empty_or(title.to_string(), stem)
+}
+
+/// Split one legacy `## Group` line into its ID and optional title.
+fn split_group_line(line: Option<&str>) -> (Option<String>, Option<String>) {
+    let Some(line) = line else {
+        return (None, None);
+    };
+    let mut parts = line.splitn(2, char::is_whitespace);
+    let id = parts
+        .next()
+        .map(|part| part.trim().to_string())
+        .filter(|part| !part.is_empty());
+    let title = parts
+        .next()
+        .map(|part| part.trim().to_string())
+        .filter(|part| !part.is_empty());
+    (id, title)
 }
 
 /// The title part of a heading line, using the same split as
@@ -2087,7 +2117,7 @@ mod tests {
     }
 
     #[test]
-    fn registry_scan_lists_each_directory_and_parses_each_record_once() {
+    fn registry_inventory_lists_each_directory_once_and_counts_each_record() {
         let project = SnapshotProject::new("scan");
         let business = project.root.join("docs/requirements/business");
         fs::create_dir_all(&business).unwrap();
@@ -2103,64 +2133,40 @@ mod tests {
         .unwrap();
 
         let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
-        let indexes = snapshot.scan_indexes();
-        let listings = snapshot.listing_count();
-        let parses = snapshot.parse_count();
-        assert_eq!(listings, project.enabled_directory_count());
-        assert_eq!(parses, 5, "two tasks, one milestone, and two requirements");
-        let conflict_scans = snapshot.conflict_scan_count();
+        let counts = snapshot.scan_counts();
         assert_eq!(
-            conflict_scans, 3,
-            "one conflict scan for each of the task, milestone, and req families"
+            snapshot.listing_count(),
+            project.enabled_directory_count(),
+            "each enabled directory is listed exactly once"
         );
-        assert_eq!(indexes["task"].records.len(), 2);
-        assert_eq!(indexes["milestone"].records.len(), 1);
-        assert_eq!(indexes["req"].records.len(), 2);
-        assert_eq!(indexes["req"].groups.len(), 1);
-        assert_eq!(indexes["req"].requirements.len(), 1);
-        assert_eq!(indexes["req"].members["REQ-001"], vec![0]);
+        assert_eq!(counts["task"], 2);
+        assert_eq!(counts["milestone"], 1);
+        assert_eq!(counts["req"], 2);
 
-        // A grouped stem appears under both lookup keys; the file still
-        // contributes exactly one record and is parsed once.
-        let ids: Vec<&str> = indexes["req"]
+        // Repeated inventory reads reuse the listing. A grouped stem appears
+        // under both lookup keys but contributes one record.
+        let again = snapshot.scan_counts();
+        assert_eq!(snapshot.listing_count(), project.enabled_directory_count());
+        assert_eq!(again, counts);
+
+        let descriptor = project.registry.descriptor("req").expect("req").clone();
+        let index = build_grouped_index_with_snapshot(
+            &project.ctx,
+            &project.cfg,
+            &project.registry,
+            &descriptor,
+            &snapshot,
+        );
+        assert_eq!(index.records.len(), 2);
+        assert_eq!(index.groups.len(), 1);
+        assert_eq!(index.requirements.len(), 1);
+        assert_eq!(index.members["REQ-001"], vec![0]);
+        let ids: Vec<&str> = index
             .records
             .iter()
             .map(|record| record.id.as_str())
             .collect();
         assert_eq!(ids, vec!["REQ-001", "REQ-001.001"]);
-
-        // Repeated inventory scans reuse the listing and parse cache.
-        let again = snapshot.scan_indexes();
-        assert_eq!(snapshot.listing_count(), listings);
-        assert_eq!(snapshot.parse_count(), parses);
-        assert_eq!(snapshot.conflict_scan_count(), conflict_scans);
-        assert_eq!(again["req"].records.len(), 2);
-        snapshot.resolve("TASK-001").unwrap().expect("cached task");
-        assert_eq!(snapshot.listing_count(), listings);
-        assert_eq!(snapshot.parse_count(), parses);
-        assert_eq!(snapshot.conflict_scan_count(), conflict_scans);
-
-        // The scan result matches the per-descriptor index builder exactly.
-        let descriptor = project.registry.descriptor("req").expect("req").clone();
-        let built = build_index_with_snapshot(
-            &project.ctx,
-            &project.cfg,
-            &project.registry,
-            &descriptor,
-            None,
-            &snapshot,
-        );
-        let scanned: Vec<&str> = indexes["req"]
-            .records
-            .iter()
-            .map(|record| record.id.as_str())
-            .collect();
-        let built_ids: Vec<&str> = built
-            .records
-            .iter()
-            .map(|record| record.id.as_str())
-            .collect();
-        assert_eq!(scanned, built_ids);
     }
 
     #[test]
@@ -2368,13 +2374,25 @@ mod tests {
 
         let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
         let counts = snapshot.scan_counts();
-        let indexes = snapshot.scan_indexes();
-        assert_eq!(counts.len(), indexes.len());
-        for (slug, index) in &indexes {
+        for descriptor in project.registry.descriptors() {
+            if !descriptor.enabled
+                || descriptor_directory(&project.ctx, &project.cfg, descriptor).is_none()
+            {
+                continue;
+            }
+            let index = build_index_with_snapshot(
+                &project.ctx,
+                &project.cfg,
+                &project.registry,
+                descriptor,
+                None,
+                &snapshot,
+            );
             assert_eq!(
-                counts.get(slug).copied().unwrap_or(0),
+                counts.get(&descriptor.slug).copied().unwrap_or(0),
                 index.records.len(),
-                "count mismatch for {slug}"
+                "count mismatch for {}",
+                descriptor.slug
             );
         }
         assert_eq!(counts["req"], 2);
@@ -2433,6 +2451,133 @@ mod tests {
         assert_eq!(light.requirements.len(), full.requirements.len());
         assert_eq!(light.members, full.members);
         assert_eq!(light.other, full.other);
+    }
+
+    fn write_grouped_project(name: &str) -> (SnapshotProject, std::path::PathBuf) {
+        let project = SnapshotProject::new(name);
+        let business = project.root.join("docs/requirements/business");
+        fs::create_dir_all(&business).unwrap();
+        fs::write(
+            business.join("REQ-001.md"),
+            "---\nid: REQ-001\ntitle: \"Group one\"\ncreated_date: '2026-01-04T00:00:00Z'\nupdated_date: '2026-01-04T00:00:00Z'\nlabels: []\nreferences: []\nstatus: active\n---\n# REQ-001 Group one\n\n## Description\nGroup.\n",
+        )
+        .unwrap();
+        (project, business)
+    }
+
+    #[test]
+    fn inventory_count_excludes_a_record_archived_in_its_active_directory() {
+        let (project, business) = write_grouped_project("archive-count");
+        fs::write(
+            business.join("REQ-001.001.md"),
+            "---\nid: REQ-001.001\ntitle: \"Active member\"\ncreated_date: '2026-01-04T00:00:00Z'\nupdated_date: '2026-01-04T00:00:00Z'\nlabels: []\nreferences: []\nstatus: active\ngroup: REQ-001\n---\n# REQ-001.001 Active member\n\n## Description\nMember.\n",
+        )
+        .unwrap();
+        fs::write(
+            business.join("REQ-001.002.md"),
+            "---\nid: REQ-001.002\ntitle: \"Archived member\"\ncreated_date: '2026-01-04T00:00:00Z'\nupdated_date: '2026-01-04T00:00:00Z'\nlabels: []\nreferences: []\nstatus: archived\ngroup: REQ-001\n---\n# REQ-001.002 Archived member\n\n## Description\nMember.\n",
+        )
+        .unwrap();
+
+        let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
+        let counts = snapshot.scan_counts();
+        assert_eq!(
+            counts["req"], 2,
+            "the archived record is absent from the inventory count"
+        );
+    }
+
+    #[test]
+    fn grouped_rows_exclude_a_record_archived_in_its_active_directory() {
+        let (project, business) = write_grouped_project("archive-rows");
+        fs::write(
+            business.join("REQ-001.001.md"),
+            "---\nid: REQ-001.001\ntitle: \"Active member\"\ncreated_date: '2026-01-04T00:00:00Z'\nupdated_date: '2026-01-04T00:00:00Z'\nlabels: []\nreferences: []\nstatus: active\ngroup: REQ-001\n---\n# REQ-001.001 Active member\n\n## Description\nMember.\n",
+        )
+        .unwrap();
+        fs::write(
+            business.join("REQ-001.002.md"),
+            "---\nid: REQ-001.002\ntitle: \"Archived member\"\ncreated_date: '2026-01-04T00:00:00Z'\nupdated_date: '2026-01-04T00:00:00Z'\nlabels: []\nreferences: []\nstatus: archived\ngroup: REQ-001\n---\n# REQ-001.002 Archived member\n\n## Description\nMember.\n",
+        )
+        .unwrap();
+
+        let descriptor = project.registry.descriptor("req").expect("req").clone();
+        let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
+        let index = build_grouped_index_with_snapshot(
+            &project.ctx,
+            &project.cfg,
+            &project.registry,
+            &descriptor,
+            &snapshot,
+        );
+        let ids: Vec<&str> = index
+            .records
+            .iter()
+            .map(|record| record.id.as_str())
+            .collect();
+        assert_eq!(ids, vec!["REQ-001", "REQ-001.001"]);
+        assert_eq!(index.requirements.len(), 1);
+        assert_eq!(index.members["REQ-001"], vec![0]);
+    }
+
+    #[test]
+    fn grouped_light_title_matches_the_full_loader_when_titles_differ() {
+        let (project, business) = write_grouped_project("title-parity");
+        fs::write(
+            business.join("REQ-001.001.md"),
+            "---\nid: REQ-001.001\ntitle: \"Front-matter title\"\ncreated_date: '2026-01-04T00:00:00Z'\nupdated_date: '2026-01-04T00:00:00Z'\nlabels: []\nreferences: []\nstatus: active\ngroup: REQ-001\n---\n# REQ-001.001 Heading title\n\n## Description\nMember.\n",
+        )
+        .unwrap();
+
+        let descriptor = project.registry.descriptor("req").expect("req").clone();
+        let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
+        let full = build_index_with_snapshot(
+            &project.ctx,
+            &project.cfg,
+            &project.registry,
+            &descriptor,
+            None,
+            &snapshot,
+        );
+        let light = build_grouped_index_with_snapshot(
+            &project.ctx,
+            &project.cfg,
+            &project.registry,
+            &descriptor,
+            &snapshot,
+        );
+        let full_member = full
+            .records
+            .iter()
+            .find(|record| record.id == "REQ-001.001")
+            .expect("full member");
+        let light_member = light
+            .records
+            .iter()
+            .find(|record| record.id == "REQ-001.001")
+            .expect("light member");
+        assert_eq!(full_member.title, "Heading title");
+        assert_eq!(
+            light_member.title, full_member.title,
+            "a grouped member shows the same title on the group page and in the list"
+        );
+    }
+
+    #[test]
+    fn frontmatter_id_mismatch_is_not_addressable_by_the_frontmatter_id() {
+        let project = SnapshotProject::new("frontmatter-id");
+        fs::write(
+            project.root.join("backlog/tasks/TASK-010.md"),
+            "---\nid: TASK-099\ntitle: \"Mismatched identity\"\ncreated_date: '2026-01-03T04:05:06Z'\nupdated_date: '2026-01-03T04:05:06Z'\nlabels: []\nreferences: []\nstatus: ToDo\nassignee: []\nmilestone: \"\"\ndependencies: []\nordinal: 9\ndocumentation: []\ntype: null\n---\n\n## Description\nMismatched.\n",
+        )
+        .unwrap();
+        let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
+        assert!(
+            snapshot.resolve("TASK-099").unwrap().is_none(),
+            "AUD-148 F5 narrowing: the front-matter ID is not a snapshot lookup key"
+        );
+        let by_stem = snapshot.resolve("TASK-010").unwrap().expect("stem lookup");
+        assert_eq!(by_stem.record.id, "TASK-010");
     }
 
     #[test]
