@@ -408,6 +408,7 @@ fn document_invocation_parsing_table() {
             enabled: true,
             statuses: None,
             default_status: None,
+            ..Default::default()
         },
     );
     let reg = ArtifactRegistry::build(&cfg).unwrap();

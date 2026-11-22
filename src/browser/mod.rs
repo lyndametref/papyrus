@@ -19,7 +19,7 @@ use crate::context::Context;
 use crate::error::AppError;
 use crate::record::edit::{self, FieldChange};
 use crate::registry::{
-    ArtifactCategory as CategoryKind, ArtifactRegistry, ContentModel, TypeDescriptor, TypedHandler,
+    ArtifactCategory as CategoryKind, ArtifactRegistry, TypeDescriptor, TypedHandler,
 };
 use http::{HttpError, Method, Request, Response};
 use records::Record;
@@ -3181,7 +3181,7 @@ fn api_doc_list(slug: &str, state: &ServerState) -> Result<Response, HttpError> 
     if let Some(TypedHandler::Requirement(_)) = handler_of(descriptor) {
         return Ok(Response::json(200, requirements_json(descriptor, &index)));
     }
-    if matches!(&descriptor.content_model, ContentModel::Generic) {
+    if descriptor.schema.is_none() {
         let items: Vec<serde_json::Value> = index
             .records
             .iter()
@@ -3237,10 +3237,7 @@ fn api_doc_list(slug: &str, state: &ServerState) -> Result<Response, HttpError> 
 }
 
 fn handler_of(descriptor: &TypeDescriptor) -> Option<TypedHandler> {
-    match &descriptor.content_model {
-        ContentModel::Generic => None,
-        ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => Some(schema.handler),
-    }
+    descriptor.handler()
 }
 
 fn requirements_json(descriptor: &TypeDescriptor, index: &records::Index) -> serde_json::Value {

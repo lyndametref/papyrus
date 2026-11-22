@@ -13,7 +13,7 @@ use crate::record::frontmatter::{self, FrontMatter};
 use crate::record::identity::{self, ParsedId};
 use crate::record::scan::{family_files, project_relative};
 use crate::record::{SectionList, SectionValue, retired_sections, section_list, section_scalar};
-use crate::registry::{ArtifactCategory, ArtifactRegistry, ContentModel, IdShape};
+use crate::registry::{ArtifactCategory, ArtifactRegistry, DocumentModel, IdShape};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::path::Path;
@@ -102,9 +102,9 @@ pub fn document_families<'a>(registry: &'a ArtifactRegistry, cfg: &Config) -> Ve
                 IdShape::Dotted => Shape::Dotted,
                 IdShape::Plain => Shape::Plain,
             };
-            let extension = match &descriptor.content_model {
-                ContentModel::HtmlMockup(_) => "html",
-                ContentModel::Generic | ContentModel::Typed(_) => "md",
+            let extension = match descriptor.document_model {
+                DocumentModel::SingleHtmlMockup => "html",
+                DocumentModel::SingleMarkdown | DocumentModel::GroupedMarkdown => "md",
             };
             Some(FamilyScan {
                 name: descriptor.slug.clone(),

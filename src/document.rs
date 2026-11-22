@@ -9,7 +9,7 @@ use crate::record::descriptor::RecordDescriptor;
 use crate::record::document::{self, Document, Section};
 use crate::record::patch::{self, PatchOp};
 use crate::registry::{
-    ArtifactCategory, ArtifactRegistry, ContentModel, StatusModel, TypeDescriptor, TypedHandler,
+    ArtifactCategory, ArtifactRegistry, DocumentModel, StatusModel, TypeDescriptor, TypedHandler,
 };
 use crate::sanitize;
 
@@ -265,8 +265,8 @@ pub fn run(
         | DocumentVerb::List
         | DocumentVerb::View
         | DocumentVerb::Edit
-        | DocumentVerb::Supersede => match &descriptor.content_model {
-            ContentModel::Generic => match invocation.verb {
+        | DocumentVerb::Supersede => match &descriptor.schema {
+            None => match invocation.verb {
                 DocumentVerb::Create => create_generic(ctx, descriptor, record, invocation),
                 DocumentVerb::List => list_records(ctx, record),
                 DocumentVerb::View => view_record(ctx, record, invocation.id),
@@ -277,7 +277,7 @@ pub fn run(
                     crate::registry::Verb::from(other).as_str()
                 ))),
             },
-            ContentModel::Typed(_) | ContentModel::HtmlMockup(_) => dispatch_typed(
+            Some(_) => dispatch_typed(
                 ctx,
                 descriptor,
                 registry,
@@ -288,9 +288,9 @@ pub fn run(
             ),
         },
         DocumentVerb::Archive | DocumentVerb::Delete | DocumentVerb::Status => {
-            match &descriptor.content_model {
+            match &descriptor.document_model {
                 // UI mockups keep their HTML metadata semantics.
-                ContentModel::HtmlMockup(_) => dispatch_typed(
+                DocumentModel::SingleHtmlMockup => dispatch_typed(
                     ctx,
                     descriptor,
                     registry,
@@ -346,9 +346,9 @@ fn dispatch_typed(
     verb: DocumentVerb,
     args: &DocumentArgs,
 ) -> Result<crate::CommandOutput, AppError> {
-    let handler = descriptor.content_model.handler().ok_or_else(|| {
+    let handler = descriptor.handler().ok_or_else(|| {
         AppError::Validation(format!(
-            "document_types.{}: content model is not typed",
+            "document_types.{}: document model is not typed",
             descriptor.slug
         ))
     })?;
@@ -948,6 +948,7 @@ mod tests {
                 enabled: true,
                 statuses: Some(vec!["active".to_string(), "archived".to_string()]),
                 default_status: None,
+                ..Default::default()
             },
         );
         cfg

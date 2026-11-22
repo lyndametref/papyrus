@@ -2,7 +2,7 @@
 id: TASK-247
 title: "Add FieldSpec, DocumentModel, and the extended document-type entry"
 created_date: '2026-11-20T17:41:19Z'
-updated_date: '2026-11-22T08:49:50Z'
+updated_date: '2026-11-22T10:11:07Z'
 labels: []
 references:
   - ADR-036
@@ -17,7 +17,7 @@ references:
   - TC-107
   - TC-108
   - TC-130
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-033
@@ -72,3 +72,6 @@ Definition of done: `cargo build`, `cargo test`, and `cargo clippy --all-targets
 - [ ] `cargo test` reports zero failures and `cargo clippy --all-targets -- -D warnings` is clean.
 ## Comments
 - **task-refiner**: Refined for MS-033: description grounded in ContentModel, DOCUMENT_TEMPLATES, DocTypeEntry and the four ContentModel call sites; 9 testable acceptance criteria added; TECH-070 and TECH-077 documented. A transitional is_builtin_document_slug bridge keeps browser list and CLI dispatch behaviour identical. No dependency, ordinal, milestone, or assignee change.
+- **rust-dev**: Changed: registry DocumentModel enum with SingleMarkdown, GroupedMarkdown, SingleHtmlMockup replaces the former content model; TypeDescriptor now carries document_model plus a transitional schema field so typed and generic paths keep today's behaviour; DocumentModel::for_slug is seed-only (req and nfr grouped, ui-mockup HTML, other seed and user-defined slugs single markdown); Config FieldSpec, FieldKind, FieldVerb, Visibility, RoleFields, Slot and extended DocTypeEntry with optional fields, group, member, slots, api_aliases, reference_visibility, label, plural, order, summary, type_alias; deny_unknown_fields rejects entry model, title, content, id_shape and field order, enabled; reserved field key constants and helpers; is_config_defined_document bridge uses is_builtin_document_slug for browser list and CLI dispatch.
+- **rust-dev**: Tests: new config unit tests cover the exact FieldSpec key set and defaults, field order and enabled rejection, kind and verb value sets, visibility values, all eight reserved keys as key and frontmatter_key, nested group and member blocks with absent versus empty collections, full presentation and slot deserialization, and entry behaviour-key rejection; new registry test covers seed-only model resolution, user-defined SingleMarkdown default, and the seed bridge. Verification: cargo test 1155 passed, 0 failed, 26 ignored; characterization replay 3 of 3, list characterization replay 3 of 3, cli help golden 2 of 2; cargo clippy --all-targets -- -D warnings clean; cargo fmt --check clean. No commit made per instruction; status left In-Progress.
+- **orchestrator**: Acceptance met: DocumentModel replaces ContentModel, FieldSpec vocabulary with reserved keys and verb defaults, nested group and member role blocks with reference visibility, extended entry with deny_unknown_fields; 1155 tests pass, characterization and help goldens unchanged, clippy clean.
