@@ -168,6 +168,42 @@ this regeneration is one of the following semantic deltas.
     `form`) is `422` instead of silently ignored. Source: ADR-039 decisions
     26-28, TECH-040 section 7.
 
+## TASK-268: seed-declared presentation and reference visibility
+
+16. **Document labels come from the seed plural.** Every document navigation
+    label, list heading, page title, inventory title, and breadcrumb label is
+    the descriptor seed `plural` with a fixed first-letter capitalization. The
+    changed labels are `Business rules` (was `Business Rules`), `Audit records`
+    (was `Audit Records`), `Technical specifications` (was `Technical
+    Specifications`), `Use cases` (was `Use Cases`), `Test cases` (was `Test
+    Cases`), `Test reports` (was `Test Reports`), `Glossary terms` (was
+    `Glossary`), `UI specifications` (was `UI Specifications`), and `UI mockups`
+    (was `UI Mockups`); `Business requirements` and `Non-functional
+    requirements` are unchanged. Count nouns, empty states, and inventory
+    notes already equaled the seed and do not change. Source: ADR-039 decisions
+    29-30, TECH-068 section 8.
+
+17. **Inventory order follows seed `order` with slug tie-break.** The static
+    document order is removed. The new inventory order is `req`, `rule`,
+    `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`, `nfr`,
+    `glossary`, `ui-spec`, `ui-mockup`, then the user-defined `note`; the
+    Backlog and Decisions aggregate cards move after the first five document
+    cards (after `use-case` instead of after `nfr`). Source: ADR-039 decision
+    30, TECH-068 section 2.1.
+
+18. **`req` and `nfr` list rows hide references in both roles.** Their group
+    and member rows no longer render `ul.row-refs`; labels still render in the
+    Title cell. Every other seed type and a user-defined type resolve `Visible`
+    and keep the reference list. This affects `http/list-req`, `http/list-nfr`,
+    and every document list page whose rows carry references. The single
+    document view keeps its References disclosure. Source: ADR-039 decisions
+    32-33, ADR-035 as amended by ADR-039, ADR-036 decision 29.
+
+19. **Backlog and Decision content is unchanged.** Their board, list, detail,
+    edit, conflict, not-found, and payload bytes keep their own presentation and
+    reference display; the only page change is the shared sidebar's document
+    labels from item 16. Source: ADR-039 decision 31, TECH-068 section 8.
+
 No other difference is expected. The `415`, `400`, `404`, `409`, `422`, `303`,
-and `500` status-code surface is unchanged, and no Backlog or Decision page or
-payload changed.
+and `500` status-code surface is unchanged, and no Backlog or Decision payload
+changed.

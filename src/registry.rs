@@ -340,6 +340,16 @@ pub struct TypeDescriptor {
     /// Always empty for a user-defined type and for every seed type except
     /// `audit`. This is not a `FieldSpec` key and never a configuration key.
     pub field_defaults: BTreeMap<String, String>,
+    /// Plural presentation noun from the seed (ADR-039 decision 29).
+    pub plural: String,
+    /// Presentation summary for the inventory note (ADR-039 decision 29).
+    pub summary: Option<String>,
+    /// Presentation order inside the document navigation (ADR-039 decision 29).
+    pub order: u32,
+    /// Legacy `?type=` value, when it differs from the slug (ADR-039 decision 29).
+    pub type_alias: Option<String>,
+    /// Legacy list API aliases (ADR-039 decision 29, ADR-041 decision 4).
+    pub api_aliases: Vec<String>,
     /// Reference visibility of a single-role type (ADR-035).
     pub reference_visibility: Option<Visibility>,
     /// Resolved browser list slots (ADR-041).
@@ -369,6 +379,27 @@ impl TypeDescriptor {
 
     pub fn is_enabled(&self) -> bool {
         self.enabled
+    }
+
+    /// Reference visibility of a single-role document (ADR-039 decision 32).
+    pub fn single_reference_visibility(&self) -> Visibility {
+        self.reference_visibility.unwrap_or(Visibility::Visible)
+    }
+
+    /// Reference visibility of a grouped document's group row.
+    pub fn group_reference_visibility(&self) -> Visibility {
+        self.group
+            .as_ref()
+            .and_then(|role| role.reference_visibility)
+            .unwrap_or(Visibility::Visible)
+    }
+
+    /// Reference visibility of a grouped document's member row.
+    pub fn member_reference_visibility(&self) -> Visibility {
+        self.member
+            .as_ref()
+            .and_then(|role| role.reference_visibility)
+            .unwrap_or(Visibility::Visible)
     }
 }
 
@@ -1339,6 +1370,11 @@ fn backlog_descriptor(cfg: &Config, template: &DescriptorTemplate) -> TypeDescri
         group: None,
         member: None,
         field_defaults: BTreeMap::new(),
+        plural: String::new(),
+        summary: None,
+        order: 0,
+        type_alias: None,
+        api_aliases: Vec::new(),
         reference_visibility: None,
         slots: Vec::new(),
         frontmatter_keys: frontmatter_keys(template),
@@ -1369,6 +1405,11 @@ fn decision_descriptor(slug: &str, entry: &TypeEntry) -> TypeDescriptor {
         group: None,
         member: None,
         field_defaults: BTreeMap::new(),
+        plural: String::new(),
+        summary: None,
+        order: 0,
+        type_alias: None,
+        api_aliases: Vec::new(),
         reference_visibility: None,
         slots: Vec::new(),
         frontmatter_keys: frontmatter_keys(&DECISION_TEMPLATE),
@@ -1862,6 +1903,11 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
                     .collect()
             })
             .unwrap_or_default(),
+        plural: effective.plural.clone().unwrap_or_else(|| slug.to_string()),
+        summary: effective.summary.clone(),
+        order: effective.order.unwrap_or(0),
+        type_alias: effective.type_alias.clone(),
+        api_aliases: effective.api_aliases.clone().unwrap_or_default(),
         reference_visibility: effective.reference_visibility,
         slots: effective.slots.clone().unwrap_or_default(),
         frontmatter_keys,

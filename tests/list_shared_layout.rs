@@ -118,10 +118,16 @@ fn representative_routes(
     out
 }
 
-fn expected_columns(presentation: &str) -> Vec<String> {
+fn expected_columns(descriptor: &TypeDescriptor) -> Vec<String> {
     let mut keys = vec!["id".to_string(), "title".to_string(), "status".to_string()];
-    for (key, _) in routes::list_slots(presentation) {
-        keys.push((*key).to_string());
+    if descriptor.category == papyrus::registry::ArtifactCategory::Document {
+        for slot in &descriptor.slots {
+            keys.push(slot.key.clone());
+        }
+    } else {
+        for (key, _) in routes::list_slots(routes::static_slug(descriptor)) {
+            keys.push((*key).to_string());
+        }
     }
     keys.push("created".to_string());
     keys.push("updated".to_string());
@@ -129,7 +135,7 @@ fn expected_columns(presentation: &str) -> Vec<String> {
     keys
 }
 
-fn assert_shared_table(html: &str, presentation: &str) {
+fn assert_shared_table(html: &str, descriptor: &TypeDescriptor, presentation: &str) {
     assert!(
         html.contains("<table class=\"table list list--shared\" data-list-layout=\"shared\""),
         "{presentation} shared table"
@@ -146,10 +152,10 @@ fn assert_shared_table(html: &str, presentation: &str) {
     }
     assert_eq!(
         actual,
-        expected_columns(presentation),
+        expected_columns(descriptor),
         "{presentation} columns"
     );
-    for key in expected_columns(presentation) {
+    for key in expected_columns(descriptor) {
         assert!(
             header.contains(&format!("<th scope=\"col\" data-column=\"{key}\">")),
             "{presentation} header {key} is a column header"
@@ -189,7 +195,10 @@ fn every_enabled_family_renders_the_shared_layout_with_its_declared_slots() {
             assert!(!html.contains("<table"));
             continue;
         }
-        assert_shared_table(&html, presentation);
+        let descriptor = registry
+            .descriptor(descriptor)
+            .expect("representative descriptor");
+        assert_shared_table(&html, descriptor, presentation);
     }
     assert_eq!(
         representatives.len(),
@@ -204,11 +213,16 @@ fn every_enabled_family_renders_the_shared_layout_with_its_declared_slots() {
 
 #[test]
 fn decision_aliases_share_the_decisions_list() {
+    let (registry, _) = registry();
     let server = Server::start(&fixture_root().join("project"));
     let mut baseline_rows = None;
     for url in ["/?type=decision", "/?type=adr", "/?type=bdr"] {
         let html = server.get(url);
-        assert_shared_table(&html, "decision");
+        let descriptor = registry
+            .descriptors()
+            .find(|descriptor| descriptor.slug == "adr")
+            .expect("decision descriptor");
+        assert_shared_table(&html, descriptor, "decision");
         assert!(html.contains("<h1 class=\"h1\">Decisions</h1>"), "{url}");
         assert!(
             html.contains("<th scope=\"col\" data-column=\"type\">Type</th>"),
@@ -286,19 +300,20 @@ fn archived_records_are_absent_from_every_list_and_the_board() {
     }
 }
 
-// TC-055 / TC-057: a Generic family keeps the shared layout, labels, and row
-// actions while omitting every reference block.
+// TC-055 / TC-057: a user-defined family keeps the shared layout, labels, and
+// row actions; its references default to visible.
 #[test]
-fn generic_family_keeps_the_shared_layout_without_reference_rows() {
+fn user_defined_family_keeps_the_shared_layout_with_visible_references() {
+    let (registry, _) = registry();
+    let note = registry.descriptor("note").expect("note descriptor");
     let server = Server::start(&fixture_root().join("project"));
     let html = server.get("/?type=note");
-    assert_shared_table(&html, "note");
+    assert_shared_table(&html, note, "note");
     assert!(html.contains("<li class=\"tag\">note</li>"), "labels stay");
     assert!(
-        !html.contains("row-refs"),
-        "no reference block in a Generic list"
+        html.contains("row-refs") && html.contains("NOTE-REF-1"),
+        "a user-defined type defaults to visible references"
     );
-    assert!(!html.contains("NOTE-REF-1"));
     let start = html.find("data-row-id=\"NOTE-001\"").expect("NOTE-001 row");
     let row = &html[start..];
     let row = &row[..row.find("</tr>").unwrap()];

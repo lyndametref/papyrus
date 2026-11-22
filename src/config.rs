@@ -1120,7 +1120,23 @@ pub fn resolved_document_entry(slug: &str, declared: &DocTypeEntry) -> DocTypeEn
     if merged.label.is_none() {
         merged.label = Some(slug.to_string());
     }
+    if merged.plural.is_none() {
+        // ADR-036 decision 33: a user-defined type derives its plural from its
+        // slug-derived label when no seed value exists.
+        merged.plural = merged.label.as_deref().map(default_plural);
+    }
     merged
+}
+
+/// The documented user-defined plural default: the label with a trailing `s`
+/// unless it already reads as a plural (ADR-036 decision 33).
+fn default_plural(label: &str) -> String {
+    match label.chars().last() {
+        Some(character) if character.is_ascii_alphabetic() && character != 's' => {
+            format!("{label}s")
+        }
+        _ => label.to_string(),
+    }
 }
 
 fn mapping_get<'a>(mapping: &'a yaml_serde::Mapping, key: &str) -> Option<&'a yaml_serde::Value> {
@@ -4962,7 +4978,7 @@ mod tests {
             .unwrap();
         assert!(entry.order.unwrap() > max_seed_order);
         assert_eq!(entry.label.as_deref(), Some("note"));
-        assert_eq!(entry.plural, None);
+        assert_eq!(entry.plural.as_deref(), Some("notes"));
         assert_eq!(entry.summary, None);
         assert_eq!(entry.type_alias, None);
         assert_eq!(entry.api_aliases, Some(Vec::new()));

@@ -855,14 +855,14 @@ fn t114_11_builtin_list_uses_shared_columns_and_keeps_sections() {
     }
     assert!(glossary.contains("class=\"filter\""));
     let tech = get(&server, "/?type=tech-spec").text();
-    assert!(tech.contains("Technical Specifications"));
+    assert!(tech.contains("Technical specifications"));
     // TASK-142: the shared list no longer renders the description preview.
     assert!(tech.contains("data-list-layout=\"shared\""));
     assert!(!tech.contains("Description"));
     let rule = get(&server, "/?type=business-rule").text();
-    assert!(rule.contains("Business Rules"));
+    assert!(rule.contains("Business rules"));
     let spec = get(&server, "/doc/TECH-001").text();
-    assert!(!spec.contains("Technical specification"));
+    assert!(!spec.contains(">Technical specification<"));
     assert!(spec.contains("<p class=\"id\">"));
     drop(server);
     let _ = fs::remove_dir_all(&d);
@@ -948,8 +948,8 @@ fn t114_15_generic_labels_and_references_round_trip() {
         "generic single-document view keeps its collapsible References section"
     );
 
-    // TC-055: the generic list omits the reference block entirely but keeps
-    // labels in the Title cell.
+    // A user-defined type defaults to visible references and keeps labels in
+    // the Title cell (ADR-036 decision 33, ADR-039 decision 32).
     let list = get(&server, "/?type=note").text();
     let start = list.find("data-row-id=\"NOTE-004\"").expect("NOTE-004 row");
     let row = &list[start..];
@@ -957,10 +957,10 @@ fn t114_15_generic_labels_and_references_round_trip() {
     assert!(row.contains("<li class=\"tag\">alpha</li>"));
     assert!(row.contains("<li class=\"tag\">beta</li>"));
     assert!(
-        !row.contains("row-refs"),
-        "no reference element in a generic row"
+        row.contains("row-refs"),
+        "a user-defined type defaults to visible references"
     );
-    assert!(!row.contains("REF-001"));
+    assert!(row.contains("REF-001"));
 
     let api: serde_json::Value =
         serde_json::from_str(&get(&server, "/api/docs/note").text()).unwrap();
@@ -1199,10 +1199,10 @@ fn t182_01_newly_configured_type_omits_references_and_keeps_the_shared_layout() 
     let row = &row[..row.find("</tr>").unwrap()];
     assert!(row.contains("<li class=\"tag\">cooking</li>"));
     assert!(
-        !row.contains("row-refs"),
-        "no reference block for a new Generic type"
+        row.contains("row-refs"),
+        "a new user-defined type defaults to visible references"
     );
-    assert!(!row.contains("REF-R1"));
+    assert!(row.contains("REF-R1"));
     assert!(row.contains("aria-label=\"View REC-001\">View</a>"));
     assert!(row.contains("aria-label=\"Edit REC-001\">Edit</a>"));
     assert!(html.contains("class=\"filter\""));
@@ -1280,7 +1280,7 @@ fn t182_03_glossary_landing_page_display_is_unchanged() {
     );
     let server = Server::start(&d);
     let html = get(&server, "/?type=glossary").text();
-    assert!(html.contains("<h1 class=\"h1\">Glossary</h1>"));
+    assert!(html.contains("<h1 class=\"h1\">Glossary terms</h1>"));
     assert!(html.contains("data-list-layout=\"shared\""));
     assert!(html.contains("Term One"));
     assert!(html.contains("Term Two"));

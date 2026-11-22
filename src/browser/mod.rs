@@ -782,21 +782,14 @@ fn inventory_page(state: &ServerState) -> Result<Response, HttpError> {
         }
     }
 
-    let mut ordered: Vec<String> = routes::inventory_order()
-        .iter()
-        .map(|slug| (*slug).to_string())
-        .collect();
-    for entry in &state.routes.inventory {
-        if !ordered.iter().any(|slug| slug == &entry.slug) {
-            ordered.push(entry.slug.clone());
-        }
-    }
-    let aggregate_at = routes::INVENTORY_AGGREGATE_AFTER.min(ordered.len());
-    for (index, slug) in ordered.iter().enumerate() {
+    // Inventory order is the descriptor seed order with slug tie-break; the
+    // route table already holds the enabled document entries in that order.
+    let aggregate_at = routes::INVENTORY_AGGREGATE_AFTER.min(state.routes.inventory.len());
+    for (index, entry) in state.routes.inventory.iter().enumerate() {
         if index == aggregate_at {
             cards.append(&mut aggregates);
         }
-        if let Some(card) = card_for(slug) {
+        if let Some(card) = card_for(&entry.slug) {
             cards.push(card);
         }
     }
@@ -859,6 +852,16 @@ fn board_task_slug(state: &ServerState) -> &str {
         .find(|item| item.group == routes::NavGroup::Backlog)
         .map(|item| item.slug.as_str())
         .unwrap_or_default()
+}
+
+/// The legacy `?type=` key for the Backlog board's descriptor.
+fn board_type_key(state: &ServerState) -> String {
+    let slug = board_task_slug(state);
+    state
+        .registry
+        .descriptor(slug)
+        .map(|descriptor| routes::legacy_url_key(descriptor).to_string())
+        .unwrap_or_else(|| slug.to_string())
 }
 
 /// The final configured task status when the board may offer `Clean up all`.
@@ -1085,7 +1088,7 @@ fn board_cleanup_submit(request: &Request, state: &ServerState) -> Result<Respon
         }
     }
     if failures.is_empty() {
-        let type_key = routes::legacy_url_key(board_task_slug(state));
+        let type_key = board_type_key(state);
         return Ok(Response::redirect(&format!(
             "/?type={}&expand={}",
             type_key, milestone_id
@@ -1134,7 +1137,7 @@ fn board_milestone_cleanup_submit(
     }
     match crate::milestone::archive(&ctx, &cfg, &state.registry, milestone_id) {
         Ok(_) => {
-            let type_key = routes::legacy_url_key(board_task_slug(state));
+            let type_key = board_type_key(state);
             Ok(Response::redirect(&format!(
                 "/?type={}&expand={}",
                 type_key, milestone_id
@@ -1193,7 +1196,7 @@ fn board_release_cleanup_submit(
         .map(|m| m.id.clone())
         .collect();
     if closed.is_empty() {
-        let type_key = routes::legacy_url_key(board_task_slug(state));
+        let type_key = board_type_key(state);
         return Ok(Response::redirect(&format!("/?type={}", type_key)));
     }
     // Capture an expand target that survives cleanup before archiving any
@@ -1218,7 +1221,7 @@ fn board_release_cleanup_submit(
     }
     let expand_target = surviving_expand_target;
     if failures.is_empty() {
-        let type_key = routes::legacy_url_key(board_task_slug(state));
+        let type_key = board_type_key(state);
         let location = if let Some(id) = expand_target {
             format!("/?type={}&expand={}", type_key, id)
         } else {
@@ -2023,7 +2026,7 @@ fn board_status_submit(
             .iter()
             .any(|milestone| milestone.id == *milestone_id)
     });
-    let type_key = routes::legacy_url_key(record.slug());
+    let type_key = routes::legacy_url_key(&record.descriptor);
     let location = match expand {
         Some(milestone_id) => format!("/?type={}&expand={}", type_key, milestone_id),
         None => format!("/?type={}", type_key),
@@ -2470,7 +2473,7 @@ fn form_name(record: &Record) -> String {
     if record.is_requirement() {
         return "requirement".to_string();
     }
-    routes::legacy_url_key(record.slug()).to_string()
+    routes::legacy_url_key(&record.descriptor).to_string()
 }
 
 fn record_json(

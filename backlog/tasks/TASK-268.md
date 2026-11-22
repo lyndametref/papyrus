@@ -2,7 +2,7 @@
 id: TASK-268
 title: "Implement seed-declared presentation and reference visibility per type and role"
 created_date: '2026-11-20T17:42:43Z'
-updated_date: '2026-11-22T16:36:06Z'
+updated_date: '2026-11-22T17:56:59Z'
 labels: []
 references:
   - ADR-039
@@ -14,7 +14,7 @@ references:
   - TECH-068
   - TC-184
   - REQ-06.004
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-035
@@ -61,3 +61,11 @@ Every document presentation fact and every document reference-visibility value c
 - [ ] #9 Reference visibility affects list rows only; the single-document view keeps its References disclosure for every document type, and CLI list, CLI view, JSON output, and stored front matter are unchanged.
 - [ ] #10 A user-defined type is listed, navigable, and rendered with slug-derived presentation defaults without a code change, an empty slots set, and visible references.
 - [ ] #11 Tests assert the seed matrix for req, nfr, and the other seed types, both grouped roles, a user-defined type, labels always rendered, hidden references absent, and no document entry in PRESENTATION; cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass.
+## Comments
+- **rust-dev**: TASK-268 evidence: tests green.
+- **rust-dev**: TASK-268 evidence presentation facts: TypeDescriptor now carries plural, summary, order, type_alias and api_aliases from resolved_document_entry and SEED_DOCUMENT_TYPES; user-defined types get the ADR-036 decision 33 slug-derived label and plural, no summary, an order after the seed types, empty aliases and slots, and Visible references. The 11 document PRESENTATION entries were removed: req, rule, audit, tech-spec, nfr, glossary, ui-spec, ui-mockup, use-case, test-case, test-report. PRESENTATION now holds only task, milestone, release and decision.
+- **rust-dev**: TASK-268 evidence routes and lists: routes label, heading, short, noun, inventory_note, legacy_url_key and api_aliases take the descriptor; static_heading and static_short remain only for the Backlog board. inventory_order is deleted; inventory follows descriptor order with slug tie-break. ListPlan::for_descriptor uses descriptor.slots for documents, static slots for Backlog and Decision, and a per-row reference flag. No document slug fallback remains in the presentation path.
+- **rust-dev**: TASK-268 evidence visibility: req and nfr resolve Hidden for both group and member roles; every other seed type resolves Visible for its single role; user-defined types default to Visible. Hidden rows emit no ul.row-refs, no empty list, no placeholder and no collapsed control while labels still render in the Title cell. Visibility affects list rows only; the single-document References disclosure, CLI list and view, JSON and stored front matter are unchanged.
+- **rust-dev**: TASK-268 evidence deltas EXPECTED-DELTAS items 16 to 19: seed-plural labels Business rules, Audit records, Technical specifications, Use cases, Test cases, Test reports, Glossary terms, UI specifications and UI mockups, with Business requirements and Non-functional requirements unchanged; inventory order req, rule, audit, tech-spec, use-case, test-case, test-report, nfr, glossary, ui-spec, ui-mockup, note and aggregates after use-case; req and nfr hidden list references; Backlog and Decision content unchanged except shared-sidebar document labels. The characterization corpus was regenerated only through the documented capture path; payloads, records, CLI and JSON, single-document References disclosure and front matter are unchanged.
+- **rust-dev**: TASK-268 evidence checks: tests cover the seed matrix, both grouped roles, user-defined defaults, labels always rendered, hidden references absent, no document PRESENTATION entry and the D-05 guard. cargo test passes, cargo clippy --all-targets -- -D warnings passes, cargo fmt --check passes. Branch is task-TASK-268; no commit per instruction; status left In-Progress.
+- **orchestrator**: Acceptance met: all 11 document entries removed from PRESENTATION; labels, headings, plural, summary, order, aliases and slots now derive from the descriptor; reference visibility per type and grouped role from the seed; inventory order follows seed order with deltas 16 to 19 recorded; suite, clippy and fmt green.

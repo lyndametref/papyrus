@@ -4314,10 +4314,10 @@ fn t40a_list_ui_mockups_category() {
     let dir = mockup_fixture("t40a");
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/?type=ui-mockup").text();
-    assert!(html.contains("<h2 class=\"h2\">UI Mockups</h2>"));
+    assert!(html.contains("<h2 class=\"h2\">UI mockups</h2>"));
     assert!(html.contains("2 UI mockups"));
     assert!(html.contains("aria-current=\"page\""));
-    // Sidebar order: UI Specifications before UI Mockups.
+    // Sidebar order: UI specifications before UI mockups.
     let specs_at = html.find("href=\"/?type=ui-spec\"").unwrap();
     let mockups_at = html.find("href=\"/?type=ui-mockup\"").unwrap();
     assert!(specs_at < mockups_at, "sidebar order");
@@ -4420,14 +4420,14 @@ fn t40c_view_ui_mockup() {
     assert!(html.contains("<dt>Task</dt>"));
     assert!(html.contains("MOCK-001"));
     // Document type is no longer repeated on the view (ADR-033 point 4).
-    assert!(html.contains("UI Mockups"));
+    assert!(html.contains("UI mockups"));
     assert!(html.contains("<h1 class=\"h1\">First mockup</h1>"));
     assert!(html.contains("<dt>UI specifications</dt>"));
     assert!(html.contains("<dt>References</dt>"));
     assert!(html.contains("UI-001"));
     assert!(html.contains("a.md"));
-    // Breadcrumb UI Mockups > ID, single Edit action.
-    assert!(html.contains("href=\"/?type=ui-mockup\">UI Mockups</a></li><li><span aria-current=\"page\">MOCK-001</span>"));
+    // Breadcrumb UI mockups > ID, single Edit action.
+    assert!(html.contains("href=\"/?type=ui-mockup\">UI mockups</a></li><li><span aria-current=\"page\">MOCK-001</span>"));
     assert_eq!(html.matches("href=\"/doc/MOCK-001/edit\"").count(), 1);
     assert!(html.contains(">Edit</a>"));
     // Empty refs still render (none) for the review package.
@@ -5121,15 +5121,15 @@ fn t25a_list_business_rules_category() {
     let dir = rule_fixture("t25a");
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/?type=business-rule").text();
-    assert!(html.contains("<h2 class=\"h2\">Business Rules</h2>"));
+    assert!(html.contains("<h2 class=\"h2\">Business rules</h2>"));
     assert!(
         html.contains("2 business rules")
-            || html.contains("2 Business Rules")
+            || html.contains("2 Business rules")
             || html.contains("2 business rule")
     );
     // count text may vary; check contains 2 and business rules
     assert!(html.contains("aria-current=\"page\""));
-    // sidebar order: Business requirements before Business Rules
+    // sidebar order: Business requirements before Business rules
     let reqs_at = html.find("href=\"/?type=req\"").unwrap();
     let rules_at = html.find("href=\"/?type=business-rule\"").unwrap();
     assert!(reqs_at < rules_at, "sidebar order");
@@ -5218,7 +5218,7 @@ fn t25c_view_business_rule() {
     let html = get(&server, "/doc/RUL-001").text();
     assert!(html.contains("<p class=\"id\">"));
     assert!(html.contains("RUL-001"));
-    assert!(html.contains("Business Rules"));
+    assert!(html.contains("Business rules"));
     assert!(html.contains("<h1 class=\"h1\">First rule</h1>"));
     assert!(html.contains("Description"));
     assert!(html.contains("Rationale"));
@@ -5228,7 +5228,7 @@ fn t25c_view_business_rule() {
     assert!(html.contains("First rationale"));
     assert!(html.contains("First applicability"));
     // breadcrumb
-    assert!(html.contains("href=\"/?type=business-rule\">Business Rules</a></li><li><span aria-current=\"page\">RUL-001</span>"));
+    assert!(html.contains("href=\"/?type=business-rule\">Business rules</a></li><li><span aria-current=\"page\">RUL-001</span>"));
     assert_eq!(html.matches("href=\"/doc/RUL-001/edit\"").count(), 1);
     assert!(html.contains(">Edit</a>"));
     // requirement link resolves to req view
@@ -5726,7 +5726,7 @@ fn t26a_list_audit_records_category() {
     let dir = audit_fixture("t26a");
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/?type=audit-record").text();
-    assert!(html.contains("<h2 class=\"h2\">Audit Records</h2>"));
+    assert!(html.contains("<h2 class=\"h2\">Audit records</h2>"));
     assert!(html.contains("2 audit records"));
     assert!(html.contains("aria-current=\"page\""));
     let rules_at = html.find("href=\"/?type=business-rule\"").unwrap();
@@ -5814,13 +5814,13 @@ fn t26c_view_audit_record() {
     let html = get(&server, "/doc/AUD-001").text();
     assert!(html.contains("<p class=\"id\">"));
     assert!(html.contains("AUD-001"));
-    assert!(html.contains("Audit Records"));
+    assert!(html.contains("Audit records"));
     assert!(html.contains("<h1 class=\"h1\">First audit</h1>"));
     assert!(html.contains("<span class=\"badge\">active</span>"));
     assert!(html.contains("<h2>Audit type</h2><p class=\"text\">security</p>"));
     assert!(html.contains("Audit type"));
     assert!(html.contains("First content paragraph."));
-    assert!(html.contains("href=\"/?type=audit-record\">Audit Records</a></li><li><span aria-current=\"page\">AUD-001</span>"));
+    assert!(html.contains("href=\"/?type=audit-record\">Audit records</a></li><li><span aria-current=\"page\">AUD-001</span>"));
     assert_eq!(html.matches("href=\"/doc/AUD-001/edit\"").count(), 1);
     assert!(html.contains(">Edit</a>"));
     assert!(html.contains("<h2>Content</h2>"));
@@ -6283,7 +6283,7 @@ fn t57a_list_category_and_sidebar() {
     let dir = tech_spec_fixture("t57a");
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/?type=tech-spec").text();
-    assert!(html.contains("<h2 class=\"h2\">Technical Specifications</h2>"));
+    assert!(html.contains("<h2 class=\"h2\">Technical specifications</h2>"));
     assert!(html.contains("2 technical specifications"));
     assert!(html.contains("href=\"/?type=tech-spec\" aria-current=\"page\""));
     let audit_at = html.find("href=\"/?type=audit-record\"").unwrap();
@@ -6396,14 +6396,14 @@ fn t57c_view_technical_specification() {
     let html = get(&server, "/doc/TECH-001").text();
     assert!(html.contains("<p class=\"id\">"));
     assert!(html.contains("TECH-001"));
-    assert!(html.contains("Technical Specifications"));
+    assert!(html.contains("Technical specifications"));
     assert!(html.contains("<h1 class=\"h1\">Offline architecture</h1>"));
     assert!(html.contains("Defines the local browser."));
     assert!(html.contains("<p class=\"text\">Defines the local browser.</p>"));
     assert!(html.contains("<section class=\"record-section\"><h2>Description</h2><p class=\"text\">Defines the local browser.</p></section>"));
     assert!(!html.contains("style=\"white-space: pre-wrap\""));
     assert!(html.contains("<h2>Description</h2>"));
-    assert!(html.contains("href=\"/?type=tech-spec\">Technical Specifications</a></li><li><span aria-current=\"page\">TECH-001</span>"));
+    assert!(html.contains("href=\"/?type=tech-spec\">Technical specifications</a></li><li><span aria-current=\"page\">TECH-001</span>"));
     assert_eq!(html.matches("href=\"/doc/TECH-001/edit\"").count(), 1);
     assert!(html.contains(">Edit</a>"));
     let empty = get(&server, "/doc/TECH-003").text();
@@ -6928,7 +6928,7 @@ fn t57l_no_js_and_narrow_layout() {
     assert!(edit.contains("method=\"post\" action=\"/doc/TECH-001\""));
     assert!(!edit.contains("onsubmit="));
     let list = get(&server, "/?type=tech-spec").text();
-    assert!(list.contains("Technical Specifications"));
+    assert!(list.contains("Technical specifications"));
     let css = get(&server, "/assets/app.css").text();
     assert!(css.contains("@media (max-width: 480px)"));
     // MOCK-0009 keeps the version annotation visible at 320 px for tech specs.
@@ -6984,18 +6984,18 @@ fn t19a_inventory_hub() {
 
     let labels = [
         "Business requirements",
-        "Business Rules",
-        "Audit Records",
-        "Technical Specifications",
-        "Non-functional requirements",
+        "Business rules",
+        "Audit records",
+        "Technical specifications",
+        "Use cases",
         "Backlog",
         "Decisions",
-        "Glossary",
-        "UI Specifications",
-        "UI Mockups",
-        "Use Cases",
-        "Test Cases",
-        "Test Reports",
+        "Test cases",
+        "Test reports",
+        "Non-functional requirements",
+        "Glossary terms",
+        "UI specifications",
+        "UI mockups",
     ];
     let mut positions = Vec::new();
     for label in &labels {
@@ -7086,7 +7086,7 @@ fn t81a_sidebar_placement_and_type_values() {
         );
     }
     let html = get(&server, "/?type=use-case").text();
-    assert!(html.contains("<h2 class=\"h2\">Use Cases</h2>"));
+    assert!(html.contains("<h2 class=\"h2\">Use cases</h2>"));
     assert!(html.contains("2 use cases"));
     assert!(html.contains("href=\"/?type=use-case\" aria-current=\"page\""));
     let tech_at = html.find("href=\"/?type=tech-spec\"").unwrap();
@@ -7201,7 +7201,7 @@ fn t81d_view_use_case_metadata_projection() {
     let html = get(&server, "/doc/UC-001").text();
     assert!(html.contains("<p class=\"id\">"));
     assert!(html.contains("UC-001"));
-    assert!(html.contains("Use Cases"));
+    assert!(html.contains("Use cases"));
     assert!(html.contains("<h1 class=\"h1\">Offline architecture</h1>"));
     assert!(html.contains("<h2>Description</h2><p class=\"text\">Defines the local browser.</p>"));
     assert!(html.contains("<section class=\"record-section\"><h2>Applicability</h2><p class=\"text\">Applies to browser.</p></section>"));
@@ -7212,7 +7212,7 @@ fn t81d_view_use_case_metadata_projection() {
     assert!(html.contains("ui"));
     assert!(html.contains("REQ-1"));
     assert!(html.contains(
-        "href=\"/?type=use-case\">Use Cases</a></li><li><span aria-current=\"page\">UC-001</span>"
+        "href=\"/?type=use-case\">Use cases</a></li><li><span aria-current=\"page\">UC-001</span>"
     ));
     assert_eq!(html.matches("href=\"/doc/UC-001/edit\"").count(), 1);
     assert!(html.contains(">Edit</a>"));
@@ -7698,7 +7698,7 @@ fn t81m_no_js_and_narrow_layout() {
     assert!(edit.contains("method=\"post\" action=\"/doc/UC-001\""));
     assert!(!edit.contains("onsubmit="));
     let list = get(&server, "/?type=use-case").text();
-    assert!(list.contains("Use Cases"));
+    assert!(list.contains("Use cases"));
     let css = get(&server, "/assets/app.css").text();
     assert!(css.contains("@media (max-width: 480px)"));
     assert!(edit.contains("class=\"hidden-field version-note\""));
@@ -8497,11 +8497,11 @@ fn tc029_ui_mockup_records_excluded_from_uniform_layout() {
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/doc/MOCK-001").text();
     assert!(html.contains("<h1 class=\"h1\">First mockup</h1>"));
-    assert!(html.contains("UI Mockups"));
+    assert!(html.contains("UI mockups"));
     assert!(html.contains("<p class=\"sub\">Created date: (none) · Updated date: (none)</p>"));
     assert!(html.contains("<dt>Status</dt>"));
     assert!(html.contains("<details"));
-    assert!(!html.contains("UI mockup"));
+    assert!(!html.contains(">UI mockup<"));
     assert!(!html.contains("record-meta"));
     drop(server);
     let _ = fs::remove_dir_all(&dir);

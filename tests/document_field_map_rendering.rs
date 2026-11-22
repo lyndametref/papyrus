@@ -180,12 +180,15 @@ fn document_list_rows_use_the_shared_hierarchy_and_keep_labels() {
     let index: Index = build_index(&ctx, &cfg, &registry, &descriptor, None);
     let plan = ListPlan::for_descriptor(
         &descriptor,
-        "req",
         &index,
         "Business requirements",
         "2 groups \u{b7} 3 requirements",
     );
-    let keys: Vec<&str> = plan.columns.iter().map(|column| column.key).collect();
+    let keys: Vec<&str> = plan
+        .columns
+        .iter()
+        .map(|column| column.key.as_str())
+        .collect();
     assert_eq!(
         keys,
         [

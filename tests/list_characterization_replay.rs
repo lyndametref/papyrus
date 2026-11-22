@@ -149,12 +149,43 @@ fn fixture_family(fixture: &Value) -> &str {
     fixture["family"].as_str().unwrap()
 }
 
-fn expected_heading(family: &str, captured: &str) -> String {
-    match family {
-        "requirement" => "Business requirements".to_string(),
-        "nfr" => "Non-functional requirements".to_string(),
-        _ => captured.to_string(),
+fn seed_slug(family: &str) -> Option<&'static str> {
+    Some(match family {
+        "requirement" => "req",
+        "nfr" => "nfr",
+        "glossary" => "glossary",
+        "business-rule" => "rule",
+        "audit" => "audit",
+        "tech-spec" => "tech-spec",
+        "ui-spec" => "ui-spec",
+        "ui-mockup" => "ui-mockup",
+        "usecase" => "use-case",
+        "testcase" => "test-case",
+        "testreport" => "test-report",
+        _ => return None,
+    })
+}
+
+fn seed_plural(family: &str) -> Option<&'static str> {
+    seed_slug(family).map(|slug| {
+        papyrus::config::seed_document_type(slug)
+            .unwrap_or_else(|| panic!("{slug} is a seed type"))
+            .plural
+    })
+}
+
+fn capitalized(value: &str) -> String {
+    let mut chars = value.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        None => String::new(),
     }
+}
+
+fn expected_heading(family: &str, captured: &str) -> String {
+    seed_plural(family)
+        .map(capitalized)
+        .unwrap_or_else(|| captured.to_string())
 }
 
 fn expected_count_note(family: &str, captured: &str) -> String {
@@ -209,46 +240,32 @@ fn expected_columns(family: &str) -> &'static [&'static str] {
     }
 }
 
-fn expected_empty_count(family: &str) -> &'static str {
+fn expected_empty_count(family: &str) -> String {
     match family {
-        "requirement" | "nfr" => "0 groups · 0 requirements",
-        "milestone" => "0 milestones",
-        "release" => "0 releases",
-        "decision" => "0 decisions",
-        "glossary" => "0 glossary terms",
-        "business-rule" => "0 business rules",
-        "audit" => "0 audit records",
-        "tech-spec" => "0 technical specifications",
-        "ui-spec" => "0 UI specifications",
-        "ui-mockup" => "0 UI mockups",
-        "usecase" => "0 use cases",
-        "testcase" => "0 test cases",
-        "testreport" => "0 test reports",
-        "note" => "0 notes",
-        "task" => "No records",
-        other => panic!("no empty count for {other}"),
+        "requirement" | "nfr" => "0 groups · 0 requirements".to_string(),
+        "task" => "No records".to_string(),
+        "milestone" => "0 milestones".to_string(),
+        "release" => "0 releases".to_string(),
+        "decision" => "0 decisions".to_string(),
+        "note" => "0 notes".to_string(),
+        _ => format!(
+            "0 {}",
+            seed_plural(family).unwrap_or_else(|| panic!("no empty count for {family}"))
+        ),
     }
 }
 
-fn expected_empty_message(family: &str) -> &'static str {
+fn expected_empty_message(family: &str) -> String {
     match family {
-        "requirement" => "No business requirements in this project.",
-        "nfr" => "No non-functional requirements in this project.",
-        "milestone" => "No milestones in this project.",
-        "release" => "No releases in this project.",
-        "decision" => "No decisions in this project.",
-        "glossary" => "No glossary terms in this project.",
-        "business-rule" => "No business rules in this project.",
-        "audit" => "No audit records in this project.",
-        "tech-spec" => "No technical specifications in this project.",
-        "ui-spec" => "No UI specifications in this project.",
-        "ui-mockup" => "No UI mockups in this project.",
-        "usecase" => "No use cases in this project.",
-        "testcase" => "No test cases in this project.",
-        "testreport" => "No test reports in this project.",
-        "note" => "No notes in this project.",
-        "task" => "No tasks in this project.",
-        other => panic!("no empty message for {other}"),
+        "task" => "No tasks in this project.".to_string(),
+        "milestone" => "No milestones in this project.".to_string(),
+        "release" => "No releases in this project.".to_string(),
+        "decision" => "No decisions in this project.".to_string(),
+        "note" => "No notes in this project.".to_string(),
+        _ => format!(
+            "No {} in this project.",
+            seed_plural(family).unwrap_or_else(|| panic!("no empty message for {family}"))
+        ),
     }
 }
 
@@ -280,7 +297,7 @@ fn normalized(value: &str, status: bool) -> String {
     }
 }
 
-fn assert_record(html: &str, record: &Value) {
+fn assert_record(html: &str, record: &Value, references_visible: bool) {
     let id = record["id"].as_str().unwrap();
     let row = row_block(html, id);
     let title = record["title"].as_str().unwrap();
@@ -314,10 +331,12 @@ fn assert_record(html: &str, record: &Value) {
         );
     }
     for reference in record["references"].as_array().unwrap() {
-        assert!(
-            row.contains(&format!("<li>{}</li>", escape(reference.as_str().unwrap()))),
-            "{id} reference {reference}"
-        );
+        let expected = format!("<li>{}</li>", escape(reference.as_str().unwrap()));
+        if references_visible {
+            assert!(row.contains(&expected), "{id} reference {reference}");
+        } else {
+            assert!(!row.contains(&expected), "{id} hides reference {reference}");
+        }
     }
     for (key, value) in record["slots"].as_object().unwrap() {
         let expected = normalized(value.as_str().unwrap(), false);
@@ -335,19 +354,35 @@ fn assert_record(html: &str, record: &Value) {
 /// ADR-035: Generic families omit every reference block; Typed and
 /// HtmlMockup families keep it. Labels stay for every family.
 fn assert_reference_visibility(html: &str, family: &str, fixture: &Value) {
-    if family == "note" {
+    let hidden = family == "requirement" || family == "nfr";
+    if hidden {
         assert!(
             !html.contains("row-refs"),
-            "Generic family {family} renders no reference block in any row"
+            "{family} hides the reference block in every row"
         );
+        for record in fixture["records"].as_array().unwrap() {
+            let row = row_block(html, record["id"].as_str().unwrap());
+            for label in record["labels"].as_array().unwrap() {
+                assert!(
+                    row.contains(&format!(
+                        "<li class=\"tag\">{}</li>",
+                        escape(label.as_str().unwrap())
+                    )),
+                    "{family} labels still render"
+                );
+            }
+        }
+        return;
+    }
+    if family == "note" {
         let row = row_block(html, "NOTE-001");
         assert!(
             row.contains("<li class=\"tag\">note</li>"),
-            "Generic labels stay in the Title cell"
+            "user-defined labels stay in the Title cell"
         );
         assert!(
-            !row.contains("NOTE-REF-1"),
-            "Generic row hides its references"
+            row.contains("NOTE-REF-1"),
+            "a user-defined type defaults to visible references"
         );
         return;
     }
@@ -547,8 +582,9 @@ fn every_populated_fixture_replays_against_the_shared_layout() {
             .map(|value| value.as_str().unwrap().to_string())
             .collect();
         assert_eq!(row_ids(&html), expected_order, "{family} row order");
+        let references_visible = family != "requirement" && family != "nfr";
         for record in fixture["records"].as_array().unwrap() {
-            assert_record(&html, record);
+            assert_record(&html, record, references_visible);
         }
         assert_reference_visibility(&html, family, &fixture);
         if family == "requirement" || family == "nfr" {
@@ -588,7 +624,7 @@ fn every_empty_fixture_replays_the_shared_empty_state() {
             "{family} count note"
         );
         assert!(
-            html.contains(expected_empty_message(family)),
+            html.contains(&expected_empty_message(family)),
             "{family} empty message"
         );
         assert!(
