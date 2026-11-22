@@ -2,7 +2,7 @@
 id: TASK-259
 title: "Delete the nine typed document modules and transitional document command tables"
 created_date: '2026-11-20T17:42:17Z'
-updated_date: '2026-11-22T12:56:00Z'
+updated_date: '2026-11-22T14:20:00Z'
 labels: []
 references:
   - ADR-036
@@ -18,6 +18,7 @@ dependencies:
   - TASK-256
   - TASK-257
   - TASK-258
+  - TASK-308
 ordinal: 70
 documentation:
   - src/lib.rs
