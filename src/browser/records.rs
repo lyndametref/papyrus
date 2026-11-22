@@ -1091,15 +1091,20 @@ fn project_front_matter(
 
 /// The display title for one document, using the loader's precedence.
 ///
-/// Tasks and milestones give the front-matter `title` precedence; every other
-/// document type uses the markdown heading. Empty values fall back to the file
-/// stem, exactly as the full loader's title fallback does.
+/// Tasks and milestones give a non-empty front-matter `title` precedence; every
+/// other document type uses the markdown heading. An empty or whitespace-only
+/// front-matter title is absent, so the heading is used, and only a missing
+/// heading falls back to the file stem, exactly as the full loader does.
 fn projected_title(
     descriptor: &TypeDescriptor,
     stem: &str,
     heading_title: &str,
     front_matter_title: Option<&str>,
 ) -> String {
+    // An empty or whitespace-only front-matter title is absent, exactly as the
+    // pre-snapshot loader filtered it out, so the heading is the next fallback
+    // before the file stem.
+    let front_matter_title = front_matter_title.filter(|value| !value.trim().is_empty());
     let title = match descriptor.handler() {
         Some(TypedHandler::Task) | Some(TypedHandler::Milestone) => {
             front_matter_title.unwrap_or(heading_title)
@@ -2561,6 +2566,50 @@ mod tests {
             light_member.title, full_member.title,
             "a grouped member shows the same title on the group page and in the list"
         );
+    }
+
+    #[test]
+    fn empty_front_matter_title_falls_back_to_heading_then_stem() {
+        let (project, business) = write_grouped_project("empty-title");
+        // A task whose front-matter title is empty keeps its heading title.
+        fs::write(
+            project.root.join("backlog/tasks/TASK-010.md"),
+            "---\nid: TASK-010\ntitle: \"\"\ncreated_date: '2026-01-03T04:05:06Z'\nupdated_date: '2026-01-03T04:05:06Z'\nlabels: []\nreferences: []\nstatus: ToDo\nassignee: []\nmilestone: \"\"\ndependencies: []\nordinal: 9\ndocumentation: []\ntype: null\n---\n# TASK-010 Heading title\n\n## Description\nTask.\n",
+        )
+        .unwrap();
+        // A task whose front-matter title is empty and has no heading falls
+        // back to its file stem.
+        fs::write(
+            project.root.join("backlog/tasks/TASK-011.md"),
+            "---\nid: TASK-011\ntitle: \"\"\ncreated_date: '2026-01-03T04:05:06Z'\nupdated_date: '2026-01-03T04:05:06Z'\nlabels: []\nreferences: []\nstatus: ToDo\nassignee: []\nmilestone: \"\"\ndependencies: []\nordinal: 10\ndocumentation: []\ntype: null\n---\n\n## Description\nTask without a heading.\n",
+        )
+        .unwrap();
+        // A whitespace-only front-matter title is absent, so the heading wins.
+        fs::write(
+            project.root.join("backlog/milestones/MS-002.md"),
+            "---\nid: MS-002\ntitle: \"   \"\ncreated_date: '2026-01-02T03:04:05Z'\nupdated_date: '2026-01-02T03:04:05Z'\nlabels: []\nreferences: []\nstatus: open\nrelease: \"\"\n---\n# MS-002 Milestone heading\n\n## Description\nMilestone.\n",
+        )
+        .unwrap();
+        // A document record with an empty front-matter title uses its heading.
+        fs::write(
+            business.join("REQ-001.001.md"),
+            "---\nid: REQ-001.001\ntitle: \"\"\ncreated_date: '2026-01-04T00:00:00Z'\nupdated_date: '2026-01-04T00:00:00Z'\nlabels: []\nreferences: []\nstatus: active\ngroup: REQ-001\n---\n# REQ-001.001 Document heading\n\n## Description\nMember.\n",
+        )
+        .unwrap();
+
+        let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
+        let title = |id: &str| {
+            snapshot
+                .resolve(id)
+                .unwrap()
+                .unwrap_or_else(|| panic!("{id} resolves"))
+                .record
+                .title
+        };
+        assert_eq!(title("TASK-010"), "Heading title");
+        assert_eq!(title("TASK-011"), "TASK-011");
+        assert_eq!(title("MS-002"), "Milestone heading");
+        assert_eq!(title("REQ-001.001"), "Document heading");
     }
 
     #[test]
