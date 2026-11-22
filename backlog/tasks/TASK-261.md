@@ -2,7 +2,7 @@
 id: TASK-261
 title: "Verify MS-034 CLI engine: command equivalence and help attribution"
 created_date: '2026-11-20T17:42:17Z'
-updated_date: '2026-11-22T13:01:38Z'
+updated_date: '2026-11-22T16:03:32Z'
 labels: []
 references:
   - REQ-07.003
@@ -20,6 +20,7 @@ assignee:
 milestone: MS-034
 dependencies:
   - TASK-260
+  - TASK-310
 ordinal: 90
 documentation:
   - tests/golden/cli-help
@@ -78,3 +79,4 @@ Every criterion has a pass or a recorded finding with evidence; the suite and qu
 - **planner**: ADR-042 rulings and planner alignments applied to MS-034: AC-3 is narrowed to the read write split and statuses-only comma syntax; AC-4 is corrected to eight document ops builders with ops-builder and TypedHandler deletion deferred to MS-035; TASK-255 carries the audit field_defaults; TASK-256 keeps the CLI mockup edit --status; TASK-258 implements the narrowed read write contract; TASK-259 is narrowed; TASK-260 attributes generated verb about lines and keeps configuration map order. Verification may start once the execution tasks are Done.
 - **planner**: ADR-042 item 7 applied: AC #1-#3 are replaced by the internal-checkpoint rule and the packaging waiver wording used by MS-032 (AUD-138) and MS-033 (AUD-140); no RC version or RC package is required. MS-034 AC-8 and TASK-307 still state the old RC-gate premise; they were not changed by this planner pass and are reported as an open decision to the orchestrator.
 - **planner**: Planner: TASK-307 archived as premise invalid (build-deb.sh is the single build script per the TASK-235 architect ruling; MS-037 AC-6 corrected) and removed from this task's dependencies; MS-034 AC-8 corrected to the internal-checkpoint rule. Verification scope remains MS-034 AC-1 to AC-7.
+- **code-auditor**: AUD-142 re-audit: corrections required, AUD-141 not fully closed; F7 help-option panic and F15 edit sentinel remain open, TASK-310 needs two corrections.

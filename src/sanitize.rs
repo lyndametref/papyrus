@@ -161,6 +161,25 @@ pub fn resolve_text_field(
     Ok(text_value(field, value, stdin.as_ref()))
 }
 
+/// Normalize a document title.
+///
+/// A title is display text and never a path component, so path separators are
+/// legitimate. Empty, whitespace-only, line-breaking, NUL, and control-bearing
+/// values are rejected.
+pub fn sanitize_title_text(input: &str) -> Option<String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if trimmed.contains('\0') || trimmed.contains('\n') || trimmed.contains('\r') {
+        return None;
+    }
+    if has_control_character(trimmed) {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
+
 /// Normalize user-controlled input. Returns `None` if a valid value cannot be
 /// produced.
 pub fn sanitize_name(input: &str) -> Option<String> {
@@ -498,6 +517,44 @@ mod control_character_tests {
         for input in ["a\\b", "a/../b", "/abs/path", "../../etc/passwd"] {
             assert_eq!(sanitize_path_string(input), None, "{input:?}");
         }
+    }
+}
+
+#[cfg(test)]
+mod title_tests {
+    use super::sanitize_title_text;
+
+    #[test]
+    fn accepts_path_separators_and_display_punctuation() {
+        for value in [
+            "CI/CD",
+            "A backslash B",
+            "A \\ B",
+            "Résumé – v2",
+            "Release [notes] & more!",
+            "Why? Because: yes",
+            "- leading dash",
+        ] {
+            assert_eq!(
+                sanitize_title_text(value),
+                Some(value.to_string()),
+                "{value:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_empty_whitespace_multiline_nul_and_controls() {
+        for value in [
+            "", "   ", "a\nb", "a\rb", "a\u{0}b", "a\u{1}b", "a\u{7F}b", "a\u{9B}b",
+        ] {
+            assert_eq!(sanitize_title_text(value), None, "{value:?}");
+        }
+    }
+
+    #[test]
+    fn trims_outer_whitespace() {
+        assert_eq!(sanitize_title_text("  CI/CD  "), Some("CI/CD".to_string()));
     }
 }
 

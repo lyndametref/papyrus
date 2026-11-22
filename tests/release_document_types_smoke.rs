@@ -422,15 +422,11 @@ fn t117_02_cli_lifecycle_persistence_and_validation() {
             stderr(&out)
         );
     }
-    let out = run(&project, &["note", "create", "path/separator"]);
-    assert_eq!(out.status.code(), Some(4));
-    assert!(
-        stderr(&out).contains("cannot be normalized"),
-        "{}",
-        stderr(&out)
-    );
     let count_after = fs::read_dir(project.join("docs/notes")).unwrap().count();
     assert_eq!(count_before, count_after, "invalid titles write nothing");
+    // A title is display text: path separators are legal (F8).
+    let out = run(&project, &["note", "create", "path/separator"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
 
     if !running_as_root() {
         use std::os::unix::fs::PermissionsExt;

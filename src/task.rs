@@ -788,36 +788,17 @@ pub fn create(
     let body_doc = body_document(&td);
     let body = crate::record::document::render(&body_doc);
     let parsed = crate::record::document::parse(&body)?;
-    let labels_value = if labels.is_empty() {
-        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
-    } else {
-        crate::record::frontmatter::FrontMatterValue::String(labels.join("\n"))
-    };
-    let refs_value = if references.is_empty() {
-        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
-    } else {
-        crate::record::frontmatter::FrontMatterValue::String(references.join("\n"))
-    };
-    let assignee_value = if assignee_yaml.is_empty() {
-        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
-    } else {
-        crate::record::frontmatter::FrontMatterValue::String(assignee_yaml.join("\n"))
-    };
+    let labels_value = crate::record::frontmatter::FrontMatterValue::Sequence(labels.clone());
+    let refs_value = crate::record::frontmatter::FrontMatterValue::Sequence(references.clone());
+    let assignee_value =
+        crate::record::frontmatter::FrontMatterValue::Sequence(assignee_yaml.clone());
     let milestone_value = if let Some(m) = &milestone {
         crate::record::frontmatter::FrontMatterValue::String(m.clone())
     } else {
         crate::record::frontmatter::FrontMatterValue::Null
     };
-    let deps_value = if deps.is_empty() {
-        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
-    } else {
-        crate::record::frontmatter::FrontMatterValue::String(deps.join("\n"))
-    };
-    let doc_value = if documentation.is_empty() {
-        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
-    } else {
-        crate::record::frontmatter::FrontMatterValue::String(documentation.join("\n"))
-    };
+    let deps_value = crate::record::frontmatter::FrontMatterValue::Sequence(deps.clone());
+    let doc_value = crate::record::frontmatter::FrontMatterValue::Sequence(documentation.clone());
     let type_value = if let Some(t) = &type_val {
         crate::record::frontmatter::FrontMatterValue::String(t.clone())
     } else {
@@ -1119,14 +1100,6 @@ pub fn edit(
         unique_push(&mut td.labels, sanitize_text(l)?);
     }
 
-    if !assignee_raw.is_empty() {
-        let mut cleaned = Vec::new();
-        for a in assignee_raw {
-            cleaned.push(sanitize_text(a)?);
-        }
-        td.assignee = cleaned.first().cloned();
-    }
-
     // Build patch ops. Legacy metadata sections and the title heading are
     // retired on every write; user operations are applied afterwards so an
     // explicit set or clear always wins.
@@ -1214,9 +1187,9 @@ pub fn edit(
             unique_push(&mut new_deps, did);
         }
         td.deps = new_deps.clone();
-        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+        ops.push(crate::record::patch::PatchOp::SetFrontMatterValue(
             "dependencies".into(),
-            new_deps.join("\n"),
+            crate::record::frontmatter::FrontMatterValue::Sequence(new_deps),
         ));
     }
     if !ac_raw.is_empty() {
@@ -1257,9 +1230,9 @@ pub fn edit(
             }
         }
         td.labels = fm_labels.clone();
-        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+        ops.push(crate::record::patch::PatchOp::SetFrontMatterValue(
             "labels".into(),
-            fm_labels.join("\n"),
+            crate::record::frontmatter::FrontMatterValue::Sequence(fm_labels),
         ));
     }
     // references append
@@ -1272,9 +1245,9 @@ pub fn edit(
                 fm_refs.push(rv);
             }
         }
-        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+        ops.push(crate::record::patch::PatchOp::SetFrontMatterValue(
             "references".into(),
-            fm_refs.join("\n"),
+            crate::record::frontmatter::FrontMatterValue::Sequence(fm_refs),
         ));
     }
     // documentation append
@@ -1287,9 +1260,9 @@ pub fn edit(
                 fm_docs.push(dv);
             }
         }
-        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+        ops.push(crate::record::patch::PatchOp::SetFrontMatterValue(
             "documentation".into(),
-            fm_docs.join("\n"),
+            crate::record::frontmatter::FrontMatterValue::Sequence(fm_docs),
         ));
     }
     // type
@@ -1318,12 +1291,12 @@ pub fn edit(
     if !assignee_raw.is_empty() {
         let mut cleaned = Vec::new();
         for a in assignee_raw {
-            cleaned.push(sanitize_text(a)?);
+            unique_push(&mut cleaned, sanitize_text(a)?);
         }
         td.assignee = cleaned.first().cloned();
-        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+        ops.push(crate::record::patch::PatchOp::SetFrontMatterValue(
             "assignee".into(),
-            cleaned.join("\n"),
+            crate::record::frontmatter::FrontMatterValue::Sequence(cleaned),
         ));
     }
     if !comments_raw.is_empty() {

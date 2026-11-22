@@ -162,7 +162,7 @@ fn create_requires_args() {
     let out = run(&d, &["ui-mockup", "create", "--task", "T", "--spec", "S"]);
     assert_eq!(out.status.code(), Some(4));
     assert!(
-        String::from_utf8_lossy(&out.stderr).contains("title"),
+        String::from_utf8_lossy(&out.stderr).contains("title is required"),
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
@@ -331,9 +331,18 @@ fn editor_rewrites() {
 fn sanitization() {
     let d = tmpdir("san");
     init(&d);
-    for bad in ["   ", "a/b", "x\\y", "a\nb", "a\rb", "a\tb", "a\u{1}b"] {
+    // A title is display text: path separators are legal (F8).
+    for good in ["a/b", "x\\y"] {
+        let out = create(&d, good, "T", &["S"], &[]);
+        assert_eq!(out.status.code(), Some(0), "title good={:?}", good);
+    }
+    fs::remove_dir_all(mockups_dir(&d)).unwrap();
+    fs::create_dir_all(mockups_dir(&d)).unwrap();
+    for bad in ["   ", "a\nb", "a\rb", "a\tb", "a\u{1}b"] {
         let out = create(&d, bad, "T", &["S"], &[]);
         assert_eq!(out.status.code(), Some(4), "title bad={:?}", bad);
+    }
+    for bad in ["a/b", "x\\y", "a\nb", "a\rb", "a\tb", "a\u{1}b"] {
         let out = create(&d, "T", bad, &["S"], &[]);
         assert_eq!(out.status.code(), Some(4), "task bad={:?}", bad);
         let out = create(&d, "T", "T", &[bad], &[]);

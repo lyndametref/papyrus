@@ -260,6 +260,73 @@ pub fn current_value_string(raw: &str, key: &str) -> Option<String> {
     None
 }
 
+fn double_quote(t: &str) -> String {
+    let mut out = String::from("\"");
+    for ch in t.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '\"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c.is_control() => {
+                let code = c as u32;
+                if code <= 0xFFFF {
+                    out.push_str(&format!("\\u{:04X}", code));
+                } else {
+                    out.push_str(&format!("\\U{:08X}", code));
+                }
+            }
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// Whether a plain (unquoted) rendering parses back to exactly `t` as a
+/// scalar string. This is the final guard against indicator prefixes, flow
+/// collection punctuation, and resolver keywords that would otherwise change
+/// the scalar's type or value.
+fn plain_round_trips(t: &str) -> bool {
+    let Ok(yaml_serde::Value::Mapping(mapping)) =
+        yaml_serde::from_str::<yaml_serde::Value>(&format!("__key__: {t}\n"))
+    else {
+        return false;
+    };
+    matches!(
+        mapping.get(yaml_serde::Value::String("__key__".to_string())),
+        Some(yaml_serde::Value::String(value)) if value == t
+    )
+}
+
+fn starts_with_yaml_indicator(t: &str) -> bool {
+    matches!(
+        t.chars().next(),
+        Some(
+            '-' | '?'
+                | ':'
+                | ','
+                | '['
+                | ']'
+                | '{'
+                | '}'
+                | '#'
+                | '&'
+                | '*'
+                | '!'
+                | '|'
+                | '>'
+                | '\''
+                | '"'
+                | '%'
+                | '@'
+                | '`'
+                | '~'
+        )
+    )
+}
+
 fn format_scalar(v: &str) -> String {
     let t = v.trim();
     if t.is_empty() {
@@ -269,23 +336,42 @@ fn format_scalar(v: &str) -> String {
     if t.starts_with('@') {
         return format!("'{}'", t.replace('\'', "''"));
     }
-    // timestamp quoting
+    // timestamp quoting keeps the historical single-quoted form
     if is_timestamp(t) {
         return format!("'{}'", t);
     }
-    // bool/null/number keywords
+    // bool/null/number keywords would change type if left plain
     let lower = t.to_lowercase();
     if lower == "true" || lower == "false" || lower == "null" || lower == "~" {
-        return format!("\"{}\"", t);
+        return double_quote(t);
     }
     if t.parse::<f64>().is_ok() {
-        return format!("\"{}\"", t);
+        return double_quote(t);
     }
-    if t.contains(':') || t.contains('#') || t.contains(' ') || t.contains('\'') || t.contains('"')
-    {
-        // quote with double quotes, escape backslashes
-        let escaped = t.replace('\\', "\\\\").replace('"', "\\\"");
-        return format!("\"{}\"", escaped);
+    // Document markers are only valid as quoted scalars.
+    if t == "---" || t == "..." {
+        return double_quote(t);
+    }
+    // Quote every indicator-leading or flow-collection-bearing value, every
+    // value containing a line break or control character, and anything whose
+    // plain rendering would not parse back to the same string.
+    let structurally_unsafe = starts_with_yaml_indicator(t)
+        || t.chars().any(|c| c.is_control())
+        || t.contains('\n')
+        || t.contains('\r')
+        || t.contains(':')
+        || t.contains('#')
+        || t.contains(' ')
+        || t.contains('\'')
+        || t.contains('"')
+        || t.contains('[')
+        || t.contains(']')
+        || t.contains('{')
+        || t.contains('}')
+        || t.contains(',')
+        || !plain_round_trips(t);
+    if structurally_unsafe {
+        return double_quote(t);
     }
     t.to_string()
 }
@@ -311,10 +397,6 @@ fn is_list_key(key: &str) -> bool {
 fn format_kv(key: &str, value: &str) -> String {
     let v = value.trim_end_matches('\n');
     if is_list_key(key) {
-        // Empty list marker passed through as-is.
-        if v.trim() == "[]" {
-            return format!("{}: []", key);
-        }
         let items: Vec<&str> = v
             .lines()
             .map(|l| l.trim())
@@ -328,16 +410,9 @@ fn format_kv(key: &str, value: &str) -> String {
             s.push_str(&format!("\n  - {}", format_scalar(item)));
         }
         s
-    } else if v.contains('\n') {
-        let mut s = format!("{}:", key);
-        for line in v.lines() {
-            let item = line.trim();
-            if !item.is_empty() {
-                s.push_str(&format!("\n  - {}", item));
-            }
-        }
-        s
     } else {
+        // A scalar key is never coerced into a sequence: embedded line breaks
+        // are escaped inside one quoted scalar.
         format!("{}: {}", key, format_scalar(v))
     }
 }
@@ -349,6 +424,49 @@ pub fn format_kv_value(key: &str, value: &FrontMatterValue) -> String {
         FrontMatterValue::Integer(n) => format!("{}: {}", key, n),
         FrontMatterValue::Sequence(items) => format_sequence(key, items),
         FrontMatterValue::String(s) => format_kv(key, s),
+    }
+}
+
+/// Re-parse one rendered key and confirm it has exactly the intended type and
+/// value. A non-round-tripping render is a validation error, so an unsafe
+/// scalar is never written.
+pub fn verify_value(raw: &str, key: &str, value: &FrontMatterValue) -> Result<(), AppError> {
+    let parsed: yaml_serde::Value = yaml_serde::from_str(raw).map_err(|error| {
+        AppError::Validation(format!(
+            "rendered front matter for '{}' is not valid YAML: {}",
+            key, error
+        ))
+    })?;
+    let yaml_serde::Value::Mapping(mapping) = parsed else {
+        return Err(AppError::Validation(format!(
+            "rendered front matter for '{}' is not a mapping",
+            key
+        )));
+    };
+    let actual = mapping.get(yaml_serde::Value::String(key.to_string()));
+    let round_trips = match (value, actual) {
+        (FrontMatterValue::Null, Some(yaml_serde::Value::Null)) => true,
+        (FrontMatterValue::Integer(expected), Some(yaml_serde::Value::Number(number))) => {
+            number.as_i64() == Some(*expected)
+        }
+        (FrontMatterValue::Sequence(expected), Some(yaml_serde::Value::Sequence(actual))) => {
+            actual.len() == expected.len()
+                && expected.iter().zip(actual).all(|(expected, actual)| {
+                    matches!(actual, yaml_serde::Value::String(actual) if actual == expected)
+                })
+        }
+        (FrontMatterValue::String(expected), Some(yaml_serde::Value::String(actual))) => {
+            actual == expected
+        }
+        _ => false,
+    };
+    if round_trips {
+        Ok(())
+    } else {
+        Err(AppError::Validation(format!(
+            "rendered front matter value for '{}' does not round-trip",
+            key
+        )))
     }
 }
 
@@ -689,6 +807,98 @@ mod tests {
         ] {
             assert_eq!(timestamp_seconds(value), None, "{:?}", value);
         }
+    }
+
+    fn parse_scalar(rendered: &str, key: &str) -> yaml_serde::Value {
+        let parsed: yaml_serde::Value = yaml_serde::from_str(rendered).unwrap();
+        let yaml_serde::Value::Mapping(mapping) = parsed else {
+            panic!("not a mapping: {rendered}");
+        };
+        mapping
+            .get(yaml_serde::Value::String(key.to_string()))
+            .cloned()
+            .unwrap_or(yaml_serde::Value::Null)
+    }
+
+    #[test]
+    fn yaml_indicator_scalars_round_trip_as_strings() {
+        for value in [
+            "*bold",
+            "[a]",
+            "&x",
+            "!x",
+            "|x",
+            "?x",
+            "-x",
+            "{}",
+            "---",
+            "...",
+            "a[b]c",
+            "a,b",
+            "true",
+            "false",
+            "null",
+            "123",
+            "1.5",
+            "@handle",
+            "2026-01-01T00:00:00Z",
+        ] {
+            let rendered = format_kv_value("title", &FrontMatterValue::String(value.to_string()));
+            assert_eq!(
+                parse_scalar(&rendered, "title"),
+                yaml_serde::Value::String(value.to_string()),
+                "rendered {rendered:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn scalar_never_coerces_to_a_sequence() {
+        let rendered = format_kv_value(
+            "note",
+            &FrontMatterValue::String("first line\nsecond line".to_string()),
+        );
+        assert!(!rendered.contains("\n  - "), "{rendered}");
+        assert_eq!(
+            parse_scalar(&rendered, "note"),
+            yaml_serde::Value::String("first line\nsecond line".to_string())
+        );
+        let legacy = format_kv("note", "first line\nsecond line");
+        assert!(!legacy.contains("\n  - "), "{legacy}");
+        assert_eq!(
+            parse_scalar(&legacy, "note"),
+            yaml_serde::Value::String("first line\nsecond line".to_string())
+        );
+    }
+
+    #[test]
+    fn sequences_keep_bracketed_and_empty_items() {
+        let rendered = format_kv_value(
+            "labels",
+            &FrontMatterValue::Sequence(vec!["[]".to_string(), "core".to_string()]),
+        );
+        assert_eq!(
+            parse_scalar(&rendered, "labels"),
+            yaml_serde::Value::Sequence(vec![
+                yaml_serde::Value::String("[]".to_string()),
+                yaml_serde::Value::String("core".to_string()),
+            ])
+        );
+        assert_eq!(
+            format_kv_value("labels", &FrontMatterValue::Sequence(Vec::new())),
+            "labels: []"
+        );
+    }
+
+    #[test]
+    fn verify_value_rejects_a_non_round_tripping_render() {
+        let error = verify_value(
+            "title: [broken]",
+            "title",
+            &FrontMatterValue::String("[broken]".to_string()),
+        )
+        .expect_err("a sequence render for a string must fail");
+        assert!(matches!(error, crate::error::AppError::Validation(_)));
     }
 
     #[test]
