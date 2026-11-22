@@ -887,6 +887,39 @@ mod tests {
         assert_eq!(list_slots("note"), &[]);
     }
 
+    /// Temporary cross-check until MS-035 switches the browser to descriptor
+    /// slots: every seed entry's declared slots must equal this static table.
+    /// It fails on any drift in either direction.
+    #[test]
+    fn seed_slots_match_static_presentation_until_ms_035() {
+        for slug in [
+            "req",
+            "nfr",
+            "glossary",
+            "rule",
+            "ui-spec",
+            "ui-mockup",
+            "audit",
+            "tech-spec",
+            "use-case",
+            "test-case",
+            "test-report",
+        ] {
+            let seed = crate::config::seed_document_type(slug)
+                .unwrap_or_else(|| panic!("{slug} is a seed type"));
+            let declared: Vec<(&str, &str)> = seed
+                .slots
+                .iter()
+                .map(|slot| (slot.key, slot.label))
+                .collect();
+            assert_eq!(
+                list_slots(slug),
+                declared.as_slice(),
+                "{slug}: seed slots drifted from routes::PRESENTATION"
+            );
+        }
+    }
+
     #[test]
     fn sidebar_groups_are_ordered() {
         let cfg = Config::default();

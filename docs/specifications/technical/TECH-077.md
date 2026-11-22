@@ -2,11 +2,12 @@
 id: TECH-077
 title: "Document-Type Configuration Validation Contract"
 created_date: '2026-11-16T17:46:56Z'
-updated_date: '2026-11-21T07:44:31Z'
+updated_date: '2026-11-22T12:12:48Z'
 labels: []
 references:
   - ADR-0019
   - ADR-036
+  - ADR-041
   - NFR-04.002
   - NFR-02.002
   - REQ-07.002
@@ -126,13 +127,15 @@ pub fn load_effective_config_tolerant(config_path: &Path, project_dir: &Path) ->
 ```
 
 - load_effective_value: parse + wholesale merge defaults; no validation.
-  document_types is replaced wholesale when present in the overlay.
+  `load_effective_value` parses the overlay and resolves `document_types`
+  against the seed table, so a file that declares only one entry still yields
+  all eleven seed slugs; the overlay is not a raw replacement.
 - load_effective_config (strict): load_effective_value + browser YAML
   validation + deserialize + Config::validate(Some(project_dir)).
 - load_effective_config_tolerant: same parse/deserialize/browser validation,
   but skips Config::validate (used by repair commands and folder relocation).
-- merge_yaml: recursive for all keys except document_types, which is
-  replaced when the overlay contains it.
+- merge_yaml: recursive for all keys except document_types, whose overlay map
+  is resolved against the seed table, not deep-merged or raw-replaced.
 - Resolution is per entry against the seed entry of the same slug:
   - Scalars fill from the seed when absent: `enabled`, `label`, `plural`,
     `order`, `summary`, `type_alias`, `default_status`, `reference_visibility`,
@@ -144,8 +147,15 @@ pub fn load_effective_config_tolerant(config_path: &Path, project_dir: &Path) ->
   - The `group` and `member` blocks resolve independently: a present block
     replaces only that role's collection, and an absent block inherits it.
   - `prefix` and `directory` are never filled from the seed.
-  - An absent slug stays absent. A present `document_types` replaces the seed
-    set wholesale, and no seed entry is re-added.
+  - The eleven seed slugs are always part of the effective configuration and
+    resolve from the seed table whether or not the file declares them. A
+    present `document_types` map is an overlay, not a replacement: declaring
+    one entry does not remove the other seed types.
+  - An absent non-seed (user-defined) slug stays absent. The written file
+    never gains entries the command did not target.
+  - A declared entry still fills scalars from the seed and replaces present
+    collections wholesale, per the bullets above.
+  - Seed slot sets are likewise always effective.
 - A user-defined slug has no seed entry. Its defaults are `SingleMarkdown`,
   `enabled: true`, a label derived from the slug, an order after the seed
   types, empty summary and aliases, visible reference visibility,
@@ -159,7 +169,8 @@ pub fn load_effective_config_tolerant(config_path: &Path, project_dir: &Path) ->
 - config set materializes before editing:
   1. Load raw file_val.
   2. If key starts with document_types. and file_val has no
-     document_types, insert the default document_types map.
+     document_types, materialize only the target seed entry with its seed
+     prefix and directory.
   3. yaml_set(file_val, key, parsed).
   4. Build candidate: default Config YAML + merge_yaml (wholesale) +
      browser YAML validation + deserialize + Config::validate(Some(project_dir)).

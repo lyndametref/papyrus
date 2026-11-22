@@ -984,7 +984,7 @@ fn user_defined_entry(_slug: &str) -> DocTypeEntry {
         summary: None,
         type_alias: None,
         reference_visibility: Some(Visibility::Visible),
-        slots: None,
+        slots: Some(Vec::new()),
         api_aliases: Some(Vec::new()),
         fields: Some(vec![FieldSpec {
             key: "description".to_string(),
@@ -999,6 +999,22 @@ fn user_defined_entry(_slug: &str) -> DocTypeEntry {
         }]),
         group: None,
         member: None,
+    }
+}
+
+/// Merge one role block so a partial declaration keeps the seed facts
+/// (ADR-036 decision 32). A declared collection replaces wholesale; a declared
+/// scalar overrides; an absent value fills from the seed.
+fn merge_role(default: Option<RoleFields>, declared: Option<RoleFields>) -> Option<RoleFields> {
+    match (default, declared) {
+        (Some(default), Some(declared)) => Some(RoleFields {
+            fields: declared.fields.or(default.fields),
+            reference_visibility: declared
+                .reference_visibility
+                .or(default.reference_visibility),
+        }),
+        (default, None) => default,
+        (None, declared) => declared,
     }
 }
 
@@ -1022,8 +1038,8 @@ fn merge_entry(default: DocTypeEntry, declared: DocTypeEntry) -> DocTypeEntry {
         slots: declared.slots.or(default.slots),
         api_aliases: declared.api_aliases.or(default.api_aliases),
         fields: declared.fields.or(default.fields),
-        group: declared.group.or(default.group),
-        member: declared.member.or(default.member),
+        group: merge_role(default.group, declared.group),
+        member: merge_role(default.member, declared.member),
     }
 }
 
@@ -1150,6 +1166,33 @@ fn validate_enum_key(
     }
 }
 
+fn is_valid_field_key(key: &str) -> bool {
+    !key.is_empty()
+        && key
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+        && !key.chars().all(|c| c.is_ascii_digit())
+}
+
+/// The effective long option of a declared field: the declared `option`, or
+/// the kebab-case derivation of `key` when absent (ADR-036 decision 15).
+pub fn field_option(key: &str, option: Option<&str>) -> String {
+    option
+        .map(str::to_string)
+        .unwrap_or_else(|| crate::sanitize::kebab_slug(key))
+}
+
+fn declared_field_option(field: &yaml_serde::Mapping) -> Option<String> {
+    let key = mapping_get(field, "key").and_then(value_as_str)?;
+    if key.is_empty() {
+        return None;
+    }
+    Some(field_option(
+        key,
+        mapping_get(field, "option").and_then(value_as_str),
+    ))
+}
+
 fn validate_field_sequence(
     slug: &str,
     path: &str,
@@ -1164,6 +1207,16 @@ fn validate_field_sequence(
         return;
     };
     let labels = field_selector_labels(sequence);
+    let mut key_counts: BTreeMap<&str, usize> = BTreeMap::new();
+    for item in sequence {
+        if let yaml_serde::Value::Mapping(field) = item
+            && let Some(key) = mapping_get(field, "key").and_then(value_as_str)
+            && !key.is_empty()
+        {
+            *key_counts.entry(key).or_default() += 1;
+        }
+    }
+    let mut seen_options: Vec<String> = Vec::new();
     for (index, item) in sequence.iter().enumerate() {
         let selector = format!("document_types.{}.{}[{}]", slug, path, labels[index]);
         let yaml_serde::Value::Mapping(field) = item else {
@@ -1184,10 +1237,70 @@ fn validate_field_sequence(
             };
             errors.push(format!("{}.{}: {}", selector, name, message));
         }
-        match mapping_get(field, "key").and_then(value_as_str) {
-            Some(key) if !key.is_empty() => {}
-            _ => errors.push(format!("{}.key: must be a non-empty string", selector)),
+
+        let key = mapping_get(field, "key").and_then(value_as_str);
+        match key {
+            Some("") => {
+                errors.push(format!("{}.key: must not be empty", selector));
+            }
+            Some(key) if !is_valid_field_key(key) => {
+                errors.push(format!(
+                    "{}.key: must match [a-z0-9_-]+ and must not be all digits",
+                    selector
+                ));
+            }
+            Some(_) => {}
+            None => errors.push(format!("{}.key: must be a non-empty string", selector)),
         }
+        if let Some(key) = key
+            && RESERVED_FIELD_KEYS.contains(&key)
+        {
+            errors.push(format!("{}.key: reserved field key: {}", selector, key));
+        }
+        if let Some(frontmatter_key) = mapping_get(field, "frontmatter_key").and_then(value_as_str)
+            && RESERVED_FIELD_KEYS.contains(&frontmatter_key)
+        {
+            errors.push(format!(
+                "{}.frontmatter_key: reserved field key: {}",
+                selector, frontmatter_key
+            ));
+        }
+
+        if let Some(heading) = mapping_get(field, "heading") {
+            let valid = value_as_str(heading).is_some_and(|text| text.starts_with("## "));
+            if !valid {
+                errors.push(format!("{}.heading: must begin with \"## \"", selector));
+            }
+        }
+        if let Some(option) = mapping_get(field, "option") {
+            let valid = value_as_str(option).is_some_and(|text| {
+                !text.is_empty()
+                    && !text.starts_with("--")
+                    && !text.chars().any(char::is_whitespace)
+            });
+            if !valid {
+                errors.push(format!(
+                    "{}.option: must be a non-empty long option name without a leading \"--\" or whitespace",
+                    selector
+                ));
+            }
+        }
+        if matches!(
+            mapping_get(field, "required"),
+            Some(yaml_serde::Value::Bool(true))
+        ) {
+            let offers_create = match mapping_get(field, "verbs") {
+                None => true,
+                Some(yaml_serde::Value::Sequence(verbs)) => verbs
+                    .iter()
+                    .any(|verb| value_as_str(verb) == Some("create")),
+                Some(_) => false,
+            };
+            if !offers_create {
+                errors.push(format!("{}.required: must be offered on create", selector));
+            }
+        }
+
         validate_enum_key(
             field,
             "kind",
@@ -1221,6 +1334,124 @@ fn validate_field_sequence(
         {
             errors.push(format!("{}.required: must be a boolean", selector));
         }
+
+        if mapping_get(field, "heading").is_none()
+            && mapping_get(field, "frontmatter_key").is_none()
+        {
+            errors.push(format!(
+                "{}: must declare heading or frontmatter_key",
+                selector
+            ));
+        }
+        if let Some(key) = key
+            && key_counts.get(key).copied().unwrap_or(0) > 1
+        {
+            errors.push(format!(
+                "document_types.{}.{}[{}].key: duplicate field key: {}",
+                slug, path, index, key
+            ));
+        }
+        if let Some(option) = declared_field_option(field)
+            && !option.is_empty()
+        {
+            if seen_options.contains(&option) {
+                errors.push(format!(
+                    "{}.option: duplicate option within a role: {}",
+                    selector, option
+                ));
+            } else {
+                seen_options.push(option);
+            }
+        }
+    }
+}
+
+fn validate_slot_value(
+    slug: &str,
+    value: &yaml_serde::Value,
+    grouped: bool,
+    errors: &mut Vec<String>,
+) {
+    let base = format!("document_types.{}.slots", slug);
+    let yaml_serde::Value::Sequence(sequence) = value else {
+        errors.push(format!("{}: must be a sequence of mappings", base));
+        return;
+    };
+    let mut seen_keys: Vec<&str> = Vec::new();
+    for (index, item) in sequence.iter().enumerate() {
+        let selector = format!("{}[{}]", base, index);
+        let yaml_serde::Value::Mapping(slot) = item else {
+            errors.push(format!(
+                "{}: slot must be a mapping with key and label",
+                selector
+            ));
+            continue;
+        };
+        let mut unknown: Vec<String> = slot
+            .keys()
+            .map(key_name)
+            .filter(|name| name != "key" && name != "label")
+            .collect();
+        unknown.sort();
+        for name in unknown {
+            errors.push(format!("{}.{}: unknown key", selector, name));
+        }
+        let key = mapping_get(slot, "key").and_then(value_as_str);
+        match key {
+            Some(key) if !key.is_empty() => {
+                if matches!(
+                    key,
+                    "id" | "title" | "status" | "created" | "updated" | "actions"
+                ) {
+                    errors.push(format!(
+                        "{}.key: structural column key {} cannot be declared as a slot",
+                        selector, key
+                    ));
+                } else if RESERVED_FIELD_KEYS.contains(&key) && !(key == "group" && grouped) {
+                    errors.push(format!("{}.key: reserved field key: {}", selector, key));
+                }
+                if seen_keys.contains(&key) {
+                    errors.push(format!("{}.key: duplicate slot key: {}", selector, key));
+                } else {
+                    seen_keys.push(key);
+                }
+            }
+            _ => errors.push(format!("{}.key: must be a non-empty string", selector)),
+        }
+        let label = mapping_get(slot, "label").and_then(value_as_str);
+        if !label.is_some_and(|label| !label.trim().is_empty()) {
+            errors.push(format!("{}.label: must be a non-empty string", selector));
+        }
+    }
+}
+
+fn validate_entry_scalar_types(
+    slug: &str,
+    mapping: &yaml_serde::Mapping,
+    grouped: bool,
+    errors: &mut Vec<String>,
+) {
+    let base = format!("document_types.{}", slug);
+    if let Some(order) = mapping_get(mapping, "order") {
+        let valid = matches!(order, yaml_serde::Value::Number(number) if number.as_u64().is_some());
+        if !valid {
+            errors.push(format!("{}.order: must be a non-negative integer", base));
+        }
+    }
+    if let Some(enabled) = mapping_get(mapping, "enabled")
+        && !matches!(enabled, yaml_serde::Value::Bool(_))
+    {
+        errors.push(format!("{}.enabled: must be a boolean", base));
+    }
+    if let Some(statuses) = mapping_get(mapping, "statuses") {
+        let valid = matches!(statuses, yaml_serde::Value::Sequence(values)
+            if values.iter().all(|value| matches!(value, yaml_serde::Value::String(_))));
+        if !valid {
+            errors.push(format!("{}.statuses: must be a sequence of strings", base));
+        }
+    }
+    if let Some(slots) = mapping_get(mapping, "slots") {
+        validate_slot_value(slug, slots, grouped, errors);
     }
 }
 
@@ -1307,6 +1538,7 @@ pub fn validate_document_types_declarations(root: &yaml_serde::Value) -> Vec<Str
         );
 
         let grouped = document_model(&slug) == crate::registry::DocumentModel::GroupedMarkdown;
+        validate_entry_scalar_types(&slug, mapping, grouped, &mut errors);
         if grouped {
             for role in ["group", "member"] {
                 if let Some(value) = mapping_get(mapping, role) {
@@ -1381,23 +1613,31 @@ fn fill_entry_from_seed(
 
 /// Resolve a declared `document_types` mapping against the seed.
 ///
-/// The entry set stays wholesale: only declared slugs survive. Each surviving
-/// entry is filled from the seed entry of the same slug, and a user-defined
-/// slug is left exactly as declared (its defaults belong to the seed table).
+/// Every seed slug stays effective even when the file declares only some of
+/// them (REQ-01.002, TC-114): a declared seed entry is filled from its seed,
+/// while an undeclared seed entry is supplied by the seed table unchanged.
+/// A user-defined slug is effective only when the file declares it, and its
+/// decision-33 defaults are projected here so `config list` and `config get`
+/// can expose them without writing them to the file (ADR-036 decision 33).
 pub fn resolve_document_types(declared: &yaml_serde::Value) -> yaml_serde::Value {
     let yaml_serde::Value::Mapping(entries) = declared else {
         return declared.clone();
     };
     let mut resolved = yaml_serde::Mapping::new();
+    // Seeds are implicit: an undeclared seed slug is still effective.
+    for seed in &SEED_DOCUMENT_TYPES {
+        if let Ok(seed_value) = yaml_serde::to_value(seed_entry(seed)) {
+            resolved.insert(yaml_serde::Value::String(seed.slug.to_string()), seed_value);
+        }
+    }
     for (key, declared_entry) in entries {
         let slug = key_name(key);
-        let value = match seed_document_type(&slug) {
-            Some(seed) => match yaml_serde::to_value(seed_entry(seed)) {
-                Ok(seed_value) => fill_entry_from_seed(&seed_value, declared_entry),
-                Err(_) => declared_entry.clone(),
-            },
-            // A user-defined entry keeps exactly what the file declares; its
-            // defaults are applied when the registry resolves the entry.
+        let default = match seed_document_type(&slug) {
+            Some(seed) => yaml_serde::to_value(seed_entry(seed)).ok(),
+            None => yaml_serde::to_value(user_defined_entry(&slug)).ok(),
+        };
+        let value = match default {
+            Some(default) => fill_entry_from_seed(&default, declared_entry),
             None => declared_entry.clone(),
         };
         resolved.insert(key.clone(), value);
@@ -1787,6 +2027,9 @@ impl Config {
             // statuses
             validate_doc_entry_statuses(slug, entry, &mut errors);
 
+            // Declared browser list columns (ADR-041 decision 8).
+            validate_doc_entry_slots(slug, entry, &mut errors);
+
             // Role blocks and field sequences (ADR-036 decisions 21 to 27).
             validate_doc_entry_fields(slug, entry, &mut errors);
         }
@@ -2026,7 +2269,8 @@ fn dir_string_valid(s: &str) -> bool {
 }
 
 fn validate_doc_entry_statuses(slug: &str, entry: &DocTypeEntry, errors: &mut Vec<String>) {
-    let ui_mockup = slug == "ui-mockup";
+    // HTML-metadata statuses are a model fact, not a slug literal (L-1).
+    let ui_mockup = document_model(slug) == crate::registry::DocumentModel::SingleHtmlMockup;
     if let Some(statuses) = &entry.statuses {
         if ui_mockup {
             errors.push(format!(
@@ -2136,6 +2380,7 @@ fn validate_field_specs(slug: &str, path: &str, fields: &[FieldSpec], errors: &m
             *counts.entry(field.key.as_str()).or_default() += 1;
         }
     }
+    let mut seen_options: Vec<String> = Vec::new();
     for (index, field) in fields.iter().enumerate() {
         let selector = format!("document_types.{}.{}[{}]", slug, path, labels[index]);
         if RESERVED_FIELD_KEYS.contains(&field.key.as_str()) {
@@ -2154,6 +2399,30 @@ fn validate_field_specs(slug: &str, path: &str, fields: &[FieldSpec], errors: &m
         }
         if field.key.is_empty() {
             errors.push(format!("{}.key: must not be empty", selector));
+        } else if !is_valid_field_key(&field.key) {
+            errors.push(format!(
+                "{}.key: must match [a-z0-9_-]+ and must not be all digits",
+                selector
+            ));
+        }
+        if let Some(heading) = field.heading.as_deref()
+            && !heading.starts_with("## ")
+        {
+            errors.push(format!("{}.heading: must begin with \"## \"", selector));
+        }
+        if let Some(option) = field.option.as_deref() {
+            let valid = !option.is_empty()
+                && !option.starts_with("--")
+                && !option.chars().any(char::is_whitespace);
+            if !valid {
+                errors.push(format!(
+                    "{}.option: must be a non-empty long option name without a leading \"--\" or whitespace",
+                    selector
+                ));
+            }
+        }
+        if field.required && !field.verbs.contains(&FieldVerb::Create) {
+            errors.push(format!("{}.required: must be offered on create", selector));
         }
         if !field.stores_value() {
             errors.push(format!(
@@ -2166,6 +2435,60 @@ fn validate_field_specs(slug: &str, path: &str, fields: &[FieldSpec], errors: &m
                 "document_types.{}.{}[{}].key: duplicate field key: {}",
                 slug, path, index, field.key
             ));
+        }
+        let option = field_option(&field.key, field.option.as_deref());
+        if !option.is_empty() {
+            if seen_options.contains(&option) {
+                errors.push(format!(
+                    "{}.option: duplicate option within a role: {}",
+                    selector, option
+                ));
+            } else {
+                seen_options.push(option);
+            }
+        }
+    }
+}
+
+fn validate_doc_entry_slots(slug: &str, entry: &DocTypeEntry, errors: &mut Vec<String>) {
+    let Some(slots) = &entry.slots else {
+        return;
+    };
+    let grouped = document_model(slug) == crate::registry::DocumentModel::GroupedMarkdown;
+    let base = format!("document_types.{}.slots", slug);
+    let mut seen_keys: Vec<&str> = Vec::new();
+    for (index, slot) in slots.iter().enumerate() {
+        let selector = format!("{}[{}]", base, index);
+        if slot.key.is_empty() {
+            errors.push(format!("{}.key: must be a non-empty string", selector));
+        } else {
+            if matches!(
+                slot.key.as_str(),
+                "id" | "title" | "status" | "created" | "updated" | "actions"
+            ) {
+                errors.push(format!(
+                    "{}.key: structural column key {} cannot be declared as a slot",
+                    selector, slot.key
+                ));
+            } else if RESERVED_FIELD_KEYS.contains(&slot.key.as_str())
+                && !(slot.key == "group" && grouped)
+            {
+                errors.push(format!(
+                    "{}.key: reserved field key: {}",
+                    selector, slot.key
+                ));
+            }
+            if seen_keys.contains(&slot.key.as_str()) {
+                errors.push(format!(
+                    "{}.key: duplicate slot key: {}",
+                    selector, slot.key
+                ));
+            } else {
+                seen_keys.push(slot.key.as_str());
+            }
+        }
+        if slot.label.trim().is_empty() {
+            errors.push(format!("{}.label: must be a non-empty string", selector));
         }
     }
 }
@@ -2307,9 +2630,10 @@ pub fn merge_yaml(base: &mut yaml_serde::Value, overlay: &yaml_serde::Value) {
                     _ => false,
                 };
                 if is_document_types {
-                    // Replace wholesale when present, then fill each declared
-                    // entry from the seed entry of the same slug (ADR-036
-                    // decision 32).
+                    // Resolve the present map against the seed: declared entries
+                    // fill from their seed, undeclared seed slugs stay effective,
+                    // and a declared user-defined slug gets its decision-33
+                    // defaults (ADR-036 decisions 32 and 33).
                     b.insert(k.clone(), resolve_document_types(v));
                 } else if let Some(existing) = b.get_mut(k) {
                     merge_yaml(existing, v);
@@ -3282,7 +3606,7 @@ mod tests {
     }
 
     #[test]
-    fn document_types_overlay_replaces_defaults_wholesale() {
+    fn document_types_overlay_keeps_seed_slugs_and_declared_user_slugs() {
         let project = TempProject::new("wholesale");
         project.write_config("document_types:\n  note:\n    prefix: NOTE\n    directory: notes/\n");
 
@@ -3298,8 +3622,13 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(keys, vec!["note".to_string()]);
-        assert!(yaml_get(&value, "document_types.deploy").is_none());
+        assert_eq!(keys.len(), 12, "eleven seeds plus the declared note");
+        assert!(keys.contains(&"req".to_string()), "{keys:?}");
+        assert!(keys.contains(&"note".to_string()), "{keys:?}");
+        assert!(
+            yaml_get(&value, "document_types.deploy").is_none(),
+            "an undeclared user-defined slug stays absent"
+        );
     }
 
     #[test]
@@ -4433,6 +4762,7 @@ mod tests {
             Some(vec!["active".to_string(), "archived".to_string()])
         );
         assert_eq!(entry.default_status, None);
+        assert_eq!(entry.slots, Some(Vec::new()), "default slots are empty");
         let fields = entry.fields.expect("default field");
         assert_eq!(fields.len(), 1);
         assert_eq!(fields[0].key, "description");
@@ -4771,9 +5101,9 @@ mod tests {
     }
 
     #[test]
-    fn absent_document_type_slugs_stay_absent() {
+    fn undeclared_seed_slugs_stay_effective_and_undeclared_user_slugs_stay_absent() {
         let declared: yaml_serde::Value = yaml_serde::from_str(
-            "document_types:\n  nfr:\n    prefix: NFR\n    directory: requirements/non-functional/\n",
+            "document_types:\n  note:\n    prefix: NOTE\n    directory: notes/\n",
         )
         .unwrap();
         let resolved = resolve_root(&declared);
@@ -4782,11 +5112,15 @@ mod tests {
         else {
             panic!("document_types must stay a mapping")
         };
-        assert_eq!(entries.len(), 1);
-        assert!(resolve_selector(&resolved, "document_types.nfr.prefix").is_ok());
+        assert_eq!(entries.len(), 12, "eleven seeds plus the declared note");
         assert!(
-            resolve_selector(&resolved, "document_types.req").is_err(),
-            "an undeclared slug must not be materialised"
+            resolve_selector(&resolved, "document_types.req.prefix").is_ok(),
+            "an undeclared seed slug stays effective (REQ-01.002, TC-114)"
+        );
+        assert!(resolve_selector(&resolved, "document_types.note.prefix").is_ok());
+        assert!(
+            resolve_selector(&resolved, "document_types.deploy").is_err(),
+            "an undeclared user-defined slug must not be materialised"
         );
     }
 
@@ -4979,6 +5313,250 @@ mod tests {
         let fields = entry.fields.expect("declared fields");
         assert_eq!(fields.len(), 1);
         assert_eq!(fields[0].key, "body");
+    }
+
+    #[test]
+    fn html_metadata_status_rule_follows_the_document_model_not_the_slug() {
+        // A non-mockup type with custom statuses still validates (L-1).
+        let mut cfg = Config::default();
+        cfg.document_types.insert(
+            "deploy".to_string(),
+            DocTypeEntry {
+                prefix: "DEP".to_string(),
+                directory: "deploy/".to_string(),
+                statuses: Some(vec![
+                    "active".to_string(),
+                    "review".to_string(),
+                    "archived".to_string(),
+                ]),
+                default_status: Some("review".to_string()),
+                ..Default::default()
+            },
+        );
+        cfg.validate(None)
+            .expect("a single-markdown type may declare custom statuses");
+
+        // The HTML-metadata type is keyed on the model, not the literal slug.
+        let mut mockup = Config::default();
+        mockup.document_types.get_mut("ui-mockup").unwrap().statuses =
+            Some(vec!["active".to_string(), "archived".to_string()]);
+        let error = mockup
+            .validate(None)
+            .expect_err("mockup has no status list");
+        assert!(
+            error.contains(
+                "document_types.ui-mockup.statuses: not allowed for a type without a front-matter status"
+            ),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn partial_group_block_resolves_identically_from_yaml_and_direct_config() {
+        let declared: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  req:\n    prefix: REQ\n    directory: requirements/business/\n    group:\n      fields: []\n",
+        )
+        .unwrap();
+        let resolved = resolve_root(&declared);
+        let from_yaml: DocTypeEntry = yaml_serde::from_value(
+            resolve_selector(&resolved, "document_types.req")
+                .unwrap()
+                .clone(),
+        )
+        .unwrap();
+        let from_yaml = resolved_document_entry("req", &from_yaml);
+
+        let mut cfg = Config::default();
+        cfg.document_types.insert(
+            "req".to_string(),
+            DocTypeEntry {
+                prefix: "REQ".to_string(),
+                directory: "requirements/business/".to_string(),
+                group: Some(RoleFields {
+                    fields: Some(Vec::new()),
+                    reference_visibility: None,
+                }),
+                ..Default::default()
+            },
+        );
+        let from_config = resolved_document_entry("req", &cfg.document_types["req"]);
+
+        let yaml_group = from_yaml.group.expect("yaml group role");
+        let config_group = from_config.group.expect("config group role");
+        assert_eq!(yaml_group.fields, Some(Vec::new()));
+        assert_eq!(config_group.fields, Some(Vec::new()));
+        assert_eq!(
+            yaml_group.reference_visibility,
+            Some(Visibility::Hidden),
+            "the seed group visibility fills from YAML"
+        );
+        assert_eq!(
+            config_group.reference_visibility,
+            Some(Visibility::Hidden),
+            "the seed group visibility fills from a direct Config"
+        );
+        assert_eq!(from_yaml.member, from_config.member);
+    }
+
+    #[test]
+    fn declared_slots_are_validated() {
+        let mut cfg = Config::default();
+        cfg.document_types.insert(
+            "deploy".to_string(),
+            DocTypeEntry {
+                prefix: "DEP".to_string(),
+                directory: "deploy/".to_string(),
+                slots: Some(vec![
+                    Slot {
+                        key: String::new(),
+                        label: String::new(),
+                    },
+                    Slot {
+                        key: "id".to_string(),
+                        label: "Id".to_string(),
+                    },
+                    Slot {
+                        key: "status".to_string(),
+                        label: "Status".to_string(),
+                    },
+                    Slot {
+                        key: "group".to_string(),
+                        label: "Group".to_string(),
+                    },
+                    Slot {
+                        key: "owner".to_string(),
+                        label: "Owner".to_string(),
+                    },
+                    Slot {
+                        key: "owner".to_string(),
+                        label: "Owner again".to_string(),
+                    },
+                ]),
+                ..Default::default()
+            },
+        );
+        let error = cfg.validate(None).expect_err("invalid slots");
+        for needle in [
+            "document_types.deploy.slots[0].key: must be a non-empty string",
+            "document_types.deploy.slots[0].label: must be a non-empty string",
+            "document_types.deploy.slots[1].key: structural column key id cannot be declared as a slot",
+            "document_types.deploy.slots[2].key: structural column key status cannot be declared as a slot",
+            "document_types.deploy.slots[3].key: reserved field key: group",
+            "document_types.deploy.slots[5].key: duplicate slot key: owner",
+        ] {
+            assert!(error.contains(needle), "missing {needle:?}: {error}");
+        }
+
+        let mut grouped = Config::default();
+        grouped.document_types.get_mut("req").unwrap().slots = Some(vec![Slot {
+            key: "group".to_string(),
+            label: "Group".to_string(),
+        }]);
+        grouped
+            .validate(None)
+            .expect("group is allowed for a grouped seed type");
+    }
+
+    #[test]
+    fn field_grammar_is_validated() {
+        let mut cfg = Config::default();
+        cfg.document_types.insert(
+            "deploy".to_string(),
+            DocTypeEntry {
+                prefix: "DEP".to_string(),
+                directory: "deploy/".to_string(),
+                fields: Some(vec![
+                    field("A.B", Some("Description")),
+                    FieldSpec {
+                        key: "second".to_string(),
+                        heading: Some("Description".to_string()),
+                        frontmatter_key: None,
+                        option: Some("--bad".to_string()),
+                        label: None,
+                        kind: FieldKind::Text,
+                        required: true,
+                        verbs: vec![FieldVerb::Edit],
+                        help: None,
+                    },
+                    FieldSpec {
+                        key: "third".to_string(),
+                        heading: Some("## Third".to_string()),
+                        frontmatter_key: None,
+                        option: Some("same".to_string()),
+                        label: None,
+                        kind: FieldKind::Text,
+                        required: false,
+                        verbs: vec![FieldVerb::Create, FieldVerb::Edit],
+                        help: None,
+                    },
+                    FieldSpec {
+                        key: "fourth".to_string(),
+                        heading: Some("## Fourth".to_string()),
+                        frontmatter_key: None,
+                        option: Some("same".to_string()),
+                        label: None,
+                        kind: FieldKind::Text,
+                        required: false,
+                        verbs: vec![FieldVerb::Create, FieldVerb::Edit],
+                        help: None,
+                    },
+                    field("9", Some("## Nine")),
+                ]),
+                ..Default::default()
+            },
+        );
+        let error = cfg.validate(None).expect_err("invalid field grammar");
+        for needle in [
+            "document_types.deploy.fields[A.B].key: must match [a-z0-9_-]+",
+            "document_types.deploy.fields[second].heading: must begin with \"## \"",
+            "document_types.deploy.fields[second].option: must be a non-empty long option name",
+            "document_types.deploy.fields[second].required: must be offered on create",
+            "document_types.deploy.fields[fourth].option: duplicate option within a role: same",
+            "document_types.deploy.fields[9].key: must match [a-z0-9_-]+",
+        ] {
+            assert!(error.contains(needle), "missing {needle:?}: {error}");
+        }
+    }
+
+    #[test]
+    fn declared_entry_scalar_types_are_named_with_selector_paths() {
+        let value: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  deploy:\n    prefix: DEP\n    directory: deploy/\n    order: -1\n    enabled: nope\n    statuses: active\n    slots: bogus\n",
+        )
+        .unwrap();
+        assert_eq!(
+            validate_document_types_declarations(&value),
+            vec![
+                "document_types.deploy.order: must be a non-negative integer",
+                "document_types.deploy.enabled: must be a boolean",
+                "document_types.deploy.statuses: must be a sequence of strings",
+                "document_types.deploy.slots: must be a sequence of mappings",
+            ]
+        );
+    }
+
+    #[test]
+    fn aggregated_raw_pass_reports_every_class_together() {
+        let value: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  deploy:\n    prefix: DEP\n    directory: deploy/\n    template: x\n    reference_visibility: maybe\n    order: abc\n    fields:\n      - key: title\n        heading: 'Description'\n        option: same\n      - key: description\n        heading: '## Description'\n        option: same\n      - key: description\n        option: same\n",
+        )
+        .unwrap();
+        let errors = validate_document_types_declarations(&value);
+        for needle in [
+            "document_types.deploy.template: unknown key",
+            "document_types.deploy.reference_visibility: must be visible or hidden",
+            "document_types.deploy.order: must be a non-negative integer",
+            "document_types.deploy.fields[title].key: reserved field key: title",
+            "document_types.deploy.fields[title].heading: must begin with \"## \"",
+            "option: duplicate option within a role: same",
+            "document_types.deploy.fields[2].key: duplicate field key: description",
+            "document_types.deploy.fields[2]: must declare heading or frontmatter_key",
+        ] {
+            assert!(
+                errors.iter().any(|error| error.contains(needle)),
+                "missing {needle:?}: {errors:?}"
+            );
+        }
     }
 
     #[test]
