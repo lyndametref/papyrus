@@ -528,13 +528,27 @@ fn descriptor<'a>(state: &'a ServerState, slug: &str) -> Result<&'a TypeDescript
         .ok_or_else(|| HttpError::new(404))
 }
 
-fn enabled_index(ctx: &Context, cfg: &Config, state: &ServerState, slug: &str) -> records::Index {
+fn enabled_index(
+    ctx: &Context,
+    cfg: &Config,
+    state: &ServerState,
+    slug: &str,
+    snapshot: &records::RecordSnapshot<'_>,
+) -> records::Index {
     if state.routes.is_decision_view(slug) {
         let mut combined = records::Index::default();
         for descriptor in state.registry.enabled(CategoryKind::Decision) {
-            combined
-                .records
-                .extend(records::build_index(ctx, cfg, &state.registry, descriptor, None).records);
+            combined.records.extend(
+                records::build_index_with_snapshot(
+                    ctx,
+                    cfg,
+                    &state.registry,
+                    descriptor,
+                    None,
+                    snapshot,
+                )
+                .records,
+            );
         }
         combined.records.sort_by(|a, b| a.id.cmp(&b.id));
         return combined;
@@ -543,7 +557,16 @@ fn enabled_index(ctx: &Context, cfg: &Config, state: &ServerState, slug: &str) -
         .registry
         .descriptor(slug)
         .filter(|descriptor| descriptor.enabled)
-        .map(|descriptor| records::build_index(ctx, cfg, &state.registry, descriptor, None))
+        .map(|descriptor| {
+            records::build_index_with_snapshot(
+                ctx,
+                cfg,
+                &state.registry,
+                descriptor,
+                None,
+                snapshot,
+            )
+        })
         .unwrap_or_default()
 }
 
@@ -554,12 +577,22 @@ fn enabled_index_for_handler(
     cfg: &Config,
     state: &ServerState,
     handler: TypedHandler,
+    snapshot: &records::RecordSnapshot<'_>,
 ) -> records::Index {
     state
         .registry
         .enabled(CategoryKind::Backlog)
         .find(|descriptor| handler_of(descriptor) == Some(handler))
-        .map(|descriptor| records::build_index(ctx, cfg, &state.registry, descriptor, None))
+        .map(|descriptor| {
+            records::build_index_with_snapshot(
+                ctx,
+                cfg,
+                &state.registry,
+                descriptor,
+                None,
+                snapshot,
+            )
+        })
         .unwrap_or_default()
 }
 
@@ -739,6 +772,7 @@ fn route(request: Request, state: &ServerState) -> Result<Response, HttpError> {
 fn inventory_page(state: &ServerState) -> Result<Response, HttpError> {
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let ctx = state.context();
+    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
     let (project, bind_note) = chrome_for(&cfg, state);
     let chrome = render::Chrome {
         project: &project,
@@ -753,7 +787,9 @@ fn inventory_page(state: &ServerState) -> Result<Response, HttpError> {
             .inventory
             .iter()
             .find(|entry| entry.slug == slug)?;
-        let count = enabled_index(&ctx, &cfg, state, slug).records.len();
+        let count = enabled_index(&ctx, &cfg, state, slug, &snapshot)
+            .records
+            .len();
         Some(render::InventoryCard {
             title: entry.title.clone(),
             count: count.to_string(),
@@ -769,7 +805,9 @@ fn inventory_page(state: &ServerState) -> Result<Response, HttpError> {
     let mut aggregates: Vec<render::InventoryCard> = Vec::new();
     for group in [routes::NavGroup::Backlog, routes::NavGroup::Decisions] {
         if let Some(item) = state.routes.nav.iter().find(|item| item.group == group) {
-            let count = enabled_index(&ctx, &cfg, state, &item.slug).records.len();
+            let count = enabled_index(&ctx, &cfg, state, &item.slug, &snapshot)
+                .records
+                .len();
             aggregates.push(render::InventoryCard {
                 title: item.label.clone(),
                 count: count.to_string(),
@@ -804,9 +842,11 @@ fn inventory_page(state: &ServerState) -> Result<Response, HttpError> {
 
 /// Render the Backlog board from freshly read task, milestone, and release
 /// indexes. Used by both the GET route and every failed status submission.
+#[allow(clippy::too_many_arguments)]
 fn render_board_page(
     state: &ServerState,
     cfg: &Config,
+    snapshot: &records::RecordSnapshot<'_>,
     expand: Option<&str>,
     alert: Option<render::BoardAlert<'_>>,
     cleanup: Option<&render::BoardCleanup<'_>>,
@@ -821,9 +861,9 @@ fn render_board_page(
         .find(|item| item.group == routes::NavGroup::Backlog)
         .map(|item| item.slug.as_str())
         .unwrap_or_default();
-    let tasks = enabled_index(&ctx, cfg, state, task_slug);
-    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone);
-    let releases = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Release);
+    let tasks = enabled_index(&ctx, cfg, state, task_slug, snapshot);
+    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone, snapshot);
+    let releases = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Release, snapshot);
     let (project, bind_note) = chrome_for(cfg, state);
     let chrome = render::Chrome {
         project: &project,
@@ -883,17 +923,18 @@ const RELEASE_CLEANUP_PARAMS: &[&str] = &["release_cleanup"];
 fn board_cleanup_preview(
     state: &ServerState,
     cfg: &Config,
+    snapshot: &records::RecordSnapshot<'_>,
     milestone_id: &str,
 ) -> Result<Response, HttpError> {
     let status = cleanup_final_status(cfg).ok_or_else(|| HttpError::new(404))?;
     let ctx = state.context();
-    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone);
+    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone, snapshot);
     let milestone = milestones
         .records
         .iter()
         .find(|milestone| milestone.id == milestone_id)
         .ok_or_else(|| HttpError::new(404))?;
-    let tasks = enabled_index(&ctx, cfg, state, board_task_slug(state));
+    let tasks = enabled_index(&ctx, cfg, state, board_task_slug(state), snapshot);
     let selected: Vec<&Record> = tasks
         .records
         .iter()
@@ -912,6 +953,7 @@ fn board_cleanup_preview(
         render_board_page(
             state,
             cfg,
+            snapshot,
             Some(milestone.id.as_str()),
             None,
             Some(&cleanup),
@@ -924,10 +966,11 @@ fn board_cleanup_preview(
 fn board_milestone_cleanup_preview(
     state: &ServerState,
     cfg: &Config,
+    snapshot: &records::RecordSnapshot<'_>,
     milestone_id: &str,
 ) -> Result<Response, HttpError> {
     let ctx = state.context();
-    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone);
+    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone, snapshot);
     let milestone = milestones
         .records
         .iter()
@@ -942,6 +985,7 @@ fn board_milestone_cleanup_preview(
         render_board_page(
             state,
             cfg,
+            snapshot,
             Some(milestone.id.as_str()),
             None,
             None,
@@ -954,10 +998,11 @@ fn board_milestone_cleanup_preview(
 fn board_release_cleanup_preview(
     state: &ServerState,
     cfg: &Config,
+    snapshot: &records::RecordSnapshot<'_>,
     release_id: &str,
 ) -> Result<Response, HttpError> {
     let ctx = state.context();
-    let releases = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Release);
+    let releases = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Release, snapshot);
     let release = releases
         .records
         .iter()
@@ -966,7 +1011,7 @@ fn board_release_cleanup_preview(
     if release.status.as_deref() != Some("released") {
         return Err(HttpError::new(404));
     }
-    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone);
+    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone, snapshot);
     let closed: Vec<&Record> = milestones
         .records
         .iter()
@@ -988,6 +1033,7 @@ fn board_release_cleanup_preview(
         render_board_page(
             state,
             cfg,
+            snapshot,
             closed.first().map(|m| m.id.as_str()),
             None,
             None,
@@ -1009,6 +1055,9 @@ fn board_cleanup_post(request: &Request, state: &ServerState) -> Result<Response
         return Err(HttpError::new(415));
     }
     let fields = parse_form(&request.body)?;
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let ctx = state.context();
+    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
     let has_ms = MILESTONE_CLEANUP_PARAMS
         .iter()
         .any(|name| fields.iter().any(|(k, v)| k == *name && v.trim() == "1"));
@@ -1016,18 +1065,22 @@ fn board_cleanup_post(request: &Request, state: &ServerState) -> Result<Response
         .iter()
         .any(|name| fields.iter().any(|(k, v)| k == *name && v.trim() == "1"));
     if has_ms {
-        return board_milestone_cleanup_submit(request, state, &fields);
+        return board_milestone_cleanup_submit(request, state, &fields, &snapshot);
     }
     if has_rel {
-        return board_release_cleanup_submit(request, state, &fields);
+        return board_release_cleanup_submit(request, state, &fields, &snapshot);
     }
-    board_cleanup_submit(request, state)
+    board_cleanup_submit(request, state, &snapshot)
 }
 
 /// Handle the `Clean up all` confirm submission: archive every task of the
 /// hosting milestone's final column through the existing `task::archive`
 /// entry point and report per-task failures without aborting the rest.
-fn board_cleanup_submit(request: &Request, state: &ServerState) -> Result<Response, HttpError> {
+fn board_cleanup_submit(
+    request: &Request,
+    state: &ServerState,
+    snapshot: &records::RecordSnapshot<'_>,
+) -> Result<Response, HttpError> {
     if media_type(request) != "application/x-www-form-urlencoded" {
         return Err(HttpError::new(415));
     }
@@ -1045,6 +1098,7 @@ fn board_cleanup_submit(request: &Request, state: &ServerState) -> Result<Respon
         let html = render_board_page(
             state,
             &cfg,
+            snapshot,
             Some(milestone_id),
             Some(render::BoardAlert {
                 heading: "Clean up all is not available",
@@ -1059,7 +1113,8 @@ fn board_cleanup_submit(request: &Request, state: &ServerState) -> Result<Respon
         return Ok(Response::html(422, html));
     };
     let ctx = state.context();
-    let milestones = enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Milestone);
+    let milestones =
+        enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Milestone, snapshot);
     if !milestones
         .records
         .iter()
@@ -1069,7 +1124,7 @@ fn board_cleanup_submit(request: &Request, state: &ServerState) -> Result<Respon
     }
     // Re-derive the set from the current stored data, so the preview is a
     // warning and not a fixed list of submitted IDs.
-    let tasks = enabled_index(&ctx, &cfg, state, board_task_slug(state));
+    let tasks = enabled_index(&ctx, &cfg, state, board_task_slug(state), snapshot);
     let selected: Vec<String> = tasks
         .records
         .iter()
@@ -1102,6 +1157,7 @@ fn board_cleanup_submit(request: &Request, state: &ServerState) -> Result<Respon
     let html = render_board_page(
         state,
         &cfg,
+        snapshot,
         Some(milestone_id),
         Some(render::BoardAlert {
             heading: "Clean up all finished with failures",
@@ -1120,6 +1176,7 @@ fn board_milestone_cleanup_submit(
     _request: &Request,
     state: &ServerState,
     fields: &[(String, String)],
+    snapshot: &records::RecordSnapshot<'_>,
 ) -> Result<Response, HttpError> {
     let milestone_id = form_field(fields, "milestone").unwrap_or("").trim();
     if milestone_id.is_empty() {
@@ -1127,7 +1184,8 @@ fn board_milestone_cleanup_submit(
     }
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let ctx = state.context();
-    let milestones = enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Milestone);
+    let milestones =
+        enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Milestone, snapshot);
     let milestone = milestones
         .records
         .iter()
@@ -1150,6 +1208,7 @@ fn board_milestone_cleanup_submit(
             let html = render_board_page(
                 state,
                 &cfg,
+                snapshot,
                 Some(milestone_id),
                 Some(render::BoardAlert {
                     heading: "Milestone cleanup finished with failures",
@@ -1170,6 +1229,7 @@ fn board_release_cleanup_submit(
     _request: &Request,
     state: &ServerState,
     fields: &[(String, String)],
+    snapshot: &records::RecordSnapshot<'_>,
 ) -> Result<Response, HttpError> {
     let release_id = form_field(fields, "release").unwrap_or("").trim();
     if release_id.is_empty() {
@@ -1177,7 +1237,7 @@ fn board_release_cleanup_submit(
     }
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let ctx = state.context();
-    let releases = enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Release);
+    let releases = enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Release, snapshot);
     let release = releases
         .records
         .iter()
@@ -1186,7 +1246,8 @@ fn board_release_cleanup_submit(
     if release.status.as_deref() != Some("released") {
         return Err(HttpError::new(404));
     }
-    let milestones = enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Milestone);
+    let milestones =
+        enabled_index_for_handler(&ctx, &cfg, state, TypedHandler::Milestone, snapshot);
     let closed: Vec<String> = milestones
         .records
         .iter()
@@ -1237,6 +1298,7 @@ fn board_release_cleanup_submit(
     let html = render_board_page(
         state,
         &cfg,
+        snapshot,
         expand_target.as_deref(),
         Some(render::BoardAlert {
             heading: "Release cleanup finished with failures",
@@ -1254,6 +1316,8 @@ fn board_release_cleanup_submit(
 fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpError> {
     let slug = type_from_query(request, state)?;
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
+    let ctx = state.context();
+    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
     let descriptor = view_descriptor(state, &slug).ok_or_else(|| HttpError::new(404))?;
     let descriptor = &descriptor;
     if handler_of(descriptor) == Some(TypedHandler::Task) {
@@ -1261,14 +1325,14 @@ fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpErr
             if let Some(value) = http::query_param(&request.target.query, name)?
                 && !value.trim().is_empty()
             {
-                return board_milestone_cleanup_preview(state, &cfg, &value);
+                return board_milestone_cleanup_preview(state, &cfg, &snapshot, &value);
             }
         }
         for name in RELEASE_CLEANUP_PARAMS {
             if let Some(value) = http::query_param(&request.target.query, name)?
                 && !value.trim().is_empty()
             {
-                return board_release_cleanup_preview(state, &cfg, &value);
+                return board_release_cleanup_preview(state, &cfg, &snapshot, &value);
             }
         }
         if let Some(milestone) = http::query_param(&request.target.query, "cleanup")?
@@ -1277,18 +1341,27 @@ fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpErr
             if let Some(scope) = http::query_param(&request.target.query, "scope")? {
                 let scope = scope.to_lowercase();
                 if scope == "milestone" || scope == "ms" {
-                    return board_milestone_cleanup_preview(state, &cfg, &milestone);
+                    return board_milestone_cleanup_preview(state, &cfg, &snapshot, &milestone);
                 }
                 if scope == "release" || scope == "rel" {
-                    return board_release_cleanup_preview(state, &cfg, &milestone);
+                    return board_release_cleanup_preview(state, &cfg, &snapshot, &milestone);
                 }
             }
-            return board_cleanup_preview(state, &cfg, &milestone);
+            return board_cleanup_preview(state, &cfg, &snapshot, &milestone);
         }
         let expand = http::query_param(&request.target.query, "expand")?;
         return Ok(Response::html(
             200,
-            render_board_page(state, &cfg, expand.as_deref(), None, None, None, None),
+            render_board_page(
+                state,
+                &cfg,
+                &snapshot,
+                expand.as_deref(),
+                None,
+                None,
+                None,
+                None,
+            ),
         ));
     }
     // The status filter and shared row-field order belong to document-type
@@ -1298,11 +1371,17 @@ fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpErr
     } else {
         None
     };
-    let ctx = state.context();
     let index = if state.routes.is_decision_view(&descriptor.slug) {
-        enabled_index(&ctx, &cfg, state, &descriptor.slug)
+        enabled_index(&ctx, &cfg, state, &descriptor.slug, &snapshot)
     } else {
-        records::build_index(&ctx, &cfg, &state.registry, descriptor, status.as_deref())
+        records::build_index_with_snapshot(
+            &ctx,
+            &cfg,
+            &state.registry,
+            descriptor,
+            status.as_deref(),
+            &snapshot,
+        )
     };
     let (project, bind_note) = chrome_for(&cfg, state);
     let chrome = render::Chrome {
@@ -1314,11 +1393,17 @@ fn list_page(request: &Request, state: &ServerState) -> Result<Response, HttpErr
     Ok(Response::html(200, html))
 }
 
-fn resolve_record(id: &str, state: &ServerState) -> Result<(Record, Config), HttpError> {
-    let cfg = state.config().map_err(|_| HttpError::new(500))?;
-    let ctx = state.context();
-    match records::resolve_id(&ctx, &cfg, &state.registry, id) {
-        Ok(Some(resolved)) => Ok((resolved.record, cfg)),
+fn display_record(id: &str, snapshot: &records::RecordSnapshot<'_>) -> Result<Record, HttpError> {
+    match snapshot.resolve(id) {
+        Ok(Some(resolved)) => Ok(resolved.record),
+        Ok(None) => Err(HttpError::new(404)),
+        Err(_) => Err(HttpError::new(500)),
+    }
+}
+
+fn live_record(id: &str, snapshot: &records::RecordSnapshot<'_>) -> Result<Record, HttpError> {
+    match snapshot.resolve_live(id) {
+        Ok(Some(resolved)) => Ok(resolved.record),
         Ok(None) => Err(HttpError::new(404)),
         Err(_) => Err(HttpError::new(500)),
     }
@@ -1364,9 +1449,18 @@ fn resolved_group<'a>(record: &Record, index: &'a records::Index) -> Option<&'a 
 }
 
 fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
-    let (record, cfg) = resolve_record(id, state)?;
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let ctx = state.context();
-    let index = records::build_index(&ctx, &cfg, &state.registry, &record.descriptor, None);
+    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
+    let record = display_record(id, &snapshot)?;
+    let index = records::build_index_with_snapshot(
+        &ctx,
+        &cfg,
+        &state.registry,
+        &record.descriptor,
+        None,
+        &snapshot,
+    );
     let group = resolved_group(&record, &index);
     let members: Vec<records::Record> = if record.is_group {
         index
@@ -1383,22 +1477,20 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
         Vec::new()
     };
     let related_milestone = if record.handler() == Some(TypedHandler::Task) {
-        record.milestone_id.as_ref().and_then(|mid| {
-            records::resolve_id(&ctx, &cfg, &state.registry, mid)
-                .ok()
-                .flatten()
-                .map(|r| r.record)
-        })
+        record
+            .milestone_id
+            .as_ref()
+            .and_then(|mid| snapshot.resolve(mid).ok().flatten())
+            .map(|r| r.record)
     } else {
         None
     };
     let related_release = if record.handler() == Some(TypedHandler::Milestone) {
-        record.release_id.as_ref().and_then(|rid| {
-            records::resolve_id(&ctx, &cfg, &state.registry, rid)
-                .ok()
-                .flatten()
-                .map(|r| r.record)
-        })
+        record
+            .release_id
+            .as_ref()
+            .and_then(|rid| snapshot.resolve(rid).ok().flatten())
+            .map(|r| r.record)
     } else {
         None
     };
@@ -1407,12 +1499,7 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
             record
                 .dependencies
                 .iter()
-                .map(|did| {
-                    records::resolve_id(&ctx, &cfg, &state.registry, did)
-                        .ok()
-                        .flatten()
-                        .map(|r| r.record)
-                })
+                .map(|did| snapshot.resolve(did).ok().flatten().map(|r| r.record))
                 .collect()
         } else {
             Vec::new()
@@ -1422,23 +1509,13 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
             record
                 .refs
                 .iter()
-                .map(|rid| {
-                    records::resolve_id(&ctx, &cfg, &state.registry, rid)
-                        .ok()
-                        .flatten()
-                        .map(|r| r.record)
-                })
+                .map(|rid| snapshot.resolve(rid).ok().flatten().map(|r| r.record))
                 .collect()
         } else if !record.refs.is_empty() {
             record
                 .refs
                 .iter()
-                .map(|rid| {
-                    records::resolve_id(&ctx, &cfg, &state.registry, rid)
-                        .ok()
-                        .flatten()
-                        .map(|r| r.record)
-                })
+                .map(|rid| snapshot.resolve(rid).ok().flatten().map(|r| r.record))
                 .collect()
         } else {
             Vec::new()
@@ -1493,9 +1570,18 @@ fn view_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
 }
 
 fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
-    let (record, cfg) = resolve_record(id, state)?;
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let ctx = state.context();
-    let index = records::build_index(&ctx, &cfg, &state.registry, &record.descriptor, None);
+    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
+    let record = display_record(id, &snapshot)?;
+    let index = records::build_index_with_snapshot(
+        &ctx,
+        &cfg,
+        &state.registry,
+        &record.descriptor,
+        None,
+        &snapshot,
+    );
     let group = resolved_group(&record, &index);
     let (project, bind_note) = chrome_for(&cfg, state);
     let chrome = render::Chrome {
@@ -1774,11 +1860,19 @@ fn document_form_post(
     record: &Record,
     cfg: &Config,
     state: &ServerState,
+    snapshot: &records::RecordSnapshot<'_>,
     fields: &[(String, String)],
     chrome: render::Chrome<'_>,
 ) -> Result<Response, HttpError> {
     let ctx = state.context();
-    let index = records::build_index(&ctx, cfg, &state.registry, &record.descriptor, None);
+    let index = records::build_index_with_snapshot(
+        &ctx,
+        cfg,
+        &state.registry,
+        &record.descriptor,
+        None,
+        snapshot,
+    );
     let group = resolved_group(record, &index);
     let live_version = record.version.as_str();
 
@@ -1923,6 +2017,7 @@ fn board_failure_response(
     status_code: u16,
     state: &ServerState,
     cfg: &Config,
+    snapshot: &records::RecordSnapshot<'_>,
     record: &Record,
     fields: &[(String, String)],
     message: &str,
@@ -1936,6 +2031,7 @@ fn board_failure_response(
     let html = render_board_page(
         state,
         cfg,
+        snapshot,
         expand.as_deref(),
         Some(render::BoardAlert {
             heading: "Status change failed",
@@ -1956,6 +2052,7 @@ fn board_status_submit(
     record: &Record,
     cfg: &Config,
     state: &ServerState,
+    snapshot: &records::RecordSnapshot<'_>,
     fields: &[(String, String)],
 ) -> Result<Response, HttpError> {
     if record.handler() != Some(TypedHandler::Task) {
@@ -1969,7 +2066,7 @@ fn board_status_submit(
             record.id, stored_status
         );
         return Ok(board_failure_response(
-            409, state, cfg, record, fields, &message,
+            409, state, cfg, snapshot, record, fields, &message,
         ));
     }
     let status = form_field(fields, "status").unwrap_or("").trim();
@@ -1978,6 +2075,7 @@ fn board_status_submit(
             422,
             state,
             cfg,
+            snapshot,
             record,
             fields,
             "Status is not a configured status.",
@@ -1998,12 +2096,12 @@ fn board_status_submit(
             record.id
         );
         return Ok(board_failure_response(
-            500, state, cfg, record, fields, &message,
+            500, state, cfg, snapshot, record, fields, &message,
         ));
     }
     // Save-then-reread: the redirect target reads the files again. The success
     // location restores the card's milestone only when it is still active.
-    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone);
+    let milestones = enabled_index_for_handler(&ctx, cfg, state, TypedHandler::Milestone, snapshot);
     let expand = record.milestone_id.as_deref().filter(|milestone_id| {
         milestones
             .records
@@ -2027,8 +2125,10 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
     if !crate::record::store::valid_version_token(version) {
         return Err(HttpError::new(400));
     }
-    let (record, cfg) = resolve_record(id, state)?;
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let ctx = state.context();
+    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
+    let record = live_record(id, &snapshot)?;
     let (project, bind_note) = chrome_for(&cfg, state);
     let chrome = render::Chrome {
         project: &project,
@@ -2037,11 +2137,11 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
     };
 
     if record.descriptor.category == CategoryKind::Document {
-        return document_form_post(&record, &cfg, state, &fields, chrome);
+        return document_form_post(&record, &cfg, state, &snapshot, &fields, chrome);
     }
 
     if form_field(&fields, "status_change") == Some("1") {
-        return board_status_submit(&record, &cfg, state, &fields);
+        return board_status_submit(&record, &cfg, state, &snapshot, &fields);
     }
 
     if version != record.version {
@@ -2091,7 +2191,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             let milestone_change = if milestone_trimmed.is_empty() {
                 FieldChange::Clear
             } else {
-                match records::resolve_id(&ctx, &cfg, &state.registry, milestone_trimmed) {
+                match snapshot.resolve(milestone_trimmed) {
                     Ok(Some(r)) if r.record.handler() == Some(TypedHandler::Milestone) => {
                         FieldChange::Set(milestone_trimmed.to_string())
                     }
@@ -2121,7 +2221,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                             dep_error = Some("A task cannot depend on itself.".to_string());
                             break;
                         }
-                        match records::resolve_id(&ctx, &cfg, &state.registry, &item) {
+                        match snapshot.resolve(&item) {
                             Ok(Some(r)) if r.record.handler() == Some(TypedHandler::Task) => {
                                 parsed.push(item)
                             }
@@ -2227,7 +2327,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             let release_change = if release_trimmed.is_empty() {
                 FieldChange::Clear
             } else {
-                match records::resolve_id(&ctx, &cfg, &state.registry, release_trimmed) {
+                match snapshot.resolve(release_trimmed) {
                     Ok(Some(r)) if r.record.handler() == Some(TypedHandler::Release) => {
                         FieldChange::Set(release_trimmed.to_string())
                     }
@@ -2728,7 +2828,16 @@ fn api_requirements(request: &Request, state: &ServerState) -> Result<Response, 
     if descriptor.document_model != DocumentModel::GroupedMarkdown {
         return Err(HttpError::new(404));
     }
-    let index = records::build_index(&state.context(), &cfg, &state.registry, descriptor, None);
+    let ctx = state.context();
+    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
+    let index = records::build_index_with_snapshot(
+        &ctx,
+        &cfg,
+        &state.registry,
+        descriptor,
+        None,
+        &snapshot,
+    );
     Ok(Response::json(200, requirements_json(descriptor, &index)))
 }
 
@@ -2736,7 +2845,9 @@ fn api_doc_list(slug: &str, state: &ServerState) -> Result<Response, HttpError> 
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let descriptor = view_descriptor(state, slug).ok_or_else(|| HttpError::new(404))?;
     let descriptor = &descriptor;
-    let index = enabled_index(&state.context(), &cfg, state, slug);
+    let ctx = state.context();
+    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
+    let index = enabled_index(&ctx, &cfg, state, slug, &snapshot);
     if descriptor.category == CategoryKind::Document {
         return Ok(Response::json(200, document_list_json(descriptor, &index)));
     }
@@ -2860,27 +2971,34 @@ fn requirements_json(descriptor: &TypeDescriptor, index: &records::Index) -> ser
 }
 
 fn api_get(id: &str, state: &ServerState) -> Result<Response, HttpError> {
-    let (record, cfg) = resolve_record(id, state)?;
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let ctx = state.context();
-    let index = records::build_index(&ctx, &cfg, &state.registry, &record.descriptor, None);
+    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
+    let record = display_record(id, &snapshot)?;
+    let index = records::build_index_with_snapshot(
+        &ctx,
+        &cfg,
+        &state.registry,
+        &record.descriptor,
+        None,
+        &snapshot,
+    );
     if record.descriptor.category == CategoryKind::Document {
         let group = document_group(&record, &index);
         return Ok(Response::json(200, record_json(&record, group, None)));
     }
     let group = resolved_group(&record, &index);
     let related = match record.handler() {
-        Some(TypedHandler::Task) => record.milestone_id.as_ref().and_then(|mid| {
-            records::resolve_id(&ctx, &cfg, &state.registry, mid)
-                .ok()
-                .flatten()
-                .map(|r| r.record)
-        }),
-        Some(TypedHandler::Milestone) => record.release_id.as_ref().and_then(|rid| {
-            records::resolve_id(&ctx, &cfg, &state.registry, rid)
-                .ok()
-                .flatten()
-                .map(|r| r.record)
-        }),
+        Some(TypedHandler::Task) => record
+            .milestone_id
+            .as_ref()
+            .and_then(|mid| snapshot.resolve(mid).ok().flatten())
+            .map(|r| r.record),
+        Some(TypedHandler::Milestone) => record
+            .release_id
+            .as_ref()
+            .and_then(|rid| snapshot.resolve(rid).ok().flatten())
+            .map(|r| r.record),
         _ => None,
     };
     Ok(Response::json(
@@ -2913,14 +3031,16 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
     if !crate::record::store::valid_version_token(version) {
         return Err(HttpError::new(400));
     }
-    let (record, cfg) = resolve_record(id, state)?;
+    let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let ctx = state.context();
+    let snapshot = records::RecordSnapshot::new(&ctx, &cfg, &state.registry);
+    let record = live_record(id, &snapshot)?;
     if version != record.version {
         return Ok(json_error(409, "record changed on disk; reload the form"));
     }
 
     if record.descriptor.category == CategoryKind::Document {
-        return api_post_document(id, object, &record, &cfg, state);
+        return api_post_document(id, object, &record, &cfg, state, &snapshot);
     }
     match record.handler() {
         Some(TypedHandler::Task) => {
@@ -2962,7 +3082,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                         if m.is_empty() {
                             milestone_change = FieldChange::Clear;
                         } else {
-                            match records::resolve_id(&ctx, &cfg, &state.registry, m) {
+                            match snapshot.resolve(m) {
                                 Ok(Some(r))
                                     if r.record.handler() == Some(TypedHandler::Milestone) =>
                                 {
@@ -3054,7 +3174,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                                 if t == record.id {
                                     return Ok(json_error(422, "A task cannot depend on itself."));
                                 }
-                                match records::resolve_id(&ctx, &cfg, &state.registry, t) {
+                                match snapshot.resolve(t) {
                                     Ok(Some(r))
                                         if r.record.handler() == Some(TypedHandler::Task) => {}
                                     _ => return Ok(json_error(422, "Dependency not found.")),
@@ -3116,13 +3236,12 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 acs,
             );
             save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            let (updated, updated_cfg) = resolve_record(id, state)?;
-            let related = updated.milestone_id.as_ref().and_then(|mid| {
-                records::resolve_id(&ctx, &updated_cfg, &state.registry, mid)
-                    .ok()
-                    .flatten()
-                    .map(|r| r.record)
-            });
+            let updated = live_record(id, &snapshot)?;
+            let related = updated
+                .milestone_id
+                .as_ref()
+                .and_then(|mid| snapshot.resolve(mid).ok().flatten())
+                .map(|r| r.record);
             Ok(Response::json(
                 200,
                 record_json(&updated, None, related.as_ref()),
@@ -3159,7 +3278,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                         if r.is_empty() {
                             release_change = FieldChange::Clear;
                         } else {
-                            match records::resolve_id(&ctx, &cfg, &state.registry, r) {
+                            match snapshot.resolve(r) {
                                 Ok(Some(res))
                                     if res.record.handler() == Some(TypedHandler::Release) =>
                                 {
@@ -3174,13 +3293,12 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             }
             let ops = edit::milestone_ops(&record.doc, &title, description_change, release_change);
             save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            let (updated, updated_cfg) = resolve_record(id, state)?;
-            let related = updated.release_id.as_ref().and_then(|rid| {
-                records::resolve_id(&ctx, &updated_cfg, &state.registry, rid)
-                    .ok()
-                    .flatten()
-                    .map(|r| r.record)
-            });
+            let updated = live_record(id, &snapshot)?;
+            let related = updated
+                .release_id
+                .as_ref()
+                .and_then(|rid| snapshot.resolve(rid).ok().flatten())
+                .map(|r| r.record);
             Ok(Response::json(
                 200,
                 record_json(&updated, None, related.as_ref()),
@@ -3210,7 +3328,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             }
             let ops = edit::release_ops(&record.doc, &title, description_change);
             save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            let (updated, _updated_cfg) = resolve_record(id, state)?;
+            let updated = live_record(id, &snapshot)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
         Some(TypedHandler::Decision) => {
@@ -3360,13 +3478,12 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 consequences_change,
             );
             save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            let (updated, updated_cfg) = resolve_record(id, state)?;
-            let superseded_title = updated.superseded_by.as_ref().and_then(|sid| {
-                records::resolve_id(&ctx, &updated_cfg, &state.registry, sid)
-                    .ok()
-                    .flatten()
-                    .map(|r| r.record.title)
-            });
+            let updated = live_record(id, &snapshot)?;
+            let superseded_title = updated
+                .superseded_by
+                .as_ref()
+                .and_then(|sid| snapshot.resolve(sid).ok().flatten())
+                .map(|r| r.record.title);
             let _ = superseded_title;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -3387,6 +3504,7 @@ fn api_post_document(
     record: &Record,
     cfg: &Config,
     state: &ServerState,
+    snapshot: &records::RecordSnapshot<'_>,
 ) -> Result<Response, HttpError> {
     // The JSON API has never accepted a write for a config-defined document;
     // that surface is the one HTML document form.
@@ -3404,7 +3522,7 @@ fn api_post_document(
     };
 
     if record.descriptor.document_model == DocumentModel::SingleHtmlMockup {
-        return api_post_mockup(id, object, record, cfg, state, &title);
+        return api_post_mockup(id, object, record, cfg, state, snapshot, &title);
     }
 
     let mut changes: Vec<(&ResolvedField, edit::DocumentFieldChange)> = Vec::new();
@@ -3486,13 +3604,14 @@ fn api_post_document(
         references.as_deref(),
     );
     save_ops(&ctx, cfg, &state.registry, record, ops)?;
-    let (updated, updated_cfg) = resolve_record(id, state)?;
-    let index = records::build_index(
+    let updated = live_record(id, snapshot)?;
+    let index = records::build_index_with_snapshot(
         &ctx,
-        &updated_cfg,
+        cfg,
         &state.registry,
         &updated.descriptor,
         None,
+        snapshot,
     );
     let group = document_group(&updated, &index);
     Ok(Response::json(200, record_json(&updated, group, None)))
@@ -3548,6 +3667,7 @@ fn api_post_mockup(
     record: &Record,
     cfg: &Config,
     state: &ServerState,
+    snapshot: &records::RecordSnapshot<'_>,
     title: &str,
 ) -> Result<Response, HttpError> {
     let ctx = state.context();
@@ -3597,7 +3717,7 @@ fn api_post_mockup(
     let original = std::fs::read_to_string(&record.path).unwrap_or_default();
     let content = records::edit_ui_mockup(&original, &record.id, title, &specs, &refs);
     save_content(&ctx, cfg, &state.registry, record, content)?;
-    let (updated, _updated_cfg) = resolve_record(id, state)?;
+    let updated = live_record(id, snapshot)?;
     Ok(Response::json(200, record_json(&updated, None, None)))
 }
 
