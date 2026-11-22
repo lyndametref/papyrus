@@ -2,7 +2,7 @@
 id: TASK-260
 title: "Regenerate CLI help goldens and replay the equivalence fixtures"
 created_date: '2026-11-20T17:42:17Z'
-updated_date: '2026-11-22T12:56:04Z'
+updated_date: '2026-11-22T15:01:50Z'
 labels: []
 references:
   - REQ-07.003
@@ -11,7 +11,7 @@ references:
   - TECH-070
   - TC-185
   - ADR-042
-status: In-Progress
+status: Done
 assignee:
   - rust-dev
 milestone: MS-034
@@ -79,3 +79,5 @@ The goldens are regenerated and complete; every diff is attributed; the fixture 
 - **task-refiner**: Short-option delta: the current -d short on description (req create, req edit, note create, note edit, and others) has no FieldSpec equivalent. Record its removal under derived field options in the diff report and in the expected-deltas document.
 - **task-refiner**: Snapshot procedure: before running PAPYRUS_UPDATE_CLI_HELP=1 cargo test --test cli_help_golden, copy the tests golden cli-help directory to a project-local .tmp snapshot directory and diff after regeneration; delete the .tmp copy before finishing. The fixture replay corpus is under tests fixtures characterization corpus and the replay is the characterization replay test.
 - **planner**: ADR-042 rulings 2 and 4 applied: every verb about line is engine-generated generic text from the document model and field sequence, and every resulting help diff is attributed to generated prose. The enabled-type order stays effective configuration map order (slug order); seed order is presentation-only, no order change is expected, and the former 'reconcile' instruction is withdrawn.
+- **rust-dev**: TASK-260 complete; branch task-TASK-260; commit 1aabf9d (base 4ecc5a6). AC-1: 144-case goldens regenerated twice with PAPYRUS_UPDATE_CLI_HELP=1; byte-identical; completeness test green. AC-2: all 93 changed goldens attributed (T title, G --term, P generated prose ADR-042 item 2, V --group engine validation, F seed-derived fields ADR-036 d29, B eight-builder retention zero deltas); report docs specifications technical cli-help-deltas.md covers every file; no unattributed golden delta. AC-3: new determinism test: 7 cases twice plus cwd, locale C vs C.UTF-8, COLUMNS 80 vs 200, TZ UTC vs Pacific-Kiritimati; identical; rejects manifest path, project dir, PID, hostname except localhost-papyrus, ISO timestamp, 0x address. AC-4: characterization_replay passes 254 cases (136 CLI, 118 HTTP); CLI records and exits match except title and term and items 7-8; 87 HTTP artifact changes attributed to TASK-292 capture normalisation and two new api-requirements cases. AC-5: TASK-257 migrated glossary create and create-json and edit and edit-json to positional title or --title; term-removed usage errors covered by glossary create-term-removed and edit-term-removed (exit 2, no record); deviation from literal AC wording recorded. AC-6: EXPECTED-DELTAS item 2 corrected --term removed and --definition kept; lists the four glossary cases plus two term-removed cases; records verb-about delta, -d removal, engine title and group validation. AC-7: top.json unchanged; order effective document_types map order (slug order); seed order presentation-only ADR-042 item 4; descriptor_equivalence projection passes. AC-8: 1261 passed, 0 failed, 26 ignored, 66 suites; clippy -D warnings clean; fmt check clean; descriptor_equivalence needed no edit. TC-185. Files: tests cli_help_golden.rs, corpus EXPECTED-DELTAS.md, corpus README.md (254 cases, 789 artifacts), docs specifications technical cli-help-deltas.md. No source or behaviour change; no new crates. Attribution counts: P 72; TP 2; TV 1; PF 4; TGP 1; TPF 10; TGPF 1; TPVF 2. Unattributed: none. Only outside-code deltas are accepted TASK-292 HTTP capture corrections, recorded explicitly.
+- **orchestrator**: Acceptance met: 144-case help golden set regenerated and deterministic, all 93 changed goldens attributed to the six documented causes, 254 characterization cases replay with only documented deltas, attribution record added.
