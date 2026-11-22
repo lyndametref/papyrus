@@ -376,6 +376,7 @@ fn dual_storage_and_list_fields_write_sections_and_yaml_sequences() {
         required: false,
         verbs: vec![FieldVerb::Create, FieldVerb::Edit],
         help: None,
+        values: papyrus::config::FieldValues::Free,
     };
     let tags = papyrus::config::FieldSpec {
         key: "tags".to_string(),
@@ -387,6 +388,7 @@ fn dual_storage_and_list_fields_write_sections_and_yaml_sequences() {
         required: false,
         verbs: vec![FieldVerb::Create, FieldVerb::Edit],
         help: None,
+        values: papyrus::config::FieldValues::Free,
     };
     let entry = DocTypeEntry {
         prefix: "CUS".to_string(),

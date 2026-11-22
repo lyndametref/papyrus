@@ -1347,19 +1347,7 @@ pub fn view_page(
             }
             content.push_str("</section>");
         }
-        None => {
-            content.push_str("<section class=\"record-section\"><h2>Description</h2>");
-            match &record.description {
-                Some(description) => {
-                    let prose = math::prose_with_diagrams(description, "", &mut next_diagram);
-                    has_math |= prose.has_math;
-                    has_diagram |= prose.has_diagram;
-                    content.push_str(&prose.html);
-                }
-                None => content.push_str("<p class=\"text empty-text\">No description.</p>"),
-            }
-            content.push_str("</section>");
-        }
+        None => {}
     }
 
     if !resolved_refs.is_empty() {
@@ -2849,11 +2837,6 @@ fn document_mockup_form(
         "Labels",
         &values.labels.join(", "),
     ));
-    form.push_str(&document_read_only_field(
-        "references",
-        "References",
-        &values.references.join(", "),
-    ));
     let status = record.field_map.display_value("status").unwrap_or_default();
     form.push_str(&document_read_only_field("status", "Status", &status));
     let task = record.field_map.display_value("task").unwrap_or_default();
@@ -2885,7 +2868,7 @@ fn document_form(
     if conflict {
         form.push_str(&format!(
             "<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2>\
-<p>This record changed on disk. Nothing was saved. record changed on disk; reload the form</p></div>\
+<p>This record changed on disk. Nothing was saved. Reload the form to continue.</p></div>\
 <div class=\"conflict-box\"><p><strong>409 Conflict \u{2014} record changed on disk; reload the form.</strong></p>\
 <p><a class=\"link\" href=\"/doc/{id}/edit\">Reload the form</a> \
 <a class=\"link\" href=\"/doc/{id}\">View current record</a></p></div>",
@@ -3035,13 +3018,13 @@ pub fn document_conflict_page(
 
 /// Generic document not-found page. It never echoes the requested ID.
 pub fn document_not_found_page(cfg: &Config, chrome: Chrome<'_>) -> String {
-    let content = "<p>The requested record was not found.</p><p><a class=\"link\" href=\"/\">Back to requirements</a></p>";
+    let content = "<h1 class=\"h1\">Not found</h1><p>The requested record was not found.</p><p><a class=\"link\" href=\"/\">Back to requirements</a></p>";
     let body = render_template(
         VIEW_TEMPLATE,
         &[],
         &[
             ("breadcrumb", ""),
-            ("page_head", "<h1 class=\"h1\">Not found</h1>"),
+            ("page_head", ""),
             ("meta", ""),
             ("content", content),
         ],

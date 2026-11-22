@@ -549,19 +549,16 @@ fn write_case(directory: &Path, observed: &BTreeMap<String, Vec<u8>>) {
 
 /// Whether this case renders a descriptor-driven document HTML page.
 fn document_html_case(case: &Case) -> bool {
+    is_document_page_renderer(case.renderer.as_deref())
+}
+
+/// Whether a renderer name denotes a descriptor-driven document page.
+pub fn is_document_page_renderer(renderer: Option<&str>) -> bool {
     matches!(
-        case.renderer.as_deref(),
+        renderer,
         Some(
             "list_page"
-                | "view_page"
-                | "edit_page"
-                | "edit_page_glossary"
-                | "edit_page_ui_spec"
-                | "edit_page_ui_mockup"
-                | "edit_page_business_rule"
-                | "edit_page_audit_record"
-                | "edit_page_tech_spec"
-                | "edit_page_use_case"
+                | "document_view_page"
                 | "document_detail_page"
                 | "document_edit_page"
                 | "document_conflict_page"

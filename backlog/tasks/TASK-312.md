@@ -2,7 +2,7 @@
 id: TASK-312
 title: "Correct MS-035 audit findings from AUD-145"
 created_date: '2026-11-22T19:08:46Z'
-updated_date: '2026-11-22T19:09:19Z'
+updated_date: '2026-11-22T19:37:27Z'
 labels: []
 references:
   - AUD-145
@@ -16,7 +16,7 @@ references:
   - TECH-040
   - REQ-06.014
   - REQ-06.019
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-035
@@ -73,3 +73,6 @@ AUD-145 (code audit MS-035) returned "corrections required": 2 high, 4 medium an
 
 ## Definition of done
 Each AUD-145 item has a recorded result and its regression test; the full suite, `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` pass; no production behaviour changes beyond the corrections; an evidence comment maps every AUD-145 finding to its correction and test.
+## Comments
+- **rust-dev**: -
+- **orchestrator**: Acceptance met: static node-level semantic allowlist with per-page mutation tests, scoped packaging out policy with guard tests, one field-domain validator for HTML and JSON, reserved envelope field keys, dead document reads removed with tighter guards, single visibility source, plus L1 to L6 cleanups; 1349 tests pass.

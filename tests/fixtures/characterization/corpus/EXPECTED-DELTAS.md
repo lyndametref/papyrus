@@ -79,21 +79,28 @@ pre-MS-035 snapshot at commit `214a252`. Record files, JSON payloads, stdout,
 stderr, exit codes, asset bodies, the HTTP status and headers, and every
 Backlog and Decision `page.html` remain byte-for-byte.
 
-An allowed difference is listed per case and per selector; each selector is
-mapped to the reason code `uniform-title-block`, `seed-presentation`, or
-`expected-delta-6` and to the item above that attributes it
-(`item-9`, `item-14`, `item-16`, `item-18`). The selectors are:
+The allowed differences are a static per-case, node-level table in
+`tests/fixtures/characterization/semantic-allowlist.json`. Each entry names one
+node part (an element, an attribute, a text node, or a subtree of a non-container
+node) on the baseline side, the accepted side, or both. An entry is never
+derived from the page under test, and the table contains no page-container
+allowance: no `form.form`, `section.section`, or `main.main` subtree may be
+hidden. A mutation of one label, text node, field, or link is therefore compared
+normally and must fail the gate.
 
-| Selector | Reason code | Item |
-| --- | --- | --- |
-| `aside.sidebar`, `nav.breadcrumb`, `title`, `h1.h1` | `seed-presentation` | 16 |
-| `section.section` | `seed-presentation` | 18 |
-| `div.page-head`, `section.record-section`, `div.meta`, `p.text`, `p.sub`, `div.actions`, `div.readonly-block`, `div.alert`, `form.form` | `uniform-title-block` | 9 |
-| `div.conflict-box` | `expected-delta-6` | 6 |
-| `div.error-page`, `main.main` | `expected-delta-6` | 6 |
+Every entry carries one of the three TASK-269 reason codes and the item below
+that attributes it:
 
-An allowlist entry that hides no real difference fails the test. The
-consolidation in TASK-269 itself adds no byte delta to the accepted corpus.
+| Reason code | Expected-delta item |
+| --- | --- |
+| `uniform-title-block` | item 9 (one document edit form) |
+| `seed-presentation` | item 16 (seed labels) and item 18 (`req`/`nfr` list references) |
+| `expected-delta-6` | item 6 (conflict and not-found renderer collapse) |
+
+The replay suite checks that every entry's reason and item appear in this
+document, that every entry hides a real difference, and that no entry targets a
+`form`, `section`, or `main` container. The consolidation in TASK-269 itself
+adds no byte delta to the accepted corpus.
 
 ## Measured verb-about-line delta (TASK-260)
 

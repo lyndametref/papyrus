@@ -1760,6 +1760,7 @@ mod tests {
                     crate::config::FieldVerb::Edit,
                 ],
                 help: None,
+                values: crate::config::FieldValues::Free,
             },
             FieldSpec {
                 key: "sponsor".to_string(),
@@ -1771,6 +1772,7 @@ mod tests {
                 required: false,
                 verbs: vec![crate::config::FieldVerb::Create],
                 help: None,
+                values: crate::config::FieldValues::Free,
             },
             FieldSpec {
                 key: "defaulted".to_string(),
@@ -1782,6 +1784,7 @@ mod tests {
                 required: false,
                 verbs: vec![crate::config::FieldVerb::Create],
                 help: None,
+                values: crate::config::FieldValues::Free,
             },
         ];
         descriptor.group = Some(crate::config::RoleFields {

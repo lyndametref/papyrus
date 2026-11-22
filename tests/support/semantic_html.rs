@@ -1,53 +1,78 @@
 #![allow(dead_code)] // Each integration test binary compiles this shared module.
-//! Test-only semantic HTML comparator (MS-035 TASK-269).
+//! Test-only semantic HTML comparator (MS-035 TASK-269, corrected by AUD-145 H1).
 //!
-//! Compares two rendered document pages without an HTML parser dependency. The
-//! comparison is deliberately semantic rather than byte-oriented:
+//! The comparison is deliberately semantic rather than byte-oriented:
 //!
-//! * tags and their sorted attributes are compared (selectors, ids, classes,
-//!   `name`, `type`, `value`, `required`, `aria-describedby`, `aria-current`,
-//!   `href`, roles and every other hook),
-//! * visible text is compared with whitespace collapsed and entities decoded,
-//! * a difference in any element, attribute, text, link, or field fails.
+//! * element existence, every attribute, and visible text are compared,
+//! * attribute order, whitespace, entities, and insignificant markup are
+//!   ignored,
+//! * a difference in any element, attribute, text, link, or field fails unless
+//!   the committed per-case node allowlist names that exact node part.
 //!
-//! Only the differences that `EXPECTED-DELTAS.md` attributes may be excluded,
-//! through an explicit per-case selector allowlist. An allowlist entry that
-//! does not actually hide a difference fails the comparison.
+//! The allowlist is static data in
+//! `tests/fixtures/characterization/semantic-allowlist.json`. It is never
+//! derived from the page under test, and it contains no page-container entry
+//! (`form.form`, `section.section`, `main.main`). Every entry names one node, a
+//! reason code from MS-035 TASK-269, and the `EXPECTED-DELTAS.md` item that
+//! attributes it.
 
-/// One allowed difference: a case, an element selector, and the reason code
+use std::sync::OnceLock;
+
+use serde::Deserialize;
+
+/// The committed static node allowlist.
+const ALLOWLIST_JSON: &str = include_str!("../fixtures/characterization/semantic-allowlist.json");
+
+/// One allowed difference: a case, one node on each side, and the reason code
 /// plus the `EXPECTED-DELTAS.md` item it implements.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct AllowedDelta {
-    pub case: &'static str,
-    pub selector: &'static str,
-    pub reason: Reason,
-    pub delta: &'static str,
+    pub case: String,
+    pub kind: AllowKind,
+    /// Structural node path in the captured baseline page.
+    #[serde(default)]
+    pub expected: Option<String>,
+    /// Structural node path in the accepted page.
+    #[serde(default)]
+    pub actual: Option<String>,
+    /// Attribute name for `kind: attr`.
+    #[serde(default)]
+    pub name: Option<String>,
+    pub reason: String,
+    pub delta: String,
 }
 
-/// The three attributed reason codes from MS-035 TASK-269.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Reason {
-    /// ADR-039 uniform document head/title and generic renderer structure.
-    UniformTitleBlock,
-    /// A label, heading, help, order, slot, alias, or reference-visibility
-    /// value that follows the seed.
-    SeedPresentation,
-    /// The MS-032 `EXPECTED-DELTAS.md` item 6 conflict/not-found collapse.
-    ExpectedDelta6,
+/// The node part an allowance removes from the comparison.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AllowKind {
+    Element,
+    Attr,
+    Text,
+    Subtree,
 }
 
-impl Reason {
-    pub fn code(self) -> &'static str {
-        match self {
-            Reason::UniformTitleBlock => "uniform-title-block",
-            Reason::SeedPresentation => "seed-presentation",
-            Reason::ExpectedDelta6 => "expected-delta-6",
-        }
+impl AllowedDelta {
+    pub fn is_documented(&self, expected_deltas: &str) -> bool {
+        let reason = match self.reason.as_str() {
+            "uniform-title-block" => "uniform-title-block",
+            "seed-presentation" => "seed-presentation",
+            "expected-delta-6" => "expected-delta-6",
+            _ => return false,
+        };
+        let item = match self.delta.as_str() {
+            "item-6" => "6",
+            "item-9" => "9",
+            "item-16" => "16",
+            "item-18" => "18",
+            _ => return false,
+        };
+        expected_deltas.contains(reason) && expected_deltas.contains(&format!("\n{item}. "))
     }
 }
 
 /// The explicit allowlist. Only entries whose `case` equals the compared case
-/// apply. Every entry must hide at least one real difference.
+/// apply. Every entry must name a token that exists on a declared side.
 #[derive(Debug, Default)]
 pub struct Allowlist {
     entries: Vec<AllowedDelta>,
@@ -60,6 +85,16 @@ impl Allowlist {
 
     pub fn empty() -> Allowlist {
         Allowlist::default()
+    }
+
+    /// The committed static table, parsed once per test process.
+    pub fn static_table() -> &'static Allowlist {
+        static TABLE: OnceLock<Allowlist> = OnceLock::new();
+        TABLE.get_or_init(|| {
+            let entries: Vec<AllowedDelta> = serde_json::from_str(ALLOWLIST_JSON)
+                .expect("parse tests/fixtures/characterization/semantic-allowlist.json");
+            Allowlist::new(entries)
+        })
     }
 
     pub fn is_empty(&self) -> bool {
@@ -82,9 +117,15 @@ impl Allowlist {
     }
 }
 
-/// Compare one document page semantically. `Ok(())` means every non-allowed
-/// token matched; `Err` names the first difference or an unused allowlist
-/// entry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Side {
+    Expected,
+    Actual,
+}
+
+/// Compare one document page semantically. `Ok(())` means every token matched
+/// or was named by a documented node allowance; `Err` names the first
+/// difference or an unused allowance.
 pub fn compare_document_html(
     case: &str,
     expected: &str,
@@ -95,132 +136,51 @@ pub fn compare_document_html(
     let actual_tokens = tokenize(actual);
     let entries = allowlist.for_case(case);
 
-    // Every allowlist entry must be necessary: removing it from the union must
-    // make the comparison fail. An entry that hides nothing is a bug.
-    for (index, entry) in entries.iter().enumerate() {
-        let without: Vec<&str> = entries
-            .iter()
-            .enumerate()
-            .filter(|(other, _)| *other != index)
-            .map(|(_, entry)| entry.selector)
-            .collect();
-        let expected_without = filter(&expected_tokens, &without);
-        let actual_without = filter(&actual_tokens, &without);
-        if same_keys(&expected_without, &actual_without) {
+    let expected_visible = filter_side(&expected_tokens, &entries, Side::Expected);
+    let actual_visible = filter_side(&actual_tokens, &entries, Side::Actual);
+
+    for entry in &entries {
+        let expected_matched = matched_side(&expected_tokens, entry, Side::Expected);
+        let actual_matched = matched_side(&actual_tokens, entry, Side::Actual);
+        if expected_matched.is_empty() && actual_matched.is_empty() {
             return Err(format!(
-                "{case}: unused allowlist entry selector `{}` ({}, {})",
-                entry.selector,
-                entry.reason.code(),
+                "{case}: unused allowlist entry {} at {} ({}, {})",
+                describe_kind(entry),
+                entry
+                    .expected
+                    .as_deref()
+                    .or(entry.actual.as_deref())
+                    .unwrap_or("<no path>"),
+                entry.reason,
+                entry.delta
+            ));
+        }
+        if same_keys(&expected_matched, &actual_matched) {
+            return Err(format!(
+                "{case}: unused allowlist entry {} at {} hides no difference ({}, {})",
+                describe_kind(entry),
+                entry
+                    .expected
+                    .as_deref()
+                    .or(entry.actual.as_deref())
+                    .unwrap_or("<no path>"),
+                entry.reason,
                 entry.delta
             ));
         }
     }
 
-    let selectors: Vec<&str> = entries.iter().map(|entry| entry.selector).collect();
-    let expected_visible = filter(&expected_tokens, &selectors);
-    let actual_visible = filter(&actual_tokens, &selectors);
-    if same_keys(&expected_visible, &actual_visible) {
-        return Ok(());
-    }
-    Err(first_difference(case, &expected_visible, &actual_visible))
+    same_keys(&expected_visible, &actual_visible)
+        .then_some(())
+        .ok_or_else(|| first_difference(case, &expected_visible, &actual_visible))
 }
 
-/// Whether `selector`'s subtree (element and descendants) differs between
-/// the two pages. Used to build an explicit per-case allowlist that contains
-/// only selectors that actually hide a difference.
-pub fn selector_differs(expected: &str, actual: &str, selector: &str) -> bool {
-    let expected_tokens = tokenize(expected);
-    let actual_tokens = tokenize(actual);
-    !same_keys(
-        &scope(&expected_tokens, selector),
-        &scope(&actual_tokens, selector),
-    )
-}
-
-/// The tokens that belong to the selected element (or its descendants).
-fn scope(tokens: &[Token], selector: &str) -> Vec<Token> {
-    tokens
-        .iter()
-        .filter(|token| {
-            token
-                .element
-                .is_some_and(|element| selector_matches(selector, &tokens[element]))
-                || token
-                    .ancestors
-                    .iter()
-                    .any(|ancestor| selector_matches(selector, &tokens[*ancestor]))
-        })
-        .cloned()
-        .collect()
-}
-
-fn same_keys(left: &[Token], right: &[Token]) -> bool {
-    left.len() == right.len()
-        && left
-            .iter()
-            .zip(right)
-            .all(|(left, right)| left.key == right.key)
-}
-
-fn describe(token: &Token, _tokens: &[Token]) -> String {
-    token.key.clone()
-}
-
-fn first_difference(case: &str, expected: &[Token], actual: &[Token]) -> String {
-    let limit = expected.len().max(actual.len());
-    for index in 0..limit {
-        match (expected.get(index), actual.get(index)) {
-            (Some(left), Some(right)) if left.key == right.key => {}
-            (Some(left), Some(right)) => {
-                return format!(
-                    "{case}: semantic HTML differs at token {index}:\n  expected: {}\n  actual:   {}",
-                    describe(left, expected),
-                    describe(right, actual)
-                );
-            }
-            (Some(left), None) => {
-                return format!(
-                    "{case}: semantic HTML has an extra expected token {index}: {}",
-                    left.key
-                );
-            }
-            (None, Some(right)) => {
-                return format!(
-                    "{case}: semantic HTML has an extra actual token {index}: {}",
-                    right.key
-                );
-            }
-            (None, None) => break,
-        }
-    }
-    format!("{case}: semantic HTML differs in length")
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Token {
-    key: String,
-    /// The start-token index of this token's element (`None` for text).
-    element: Option<usize>,
-    /// Start-token indices of the open ancestors, outermost first.
-    ancestors: Vec<usize>,
-}
-
-#[derive(Clone, Debug)]
-struct StartTag {
-    name: String,
-    attrs: Vec<(String, String)>,
-}
-
-const VOID_ELEMENTS: &[&str] = &[
-    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source",
-    "track", "wbr",
-];
-
-fn tokenize(html: &str) -> Vec<Token> {
+/// Parse a page into path-addressed semantic tokens.
+pub fn tokenize(html: &str) -> Vec<Token> {
     let bytes = html.as_bytes();
     let mut index = 0usize;
     let mut tokens: Vec<Token> = Vec::new();
-    let mut stack: Vec<(usize, String)> = Vec::new();
+    let mut stack: Vec<OpenElement> = vec![OpenElement::root()];
     while index < bytes.len() {
         if bytes[index] != b'<' {
             let next = html[index..]
@@ -229,10 +189,13 @@ fn tokenize(html: &str) -> Vec<Token> {
                 .unwrap_or(bytes.len());
             let raw = &html[index..next];
             if let Some(text) = canonical_text(raw) {
+                let parent = stack.last_mut().expect("parser root");
+                let path = text_path(&parent.path, parent.texts);
+                parent.texts += 1;
                 tokens.push(Token {
                     key: format!("text:{text}"),
-                    element: None,
-                    ancestors: stack.iter().map(|(index, _)| *index).collect(),
+                    path,
+                    kind: TokenKind::Text,
                 });
             }
             index = next;
@@ -266,39 +229,239 @@ fn tokenize(html: &str) -> Vec<Token> {
             if name.is_empty() {
                 continue;
             }
-            let position = stack.iter().rposition(|(_, open)| open == &name);
-            let element = position.map(|position| stack[position].0);
-            if let Some(position) = position {
-                stack.truncate(position);
-            }
+            let position = stack.iter().rposition(|open| open.tag == name);
+            let Some(position) = position else {
+                continue;
+            };
+            let path = stack[position].path.clone();
             tokens.push(Token {
                 key: format!("end:{name}"),
-                element,
-                ancestors: stack.iter().map(|(index, _)| *index).collect(),
+                path,
+                kind: TokenKind::End,
             });
+            stack.truncate(position);
             continue;
         }
         let (tag, next, self_closing) = parse_start_tag(html, index);
         index = next;
         let name = tag.name.clone();
-        let token_index = tokens.len();
+        let (path, parent) = {
+            let parent = stack.last_mut().expect("parser root");
+            let path = element_path(&parent.path, parent.children);
+            parent.children += 1;
+            (path, parent.path.clone())
+        };
+        let _ = parent;
         tokens.push(Token {
-            key: start_key(&tag),
-            element: Some(token_index),
-            ancestors: stack.iter().map(|(index, _)| *index).collect(),
+            key: format!("start:{name}"),
+            path: path.clone(),
+            kind: TokenKind::Start,
         });
+        let mut attrs = tag.attrs.clone();
+        attrs.sort();
+        for (attr, value) in attrs {
+            tokens.push(Token {
+                key: format!("attr:{attr}={value:?}"),
+                path: path.clone(),
+                kind: TokenKind::Attr(attr),
+            });
+        }
         if !VOID_ELEMENTS.contains(&name.as_str()) && !self_closing {
-            stack.push((token_index, name));
+            stack.push(OpenElement {
+                path,
+                tag: name,
+                children: 0,
+                texts: 0,
+            });
         } else if !VOID_ELEMENTS.contains(&name.as_str()) && self_closing {
             tokens.push(Token {
                 key: format!("end:{name}"),
-                element: Some(token_index),
-                ancestors: stack.iter().map(|(index, _)| *index).collect(),
+                path,
+                kind: TokenKind::End,
             });
         }
     }
     tokens
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Token {
+    pub key: String,
+    pub path: String,
+    pub kind: TokenKind,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TokenKind {
+    Start,
+    End,
+    Attr(String),
+    Text,
+}
+
+struct OpenElement {
+    path: String,
+    tag: String,
+    children: usize,
+    texts: usize,
+}
+
+impl OpenElement {
+    fn root() -> OpenElement {
+        OpenElement {
+            path: String::new(),
+            tag: String::new(),
+            children: 0,
+            texts: 0,
+        }
+    }
+}
+
+fn element_path(parent: &str, index: usize) -> String {
+    if parent.is_empty() {
+        index.to_string()
+    } else {
+        format!("{parent}.{index}")
+    }
+}
+
+fn text_path(parent: &str, index: usize) -> String {
+    if parent.is_empty() {
+        format!("#text{index}")
+    } else {
+        format!("{parent}#text{index}")
+    }
+}
+
+fn describe_kind(entry: &AllowedDelta) -> String {
+    match entry.kind {
+        AllowKind::Element => "element".to_string(),
+        AllowKind::Attr => format!("attribute {}", entry.name.as_deref().unwrap_or("<none>")),
+        AllowKind::Text => "text".to_string(),
+        AllowKind::Subtree => "subtree".to_string(),
+    }
+}
+
+fn side_path(entry: &AllowedDelta, side: Side) -> Option<&str> {
+    match side {
+        Side::Expected => entry.expected.as_deref(),
+        Side::Actual => entry.actual.as_deref(),
+    }
+}
+
+fn filter_side(tokens: &[Token], entries: &[&AllowedDelta], side: Side) -> Vec<Token> {
+    tokens
+        .iter()
+        .filter(|token| {
+            !entries.iter().any(|entry| {
+                side_path(entry, side).is_some_and(|path| entry_matches(token, entry, path))
+            })
+        })
+        .cloned()
+        .collect()
+}
+
+fn matched_side(tokens: &[Token], entry: &AllowedDelta, side: Side) -> Vec<Token> {
+    let Some(path) = side_path(entry, side) else {
+        return Vec::new();
+    };
+    tokens
+        .iter()
+        .filter(|token| entry_matches(token, entry, path))
+        .cloned()
+        .collect()
+}
+
+fn entry_matches(token: &Token, entry: &AllowedDelta, path: &str) -> bool {
+    match entry.kind {
+        AllowKind::Subtree => {
+            token.path == path
+                || token.path.starts_with(&format!("{path}."))
+                || token.path.starts_with(&format!("{path}#text"))
+        }
+        AllowKind::Element => {
+            token.path == path && matches!(token.kind, TokenKind::Start | TokenKind::End)
+        }
+        AllowKind::Attr => {
+            token.path == path
+                && entry.name.as_deref().is_some_and(
+                    |name| matches!(&token.kind, TokenKind::Attr(found) if found == name),
+                )
+        }
+        AllowKind::Text => token.path == path && token.kind == TokenKind::Text,
+    }
+}
+
+/// The element tag at a structural path, if the path names a start token.
+pub fn element_tag_at_path(html: &str, path: &str) -> Option<String> {
+    tokenize(html).into_iter().find_map(|token| {
+        if token.path == path && token.kind == TokenKind::Start {
+            token.key.strip_prefix("start:").map(str::to_string)
+        } else {
+            None
+        }
+    })
+}
+
+fn subtree_tokens(tokens: &[Token], path: &str) -> Vec<Token> {
+    tokens
+        .iter()
+        .filter(|token| {
+            token.path == path
+                || token.path.starts_with(&format!("{path}."))
+                || token.path.starts_with(&format!("{path}#text"))
+        })
+        .cloned()
+        .collect()
+}
+
+fn same_keys(left: &[Token], right: &[Token]) -> bool {
+    left.len() == right.len()
+        && left
+            .iter()
+            .zip(right)
+            .all(|(left, right)| left.key == right.key)
+}
+
+fn first_difference(case: &str, expected: &[Token], actual: &[Token]) -> String {
+    let limit = expected.len().max(actual.len());
+    for index in 0..limit {
+        match (expected.get(index), actual.get(index)) {
+            (Some(left), Some(right)) if left.key == right.key => {}
+            (Some(left), Some(right)) => {
+                return format!(
+                    "{case}: semantic HTML differs at token {index} ({} vs {}):\n  expected: {}\n  actual:   {}",
+                    left.path, right.path, left.key, right.key
+                );
+            }
+            (Some(left), None) => {
+                return format!(
+                    "{case}: semantic HTML has an extra expected token {index} at {}: {}",
+                    left.path, left.key
+                );
+            }
+            (None, Some(right)) => {
+                return format!(
+                    "{case}: semantic HTML has an extra actual token {index} at {}: {}",
+                    right.path, right.key
+                );
+            }
+            (None, None) => break,
+        }
+    }
+    format!("{case}: semantic HTML differs in length")
+}
+
+#[derive(Clone, Debug)]
+struct StartTag {
+    name: String,
+    attrs: Vec<(String, String)>,
+}
+
+const VOID_ELEMENTS: &[&str] = &[
+    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source",
+    "track", "wbr",
+];
 
 fn parse_start_tag(html: &str, start: usize) -> (StartTag, usize, bool) {
     let bytes = html.as_bytes();
@@ -384,20 +547,6 @@ fn is_tag_delimiter(byte: u8) -> bool {
     byte.is_ascii_whitespace() || byte == b'>' || byte == b'/'
 }
 
-fn start_key(tag: &StartTag) -> String {
-    let mut attrs = tag.attrs.clone();
-    attrs.sort();
-    let mut out = format!("start:{}", tag.name);
-    for (name, value) in attrs {
-        if value.is_empty() {
-            out.push_str(&format!(" {name}"));
-        } else {
-            out.push_str(&format!(" {name}={value:?}"));
-        }
-    }
-    out
-}
-
 fn canonical_text(raw: &str) -> Option<String> {
     let decoded = decode_entities(raw);
     let collapsed = decoded.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -465,103 +614,6 @@ fn decode_entity(entity: &str) -> Option<String> {
         .map(|character| character.to_string())
 }
 
-/// Whether the two pages are semantic-equal when every selector in
-/// `selectors` is hidden. Used to prune redundant allowlist entries.
-pub fn equal_after_filter(expected: &str, actual: &str, selectors: &[&str]) -> bool {
-    let expected_tokens = tokenize(expected);
-    let actual_tokens = tokenize(actual);
-    same_keys(
-        &filter(&expected_tokens, selectors),
-        &filter(&actual_tokens, selectors),
-    )
-}
-
-fn filter(tokens: &[Token], selectors: &[&str]) -> Vec<Token> {
-    if selectors.is_empty() {
-        return tokens.to_vec();
-    }
-    tokens
-        .iter()
-        .filter(|token| {
-            !selectors.iter().any(|selector| {
-                token
-                    .element
-                    .is_some_and(|element| selector_matches(selector, &tokens[element]))
-                    || token
-                        .ancestors
-                        .iter()
-                        .any(|ancestor| selector_matches(selector, &tokens[*ancestor]))
-            })
-        })
-        .cloned()
-        .collect()
-}
-
-/// Match a small, explicit selector grammar against a start token:
-/// `tag`, `.class`, `#id`, and `tag.class` combinations.
-fn selector_matches(selector: &str, token: &Token) -> bool {
-    let Some(rest) = token.key.strip_prefix("start:") else {
-        return false;
-    };
-    let tag = rest.split_whitespace().next().unwrap_or("");
-    let attrs = parse_key_attrs(rest);
-    let mut expected_tag = String::new();
-    let mut classes: Vec<&str> = Vec::new();
-    let mut id: Option<&str> = None;
-    let mut remainder = selector;
-    let mut consumed_tag = false;
-    while !remainder.is_empty() {
-        if let Some(after) = remainder.strip_prefix('.') {
-            let end = after.find(['.', '#']).unwrap_or(after.len());
-            classes.push(&after[..end]);
-            remainder = &after[end..];
-        } else if let Some(after) = remainder.strip_prefix('#') {
-            let end = after.find(['.', '#']).unwrap_or(after.len());
-            id = Some(&after[..end]);
-            remainder = &after[end..];
-        } else {
-            let end = remainder.find(['.', '#']).unwrap_or(remainder.len());
-            expected_tag = remainder[..end].to_string();
-            remainder = &remainder[end..];
-            consumed_tag = true;
-        }
-    }
-    if !consumed_tag {
-        expected_tag = "*".to_string();
-    }
-    if expected_tag != "*" && expected_tag != tag {
-        return false;
-    }
-    if let Some(id) = id
-        && attrs.get("id").map(String::as_str) != Some(id)
-    {
-        return false;
-    }
-    if !classes.is_empty() {
-        let found = attrs.get("class").map(String::as_str).unwrap_or("");
-        let found: Vec<&str> = found.split_whitespace().collect();
-        if !classes.iter().all(|class| found.contains(class)) {
-            return false;
-        }
-    }
-    true
-}
-
-fn parse_key_attrs(rest: &str) -> std::collections::BTreeMap<String, String> {
-    let mut attrs = std::collections::BTreeMap::new();
-    let mut lexer = rest.split_whitespace();
-    let _tag = lexer.next();
-    for piece in lexer {
-        if let Some((name, value)) = piece.split_once('=') {
-            let value = value.trim_matches('"').to_string();
-            attrs.insert(name.to_string(), value);
-        } else {
-            attrs.insert(piece.to_string(), String::new());
-        }
-    }
-    attrs
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -598,6 +650,16 @@ mod tests {
     }
 
     #[test]
+    fn an_attribute_change_fails() {
+        let error = compare(
+            &page("<input name=\"a\" type=\"text\">"),
+            &page("<input name=\"a\" type=\"password\">"),
+        )
+        .unwrap_err();
+        assert!(error.contains("type"));
+    }
+
+    #[test]
     fn an_added_removed_or_reordered_form_field_fails() {
         let baseline =
             page("<form><input name=\"a\" type=\"text\"><input name=\"b\" type=\"text\"></form>");
@@ -623,12 +685,15 @@ mod tests {
     }
 
     #[test]
-    fn an_allowlisted_selector_hides_only_its_subtree_and_must_be_used() {
+    fn a_node_allowance_hides_only_that_node_part_and_must_be_used() {
         let allow = Allowlist::new(vec![AllowedDelta {
-            case: "synthetic",
-            selector: "aside.sidebar",
-            reason: Reason::SeedPresentation,
-            delta: "item-16",
+            case: "synthetic".to_string(),
+            kind: AllowKind::Text,
+            expected: Some("0.1.0#text0".to_string()),
+            actual: Some("0.1.0#text0".to_string()),
+            name: None,
+            reason: "seed-presentation".to_string(),
+            delta: "item-16".to_string(),
         }]);
         assert_eq!(
             compare_document_html(

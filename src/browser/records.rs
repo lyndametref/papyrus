@@ -7,11 +7,11 @@
 //! every record; behaviour is selected by `DocumentModel`/`TypedHandler`, never
 //! by a browser-local category enum or a slug literal.
 
-use crate::config::Config;
+use crate::config::{Config, FieldKind, FieldSpec, FieldValues};
 use crate::context::Context;
 use crate::error::AppError;
 use crate::record::document::{self, Document};
-use crate::record::field_map::DocumentFieldMap;
+use crate::record::field_map::{DocumentFieldMap, ResolvedField};
 use crate::record::identity;
 use crate::record::view::RecordView;
 use crate::registry::{
@@ -386,7 +386,6 @@ pub fn load_record(
         }
         None => {
             record.title = non_empty_or(heading_title(&record.doc), &stem);
-            record.description = section_or_none(&record.doc, "Description");
         }
     }
 
@@ -1085,6 +1084,93 @@ pub fn validate_requirement_refs(values: &[String]) -> Result<Vec<String>, Strin
         }
     }
     Ok(out)
+}
+
+/// The descriptor field spec that backs a resolved field, across both roles.
+pub fn document_field_spec<'a>(record: &'a Record, key: &str) -> Option<&'a FieldSpec> {
+    let descriptor = &record.descriptor;
+    descriptor
+        .fields
+        .iter()
+        .chain(
+            descriptor
+                .group
+                .iter()
+                .flat_map(|role| role.fields.iter().flatten()),
+        )
+        .chain(
+            descriptor
+                .member
+                .iter()
+                .flat_map(|role| role.fields.iter().flatten()),
+        )
+        .find(|spec| spec.key == key)
+}
+
+/// The one validator for a submitted scalar document-field value (AUD-145 M1).
+///
+/// The field domain comes from the descriptor: an allowed-value domain rejects
+/// every value outside its list, and the remaining fields follow their kind.
+pub fn validate_document_field_value(
+    record: &Record,
+    field: &ResolvedField,
+    raw: &str,
+) -> Result<Option<String>, String> {
+    if let Some(spec) = document_field_spec(record, &field.key)
+        && let FieldValues::Allowed(values) = &spec.values
+    {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            return Err(format!("{} is required.", field.label));
+        }
+        if !values.iter().any(|value| value == trimmed) {
+            return Err(allowed_values_error(&field.label, values));
+        }
+        return Ok(Some(trimmed.to_string()));
+    }
+    if field.kind == FieldKind::Text {
+        validate_single_line(&field.label, raw)
+    } else {
+        validate_multiline(&field.label, raw)
+    }
+}
+
+/// The one validator for a submitted list document-field value (AUD-145 M1).
+pub fn validate_document_field_list(
+    record: &Record,
+    field: &ResolvedField,
+    raw: &[String],
+) -> Result<Vec<String>, String> {
+    if submitted_tag_values(raw)
+        .iter()
+        .any(|value| value.chars().any(char::is_control))
+    {
+        return Err(format!(
+            "{} cannot contain control characters.",
+            field.label
+        ));
+    }
+    match document_field_spec(record, &field.key).map(|spec| &spec.values) {
+        Some(FieldValues::RecordIds) => validate_requirement_refs(raw),
+        _ => validate_list_items(&field.label, &raw.join("\n")),
+    }
+}
+
+/// The message for a scalar outside its declared allowed-value domain.
+fn allowed_values_error(label: &str, values: &[String]) -> String {
+    let last = values.last().cloned().unwrap_or_default();
+    let head = values
+        .iter()
+        .take(values.len().saturating_sub(1))
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
+    let joined = if head.is_empty() {
+        last
+    } else {
+        format!("{head}, or {last}")
+    };
+    format!("{label} must be one of {joined}.")
 }
 
 /// Whether a decision ID exists in the active or archived store.
