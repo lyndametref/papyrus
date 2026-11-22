@@ -2,7 +2,7 @@
 id: ADR-039
 title: "One descriptor-driven document view and edit surface"
 created_date: '2026-11-20T19:58:18Z'
-updated_date: '2026-11-20T20:01:32Z'
+updated_date: '2026-11-22T08:55:32Z'
 labels: []
 references:
   - RE-010
@@ -181,6 +181,13 @@ accepted
 - **Decision 22:** a field whose `verbs` exclude `edit` is rendered read-only (label and value, no control) and is never writable; it is not omitted, so the view and the form show the same field sequence.
 - **Decision 26 step 6:** the accepted keys are `title`, `labels`, `references`, a declared field key of the record's field map, and a fixed-metadata key the record's model offers (`specs` and `refs` for `SingleHtmlMockup`). Every other key, including `status`, is `422`.
 - **Decision 29:** the presentation facts are the descriptor `label`, `plural`, `order`, `summary`, `api_aliases`, `type_alias`, `slots`, and `reference_visibility`, and each field's `label`, `help`, and sequence position. A field's `required`, `kind`, and `verbs` are data too, but they drive validation and control type rather than supplying a string.
+- No other decision, downstream constraint, or status changes.
+
+### Clarification (2026-11-22) — seed list slots (decisions 5, 6, and 25)
+
+- **Decision 5:** the sentence "the seed declares none" is replaced in effect by ADR-041 decision 4. Every seed document type declares the exact slot set of that table, and seven of them declare an empty `slots` collection.
+- **Decision 6:** `group` is a permitted slot key for a `GroupedMarkdown` seed type (`req`, `nfr`), where it renders the engine-owned group link. The rest of the reserved-key rule stands: `group` remains reserved and prohibited as a field key and a `frontmatter_key`, the other structural and reserved keys remain prohibited as slot keys, and a slot key may not repeat.
+- **Decision 25:** "currently none" now reads: the slots are the seed sets of ADR-041 decision 4. Browser list columns are unchanged, and a slot key is not a field key (ADR-041 decision 7).
 - No other decision, downstream constraint, or status changes.
 ## Context
 RE-010 fixes the target architecture: three category handlers, and one schema-driven document engine with `DocumentModel` = `SingleMarkdown`, `GroupedMarkdown`, `SingleHtmlMockup`. ADR-036 gives every document type one descriptor, one seed table, config-declared field sequences, and one engine that emits only PatchOps. ADR-0036 settles the data model; this ADR settles the browser surface that consumes it.

@@ -2,7 +2,7 @@
 id: TASK-293
 title: "Record the accepted seed slot sets for built-in document types"
 created_date: '2026-11-22T08:53:01Z'
-updated_date: '2026-11-22T08:53:01Z'
+updated_date: '2026-11-22T09:43:32Z'
 labels: []
 references:
   - ADR-039
@@ -12,7 +12,7 @@ references:
   - TECH-077
   - REQ-07.002
   - REQ-07.004
-status: ToDo
+status: Done
 assignee:
   - architect
 milestone: MS-033
@@ -43,3 +43,6 @@ Definition of done: one accepted decision names every seed type's slot set and r
 - [ ] The accepted decision names every one of the eleven seed document types' slot set exactly.
 - [ ] ADR-039 or the new ADR is internally consistent about group: decision 6 no longer forbids a slot set the decision declares.
 - [ ] No code or specification change is made; requirement and specification references are updated only where needed.
+## Comments
+- **architect**: Architecture evidence: ADR-041 (accepted) owns the seed slot sets; record file ADR-041-seed-list-slots-for-the-eleven-built-in-document-types.md. Per-type slots read from PRESENTATION and confirmed against the characterization corpus: req group=Group; nfr group=Group; glossary none; rule applicability=Applicability; ui-spec none; ui-mockup task=Task and specs=Specs; audit audit_type=Audit type; tech-spec none; use-case none; test-case none; test-report none. Browser list columns are unchanged; a slot key is not a field key; group is a permitted slot key only on GroupedMarkdown seed types and remains prohibited as a field key and frontmatter key. ADR-039 carries a dated clarification (2026-11-22) for decisions 5, 6 and 25 pointing to ADR-041; every other ADR-039 decision stands. papyrus check adds no finding. No code, TECH, requirement or test change.
+- **orchestrator**: Acceptance met: ADR-041 accepted, naming the exact seed slot sets for all 11 seed types with the engine-owned group link for grouped types; ADR-039 decisions 6 and 25 clarified; browser list columns unchanged.
