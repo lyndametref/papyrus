@@ -599,3 +599,42 @@ fn every_empty_fixture_replays_the_shared_empty_state() {
         );
     }
 }
+
+/// TASK-292 C-5: the pinned `project-empty` fixture must contain the shared
+/// configuration and no record files. TASK-241 removed three stray records to
+/// restore this documented invariant; this guard keeps it from regressing.
+#[test]
+fn pinned_project_empty_fixture_contains_no_record_files() {
+    let root = fixture_root().join("project-empty");
+    let mut files = Vec::new();
+    fn walk(directory: &Path, files: &mut Vec<PathBuf>) {
+        let mut entries: Vec<PathBuf> = std::fs::read_dir(directory)
+            .unwrap_or_else(|error| panic!("read {}: {error}", directory.display()))
+            .flatten()
+            .map(|entry| entry.path())
+            .collect();
+        entries.sort();
+        for path in entries {
+            if path.is_dir() {
+                walk(&path, files);
+            } else {
+                files.push(path);
+            }
+        }
+    }
+    walk(&root, &mut files);
+    let relative: Vec<String> = files
+        .iter()
+        .map(|path| {
+            path.strip_prefix(&root)
+                .expect("fixture file lives under project-empty")
+                .to_string_lossy()
+                .replace('\\', "/")
+        })
+        .collect();
+    assert_eq!(
+        relative,
+        vec!["papyrus.config.yml".to_string()],
+        "project-empty must hold only the configuration; stray record files break the pinned empty-fixture invariant"
+    );
+}

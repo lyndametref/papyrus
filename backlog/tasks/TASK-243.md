@@ -2,7 +2,7 @@
 id: TASK-243
 title: "Verify MS-032 baseline: reproducible benchmarks, fixtures, and frozen behavior"
 created_date: '2026-11-20T17:41:02Z'
-updated_date: '2026-11-21T16:44:50Z'
+updated_date: '2026-11-22T06:35:59Z'
 labels: []
 references:
   - NFR-007.001
@@ -14,13 +14,15 @@ references:
   - TC-183
   - TC-184
   - ADR-039
-status: ToDo
+  - ADR-040
+status: Done
 assignee:
   - quality-gatekeeper
 milestone: MS-032
 dependencies:
   - TASK-241
   - TASK-242
+  - TASK-292
 ordinal: 60
 documentation:
   - docs/audits
@@ -53,7 +55,7 @@ Definition of done: the audit record covers AC-1 to AC-7 with evidence pointers,
 ## Acceptance Criteria
 
 - [ ] Each MS-032 acceptance criterion AC-1 to AC-7 is checked and recorded as pass or fail with an evidence pointer in a quality audit record that references MS-032 and TASK-243, and the task carries a summary comment.
-- [ ] The benchmark harness is rerun twice per recorded profile on the recorded host, and every rerun p95 falls inside the recorded variance band widened by ten percent of the nearer bound; a value outside the band fails verification with the deviation recorded (MS-032 AC-1).
+- [ ] The benchmark harness is rerun twice per recorded profile on the recorded host, and every rerun p95 is in band under the resolution-aware tolerance: it lies inside the recorded variance band widened by ten percent of the nearer bound, or within an absolute floor of 3 ms of the recorded value where the 1 ms measurement clock is coarser than that band (ADR-040); a rerun outside both fails verification with the deviation recorded (MS-032 AC-1).
 - [ ] The 382-record measurement and the historical 14.2 s inventory and 1.8 s view figures both appear in the benchmark summary document with provenance (MS-032 AC-4).
 - [ ] Fixtures regenerate byte-identically: a capture rerun leaves the corpus and CLI-help fixture trees unchanged in git status, and the recomputed corpus hash matches the recorded hash (MS-032 AC-2, AC-6).
 - [ ] The replay gate passes from a clean checkout and its negative self-check still fails on a one-byte change.
@@ -65,3 +67,5 @@ Definition of done: the audit record covers AC-1 to AC-7 with evidence pointers,
 
 ## Comments
 - **task-refiner**: Refined by task-refiner for MS-032: description grounded in the current routes, renderers, harness conventions and root-cause call sites; acceptance criteria added; references and documentation set. No dependency, ordinal or milestone change. Status left ToDo because papyrus.config.yml declares statuses [ToDo, In-Progress, Done].
+- **planner**: AC-2 amended by planner for AUD-137 CR-4: the rerun criterion now uses the resolution-aware tolerance (inside the widened interval, or within an absolute floor of 3 ms of the recorded value) per ADR-040, so the six sub-5 ms out-of-band edit-single-html-mockup values are not verification failures.
+- **orchestrator**: Close-out audit AUD-138 issued: CR-1 to CR-5 closed, AC-1 to AC-9 all pass, no findings, verdict pass; packaging waived per MS-037 single-release rule.

@@ -24,6 +24,12 @@ pub const BIND: &str = "{{BIND}}";
 pub const PROJECT: &str = "{{PROJECT}}";
 /// Literal token that replaces the mtime-derived edit-form version token.
 pub const VERSION: &str = "{{VERSION}}";
+/// Request-body placeholder replaced with the record's current version token,
+/// so a success case can submit without hard-coding an mtime-derived value.
+const VERSION_PLACEHOLDER: &str = "{{VERSION}}";
+/// Literal token that replaces a response Content-Length whose body echoes a
+/// variable-length version token.
+const LENGTH: &str = "{{LENGTH}}";
 
 /// Artifact names the corpus may declare.
 pub const ARTIFACTS: &[&str] = &[
@@ -44,6 +50,10 @@ pub struct RequestSpec {
     pub path: String,
     #[serde(default)]
     pub body: Option<String>,
+    /// Request `Content-Type`. Defaults to form encoding when a body is sent,
+    /// because every pre-existing POST case submits an HTML form.
+    #[serde(default)]
+    pub content_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -292,10 +302,15 @@ impl Runner<'_> {
             let observed = match case.kind.as_str() {
                 "cli" => observe_cli(case, self.ctx, &seed),
                 "http" => {
-                    let entry = servers.entry(project).or_insert_with(|| {
-                        let server = Server::start(&seed);
+                    // HTTP cases run against a throwaway copy: successful form
+                    // and API writes must never touch the committed seed.
+                    let entry = servers.entry(project.clone()).or_insert_with(|| {
+                        let directory = self.ctx.work.join(format!("http-{project}"));
+                        let _ = fs::remove_dir_all(&directory);
+                        copy_tree(&seed, &directory);
+                        let server = Server::start(&directory);
                         let bind = server.bind_note();
-                        (server, seed, bind)
+                        (server, directory, bind)
                     });
                     observe_http(case, &entry.0, &entry.1, &entry.2)
                 }
@@ -425,6 +440,39 @@ fn expected_subset(case: &Case, observed: BTreeMap<String, Vec<u8>>) -> BTreeMap
     declared
 }
 
+/// The document ID addressed by a `POST /doc/<ID>` or `POST /api/doc/<ID>`
+/// route, used only to look up the record's current version token.
+fn request_target_id(path: &str) -> Option<&str> {
+    let rest = path
+        .strip_prefix("/api/doc/")
+        .or_else(|| path.strip_prefix("/doc/"))?;
+    let id = rest.strip_suffix("/edit").unwrap_or(rest);
+    (!id.is_empty() && !id.contains('/')).then_some(id)
+}
+
+/// Read the record's current version token from its edit form. The version is
+/// mtime-derived, so it must be fetched immediately before the POST.
+fn current_version(server: &Server, id: &str) -> String {
+    let path = format!("/doc/{id}/edit");
+    let reply = server.request("GET", &path, None, None);
+    assert_eq!(reply.status, 200, "edit page for {id}");
+    let text = String::from_utf8_lossy(&reply.body);
+    const MARKER: &str = "name=\"version\" value=\"";
+    let start = text
+        .find(MARKER)
+        .unwrap_or_else(|| panic!("edit page for {id} has no version field"))
+        + MARKER.len();
+    let value: String = text[start..]
+        .chars()
+        .take_while(|character| *character != '"')
+        .collect();
+    assert!(
+        !value.is_empty() && !value.contains("{{"),
+        "edit page for {id} exposes a version token"
+    );
+    value
+}
+
 fn observe_http(
     case: &Case,
     server: &Server,
@@ -435,15 +483,50 @@ fn observe_http(
         .request
         .as_ref()
         .unwrap_or_else(|| panic!("{}: http case without a request", case.id));
-    let reply = server.request(&request.method, &request.path, request.body.as_deref());
+    let body = request.body.as_deref().map(|body| {
+        if body.contains(VERSION_PLACEHOLDER) {
+            let id = request_target_id(&request.path).unwrap_or_else(|| {
+                panic!(
+                    "{}: a body with {VERSION_PLACEHOLDER} needs a document route",
+                    case.id
+                )
+            });
+            body.replace(VERSION_PLACEHOLDER, &current_version(server, id))
+        } else {
+            body.to_string()
+        }
+    });
+    let reply = server.request(
+        &request.method,
+        &request.path,
+        body.as_deref(),
+        request.content_type.as_deref(),
+    );
     let normaliser = Normaliser::new(seed, bind);
+    let body = normaliser.apply(&reply.body);
     let mut observed = BTreeMap::new();
+    // A version token is mtime-derived and its digit length can change between
+    // runs, so the raw Content-Length of a response that echoes it is volatile.
+    // Record a stable placeholder instead of a length that would flake.
+    let body_echoes_version = body
+        .windows(VERSION.len())
+        .any(|window| window == VERSION.as_bytes());
+    let headers: Vec<(String, String)> = reply
+        .headers
+        .into_iter()
+        .map(|(name, value)| {
+            if body_echoes_version && name.eq_ignore_ascii_case("content-length") {
+                (name, LENGTH.to_string())
+            } else {
+                (name, value)
+            }
+        })
+        .collect();
     let http = serde_json::json!({
         "status": reply.status,
-        "headers": reply.headers,
+        "headers": headers,
     });
     observed.insert("http.json".to_string(), format!("{http}\n").into_bytes());
-    let body = normaliser.apply(&reply.body);
     for artifact in &case.artifacts {
         match artifact.as_str() {
             "page.html" | "payload.json" | "body.txt" => {
@@ -568,14 +651,22 @@ impl Server {
         format!("127.0.0.1:{}", self.port)
     }
 
-    fn request(&self, method: &str, path: &str, body: Option<&str>) -> Reply {
+    fn request(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<&str>,
+        content_type: Option<&str>,
+    ) -> Reply {
         let mut stream = TcpStream::connect(("127.0.0.1", self.port)).expect("connect to browser");
         let mut request = format!(
             "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\n",
             self.port
         );
         if let Some(body) = body {
-            request.push_str("Content-Type: application/x-www-form-urlencoded\r\n");
+            let content_type =
+                content_type.unwrap_or("application/x-www-form-urlencoded; charset=utf-8");
+            request.push_str(&format!("Content-Type: {content_type}\r\n"));
             request.push_str(&format!("Content-Length: {}\r\n", body.len()));
         }
         request.push_str("\r\n");

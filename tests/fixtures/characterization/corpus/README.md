@@ -1,7 +1,7 @@
 # Characterization corpus (TASK-240, MS-032)
 
 Frozen pre-refactor behaviour of every document type and every browser route
-(236 cases, 752 artifacts),
+(252 cases, 783 artifacts),
 captured as byte-for-byte artifacts. MS-033 onward replays this corpus to prove
 that the refactor changed nothing except the deltas listed in
 [`EXPECTED-DELTAS.md`](EXPECTED-DELTAS.md).
@@ -88,13 +88,25 @@ pinned to commit `d60f71c9` and must not change.
   `business-rule` and `audit-record`), `GET /doc/<ID>`, `GET /doc/<ID>/edit`,
   `GET /api/docs/<slug>`, `GET /api/doc/<ID>`, and every legacy path declared in
   `Presentation::api_paths`.
+- Grouped requirement index: `GET /api/requirements?type=req` and
+  `GET /api/requirements?type=nfr` return the JSON index for each grouped type
+  (TASK-292 CR-3).
 - Shared surfaces: `GET /`, `GET /?type=task`, `/assets/app.css`,
   `/assets/app.js`, `/assets/nav-state.js`, an unknown path (404), and a
   document route with a disallowed method (405).
-- Conflicts: nine stale-version `POST /doc/<ID>` cases, one per reachable
-  conflict renderer across `note`, `ui-mockup`, `rule`, `audit`, `tech-spec`,
-  `use-case`, `test-case`, `test-report`, and `req`.
-- Not found: `TECH-999`, `UC-999`, `TC-999`, `TR-999`, `NOTE-999`.
+- Conflicts: twelve stale-version `POST /doc/<ID>` cases, one per document
+  type across `note`, `ui-mockup`, `rule`, `audit`, `tech-spec`, `use-case`,
+  `test-case`, `test-report`, `req`, `nfr`, `glossary`, and `ui-spec`, covering
+  every reachable conflict renderer (`conflict_page` for `req`/`nfr`/`glossary`/
+  `ui-spec`, plus the dedicated `document_conflict_page`, `conflict_page_ui_mockup`,
+  `conflict_page_business_rule`, `conflict_page_audit_record`,
+  `conflict_page_tech_spec`, and `conflict_page_use_case`).
+- Writes: `POST /api/doc/<ID>` success (200 JSON) and stale-version conflict
+  (409 JSON); `POST /doc/<ID>` form success (303 redirect) and validation
+  failure (422 edit page with field errors).
+- Not found: one case per document type — `REQ-999.001`, `NFR-999.001`,
+  `GLO-999`, `BR-999`, `AUD-999`, `TECH-999`, `UC-999`, `TC-999`, `TR-999`,
+  `UI-999`, `MOCK-999`, and `NOTE-999`.
 - Empty states: `project-empty` supplies the inventory, requirement list, and
   board cases.
 - CLI per type: `create`, `create --json`, `list`, `list --json`, `view`,
@@ -115,10 +127,13 @@ The capture replaces four volatile tokens in every artifact:
 | `{{BIND}}` | the shell bind note `127.0.0.1:<port>` embedded in every page |
 | `{{PROJECT}}` | the absolute project directory echoed by `--json view` |
 | `{{VERSION}}` | the mtime-derived token in `name="version" value="..."` on edit and conflict pages |
+| `{{LENGTH}}` | the response `Content-Length` header when the body echoes a version token, whose digit count varies with the mtime |
 
-The server emits no `Date` header, so `http.json` needs no header
+The server emits no `Date` header, so `http.json` needs no other header
 normalisation. Captured artifacts contain no wall-clock value, PID, absolute
-path, or ephemeral port.
+path, or ephemeral port. HTTP cases run against a throwaway copy of the seed
+project, so the write cases (form and API POST) never modify the committed
+fixture.
 
 `{{VERSION}}` and `{{PROJECT}}` extend the timestamp rule of the task: both are
 wall-clock or checkout derived and would otherwise break AC-5.

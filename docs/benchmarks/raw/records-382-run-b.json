@@ -5,7 +5,11 @@
   "corpus_hash": "16852d24b236c29d9a109ec5c706645bf3ab5a60615c120a3dcf6e76cb816a15",
   "corpus_files": 383,
   "harness_command": "cargo test --release --test benchmark_baseline -- --ignored --nocapture",
-  "git_commit": "c34cf77a209d8af09b759b4534e146fb617cc2aa",
+  "git_commit": "cd26ef564baa89e47e82f6d78e9b68642a2908ab",
+  "production_tree_commit": "3bc3ce518238f2a36b9c095df0e7226bf889184a",
+  "harness_commit": "d46d6dfee641dfb1692ff9696d6a8fdc95878db2",
+  "harness_worktree_modified": true,
+  "purpose": "recorded baseline run",
   "rustc_version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
   "build_profile": "release (lto=true, strip=true)",
   "host": {
@@ -17,7 +21,7 @@
     "kernel": "Linux 7.2.15+deb14-amd64 x86_64",
     "distribution": "Debian GNU/Linux forky/sid"
   },
-  "date": "2026-11-21T21:01:48+01:00",
+  "date": "2026-11-22T03:26:50+01:00",
   "run": "b",
   "protocol": {
     "reduced_sample_protocol": true,
@@ -49,22 +53,23 @@
       "warmups": 2,
       "measured": 20,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty",
       "baseline_only_p95": true,
       "server_observed_ms": {
-        "p50": 11784,
-        "p95": 12125,
-        "min": 11646,
-        "max": 12126,
-        "mean": 11828.35
+        "p50": 11818,
+        "p95": 12017,
+        "min": 11653,
+        "max": 12021,
+        "mean": 11853.4
       },
       "wall_us": {
-        "p50": 11784374,
-        "p95": 12125568,
-        "min": 11646534,
-        "max": 12126329,
-        "mean": 11829004.3
+        "p50": 11818285,
+        "p95": 12017349,
+        "min": 11654164,
+        "max": 12021834,
+        "mean": 11854018.35
       }
     },
     {
@@ -74,22 +79,23 @@
       "warmups": 10,
       "measured": 100,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
       "baseline_only_p95": false,
       "server_observed_ms": {
-        "p50": 552,
-        "p95": 565,
-        "min": 541,
-        "max": 573,
-        "mean": 553.36
+        "p50": 554,
+        "p95": 564,
+        "min": 548,
+        "max": 571,
+        "mean": 554.92
       },
       "wall_us": {
-        "p50": 552606,
-        "p95": 565868,
-        "min": 541954,
-        "max": 574118,
-        "mean": 554039.09
+        "p50": 554878,
+        "p95": 564855,
+        "min": 548258,
+        "max": 572041,
+        "mean": 555613.83
       }
     },
     {
@@ -99,22 +105,23 @@
       "warmups": 2,
       "measured": 20,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty",
       "baseline_only_p95": true,
       "server_observed_ms": {
-        "p50": 3585,
-        "p95": 3630,
-        "min": 3510,
-        "max": 3633,
-        "mean": 3576.45
+        "p50": 3549,
+        "p95": 3632,
+        "min": 3529,
+        "max": 3711,
+        "mean": 3572.4
       },
       "wall_us": {
-        "p50": 3585569,
-        "p95": 3630725,
-        "min": 3510634,
-        "max": 3633467,
-        "mean": 3577128.95
+        "p50": 3549526,
+        "p95": 3632944,
+        "min": 3529694,
+        "max": 3711404,
+        "mean": 3573155.7
       }
     },
     {
@@ -124,22 +131,23 @@
       "warmups": 2,
       "measured": 20,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty",
       "baseline_only_p95": true,
       "server_observed_ms": {
-        "p50": 3703,
-        "p95": 3758,
-        "min": 3607,
-        "max": 3772,
-        "mean": 3700.95
+        "p50": 3684,
+        "p95": 3728,
+        "min": 3653,
+        "max": 3748,
+        "mean": 3690.85
       },
       "wall_us": {
-        "p50": 3704081,
-        "p95": 3759146,
-        "min": 3607269,
-        "max": 3772620,
-        "mean": 3701615.9
+        "p50": 3684552,
+        "p95": 3729134,
+        "min": 3654051,
+        "max": 3748471,
+        "mean": 3691621.8
       }
     },
     {
@@ -149,22 +157,23 @@
       "warmups": 10,
       "measured": 100,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
       "baseline_only_p95": false,
       "server_observed_ms": {
-        "p50": 1,
-        "p95": 1,
+        "p50": 2,
+        "p95": 2,
         "min": 1,
-        "max": 1,
-        "mean": 1.0
+        "max": 2,
+        "mean": 1.51
       },
       "wall_us": {
-        "p50": 1921,
-        "p95": 1991,
-        "min": 1824,
-        "max": 2025,
-        "mean": 1920.86
+        "p50": 2112,
+        "p95": 2419,
+        "min": 1833,
+        "max": 2515,
+        "mean": 2147.6
       }
     },
     {
@@ -174,22 +183,23 @@
       "warmups": 2,
       "measured": 20,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty",
       "baseline_only_p95": true,
       "server_observed_ms": {
-        "p50": 3667,
-        "p95": 3759,
-        "min": 3619,
-        "max": 3781,
-        "mean": 3682.5
+        "p50": 3670,
+        "p95": 3744,
+        "min": 3639,
+        "max": 3745,
+        "mean": 3681.65
       },
       "wall_us": {
-        "p50": 3667430,
-        "p95": 3760139,
-        "min": 3620059,
-        "max": 3781736,
-        "mean": 3683356.75
+        "p50": 3670514,
+        "p95": 3744620,
+        "min": 3639654,
+        "max": 3745482,
+        "mean": 3682417.85
       }
     },
     {
@@ -199,22 +209,23 @@
       "warmups": 10,
       "measured": 100,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
       "baseline_only_p95": false,
       "server_observed_ms": {
-        "p50": 554,
+        "p50": 553,
         "p95": 567,
-        "min": 542,
-        "max": 585,
-        "mean": 556.15
+        "min": 548,
+        "max": 573,
+        "mean": 556.05
       },
       "wall_us": {
-        "p50": 555050,
-        "p95": 567537,
-        "min": 542952,
-        "max": 585398,
-        "mean": 556810.29
+        "p50": 554021,
+        "p95": 567503,
+        "min": 548267,
+        "max": 573492,
+        "mean": 556731.4
       }
     },
     {
@@ -224,22 +235,23 @@
       "warmups": 2,
       "measured": 20,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty",
       "baseline_only_p95": true,
       "server_observed_ms": {
-        "p50": 3548,
-        "p95": 3644,
-        "min": 3513,
-        "max": 3661,
-        "mean": 3575.95
+        "p50": 3587,
+        "p95": 3612,
+        "min": 3539,
+        "max": 3627,
+        "mean": 3583.0
       },
       "wall_us": {
-        "p50": 3548981,
-        "p95": 3644505,
-        "min": 3513600,
-        "max": 3661317,
-        "mean": 3576587.45
+        "p50": 3587483,
+        "p95": 3612666,
+        "min": 3539847,
+        "max": 3628036,
+        "mean": 3583689.55
       }
     },
     {
@@ -249,22 +261,23 @@
       "warmups": 2,
       "measured": 20,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty",
       "baseline_only_p95": true,
       "server_observed_ms": {
-        "p50": 3664,
-        "p95": 3756,
-        "min": 3630,
-        "max": 3756,
-        "mean": 3680.3
+        "p50": 3660,
+        "p95": 3724,
+        "min": 3576,
+        "max": 3731,
+        "mean": 3660.0
       },
       "wall_us": {
-        "p50": 3664567,
-        "p95": 3756344,
-        "min": 3630748,
-        "max": 3756513,
-        "mean": 3681048.0
+        "p50": 3660736,
+        "p95": 3724914,
+        "min": 3577120,
+        "max": 3732421,
+        "mean": 3660897.5
       }
     },
     {
@@ -274,22 +287,23 @@
       "warmups": 10,
       "measured": 100,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
       "baseline_only_p95": false,
       "server_observed_ms": {
         "p50": 1,
-        "p95": 2,
+        "p95": 1,
         "min": 1,
         "max": 2,
-        "mean": 1.42
+        "mean": 1.03
       },
       "wall_us": {
-        "p50": 1717,
-        "p95": 2450,
-        "min": 1546,
-        "max": 2491,
-        "mean": 1971.89
+        "p50": 1623,
+        "p95": 1953,
+        "min": 1549,
+        "max": 2196,
+        "mean": 1658.17
       }
     },
     {
@@ -299,22 +313,23 @@
       "warmups": 2,
       "measured": 20,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty",
       "baseline_only_p95": true,
       "server_observed_ms": {
-        "p50": 3672,
-        "p95": 3783,
-        "min": 3633,
-        "max": 3803,
-        "mean": 3710.6
+        "p50": 3705,
+        "p95": 3732,
+        "min": 3639,
+        "max": 3743,
+        "mean": 3698.2
       },
       "wall_us": {
-        "p50": 3673249,
-        "p95": 3783859,
-        "min": 3633602,
-        "max": 3803442,
-        "mean": 3711439.55
+        "p50": 3706058,
+        "p95": 3733212,
+        "min": 3639271,
+        "max": 3743243,
+        "mean": 3698978.65
       }
     }
   ],
