@@ -1064,9 +1064,9 @@ fn resolve_document(
 }
 
 fn preserves_trailing_newline(descriptor: &TypeDescriptor) -> bool {
-    // Transitional: the glossary and requirement modules historically printed
-    // the record with its trailing newline. TASK-259 must record this seed fact
-    // before the handler enum is removed.
+    // Seed-inexpressible quirk retained deliberately (TASK-255, TASK-259): the
+    // glossary and requirement modules historically printed the record with its
+    // trailing newline. The handler mapping keeps it until MS-035.
     matches!(
         descriptor.handler(),
         Some(TypedHandler::Glossary) | Some(TypedHandler::Requirement(_))
@@ -1312,6 +1312,8 @@ fn edit_document(
     if let Some(command) = editor_command {
         let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
         run_editor(&command, &safe_path)?;
+        // Seed-inexpressible quirk retained deliberately (TASK-255, TASK-259):
+        // a ui-spec body rewritten by the editor re-adopts front matter.
         if matches!(descriptor.handler(), Some(TypedHandler::UiSpec)) {
             record::migrate::ensure_front_matter(ctx, cfg, registry, &safe_path)?;
         }
@@ -2457,56 +2459,64 @@ mod tests {
         default_config(&dir);
         let c = ctx(&dir);
         let reg = registry(&c);
-        let req_scope = scope_for(&c, "req");
-        let nfr_scope = scope_for(&c, "nfr");
-        let _ = crate::requirement::create_group(
+        let req_group = run(
             &c,
-            &req_scope,
-            &access(&c).1,
-            crate::requirement::Kind::Req,
-            "G",
-            None,
-            None,
-        )
-        .unwrap();
-        let rid = crate::requirement::create(
-            &c,
-            &req_scope,
+            &access(&c).0,
             &reg,
-            crate::requirement::Kind::Req,
-            Some("R"),
-            None,
-            None,
-            Some(sanitize::Text::literal("desc")),
-            "REQ-001",
-            &[],
-            &[],
+            generic_invocation(
+                "req",
+                DocumentVerb::CreateGroup,
+                None,
+                Some("G".to_string()),
+                None,
+                vec![],
+                vec![],
+                None,
+            ),
         )
-        .unwrap();
-        let _ = crate::requirement::create_group(
-            &c,
-            &nfr_scope,
-            &access(&c).1,
-            crate::requirement::Kind::Nfr,
-            "NG",
+        .unwrap()
+        .text;
+        let mut req_create = generic_invocation(
+            "req",
+            DocumentVerb::Create,
             None,
+            Some("R".to_string()),
+            Some("desc".to_string()),
+            vec![],
+            vec![],
             None,
-        )
-        .unwrap();
-        let nid = crate::requirement::create(
+        );
+        req_create.args.insert("group", vec![req_group]);
+        let rid = run(&c, &access(&c).0, &reg, req_create).unwrap().text;
+        let nfr_group = run(
             &c,
-            &nfr_scope,
+            &access(&c).0,
             &reg,
-            crate::requirement::Kind::Nfr,
-            Some("NR"),
-            None,
-            None,
-            Some(sanitize::Text::literal("desc")),
-            "NFR-001",
-            &[],
-            &[],
+            generic_invocation(
+                "nfr",
+                DocumentVerb::CreateGroup,
+                None,
+                Some("NG".to_string()),
+                None,
+                vec![],
+                vec![],
+                None,
+            ),
         )
-        .unwrap();
+        .unwrap()
+        .text;
+        let mut nfr_create = generic_invocation(
+            "nfr",
+            DocumentVerb::Create,
+            None,
+            Some("NR".to_string()),
+            Some("desc".to_string()),
+            vec![],
+            vec![],
+            None,
+        );
+        nfr_create.args.insert("group", vec![nfr_group]);
+        let nid = run(&c, &access(&c).0, &reg, nfr_create).unwrap().text;
 
         let out = run(
             &c,
@@ -3189,31 +3199,35 @@ mod tests {
         .unwrap();
         assert!(out.text.contains("# DEP-001 G"));
         // typed req
-        let req_scope = scope_for(&c, "req");
-        let _ = crate::requirement::create_group(
+        let req_group = run(
             &c,
-            &req_scope,
-            &access(&c).1,
-            crate::requirement::Kind::Req,
-            "G",
-            None,
-            None,
-        )
-        .unwrap();
-        let rid = crate::requirement::create(
-            &c,
-            &req_scope,
+            &access(&c).0,
             &reg,
-            crate::requirement::Kind::Req,
-            Some("R"),
-            None,
-            None,
-            Some(sanitize::Text::literal("desc")),
-            "REQ-001",
-            &[],
-            &[],
+            generic_invocation(
+                "req",
+                DocumentVerb::CreateGroup,
+                None,
+                Some("G".to_string()),
+                None,
+                vec![],
+                vec![],
+                None,
+            ),
         )
-        .unwrap();
+        .unwrap()
+        .text;
+        let mut req_create = generic_invocation(
+            "req",
+            DocumentVerb::Create,
+            None,
+            Some("R".to_string()),
+            Some("desc".to_string()),
+            vec![],
+            vec![],
+            None,
+        );
+        req_create.args.insert("group", vec![req_group]);
+        let rid = run(&c, &access(&c).0, &reg, req_create).unwrap().text;
         let out = run(
             &c,
             &access(&c).0,
@@ -3255,17 +3269,24 @@ mod tests {
         let dir = tmpdir("typedext");
         default_config(&dir);
         let c = ctx(&dir);
-        let req_scope = scope_for(&c, "req");
-        let gid = crate::requirement::create_group(
+        let reg = registry(&c);
+        let gid = run(
             &c,
-            &req_scope,
-            &access(&c).1,
-            crate::requirement::Kind::Req,
-            "G",
-            None,
-            None,
+            &access(&c).0,
+            &reg,
+            generic_invocation(
+                "req",
+                DocumentVerb::CreateGroup,
+                None,
+                Some("G".to_string()),
+                None,
+                vec![],
+                vec![],
+                None,
+            ),
         )
-        .unwrap();
+        .unwrap()
+        .text;
         assert!(!gid.is_empty());
         let mock_scope = scope_for(&c, "ui-mockup");
         let id = crate::ui_mockup::handle(
@@ -3303,5 +3324,21 @@ mod tests {
         )
         .unwrap();
         assert!(out.text.contains(&id2));
+    }
+
+    #[test]
+    fn handler_mapping_keeps_the_view_trailing_newline_quirk() {
+        let dir = tmpdir("newline-quirk");
+        default_config(&dir);
+        let c = ctx(&dir);
+        let reg = registry(&c);
+        for slug in ["glossary", "req", "nfr"] {
+            let descriptor = reg.descriptor(slug).unwrap_or_else(|| panic!("{slug}"));
+            assert!(preserves_trailing_newline(descriptor), "{slug}");
+        }
+        for slug in ["rule", "ui-spec", "tech-spec", "audit", "use-case"] {
+            let descriptor = reg.descriptor(slug).unwrap_or_else(|| panic!("{slug}"));
+            assert!(!preserves_trailing_newline(descriptor), "{slug}");
+        }
     }
 }

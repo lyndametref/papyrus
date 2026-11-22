@@ -2,7 +2,7 @@
 id: TASK-259
 title: "Delete the nine typed document modules and transitional document command tables"
 created_date: '2026-11-20T17:42:17Z'
-updated_date: '2026-11-22T14:20:00Z'
+updated_date: '2026-11-22T14:49:24Z'
 labels: []
 references:
   - ADR-036
@@ -10,7 +10,7 @@ references:
   - TECH-066
   - REQ-07.004
   - ADR-042
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-034
@@ -65,3 +65,5 @@ The nine modules and the transitional document CLI verb tables are gone; `ui_moc
 - **task-refiner**: Grounding (browser dependency): src/browser/mod.rs calls edit::requirement_ops, edit::glossary_ops, edit::ui_spec_ops, edit::business_rule_ops, edit::audit_ops, edit::tech_spec_ops, edit::use_case_ops, and edit::generic_document_ops, and selects document behavior through the document TypedHandler variants. This is why the builders and variants remain in MS-034.
 - **planner**: ADR-042 planner alignment applied: TASK-259 is narrowed to the nine typed CLI modules and the transitional document CLI schema/verb tables. The eight document ops builders and the document TypedHandler variants are consumed by src/browser/mod.rs, so they remain in MS-034 and their deletion is deferred to MS-035 TASK-266/TASK-269; a deferral note is added to TASK-269. No dependency, ordinal, or milestone change.
 - **planner**: The audit_type default and verb-about-line escalations are resolved by ADR-042 rulings 1 and 2 in TASK-255 and TASK-260; no seed fact is missing for module deletion.
+- **rust-dev**: TASK-259: deleted src audit.rs, glossary.rs, requirement.rs, rule.rs, tech_spec.rs, test_case.rs, test_report.rs, ui_spec.rs, use_case.rs and their lib.rs mods; removed registry document_schema, the nine *_verbs and ten *_schema builders while retaining ui_mockup.rs and ui_mockup_schema and ui_mockup_verbs, the eight document ops builders, and document TypedHandler variants via document_handler; Markdown docs now derive metadata from DocumentModel and seed (schema None), browser is_generic and api_doc_list use handler().is_none(). Quirks: glossary, req, nfr view trailing newline retained (new handler-mapping test plus corpus); ui-spec post-editor frontmatter adoption retained (ui_spec_cli test); nfr --story is the documented corrected delta (req_cli and document_dispatch tests). Added D-13 to D-16 no-drift guards. env -u EDITOR -u VISUAL cargo test: 1260 passed, 0 failed; clippy -D warnings and fmt clean. LOC excluding task file: +404 and -6089 net -5685. Branch task-TASK-259, working tree (no commit per instruction).
+- **orchestrator**: Acceptance met: nine typed document modules and transitional schemas and verb tables deleted with a net reduction of 5685 lines; ui_mockup retained; eight ops builders and TypedHandler variants kept for MS-035; three quirks preserved with guards; 1260 tests pass.

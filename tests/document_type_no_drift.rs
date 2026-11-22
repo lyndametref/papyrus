@@ -517,7 +517,12 @@ fn scanner_flags_planted_violations_and_accepts_allowlisted_lines() {
 
 // TASK-119 guards ----------------------------------------------------------
 
-const TYPED_DOCUMENT_MODULES: [&str; 10] = [
+/// The only typed document module left after TASK-259: the HTML mockup keeps
+/// its own metadata writer until MS-035.
+const TYPED_DOCUMENT_MODULES: [&str; 1] = ["src/ui_mockup.rs"];
+
+/// The nine per-type CLI modules deleted by TASK-259.
+const REMOVED_DOCUMENT_MODULES: [&str; 9] = [
     "src/requirement.rs",
     "src/glossary.rs",
     "src/rule.rs",
@@ -527,7 +532,43 @@ const TYPED_DOCUMENT_MODULES: [&str; 10] = [
     "src/use_case.rs",
     "src/test_case.rs",
     "src/test_report.rs",
-    "src/ui_mockup.rs",
+];
+
+/// The transitional document command tables deleted by TASK-259. The HTML
+/// mockup keeps its model-owned verb table until MS-035.
+const REMOVED_DOCUMENT_COMMAND_BUILDERS: [&str; 20] = [
+    "fn document_schema(",
+    "fn requirement_verbs(",
+    "fn glossary_verbs(",
+    "fn rule_verbs(",
+    "fn ui_spec_verbs(",
+    "fn audit_verbs(",
+    "fn tech_spec_verbs(",
+    "fn use_case_verbs(",
+    "fn test_case_verbs(",
+    "fn test_report_verbs(",
+    "fn requirement_business_schema(",
+    "fn requirement_non_functional_schema(",
+    "fn glossary_schema(",
+    "fn rule_schema(",
+    "fn ui_spec_schema(",
+    "fn audit_schema(",
+    "fn tech_spec_schema(",
+    "fn use_case_schema(",
+    "fn test_case_schema(",
+    "fn test_report_schema(",
+];
+
+/// The eight document ops builders retained for the browser until MS-035.
+const DEFERRED_DOCUMENT_OPS_BUILDERS: [&str; 8] = [
+    "generic_document_ops",
+    "requirement_ops",
+    "glossary_ops",
+    "ui_spec_ops",
+    "business_rule_ops",
+    "audit_ops",
+    "tech_spec_ops",
+    "use_case_ops",
 ];
 
 const REMOVED_DOCUMENT_ENUMS: [&str; 10] = [
@@ -689,6 +730,95 @@ fn d12_document_records_have_one_source() {
                 .iter()
                 .any(|descriptor| descriptor.name == name && descriptor.record_type == record_type),
             "static descriptor missing: {name}"
+        );
+    }
+}
+
+// D-13 ---------------------------------------------------------------------
+#[test]
+fn d13_typed_document_modules_are_deleted_and_ui_mockup_remains() {
+    for rel in REMOVED_DOCUMENT_MODULES {
+        assert!(
+            !Path::new(rel).exists(),
+            "{rel} must be deleted by TASK-259"
+        );
+    }
+    assert!(
+        Path::new("src/ui_mockup.rs").exists(),
+        "ui_mockup must remain as the SingleHtmlMockup surface"
+    );
+}
+
+// D-14 ---------------------------------------------------------------------
+#[test]
+fn d14_transitional_document_command_tables_are_gone() {
+    let registry = fs::read_to_string("src/registry.rs").expect("registry.rs");
+    let production: String = production_lines_in(&registry)
+        .into_iter()
+        .map(|(_, line)| line)
+        .collect::<Vec<_>>()
+        .join("\n");
+    for builder in REMOVED_DOCUMENT_COMMAND_BUILDERS {
+        assert!(
+            !production.contains(builder),
+            "transitional document command table must be deleted: {builder}"
+        );
+    }
+}
+
+// D-15 ---------------------------------------------------------------------
+#[test]
+fn d15_deferred_document_ops_builders_remain_until_ms035() {
+    let edit = fs::read_to_string("src/record/edit.rs").expect("edit.rs");
+    let production: String = production_lines_in(&edit)
+        .into_iter()
+        .map(|(_, line)| line)
+        .collect::<Vec<_>>()
+        .join("\n");
+    for builder in DEFERRED_DOCUMENT_OPS_BUILDERS {
+        assert!(
+            production.contains(&format!("pub fn {builder}(")),
+            "the browser still calls {builder}; MS-035 TASK-266/TASK-269 deletes it"
+        );
+    }
+    for builder in [
+        "task_status_ops",
+        "task_ops",
+        "milestone_ops",
+        "release_ops",
+        "decision_ops",
+    ] {
+        assert!(
+            production.contains(&format!("pub fn {builder}(")),
+            "backlog/decision builder must remain: {builder}"
+        );
+    }
+}
+
+// D-16 ---------------------------------------------------------------------
+#[test]
+fn d16_document_typed_handlers_remain_until_ms035() {
+    let registry = fs::read_to_string("src/registry.rs").expect("registry.rs");
+    let production: String = production_lines_in(&registry)
+        .into_iter()
+        .map(|(_, line)| line)
+        .collect::<Vec<_>>()
+        .join("\n");
+    for variant in [
+        "Requirement(RequirementKind)",
+        "Glossary",
+        "UiSpec",
+        "Rule",
+        "UiMockup",
+        "Audit",
+        "TechSpec",
+        "UseCase",
+        "TestCase",
+        "TestReport",
+    ] {
+        assert!(
+            production.contains(variant),
+            "document TypedHandler variant must remain until MS-035 TASK-269: {variant}"
         );
     }
 }

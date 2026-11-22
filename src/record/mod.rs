@@ -113,7 +113,7 @@ mod read_path_guard_tests {
     fn every_read_module_builds_no_per_record_configuration_or_registry() {
         let paths = read_module_paths();
         assert!(
-            paths.len() >= 15,
+            paths.len() >= 8,
             "expected the top-level read modules, found {}",
             paths.len()
         );
