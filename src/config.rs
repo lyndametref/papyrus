@@ -72,8 +72,130 @@ impl Default for TypeEntry {
     }
 }
 
+/// The front-matter and engine-owned keys a document field may never declare
+/// as its `key` or `frontmatter_key` (ADR-036 decision 23).
+pub const RESERVED_FIELD_KEYS: [&str; 8] = [
+    "id",
+    "title",
+    "status",
+    "labels",
+    "references",
+    "created_date",
+    "updated_date",
+    "group",
+];
+
+/// The entry keys that select behaviour and are not configuration keys
+/// (ADR-036 decision 6, REQ-07.004).
+pub const RESERVED_ENTRY_KEYS: [&str; 4] = ["model", "title", "content", "id_shape"];
+
+/// The verbs a field's option is offered on (ADR-036 decision 19).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum FieldVerb {
+    Create,
+    Edit,
+}
+
+/// The accepted value form of a field (ADR-036 decision 17).
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum FieldKind {
+    #[default]
+    Text,
+    Multiline,
+    List,
+}
+
+fn default_field_verbs() -> Vec<FieldVerb> {
+    vec![FieldVerb::Create, FieldVerb::Edit]
+}
+
+/// Whether a role's references are rendered (ADR-035, ADR-036 decision 27).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Visibility {
+    Visible,
+    Hidden,
+}
+
+/// One declared document field (ADR-036 decision 11).
+///
+/// The type has exactly the documented keys: there is no `order` and no
+/// `enabled`, and sequence position is the only order. Unknown keys are
+/// rejected at deserialization so validation can name their selector path
+/// (ADR-036 decision 34).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct FieldSpec {
+    /// Stable field identity in field maps, selectors, and form posts.
+    pub key: String,
+    /// Level-2 Markdown heading, written with its `## ` prefix.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub heading: Option<String>,
+    /// Front-matter key that stores the value; may differ from `key`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frontmatter_key: Option<String>,
+    /// Long CLI option name without the leading `--`; derived from `key` when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub option: Option<String>,
+    /// Human-facing label for CLI help and the browser form.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// Value form; `text` when absent.
+    #[serde(default)]
+    pub kind: FieldKind,
+    /// Whether `create` must supply the field.
+    #[serde(default)]
+    pub required: bool,
+    /// Verbs whose option offers the field; defaults to `[create, edit]`.
+    #[serde(default = "default_field_verbs")]
+    pub verbs: Vec<FieldVerb>,
+    /// Option help text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub help: Option<String>,
+}
+
+impl FieldSpec {
+    /// The reserved key this field names as its `key` or `frontmatter_key`.
+    pub fn reserved_key(&self) -> Option<&'static str> {
+        let frontmatter = self.frontmatter_key.as_deref();
+        RESERVED_FIELD_KEYS
+            .iter()
+            .copied()
+            .find(|reserved| self.key == *reserved || frontmatter == Some(*reserved))
+    }
+
+    /// Whether the field declares a body heading, a front-matter key, or both.
+    pub fn stores_value(&self) -> bool {
+        self.heading.is_some() || self.frontmatter_key.is_some()
+    }
+}
+
+/// One role's field sequence and optional reference visibility (ADR-036
+/// decision 27).
+///
+/// An absent member is `None`; a present empty `fields` collection is
+/// `Some(vec![])`, so the two stay distinguishable (ADR-036 decision 32).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default, deny_unknown_fields)]
+pub struct RoleFields {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fields: Option<Vec<FieldSpec>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_visibility: Option<Visibility>,
+}
+
+/// One browser list column declared by a document type (ADR-041).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Slot {
+    pub key: String,
+    pub label: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct DocTypeEntry {
     pub prefix: String,
     pub directory: String,
@@ -87,6 +209,39 @@ pub struct DocTypeEntry {
     /// Initial status of a new record; falls back to `active` (REQ-07.001).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_status: Option<String>,
+    /// Presentation label; filled from the seed when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// Presentation plural; filled from the seed when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plural: Option<String>,
+    /// Presentation order; filled from the seed when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub order: Option<u32>,
+    /// Presentation summary; filled from the seed when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    /// Alternate type name; filled from the seed when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub type_alias: Option<String>,
+    /// Reference visibility of a single-role type (ADR-035).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_visibility: Option<Visibility>,
+    /// Declared browser list columns (ADR-041).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slots: Option<Vec<Slot>>,
+    /// Declared API aliases.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_aliases: Option<Vec<String>>,
+    /// Field sequence of a single-role type (ADR-036 decision 26).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fields: Option<Vec<FieldSpec>>,
+    /// Group role of a grouped type (ADR-036 decision 27).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<RoleFields>,
+    /// Member role of a grouped type (ADR-036 decision 27).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub member: Option<RoleFields>,
 }
 
 impl Default for DocTypeEntry {
@@ -97,6 +252,17 @@ impl Default for DocTypeEntry {
             enabled: true,
             statuses: None,
             default_status: None,
+            label: None,
+            plural: None,
+            order: None,
+            summary: None,
+            type_alias: None,
+            reference_visibility: None,
+            slots: None,
+            api_aliases: None,
+            fields: None,
+            group: None,
+            member: None,
         }
     }
 }
@@ -178,6 +344,7 @@ impl Default for Config {
                         None
                     },
                     default_status: None,
+                    ..Default::default()
                 },
             );
         }
@@ -1113,6 +1280,7 @@ mod tests {
             enabled: true,
             statuses: None,
             default_status: None,
+            ..Default::default()
         };
         let value = serde_json::to_value(&entry).unwrap();
         let object = value.as_object().unwrap();
@@ -1222,6 +1390,7 @@ mod tests {
             enabled: true,
             statuses: None,
             default_status: None,
+            ..Default::default()
         }
     }
 
@@ -1896,6 +2065,215 @@ mod tests {
                 .iter()
                 .any(|(key, value)| key.ends_with(".default_status") && value.is_empty()),
             "no empty default_status values"
+        );
+    }
+
+    #[test]
+    fn field_spec_declares_the_documented_keys_and_defaults() {
+        let field: FieldSpec = yaml_serde::from_str(
+            "key: story\nheading: '## User Story'\nfrontmatter_key: story_text\noption: story\nlabel: Story\nkind: multiline\nrequired: true\nhelp: The user story.\n",
+        )
+        .unwrap();
+        assert_eq!(field.key, "story");
+        assert_eq!(field.heading.as_deref(), Some("## User Story"));
+        assert_eq!(field.frontmatter_key.as_deref(), Some("story_text"));
+        assert_eq!(field.option.as_deref(), Some("story"));
+        assert_eq!(field.label.as_deref(), Some("Story"));
+        assert_eq!(field.kind, FieldKind::Multiline);
+        assert!(field.required);
+        assert_eq!(field.verbs, vec![FieldVerb::Create, FieldVerb::Edit]);
+        assert_eq!(field.help.as_deref(), Some("The user story."));
+        assert!(field.stores_value());
+
+        let minimal: FieldSpec = yaml_serde::from_str("key: description\n").unwrap();
+        assert_eq!(minimal.kind, FieldKind::Text);
+        assert!(!minimal.required);
+        assert_eq!(minimal.verbs, vec![FieldVerb::Create, FieldVerb::Edit]);
+        assert!(!minimal.stores_value(), "neither location is declared");
+    }
+
+    #[test]
+    fn field_spec_rejects_order_enabled_and_unknown_keys() {
+        for extra in ["order: 10", "enabled: true", "short: d", "template: x"] {
+            let yaml = format!("key: description\nheading: '## Description'\n{extra}\n");
+            assert!(
+                yaml_serde::from_str::<FieldSpec>(&yaml).is_err(),
+                "field key must be rejected: {extra}"
+            );
+        }
+        assert_eq!(
+            RESERVED_ENTRY_KEYS,
+            ["model", "title", "content", "id_shape"]
+        );
+    }
+
+    #[test]
+    fn field_kind_and_verbs_reject_unknown_values() {
+        for kind in ["text", "multiline", "list"] {
+            let yaml = format!("key: description\nheading: '## Description'\nkind: {kind}\n");
+            assert!(
+                yaml_serde::from_str::<FieldSpec>(&yaml).is_ok(),
+                "kind must be accepted: {kind}"
+            );
+        }
+        assert!(
+            yaml_serde::from_str::<FieldSpec>(
+                "key: description\nheading: '## Description'\nkind: paragraph\n"
+            )
+            .is_err()
+        );
+
+        let yaml = "key: description\nheading: '## Description'\nverbs: [create]\n";
+        assert_eq!(
+            yaml_serde::from_str::<FieldSpec>(yaml).unwrap().verbs,
+            vec![FieldVerb::Create]
+        );
+        assert!(
+            yaml_serde::from_str::<FieldSpec>(
+                "key: description\nheading: '## Description'\nverbs: [delete]\n"
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn reference_visibility_accepts_only_visible_and_hidden() {
+        for (raw, expected) in [
+            ("visible", Visibility::Visible),
+            ("hidden", Visibility::Hidden),
+        ] {
+            let yaml = format!("prefix: DEP\ndirectory: deploy/\nreference_visibility: {raw}\n");
+            assert_eq!(
+                yaml_serde::from_str::<DocTypeEntry>(&yaml)
+                    .unwrap()
+                    .reference_visibility,
+                Some(expected)
+            );
+        }
+        assert!(
+            yaml_serde::from_str::<DocTypeEntry>(
+                "prefix: DEP\ndirectory: deploy/\nreference_visibility: sometimes\n"
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn reserved_field_keys_cover_every_engine_owned_key() {
+        assert_eq!(
+            RESERVED_FIELD_KEYS,
+            [
+                "id",
+                "title",
+                "status",
+                "labels",
+                "references",
+                "created_date",
+                "updated_date",
+                "group",
+            ]
+        );
+        for reserved in RESERVED_FIELD_KEYS {
+            let as_key: FieldSpec =
+                yaml_serde::from_str(&format!("key: {reserved}\nheading: '## X'\n")).unwrap();
+            assert_eq!(as_key.reserved_key(), Some(reserved), "{reserved} as key");
+
+            let as_frontmatter: FieldSpec =
+                yaml_serde::from_str(&format!("key: custom\nfrontmatter_key: {reserved}\n"))
+                    .unwrap();
+            assert_eq!(
+                as_frontmatter.reserved_key(),
+                Some(reserved),
+                "{reserved} as frontmatter_key"
+            );
+        }
+        let ok: FieldSpec = yaml_serde::from_str("key: story\nheading: '## User Story'\n").unwrap();
+        assert_eq!(ok.reserved_key(), None);
+    }
+
+    #[test]
+    fn grouped_role_blocks_declare_fields_and_reference_visibility() {
+        let entry: DocTypeEntry = yaml_serde::from_str(
+            "prefix: REQ\ndirectory: requirements/business/\ngroup:\n  reference_visibility: hidden\n  fields:\n    - key: story\n      heading: '## User Story'\nmember:\n  fields: []\n  reference_visibility: visible\n",
+        )
+        .unwrap();
+        let group = entry.group.expect("group block");
+        assert_eq!(group.reference_visibility, Some(Visibility::Hidden));
+        assert_eq!(group.fields.as_ref().unwrap().len(), 1);
+        let member = entry.member.expect("member block");
+        assert_eq!(member.reference_visibility, Some(Visibility::Visible));
+        assert_eq!(member.fields, Some(Vec::new()), "fields: [] stays present");
+        assert_eq!(entry.fields, None, "a grouped type has no top-level fields");
+    }
+
+    #[test]
+    fn absent_collections_are_none_and_empty_ones_are_some() {
+        let absent: DocTypeEntry =
+            yaml_serde::from_str("prefix: DEP\ndirectory: deploy/\n").unwrap();
+        assert_eq!(absent.fields, None);
+        assert_eq!(absent.group, None);
+        assert_eq!(absent.member, None);
+        assert_eq!(absent.slots, None);
+        assert_eq!(absent.api_aliases, None);
+        assert_eq!(absent.reference_visibility, None);
+        assert_eq!(absent.label, None);
+        assert_eq!(absent.plural, None);
+        assert_eq!(absent.order, None);
+        assert_eq!(absent.summary, None);
+        assert_eq!(absent.type_alias, None);
+
+        let empty: DocTypeEntry = yaml_serde::from_str(
+            "prefix: DEP\ndirectory: deploy/\nfields: []\nslots: []\napi_aliases: []\n",
+        )
+        .unwrap();
+        assert_eq!(empty.fields, Some(Vec::new()));
+        assert_eq!(empty.slots, Some(Vec::new()));
+        assert_eq!(empty.api_aliases, Some(Vec::new()));
+    }
+
+    #[test]
+    fn doc_type_entry_deserializes_presentation_and_slot_declarations() {
+        let entry: DocTypeEntry = yaml_serde::from_str(
+            "prefix: DEP\ndirectory: deploy/\nlabel: Deployment\nplural: Deployments\norder: 120\nsummary: Deployment records.\ntype_alias: deployment\nreference_visibility: visible\nslots:\n  - key: environment\n    label: Environment\napi_aliases: [/api/deployments]\nfields:\n  - key: description\n    heading: '## Description'\nstatuses: [active, archived]\ndefault_status: active\n",
+        )
+        .unwrap();
+        assert_eq!(entry.label.as_deref(), Some("Deployment"));
+        assert_eq!(entry.plural.as_deref(), Some("Deployments"));
+        assert_eq!(entry.order, Some(120));
+        assert_eq!(entry.summary.as_deref(), Some("Deployment records."));
+        assert_eq!(entry.type_alias.as_deref(), Some("deployment"));
+        assert_eq!(entry.reference_visibility, Some(Visibility::Visible));
+        assert_eq!(
+            entry.slots,
+            Some(vec![Slot {
+                key: "environment".to_string(),
+                label: "Environment".to_string(),
+            }])
+        );
+        assert_eq!(
+            entry.api_aliases,
+            Some(vec!["/api/deployments".to_string()])
+        );
+        assert_eq!(entry.fields.as_ref().unwrap().len(), 1);
+        assert_eq!(
+            entry.statuses,
+            Some(vec!["active".to_string(), "archived".to_string()])
+        );
+        assert_eq!(entry.default_status.as_deref(), Some("active"));
+    }
+
+    #[test]
+    fn doc_type_entry_rejects_behaviour_keys() {
+        for key in RESERVED_ENTRY_KEYS {
+            let yaml = format!("prefix: DEP\ndirectory: deploy/\n{key}: value\n");
+            assert!(
+                yaml_serde::from_str::<DocTypeEntry>(&yaml).is_err(),
+                "entry key must be rejected: {key}"
+            );
+        }
+        assert!(
+            yaml_serde::from_str::<DocTypeEntry>("prefix: DEP\ndirectory: deploy/\ntemplate: x\n")
+                .is_err()
         );
     }
 }

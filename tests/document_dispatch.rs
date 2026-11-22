@@ -25,6 +25,7 @@ fn project(name: &str) -> (PathBuf, Context, ArtifactRegistry) {
             enabled: true,
             statuses: None,
             default_status: None,
+            ..Default::default()
         },
     );
     fs::write(

@@ -220,48 +220,70 @@ pub const CANONICAL_DOCUMENT_VERB_ORDER: &[Verb] = &[
     Verb::Status,
 ];
 
-/// The body model of a document type (REQ-07.004, REQ-05.008).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ContentModel {
-    /// Config-defined document type (REQ-07.004, ADR-0018).
-    Generic,
-    Typed(TypedSchema),
-    HtmlMockup(TypedSchema),
+/// The body model of a document type (ADR-036 decision 5, REQ-07.004).
+///
+/// The model is seed data and never a configuration key: a seed slug takes its
+/// model from the seed table, and every user-defined slug is `SingleMarkdown`
+/// (ADR-036 decisions 6 and 31).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DocumentModel {
+    /// One markdown record per plain ID.
+    SingleMarkdown,
+    /// Group and member records with dotted member IDs.
+    GroupedMarkdown,
+    /// One HTML record per plain ID with metadata-held state.
+    SingleHtmlMockup,
 }
 
-impl ContentModel {
-    /// The ordered verb metadata used to build this content model's command.
+impl DocumentModel {
+    /// The model a slug resolves to from the seed alone.
+    ///
+    /// `req` and `nfr` are grouped, `ui-mockup` is an HTML mockup, every other
+    /// seed slug and every slug with no seed entry is single markdown.
+    pub fn for_slug(slug: &str) -> DocumentModel {
+        DOCUMENT_TEMPLATES
+            .iter()
+            .find(|template| template.slug == slug)
+            .map_or(DocumentModel::SingleMarkdown, |template| {
+                template.content.document_model()
+            })
+    }
+}
+
+impl TypeDescriptor {
+    /// The ordered verb metadata used to build this type's command.
     ///
     /// A generic document carries no schema, so its metadata comes from the
-    /// shared document baseline; a typed model owns its copy.
-    pub fn verbs(&self) -> Vec<VerbSpec> {
-        match self {
-            ContentModel::Generic => generic_document_verbs(),
-            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => schema.verbs.clone(),
+    /// shared document baseline; a built-in type owns its copy.
+    pub fn verb_specs(&self) -> Vec<VerbSpec> {
+        match &self.schema {
+            Some(schema) => schema.verbs.clone(),
+            None => generic_document_verbs(),
         }
     }
 
     /// The module that owns typed validation and patch building, if any.
     pub fn handler(&self) -> Option<TypedHandler> {
-        match self {
-            ContentModel::Generic => None,
-            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => Some(schema.handler),
-        }
+        self.schema.as_ref().map(|schema| schema.handler)
     }
-}
 
-impl TypeDescriptor {
-    /// The verb spec for `verb`, when the content model declares one.
+    /// Whether this descriptor is the config-defined document path that the
+    /// seed-derived model replaces (REQ-07.004, MS-033 AC-7).
+    ///
+    /// Transitional bridge until MS-034/MS-035 read the seed-derived model and
+    /// `reference_visibility` instead.
+    pub fn is_config_defined_document(&self) -> bool {
+        self.category == ArtifactCategory::Document && !is_builtin_document_slug(&self.slug)
+    }
+
+    /// The verb spec for `verb`, when the descriptor declares one.
     pub fn verb_spec(&self, verb: Verb) -> Option<VerbSpec> {
-        self.content_model
-            .verbs()
-            .into_iter()
-            .find(|spec| spec.verb == verb)
+        self.verb_specs().into_iter().find(|spec| spec.verb == verb)
     }
 
     /// Every declared spec verb, in canonical presentation order.
     pub fn ordered_verb_specs(&self) -> Vec<VerbSpec> {
-        let specs = self.content_model.verbs();
+        let specs = self.verb_specs();
         CANONICAL_DOCUMENT_VERB_ORDER
             .iter()
             .filter(|verb| self.has_verb(**verb))
@@ -291,7 +313,13 @@ pub struct TypeDescriptor {
     pub status_model: StatusModel,
     pub verbs: Vec<Verb>,
     pub create_options: CreateOptions,
-    pub content_model: ContentModel,
+    pub document_model: DocumentModel,
+    /// Transitional typed schema carried by a built-in type until TASK-249
+    /// derives fields, sections, and verbs from the seed (ADR-036 decision 29).
+    ///
+    /// `None` is the generic config-defined document path retained until the
+    /// same task.
+    pub schema: Option<TypedSchema>,
     pub frontmatter_keys: Vec<String>,
     pub id_shape: IdShape,
     pub archive_policy: ArchivePolicy,
@@ -2097,10 +2125,10 @@ enum TemplateVerbs {
     DocumentBaseline { extensions: &'static [Verb] },
 }
 
-/// The typed content-model shape a template names.
+/// The typed schema shape a template names.
 ///
 /// The template table is the static source of the current section and verb
-/// facts. Building a descriptor materialises an owned [`ContentModel`] from
+/// facts. Building a descriptor materialises an owned [`TypedSchema`] from
 /// this kind, so no descriptor borrows the table (TECH-071 section 1).
 #[derive(Clone, Copy, Debug)]
 enum SchemaKind {
@@ -2122,25 +2150,34 @@ enum SchemaKind {
 }
 
 impl SchemaKind {
-    fn content_model(self) -> ContentModel {
+    fn schema(self) -> TypedSchema {
         match self {
-            SchemaKind::Task => ContentModel::Typed(task_schema()),
-            SchemaKind::Milestone => ContentModel::Typed(milestone_schema()),
-            SchemaKind::Release => ContentModel::Typed(release_schema()),
-            SchemaKind::Decision => ContentModel::Typed(decision_schema()),
-            SchemaKind::RequirementBusiness => ContentModel::Typed(requirement_business_schema()),
-            SchemaKind::RequirementNonFunctional => {
-                ContentModel::Typed(requirement_non_functional_schema())
+            SchemaKind::Task => task_schema(),
+            SchemaKind::Milestone => milestone_schema(),
+            SchemaKind::Release => release_schema(),
+            SchemaKind::Decision => decision_schema(),
+            SchemaKind::RequirementBusiness => requirement_business_schema(),
+            SchemaKind::RequirementNonFunctional => requirement_non_functional_schema(),
+            SchemaKind::Glossary => glossary_schema(),
+            SchemaKind::Rule => rule_schema(),
+            SchemaKind::UiSpec => ui_spec_schema(),
+            SchemaKind::UiMockup => ui_mockup_schema(),
+            SchemaKind::Audit => audit_schema(),
+            SchemaKind::TechSpec => tech_spec_schema(),
+            SchemaKind::UseCase => use_case_schema(),
+            SchemaKind::TestCase => test_case_schema(),
+            SchemaKind::TestReport => test_report_schema(),
+        }
+    }
+
+    /// The document model this seed kind resolves to (ADR-036 decisions 6, 31).
+    fn document_model(self) -> DocumentModel {
+        match self {
+            SchemaKind::RequirementBusiness | SchemaKind::RequirementNonFunctional => {
+                DocumentModel::GroupedMarkdown
             }
-            SchemaKind::Glossary => ContentModel::Typed(glossary_schema()),
-            SchemaKind::Rule => ContentModel::Typed(rule_schema()),
-            SchemaKind::UiSpec => ContentModel::Typed(ui_spec_schema()),
-            SchemaKind::UiMockup => ContentModel::HtmlMockup(ui_mockup_schema()),
-            SchemaKind::Audit => ContentModel::Typed(audit_schema()),
-            SchemaKind::TechSpec => ContentModel::Typed(tech_spec_schema()),
-            SchemaKind::UseCase => ContentModel::Typed(use_case_schema()),
-            SchemaKind::TestCase => ContentModel::Typed(test_case_schema()),
-            SchemaKind::TestReport => ContentModel::Typed(test_report_schema()),
+            SchemaKind::UiMockup => DocumentModel::SingleHtmlMockup,
+            _ => DocumentModel::SingleMarkdown,
         }
     }
 }
@@ -2711,7 +2748,8 @@ fn backlog_descriptor(cfg: &Config, template: &DescriptorTemplate) -> TypeDescri
         status_model,
         verbs,
         create_options: template.create_options,
-        content_model: template.content.content_model(),
+        document_model: template.content.document_model(),
+        schema: Some(template.content.schema()),
         frontmatter_keys: frontmatter_keys(template),
         id_shape: template.id_shape,
         archive_policy: template.archive,
@@ -2735,7 +2773,8 @@ fn decision_descriptor(slug: &str, entry: &TypeEntry) -> TypeDescriptor {
         },
         verbs: DECISION_VERBS.to_vec(),
         create_options: NO_CREATE_OPTIONS,
-        content_model: SchemaKind::Decision.content_model(),
+        document_model: SchemaKind::Decision.document_model(),
+        schema: Some(SchemaKind::Decision.schema()),
         frontmatter_keys: frontmatter_keys(&DECISION_TEMPLATE),
         id_shape: IdShape::Plain,
         archive_policy: ArchivePolicy::None,
@@ -2750,10 +2789,10 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
         .iter()
         .find(|template| template.slug == slug);
 
-    let content_model = match template {
-        Some(template) => template.content.content_model(),
-        None => ContentModel::Generic,
-    };
+    let document_model = template.map_or(DocumentModel::SingleMarkdown, |template| {
+        template.content.document_model()
+    });
+    let schema = template.map(|template| template.content.schema());
 
     let (status_model, verbs, id_shape, create_options, archive_policy, frontmatter_keys) =
         match template {
@@ -2766,10 +2805,11 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
                 if let TemplateVerbs::DocumentBaseline { extensions } = template.verbs {
                     verbs.extend(extensions.iter().copied());
                 }
-                let keys = match &content_model {
+                let keys = if document_model == DocumentModel::SingleHtmlMockup {
                     // UI mockups are HTML records and carry no front matter.
-                    ContentModel::HtmlMockup(_) => Vec::new(),
-                    _ => frontmatter_keys(template),
+                    Vec::new()
+                } else {
+                    frontmatter_keys(template)
                 };
                 (
                     status_model,
@@ -2804,7 +2844,7 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
     let record = match template {
         Some(template) => template
             .record
-            .map(|facts| document_record(template, &content_model, facts)),
+            .map(|facts| document_record(template, schema.as_ref(), facts)),
         // A config-defined type has no static template, so the registry builds
         // its record facts inline from the type it already owns. The registry
         // owns the descriptor; nothing is leaked or cached (ADR-0017 D10).
@@ -2838,7 +2878,8 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
         status_model,
         verbs,
         create_options,
-        content_model,
+        document_model,
+        schema,
         frontmatter_keys,
         id_shape,
         archive_policy,
@@ -2853,7 +2894,7 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
 /// `RecordDescriptor::resolve_directory` reads through `doc_type_key`.
 fn document_record(
     template: &DescriptorTemplate,
-    content: &ContentModel,
+    schema: Option<&TypedSchema>,
     facts: RecordFacts,
 ) -> RecordDescriptor {
     RecordDescriptor {
@@ -2871,12 +2912,10 @@ fn document_record(
             .copied()
             .map(Cow::Borrowed)
             .collect(),
-        sections: match content {
-            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => {
-                schema.sections.clone()
-            }
+        sections: match schema {
+            Some(schema) => schema.sections.clone(),
             // Unreachable for a template, but keeps the projection total.
-            ContentModel::Generic => vec![Cow::Borrowed("## Description")],
+            None => vec![Cow::Borrowed("## Description")],
         },
     }
 }
@@ -3080,10 +3119,10 @@ fn check_invariants(descriptors: &[TypeDescriptor]) -> Result<(), RegistryError>
 
     // I15.
     for descriptor in descriptors {
-        let expected: &[Verb] = match &descriptor.content_model {
-            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => &schema.extensions,
+        let expected: &[Verb] = match &descriptor.schema {
+            Some(schema) => &schema.extensions,
             // A generic document has exactly the baseline plus `status`.
-            ContentModel::Generic => &[],
+            None => &[],
         };
         let declared = extension_verbs(descriptor);
         if declared.len() != expected.len() || !declared.iter().all(|verb| expected.contains(verb))
@@ -3103,7 +3142,7 @@ fn check_invariants(descriptors: &[TypeDescriptor]) -> Result<(), RegistryError>
 
     // I17: every document verb has a spec and every spec verb is declared.
     for descriptor in documents() {
-        let specs = descriptor.content_model.verbs();
+        let specs = descriptor.verb_specs();
         if let Some(verb) = descriptor
             .verbs
             .iter()
@@ -3190,6 +3229,7 @@ mod tests {
             enabled: true,
             statuses: None,
             default_status: None,
+            ..Default::default()
         }
     }
 
@@ -3236,10 +3276,10 @@ mod tests {
     }
 
     fn schema(descriptor: &TypeDescriptor) -> &TypedSchema {
-        match &descriptor.content_model {
-            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => schema,
-            ContentModel::Generic => panic!("descriptor has no typed schema: {}", descriptor.slug),
-        }
+        descriptor
+            .schema
+            .as_ref()
+            .unwrap_or_else(|| panic!("descriptor has no typed schema: {}", descriptor.slug))
     }
 
     // 1
@@ -3358,10 +3398,15 @@ mod tests {
         for slug in TYPED_DOCUMENT_SLUGS {
             let descriptor = registry.descriptor(slug).expect(slug);
             assert_eq!(descriptor.category, ArtifactCategory::Document);
-            assert!(matches!(
-                descriptor.content_model,
-                ContentModel::Typed(_) | ContentModel::HtmlMockup(_)
-            ));
+            assert_eq!(
+                descriptor.document_model,
+                match *slug {
+                    "req" | "nfr" => DocumentModel::GroupedMarkdown,
+                    "ui-mockup" => DocumentModel::SingleHtmlMockup,
+                    _ => DocumentModel::SingleMarkdown,
+                }
+            );
+            assert!(descriptor.schema.is_some(), "{slug} schema");
         }
         assert_eq!(
             registry.in_category(ArtifactCategory::Document).count(),
@@ -3369,6 +3414,45 @@ mod tests {
             "the default map seeds the eleven configured document types"
         );
         assert!(registry.descriptor("deploy").is_none());
+    }
+
+    #[test]
+    fn document_model_is_seed_only_and_user_defined_slugs_default_to_single_markdown() {
+        for (slug, expected) in [
+            ("req", DocumentModel::GroupedMarkdown),
+            ("nfr", DocumentModel::GroupedMarkdown),
+            ("ui-mockup", DocumentModel::SingleHtmlMockup),
+            ("glossary", DocumentModel::SingleMarkdown),
+            ("rule", DocumentModel::SingleMarkdown),
+            ("ui-spec", DocumentModel::SingleMarkdown),
+            ("audit", DocumentModel::SingleMarkdown),
+            ("tech-spec", DocumentModel::SingleMarkdown),
+            ("use-case", DocumentModel::SingleMarkdown),
+            ("test-case", DocumentModel::SingleMarkdown),
+            ("test-report", DocumentModel::SingleMarkdown),
+            ("deploy", DocumentModel::SingleMarkdown),
+            ("", DocumentModel::SingleMarkdown),
+        ] {
+            assert_eq!(DocumentModel::for_slug(slug), expected, "{slug}");
+        }
+        assert!(!is_builtin_document_slug("deploy"));
+        assert!(is_builtin_document_slug("req"));
+
+        let registry = ArtifactRegistry::build(&config_with(
+            "deploy",
+            entry("DEP", "architecture/deployment/"),
+        ))
+        .expect("registry");
+        let deploy = registry.descriptor("deploy").expect("deploy");
+        assert_eq!(deploy.document_model, DocumentModel::SingleMarkdown);
+        assert!(deploy.schema.is_none());
+        assert!(deploy.is_config_defined_document());
+        assert!(
+            !registry
+                .descriptor("req")
+                .expect("req")
+                .is_config_defined_document()
+        );
     }
 
     // 5
@@ -3385,7 +3469,8 @@ mod tests {
         assert_eq!(deploy.prefix, "DEP");
         assert_eq!(deploy.directory.config_key, "doc_directory");
         assert_eq!(deploy.directory.relative, "architecture/deployment/");
-        assert_eq!(deploy.content_model, ContentModel::Generic);
+        assert_eq!(deploy.document_model, DocumentModel::SingleMarkdown);
+        assert!(deploy.schema.is_none());
         assert_eq!(deploy.id_shape, IdShape::Plain);
         assert_eq!(
             deploy.verbs,
@@ -3466,7 +3551,7 @@ mod tests {
         assert!(!mockup.has_verb(Verb::Status));
         assert!(mockup.frontmatter_keys.is_empty());
         assert_eq!(mockup.frontmatter_status_key(), None);
-        assert!(matches!(mockup.content_model, ContentModel::HtmlMockup(_)));
+        assert_eq!(mockup.document_model, DocumentModel::SingleHtmlMockup);
         assert!(schema(mockup).sections.is_empty());
         assert_eq!(schema(mockup).handler, TypedHandler::UiMockup);
         assert_eq!(mockup.create_options.group, GroupRequirement::Absent);
@@ -3826,10 +3911,8 @@ mod tests {
                 "{slug} status key"
             );
 
-            let expected_sections: &[Cow<'static, str>] = match &descriptor.content_model {
-                ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => &schema.sections,
-                ContentModel::Generic => &[Cow::Borrowed("## Description")],
-            };
+            let expected_sections: &[Cow<'static, str>] =
+                &descriptor.schema.as_ref().expect("typed schema").sections;
             assert_eq!(record.sections, expected_sections, "{slug} sections");
 
             let expected_dir = project
@@ -4290,7 +4373,7 @@ mod tests {
     fn every_document_verb_has_a_spec_and_every_spec_verb_is_declared() {
         let registry = default_registry();
         for descriptor in registry.in_category(ArtifactCategory::Document) {
-            let specs = descriptor.content_model.verbs();
+            let specs = descriptor.verb_specs();
             for verb in &descriptor.verbs {
                 assert!(
                     specs.iter().any(|spec| spec.verb == *verb),
@@ -4318,7 +4401,7 @@ mod tests {
         let cfg = Config::default();
         let mut descriptors = assembled(&cfg);
         let glossary = find_mut(&mut descriptors, "glossary");
-        glossary.content_model = ContentModel::Typed(no_spec_schema);
+        glossary.schema = Some(no_spec_schema);
         let error = invariant_error(&descriptors);
         assert!(matches!(
             error,

@@ -4,7 +4,7 @@
 //! `crate::record/`. This module only reshapes the shared [`Document`] and
 //! [`RecordView`] into the render-only [`Record`] view model and keeps the
 //! browser's validation rules. The owning [`TypeDescriptor`] is carried on
-//! every record; behaviour is selected by `ContentModel`/`TypedHandler`, never
+//! every record; behaviour is selected by `DocumentModel`/`TypedHandler`, never
 //! by a browser-local category enum or a slug literal.
 
 use crate::config::Config;
@@ -14,7 +14,7 @@ use crate::record::document::{self, Document};
 use crate::record::identity;
 use crate::record::view::RecordView;
 use crate::registry::{
-    ArtifactCategory as CategoryKind, ArtifactRegistry, ContentModel, IdShape, StatusModel,
+    ArtifactCategory as CategoryKind, ArtifactRegistry, DocumentModel, IdShape, StatusModel,
     TypeDescriptor, TypedHandler,
 };
 use std::collections::BTreeMap;
@@ -83,18 +83,15 @@ impl Record {
 
     /// Typed handler for built-in types; `None` for generic config types.
     pub fn handler(&self) -> Option<TypedHandler> {
-        match &self.descriptor.content_model {
-            ContentModel::Generic => None,
-            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => Some(schema.handler),
-        }
+        self.descriptor.handler()
     }
 
     pub fn is_generic(&self) -> bool {
-        matches!(&self.descriptor.content_model, ContentModel::Generic)
+        self.descriptor.schema.is_none()
     }
 
     pub fn is_html_mockup(&self) -> bool {
-        matches!(&self.descriptor.content_model, ContentModel::HtmlMockup(_))
+        self.descriptor.document_model == DocumentModel::SingleHtmlMockup
     }
 
     pub fn is_requirement(&self) -> bool {
@@ -246,8 +243,8 @@ pub fn matches_stem(descriptor: &TypeDescriptor, stem: &str) -> bool {
 }
 
 fn content_extension(descriptor: &TypeDescriptor) -> &'static str {
-    match &descriptor.content_model {
-        ContentModel::HtmlMockup(_) => "html",
+    match descriptor.document_model {
+        DocumentModel::SingleHtmlMockup => "html",
         _ => "md",
     }
 }
@@ -312,7 +309,7 @@ pub fn load_record(
     descriptor: &TypeDescriptor,
     path: &Path,
 ) -> Result<Option<Record>, AppError> {
-    if matches!(&descriptor.content_model, ContentModel::HtmlMockup(_)) {
+    if descriptor.document_model == DocumentModel::SingleHtmlMockup {
         return load_ui_mockup(ctx, cfg, descriptor, path);
     }
     let safe = match Context::ensure_within(&ctx.project_dir, path) {
@@ -710,7 +707,7 @@ pub fn resolve_id(
         let Some(dir) = descriptor_directory(ctx, cfg, descriptor) else {
             continue;
         };
-        if matches!(&descriptor.content_model, ContentModel::HtmlMockup(_)) {
+        if descriptor.document_model == DocumentModel::SingleHtmlMockup {
             let Some(wanted) = canonical_id(descriptor, id) else {
                 continue;
             };

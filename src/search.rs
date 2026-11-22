@@ -10,7 +10,7 @@ use crate::commands::load_effective_config;
 use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
-use crate::registry::{ArtifactCategory, ArtifactRegistry, ContentModel, IdShape, TypeDescriptor};
+use crate::registry::{ArtifactCategory, ArtifactRegistry, DocumentModel, IdShape, TypeDescriptor};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
@@ -161,7 +161,7 @@ fn collect_document_type(
         };
         // An archived UI mockup is excluded by its HTML status without
         // relocation (Assumption A2).
-        if matches!(&descriptor.content_model, ContentModel::HtmlMockup(_))
+        if descriptor.document_model == DocumentModel::SingleHtmlMockup
             && crate::ui_mockup::parse_record(&content, &stem_id).status == "archived"
         {
             continue;
@@ -207,9 +207,9 @@ fn document_active_dir(
 }
 
 fn document_extension(descriptor: &TypeDescriptor) -> &'static str {
-    match &descriptor.content_model {
-        ContentModel::HtmlMockup(_) => "html",
-        ContentModel::Generic | ContentModel::Typed(_) => "md",
+    match descriptor.document_model {
+        DocumentModel::SingleHtmlMockup => "html",
+        DocumentModel::SingleMarkdown | DocumentModel::GroupedMarkdown => "md",
     }
 }
 
@@ -231,7 +231,7 @@ fn document_identity_and_title(
     content: &str,
     stem_id: &str,
 ) -> (String, String) {
-    if matches!(&descriptor.content_model, ContentModel::HtmlMockup(_)) {
+    if descriptor.document_model == DocumentModel::SingleHtmlMockup {
         return (
             stem_id.to_string(),
             crate::ui_mockup::extract_title(content, stem_id),
@@ -409,6 +409,7 @@ mod tests {
             enabled,
             statuses: None,
             default_status: None,
+            ..Default::default()
         }
     }
 

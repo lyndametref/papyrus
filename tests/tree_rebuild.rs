@@ -20,6 +20,7 @@ fn entry(prefix: &str, directory: &str, enabled: bool) -> DocTypeEntry {
         enabled,
         statuses: None,
         default_status: None,
+        ..Default::default()
     }
 }
 

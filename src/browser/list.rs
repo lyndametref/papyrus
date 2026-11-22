@@ -9,7 +9,7 @@ use crate::browser::records::{Index, Record};
 use crate::browser::render::escape;
 use crate::browser::render::render_template;
 use crate::browser::routes;
-use crate::registry::{ContentModel, IdShape, TypeDescriptor};
+use crate::registry::{IdShape, TypeDescriptor};
 
 /// The list section template: heading, count note, then the table or empty state.
 const LIST_TEMPLATE: &str = "<section class=\"section\" aria-label=\"{{heading}}\">\
@@ -30,8 +30,8 @@ pub struct ListPlan {
     pub empty: Option<EmptyState>,
     /// Whether the Title cell renders the front-matter reference list.
     ///
-    /// Resolved from the descriptor content model (ADR-035): config-defined
-    /// document types (`ContentModel::Generic`) omit the block entirely.
+    /// Resolved from the seed bridge (ADR-035): a config-defined document type
+    /// omits the block entirely until MS-035 applies the seed default.
     pub show_references: bool,
 }
 
@@ -150,7 +150,7 @@ impl ListPlan {
         } else {
             None
         };
-        let show_references = !matches!(&descriptor.content_model, ContentModel::Generic);
+        let show_references = !descriptor.is_config_defined_document();
         ListPlan {
             heading: heading.to_string(),
             count_note: count_note.to_string(),
@@ -511,6 +511,7 @@ mod tests {
                 enabled: true,
                 statuses: Some(vec!["active".to_string(), "archived".to_string()]),
                 default_status: None,
+                ..Default::default()
             },
         );
         let registry = ArtifactRegistry::build(&cfg).expect("registry");
