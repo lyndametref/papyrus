@@ -161,13 +161,16 @@ pub fn generic_document_ops(
         // Existing keys are always patched so edits (including clearing) apply;
         // the patch layer turns identical values into no-ops.
         if !labels.is_empty() || crate::record::frontmatter::contains_key(&fm.raw, "labels") {
-            fm_ops.push(PatchOp::SetFrontMatter("labels".into(), labels.join("\n")));
+            fm_ops.push(PatchOp::SetFrontMatterValue(
+                "labels".into(),
+                crate::record::frontmatter::FrontMatterValue::Sequence(labels.to_vec()),
+            ));
         }
         if !references.is_empty() || crate::record::frontmatter::contains_key(&fm.raw, "references")
         {
-            fm_ops.push(PatchOp::SetFrontMatter(
+            fm_ops.push(PatchOp::SetFrontMatterValue(
                 "references".into(),
-                references.join("\n"),
+                crate::record::frontmatter::FrontMatterValue::Sequence(references.to_vec()),
             ));
         }
     }
@@ -300,17 +303,26 @@ pub fn task_ops(
         }
         match &assignee {
             FieldChange::Clear => {
-                fm_ops.push(PatchOp::SetFrontMatter("assignee".into(), String::new()));
+                fm_ops.push(PatchOp::SetFrontMatterValue(
+                    "assignee".into(),
+                    crate::record::frontmatter::FrontMatterValue::Sequence(Vec::new()),
+                ));
             }
             FieldChange::Set(value) => {
-                fm_ops.push(PatchOp::SetFrontMatter("assignee".into(), value.clone()));
+                fm_ops.push(PatchOp::SetFrontMatterValue(
+                    "assignee".into(),
+                    crate::record::frontmatter::FrontMatterValue::Sequence(vec![value.clone()]),
+                ));
             }
             FieldChange::Keep => {}
         }
-        fm_ops.push(PatchOp::SetFrontMatter("labels".into(), labels.join("\n")));
-        fm_ops.push(PatchOp::SetFrontMatter(
+        fm_ops.push(PatchOp::SetFrontMatterValue(
+            "labels".into(),
+            crate::record::frontmatter::FrontMatterValue::Sequence(labels.clone()),
+        ));
+        fm_ops.push(PatchOp::SetFrontMatterValue(
             "dependencies".into(),
-            dependencies.join("\n"),
+            crate::record::frontmatter::FrontMatterValue::Sequence(dependencies.clone()),
         ));
     }
     let mut sections = doc.sections.clone();
@@ -643,10 +655,13 @@ pub fn use_case_ops(
     let has_fm = doc.front_matter.is_some();
     let mut fm_ops = title_ops(doc, title);
     if has_fm {
-        fm_ops.push(PatchOp::SetFrontMatter("labels".into(), labels.join("\n")));
-        fm_ops.push(PatchOp::SetFrontMatter(
+        fm_ops.push(PatchOp::SetFrontMatterValue(
+            "labels".into(),
+            crate::record::frontmatter::FrontMatterValue::Sequence(labels.clone()),
+        ));
+        fm_ops.push(PatchOp::SetFrontMatterValue(
             "references".into(),
-            references.join("\n"),
+            crate::record::frontmatter::FrontMatterValue::Sequence(references.clone()),
         ));
     }
     let mut sections = doc.sections.clone();

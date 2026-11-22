@@ -85,6 +85,27 @@ pub const RESERVED_FIELD_KEYS: [&str; 8] = [
     "group",
 ];
 
+/// Option names the fixed engine and global command surface already owns.
+///
+/// A field-derived long option must never shadow one of these names, nor a
+/// reserved field key that is also an option (`title`, `status`).
+pub const RESERVED_OPTION_NAMES: [&str; 14] = [
+    "title",
+    "id",
+    "value",
+    "force",
+    "editor",
+    "label",
+    "reference",
+    "group",
+    "json",
+    "dir",
+    "config",
+    "no-color",
+    "no_color",
+    "status",
+];
+
 /// The entry keys that select behaviour and are not configuration keys
 /// (ADR-036 decision 6, REQ-07.004).
 pub const RESERVED_ENTRY_KEYS: [&str; 4] = ["model", "title", "content", "id_shape"];
@@ -610,6 +631,11 @@ pub struct SeedDocumentType {
     pub member: Option<SeedRole>,
     /// Values written on create when the field is absent (ADR-042 ruling 1).
     pub field_defaults: &'static [(&'static str, &'static str)],
+    /// The browser-facing typed handler this seed slug keeps until MS-035.
+    ///
+    /// Carrying the handler here keeps one seed table authoritative (F13): the
+    /// descriptor never re-derives a slug-to-handler map.
+    pub handler: Option<crate::registry::TypedHandler>,
     pub record: SeedRecord,
 }
 
@@ -645,6 +671,9 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
             fields: REQ_FIELDS,
             reference_visibility: Visibility::Hidden,
         }),
+        handler: Some(crate::registry::TypedHandler::Requirement(
+            crate::registry::RequirementKind::Business,
+        )),
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "business requirement",
@@ -677,6 +706,9 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
             fields: REQ_FIELDS,
             reference_visibility: Visibility::Hidden,
         }),
+        handler: Some(crate::registry::TypedHandler::Requirement(
+            crate::registry::RequirementKind::NonFunctional,
+        )),
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "non-functional requirement",
@@ -703,6 +735,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: GLOSSARY_FIELDS,
         group: None,
         member: None,
+        handler: Some(crate::registry::TypedHandler::Glossary),
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "glossary term",
@@ -729,6 +762,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: RULE_FIELDS,
         group: None,
         member: None,
+        handler: Some(crate::registry::TypedHandler::Rule),
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "business rule",
@@ -755,6 +789,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: UI_SPEC_FIELDS,
         group: None,
         member: None,
+        handler: Some(crate::registry::TypedHandler::UiSpec),
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "ui specification",
@@ -781,6 +816,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: &[],
         group: None,
         member: None,
+        handler: Some(crate::registry::TypedHandler::UiMockup),
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "ui mockup",
@@ -807,6 +843,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: AUDIT_FIELDS,
         group: None,
         member: None,
+        handler: Some(crate::registry::TypedHandler::Audit),
         field_defaults: AUDIT_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "audit record",
@@ -833,6 +870,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: TECH_SPEC_FIELDS,
         group: None,
         member: None,
+        handler: Some(crate::registry::TypedHandler::TechSpec),
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "technical specification",
@@ -859,6 +897,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: DESCRIPTION_APPLICABILITY_FIELDS,
         group: None,
         member: None,
+        handler: Some(crate::registry::TypedHandler::UseCase),
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "use case",
@@ -885,6 +924,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: DESCRIPTION_APPLICABILITY_FIELDS,
         group: None,
         member: None,
+        handler: Some(crate::registry::TypedHandler::TestCase),
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "test case",
@@ -911,6 +951,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: DESCRIPTION_APPLICABILITY_FIELDS,
         group: None,
         member: None,
+        handler: Some(crate::registry::TypedHandler::TestReport),
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "test report",
@@ -1340,6 +1381,22 @@ fn validate_field_sequence(
         }
         validate_field_string_property(field, "label", &selector, errors);
         validate_field_string_property(field, "help", &selector, errors);
+        if let Some(key) = key
+            && !key.is_empty()
+        {
+            let long = field_option(key, mapping_get(field, "option").and_then(value_as_str));
+            if long.is_empty() {
+                errors.push(format!(
+                    "{}.option: derived option name must not be empty",
+                    selector
+                ));
+            } else if RESERVED_OPTION_NAMES.contains(&long.as_str()) {
+                errors.push(format!(
+                    "{}.option: reserved option name: {}",
+                    selector, long
+                ));
+            }
+        }
         if matches!(
             mapping_get(field, "required"),
             Some(yaml_serde::Value::Bool(true))
@@ -2476,6 +2533,18 @@ fn validate_field_specs(slug: &str, path: &str, fields: &[FieldSpec], errors: &m
                 ));
             }
         }
+        let long = field_option(&field.key, field.option.as_deref());
+        if long.is_empty() {
+            errors.push(format!(
+                "{}.option: derived option name must not be empty",
+                selector
+            ));
+        } else if RESERVED_OPTION_NAMES.contains(&long.as_str()) {
+            errors.push(format!(
+                "{}.option: reserved option name: {}",
+                selector, long
+            ));
+        }
         if field.required && !field.verbs.contains(&FieldVerb::Create) {
             errors.push(format!("{}.required: must be offered on create", selector));
         }
@@ -2548,8 +2617,63 @@ fn validate_doc_entry_slots(slug: &str, entry: &DocTypeEntry, errors: &mut Vec<S
     }
 }
 
+fn validate_cross_role_options(slug: &str, entry: &DocTypeEntry, errors: &mut Vec<String>) {
+    let mut seen: Vec<(String, String)> = Vec::new();
+    for (role_name, role) in [("group", &entry.group), ("member", &entry.member)] {
+        let Some(fields) = role.as_ref().and_then(|role| role.fields.as_ref()) else {
+            continue;
+        };
+        for (index, field) in fields.iter().enumerate() {
+            if field.key.is_empty() {
+                continue;
+            }
+            let long = field_option(&field.key, field.option.as_deref());
+            if long.is_empty() {
+                continue;
+            }
+            if let Some((other_long, other_key)) =
+                seen.iter().find(|(existing_long, existing_key)| {
+                    existing_long == &long && existing_key != &field.key
+                })
+            {
+                errors.push(format!(
+                    "document_types.{}.{}.fields[{}].option: duplicate option across roles: {} is already used by {}",
+                    slug, role_name, index, other_long, other_key
+                ));
+            } else if !seen.iter().any(|(existing, _)| existing == &long) {
+                seen.push((long, field.key.clone()));
+            }
+        }
+    }
+}
+
 fn validate_doc_entry_fields(slug: &str, entry: &DocTypeEntry, errors: &mut Vec<String>) {
-    let grouped = document_model(slug) == crate::registry::DocumentModel::GroupedMarkdown;
+    let model = document_model(slug);
+    if model == crate::registry::DocumentModel::SingleHtmlMockup {
+        if entry
+            .fields
+            .as_ref()
+            .is_some_and(|fields| !fields.is_empty())
+        {
+            errors.push(format!(
+                "document_types.{}.fields: not allowed for a type without field options",
+                slug
+            ));
+        }
+        for (name, present) in [
+            ("group", entry.group.is_some()),
+            ("member", entry.member.is_some()),
+        ] {
+            if present {
+                errors.push(format!(
+                    "document_types.{}.{}: not allowed for a type without field options",
+                    slug, name
+                ));
+            }
+        }
+        return;
+    }
+    let grouped = model == crate::registry::DocumentModel::GroupedMarkdown;
     if grouped {
         if entry.fields.is_some() {
             errors.push(format!(
@@ -2564,6 +2688,7 @@ fn validate_doc_entry_fields(slug: &str, entry: &DocTypeEntry, errors: &mut Vec<
                 validate_field_specs(slug, &format!("{}.fields", name), fields, errors);
             }
         }
+        validate_cross_role_options(slug, entry, errors);
     } else {
         for (name, present) in [
             ("group", entry.group.is_some()),
@@ -4923,6 +5048,82 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn derived_option_names_are_validated_before_a_command_is_built() {
+        let mut reserved = field("custom", Some("## Custom"));
+        reserved.option = Some("json".to_string());
+        let error = validate_single(
+            "deploy",
+            DocTypeEntry {
+                prefix: "DEP".to_string(),
+                directory: "deployment/".to_string(),
+                fields: Some(vec![reserved]),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(
+            error.contains(
+                "document_types.deploy.fields[custom].option: reserved option name: json"
+            ),
+            "{error}"
+        );
+
+        let empty = field("___", Some("## Empty"));
+        let error = validate_single(
+            "deploy",
+            DocTypeEntry {
+                prefix: "DEP".to_string(),
+                directory: "deployment/".to_string(),
+                fields: Some(vec![empty]),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(
+            error.contains("derived option name must not be empty"),
+            "{error}"
+        );
+
+        let mut group_field = field("group_only", Some("## Group"));
+        group_field.option = Some("shared-option".to_string());
+        let mut member_field = field("member_only", Some("## Member"));
+        member_field.option = Some("shared-option".to_string());
+        let error = validate_single(
+            "req",
+            DocTypeEntry {
+                prefix: "REQ".to_string(),
+                directory: "requirements/".to_string(),
+                group: Some(RoleFields {
+                    fields: Some(vec![group_field]),
+                    reference_visibility: None,
+                }),
+                member: Some(RoleFields {
+                    fields: Some(vec![member_field]),
+                    reference_visibility: None,
+                }),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(error.contains("duplicate option across roles"), "{error}");
+
+        let error = validate_single(
+            "ui-mockup",
+            DocTypeEntry {
+                prefix: "MOCK".to_string(),
+                directory: "mockups/".to_string(),
+                fields: Some(vec![field("task", Some("## Task"))]),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(
+            error.contains("not allowed for a type without field options"),
+            "{error}"
+        );
     }
 
     #[test]

@@ -201,12 +201,22 @@ fn glossary_sanitization() {
     init(&d);
     let p = d.to_str().unwrap();
 
-    for bad in ["a/b", "x\\y", "   ", "a\nb"] {
+    // A title is display text: path separators are legal (F8).
+    for good in ["a/b", "x\\y"] {
+        let out = bin()
+            .args(["--dir", p, "glossary", "create", good, "--definition", "ok"])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(0), "title good={}", good);
+    }
+    fs::remove_dir_all(d.join("docs/glossary")).unwrap();
+    fs::create_dir_all(d.join("docs/glossary")).unwrap();
+    for bad in ["   ", "a\nb"] {
         let out = bin()
             .args(["--dir", p, "glossary", "create", bad, "--definition", "ok"])
             .output()
             .unwrap();
-        assert_eq!(out.status.code(), Some(4), "term bad={}", bad);
+        assert_eq!(out.status.code(), Some(4), "title bad={}", bad);
     }
 
     let out = bin()
@@ -235,7 +245,7 @@ fn glossary_sanitization() {
     assert_eq!(out.status.code(), Some(4));
 
     let out = bin()
-        .args(["--dir", p, "glossary", "edit", "GLO-001", "--title", "x\\y"])
+        .args(["--dir", p, "glossary", "edit", "GLO-001", "--title", "a\tb"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(4));

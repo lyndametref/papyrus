@@ -9,7 +9,8 @@ use crate::record::descriptor::RecordDescriptor;
 use crate::record::document::{self, Document};
 use crate::record::patch::{self, PatchOp};
 use crate::registry::{
-    ArtifactCategory, ArtifactRegistry, DocumentModel, StatusModel, TypeDescriptor, TypedHandler,
+    ArtifactCategory, ArtifactRegistry, DocumentModel, DocumentRole, StatusModel, TypeDescriptor,
+    TypedHandler, fields_for_verb, role_fields,
 };
 use crate::sanitize;
 
@@ -293,6 +294,8 @@ pub fn run(
             invocation.id,
             invocation.status_value,
         ),
+        // No Markdown descriptor declares `supersede`; the only model that
+        // owns it, `SingleHtmlMockup`, is routed to `ui_mockup::handle` above.
         DocumentVerb::Supersede => Err(unsupported_verb(DocumentVerb::Supersede)),
     }
 }
@@ -324,65 +327,10 @@ fn sanitize_field(input: &str) -> Result<String, AppError> {
         .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))
 }
 
-fn current_list(doc: &Document, key: &str) -> Vec<String> {
-    if let Some(fm) = &doc.front_matter
-        && let yaml_serde::Value::Mapping(mapping) = &fm.data
-        && let Some(yaml_serde::Value::Sequence(sequence)) =
-            mapping.get(yaml_serde::Value::String(key.to_string()))
-    {
-        return sequence
-            .iter()
-            .filter_map(|value| match value {
-                yaml_serde::Value::String(text) => Some(text.clone()),
-                _ => None,
-            })
-            .collect();
-    }
-    Vec::new()
-}
-
-/// The resolved role field sequence for a verb.
+/// The resolved role field sequence for a verb, from the one shared registry
+/// resolver (F9).
 fn document_fields_for_verb(descriptor: &TypeDescriptor, verb: DocumentVerb) -> Vec<FieldSpec> {
-    match descriptor.document_model {
-        DocumentModel::SingleMarkdown => descriptor.fields.clone(),
-        DocumentModel::GroupedMarkdown => match verb {
-            DocumentVerb::CreateGroup => descriptor
-                .group
-                .as_ref()
-                .and_then(|role| role.fields.clone())
-                .unwrap_or_default(),
-            DocumentVerb::Create => descriptor
-                .member
-                .as_ref()
-                .and_then(|role| role.fields.clone())
-                .or_else(|| {
-                    descriptor
-                        .group
-                        .as_ref()
-                        .and_then(|role| role.fields.clone())
-                })
-                .unwrap_or_default(),
-            DocumentVerb::Edit => {
-                let mut fields = Vec::new();
-                for role in [descriptor.group.as_ref(), descriptor.member.as_ref()]
-                    .into_iter()
-                    .flatten()
-                {
-                    for field in role.fields.iter().flatten() {
-                        if !fields
-                            .iter()
-                            .any(|existing: &FieldSpec| existing.key == field.key)
-                        {
-                            fields.push(field.clone());
-                        }
-                    }
-                }
-                fields
-            }
-            _ => Vec::new(),
-        },
-        DocumentModel::SingleHtmlMockup => Vec::new(),
-    }
+    fields_for_verb(descriptor, crate::registry::Verb::from(verb))
 }
 
 fn field_long(field: &FieldSpec) -> String {
@@ -530,7 +478,7 @@ fn sanitize_title(raw: &str) -> Result<String, AppError> {
     if raw.trim().is_empty() {
         return Err(AppError::Validation("title must not be empty".to_string()));
     }
-    sanitize::sanitize_name(raw)
+    sanitize::sanitize_title_text(raw)
         .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))
 }
 
@@ -716,7 +664,6 @@ fn append_field_create_ops(
 
 /// Build the create patch for a Markdown model. The engine emits only
 /// `PatchOp` values; `record::patch` renders the single final write.
-#[allow(clippy::too_many_arguments)]
 fn create_document(
     ctx: &Context,
     cfg: &Config,
@@ -738,35 +685,36 @@ fn create_document(
         fs::create_dir_all(&archived).map_err(|error| AppError::Runtime(error.to_string()))?;
     }
 
-    let (id, group_link) = if descriptor.document_model == DocumentModel::GroupedMarkdown {
+    let (reservation, group_link) = if descriptor.document_model == DocumentModel::GroupedMarkdown {
         let group_raw = args
             .get("group")
             .ok_or_else(|| AppError::Validation("missing required argument: group".to_string()))?;
         let group = resolve_group(ctx, cfg, registry, scope, group_raw)?;
-        let next = record::identity::next_seq_number(&active, &archived, &group.id);
-        let id = record::identity::format_seq_id(&group.id, next as i64, scope.id_padding);
-        (id, Some(group))
-    } else {
-        let next = record::identity::next_number(&active, &archived, &scope.prefix);
-        (
-            record::identity::format_id(&scope.prefix, next as i64, scope.id_padding),
-            None,
+        let reservation = record::identity::reserve_seq_number(
+            &active,
+            &archived,
+            &group.id,
+            scope.id_padding,
+            "md",
         )
+        .map_err(|error| AppError::Runtime(error.to_string()))?;
+        (reservation, Some(group))
+    } else {
+        let reservation = record::identity::reserve_number(
+            &active,
+            &archived,
+            &scope.prefix,
+            scope.id_padding,
+            "md",
+        )
+        .map_err(|error| AppError::Runtime(error.to_string()))?;
+        (reservation, None)
     };
+    let id = reservation.id.clone();
 
     let now = record::frontmatter::utc_now();
     let labels = sanitize_labels(args.get_all("label"))?;
     let references = sanitize_references(args.get_all("reference"))?;
-    let labels_value = if labels.is_empty() {
-        "[]".to_string()
-    } else {
-        labels.join("\n")
-    };
-    let references_value = if references.is_empty() {
-        "[]".to_string()
-    } else {
-        references.join("\n")
-    };
 
     let mut ops = vec![
         PatchOp::SetFrontMatterValue(
@@ -787,11 +735,11 @@ fn create_document(
         ),
         PatchOp::SetFrontMatterValue(
             "labels".to_string(),
-            record::frontmatter::FrontMatterValue::String(labels_value),
+            record::frontmatter::FrontMatterValue::Sequence(labels),
         ),
         PatchOp::SetFrontMatterValue(
             "references".to_string(),
-            record::frontmatter::FrontMatterValue::String(references_value),
+            record::frontmatter::FrontMatterValue::Sequence(references),
         ),
     ];
     // Every front-matter-backed Markdown model seeds its status from the
@@ -820,14 +768,17 @@ fn create_document(
 
     let doc = initial_document(&id, &title);
     let content = patch::apply_patch(&doc, &ops)?;
-    let path = active.join(format!("{id}.md"));
-    let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
+    let safe_path = Context::ensure_within(&ctx.project_dir, &reservation.path)?;
     record::store::write_atomic(ctx, cfg, registry, &safe_path, &content)?;
+    reservation.commit();
     Ok(typed_created(ctx, id))
 }
 
-/// The engine-owned grouped create-group surface, transitional to TASK-256.
-#[allow(clippy::too_many_arguments)]
+/// The engine-owned grouped create-group surface.
+///
+/// It runs the same stdin resolution, required-field enforcement, defaults, and
+/// field-op builder as `create`, so a group role field with `frontmatter_key`
+/// and every `field_defaults` entry behave exactly as on create.
 fn create_group_document(
     ctx: &Context,
     cfg: &Config,
@@ -837,14 +788,18 @@ fn create_group_document(
     invocation: &DocumentInvocation,
 ) -> Result<crate::CommandOutput, AppError> {
     let fields = document_fields_for_verb(descriptor, DocumentVerb::CreateGroup);
-    let args = merge_invocation_args(invocation, &fields);
+    let mut args = merge_invocation_args(invocation, &fields);
+    resolve_field_stdin(&fields, &mut args)?;
     let title = required_title(&args)?;
+    ensure_required_fields(&fields, &args, &descriptor.field_defaults)?;
 
     let active = scope.active.clone();
     let archived = scope.archived.clone();
     fs::create_dir_all(&active).map_err(|error| AppError::Runtime(error.to_string()))?;
-    let next = record::identity::next_number(&active, &archived, &scope.prefix);
-    let id = record::identity::format_id(&scope.prefix, next as i64, scope.id_padding);
+    let reservation =
+        record::identity::reserve_number(&active, &archived, &scope.prefix, scope.id_padding, "md")
+            .map_err(|error| AppError::Runtime(error.to_string()))?;
+    let id = reservation.id.clone();
 
     let mut ops = Vec::new();
     // Every front-matter-backed Markdown model seeds its status from the
@@ -857,39 +812,13 @@ fn create_group_document(
         ));
     }
     ops.push(PatchOp::SetHeadingTitle(title.clone()));
-    for field in &fields {
-        if !field_offered(field, DocumentVerb::CreateGroup) || args.get(&field.key).is_none() {
-            continue;
-        }
-        let Some(heading) = &field.heading else {
-            continue;
-        };
-        match field.kind {
-            crate::config::FieldKind::List => {
-                let values = list_values(&args, field)?;
-                if !values.is_empty() {
-                    ops.push(PatchOp::SetSection(
-                        heading.clone(),
-                        list_section_body(&values),
-                    ));
-                }
-            }
-            crate::config::FieldKind::Text | crate::config::FieldKind::Multiline => {
-                if let Some(value) = scalar_value(&args, field)? {
-                    ops.push(PatchOp::SetSection(
-                        heading.clone(),
-                        scalar_section_body(&value),
-                    ));
-                }
-            }
-        }
-    }
+    append_field_create_ops(descriptor, &fields, &args, &mut ops)?;
 
     let doc = initial_document(&id, &title);
     let content = patch::apply_patch(&doc, &ops)?;
-    let path = active.join(format!("{id}.md"));
-    let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
+    let safe_path = Context::ensure_within(&ctx.project_dir, &reservation.path)?;
     record::store::write_atomic(ctx, cfg, registry, &safe_path, &content)?;
+    reservation.commit();
     Ok(typed_created(ctx, id))
 }
 
@@ -899,9 +828,11 @@ struct GroupLink {
 
 /// Resolve the owning group of a grouped member create.
 ///
-/// The group must already exist as an active record of the same document type.
-/// An unknown, archived, or cross-type group is one validation outcome and
-/// writes nothing (ADR-036 decision 9).
+/// The reference is resolved through the shared resolver, so every form that
+/// `view`/`list` accept for this type is accepted here and the canonical stored
+/// ID is used. A dotted member reference resolves to its group. An unknown,
+/// archived, or cross-type group is one validation outcome and writes nothing
+/// (ADR-036 decision 9).
 fn resolve_group(
     ctx: &Context,
     cfg: &Config,
@@ -909,46 +840,86 @@ fn resolve_group(
     scope: &DocumentScope,
     group_raw: &str,
 ) -> Result<GroupLink, AppError> {
-    let group_id = sanitize_field(group_raw)?;
-    if !record::identity::is_group_id(&group_id, &scope.prefix) {
-        let other = registry.descriptors().find(|candidate| {
-            candidate.category == ArtifactCategory::Document
-                && candidate.document_model == DocumentModel::GroupedMarkdown
-                && candidate.prefix != scope.prefix
-                && record::identity::is_group_id(&group_id, &candidate.prefix)
-        });
-        if let Some(other) = other
-            && let Ok(other_scope) = DocumentScope::resolve(ctx, cfg, other)
-            && (other_scope.active.join(format!("{group_id}.md")).exists()
-                || other_scope.archived.join(format!("{group_id}.md")).exists())
-        {
+    let requested = sanitize_field(group_raw)?;
+    let dirs = vec![scope.active.clone(), scope.archived.clone()];
+    let prefixes = vec![scope.prefix.clone()];
+    let resolved = if let Some(found) =
+        record::resolve::resolve_in_dirs(ctx, cfg, registry, &dirs, &requested, &prefixes, true)?
+    {
+        Some(found)
+    } else {
+        record::resolve::resolve_in_dirs(ctx, cfg, registry, &dirs, &requested, &prefixes, false)?
+    };
+    if let Some(found) = resolved {
+        let group_id = found
+            .id
+            .split_once('.')
+            .map(|(group, _)| group.to_string())
+            .unwrap_or_else(|| found.id.clone());
+        if found.path.parent() == Some(scope.archived.as_path()) {
             return Err(AppError::Validation(format!(
-                "group type mismatch: {group_id}"
+                "group is archived: {group_id}"
             )));
         }
-        return Err(AppError::Validation(format!("group not found: {group_id}")));
-    }
-
-    let active_path = scope.active.join(format!("{group_id}.md"));
-    let archived_path = scope.archived.join(format!("{group_id}.md"));
-    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
-    let archived_safe = Context::ensure_within(&ctx.project_dir, &archived_path)?;
-    if active_safe.exists() {
+        // Use the resolved canonical path so a stored `-<slug>` stem still
+        // resolves; a dotted member reference resolves its group record.
+        let group_path = if found.id.contains('.') {
+            let active = vec![scope.active.clone()];
+            let prefixes = vec![scope.prefix.clone()];
+            let Some(group_record) = record::resolve::resolve_in_dirs(
+                ctx, cfg, registry, &active, &group_id, &prefixes, false,
+            )?
+            else {
+                return Err(AppError::Validation(format!("group not found: {group_id}")));
+            };
+            group_record.path
+        } else {
+            found.path
+        };
         // Read the group so a boundary escape or unreadable record is rejected
         // before a member is allocated; the title itself is not stored again.
-        let (doc, _token) = record::store::read_document(ctx, cfg, registry, &active_safe)?;
+        let (doc, _token) = record::store::read_document(ctx, cfg, registry, &group_path)?;
         let (_, title) = document::heading_id_title(&doc);
         if title.is_empty() {
             return Err(AppError::Runtime(format!("group has no title: {group_id}")));
         }
         return Ok(GroupLink { id: group_id });
     }
-    if archived_safe.exists() {
+
+    // A group ID shaped like another grouped family is a type mismatch rather
+    // than a plain unknown ID.
+    let other = registry.descriptors().find(|candidate| {
+        candidate.category == ArtifactCategory::Document
+            && candidate.document_model == DocumentModel::GroupedMarkdown
+            && candidate.prefix != scope.prefix
+            && record::identity::is_group_id(&requested, &candidate.prefix)
+    });
+    let Some(other) = other else {
         return Err(AppError::Validation(format!(
-            "group is archived: {group_id}"
+            "group not found: {requested}"
+        )));
+    };
+    let other_scope = DocumentScope::resolve(ctx, cfg, other)?;
+    let other_dirs = vec![other_scope.active.clone(), other_scope.archived.clone()];
+    let other_prefixes = vec![other.prefix.clone()];
+    if record::resolve::resolve_in_dirs(
+        ctx,
+        cfg,
+        registry,
+        &other_dirs,
+        &requested,
+        &other_prefixes,
+        false,
+    )?
+    .is_some()
+    {
+        return Err(AppError::Validation(format!(
+            "group type mismatch: {requested}"
         )));
     }
-    Err(AppError::Validation(format!("group not found: {group_id}")))
+    Err(AppError::Validation(format!(
+        "group not found: {requested}"
+    )))
 }
 
 fn list_documents(
@@ -1036,12 +1007,9 @@ fn resolve_document(
     descriptor: &TypeDescriptor,
     requested: &str,
 ) -> Result<record::resolve::ResolvedRecord, AppError> {
-    // A config-defined type keeps its historical active-only edit/view
-    // resolution; seed types read the archived directory too (TECH-066).
-    let mut dirs = vec![scope.active.clone()];
-    if !descriptor.is_config_defined_document() {
-        dirs.push(scope.archived.clone());
-    }
+    // Every document type reads both the active and archived folders, so the
+    // archived-edit guard is reachable for config-defined types too (TECH-066).
+    let dirs = vec![scope.active.clone(), scope.archived.clone()];
     let prefixes = vec![scope.prefix.clone()];
     let dotted = descriptor.id_shape == crate::registry::IdShape::Grouped;
     if let Some(found) =
@@ -1158,7 +1126,6 @@ fn list_field_ops(ops: &mut Vec<PatchOp>, field: &FieldSpec, values: &[String]) 
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn edit_document(
     ctx: &Context,
     cfg: &Config,
@@ -1183,17 +1150,38 @@ fn edit_document(
         )));
     }
 
-    let fields = if descriptor.document_model == DocumentModel::GroupedMarkdown && !id.contains('.')
-    {
-        descriptor
-            .group
-            .as_ref()
-            .and_then(|role| role.fields.clone())
-            .unwrap_or_default()
-    } else {
-        document_fields_for_verb(descriptor, DocumentVerb::Edit)
+    // Resolve the record role first, then use only that role's fields (F6/F9).
+    let role = match descriptor.document_model {
+        DocumentModel::GroupedMarkdown if id.contains('.') => DocumentRole::Member,
+        DocumentModel::GroupedMarkdown => DocumentRole::Group,
+        DocumentModel::SingleMarkdown | DocumentModel::SingleHtmlMockup => DocumentRole::Single,
     };
+    let fields = role_fields(descriptor, role);
     let mut args = merge_invocation_args(invocation, &fields);
+    if descriptor.document_model == DocumentModel::GroupedMarkdown {
+        let other_role = match role {
+            DocumentRole::Group => DocumentRole::Member,
+            DocumentRole::Member => DocumentRole::Group,
+            DocumentRole::Single => DocumentRole::Single,
+        };
+        let active: BTreeSet<&str> = fields.iter().map(|field| field.key.as_str()).collect();
+        let mut rejected: Vec<String> = Vec::new();
+        for field in role_fields(descriptor, other_role) {
+            if active.contains(field.key.as_str()) {
+                continue;
+            }
+            let remove_key = format!("no_{}", field.key);
+            if args.get(&field.key).is_some() || args.optional(&remove_key).is_some() {
+                rejected.push(format!("--{}", field_long(&field)));
+            }
+        }
+        if !rejected.is_empty() {
+            return Err(AppError::Validation(format!(
+                "option(s) not available for this record role: {}",
+                rejected.join(", ")
+            )));
+        }
+    }
     resolve_field_stdin(&fields, &mut args)?;
 
     let editor_command = if invocation.editor {
@@ -1274,24 +1262,27 @@ fn edit_document(
     }
 
     if !args.get_all("label").is_empty() {
-        let mut labels = current_list(&doc, "labels");
+        let mut labels = frontmatter_sequence(&doc, "labels");
         for label in sanitize_labels(args.get_all("label"))? {
             if !labels.contains(&label) {
                 labels.push(label);
             }
         }
-        ops.push(PatchOp::SetFrontMatter("labels".into(), labels.join("\n")));
+        ops.push(PatchOp::SetFrontMatterValue(
+            "labels".into(),
+            record::frontmatter::FrontMatterValue::Sequence(labels),
+        ));
     }
     if !args.get_all("reference").is_empty() {
-        let mut references = current_list(&doc, "references");
+        let mut references = frontmatter_sequence(&doc, "references");
         for reference in sanitize_references(args.get_all("reference"))? {
             if !references.contains(&reference) {
                 references.push(reference);
             }
         }
-        ops.push(PatchOp::SetFrontMatter(
+        ops.push(PatchOp::SetFrontMatterValue(
             "references".into(),
-            references.join("\n"),
+            record::frontmatter::FrontMatterValue::Sequence(references),
         ));
     }
 
@@ -1726,6 +1717,114 @@ mod tests {
         assert_eq!(out.text, "GLO-001");
         let content = fs::read_to_string(dir.join("docs/glossary/GLO-001.md")).unwrap();
         assert!(content.contains("status: active"), "{content}");
+    }
+
+    fn group_test_descriptor(registry: &ArtifactRegistry) -> TypeDescriptor {
+        let mut descriptor = registry.descriptor("req").expect("req").clone();
+        let fields = vec![
+            FieldSpec {
+                key: "mandatory".to_string(),
+                heading: Some("## Mandatory".to_string()),
+                frontmatter_key: None,
+                option: None,
+                label: Some("Mandatory".to_string()),
+                kind: crate::config::FieldKind::Multiline,
+                required: true,
+                verbs: vec![
+                    crate::config::FieldVerb::Create,
+                    crate::config::FieldVerb::Edit,
+                ],
+                help: None,
+            },
+            FieldSpec {
+                key: "sponsor".to_string(),
+                heading: Some("## Sponsor".to_string()),
+                frontmatter_key: Some("sponsor_ref".to_string()),
+                option: None,
+                label: Some("Sponsor".to_string()),
+                kind: crate::config::FieldKind::Text,
+                required: false,
+                verbs: vec![crate::config::FieldVerb::Create],
+                help: None,
+            },
+            FieldSpec {
+                key: "defaulted".to_string(),
+                heading: Some("## Defaulted".to_string()),
+                frontmatter_key: Some("defaulted".to_string()),
+                option: None,
+                label: Some("Defaulted".to_string()),
+                kind: crate::config::FieldKind::Text,
+                required: false,
+                verbs: vec![crate::config::FieldVerb::Create],
+                help: None,
+            },
+        ];
+        descriptor.group = Some(crate::config::RoleFields {
+            fields: Some(fields),
+            reference_visibility: None,
+        });
+        descriptor
+            .field_defaults
+            .insert("defaulted".to_string(), "seed-value".to_string());
+        descriptor
+    }
+
+    #[test]
+    fn create_group_enforces_required_fields_and_applies_shared_field_ops() {
+        let dir = tmpdir("group-shared-pipeline");
+        default_config(&dir);
+        let c = ctx(&dir);
+        let cfg = load_config(&c).unwrap();
+        let reg = ArtifactRegistry::build(&cfg).unwrap();
+        let descriptor = group_test_descriptor(&reg);
+        let scope = scope_for(&c, "req");
+
+        let missing = match create_group_document(
+            &c,
+            &cfg,
+            &reg,
+            &descriptor,
+            &scope,
+            &generic_invocation(
+                "req",
+                DocumentVerb::CreateGroup,
+                None,
+                Some("G".to_string()),
+                None,
+                vec![],
+                vec![],
+                None,
+            ),
+        ) {
+            Ok(_) => panic!("the required group field is enforced"),
+            Err(error) => error,
+        };
+        assert!(missing.to_string().contains("mandatory"), "{missing}");
+        assert!(!dir.join("docs/requirements/business/REQ-001.md").exists());
+
+        let mut invocation = generic_invocation(
+            "req",
+            DocumentVerb::CreateGroup,
+            None,
+            Some("G".to_string()),
+            None,
+            vec![],
+            vec![],
+            None,
+        );
+        invocation
+            .args
+            .insert("mandatory", vec!["body".to_string()]);
+        invocation.args.insert("sponsor", vec!["S".to_string()]);
+        let out = create_group_document(&c, &cfg, &reg, &descriptor, &scope, &invocation).unwrap();
+        assert_eq!(out.text, "REQ-001");
+        let content =
+            fs::read_to_string(dir.join("docs/requirements/business/REQ-001.md")).unwrap();
+        assert!(content.contains("sponsor_ref: S\n"), "{content}");
+        assert!(content.contains("## Sponsor\nS\n"), "{content}");
+        assert!(content.contains("defaulted: seed-value\n"), "{content}");
+        assert!(content.contains("## Defaulted\nseed-value\n"), "{content}");
+        assert!(content.contains("## Mandatory\nbody\n"), "{content}");
     }
 
     #[test]

@@ -135,6 +135,9 @@ fn resolve_record(
 pub(crate) struct Mockup {
     pub(crate) id: String,
     pub(crate) title: String,
+    /// Raw (already-encoded) display title from the `<title>` element, kept
+    /// verbatim on an unrelated edit.
+    pub(crate) raw_title: String,
     pub(crate) task: String,
     pub(crate) specs: Vec<String>,
     pub(crate) refs: Vec<String>,
@@ -142,34 +145,56 @@ pub(crate) struct Mockup {
     pub(crate) superseded_by: Option<String>,
 }
 
-fn parse_field_comment(content: &str, key: &str) -> Option<String> {
+/// The fixed comment block: the first contiguous run of single-line
+/// `<!-- ... -->` comments, preferring the run that starts with `mockup-id`.
+///
+/// Metadata is read from this block only, so a value shown in a visible
+/// paragraph can never set record metadata.
+fn comment_block(content: &str) -> Option<&str> {
+    let mut runs: Vec<(usize, usize)> = Vec::new();
+    let mut current: Option<(usize, usize)> = None;
+    let mut search = 0usize;
+    while let Some(rel) = content[search..].find("<!--") {
+        let start = search + rel;
+        let Some(close_rel) = content[start + 4..].find("-->") else {
+            break;
+        };
+        let end = start + 4 + close_rel + 3;
+        if let Some((run_start, run_end)) = current {
+            if content[run_end..start].trim().is_empty() {
+                current = Some((run_start, end));
+            } else {
+                runs.push((run_start, run_end));
+                current = Some((start, end));
+            }
+        } else {
+            current = Some((start, end));
+        }
+        search = end;
+    }
+    if let Some(run) = current {
+        runs.push(run);
+    }
+    let chosen = runs
+        .iter()
+        .find(|(start, end)| content[*start..*end].contains("<!-- mockup-id:"))
+        .or_else(|| runs.first())?;
+    Some(&content[chosen.0..chosen.1])
+}
+
+fn parse_field_comment(block: &str, key: &str) -> Option<String> {
     let mut start = 0usize;
-    while let Some(i) = content[start..].find("<!--") {
+    while let Some(i) = block[start..].find("<!--") {
         let i = start + i;
-        if let Some(j) = content[i..].find("-->") {
-            let inner = content[i + 4..i + j].trim();
+        if let Some(j) = block[i..].find("-->") {
+            let inner = block[i + 4..i + j].trim();
             if let Some(rest) = inner.strip_prefix(&format!("{}:", key)) {
-                return Some(rest.trim().to_string());
+                return Some(decode_entities(rest.trim()));
             }
             start = i + j + 3;
         } else {
             break;
         }
-    }
-    None
-}
-
-fn parse_visible(content: &str, prefix: &str) -> Option<String> {
-    if let Some(i) = content.find(prefix) {
-        let rest = &content[i + prefix.len()..];
-        // trim until closing tag if present
-        let val = if let Some(j) = rest.find("</") {
-            rest[..j].trim()
-        } else {
-            rest.trim()
-        };
-        // strip trailing '>'? no
-        return Some(val.to_string());
     }
     None
 }
@@ -190,11 +215,29 @@ fn extract_between(content: &str, start: &str, end: &str) -> Option<String> {
 /// `&amp;mdash;` stays a literal `&mdash;` instead of double-decoding.
 pub(crate) fn decode_entities(s: &str) -> String {
     s.replace("&mdash;", "—")
+        .replace("&#45;", "-")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
         .replace("&#39;", "'")
         .replace("&amp;", "&")
+}
+
+/// Encode one value for HTML text and attribute context.
+pub(crate) fn escape_text(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+/// Encode one value for the fixed HTML comment block.
+///
+/// `--` is broken so a value can never terminate or invalidate the comment.
+fn escape_comment(value: &str) -> String {
+    escape_text(value).replace("--", "-&#45;")
 }
 
 /// Raw inner text of the first `<title>` element, or `None` when absent.
@@ -277,12 +320,56 @@ pub(crate) fn extract_title(content: &str, id: &str) -> String {
     }
 }
 
+/// Raw display title from `<title>`, before entity decoding, so an unrelated
+/// edit can preserve the exact encoded bytes.
+fn raw_display_title(content: &str, id: &str) -> Option<String> {
+    let raw = raw_title_text(content)?;
+    let text = raw.trim();
+    if text.is_empty() {
+        return None;
+    }
+    let dash = text.find('—');
+    let entity = text.find("&mdash;");
+    let separator = match (dash, entity) {
+        (Some(d), Some(e)) => {
+            if d <= e {
+                Some((d, '—'.len_utf8()))
+            } else {
+                Some((e, "&mdash;".len()))
+            }
+        }
+        (Some(d), None) => Some((d, '—'.len_utf8())),
+        (None, Some(e)) => Some((e, "&mdash;".len())),
+        (None, None) => None,
+    };
+    if let Some((at, width)) = separator {
+        let rest = text[at + width..].trim();
+        return (!rest.is_empty()).then(|| rest.to_string());
+    }
+    let without_id = text
+        .strip_prefix(id)
+        .and_then(|rest| {
+            if rest.is_empty() || !rest.chars().next().is_some_and(char::is_whitespace) {
+                None
+            } else {
+                Some(rest.trim())
+            }
+        })
+        .unwrap_or(text);
+    (!without_id.is_empty()).then(|| without_id.to_string())
+}
+
 /// Split a `specs`/`refs` comment value on Unicode whitespace (section 3.4).
-pub(crate) fn comment_list(content: &str, key: &str) -> Vec<String> {
-    match parse_field_comment(content, key) {
+fn comment_list_in(block: &str, key: &str) -> Vec<String> {
+    match parse_field_comment(block, key) {
         Some(raw) => split_list(&raw),
         None => Vec::new(),
     }
+}
+
+#[cfg(test)]
+pub(crate) fn comment_list(content: &str, key: &str) -> Vec<String> {
+    comment_list_in(comment_block(content).unwrap_or_default(), key)
 }
 
 /// Browser metadata: file-stem ID, `<title>` title, comment-sourced lists.
@@ -298,15 +385,16 @@ pub(crate) struct BrowserMetadata {
 
 pub(crate) fn parse_browser_metadata(content: &str, id: &str) -> BrowserMetadata {
     let title = extract_title(content, id);
-    let specs = comment_list(content, "specs");
-    let refs = comment_list(content, "refs");
-    let task = parse_field_comment(content, "task")
+    let block = comment_block(content).unwrap_or_default();
+    let specs = comment_list_in(block, "specs");
+    let refs = comment_list_in(block, "refs");
+    let task = parse_field_comment(block, "task")
         .map(|v| v.trim().to_string())
         .unwrap_or_default();
-    let status = parse_field_comment(content, "status")
+    let status = parse_field_comment(block, "status")
         .map(|v| v.trim().to_string())
         .unwrap_or_default();
-    let superseded_by = parse_field_comment(content, "superseded-by")
+    let superseded_by = parse_field_comment(block, "superseded-by")
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty());
     BrowserMetadata {
@@ -324,8 +412,7 @@ pub(crate) fn parse_record(content: &str, fallback_id: &str) -> Mockup {
     // package is the landing heading, never the record identity.
     let id = fallback_id.to_string();
     // Title: prefer the <title> element (browser rule); only when it is
-    // absent do CLI files fall back to the stub <h1>. A present <title>
-    // always wins so review packages are not misread from the landing <h1>.
+    // absent do CLI files fall back to the stub <h1>.
     let mut title = String::new();
     let has_title = raw_title_text(content).is_some_and(|raw| !raw.trim().is_empty());
     if has_title {
@@ -341,35 +428,19 @@ pub(crate) fn parse_record(content: &str, fallback_id: &str) -> Mockup {
     if title.is_empty() {
         title = id.clone();
     }
+    let raw_title = raw_display_title(content, &id).unwrap_or_else(|| escape_text(&title));
 
-    let status_comment = parse_field_comment(content, "status");
-    let status_visible = parse_visible(content, "<p>Status:");
-    let mut status = status_visible
-        .or(status_comment)
-        .unwrap_or_else(|| "pending".to_string());
+    // Metadata comes only from the fixed comment block. A visible paragraph
+    // or a title is never a metadata source.
+    let block = comment_block(content).unwrap_or_default();
+    let mut status = parse_field_comment(block, "status").unwrap_or_default();
     if status.is_empty() {
         status = "pending".to_string();
     }
-
-    let task_comment = parse_field_comment(content, "task");
-    let task_visible = parse_visible(content, "<p>Task:");
-    let task = task_visible.or(task_comment).unwrap_or_default();
-
-    let specs_comment = parse_field_comment(content, "specs");
-    let specs_visible = parse_visible(content, "<p>UI specifications:");
-    let specs_str = specs_visible.or(specs_comment).unwrap_or_default();
-    let specs = split_list(&specs_str);
-
-    let refs_comment = parse_field_comment(content, "refs");
-    let refs_visible = parse_visible(content, "<p>References:");
-    let refs_str = refs_visible.or(refs_comment).unwrap_or_default();
-    let refs = split_list(&refs_str);
-
-    let superseded_visible = parse_visible(content, "<p>Superseded by:");
-    let superseded_comment = parse_field_comment(content, "superseded-by");
-    let superseded_str = superseded_visible
-        .or(superseded_comment)
-        .unwrap_or_default();
+    let task = parse_field_comment(block, "task").unwrap_or_default();
+    let specs = split_list(&parse_field_comment(block, "specs").unwrap_or_default());
+    let refs = split_list(&parse_field_comment(block, "refs").unwrap_or_default());
+    let superseded_str = parse_field_comment(block, "superseded-by").unwrap_or_default();
     let superseded_by = if superseded_str.trim().is_empty() {
         None
     } else {
@@ -379,6 +450,7 @@ pub(crate) fn parse_record(content: &str, fallback_id: &str) -> Mockup {
     Mockup {
         id,
         title,
+        raw_title,
         task,
         specs,
         refs,
@@ -388,25 +460,31 @@ pub(crate) fn parse_record(content: &str, fallback_id: &str) -> Mockup {
 }
 
 pub(crate) fn render_record(record: &Mockup) -> String {
+    let id = escape_text(&record.id);
+    let title_html = escape_text(&record.title);
+    let title_raw = if record.raw_title.is_empty() {
+        if record.title.is_empty() {
+            id.clone()
+        } else {
+            title_html.clone()
+        }
+    } else {
+        record.raw_title.clone()
+    };
+    let status = escape_text(&record.status);
+    let status_comment = escape_comment(&record.status);
+    let task = escape_text(&record.task);
+    let task_comment = escape_comment(&record.task);
     let specs_str = record.specs.join(" ");
+    let specs_comment = escape_comment(&specs_str);
+    let specs_text = escape_text(&specs_str);
     let refs_str = record.refs.join(" ");
-    let superseded_str = record.superseded_by.clone().unwrap_or_default();
+    let refs_comment = escape_comment(&refs_str);
+    let refs_text = escape_text(&refs_str);
+    let superseded = record.superseded_by.clone().unwrap_or_default();
+    let superseded_text = escape_text(&superseded);
     format!(
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>{} — {}</title>\n</head>\n<body>\n<!-- mockup-id: {} -->\n<!-- status: {} -->\n<!-- task: {} -->\n<!-- specs: {} -->\n<!-- refs: {} -->\n<h1>{} {}</h1>\n<p>Status: {}</p>\n<p>Task: {}</p>\n<p>UI specifications: {}</p>\n<p>References: {}</p>\n<p>Superseded by: {}</p>\n</body>\n</html>\n",
-        record.id,
-        record.title,
-        record.id,
-        record.status,
-        record.task,
-        specs_str,
-        refs_str,
-        record.id,
-        record.title,
-        record.status,
-        record.task,
-        specs_str,
-        refs_str,
-        superseded_str
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>{id} — {title_raw}</title>\n</head>\n<body>\n<!-- mockup-id: {id} -->\n<!-- status: {status_comment} -->\n<!-- task: {task_comment} -->\n<!-- specs: {specs_comment} -->\n<!-- refs: {refs_comment} -->\n<h1>{id} {title_html}</h1>\n<p>Status: {status}</p>\n<p>Task: {task}</p>\n<p>UI specifications: {specs_text}</p>\n<p>References: {refs_text}</p>\n<p>Superseded by: {superseded_text}</p>\n</body>\n</html>\n"
     )
 }
 
@@ -449,7 +527,8 @@ fn create(
     specs_raw: &[String],
     refs_raw: &[String],
 ) -> Result<String, AppError> {
-    let title = sanitize_field(title_raw)?;
+    // The title has already passed the shared title contract.
+    let title = title_raw.trim().to_string();
     let task = sanitize_field(task_raw)?;
     let specs = sanitize_list(specs_raw)?;
     if specs.is_empty() {
@@ -462,11 +541,19 @@ fn create(
     let active = scope.active.clone();
     ensure_dirs(&active)?;
 
-    let next = crate::record::identity::next_html_number(&active, &scope.archived, &scope.prefix);
-    let id = crate::record::identity::format_id(&scope.prefix, next as i64, scope.id_padding);
+    let reservation = crate::record::identity::reserve_number(
+        &active,
+        &scope.archived,
+        &scope.prefix,
+        scope.id_padding,
+        "html",
+    )
+    .map_err(|e| AppError::Runtime(e.to_string()))?;
+    let id = reservation.id.clone();
 
     let record = Mockup {
         id: id.clone(),
+        raw_title: escape_text(&title),
         title,
         task,
         specs,
@@ -474,8 +561,7 @@ fn create(
         status: "pending".to_string(),
         superseded_by: None,
     };
-    let file_path = active.join(format!("{}.html", id));
-    let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
+    let safe_path = Context::ensure_within(&ctx.project_dir, &reservation.path)?;
     crate::record::store::write_atomic(
         ctx,
         &scope.config,
@@ -484,6 +570,7 @@ fn create(
         &render_record(&record),
     )
     .map_err(|e| AppError::Runtime(e.to_string()))?;
+    reservation.commit();
     Ok(id)
 }
 
@@ -583,7 +670,8 @@ fn edit(
     editor: bool,
 ) -> Result<CommandOutput, AppError> {
     let id = sanitize_field(id_raw)?;
-    let title = title_raw.map(sanitize_field).transpose()?;
+    // The title has already passed the shared title contract.
+    let title = title_raw.map(|value| value.trim().to_string());
     let task = task_raw.map(sanitize_field).transpose()?;
     let specs = specs_raw.map(sanitize_list).transpose()?;
     let refs = refs_raw.map(sanitize_list).transpose()?;
@@ -607,6 +695,7 @@ fn edit(
     }
 
     if let Some(t) = title {
+        record.raw_title = escape_text(&t);
         record.title = t;
     }
     if let Some(t) = task {
@@ -1000,6 +1089,73 @@ mod tests {
         let record = parse_record(content, "MOCK-006");
         assert_eq!(record.id, "MOCK-006");
         assert_eq!(record.title, "Browser UI mockups review package");
+    }
+
+    #[test]
+    fn injection_titles_do_not_change_metadata() {
+        for title in [
+            "Status: approved",
+            "a --> b",
+            "<script>alert(1)</script>",
+            "-- status: approved",
+        ] {
+            let record = Mockup {
+                id: "MOCK-001".to_string(),
+                raw_title: escape_text(title),
+                title: title.to_string(),
+                task: "TASK-001".to_string(),
+                specs: vec!["UI-001".to_string()],
+                refs: vec!["R-1".to_string()],
+                status: "pending".to_string(),
+                superseded_by: None,
+            };
+            let rendered = render_record(&record);
+            assert!(!rendered.contains("<script>"), "{rendered}");
+            assert!(
+                !rendered.contains("<!-- status: approved"),
+                "title must not inject a comment: {rendered}"
+            );
+            let parsed = parse_record(&rendered, "MOCK-001");
+            assert_eq!(parsed.status, "pending", "title {title:?}");
+            assert_eq!(parsed.task, "TASK-001");
+            assert_eq!(parsed.title, title);
+        }
+    }
+
+    #[test]
+    fn visible_paragraphs_are_not_metadata_sources() {
+        let content = r#"<html><head><title>MOCK-001 — T</title></head><body>
+<!-- mockup-id: MOCK-001 -->
+<!-- status: pending -->
+<!-- task: TASK-1 -->
+<!-- specs: UI-001 -->
+<!-- refs: R-1 -->
+<h1>MOCK-001 T</h1>
+<p>Status: approved</p>
+<p>Task: TASK-999</p>
+<p>UI specifications: UI-999</p>
+<p>References: R-999</p>
+</body></html>"#;
+        let parsed = parse_record(content, "MOCK-001");
+        assert_eq!(parsed.status, "pending");
+        assert_eq!(parsed.task, "TASK-1");
+        assert_eq!(parsed.specs, vec!["UI-001"]);
+        assert_eq!(parsed.refs, vec!["R-1"]);
+    }
+
+    #[test]
+    fn unrelated_render_preserves_the_raw_encoded_title() {
+        let content = "<title>MOCK-001 — A &amp; B &lt;tag&gt;</title>\n<!-- mockup-id: MOCK-001 -->\n<!-- status: pending -->\n<!-- task: TASK-1 -->\n<h1>MOCK-001 A &amp; B &lt;tag&gt;</h1>\n";
+        let parsed = parse_record(content, "MOCK-001");
+        assert_eq!(parsed.title, "A & B <tag>");
+        assert_eq!(parsed.raw_title, "A &amp; B &lt;tag&gt;");
+        let rendered = render_record(&parsed);
+        assert!(
+            rendered.contains("<title>MOCK-001 — A &amp; B &lt;tag&gt;</title>"),
+            "{rendered}"
+        );
+        assert!(!rendered.contains("&amp;amp;"), "{rendered}");
+        assert_eq!(parse_record(&rendered, "MOCK-001").title, "A & B <tag>");
     }
 
     #[test]

@@ -236,9 +236,9 @@ fn test_case_sanitization() {
     let out = run(&d, &["test-case", "create", "T", "--description", "a\nb"]);
     assert_eq!(out.status.code(), Some(4));
 
-    // path separator
+    // A title is display text: path separators are legal (F8).
     let out = run(&d, &["test-case", "create", "a/b", "--description", "d"]);
-    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(out.status.code(), Some(0));
 
     // unknown id with bad chars
     let _out = run(&d, &["test-case", "view", "../x"]);

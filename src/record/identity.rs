@@ -359,6 +359,88 @@ pub fn next_html_number(active: &Path, archived: &Path, prefix: &str) -> u32 {
     allocate_next(&observed) as u32
 }
 
+/// One atomically reserved record path.
+///
+/// The placeholder file is created with `create_new`, so two concurrent
+/// creators can never reserve the same ID. The reservation is removed on drop
+/// unless [`ReservedId::commit`] is called after the content is written.
+#[derive(Debug)]
+pub struct ReservedId {
+    pub id: String,
+    pub path: std::path::PathBuf,
+    committed: bool,
+}
+
+impl ReservedId {
+    /// Keep the placeholder after the real content has been written over it.
+    pub fn commit(mut self) {
+        self.committed = true;
+    }
+}
+
+impl Drop for ReservedId {
+    fn drop(&mut self) {
+        if !self.committed {
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
+}
+
+fn try_reserve(active: &Path, id: &str, extension: &str) -> std::io::Result<Option<ReservedId>> {
+    let path = active.join(format!("{}.{}", id, extension));
+    match std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+    {
+        Ok(_) => Ok(Some(ReservedId {
+            id: id.to_string(),
+            path,
+            committed: false,
+        })),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+/// Reserve the next plain ID atomically.
+pub fn reserve_number(
+    active: &Path,
+    archived: &Path,
+    prefix: &str,
+    padding: usize,
+    extension: &str,
+) -> std::io::Result<ReservedId> {
+    loop {
+        let next = if extension == "html" {
+            next_html_number(active, archived, prefix)
+        } else {
+            next_number(active, archived, prefix)
+        };
+        let id = format_id(prefix, next as i64, padding);
+        if let Some(reserved) = try_reserve(active, &id, extension)? {
+            return Ok(reserved);
+        }
+    }
+}
+
+/// Reserve the next dotted member ID atomically.
+pub fn reserve_seq_number(
+    active: &Path,
+    archived: &Path,
+    group_id: &str,
+    padding: usize,
+    extension: &str,
+) -> std::io::Result<ReservedId> {
+    loop {
+        let next = next_seq_number(active, archived, group_id);
+        let id = format_seq_id(group_id, next as i64, padding);
+        if let Some(reserved) = try_reserve(active, &id, extension)? {
+            return Ok(reserved);
+        }
+    }
+}
+
 /// Allocate `max(observed) + 1`, with a minimum of 1.
 pub fn allocate_next(observed: &[i64]) -> i64 {
     match observed.iter().copied().max() {
@@ -512,6 +594,34 @@ mod tests {
     fn empty_family_starts_at_one() {
         assert_eq!(allocate_next(&[]), 1);
         assert_eq!(IdSpec::new("MS", 3).format_id(1), "MS-001");
+    }
+
+    #[test]
+    fn reservation_never_replaces_an_existing_target() {
+        let base = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join(format!("identity-reserve-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::write(base.join("TECH-001.md"), "first").unwrap();
+
+        let reserved = reserve_number(&base, &base, "TECH", 3, "md").unwrap();
+        assert_eq!(reserved.id, "TECH-002");
+        assert_eq!(
+            std::fs::read_to_string(base.join("TECH-001.md")).unwrap(),
+            "first"
+        );
+        std::fs::write(&reserved.path, "second").unwrap();
+        reserved.commit();
+
+        let reserved = reserve_number(&base, &base, "TECH", 3, "md").unwrap();
+        assert_eq!(reserved.id, "TECH-003");
+        reserved.commit();
+        assert_eq!(
+            std::fs::read_to_string(base.join("TECH-002.md")).unwrap(),
+            "second"
+        );
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

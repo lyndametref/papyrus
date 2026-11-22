@@ -788,36 +788,17 @@ pub fn create(
     let body_doc = body_document(&td);
     let body = crate::record::document::render(&body_doc);
     let parsed = crate::record::document::parse(&body)?;
-    let labels_value = if labels.is_empty() {
-        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
-    } else {
-        crate::record::frontmatter::FrontMatterValue::String(labels.join("\n"))
-    };
-    let refs_value = if references.is_empty() {
-        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
-    } else {
-        crate::record::frontmatter::FrontMatterValue::String(references.join("\n"))
-    };
-    let assignee_value = if assignee_yaml.is_empty() {
-        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
-    } else {
-        crate::record::frontmatter::FrontMatterValue::String(assignee_yaml.join("\n"))
-    };
+    let labels_value = crate::record::frontmatter::FrontMatterValue::Sequence(labels.clone());
+    let refs_value = crate::record::frontmatter::FrontMatterValue::Sequence(references.clone());
+    let assignee_value =
+        crate::record::frontmatter::FrontMatterValue::Sequence(assignee_yaml.clone());
     let milestone_value = if let Some(m) = &milestone {
         crate::record::frontmatter::FrontMatterValue::String(m.clone())
     } else {
         crate::record::frontmatter::FrontMatterValue::Null
     };
-    let deps_value = if deps.is_empty() {
-        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
-    } else {
-        crate::record::frontmatter::FrontMatterValue::String(deps.join("\n"))
-    };
-    let doc_value = if documentation.is_empty() {
-        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
-    } else {
-        crate::record::frontmatter::FrontMatterValue::String(documentation.join("\n"))
-    };
+    let deps_value = crate::record::frontmatter::FrontMatterValue::Sequence(deps.clone());
+    let doc_value = crate::record::frontmatter::FrontMatterValue::Sequence(documentation.clone());
     let type_value = if let Some(t) = &type_val {
         crate::record::frontmatter::FrontMatterValue::String(t.clone())
     } else {

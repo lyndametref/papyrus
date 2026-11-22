@@ -203,11 +203,31 @@ fn audit_sanitization() {
     let d = tmpdir("san");
     init(&d);
 
-    for bad in ["a/b", "x\\y", "   ", "a\nb"] {
-        let out = create(&d, bad, "ok", None);
-        assert_eq!(out.status.code(), Some(4), "title bad={}", bad);
+    // A title is display text, not a path component: path separators are
+    // legitimate title characters (F8).
+    for (index, title) in ["a/b", "x\\y"].into_iter().enumerate() {
+        let out = create(&d, title, "ok", None);
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "title {title:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let id = format!("AUD-{:03}", index + 1);
+        let content = fs::read_to_string(record(&d, &id)).unwrap();
+        assert!(
+            content.contains(title),
+            "title {title:?} not stored: {content}"
+        );
     }
 
+    // Empty, whitespace-only, and multi-line titles stay validation outcomes.
+    for bad in ["   ", "a\nb"] {
+        let out = create(&d, bad, "ok", None);
+        assert_eq!(out.status.code(), Some(4), "title bad={bad:?}");
+    }
+
+    // Fields keep the stricter single-line name rules.
     let out = create(&d, "OK", "x/y", None);
     assert_eq!(out.status.code(), Some(4));
 
@@ -220,8 +240,9 @@ fn audit_sanitization() {
     let out = run(&d, &["audit", "view", "a/b"]);
     assert_eq!(out.status.code(), Some(4));
 
+    // A legal title is accepted on edit too.
     let out = run(&d, &["audit", "edit", "AUD-001", "--title", "x\\y"]);
-    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(out.status.code(), Some(0));
 
     let out = run(&d, &["audit", "edit", "AUD-001", "--content", "a/b"]);
     assert_eq!(out.status.code(), Some(4));

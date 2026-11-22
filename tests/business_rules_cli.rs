@@ -254,7 +254,14 @@ fn rule_sanitization_rejects_bad_input() {
     let d = tmpdir("san");
     init(&d);
 
-    for bad in ["   ", "a/b", "x\\y", "a\nb", "a\rb", "a\tb", "a\u{1}b"] {
+    // A title is display text: path separators are legal (F8).
+    for good in ["a/b", "x\\y"] {
+        let out = create(&d, good, "d", "r", "a");
+        assert_eq!(out.status.code(), Some(0), "title good={:?}", good);
+    }
+    fs::remove_dir_all(d.join("docs/business-rules")).unwrap();
+    fs::create_dir_all(d.join("docs/business-rules")).unwrap();
+    for bad in ["   ", "a\nb", "a\rb", "a\tb", "a\u{1}b"] {
         let out = create(&d, bad, "d", "r", "a");
         assert_eq!(out.status.code(), Some(4), "title bad={:?}", bad);
         let out = create(&d, "T", bad, "r", "a");
@@ -264,6 +271,8 @@ fn rule_sanitization_rejects_bad_input() {
         let out = create(&d, "T", "d", "r", bad);
         assert_eq!(out.status.code(), Some(4), "applicability bad={:?}", bad);
     }
+    let out = create(&d, "T", "a/b", "r", "a");
+    assert_eq!(out.status.code(), Some(4), "a description keeps path rules");
     assert!(!record(&d, "RUL-001").exists());
 
     create(&d, "OK", "d", "r", "a");
@@ -274,7 +283,7 @@ fn rule_sanitization_rejects_bad_input() {
     }
 
     let before = fs::read_to_string(record(&d, "RUL-001")).unwrap();
-    let out = run(&d, &["rule", "edit", "RUL-001", "--title", "x/y"]);
+    let out = run(&d, &["rule", "edit", "RUL-001", "--title", "a\tb"]);
     assert_eq!(out.status.code(), Some(4));
     let out = run(&d, &["rule", "edit", "RUL-001", "--description", "a\tb"]);
     assert_eq!(out.status.code(), Some(4));
@@ -574,7 +583,7 @@ fn rule_editor_sanitization_failure_writes_nothing() {
     init(&d);
     create(&d, "San", "d", "r", "a");
     let before = fs::read_to_string(record(&d, "RUL-001")).unwrap();
-    let out = run(&d, &["rule", "edit", "RUL-001", "--title", "a/b"]);
+    let out = run(&d, &["rule", "edit", "RUL-001", "--title", "a\tb"]);
     assert_eq!(out.status.code(), Some(4));
     assert_eq!(fs::read_to_string(record(&d, "RUL-001")).unwrap(), before);
     let _ = fs::remove_dir_all(&d);

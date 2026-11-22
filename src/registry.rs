@@ -112,20 +112,6 @@ impl Verb {
     }
 }
 
-/// Extra arguments a `create` command accepts.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct CreateOptions {
-    pub group: GroupRequirement,
-}
-
-/// Whether `create` requires a `--group` declaration.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum GroupRequirement {
-    #[default]
-    Absent,
-    Required,
-}
-
 /// The requirement family a typed handler belongs to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RequirementKind {
@@ -277,12 +263,12 @@ impl TypeDescriptor {
 
     /// The typed handler that still selects browser branches, if any.
     ///
-    /// Seed document slugs resolve through [`document_handler`]; backlog and
-    /// decision types keep their schema handler. A config-defined document has
-    /// no handler.
+    /// Seed document slugs read the handler carried by the seed table; backlog
+    /// and decision types keep their schema handler. A config-defined document
+    /// has no handler.
     pub fn handler(&self) -> Option<TypedHandler> {
         if self.category == ArtifactCategory::Document {
-            document_handler(&self.slug)
+            crate::config::seed_document_type(&self.slug).and_then(|seed| seed.handler)
         } else {
             self.schema.as_ref().map(|schema| schema.handler)
         }
@@ -291,8 +277,8 @@ impl TypeDescriptor {
     /// Whether this descriptor is the config-defined document path that the
     /// seed-derived model replaces (REQ-07.004, MS-033 AC-7).
     ///
-    /// Transitional bridge until MS-034/MS-035 read the seed-derived model and
-    /// `reference_visibility` instead.
+    /// Compatibility bridge for a type declared only in configuration; the
+    /// seed-derived model and visibility are read for built-in slugs.
     pub fn is_config_defined_document(&self) -> bool {
         self.category == ArtifactCategory::Document && !is_seed_document_slug(&self.slug)
     }
@@ -333,7 +319,6 @@ pub struct TypeDescriptor {
     pub enabled: bool,
     pub status_model: StatusModel,
     pub verbs: Vec<Verb>,
-    pub create_options: CreateOptions,
     pub document_model: DocumentModel,
     /// Typed schema carried by a backlog/decision type, or by the HTML mockup
     /// document surface that is not field-derived (ADR-036 decision 29).
@@ -434,6 +419,18 @@ pub enum RegistryError {
     RestoreVerbOnDocument { slug: String },
     /// I17: a document verb and its command metadata disagree.
     VerbSpecMismatch { slug: String, verb: &'static str },
+    /// I18: a field declares no derived option name.
+    DerivedOptionEmpty { slug: String, path: String },
+    /// I19: a field-derived option shadows a fixed engine or global option.
+    DerivedOptionReserved {
+        slug: String,
+        path: String,
+        option: String,
+    },
+    /// I20: two different fields derive the same option name.
+    DerivedOptionDuplicate { slug: String, option: String },
+    /// I21: the HTML mockup declares field options it cannot render.
+    MockupFieldDeclared { slug: String, path: String },
 }
 
 impl fmt::Display for RegistryError {
@@ -512,6 +509,26 @@ impl fmt::Display for RegistryError {
                 f,
                 "document_types.{}: verb {} has no matching command metadata",
                 slug, verb
+            ),
+            RegistryError::DerivedOptionEmpty { slug, path } => write!(
+                f,
+                "document_types.{}.{}.option: derived option name must not be empty",
+                slug, path
+            ),
+            RegistryError::DerivedOptionReserved { slug, path, option } => write!(
+                f,
+                "document_types.{}.{}.option: reserved option name: {}",
+                slug, path, option
+            ),
+            RegistryError::DerivedOptionDuplicate { slug, option } => write!(
+                f,
+                "document_types.{}.fields: duplicate derived option across roles: {}",
+                slug, option
+            ),
+            RegistryError::MockupFieldDeclared { slug, path } => write!(
+                f,
+                "document_types.{}.{}: not allowed for a type without field options",
+                slug, path
             ),
         }
     }
@@ -995,9 +1012,6 @@ const MILESTONE_STATES: &[&str] = &["open", "closed", "archived"];
 const RELEASE_STATES: &[&str] = &["planned", "released"];
 const MOCKUP_STATES: &[&str] = &["pending", "approved", "archived"];
 
-const NO_CREATE_OPTIONS: CreateOptions = CreateOptions {
-    group: GroupRequirement::Absent,
-};
 const FRONTMATTER_ARCHIVE: ArchivePolicy = ArchivePolicy::ArchivedFolder {
     state_field: Some("status"),
 };
@@ -1077,7 +1091,6 @@ struct DescriptorTemplate {
     frontmatter_status: Option<&'static str>,
     frontmatter_extra: &'static [&'static str],
     archive: ArchivePolicy,
-    create_options: CreateOptions,
 }
 
 const TASK_VERBS: &[Verb] = &[
@@ -1129,7 +1142,6 @@ const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
             "type",
         ],
         archive: FRONTMATTER_ARCHIVE,
-        create_options: NO_CREATE_OPTIONS,
     },
     DescriptorTemplate {
         slug: "milestone",
@@ -1149,7 +1161,6 @@ const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
         // the backlog archive milestones folder, which is both the lifecycle
         // archive destination and the legacy read/import location.
         archive: FRONTMATTER_ARCHIVE,
-        create_options: NO_CREATE_OPTIONS,
     },
     DescriptorTemplate {
         slug: "release",
@@ -1165,7 +1176,6 @@ const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
         frontmatter_status: Some("status"),
         frontmatter_extra: &[],
         archive: ArchivePolicy::None,
-        create_options: NO_CREATE_OPTIONS,
     },
 ];
 
@@ -1184,7 +1194,6 @@ const DECISION_TEMPLATE: DescriptorTemplate = DescriptorTemplate {
     frontmatter_status: None,
     frontmatter_extra: &["superseded_by"],
     archive: ArchivePolicy::None,
-    create_options: NO_CREATE_OPTIONS,
 };
 
 /// The built-in registry: every configured type with its behavior.
@@ -1324,7 +1333,6 @@ fn backlog_descriptor(cfg: &Config, template: &DescriptorTemplate) -> TypeDescri
         enabled: true,
         status_model,
         verbs,
-        create_options: template.create_options,
         document_model: template.content.document_model(),
         schema: Some(template.content.schema()),
         fields: Vec::new(),
@@ -1355,7 +1363,6 @@ fn decision_descriptor(slug: &str, entry: &TypeEntry) -> TypeDescriptor {
             states: DECISION_STATES,
         },
         verbs: DECISION_VERBS.to_vec(),
-        create_options: NO_CREATE_OPTIONS,
         document_model: SchemaKind::Decision.document_model(),
         schema: Some(SchemaKind::Decision.schema()),
         fields: Vec::new(),
@@ -1368,28 +1375,6 @@ fn decision_descriptor(slug: &str, entry: &TypeEntry) -> TypeDescriptor {
         id_shape: IdShape::Plain,
         archive_policy: ArchivePolicy::None,
         record: None,
-    }
-}
-
-/// The typed handler each seed document slug keeps for the browser until
-/// MS-035 TASK-269 deletes the per-type branches.
-///
-/// This is the minimal handler mapping required by `src/browser/mod.rs`; no
-/// command metadata is derived from it. A user-defined slug has no handler.
-fn document_handler(slug: &str) -> Option<TypedHandler> {
-    match slug {
-        "req" => Some(TypedHandler::Requirement(RequirementKind::Business)),
-        "nfr" => Some(TypedHandler::Requirement(RequirementKind::NonFunctional)),
-        "glossary" => Some(TypedHandler::Glossary),
-        "rule" => Some(TypedHandler::Rule),
-        "ui-spec" => Some(TypedHandler::UiSpec),
-        "ui-mockup" => Some(TypedHandler::UiMockup),
-        "audit" => Some(TypedHandler::Audit),
-        "tech-spec" => Some(TypedHandler::TechSpec),
-        "use-case" => Some(TypedHandler::UseCase),
-        "test-case" => Some(TypedHandler::TestCase),
-        "test-report" => Some(TypedHandler::TestReport),
-        _ => None,
     }
 }
 
@@ -1515,37 +1500,62 @@ fn build_document_verb_spec(descriptor: &TypeDescriptor, verb: Verb) -> VerbSpec
     }
 }
 
+/// The role whose field sequence a record uses (ADR-036 decision 27).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DocumentRole {
+    /// The single field sequence of a `SingleMarkdown` type.
+    Single,
+    /// The group role of a `GroupedMarkdown` type.
+    Group,
+    /// The member role of a `GroupedMarkdown` type.
+    Member,
+}
+
+/// The resolved field sequence of one role.
+///
+/// This is the single source the command builder and the document engine use,
+/// so help, create-group, create, and edit cannot drift.
+pub fn role_fields(descriptor: &TypeDescriptor, role: DocumentRole) -> Vec<FieldSpec> {
+    match role {
+        DocumentRole::Single => descriptor.fields.clone(),
+        DocumentRole::Group => descriptor
+            .group
+            .as_ref()
+            .and_then(|role| role.fields.clone())
+            .unwrap_or_default(),
+        DocumentRole::Member => descriptor
+            .member
+            .as_ref()
+            .and_then(|role| role.fields.clone())
+            .or_else(|| {
+                descriptor
+                    .group
+                    .as_ref()
+                    .and_then(|role| role.fields.clone())
+            })
+            .unwrap_or_default(),
+    }
+}
+
 /// The role field sequence that supplies a verb's options.
-fn document_fields_for_verb(descriptor: &TypeDescriptor, verb: Verb) -> Vec<FieldSpec> {
+///
+/// `edit` offers the union of both roles because the terminal role is unknown
+/// until the record ID resolves; the engine resolves the role first and accepts
+/// only that role's options at runtime.
+pub fn fields_for_verb(descriptor: &TypeDescriptor, verb: Verb) -> Vec<FieldSpec> {
     match descriptor.document_model {
-        DocumentModel::SingleMarkdown => descriptor.fields.clone(),
+        DocumentModel::SingleMarkdown => role_fields(descriptor, DocumentRole::Single),
         DocumentModel::GroupedMarkdown => match verb {
-            Verb::CreateGroup => descriptor
-                .group
-                .as_ref()
-                .and_then(|role| role.fields.clone())
-                .unwrap_or_default(),
-            Verb::Create => descriptor
-                .member
-                .as_ref()
-                .and_then(|role| role.fields.clone())
-                .or_else(|| {
-                    descriptor
-                        .group
-                        .as_ref()
-                        .and_then(|role| role.fields.clone())
-                })
-                .unwrap_or_default(),
+            Verb::CreateGroup => role_fields(descriptor, DocumentRole::Group),
+            Verb::Create => role_fields(descriptor, DocumentRole::Member),
             Verb::Edit => {
                 let mut fields: Vec<FieldSpec> = Vec::new();
-                for role in [descriptor.group.as_ref(), descriptor.member.as_ref()]
+                for field in role_fields(descriptor, DocumentRole::Group)
                     .into_iter()
-                    .flatten()
+                    .chain(role_fields(descriptor, DocumentRole::Member))
                 {
-                    for field in role.fields.iter().flatten() {
-                        if !fields.iter().any(|existing| existing.key == field.key) {
-                            fields.push(field.clone());
-                        }
+                    if !fields.iter().any(|existing| existing.key == field.key) {
+                        fields.push(field);
                     }
                 }
                 fields
@@ -1615,7 +1625,7 @@ fn field_remove_arg(field: &FieldSpec) -> ArgSpec {
 
 fn document_field_args(descriptor: &TypeDescriptor, verb: Verb) -> Vec<ArgSpec> {
     let mut args = Vec::new();
-    for field in document_fields_for_verb(descriptor, verb) {
+    for field in fields_for_verb(descriptor, verb) {
         let offered = field.verbs.iter().any(|field_verb| match field_verb {
             crate::config::FieldVerb::Create => verb == Verb::Create || verb == Verb::CreateGroup,
             crate::config::FieldVerb::Edit => verb == Verb::Edit,
@@ -1691,6 +1701,92 @@ fn document_verbs(model: DocumentModel) -> Vec<Verb> {
     verbs
 }
 
+/// Validate the derived command surface of one document type.
+///
+/// The registry is the only place the command builder can trust, so it rejects
+/// an empty, reserved, or colliding derived option and any field declaration on
+/// the HTML mockup before `cli::tree` ever builds an `Arg`.
+fn validate_derived_surface(
+    slug: &str,
+    model: DocumentModel,
+    fields: &[FieldSpec],
+    group: Option<&RoleFields>,
+    member: Option<&RoleFields>,
+) -> Result<(), RegistryError> {
+    if model == DocumentModel::SingleHtmlMockup {
+        if !fields.is_empty() {
+            return Err(RegistryError::MockupFieldDeclared {
+                slug: slug.to_string(),
+                path: "fields".to_string(),
+            });
+        }
+        for (name, role) in [("group", group), ("member", member)] {
+            if role.is_some() {
+                return Err(RegistryError::MockupFieldDeclared {
+                    slug: slug.to_string(),
+                    path: name.to_string(),
+                });
+            }
+        }
+        return Ok(());
+    }
+
+    let mut sequences: Vec<(String, &[FieldSpec])> = Vec::new();
+    match model {
+        DocumentModel::SingleMarkdown => sequences.push(("fields".to_string(), fields)),
+        DocumentModel::GroupedMarkdown => {
+            sequences.push((
+                "group.fields".to_string(),
+                group.and_then(|role| role.fields.as_deref()).unwrap_or(&[]),
+            ));
+            sequences.push((
+                "member.fields".to_string(),
+                member
+                    .and_then(|role| role.fields.as_deref())
+                    .unwrap_or(&[]),
+            ));
+        }
+        DocumentModel::SingleHtmlMockup => {}
+    }
+
+    let mut seen: Vec<(String, String)> = Vec::new();
+    for (path, sequence) in sequences {
+        for field in sequence {
+            let long = field
+                .option
+                .clone()
+                .unwrap_or_else(|| crate::sanitize::kebab_slug(&field.key));
+            if long.is_empty() {
+                return Err(RegistryError::DerivedOptionEmpty {
+                    slug: slug.to_string(),
+                    path: format!("{}[{}]", path, field.key),
+                });
+            }
+            if crate::config::RESERVED_OPTION_NAMES.contains(&long.as_str()) {
+                return Err(RegistryError::DerivedOptionReserved {
+                    slug: slug.to_string(),
+                    path: format!("{}[{}]", path, field.key),
+                    option: long,
+                });
+            }
+            if let Some((_, other)) = seen
+                .iter()
+                .find(|(existing, key)| existing == &long && key != &field.key)
+            {
+                let _ = other;
+                return Err(RegistryError::DerivedOptionDuplicate {
+                    slug: slug.to_string(),
+                    option: long,
+                });
+            }
+            if !seen.iter().any(|(existing, _)| existing == &long) {
+                seen.push((long, field.key.clone()));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Build one document descriptor from the seed entry and the effective
 /// configuration entry (ADR-036 decisions 28 to 33).
 fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescriptor, RegistryError> {
@@ -1713,12 +1809,6 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
         DocumentModel::GroupedMarkdown => IdShape::Grouped,
         DocumentModel::SingleMarkdown | DocumentModel::SingleHtmlMockup => IdShape::Plain,
     };
-    let create_options = match document_model {
-        DocumentModel::GroupedMarkdown => CreateOptions {
-            group: GroupRequirement::Required,
-        },
-        DocumentModel::SingleMarkdown | DocumentModel::SingleHtmlMockup => NO_CREATE_OPTIONS,
-    };
     let archive_policy = match document_model {
         DocumentModel::SingleHtmlMockup => HTML_METADATA_ARCHIVE,
         DocumentModel::SingleMarkdown | DocumentModel::GroupedMarkdown => FRONTMATTER_ARCHIVE,
@@ -1727,6 +1817,13 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
     let fields = effective.fields.clone().unwrap_or_default();
     let group = effective.group.clone();
     let member = effective.member.clone();
+    validate_derived_surface(
+        slug,
+        document_model,
+        &fields,
+        group.as_ref(),
+        member.as_ref(),
+    )?;
     let label = effective.label.clone().unwrap_or_else(|| slug.to_string());
     let frontmatter_keys =
         document_frontmatter_keys(document_model, &fields, group.as_ref(), member.as_ref());
@@ -1752,7 +1849,6 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
         enabled: effective.enabled,
         status_model,
         verbs,
-        create_options,
         document_model,
         schema,
         fields,
@@ -2392,10 +2488,24 @@ mod tests {
                     _ => DocumentModel::SingleMarkdown,
                 }
             );
+            let expected = match *slug {
+                "req" => Some(TypedHandler::Requirement(RequirementKind::Business)),
+                "nfr" => Some(TypedHandler::Requirement(RequirementKind::NonFunctional)),
+                "glossary" => Some(TypedHandler::Glossary),
+                "rule" => Some(TypedHandler::Rule),
+                "ui-spec" => Some(TypedHandler::UiSpec),
+                "ui-mockup" => Some(TypedHandler::UiMockup),
+                "audit" => Some(TypedHandler::Audit),
+                "tech-spec" => Some(TypedHandler::TechSpec),
+                "use-case" => Some(TypedHandler::UseCase),
+                "test-case" => Some(TypedHandler::TestCase),
+                "test-report" => Some(TypedHandler::TestReport),
+                other => panic!("unexpected seed slug {other}"),
+            };
             assert_eq!(
                 descriptor.handler(),
-                document_handler(slug),
-                "{slug} keeps its browser handler"
+                expected,
+                "{slug} keeps its concrete browser handler"
             );
             if *slug == "ui-mockup" {
                 assert!(descriptor.schema.is_some(), "{slug} keeps its schema");
@@ -2482,7 +2592,6 @@ mod tests {
                 Verb::Status,
             ]
         );
-        assert_eq!(deploy.create_options, NO_CREATE_OPTIONS);
         assert_eq!(
             deploy.archive_policy,
             ArchivePolicy::ArchivedFolder {
@@ -2522,7 +2631,6 @@ mod tests {
             assert_eq!(descriptor.id_shape, IdShape::Grouped);
             assert!(descriptor.has_verb(Verb::CreateGroup));
             assert!(descriptor.has_verb(Verb::Status));
-            assert_eq!(descriptor.create_options.group, GroupRequirement::Required);
         }
         assert_eq!(
             registry.descriptor("req").unwrap().label,
@@ -2552,7 +2660,6 @@ mod tests {
         assert_eq!(mockup.document_model, DocumentModel::SingleHtmlMockup);
         assert!(schema(mockup).sections.is_empty());
         assert_eq!(schema(mockup).handler, TypedHandler::UiMockup);
-        assert_eq!(mockup.create_options.group, GroupRequirement::Absent);
     }
 
     // 9
@@ -3039,6 +3146,61 @@ mod tests {
     }
 
     // 21
+    #[test]
+    fn build_rejects_invalid_derived_options_instead_of_panicking() {
+        use crate::config::{FieldKind, FieldSpec, FieldVerb, RoleFields};
+
+        let field = |key: &str, option: Option<&str>| FieldSpec {
+            key: key.to_string(),
+            heading: Some(format!("## {}", key)),
+            frontmatter_key: None,
+            option: option.map(str::to_string),
+            label: None,
+            kind: FieldKind::Text,
+            required: false,
+            verbs: vec![FieldVerb::Create, FieldVerb::Edit],
+            help: None,
+        };
+
+        let mut reserved = entry("DEP", "deployment/");
+        reserved.fields = Some(vec![field("custom", Some("json"))]);
+        let error =
+            ArtifactRegistry::build(&config_with("deploy", reserved)).expect_err("reserved option");
+        assert!(
+            error.to_string().contains("reserved option name: json"),
+            "{error}"
+        );
+
+        let mut duplicate = entry("REQ", "requirements/");
+        duplicate.group = Some(RoleFields {
+            fields: Some(vec![field("group_only", Some("same"))]),
+            reference_visibility: None,
+        });
+        duplicate.member = Some(RoleFields {
+            fields: Some(vec![field("member_only", Some("same"))]),
+            reference_visibility: None,
+        });
+        let error = ArtifactRegistry::build(&config_with("req", duplicate))
+            .expect_err("cross-role duplicate");
+        assert!(
+            error
+                .to_string()
+                .contains("duplicate derived option across roles"),
+            "{error}"
+        );
+
+        let mut mockup = entry("MOCK", "mockups/");
+        mockup.fields = Some(vec![field("task", None)]);
+        let error =
+            ArtifactRegistry::build(&config_with("ui-mockup", mockup)).expect_err("mockup fields");
+        assert!(
+            error
+                .to_string()
+                .contains("not allowed for a type without field options"),
+            "{error}"
+        );
+    }
+
     #[test]
     fn reserved_slug_is_rejected_case_insensitively() {
         for slug in ["task", "TASK", "Task", "adr", "ADR"] {
@@ -3680,16 +3842,6 @@ mod tests {
             assert_eq!(descriptor.verbs, expected, "{} verbs", descriptor.slug);
             let grouped = descriptor.document_model == DocumentModel::GroupedMarkdown;
             assert_eq!(
-                descriptor.create_options.group,
-                if grouped {
-                    GroupRequirement::Required
-                } else {
-                    GroupRequirement::Absent
-                },
-                "{} group requirement",
-                descriptor.slug
-            );
-            assert_eq!(
                 descriptor.has_verb(Verb::CreateGroup),
                 grouped,
                 "{} create-group",
@@ -3810,16 +3962,6 @@ mod tests {
                 descriptor.has_verb(Verb::CreateGroup),
                 descriptor.document_model == DocumentModel::GroupedMarkdown,
                 "{} create-group",
-                descriptor.slug
-            );
-            assert_eq!(
-                descriptor.create_options.group,
-                if descriptor.document_model == DocumentModel::GroupedMarkdown {
-                    GroupRequirement::Required
-                } else {
-                    GroupRequirement::Absent
-                },
-                "{} --group requirement",
                 descriptor.slug
             );
         }
