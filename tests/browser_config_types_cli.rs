@@ -219,6 +219,25 @@ fn post(s: &Server, path: &str, body: &str) -> HttpResponse {
     request(s.port, "POST", path, Some(body))
 }
 
+fn post_content_type(s: &Server, path: &str, body: &str, content_type: &str) -> HttpResponse {
+    let raw = format!(
+        "POST {} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n{}",
+        path,
+        s.port,
+        content_type,
+        body.len(),
+        body
+    );
+    let mut stream = TcpStream::connect(("127.0.0.1", s.port)).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(15)))
+        .unwrap();
+    stream.write_all(raw.as_bytes()).unwrap();
+    let mut bytes = Vec::new();
+    stream.read_to_end(&mut bytes).unwrap();
+    parse(&bytes)
+}
+
 fn urlencode(value: &str) -> String {
     let mut out = String::new();
     for byte in value.as_bytes() {
@@ -1176,4 +1195,359 @@ fn t182_04_list_views_and_assets_require_no_network_access() {
 
     drop(server);
     let _ = fs::remove_dir_all(&d);
+}
+
+// ---------------------------------------------------------------------------
+// TASK-266: one generic document edit form and one form_post handler.
+// ---------------------------------------------------------------------------
+
+fn write_doc(project: &Path, relative: &str, content: &str) {
+    let path = project.join(relative);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, content).unwrap();
+}
+
+fn position(html: &str, needle: &str) -> usize {
+    html.find(needle)
+        .unwrap_or_else(|| panic!("missing {needle:?} in page"))
+}
+
+#[test]
+fn t266_form_single_and_group_roles() {
+    let d = init("266-form");
+    write_doc(
+        &d,
+        "docs/glossary/GLO-001.md",
+        "---\nid: GLO-001\ntitle: Term one\nstatus: active\ncreated_date: 2026-01-01T00:00:00Z\nupdated_date: 2026-01-01T00:00:00Z\nlabels:\n  - core\nreferences:\n  - REF-001\n---\n# GLO-001 Term one\n\n## Definition\nA term.\n",
+    );
+    write_doc(
+        &d,
+        "docs/requirements/business/REQ-001.md",
+        "---\nid: REQ-001\ntitle: Group\nstatus: active\ncreated_date: 2026-01-01T00:00:00Z\nupdated_date: 2026-01-01T00:00:00Z\n---\n# REQ-001 Group\n\n## User Story\nGroup story\n\n## Description\nGroup description\n",
+    );
+    write_doc(
+        &d,
+        "docs/requirements/business/REQ-001.001.md",
+        "---\nid: REQ-001.001\ntitle: Member\nstatus: active\ngroup: REQ-001\ncreated_date: 2026-01-01T00:00:00Z\nupdated_date: 2026-01-01T00:00:00Z\n---\n# REQ-001.001 Member\n\n## User Story\nMember story\n\n## Description\nMember description\n",
+    );
+    let server = Server::start(&d);
+
+    let edit = get(&server, "/doc/GLO-001/edit").text();
+    assert!(!edit.contains("name=\"status\""));
+    assert!(edit.contains("<label for=\"definition\">Definition"));
+    // Title, declared fields, general controls, read-only status/dates, token.
+    let title = position(&edit, "id=\"title\"");
+    let definition = position(&edit, "id=\"definition\"");
+    let labels = position(&edit, "id=\"labels\"");
+    let references = position(&edit, "id=\"references\"");
+    let status = position(&edit, "id=\"status\"");
+    let created = position(&edit, "id=\"created_date\"");
+    let updated = position(&edit, "id=\"updated_date\"");
+    let version = position(&edit, "name=\"version\"");
+    assert!(title < definition);
+    assert!(definition < labels);
+    assert!(labels < references);
+    assert!(references < status);
+    assert!(status < created);
+    assert!(created < updated);
+    assert!(updated < version);
+    assert!(
+        edit.contains("<label for=\"definition\">Definition <span class=\"req\">(required)</span>")
+    );
+    assert!(edit.contains("aria-describedby=\"definition-help\""));
+
+    let group = get(&server, "/doc/REQ-001/edit").text();
+    assert!(group.contains("<label for=\"story\">"));
+    assert!(group.contains("<label for=\"description\">"));
+    assert!(!group.contains("name=\"group\""));
+    let group_story = position(&group, "id=\"story\"");
+    let group_description = position(&group, "id=\"description\"");
+    assert!(group_story < group_description);
+
+    let member = get(&server, "/doc/REQ-001.001/edit").text();
+    assert!(member.contains("<label for=\"story\">"));
+    assert!(member.contains("<label for=\"description\">"));
+    assert!(!member.contains("name=\"group\""));
+    // The group link is read-only, not a control.
+    assert!(member.contains("href=\"/doc/REQ-001\""));
+    assert!(member.contains("<dt>Owning group</dt>"));
+    drop(server);
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn t266_mockup_form_offers_only_title_specs_and_refs() {
+    let d = init("266-mockup");
+    write_doc(
+        &d,
+        "docs/specifications/ui/mockups/MOCK-001.html",
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>MOCK-001 \u{2014} Pending mockup</title>\n</head>\n<body>\n<!-- mockup-id: MOCK-001 -->\n<!-- status: pending -->\n<!-- task: TASK-001 -->\n<!-- specs: UI-001 -->\n<!-- refs: MOCK-REF-1 -->\n<!-- superseded-by: -->\n<h1>MOCK-001 Pending mockup</h1>\n<p>Status: pending</p>\n<p>Task: TASK-001</p>\n<p>UI specifications: UI-001</p>\n<p>References: MOCK-REF-1</p>\n</body>\n</html>\n",
+    );
+    let server = Server::start(&d);
+    let edit = get(&server, "/doc/MOCK-001/edit").text();
+    assert!(edit.contains("<label for=\"title\">"));
+    assert!(edit.contains("name=\"specs\""));
+    assert!(edit.contains("name=\"refs\""));
+    for forbidden in [
+        "name=\"labels\"",
+        "name=\"references\"",
+        "name=\"status\"",
+        "name=\"task\"",
+        "name=\"superseded_by\"",
+        "name=\"description\"",
+    ] {
+        assert!(!edit.contains(forbidden), "{forbidden}");
+    }
+    for read_only in ["Labels", "References", "Status", "Task", "Superseded by"] {
+        assert!(edit.contains(read_only), "{read_only}");
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn t266_status_codes_title_and_noop() {
+    let d = init("266-http");
+    let path = d.join("docs/glossary/GLO-001.md");
+    let source = "---\nid: GLO-001\ntitle: Term one\nstatus: active\ncreated_date: 2026-01-01T00:00:00Z\nupdated_date: 2026-01-01T00:00:00Z\nlabels:\n  - core\nreferences:\n  - REF-001\n---\n# GLO-001 Term one\n\n## Definition\nA term.\n";
+    write_doc(&d, "docs/glossary/GLO-001.md", source);
+    let before = fs::read(&path).unwrap();
+    let server = Server::start(&d);
+    let edit = get(&server, "/doc/GLO-001/edit").text();
+    let version = version_of(&edit);
+
+    // 415: a non-form media type.
+    assert_eq!(
+        post_content_type(&server, "/doc/GLO-001", "{}", "application/json").status,
+        415
+    );
+    // 400: missing or malformed token.
+    assert_eq!(
+        post(&server, "/doc/GLO-001", &form(&[("title", "x")])).status,
+        400
+    );
+    assert_eq!(
+        post(
+            &server,
+            "/doc/GLO-001",
+            &form(&[("version", "bad"), ("title", "x")]),
+        )
+        .status,
+        400
+    );
+    // 404: unknown ID through the one not-found page.
+    assert_eq!(
+        post(&server, "/doc/GLO-404", &form(&[("version", "1.2.3")])).status,
+        404
+    );
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // 409: stale token, submitted values, live token, no write.
+    let conflict = post(
+        &server,
+        "/doc/GLO-001",
+        &form(&[("version", "1.2.3"), ("title", "Stale")]),
+    );
+    assert_eq!(conflict.status, 409);
+    let html = conflict.text();
+    assert!(html.contains("record changed on disk"));
+    assert!(html.contains("Stale"));
+    assert_eq!(version_of(&html), version);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // 422: status is a reserved key that cannot be written.
+    let status_rejected = post(
+        &server,
+        "/doc/GLO-001",
+        &form(&[
+            ("version", &version),
+            ("title", "Ok"),
+            ("status", "archived"),
+        ]),
+    );
+    assert_eq!(status_rejected.status, 422);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // 422: title contract.
+    for title in ["", &"x".repeat(201), "a\tb"] {
+        let response = post(
+            &server,
+            "/doc/GLO-001",
+            &form(&[("version", &version), ("title", title), ("definition", "D")]),
+        );
+        assert_eq!(response.status, 422, "title={title:?}");
+        assert_eq!(fs::read(&path).unwrap(), before);
+    }
+    // 422: a required field may change but not be cleared.
+    let cleared = post(
+        &server,
+        "/doc/GLO-001",
+        &form(&[("version", &version), ("title", "Ok"), ("definition", "")]),
+    );
+    assert_eq!(cleared.status, 422);
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    // 303: one generic save.
+    let saved = post(
+        &server,
+        "/doc/GLO-001",
+        &form(&[
+            ("version", &version),
+            ("title", "Renamed term"),
+            ("definition", "New definition"),
+            ("labels", "one"),
+            ("references", "REF-002"),
+        ]),
+    );
+    assert_eq!(saved.status, 303);
+    assert_eq!(saved.header("Location"), Some("/doc/GLO-001"));
+    let saved_text = fs::read_to_string(&path).unwrap();
+    assert!(saved_text.contains("Renamed term"));
+    assert!(saved_text.contains("# GLO-001 Renamed term"));
+    assert!(saved_text.contains("## Definition\nNew definition"));
+    assert!(saved_text.contains("status: active"));
+
+    // A second identical submission writes nothing.
+    let edit = get(&server, "/doc/GLO-001/edit").text();
+    let version = version_of(&edit);
+    let same = post(
+        &server,
+        "/doc/GLO-001",
+        &form(&[
+            ("version", &version),
+            ("title", "Renamed term"),
+            ("definition", "New definition"),
+            ("labels", "one"),
+            ("references", "REF-002"),
+        ]),
+    );
+    assert_eq!(same.status, 303);
+    assert_eq!(fs::read(&path).unwrap(), saved_text.as_bytes());
+
+    drop(server);
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn t266_group_key_rejected_and_list_order() {
+    let d = init("266-group-list");
+    write_doc(
+        &d,
+        "docs/requirements/business/REQ-001.md",
+        "---\nid: REQ-001\ntitle: Group\nstatus: active\n---\n# REQ-001 Group\n\n## User Story\nS\n\n## Description\nD\n",
+    );
+    write_doc(
+        &d,
+        "docs/requirements/business/REQ-001.001.md",
+        "---\nid: REQ-001.001\ntitle: Member\nstatus: active\ngroup: REQ-001\n---\n# REQ-001.001 Member\n\n## User Story\nS\n\n## Description\nD\n",
+    );
+    write_doc(
+        &d,
+        "docs/business-rules/RUL-001.md",
+        "---\nid: RUL-001\ntitle: Rule\nstatus: active\n---\n# RUL-001 Rule\n\n## Description\nD\n\n## Rationale\nR\n\n## Applicability\nA\n\n## Requirements\n- REQ-001.001\n",
+    );
+    let server = Server::start(&d);
+
+    // A group key posted to a member is undeclared: 422 and no write.
+    let member_path = d.join("docs/requirements/business/REQ-001.001.md");
+    let before = fs::read(&member_path).unwrap();
+    let version = version_of(&get(&server, "/doc/REQ-001.001/edit").text());
+    let response = post(
+        &server,
+        "/doc/REQ-001.001",
+        &form(&[
+            ("version", &version),
+            ("title", "Moved"),
+            ("group", "REQ-999"),
+        ]),
+    );
+    assert_eq!(response.status, 422);
+    assert_eq!(fs::read(&member_path).unwrap(), before);
+
+    // List controls accept repeated values in submission order, collapsing
+    // duplicates; create-only fields are never writable.
+    let rule_path = d.join("docs/business-rules/RUL-001.md");
+    let version = version_of(&get(&server, "/doc/RUL-001/edit").text());
+    let saved = post(
+        &server,
+        "/doc/RUL-001",
+        &form(&[
+            ("version", &version),
+            ("title", "Rule renamed"),
+            ("description", "D2"),
+            ("rationale", "Ignored rationale"),
+            ("applicability", "Ignored applicability"),
+            ("requirements", "REQ-001.001"),
+            ("requirements", "REQ-001.001"),
+            ("requirements", ""),
+        ]),
+    );
+    assert_eq!(saved.status, 303);
+    let text = fs::read_to_string(&rule_path).unwrap();
+    assert!(text.contains("## Rationale\nR"));
+    assert!(text.contains("## Applicability\nA"));
+    assert!(!text.contains("Ignored"));
+    assert!(text.contains("## Requirements\n- REQ-001.001\n"));
+    drop(server);
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn t266_document_path_has_no_per_type_builder_or_template() {
+    let browser = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/browser");
+    let mod_rs = std::fs::read_to_string(browser.join("mod.rs")).unwrap();
+    // The HTML document path is the generic builder and the generic handler.
+    // The JSON api_post path stays on its own builders until TASK-269.
+    let handler_start = mod_rs.find("fn document_form_post").unwrap();
+    let handler_end = mod_rs.find("fn board_failure_response").unwrap();
+    let handler = &mod_rs[handler_start..handler_end];
+    for builder in [
+        "generic_document_ops",
+        "requirement_ops",
+        "glossary_ops",
+        "ui_spec_ops",
+        "business_rule_ops",
+        "audit_ops",
+        "tech_spec_ops",
+        "use_case_ops",
+    ] {
+        assert!(
+            !handler.contains(&format!("edit::{builder}")),
+            "document handler must not call {builder}"
+        );
+    }
+    let edit_start = mod_rs.find("fn edit_page(").unwrap();
+    let edit_end = mod_rs.find("fn media_type(").unwrap();
+    let edit_page = &mod_rs[edit_start..edit_end];
+    for renderer in [
+        "edit_page_glossary(",
+        "edit_page_ui_spec(",
+        "edit_page_ui_mockup(",
+        "edit_page_business_rule(",
+        "edit_page_audit_record(",
+        "edit_page_tech_spec(",
+        "edit_page_use_case(",
+    ] {
+        assert!(
+            !edit_page.contains(&format!("render::{renderer}")),
+            "document edit path must not call {renderer}"
+        );
+    }
+    assert!(handler.contains("edit::document_edit_ops"));
+    assert!(mod_rs.contains("render::document_edit_page"));
+    let render_rs = std::fs::read_to_string(browser.join("render.rs")).unwrap();
+    assert!(!render_rs.contains("DOCUMENT_EDIT_TEMPLATE"));
+    assert!(
+        !browser.join("templates/document_edit.html").exists(),
+        "the document-specific template is deleted"
+    );
+    for template in [
+        "shell.html",
+        "list.html",
+        "view.html",
+        "edit.html",
+        "error.html",
+    ] {
+        assert!(browser.join("templates").join(template).exists());
+    }
 }

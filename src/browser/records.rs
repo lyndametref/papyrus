@@ -820,6 +820,26 @@ pub fn validate_title(raw: &str) -> Result<String, String> {
     Ok(value.to_string())
 }
 
+/// Validate a single-line field and return the stored value, or `None` when the
+/// value is empty. A single-line value rejects every line break and control
+/// character, and never injects a section heading (TECH-040 section 7).
+pub fn validate_single_line(label: &str, raw: &str) -> Result<Option<String>, String> {
+    let value = raw.trim();
+    if value.is_empty() {
+        return Ok(None);
+    }
+    if value.chars().count() > MAX_TEXT_CHARS {
+        return Err(format!("{} must be at most 20000 characters.", label));
+    }
+    if value.chars().any(char::is_control) {
+        return Err(format!("{} cannot contain control characters.", label));
+    }
+    if value.starts_with("## ") {
+        return Err(format!("{} contains a line starting with ## .", label));
+    }
+    Ok(Some(value.to_string()))
+}
+
 /// Validate a multi-line field and return the stored value, or `None` when the
 /// value is empty (specification sections 7.3 and 7.4).
 pub fn validate_multiline(label: &str, raw: &str) -> Result<Option<String>, String> {

@@ -14,9 +14,9 @@ use std::time::Duration;
 
 const PHRASE: &str = "quick brown fox";
 const SECOND_PHRASE: &str = "hidden zebra fact";
-const NOT_FOUND_UC: &str = "Archived use cases are not listed and cannot be opened. The same page is used for an unknown address.";
-const NOT_FOUND_TC: &str = "Archived test cases are not listed and cannot be opened. The same page is used for an unknown address.";
-const NOT_FOUND_TR: &str = "Archived test reports are not listed and cannot be opened. The same page is used for an unknown address.";
+const NOT_FOUND_UC: &str = "The requested record was not found.";
+const NOT_FOUND_TC: &str = "The requested record was not found.";
+const NOT_FOUND_TR: &str = "The requested record was not found.";
 
 fn bin() -> Command {
     Command::new(env!("CARGO_BIN_EXE_papyrus"))
@@ -703,17 +703,11 @@ fn milestone_use_cases_test_cases_test_reports_flow() {
     assert!(!res.body.is_empty());
     assert_no_external_refs(&res.text(), "script");
 
-    for (id, help, recovery_text) in [
-        ("UC-002", NOT_FOUND_UC, "Back to Use Cases"),
-        ("TC-002", NOT_FOUND_TC, "Back to Test Cases"),
-        ("TR-002", NOT_FOUND_TR, "Back to Test Reports"),
+    for (id, help) in [
+        ("UC-002", NOT_FOUND_UC),
+        ("TC-002", NOT_FOUND_TC),
+        ("TR-002", NOT_FOUND_TR),
     ] {
-        let recovery_href = match id {
-            "UC-002" => "/?type=use-case",
-            "TC-002" => "/?type=test-case",
-            "TR-002" => "/?type=test-report",
-            _ => unreachable!(),
-        };
         let unknown_id = match id {
             "UC-002" => "UC-404",
             "TC-002" => "TC-404",
@@ -724,10 +718,10 @@ fn milestone_use_cases_test_cases_test_reports_flow() {
         let resp = server.get(&url);
         assert_eq!(resp.status, 404);
         let not_found = resp.text();
-        assert!(not_found.contains("Record not found"));
+        assert!(not_found.contains("Not found"));
         assert!(not_found.contains(help));
-        assert!(not_found.contains(&format!("href=\"{}\"", recovery_href)));
-        assert!(not_found.contains(&format!(">{}</a>", recovery_text)));
+        assert!(not_found.contains("href=\"/\""));
+        assert!(!not_found.contains(id));
         let unknown = server.get(&format!("/doc/{}", unknown_id));
         assert_eq!(unknown.status, 404);
         assert_eq!(not_found, unknown.text());

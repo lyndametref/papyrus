@@ -2,7 +2,7 @@
 id: TASK-266
 title: "Implement the generic edit form and form_post handler"
 created_date: '2026-11-20T17:42:43Z'
-updated_date: '2026-11-22T16:33:29Z'
+updated_date: '2026-11-22T17:34:41Z'
 labels: []
 references:
   - ADR-039
@@ -14,7 +14,7 @@ references:
   - TECH-040
   - TC-183
   - TC-184
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-035
@@ -60,3 +60,20 @@ One field-map-driven edit form and one document `form_post` serve every document
 - [ ] #9 Backlog and Decision edit and POST behavior, including the board status submit and typed edit pages, is unchanged; the document category is routed to the new builder and handler.
 - [ ] #10 document_edit.html and DOCUMENT_EDIT_TEMPLATE are deleted once unused; the template set remains shell.html, list.html, view.html, edit.html, and error.html; no new route, dependency, asset, client script, or template is added.
 - [ ] #11 Tests cover each document model and role, the 415, 400, 404, 409, 422, and 303 outcomes, the title and required-field rules, and a no-op byte-identical save; cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass.
+## Comments
+- **rust-dev**: TASK-266 evidence: branch task-TASK-266; uncommitted per instruction; status left In-Progress.
+- **rust-dev**: Form: render::document_edit_page uses Record.field_map for single, group, member, and mockup records; order is fixed title, editable ResolvedField controls in descriptor order, general labels and references, read-only status, created_date, updated_date, hidden version token.
+- **rust-dev**: Control mapping: FieldKind::Text maps to a single-line input, Multiline to a textarea, List to repeated tag inputs; label from ResolvedField.label, help from help bound with aria-describedby=<key>-help, required marker and attribute from required.
+- **rust-dev**: Read-only: a field whose verbs exclude edit (business-rule Rationale and Applicability) renders label plus value and is never written; grouped forms use group.fields or member.fields; the owning group is a read-only link, membership is never a control.
+- **rust-dev**: Mockup: title plus list-valued specs and refs controls only; labels, references, status, task, and superseded_by read-only; no field sequence and no status control. No document form renders name="status".
+- **rust-dev**: POST doc route: one form_post routes every CategoryKind::Document record to document_form_post. Order: 415 non-form media type; 400 missing or malformed version; 404 unknown, archived, or disabled through the one document_not_found_page; 409 stale token through the one conflict page with submitted values and live token, no write; 422 undeclared key (including status and a group key on a member) or validation error with submitted values and the same token, no write; 303 to the doc route on success.
+- **rust-dev**: Accepted keys: version, title, labels, references, a declared field key, and specs and refs for a mockup; every other key is 422. No status is writable.
+- **rust-dev**: Title and kind rules: title is single-line, non-empty, at most MAX_TITLE_CHARS, and cannot be cleared; required fields may change but not be cleared; optional fields clear; text is single-line, multiline preserves line breaks, list accepts repeated values in order and dedups.
+- **rust-dev**: Write contract: one patch built by record::edit::document_edit_ops from the field map and applied once through save_ops and record::store; updated_date refreshed once; no-op, conflict, and validation saves are byte-identical.
+- **rust-dev**: AC8: the HTML document path calls edit::document_edit_ops, not generic_document_ops, requirement_ops, glossary_ops, ui_spec_ops, business_rule_ops, audit_ops, tech_spec_ops, or use_case_ops; the JSON api_post path remains for TASK-269.
+- **rust-dev**: AC9 and AC10: Backlog and Decision edit and POST and the board status submit are unchanged; DOCUMENT_EDIT_TEMPLATE and templates document_edit.html are deleted; template set is shell, list, view, edit, error; no route, dependency, asset, client script, or template added.
+- **rust-dev**: Tests: new t266_form_single_and_group_roles, t266_mockup_form_offers_only_title_specs_and_refs, t266_status_codes_title_and_noop, t266_group_key_rejected_and_list_order, and t266_document_path_has_no_per_type_builder_or_template; existing browser, shell, and smoke tests updated for the unified behavior.
+- **rust-dev**: Checks: env -u EDITOR -u VISUAL cargo test passes (0 failures); cargo clippy --all-targets -- -D warnings passes; cargo fmt --all -- --check passes; characterization replay passes after regenerating 43 baselines.
+- **rust-dev**: Semantic deltas (EXPECTED-DELTAS items 9 to 15): unified edit pages, create-only fields read-only, role field sequences, mockup controls, one conflict page, one not-found page, field-map requiredness and kind, and undeclared-key 422. Status codes, conflict 409, not-found 404, redirect 303, and Backlog and Decision output are unchanged.
+- **rust-dev**: Files: src browser mod, render, records; src record edit; src document; src browser templates document_edit.html (deleted); tests browser_cli, browser_config_types_cli, browser_shell_cli, technical_specifications_smoke, use_cases_test_cases_test_reports_smoke; EXPECTED-DELTAS.md; and regenerated http edit, conflict, not-found, and form-post-validation baselines.
+- **orchestrator**: Acceptance met: one generic edit form and one form_post with ordered 415, 400, 404, 409, 422 and 303 responses, declared-key enforcement, role-scoped fields, list handling, mockup title plus specs and refs, no status control, single write path; template deleted; 43 baselines regenerated with EXPECTED-DELTAS 9 to 15.

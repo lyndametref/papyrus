@@ -1083,44 +1083,58 @@ fn view_document(
     })
 }
 
-fn clear_field_ops(ops: &mut Vec<PatchOp>, field: &FieldSpec) {
-    if let Some(heading) = &field.heading {
-        ops.push(PatchOp::ClearSection(heading.clone()));
+pub(crate) fn clear_field_ops(
+    ops: &mut Vec<PatchOp>,
+    heading: Option<&str>,
+    frontmatter_key: Option<&str>,
+) {
+    if let Some(heading) = heading {
+        ops.push(PatchOp::ClearSection(heading.to_string()));
     }
-    if let Some(key) = &field.frontmatter_key {
-        ops.push(PatchOp::ClearFrontMatter(key.clone()));
+    if let Some(key) = frontmatter_key {
+        ops.push(PatchOp::ClearFrontMatter(key.to_string()));
     }
 }
 
-fn set_scalar_ops(ops: &mut Vec<PatchOp>, field: &FieldSpec, value: &str) {
-    if let Some(heading) = &field.heading {
+pub(crate) fn set_scalar_ops(
+    ops: &mut Vec<PatchOp>,
+    heading: Option<&str>,
+    frontmatter_key: Option<&str>,
+    value: &str,
+) {
+    if let Some(heading) = heading {
         ops.push(PatchOp::SetSection(
-            heading.clone(),
+            heading.to_string(),
             scalar_section_body(value),
         ));
     }
-    if let Some(key) = &field.frontmatter_key {
+    if let Some(key) = frontmatter_key {
         ops.push(PatchOp::SetFrontMatterValue(
-            key.clone(),
+            key.to_string(),
             record::frontmatter::FrontMatterValue::String(value.to_string()),
         ));
     }
 }
 
-fn list_field_ops(ops: &mut Vec<PatchOp>, field: &FieldSpec, values: &[String]) {
-    if let Some(heading) = &field.heading {
+pub(crate) fn list_field_ops(
+    ops: &mut Vec<PatchOp>,
+    heading: Option<&str>,
+    frontmatter_key: Option<&str>,
+    values: &[String],
+) {
+    if let Some(heading) = heading {
         if values.is_empty() {
-            ops.push(PatchOp::ClearSection(heading.clone()));
+            ops.push(PatchOp::ClearSection(heading.to_string()));
         } else {
             ops.push(PatchOp::SetSection(
-                heading.clone(),
+                heading.to_string(),
                 list_section_body(values),
             ));
         }
     }
-    if let Some(key) = &field.frontmatter_key {
+    if let Some(key) = frontmatter_key {
         ops.push(PatchOp::SetFrontMatterValue(
-            key.clone(),
+            key.to_string(),
             record::frontmatter::FrontMatterValue::Sequence(values.to_vec()),
         ));
     }
@@ -1238,7 +1252,12 @@ fn edit_document(
                         field.key
                     )));
                 }
-                list_field_ops(&mut ops, field, &values);
+                list_field_ops(
+                    &mut ops,
+                    field.heading.as_deref(),
+                    field.frontmatter_key.as_deref(),
+                    &values,
+                );
             }
             crate::config::FieldKind::Text | crate::config::FieldKind::Multiline => {
                 if args.get(&field.key).is_none() {
@@ -1252,10 +1271,19 @@ fn edit_document(
                             field.key
                         )));
                     }
-                    clear_field_ops(&mut ops, field);
+                    clear_field_ops(
+                        &mut ops,
+                        field.heading.as_deref(),
+                        field.frontmatter_key.as_deref(),
+                    );
                 } else {
                     let value = text.resolve()?;
-                    set_scalar_ops(&mut ops, field, &value);
+                    set_scalar_ops(
+                        &mut ops,
+                        field.heading.as_deref(),
+                        field.frontmatter_key.as_deref(),
+                        &value,
+                    );
                 }
             }
         }

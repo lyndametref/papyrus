@@ -13,11 +13,12 @@ use crate::record::edit::FieldChange;
 use crate::record::field_map::{FieldRole, FieldValue};
 use crate::registry::{ArtifactCategory as CategoryKind, TypeDescriptor, TypedHandler};
 
+use std::collections::BTreeMap;
+
 pub const LIST_TEMPLATE: &str = include_str!("templates/list.html");
 pub const VIEW_TEMPLATE: &str = include_str!("templates/view.html");
 pub const EDIT_TEMPLATE: &str = include_str!("templates/edit.html");
 pub const ERROR_TEMPLATE: &str = include_str!("templates/error.html");
-pub const DOCUMENT_EDIT_TEMPLATE: &str = include_str!("templates/document_edit.html");
 
 /// Escape a value for HTML text and double-quoted attribute contexts.
 pub fn escape(value: &str) -> String {
@@ -2725,15 +2726,25 @@ fn tag_field(
             escape(value)
         ));
     }
+    let described = document_described_by(field_id, Some(help), error);
     let add_input = format!(
         "<input class=\"tag-input tag-add\" id=\"{}\" name=\"{}\" type=\"text\" placeholder=\"{}\"{}>",
         add_id,
         field_id,
         escape(placeholder),
-        invalid_attrs(field_id, error)
+        described
     );
+    let help_html = if help.trim().is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<p class=\"help\" id=\"{}-help\">{}</p>",
+            field_id,
+            escape(help)
+        )
+    };
     format!(
-        "<div class=\"field\" id=\"{}\"><label for=\"{}\">{}</label><div class=\"tagbox\" data-tagbox=\"{}\">{}{}</div><div class=\"add-line\"><button class=\"btn\" type=\"button\" data-add=\"{}\">Add</button></div><p class=\"help\">{}</p>{}</div>",
+        "<div class=\"field\" id=\"{}\"><label for=\"{}\">{}</label><div class=\"tagbox\" data-tagbox=\"{}\">{}{}</div><div class=\"add-line\"><button class=\"btn\" type=\"button\" data-add=\"{}\">Add</button></div>{}{}</div>",
         field_id,
         add_id,
         label_html,
@@ -2741,7 +2752,7 @@ fn tag_field(
         tags,
         add_input,
         field_id,
-        escape(help),
+        help_html,
         field_error(field_id, error)
     )
 }
@@ -4282,120 +4293,425 @@ fn fixed_metadata_label(key: &str) -> String {
 
 /// Submitted values for the generic document edit form.
 #[derive(Clone, Debug, Default)]
-pub struct DocumentEditValues {
+pub struct DocumentFormValues {
     pub title: String,
-    pub description: String,
+    /// Values per declared field key, in submission order.
+    pub fields: BTreeMap<String, Vec<String>>,
     pub labels: Vec<String>,
     pub references: Vec<String>,
+    pub specs: Vec<String>,
+    pub refs: Vec<String>,
+}
+
+impl DocumentFormValues {
+    /// Pristine values taken from the record and its field map.
+    pub fn from_record(record: &Record) -> Self {
+        let mut fields = BTreeMap::new();
+        for field in &record.field_map.fields {
+            let values = match &field.value {
+                FieldValue::Text(value) => vec![value.clone()],
+                FieldValue::Items(items) => items.clone(),
+                FieldValue::Absent => Vec::new(),
+            };
+            fields.insert(field.key.clone(), values);
+        }
+        Self {
+            title: record.title.clone(),
+            fields,
+            labels: record.labels.clone(),
+            references: if record.is_html_mockup() {
+                Vec::new()
+            } else {
+                record.refs.clone()
+            },
+            specs: record.specs.clone(),
+            refs: record.refs.clone(),
+        }
+    }
+
+    fn field_values(&self, key: &str) -> &[String] {
+        self.fields.get(key).map(Vec::as_slice).unwrap_or(&[])
+    }
+
+    fn scalar(&self, key: &str) -> String {
+        self.fields
+            .get(key)
+            .and_then(|values| values.last())
+            .cloned()
+            .unwrap_or_default()
+    }
 }
 
 /// Field errors for the generic document edit form.
 #[derive(Clone, Debug, Default)]
-pub struct DocumentFieldErrors {
+pub struct DocumentFormErrors {
+    /// A form-level rejection (an undeclared key).
+    pub form: Option<String>,
     pub title: Option<String>,
-    pub description: Option<String>,
+    pub fields: BTreeMap<String, String>,
     pub labels: Option<String>,
     pub references: Option<String>,
+    pub specs: Option<String>,
+    pub refs: Option<String>,
 }
 
-impl DocumentFieldErrors {
+impl DocumentFormErrors {
     pub fn any(&self) -> bool {
-        self.title.is_some()
-            || self.description.is_some()
+        self.form.is_some()
+            || self.title.is_some()
+            || !self.fields.is_empty()
             || self.labels.is_some()
             || self.references.is_some()
+            || self.specs.is_some()
+            || self.refs.is_some()
+    }
+
+    fn field(&self, key: &str) -> Option<&str> {
+        self.fields.get(key).map(String::as_str)
     }
 }
 
-fn document_edit_form(
-    record: &Record,
-    values: &DocumentEditValues,
-    errors: &DocumentFieldErrors,
-    version: &str,
-) -> String {
-    let mut alert = String::new();
-    let mut messages = Vec::new();
-    for message in [
-        errors.title.as_deref(),
-        errors.description.as_deref(),
-        errors.labels.as_deref(),
-        errors.references.as_deref(),
-    ]
-    .into_iter()
-    .flatten()
-    {
-        messages.push(format!("<li>{}</li>", escape(message)));
+fn document_field_label(label: &str, required: bool) -> String {
+    if required {
+        format!("{} <span class=\"req\">(required)</span>", escape(label))
+    } else {
+        escape(label)
     }
-    if !messages.is_empty() {
-        alert = format!(
-            "<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>{}</ul><p>Nothing was saved. Your typed values are kept below.</p></div>",
-            messages.join("")
-        );
+}
+
+fn document_described_by(field_id: &str, help: Option<&str>, error: Option<&str>) -> String {
+    let mut ids = Vec::new();
+    if help.is_some_and(|value| !value.trim().is_empty()) {
+        ids.push(format!("{}-help", field_id));
     }
-    let labels: String = values
-        .labels
-        .iter()
-        .map(|value| {
-            format!(
-                "<input class=\"input\" name=\"labels\" type=\"text\" value=\"{}\">",
-                escape(value)
-            )
-        })
-        .collect();
-    let references: String = values
-        .references
-        .iter()
-        .map(|value| {
-            format!(
-                "<input class=\"input\" name=\"references\" type=\"text\" value=\"{}\">",
-                escape(value)
-            )
-        })
-        .collect();
+    if error.is_some() {
+        ids.push(format!("{}-error", field_id));
+    }
+    if ids.is_empty() {
+        return String::new();
+    }
+    let invalid = if error.is_some() {
+        " aria-invalid=\"true\""
+    } else {
+        ""
+    };
+    format!("{} aria-describedby=\"{}\"", invalid, ids.join(" "))
+}
+
+fn document_help(field_id: &str, help: Option<&str>) -> String {
+    match help.filter(|value| !value.trim().is_empty()) {
+        Some(help) => format!(
+            "<p class=\"help\" id=\"{}-help\">{}</p>",
+            field_id,
+            escape(help)
+        ),
+        None => String::new(),
+    }
+}
+
+fn document_title_field(value: &str, error: Option<&str>) -> String {
+    const HELP: &str = "Required \u{b7} 1 to 200 characters \u{b7} shown in lists and headings.";
     format!(
-        "{alert}<form class=\"form\" method=\"post\" action=\"/doc/{id}\">\
-<input type=\"hidden\" name=\"version\" value=\"{version}\">\
-<div class=\"field\"><label for=\"title\">Title</label><input class=\"input\" id=\"title\" name=\"title\" type=\"text\" value=\"{title}\" required maxlength=\"200\"></div>\
-<div class=\"field\"><label for=\"description\">Description</label><textarea class=\"input\" id=\"description\" name=\"description\" rows=\"8\">{description}</textarea></div>\
-<div class=\"field\"><label>Labels</label>{labels}<input class=\"input\" name=\"labels\" type=\"text\" value=\"\"></div>\
-<div class=\"field\"><label>References</label>{references}<input class=\"input\" name=\"references\" type=\"text\" value=\"\"></div>\
-{timestamps}\
-<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button><a class=\"link\" href=\"/doc/{id}\">Cancel</a></div></form>",
-        alert = alert,
-        id = escape(&record.id),
-        version = escape(version),
-        title = escape(&values.title),
-        description = escape(&values.description),
-        labels = labels,
-        references = references,
-        timestamps = read_only_timestamps(record),
+        "<div class=\"field\"><label for=\"title\">Title <span class=\"req\">(required)</span></label>\
+<input class=\"input\" id=\"title\" name=\"title\" type=\"text\" required value=\"{}\"{}>\
+<p class=\"help\" id=\"title-help\">{}</p>{}</div>",
+        escape(value),
+        document_described_by("title", Some(HELP), error),
+        HELP,
+        field_error("title", error)
     )
 }
 
-/// Generic document edit form (section 4.2); never renders status.
+fn document_scalar_field(
+    field: &crate::record::field_map::ResolvedField,
+    value: &str,
+    error: Option<&str>,
+) -> String {
+    let id = &field.key;
+    let required = if field.required { " required" } else { "" };
+    let described = document_described_by(id, field.help.as_deref(), error);
+    let control = match field.kind {
+        crate::config::FieldKind::Text => format!(
+            "<input class=\"input\" id=\"{}\" name=\"{}\" type=\"text\"{} value=\"{}\"{}>",
+            id,
+            id,
+            required,
+            escape(value),
+            described
+        ),
+        crate::config::FieldKind::Multiline => format!(
+            "<textarea class=\"textarea\" id=\"{}\" name=\"{}\" rows=\"6\"{}{}>{}</textarea>",
+            id,
+            id,
+            required,
+            described,
+            escape(value)
+        ),
+        crate::config::FieldKind::List => unreachable!("list fields use the list control"),
+    };
+    format!(
+        "<div class=\"field\"><label for=\"{}\">{}</label>{}{}{}</div>",
+        id,
+        document_field_label(&field.label, field.required),
+        control,
+        document_help(id, field.help.as_deref()),
+        field_error(id, error)
+    )
+}
+
+fn document_list_field(
+    field: &crate::record::field_map::ResolvedField,
+    values: &[String],
+    error: Option<&str>,
+) -> String {
+    tag_field(
+        &field.key,
+        &format!("{}-add", field.key),
+        &document_field_label(&field.label, field.required),
+        values,
+        "",
+        field.help.as_deref().unwrap_or(""),
+        error,
+        "Value",
+    )
+}
+
+fn document_read_only_field(id: &str, label: &str, value: &str) -> String {
+    let value = if value.trim().is_empty() {
+        "(none)".to_string()
+    } else {
+        value.to_string()
+    };
+    format!(
+        "<div class=\"field\"><label>{}</label><p class=\"read-only-value\" id=\"{}\">{}</p>\
+<p class=\"help\">(read-only)</p></div>",
+        escape(label),
+        escape(id),
+        escape(&value)
+    )
+}
+
+fn document_read_only_status(record: &Record) -> String {
+    format!(
+        "<div class=\"field\"><label for=\"status\">Status (read-only)</label>\
+<input class=\"input\" id=\"status\" type=\"text\" value=\"{}\" disabled readonly>\
+<p class=\"help\">(read-only)</p></div>",
+        escape(&record.status_text())
+    )
+}
+
+fn document_form_alert(record: &Record, errors: &DocumentFormErrors) -> String {
+    let mut entries = String::new();
+    let mut push = |id: &str, message: Option<&str>| {
+        if let Some(message) = message {
+            entries.push_str(&format!(
+                "<li><a href=\"#{}\">{}</a></li>",
+                id,
+                escape(message)
+            ));
+        }
+    };
+    push("title", errors.title.as_deref());
+    for field in &record.field_map.fields {
+        push(&field.key, errors.field(&field.key));
+    }
+    push("labels", errors.labels.as_deref());
+    push("references", errors.references.as_deref());
+    push("specs", errors.specs.as_deref());
+    push("refs", errors.refs.as_deref());
+    if let Some(message) = &errors.form {
+        entries.push_str(&format!("<li>{}</li>", escape(message)));
+    }
+    if entries.is_empty() {
+        return String::new();
+    }
+    format!(
+        "<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><ul>{}</ul>\
+<p>Nothing was saved. Your typed values are kept below.</p></div>",
+        entries
+    )
+}
+
+fn document_mockup_form(
+    record: &Record,
+    values: &DocumentFormValues,
+    errors: &DocumentFormErrors,
+) -> String {
+    let mut form = String::new();
+    form.push_str(&tag_field(
+        "specs",
+        "specs-add",
+        "UI specifications <span class=\"req\">(required)</span>",
+        &values.specs,
+        "Add UI specification id (e.g. UI-003)",
+        "Required \u{b7} one or more UI specification ids \u{b7} added one at a time.",
+        errors.specs.as_deref(),
+        "UI specification",
+    ));
+    form.push_str(&tag_field(
+        "refs",
+        "refs-add",
+        "References",
+        &values.refs,
+        "Add a reference (e.g. docs/specifications/ui-mockups-management.md)",
+        "Optional \u{b7} references to other documents.",
+        errors.refs.as_deref(),
+        "Reference",
+    ));
+    // The mockup form never writes the general labels or references, the
+    // status, the task, or the supersession; they are read-only.
+    form.push_str(&document_read_only_field(
+        "labels",
+        "Labels",
+        &values.labels.join(", "),
+    ));
+    form.push_str(&document_read_only_field(
+        "references",
+        "References",
+        &values.references.join(", "),
+    ));
+    let status = record.field_map.display_value("status").unwrap_or_default();
+    form.push_str(&document_read_only_field("status", "Status", &status));
+    let task = record.field_map.display_value("task").unwrap_or_default();
+    form.push_str(&document_read_only_field("task", "Task", &task));
+    let superseded = record
+        .field_map
+        .display_value("superseded_by")
+        .unwrap_or_default();
+    form.push_str(&document_read_only_field(
+        "superseded_by",
+        "Superseded by",
+        &superseded,
+    ));
+    form
+}
+
+fn document_form(
+    record: &Record,
+    values: &DocumentFormValues,
+    errors: &DocumentFormErrors,
+    version: &str,
+    conflict: bool,
+) -> String {
+    let mut form = String::new();
+    form.push_str(&format!(
+        "<form class=\"form\" method=\"post\" action=\"/doc/{}\" data-dirty-guard>",
+        escape(&record.id)
+    ));
+    if conflict {
+        form.push_str(&format!(
+            "<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2>\
+<p>This record changed on disk. Nothing was saved. record changed on disk; reload the form</p></div>\
+<div class=\"conflict-box\"><p><strong>409 Conflict \u{2014} record changed on disk; reload the form.</strong></p>\
+<p><a class=\"link\" href=\"/doc/{id}/edit\">Reload the form</a> \
+<a class=\"link\" href=\"/doc/{id}\">View current record</a></p></div>",
+            id = escape(&record.id)
+        ));
+    } else if errors.any() {
+        form.push_str(&document_form_alert(record, errors));
+    }
+    form.push_str(&document_title_field(
+        &values.title,
+        errors.title.as_deref(),
+    ));
+    if record.is_html_mockup() {
+        form.push_str(&document_mockup_form(record, values, errors));
+    } else {
+        for field in &record.field_map.fields {
+            if field.editable {
+                if field.kind == crate::config::FieldKind::List {
+                    form.push_str(&document_list_field(
+                        field,
+                        values.field_values(&field.key),
+                        errors.field(&field.key),
+                    ));
+                } else {
+                    form.push_str(&document_scalar_field(
+                        field,
+                        &values.scalar(&field.key),
+                        errors.field(&field.key),
+                    ));
+                }
+            } else {
+                form.push_str(&document_read_only_field(
+                    &field.key,
+                    &field.label,
+                    &field.value.display().unwrap_or_default(),
+                ));
+            }
+        }
+        form.push_str(&tag_field(
+            "labels",
+            "labels-add",
+            "Labels",
+            &values.labels,
+            "Add a label",
+            "Optional.",
+            errors.labels.as_deref(),
+            "Label",
+        ));
+        form.push_str(&tag_field(
+            "references",
+            "references-add",
+            "References",
+            &values.references,
+            "Add a reference",
+            "Optional.",
+            errors.references.as_deref(),
+            "Reference",
+        ));
+        form.push_str(&document_read_only_status(record));
+    }
+    form.push_str(&read_only_timestamps(record));
+    form.push_str(
+        "<p class=\"hidden-field version-note\">Hidden field: version (optimistic-concurrency token)</p>",
+    );
+    form.push_str(&format!(
+        "<input type=\"hidden\" name=\"version\" value=\"{}\">",
+        escape(version)
+    ));
+    form.push_str(&format!(
+        "<div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Save changes</button>\
+<a class=\"link\" href=\"/doc/{}\">Cancel</a>\
+<span class=\"form-note\" data-form-note>Returns to the record view without saving.</span></div></form>",
+        escape(&record.id)
+    ));
+    form
+}
+
+fn document_edit_body(record: &Record, resolved_group: Option<&Record>, form: &str) -> String {
+    let page_head = format!(
+        "<div class=\"page-head\"><div><h1 class=\"h1\">Edit {}</h1><p class=\"sub\">{}</p></div>\
+<p class=\"status\" data-dirty-status hidden>Unsaved changes</p></div>",
+        escape(&record.id),
+        escape(&record.title)
+    );
+    render_template(
+        EDIT_TEMPLATE,
+        &[],
+        &[
+            ("breadcrumb", &edit_breadcrumb(record, resolved_group)),
+            ("page_head", &page_head),
+            ("meta", &metadata_block(record, resolved_group, true)),
+            ("form", form),
+        ],
+    )
+}
+
+/// Generic document edit form (TECH-068 sections 4.2): never renders a status
+/// control and never writes status.
+#[allow(clippy::too_many_arguments)]
 pub fn document_edit_page(
     record: &Record,
-    values: &DocumentEditValues,
-    errors: &DocumentFieldErrors,
+    resolved_group: Option<&Record>,
+    values: &DocumentFormValues,
+    errors: &DocumentFormErrors,
     version: &str,
     cfg: &Config,
     chrome: Chrome<'_>,
 ) -> String {
-    let page_head = format!(
-        "<h1 class=\"h1\">Edit {} {}</h1>",
-        escape(&record.id),
-        escape(&record.title)
-    );
-    let body = render_template(
-        DOCUMENT_EDIT_TEMPLATE,
-        &[],
-        &[
-            ("breadcrumb", &edit_breadcrumb(record, None)),
-            ("page_head", &page_head),
-            ("meta", ""),
-            ("form", &document_edit_form(record, values, errors, version)),
-        ],
-    );
+    let form = document_form(record, values, errors, version, false);
+    let body = document_edit_body(record, resolved_group, &form);
     page(
         chrome,
         PageRoute::Other,
@@ -4405,44 +4721,25 @@ pub fn document_edit_page(
     )
 }
 
-/// Stale-version conflict page that preserves the submitted values.
+/// Stale-version conflict page: the same edit form with the submitted values,
+/// the live token, and a conflict notice. Nothing is written.
 #[allow(clippy::too_many_arguments)]
 pub fn document_conflict_page(
     record: &Record,
-    title: &str,
-    description: &str,
-    labels: &[String],
-    references: &[String],
+    resolved_group: Option<&Record>,
+    values: &DocumentFormValues,
+    version: &str,
     cfg: &Config,
     chrome: Chrome<'_>,
 ) -> String {
-    let values = DocumentEditValues {
-        title: title.to_string(),
-        description: description.to_string(),
-        labels: labels.to_vec(),
-        references: references.to_vec(),
-    };
-    let errors = DocumentFieldErrors::default();
-    let mut form = document_edit_form(record, &values, &errors, &record.version);
-    form = format!(
-        "<div class=\"alert\" role=\"alert\"><h2>There is a problem</h2><p>record changed on disk; reload the form</p></div>{}",
-        form
+    let form = document_form(
+        record,
+        values,
+        &DocumentFormErrors::default(),
+        version,
+        true,
     );
-    let page_head = format!(
-        "<h1 class=\"h1\">Edit {} {}</h1>",
-        escape(&record.id),
-        escape(&record.title)
-    );
-    let body = render_template(
-        DOCUMENT_EDIT_TEMPLATE,
-        &[],
-        &[
-            ("breadcrumb", &edit_breadcrumb(record, None)),
-            ("page_head", &page_head),
-            ("meta", ""),
-            ("form", &form),
-        ],
-    );
+    let body = document_edit_body(record, resolved_group, &form);
     page(
         chrome,
         PageRoute::Other,

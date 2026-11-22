@@ -427,30 +427,82 @@ fn detail_and_edit_field_sets_are_unchanged_per_family() {
                 "Superseded by",
             ],
         ),
-        ("requirement", &["User story", "Description"]),
-        ("nfr", &["Description"]),
-        ("glossary", &["Term", "Definition"]),
+        (
+            "requirement",
+            &["Title", "User story", "Description", "Labels", "References"],
+        ),
+        (
+            "nfr",
+            &["Title", "User story", "Description", "Labels", "References"],
+        ),
+        ("glossary", &["Title", "Definition", "Labels", "References"]),
         (
             "business-rule",
-            &["Description", "Rationale", "Applicability", "Requirements"],
+            &[
+                "Title",
+                "Description",
+                "Rationale",
+                "Applicability",
+                "Requirements",
+                "Labels",
+                "References",
+            ],
         ),
-        ("audit", &["Audit type", "Content"]),
-        ("tech-spec", &["Description"]),
-        ("ui-spec", &["View", "Description"]),
-        ("ui-mockup", &["UI specifications", "References"]),
+        (
+            "audit",
+            &["Title", "Audit type", "Content", "Labels", "References"],
+        ),
+        (
+            "tech-spec",
+            &["Title", "Description", "Labels", "References"],
+        ),
+        (
+            "ui-spec",
+            &["Title", "View", "Description", "Labels", "References"],
+        ),
+        (
+            "ui-mockup",
+            &[
+                "Title",
+                "UI specifications",
+                "References",
+                "Labels",
+                "Status",
+                "Task",
+                "Superseded by",
+            ],
+        ),
         (
             "usecase",
-            &["Description", "Applicability", "Labels", "References"],
+            &[
+                "Title",
+                "Description",
+                "Applicability",
+                "Labels",
+                "References",
+            ],
         ),
         (
             "testcase",
-            &["Description", "Applicability", "Labels", "References"],
+            &[
+                "Title",
+                "Description",
+                "Applicability",
+                "Labels",
+                "References",
+            ],
         ),
         (
             "testreport",
-            &["Description", "Applicability", "Labels", "References"],
+            &[
+                "Title",
+                "Description",
+                "Applicability",
+                "Labels",
+                "References",
+            ],
         ),
-        ("note", &["Title", "Description"]),
+        ("note", &["Title", "Description", "Labels", "References"]),
     ];
     let server = Server::start(&fixture_root().join("project"));
     for (family, labels) in expected {
