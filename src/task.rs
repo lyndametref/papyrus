@@ -3,7 +3,6 @@
     clippy::type_complexity,
     clippy::manual_flatten
 )]
-use crate::commands::load_effective_config;
 use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
@@ -120,7 +119,12 @@ pub enum TaskCmd {
     },
 }
 
-pub fn run(ctx: &Context, cmd: TaskCmd) -> Result<crate::CommandOutput, AppError> {
+pub fn run(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    cmd: TaskCmd,
+) -> Result<crate::CommandOutput, AppError> {
     match cmd {
         TaskCmd::Create {
             title,
@@ -138,6 +142,8 @@ pub fn run(ctx: &Context, cmd: TaskCmd) -> Result<crate::CommandOutput, AppError
             let description = sanitize::resolve_text_field("description", description)?;
             let id = create(
                 ctx,
+                cfg,
+                registry,
                 &title,
                 description,
                 &ac,
@@ -174,6 +180,8 @@ pub fn run(ctx: &Context, cmd: TaskCmd) -> Result<crate::CommandOutput, AppError
             watch,
         } => list(
             ctx,
+            cfg,
+            registry,
             status.as_deref(),
             milestone.as_deref(),
             release.as_deref(),
@@ -184,7 +192,7 @@ pub fn run(ctx: &Context, cmd: TaskCmd) -> Result<crate::CommandOutput, AppError
             sort.as_deref(),
             watch,
         ),
-        TaskCmd::View { id } => view(ctx, &id),
+        TaskCmd::View { id } => view(ctx, cfg, registry, &id),
         TaskCmd::Edit {
             id,
             title,
@@ -205,6 +213,8 @@ pub fn run(ctx: &Context, cmd: TaskCmd) -> Result<crate::CommandOutput, AppError
             editor,
         } => edit(
             ctx,
+            cfg,
+            registry,
             &id,
             title.as_deref(),
             sanitize::resolve_text_field("description", description)?,
@@ -223,19 +233,15 @@ pub fn run(ctx: &Context, cmd: TaskCmd) -> Result<crate::CommandOutput, AppError
             &assignee,
             editor,
         ),
-        TaskCmd::Archive { id } => archive(ctx, &id),
-        TaskCmd::Restore { id } => restore(ctx, &id),
-        TaskCmd::Delete { id, force } => delete(ctx, &id, force),
+        TaskCmd::Archive { id } => archive(ctx, cfg, registry, &id),
+        TaskCmd::Restore { id } => restore(ctx, cfg, registry, &id),
+        TaskCmd::Delete { id, force } => delete(ctx, cfg, registry, &id, force),
     }
 }
 
 fn sanitize_text(input: &str) -> Result<String, AppError> {
     sanitize::sanitize_name(input)
         .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))
-}
-
-fn load_config(ctx: &Context) -> Result<Config, AppError> {
-    load_effective_config(&ctx.config_path, &ctx.project_dir)
 }
 
 fn task_descriptor() -> crate::record::descriptor::RecordDescriptor {
@@ -261,7 +267,12 @@ fn read_dirs(ctx: &Context, cfg: &Config) -> Vec<PathBuf> {
     task_descriptor().resolve_read_directories(cfg, &ctx.project_dir)
 }
 
-fn resolve_task_path(ctx: &Context, cfg: &Config, id: &str) -> Result<PathBuf, AppError> {
+fn resolve_task_path(
+    ctx: &Context,
+    cfg: &Config,
+    _registry: &crate::registry::ArtifactRegistry,
+    id: &str,
+) -> Result<PathBuf, AppError> {
     let spec = task_id_spec(cfg);
     let wanted = spec
         .parse_id(id)
@@ -274,9 +285,14 @@ fn resolve_task_path(ctx: &Context, cfg: &Config, id: &str) -> Result<PathBuf, A
     Err(AppError::NotFound(format!("not found: {}", id)))
 }
 
-fn resolve_task_path_migrated(ctx: &Context, cfg: &Config, id: &str) -> Result<PathBuf, AppError> {
-    let path = resolve_task_path(ctx, cfg, id)?;
-    crate::record::migrate::ensure_front_matter_canonical(ctx, &path)
+fn resolve_task_path_migrated(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    id: &str,
+) -> Result<PathBuf, AppError> {
+    let path = resolve_task_path(ctx, cfg, registry, id)?;
+    crate::record::migrate::ensure_front_matter_canonical(ctx, cfg, registry, &path)
 }
 
 fn task_frontmatter_id(content: &str) -> Option<String> {
@@ -292,13 +308,18 @@ fn task_frontmatter_id(content: &str) -> Option<String> {
     Some(id.to_string())
 }
 
-fn reject_task_write_conflict(ctx: &Context, path: &std::path::Path) -> Result<(), AppError> {
+fn reject_task_write_conflict(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    path: &std::path::Path,
+) -> Result<(), AppError> {
     let content = fs::read_to_string(path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let desc = task_descriptor();
-    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, &desc);
-    if let Some(reason) =
-        crate::record::migrate::check_conflicts_for_path(ctx, path, &desc, &content, &conflicts)
-    {
+    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, cfg, registry, &desc);
+    if let Some(reason) = crate::record::migrate::check_conflicts_for_path(
+        ctx, cfg, path, &desc, &content, &conflicts,
+    ) {
         return Err(AppError::Validation(format!(
             "migration conflict at {}: {}",
             crate::record::migrate::rel_path(&ctx.project_dir, path),
@@ -367,12 +388,22 @@ fn ensure_dir(dir: &std::path::Path, project_dir: &std::path::Path) -> Result<()
     fs::create_dir_all(&safe).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
-fn milestone_exists(ctx: &Context, cfg: &Config, id: &str) -> bool {
-    crate::milestone::resolve_milestone_entry(ctx, cfg, id).is_some()
+fn milestone_exists(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    id: &str,
+) -> bool {
+    crate::milestone::resolve_milestone_entry(ctx, cfg, registry, id).is_some()
 }
 
-fn task_exists(ctx: &Context, cfg: &Config, id: &str) -> bool {
-    resolve_task_path(ctx, cfg, id).is_ok()
+fn task_exists(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    id: &str,
+) -> bool {
+    resolve_task_path(ctx, cfg, registry, id).is_ok()
 }
 
 fn report_unrecognised_status(cfg: &Config, id: &str, status: &str) {
@@ -385,8 +416,13 @@ fn report_unrecognised_status(cfg: &Config, id: &str, status: &str) {
     );
 }
 
-fn milestone_release(ctx: &Context, cfg: &Config, milestone_id: &str) -> Option<String> {
-    let path = crate::milestone::resolve_milestone_entry(ctx, cfg, milestone_id)?;
+fn milestone_release(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    milestone_id: &str,
+) -> Option<String> {
+    let path = crate::milestone::resolve_milestone_entry(ctx, cfg, registry, milestone_id)?;
     let content = fs::read_to_string(&path).ok()?;
     if let Ok(Some(fm)) = crate::record::frontmatter::parse(&content)
         && crate::record::frontmatter::contains_key(&fm.raw, "release")
@@ -620,8 +656,11 @@ fn unique_push(vec: &mut Vec<String>, val: String) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create(
     ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
     title_raw: &str,
     desc_raw: Option<sanitize::Text>,
     ac_raw: &[String],
@@ -634,7 +673,6 @@ pub fn create(
     ordinal_raw: Option<&str>,
     assignee_raw: &[String],
 ) -> Result<String, AppError> {
-    let cfg = load_config(ctx)?;
     let title = sanitize_text(title_raw)?;
     let desc = match &desc_raw {
         Some(text) => Some(text.resolve()?),
@@ -647,7 +685,7 @@ pub fn create(
     let mut deps: Vec<String> = Vec::new();
     for d in deps_raw {
         let did = sanitize_text(d)?;
-        if !task_exists(ctx, &cfg, &did) {
+        if !task_exists(ctx, cfg, registry, &did) {
             return Err(AppError::NotFound(format!("task not found: {}", did)));
         }
         unique_push(&mut deps, did);
@@ -655,7 +693,7 @@ pub fn create(
     let milestone = match milestone_raw {
         Some(s) => {
             let mid = sanitize_text(s)?;
-            if !milestone_exists(ctx, &cfg, &mid) {
+            if !milestone_exists(ctx, cfg, registry, &mid) {
                 return Err(AppError::NotFound(format!("milestone not found: {}", mid)));
             }
             Some(mid)
@@ -710,9 +748,9 @@ pub fn create(
         Some(assignee_list)
     };
 
-    let active = active_dir(ctx, &cfg)?;
+    let active = active_dir(ctx, cfg)?;
     ensure_dir(&active, &ctx.project_dir)?;
-    let dirs = read_dirs(ctx, &cfg);
+    let dirs = read_dirs(ctx, cfg);
     let dir_refs: Vec<&std::path::Path> = dirs.iter().map(PathBuf::as_path).collect();
     let next = crate::record::identity::next_number_in_dirs(&dir_refs, &cfg.task_prefix);
     let id =
@@ -736,7 +774,7 @@ pub fn create(
     let ordinal_final = match ordinal_val {
         Some(n) => n,
         None => {
-            let dirs = read_dirs(ctx, &cfg);
+            let dirs = read_dirs(ctx, cfg);
             let dir_refs: Vec<&std::path::Path> = dirs.iter().map(PathBuf::as_path).collect();
             crate::record::identity::scan_max_ordinal_in_dirs(&dir_refs)
         }
@@ -824,18 +862,22 @@ pub fn create(
     let file_content = crate::record::patch::apply_patch(&parsed, &ops)?;
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    crate::record::store::write_atomic(ctx, &safe_path, &file_content)?;
+    crate::record::store::write_atomic(ctx, cfg, registry, &safe_path, &file_content)?;
     Ok(id)
 }
 
-pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
+pub fn view(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    id_raw: &str,
+) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let path = resolve_task_path_migrated(ctx, &cfg, &id)?;
+    let path = resolve_task_path_migrated(ctx, cfg, registry, &id)?;
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let status = frontmatter_scalar(&content, "status").unwrap_or_default();
-    report_unrecognised_status(&cfg, &id, status.trim());
+    report_unrecognised_status(cfg, &id, status.trim());
     let text = content.clone();
     let version = fs::metadata(&path)
         .map(|m| crate::record::store::version_token(&m))
@@ -964,8 +1006,11 @@ fn rebuild_marker_section(
     Some(lines.join("\n"))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn edit(
     ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
     id_raw: &str,
     title_raw: Option<&str>,
     desc_raw: Option<sanitize::Text>,
@@ -990,16 +1035,15 @@ pub fn edit(
             "mutually exclusive flags: --milestone and --no-milestone".to_string(),
         ));
     }
-    let cfg = load_config(ctx)?;
-    let path = resolve_task_path_migrated(ctx, &cfg, &id)?;
+    let path = resolve_task_path_migrated(ctx, cfg, registry, &id)?;
 
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let doc = crate::record::document::parse(&content)?;
     let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, &desc);
-    if let Some(reason) =
-        crate::record::migrate::check_conflicts_for_path(ctx, &path, &desc, &content, &conflicts)
-    {
+    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, cfg, registry, &desc);
+    if let Some(reason) = crate::record::migrate::check_conflicts_for_path(
+        ctx, cfg, &path, &desc, &content, &conflicts,
+    ) {
         return Err(AppError::Validation(format!(
             "migration conflict at {}: {}",
             crate::record::migrate::rel_path(&ctx.project_dir, &path),
@@ -1033,7 +1077,7 @@ pub fn edit(
     }
     if let Some(m) = milestone_raw {
         let mid = sanitize_text(m)?;
-        if !milestone_exists(ctx, &cfg, &mid) {
+        if !milestone_exists(ctx, cfg, registry, &mid) {
             return Err(AppError::NotFound(format!("milestone not found: {}", mid)));
         }
         td.milestone = Some(mid);
@@ -1063,7 +1107,7 @@ pub fn edit(
                 "task cannot depend on itself".to_string(),
             ));
         }
-        if !task_exists(ctx, &cfg, &did) {
+        if !task_exists(ctx, cfg, registry, &did) {
             return Err(AppError::NotFound(format!("task not found: {}", did)));
         }
         unique_push(&mut td.deps, did);
@@ -1131,7 +1175,7 @@ pub fn edit(
     }
     if let Some(m) = milestone_raw {
         let mid = sanitize_text(m)?;
-        if !milestone_exists(ctx, &cfg, &mid) {
+        if !milestone_exists(ctx, cfg, registry, &mid) {
             return Err(AppError::NotFound(format!("milestone not found: {}", mid)));
         }
         td.milestone = Some(mid.clone());
@@ -1164,7 +1208,7 @@ pub fn edit(
                     "task cannot depend on itself".to_string(),
                 ));
             }
-            if !task_exists(ctx, &cfg, &did) {
+            if !task_exists(ctx, cfg, registry, &did) {
                 return Err(AppError::NotFound(format!("task not found: {}", did)));
             }
             unique_push(&mut new_deps, did);
@@ -1331,7 +1375,7 @@ pub fn edit(
 
     if new_content != content {
         let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
-        crate::record::store::write_atomic(ctx, &safe_write, &new_content)?;
+        crate::record::store::write_atomic(ctx, cfg, registry, &safe_write, &new_content)?;
     }
 
     let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
@@ -1416,8 +1460,11 @@ fn fingerprint_dir(dir: &std::path::Path) -> String {
     entries.join("|")
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn list(
     ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
     status_filter: Option<&str>,
     milestone_filter: Option<&str>,
     release_filter: Option<&str>,
@@ -1428,8 +1475,7 @@ pub fn list(
     sort_field: Option<&str>,
     watch: bool,
 ) -> Result<crate::CommandOutput, AppError> {
-    let cfg = load_config(ctx)?;
-    let active = active_dir(ctx, &cfg)?;
+    let active = active_dir(ctx, cfg)?;
     let _ = ensure_dir(&active, &ctx.project_dir);
 
     let status_f = match status_filter {
@@ -1468,6 +1514,7 @@ pub fn list(
 
     let render = |ctx: &Context,
                   cfg: &Config,
+                  registry: &crate::registry::ArtifactRegistry,
                   active: &std::path::Path|
      -> (String, Option<serde_json::Value>) {
         let mut items: Vec<(
@@ -1480,7 +1527,7 @@ pub fn list(
             String,
         )> = Vec::new();
         let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, &desc);
+        let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, cfg, registry, &desc);
         if let Ok(rd) = fs::read_dir(active) {
             for e in rd.flatten() {
                 let path = e.path();
@@ -1523,7 +1570,7 @@ pub fn list(
                 if let Some(rf) = &release_f {
                     match &td.milestone {
                         Some(mid) => {
-                            let mr = milestone_release(ctx, cfg, mid);
+                            let mr = milestone_release(ctx, cfg, registry, mid);
                             if mr.as_deref() != Some(rf.as_str()) {
                                 continue;
                             }
@@ -1616,7 +1663,7 @@ pub fn list(
     };
 
     if !watch {
-        let (text, json) = render(ctx, &cfg, &active);
+        let (text, json) = render(ctx, cfg, registry, &active);
         return Ok(crate::CommandOutput {
             text,
             json,
@@ -1627,7 +1674,7 @@ pub fn list(
     install_sigint();
     WATCH_STOP.store(false, Ordering::SeqCst);
 
-    let (text, json) = render(ctx, &cfg, &active);
+    let (text, json) = render(ctx, cfg, registry, &active);
     if ctx.json {
         if let Some(v) = &json {
             println!("{}", v);
@@ -1646,7 +1693,7 @@ pub fn list(
         let new_fp = fingerprint_dir(&active);
         if new_fp != last_fp {
             last_fp = new_fp;
-            let (text, json) = render(ctx, &cfg, &active);
+            let (text, json) = render(ctx, cfg, registry, &active);
             if ctx.json {
                 if let Some(v) = &json {
                     println!("{}", v);
@@ -1688,7 +1735,12 @@ fn move_record(
 
 /// Retire legacy metadata sections and refresh `updated_date` before a
 /// lifecycle write (archive/restore). The file is written once.
-fn retire_and_touch(ctx: &Context, path: &std::path::Path) -> Result<(), AppError> {
+fn retire_and_touch(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    path: &std::path::Path,
+) -> Result<(), AppError> {
     let content = fs::read_to_string(path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let doc = crate::record::document::parse(&content)?;
     let desc = crate::record::descriptor::descriptor_for("task")
@@ -1700,25 +1752,29 @@ fn retire_and_touch(ctx: &Context, path: &std::path::Path) -> Result<(), AppErro
     ));
     let new_content = crate::record::patch::apply_patch(&doc, &ops)?;
     if new_content != content {
-        crate::record::store::write_atomic(ctx, path, &new_content)?;
+        crate::record::store::write_atomic(ctx, cfg, registry, path, &new_content)?;
     }
     Ok(())
 }
 
-pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
+pub fn archive(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    id_raw: &str,
+) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let path = resolve_task_path(ctx, &cfg, &id)?;
-    let active = active_dir(ctx, &cfg)?;
+    let path = resolve_task_path(ctx, cfg, registry, &id)?;
+    let active = active_dir(ctx, cfg)?;
     if !path_in_directory(&path, &active) {
         // A record already in the canonical archive or a legacy alias is
         // already archived; refuse before any write, move, or removal.
         return Err(AppError::Validation(format!("already archived: {}", id)));
     }
-    reject_task_write_conflict(ctx, &path)?;
-    let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
-    retire_and_touch(ctx, &path)?;
-    let archive = archive_dir(ctx, &cfg)?;
+    reject_task_write_conflict(ctx, cfg, registry, &path)?;
+    let path = crate::record::migrate::ensure_front_matter_canonical(ctx, cfg, registry, &path)?;
+    retire_and_touch(ctx, cfg, registry, &path)?;
+    let archive = archive_dir(ctx, cfg)?;
     ensure_dir(&archive, &ctx.project_dir)?;
 
     let file_name = path
@@ -1742,14 +1798,18 @@ pub fn archive(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
     })
 }
 
-pub fn restore(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
+pub fn restore(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    id_raw: &str,
+) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let path = resolve_task_path(ctx, &cfg, &id)?;
-    reject_task_write_conflict(ctx, &path)?;
-    let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
-    retire_and_touch(ctx, &path)?;
-    let active = active_dir(ctx, &cfg)?;
+    let path = resolve_task_path(ctx, cfg, registry, &id)?;
+    reject_task_write_conflict(ctx, cfg, registry, &path)?;
+    let path = crate::record::migrate::ensure_front_matter_canonical(ctx, cfg, registry, &path)?;
+    retire_and_touch(ctx, cfg, registry, &path)?;
+    let active = active_dir(ctx, cfg)?;
     ensure_dir(&active, &ctx.project_dir)?;
 
     let file_name = path
@@ -1773,12 +1833,17 @@ pub fn restore(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppE
     })
 }
 
-pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<crate::CommandOutput, AppError> {
+pub fn delete(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    id_raw: &str,
+    force: bool,
+) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let path = resolve_task_path(ctx, &cfg, &id)?;
-    reject_task_write_conflict(ctx, &path)?;
-    let path = crate::record::migrate::ensure_front_matter_canonical(ctx, &path)?;
+    let path = resolve_task_path(ctx, cfg, registry, &id)?;
+    reject_task_write_conflict(ctx, cfg, registry, &path)?;
+    let path = crate::record::migrate::ensure_front_matter_canonical(ctx, cfg, registry, &path)?;
 
     if !force {
         print!("Delete {}? [y/N] ", id);
@@ -1817,6 +1882,12 @@ pub fn delete(ctx: &Context, id_raw: &str, force: bool) -> Result<crate::Command
 
 #[cfg(test)]
 mod tests {
+    fn access(c: &Context) -> (crate::config::Config, crate::registry::ArtifactRegistry) {
+        let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir)
+            .unwrap_or_default();
+        let registry = crate::registry::ArtifactRegistry::build(&cfg).expect("registry");
+        (cfg, registry)
+    }
     use super::*;
     use crate::context::Context;
     use std::fs;
@@ -1853,7 +1924,21 @@ mod tests {
         fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
         let content = "---\nid: TASK-5\ntitle: Front-Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
         fs::write(dir.join("backlog/tasks/TASK-005.md"), content).unwrap();
-        let out = list(&c, None, None, None, None, None, None, None, None, false).unwrap();
+        let out = list(
+            &c,
+            &access(&c).0,
+            &access(&c).1,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            false,
+        )
+        .unwrap();
         assert!(out.text.contains("TASK-5 Front-Title"), "got: {}", out.text);
     }
 
@@ -1872,6 +1957,8 @@ mod tests {
         .unwrap();
         let id = create(
             &c,
+            &access(&c).0,
+            &access(&c).1,
             "New",
             None,
             &[],
@@ -1894,6 +1981,8 @@ mod tests {
         let c = ctx(&dir);
         let id = create(
             &c,
+            &access(&c).0,
+            &access(&c).1,
             "New Task",
             Some(sanitize::Text::literal("Desc")),
             &["first ac".to_string()],
@@ -1972,9 +2061,11 @@ mod tests {
         fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
         let content = "---\nid: TASK-99\ntitle: Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
         fs::write(dir.join("backlog/tasks/TASK-005.md"), content).unwrap();
-        let out = view(&c, "TASK-099").unwrap_or_else(|e| panic!("canonical view failed: {}", e));
+        let out = view(&c, &access(&c).0, &access(&c).1, "TASK-099")
+            .unwrap_or_else(|e| panic!("canonical view failed: {}", e));
         assert!(out.text.contains("id: TASK-99"), "got: {}", out.text);
-        let out2 = view(&c, "TASK-005").unwrap_or_else(|e| panic!("filename view failed: {}", e));
+        let out2 = view(&c, &access(&c).0, &access(&c).1, "TASK-005")
+            .unwrap_or_else(|e| panic!("filename view failed: {}", e));
         assert!(out2.text.contains("id: TASK-99"), "got: {}", out2.text);
     }
 
@@ -1987,6 +2078,8 @@ mod tests {
         fs::write(dir.join("backlog/tasks/TASK-005.md"), content).unwrap();
         let err = edit(
             &c,
+            &access(&c).0,
+            &access(&c).1,
             "TASK-099",
             Some("NewTitle"),
             None,
@@ -2026,7 +2119,9 @@ mod tests {
         fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
         let content = "---\nid: TASK-99\ntitle: Title\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nstatus: To Do\nassignee: []\nmilestone: null\ndependencies: []\nordinal: 5\ndocumentation: []\ntype: null\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nBody\n<!-- SECTION:DESCRIPTION:END -->\n";
         fs::write(dir.join("backlog/tasks/TASK-005.md"), content).unwrap();
-        let err = archive(&c, "TASK-005").err().expect("expected error");
+        let err = archive(&c, &access(&c).0, &access(&c).1, "TASK-005")
+            .err()
+            .expect("expected error");
         let msg = err.to_string();
         assert!(
             msg.contains("migration conflict"),
@@ -2051,7 +2146,7 @@ mod tests {
         );
         let path = dir.join("backlog/tasks/TASK-006.md");
         fs::write(&path, &content).unwrap();
-        let out = view(&c, "TASK-006").unwrap();
+        let out = view(&c, &access(&c).0, &access(&c).1, "TASK-006").unwrap();
         assert_eq!(out.text, content, "view must not complete missing keys");
         assert_eq!(fs::read_to_string(&path).unwrap(), content);
     }
@@ -2070,6 +2165,8 @@ mod tests {
         fs::write(&path, &content).unwrap();
         edit(
             &c,
+            &access(&c).0,
+            &access(&c).1,
             "TASK-005",
             Some("NewTitle"),
             None,
@@ -2117,6 +2214,8 @@ mod tests {
         fs::write(&path, &content).unwrap();
         edit(
             &c,
+            &access(&c).0,
+            &access(&c).1,
             "TASK-005",
             None,
             None,
@@ -2162,6 +2261,8 @@ mod tests {
 
         edit(
             &c,
+            &access(&c).0,
+            &access(&c).1,
             "TASK-001",
             None,
             None,
@@ -2200,6 +2301,8 @@ mod tests {
 
         edit(
             &c,
+            &access(&c).0,
+            &access(&c).1,
             "TASK-006",
             Some("Renamed"),
             None,
@@ -2247,7 +2350,7 @@ mod tests {
         )
         .unwrap();
 
-        archive(&c, "TASK-001").unwrap();
+        archive(&c, &access(&c).0, &access(&c).1, "TASK-001").unwrap();
         assert!(!dir.join("backlog/tasks/TASK-001.md").exists());
         let archived_path = dir.join("backlog/archive/tasks/TASK-001.md");
         assert!(
@@ -2267,7 +2370,7 @@ mod tests {
             archived
         );
 
-        restore(&c, "TASK-001").unwrap();
+        restore(&c, &access(&c).0, &access(&c).1, "TASK-001").unwrap();
         assert!(dir.join("backlog/tasks/TASK-001.md").exists());
         assert!(!dir.join("backlog/archive/tasks/TASK-001.md").exists());
     }
@@ -2280,7 +2383,7 @@ mod tests {
         let content = task_record("TASK-002", "Two");
         fs::write(dir.join("backlog/tasks/archived/TASK-002.md"), &content).unwrap();
 
-        restore(&c, "TASK-002").unwrap();
+        restore(&c, &access(&c).0, &access(&c).1, "TASK-002").unwrap();
         assert!(!dir.join("backlog/tasks/archived/TASK-002.md").exists());
         let restored = dir.join("backlog/tasks/TASK-002.md");
         assert!(
@@ -2324,8 +2427,25 @@ mod tests {
             task_record("TASK-18", "Hidden"),
         )
         .unwrap();
-        assert!(matches!(view(&c, "TASK-018"), Err(AppError::NotFound(_))));
-        let out = list(&c, None, None, None, None, None, None, None, None, false).unwrap();
+        assert!(matches!(
+            view(&c, &access(&c).0, &access(&c).1, "TASK-018"),
+            Err(AppError::NotFound(_))
+        ));
+        let out = list(
+            &c,
+            &access(&c).0,
+            &access(&c).1,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            false,
+        )
+        .unwrap();
         assert!(out.text.is_empty(), "got: {}", out.text);
     }
 
@@ -2357,6 +2477,8 @@ mod tests {
         .unwrap();
         let id = create(
             &c,
+            &access(&c).0,
+            &access(&c).1,
             "New",
             None,
             &[],
@@ -2380,7 +2502,7 @@ mod tests {
         fs::create_dir_all(dir.join("backlog/tasks")).unwrap();
         let content = task_record("TASK-001", "One").replace("status: ToDo", "status: Weird");
         fs::write(dir.join("backlog/tasks/TASK-001.md"), &content).unwrap();
-        let out = view(&c, "TASK-001").unwrap();
+        let out = view(&c, &access(&c).0, &access(&c).1, "TASK-001").unwrap();
         assert!(out.text.contains("status: Weird"));
         assert_eq!(
             fs::read_to_string(dir.join("backlog/tasks/TASK-001.md")).unwrap(),
@@ -2392,6 +2514,12 @@ mod tests {
 
 #[cfg(test)]
 mod native_layout_tests {
+    fn access(c: &Context) -> (crate::config::Config, crate::registry::ArtifactRegistry) {
+        let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir)
+            .unwrap_or_default();
+        let registry = crate::registry::ArtifactRegistry::build(&cfg).expect("registry");
+        (cfg, registry)
+    }
     use super::*;
 
     fn tmpdir(name: &str) -> PathBuf {
@@ -2433,7 +2561,7 @@ mod native_layout_tests {
         let before = record("TASK-005", "Five");
         fs::write(&path, &before).unwrap();
 
-        let err = match archive(&c, "TASK-005") {
+        let err = match archive(&c, &access(&c).0, &access(&c).1, "TASK-005") {
             Err(err) => err,
             Ok(_) => panic!("archive from a legacy alias must fail"),
         };
@@ -2454,7 +2582,7 @@ mod native_layout_tests {
         let before = record("TASK-006", "Six");
         fs::write(&path, &before).unwrap();
 
-        let err = match archive(&c, "TASK-006") {
+        let err = match archive(&c, &access(&c).0, &access(&c).1, "TASK-006") {
             Err(err) => err,
             Ok(_) => panic!("archive from the canonical archive must fail"),
         };

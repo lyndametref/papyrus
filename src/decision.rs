@@ -1,5 +1,4 @@
 #![allow(clippy::too_many_arguments)]
-use crate::commands::load_effective_config;
 use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
@@ -54,7 +53,12 @@ pub enum DecisionCmd {
     },
 }
 
-pub fn run(ctx: &Context, cmd: DecisionCmd) -> Result<crate::CommandOutput, AppError> {
+pub fn run(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    cmd: DecisionCmd,
+) -> Result<crate::CommandOutput, AppError> {
     match cmd {
         DecisionCmd::Create {
             title,
@@ -75,6 +79,8 @@ pub fn run(ctx: &Context, cmd: DecisionCmd) -> Result<crate::CommandOutput, AppE
             let consequences = sanitize::text_value("consequences", consequences, stdin.as_ref());
             let id = create(
                 ctx,
+                cfg,
+                registry,
                 &title,
                 decision_type.as_deref(),
                 decision,
@@ -95,8 +101,8 @@ pub fn run(ctx: &Context, cmd: DecisionCmd) -> Result<crate::CommandOutput, AppE
                 ..Default::default()
             })
         }
-        DecisionCmd::List { decision_type } => list(ctx, decision_type.as_deref()),
-        DecisionCmd::View { id } => view(ctx, &id),
+        DecisionCmd::List { decision_type } => list(ctx, cfg, registry, decision_type.as_deref()),
+        DecisionCmd::View { id } => view(ctx, cfg, registry, &id),
         DecisionCmd::Edit {
             id,
             title,
@@ -115,6 +121,8 @@ pub fn run(ctx: &Context, cmd: DecisionCmd) -> Result<crate::CommandOutput, AppE
             ])?;
             edit(
                 ctx,
+                cfg,
+                registry,
                 &id,
                 title.as_deref(),
                 sanitize::text_value("decision", decision, stdin.as_ref()),
@@ -132,10 +140,6 @@ pub fn run(ctx: &Context, cmd: DecisionCmd) -> Result<crate::CommandOutput, AppE
 fn sanitize_text(input: &str) -> Result<String, AppError> {
     sanitize::sanitize_name(input)
         .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))
-}
-
-fn load_config(ctx: &Context) -> Result<Config, AppError> {
-    load_effective_config(&ctx.config_path, &ctx.project_dir)
 }
 
 fn active_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
@@ -186,10 +190,13 @@ fn decision_dirs(ctx: &Context, cfg: &Config) -> Vec<PathBuf> {
 fn resolve_decision(
     ctx: &Context,
     cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
     id: &str,
 ) -> Result<Option<crate::record::resolve::ResolvedRecord>, AppError> {
     crate::record::resolve::resolve_in_dirs(
         ctx,
+        cfg,
+        registry,
         &decision_dirs(ctx, cfg),
         id,
         &decision_prefixes(cfg),
@@ -200,9 +207,11 @@ fn resolve_decision(
 fn resolve_decision_required(
     ctx: &Context,
     cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
     id: &str,
 ) -> Result<crate::record::resolve::ResolvedRecord, AppError> {
-    resolve_decision(ctx, cfg, id)?.ok_or_else(|| AppError::NotFound(format!("not found: {}", id)))
+    resolve_decision(ctx, cfg, registry, id)?
+        .ok_or_else(|| AppError::NotFound(format!("not found: {}", id)))
 }
 
 fn ensure_dir(dir: &std::path::Path, project_dir: &std::path::Path) -> Result<(), AppError> {
@@ -350,8 +359,11 @@ pub fn valid_transition(current: &str, next: &str) -> bool {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create(
     ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
     title_raw: &str,
     type_raw: Option<&str>,
     decision_raw: Option<sanitize::Text>,
@@ -360,13 +372,12 @@ pub fn create(
     labels_raw: &[String],
     references_raw: &[String],
 ) -> Result<String, AppError> {
-    let cfg = load_config(ctx)?;
     let title = sanitize_text(title_raw)?;
     let type_key = match type_raw {
         Some(s) => sanitize_text(s)?,
         None => "adr".to_string(),
     };
-    let entry = type_entry(&cfg, &type_key)?;
+    let entry = type_entry(cfg, &type_key)?;
     let decision = match &decision_raw {
         Some(text) => Some(text.resolve()?),
         None => None,
@@ -397,8 +408,8 @@ pub fn create(
         }
     }
 
-    let active = active_dir(ctx, &cfg)?;
-    let archived = archived_dir(ctx, &cfg)?;
+    let active = active_dir(ctx, cfg)?;
+    let archived = archived_dir(ctx, cfg)?;
     ensure_dir(&active, &ctx.project_dir)?;
 
     let next = crate::record::identity::next_number(&active, &archived, &entry.prefix);
@@ -460,35 +471,42 @@ pub fn create(
     };
     let file_path = active.join(file_name);
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    crate::record::store::write_atomic(ctx, &safe_path, &file_content)?;
+    crate::record::store::write_atomic(ctx, cfg, registry, &safe_path, &file_content)?;
     Ok(id)
 }
 
 pub fn list(
     ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
     type_filter_raw: Option<&str>,
 ) -> Result<crate::CommandOutput, AppError> {
-    let cfg = load_config(ctx)?;
     let type_filter = match type_filter_raw {
         Some(s) => {
             let key = sanitize_text(s)?;
-            let entry = type_entry(&cfg, &key)?;
+            let entry = type_entry(cfg, &key)?;
             Some((key, entry.prefix))
         }
         None => None,
     };
 
-    let active = active_dir(ctx, &cfg)?;
+    let active = active_dir(ctx, cfg)?;
     let _ = ensure_dir(&active, &ctx.project_dir);
 
-    let records =
-        crate::record::resolve::list_in_dir(ctx, &active, &decision_prefixes(&cfg), false)?;
+    let records = crate::record::resolve::list_in_dir(
+        ctx,
+        cfg,
+        registry,
+        &active,
+        &decision_prefixes(cfg),
+        false,
+    )?;
     let mut items: Vec<(String, String, String)> = Vec::new();
     for record in records {
         let included = if let Some((_, prefix)) = &type_filter {
             crate::record::identity::parse_id_parts(&record.id, prefix, false).is_some()
         } else {
-            type_key_for_id(&cfg, &record.id).is_some()
+            type_key_for_id(cfg, &record.id).is_some()
         };
         if !included {
             continue;
@@ -537,14 +555,18 @@ pub fn list(
     })
 }
 
-pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
+pub fn view(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    id_raw: &str,
+) -> Result<crate::CommandOutput, AppError> {
     let id = sanitize_text(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let _ = ensure_dir(&active_dir(ctx, &cfg)?, &ctx.project_dir);
-    let record = resolve_decision_required(ctx, &cfg, &id)?;
+    let _ = ensure_dir(&active_dir(ctx, cfg)?, &ctx.project_dir);
+    let record = resolve_decision_required(ctx, cfg, registry, &id)?;
     let canonical = record.id.clone();
 
-    let content = crate::record::migrate::ensure_front_matter(ctx, &record.path)?;
+    let content = crate::record::migrate::ensure_front_matter(ctx, cfg, registry, &record.path)?;
     let text = content.clone();
     let json = if ctx.json {
         Some(serde_json::json!({
@@ -563,8 +585,11 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn edit(
     ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
     id_raw: &str,
     title_raw: Option<&str>,
     decision_raw: Option<sanitize::Text>,
@@ -576,14 +601,13 @@ pub fn edit(
     references_raw: &[String],
 ) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let _ = ensure_dir(&active_dir(ctx, &cfg)?, &ctx.project_dir);
-    let record = resolve_decision_required(ctx, &cfg, &requested)?;
+    let _ = ensure_dir(&active_dir(ctx, cfg)?, &ctx.project_dir);
+    let record = resolve_decision_required(ctx, cfg, registry, &requested)?;
     record.ensure_writable()?;
     let id = record.id.clone();
     let path = record.path.clone();
 
-    let (doc, _token) = crate::record::store::read_document(ctx, &path)?;
+    let (doc, _token) = crate::record::store::read_document(ctx, cfg, registry, &path)?;
     let content = doc.source.clone();
     let mut dd = record_from_document(&doc);
     if dd.id.is_empty() {
@@ -623,7 +647,7 @@ pub fn edit(
     }
     if let Some(sup) = superseded_by_raw {
         let sup_requested = sanitize_text(sup)?;
-        let sup_record = resolve_decision_required(ctx, &cfg, &sup_requested)?;
+        let sup_record = resolve_decision_required(ctx, cfg, registry, &sup_requested)?;
         let sup_id = sup_record.id;
         if sup_id == id {
             return Err(AppError::Validation(format!(
@@ -631,9 +655,9 @@ pub fn edit(
                 id
             )));
         }
-        let current_type = type_key_for_id(&cfg, &id)
+        let current_type = type_key_for_id(cfg, &id)
             .ok_or_else(|| AppError::Validation(format!("unknown decision type for: {}", id)))?;
-        let sup_type = type_key_for_id(&cfg, &sup_id).ok_or_else(|| {
+        let sup_type = type_key_for_id(cfg, &sup_id).ok_or_else(|| {
             AppError::Validation(format!("unknown decision type for: {}", sup_id))
         })?;
         if current_type != sup_type {
@@ -745,7 +769,7 @@ pub fn edit(
 
     if new_content != content {
         let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
-        crate::record::store::write_atomic(ctx, &safe_write, &new_content)?;
+        crate::record::store::write_atomic(ctx, cfg, registry, &safe_write, &new_content)?;
     }
 
     let _safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
@@ -803,6 +827,12 @@ mod tests {
 
 #[cfg(test)]
 mod native_layout_tests {
+    fn access(c: &Context) -> (crate::config::Config, crate::registry::ArtifactRegistry) {
+        let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir)
+            .unwrap_or_default();
+        let registry = crate::registry::ArtifactRegistry::build(&cfg).expect("registry");
+        (cfg, registry)
+    }
     use super::*;
 
     fn tmpdir(name: &str) -> PathBuf {
@@ -839,12 +869,24 @@ mod native_layout_tests {
     fn create_writes_a_kebab_slug_and_list_view_archive_use_the_canonical_id() {
         let dir = tmpdir("slug-lifecycle");
         let c = ctx(&dir);
-        let id = create(&c, "First Decision", None, None, None, None, &[], &[]).unwrap();
+        let id = create(
+            &c,
+            &access(&c).0,
+            &access(&c).1,
+            "First Decision",
+            None,
+            None,
+            None,
+            None,
+            &[],
+            &[],
+        )
+        .unwrap();
         assert_eq!(id, "ADR-001");
         let created = dir.join("decisions/ADR-001-first-decision.md");
         assert!(created.exists(), "new decisions carry a kebab slug");
 
-        let listed = list(&c, None).unwrap();
+        let listed = list(&c, &access(&c).0, &access(&c).1, None).unwrap();
         assert!(
             listed.text.contains("ADR-001 First Decision"),
             "list must report the canonical ID: {}",
@@ -852,7 +894,7 @@ mod native_layout_tests {
         );
         assert!(!listed.text.contains("ADR-001-first-decision"));
 
-        let viewed = view(&c, "ADR-1").unwrap();
+        let viewed = view(&c, &access(&c).0, &access(&c).1, "ADR-1").unwrap();
         assert!(viewed.text.contains("# ADR-001 First Decision"));
     }
 
@@ -864,13 +906,15 @@ mod native_layout_tests {
         let path = dir.join("decisions/ADR-002.md");
         fs::write(&path, legacy_decision("ADR-002", "Legacy")).unwrap();
 
-        let viewed = view(&c, "ADR-002").unwrap();
+        let viewed = view(&c, &access(&c).0, &access(&c).1, "ADR-002").unwrap();
         assert!(viewed.text.contains("# ADR-002 Legacy"));
 
         // A status edit is the in-place `## Status` line; it never moves or
         // renames the file.
         edit(
             &c,
+            &access(&c).0,
+            &access(&c).1,
             "ADR-2",
             None,
             None,

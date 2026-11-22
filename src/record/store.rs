@@ -5,6 +5,7 @@ use crate::context::Context;
 use crate::error::AppError;
 use crate::record::document;
 use crate::record::document::Document;
+use crate::registry::ArtifactRegistry;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -79,12 +80,22 @@ pub fn resolve_path(ctx: &Context, target: &Path) -> Result<PathBuf, AppError> {
     Context::ensure_within(&ctx.project_dir, target)
 }
 
-pub fn read(ctx: &Context, target: &Path) -> Result<(Document, String), AppError> {
-    read_document(ctx, target)
+pub fn read(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    target: &Path,
+) -> Result<(Document, String), AppError> {
+    read_document(ctx, cfg, registry, target)
 }
 
-pub fn read_document(ctx: &Context, target: &Path) -> Result<(Document, String), AppError> {
-    let (safe, content) = read_source(ctx, target)?;
+pub fn read_document(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    target: &Path,
+) -> Result<(Document, String), AppError> {
+    let (safe, content) = read_source(ctx, cfg, registry, target)?;
     let doc = document::parse(&content)?;
     let meta = fs::metadata(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
     let token = version_token(&meta);
@@ -106,8 +117,13 @@ pub struct NormalizedRead {
 /// contract, while the browser requests LF-normalized content so headings never
 /// carry a trailing `\r` (ADR-0013 D2). `stored_source` keeps the on-disk bytes
 /// so a line-ending-only difference still produces exactly one write.
-pub fn read_document_normalized(ctx: &Context, target: &Path) -> Result<NormalizedRead, AppError> {
-    let (safe, stored_source) = read_source(ctx, target)?;
+pub fn read_document_normalized(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    target: &Path,
+) -> Result<NormalizedRead, AppError> {
+    let (safe, stored_source) = read_source(ctx, cfg, registry, target)?;
     let normalized = crate::record::line_endings::normalize(&stored_source);
     let document = document::parse(&normalized)?;
     let meta = fs::metadata(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
@@ -118,7 +134,12 @@ pub fn read_document_normalized(ctx: &Context, target: &Path) -> Result<Normaliz
     })
 }
 
-fn read_source(ctx: &Context, target: &Path) -> Result<(PathBuf, String), AppError> {
+fn read_source(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    target: &Path,
+) -> Result<(PathBuf, String), AppError> {
     let safe = resolve_path(ctx, target).map_err(|_| {
         AppError::Runtime(format!(
             "path resolves outside project directory: {}",
@@ -132,7 +153,7 @@ fn read_source(ctx: &Context, target: &Path) -> Result<(PathBuf, String), AppErr
         )));
     }
     // Read-path auto-relocate for active-folder archived-status records.
-    let safe = match relocate_if_archived(ctx, &safe) {
+    let safe = match relocate_if_archived(ctx, cfg, registry, &safe) {
         Ok(p) => p,
         Err(RelocateError::WriteFailed { source }) => {
             return Err(AppError::Validation(format!(
@@ -152,11 +173,12 @@ fn read_source(ctx: &Context, target: &Path) -> Result<(PathBuf, String), AppErr
         }
         Err(RelocateError::Other(e)) => return Err(e),
     };
-    let content = crate::record::migrate::ensure_front_matter_quiet(ctx, &safe)?;
+    let content = crate::record::migrate::ensure_front_matter_quiet(ctx, cfg, registry, &safe)?;
     // Tolerant read: flag (but preserve) an undeclared status value.
-    if let Some(desc) = crate::record::migrate::managed_descriptor(&ctx.project_dir, &safe) {
-        let cfg = load_cfg(ctx);
-        let declared = desc.declared_statuses(&cfg);
+    if let Some(desc) =
+        crate::record::migrate::managed_descriptor(cfg, registry, &ctx.project_dir, &safe)
+    {
+        let declared = desc.declared_statuses(cfg);
         if let Ok(Some(fm)) = crate::record::frontmatter::parse(&content)
             && let Some(status) =
                 crate::record::frontmatter::current_value_string(&fm.raw, "status")
@@ -221,19 +243,27 @@ pub fn move_record(ctx: &Context, source: &Path, destination: &Path) -> Result<(
     fs::rename(&source, &destination).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
-pub fn write_atomic(ctx: &Context, target: &Path, content: &str) -> Result<(), AppError> {
+pub fn write_atomic(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    target: &Path,
+    content: &str,
+) -> Result<(), AppError> {
     // Lazy migration on first write: if the target is a managed document record
     // lacking front matter, add front matter before writing.
     let mut content = content.to_string();
     if !crate::record::frontmatter::has_front_matter(&content) {
         let safe_check = resolve_path(ctx, target).ok();
         if let Some(safe) = safe_check
-            && let Some(desc) = crate::record::migrate::managed_descriptor(&ctx.project_dir, &safe)
+            && let Some(desc) =
+                crate::record::migrate::managed_descriptor(cfg, registry, &ctx.project_dir, &safe)
         {
             // Conflict detection before lazy migration on the write path.
-            let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, &desc);
+            let conflicts =
+                crate::record::migrate::scan_migration_conflicts(ctx, cfg, registry, &desc);
             if let Some(reason) = crate::record::migrate::check_conflicts_for_path(
-                ctx, &safe, &desc, &content, &conflicts,
+                ctx, cfg, &safe, &desc, &content, &conflicts,
             ) {
                 let rel = safe
                     .strip_prefix(&ctx.project_dir)
@@ -245,8 +275,9 @@ pub fn write_atomic(ctx: &Context, target: &Path, content: &str) -> Result<(), A
                     rel, reason
                 )));
             }
-            let (new_content, changed, action, keys) =
-                crate::record::migrate::migrate_content(ctx, &safe, &content, false)?;
+            let (new_content, changed, action, keys) = crate::record::migrate::migrate_content(
+                ctx, cfg, registry, &safe, &content, false,
+            )?;
             if changed {
                 content = new_content;
                 let rel = safe
@@ -345,23 +376,20 @@ pub fn write_atomic(ctx: &Context, target: &Path, content: &str) -> Result<(), A
     result
 }
 
-fn load_cfg(ctx: &Context) -> Config {
-    crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir).unwrap_or_default()
-}
-
 /// Archive a record: patch status to `archived`, write the destination via the
 /// atomic sequence, and remove the source only after the destination write
 /// succeeds.
 pub fn archive_inner(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     descriptor: &crate::record::descriptor::RecordDescriptor,
     id: &str,
 ) -> Result<PathBuf, RelocateError> {
-    let cfg = load_cfg(ctx);
     let active_dir = descriptor
-        .resolve_directory(&cfg, &ctx.project_dir)
+        .resolve_directory(cfg, &ctx.project_dir)
         .map_err(RelocateError::Other)?;
-    let archived_dir = match descriptor.resolve_archived_directory(&cfg, &ctx.project_dir) {
+    let archived_dir = match descriptor.resolve_archived_directory(cfg, &ctx.project_dir) {
         Some(Ok(dir)) => dir,
         Some(Err(e)) => return Err(RelocateError::Other(e)),
         None => {
@@ -371,19 +399,22 @@ pub fn archive_inner(
             ))));
         }
     };
-    let read_dirs = descriptor.resolve_read_directories(&cfg, &ctx.project_dir);
-    let prefixes = descriptor.configured_prefixes(&cfg);
+    let read_dirs = descriptor.resolve_read_directories(cfg, &ctx.project_dir);
+    let prefixes = descriptor.configured_prefixes(cfg);
     let dotted = descriptor.is_dotted_id();
-    let resolved = crate::record::resolve::resolve_in_dirs(ctx, &read_dirs, id, &prefixes, dotted)
-        .map_err(RelocateError::Other)?;
+    let resolved = crate::record::resolve::resolve_in_dirs(
+        ctx, cfg, registry, &read_dirs, id, &prefixes, dotted,
+    )
+    .map_err(RelocateError::Other)?;
     let record = resolved.ok_or_else(|| {
         RelocateError::Other(AppError::NotFound(format!("record not found: {}", id)))
     })?;
     let path = record.path;
 
     // Lazy adoption first so status is present.
-    let content_for_status = crate::record::migrate::ensure_front_matter_quiet(ctx, &path)
-        .map_err(RelocateError::Other)?;
+    let content_for_status =
+        crate::record::migrate::ensure_front_matter_quiet(ctx, cfg, registry, &path)
+            .map_err(RelocateError::Other)?;
     let status = crate::record::frontmatter::parse(&content_for_status)
         .ok()
         .flatten()
@@ -434,8 +465,10 @@ pub fn archive_inner(
     )
     .map_err(RelocateError::Other)?;
 
-    write_atomic(ctx, &dest, &new_content).map_err(|_| RelocateError::WriteFailed {
-        source: path.clone(),
+    write_atomic(ctx, cfg, registry, &dest, &new_content).map_err(|_| {
+        RelocateError::WriteFailed {
+            source: path.clone(),
+        }
     })?;
 
     if let Err(_e) = fs::remove_file(&path) {
@@ -453,16 +486,23 @@ pub fn archive_inner(
 /// relocation failure modes.
 pub fn archive(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     descriptor: &crate::record::descriptor::RecordDescriptor,
     id: &str,
 ) -> Result<PathBuf, AppError> {
-    archive_inner(ctx, descriptor, id).map_err(|e| e.into_app_error())
+    archive_inner(ctx, cfg, registry, descriptor, id).map_err(|e| e.into_app_error())
 }
 
 /// Relocate an active-folder record whose `status` is `archived` to the
 /// archived folder. Returns the (possibly new) path. Idempotent and a no-op
 /// for non-managed or non-archived-status records.
-pub fn relocate_if_archived(ctx: &Context, path: &Path) -> Result<PathBuf, RelocateError> {
+pub fn relocate_if_archived(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    path: &Path,
+) -> Result<PathBuf, RelocateError> {
     let safe = resolve_path(ctx, path).map_err(RelocateError::Other)?;
     if !safe.exists() {
         return Err(RelocateError::Other(AppError::NotFound(format!(
@@ -470,13 +510,13 @@ pub fn relocate_if_archived(ctx: &Context, path: &Path) -> Result<PathBuf, Reloc
             safe.display()
         ))));
     }
-    let desc = match crate::record::migrate::managed_descriptor(&ctx.project_dir, &safe) {
-        Some(d) => d,
-        None => return Ok(safe),
-    };
-    let cfg = load_cfg(ctx);
+    let desc =
+        match crate::record::migrate::managed_descriptor(cfg, registry, &ctx.project_dir, &safe) {
+            Some(d) => d,
+            None => return Ok(safe),
+        };
     let active_dir = desc
-        .resolve_directory(&cfg, &ctx.project_dir)
+        .resolve_directory(cfg, &ctx.project_dir)
         .map_err(RelocateError::Other)?;
     if safe.parent() != Some(active_dir.as_path()) {
         return Ok(safe);
@@ -492,7 +532,7 @@ pub fn relocate_if_archived(ctx: &Context, path: &Path) -> Result<PathBuf, Reloc
 
     // Direct relocation without resolving by id (avoids recursion through
     // `resolve_in_dirs` / `archive_inner`).
-    let archived_dir = match desc.resolve_archived_directory(&cfg, &ctx.project_dir) {
+    let archived_dir = match desc.resolve_archived_directory(cfg, &ctx.project_dir) {
         Some(Ok(dir)) => dir,
         Some(Err(e)) => return Err(RelocateError::Other(e)),
         None => {
@@ -524,7 +564,7 @@ pub fn relocate_if_archived(ctx: &Context, path: &Path) -> Result<PathBuf, Reloc
     )
     .map_err(RelocateError::Other)?;
 
-    crate::record::store::write_atomic(ctx, &dest, &new_content).map_err(|_| {
+    crate::record::store::write_atomic(ctx, cfg, registry, &dest, &new_content).map_err(|_| {
         eprintln!(
             "failed to relocate archived record; source intact: {}",
             safe.display()
@@ -557,20 +597,23 @@ pub fn relocate_if_archived(ctx: &Context, path: &Path) -> Result<PathBuf, Reloc
 /// archived file; remove an archived record directly.
 pub fn delete(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     descriptor: &crate::record::descriptor::RecordDescriptor,
     id: &str,
 ) -> Result<(), AppError> {
-    let cfg = load_cfg(ctx);
-    let active_dir = descriptor.resolve_directory(&cfg, &ctx.project_dir)?;
-    let read_dirs = descriptor.resolve_read_directories(&cfg, &ctx.project_dir);
-    let prefixes = descriptor.configured_prefixes(&cfg);
+    let active_dir = descriptor.resolve_directory(cfg, &ctx.project_dir)?;
+    let read_dirs = descriptor.resolve_read_directories(cfg, &ctx.project_dir);
+    let prefixes = descriptor.configured_prefixes(cfg);
     let dotted = descriptor.is_dotted_id();
-    let resolved = crate::record::resolve::resolve_in_dirs(ctx, &read_dirs, id, &prefixes, dotted)?;
+    let resolved = crate::record::resolve::resolve_in_dirs(
+        ctx, cfg, registry, &read_dirs, id, &prefixes, dotted,
+    )?;
     let record = resolved.ok_or_else(|| AppError::NotFound(format!("record not found: {}", id)))?;
     let path = record.path;
 
     if path.parent() == Some(active_dir.as_path()) {
-        let archived_path = archive(ctx, descriptor, id)?;
+        let archived_path = archive(ctx, cfg, registry, descriptor, id)?;
         fs::remove_file(&archived_path).map_err(|e| AppError::Runtime(e.to_string()))?;
     } else {
         fs::remove_file(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
@@ -586,18 +629,19 @@ pub fn delete(
 /// current status refuses writes until fixed.
 pub fn set_status(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     descriptor: &crate::record::descriptor::RecordDescriptor,
     id: &str,
     value: &str,
 ) -> Result<(), AppError> {
-    let cfg = load_cfg(ctx);
     // Reject archived explicitly.
     if value == "archived" {
         return Err(AppError::Validation(
             "status 'archived' is not allowed here; use archive".to_string(),
         ));
     }
-    let declared = descriptor.declared_statuses(&cfg);
+    let declared = descriptor.declared_statuses(cfg);
     if !declared.is_empty() && !declared.iter().any(|d| d == value) {
         return Err(AppError::Validation(format!(
             "unknown status '{}' for {}",
@@ -606,12 +650,14 @@ pub fn set_status(
     }
 
     let archived_dir = descriptor
-        .resolve_archived_directory(&cfg, &ctx.project_dir)
+        .resolve_archived_directory(cfg, &ctx.project_dir)
         .and_then(|r| r.ok());
-    let read_dirs = descriptor.resolve_read_directories(&cfg, &ctx.project_dir);
-    let prefixes = descriptor.configured_prefixes(&cfg);
+    let read_dirs = descriptor.resolve_read_directories(cfg, &ctx.project_dir);
+    let prefixes = descriptor.configured_prefixes(cfg);
     let dotted = descriptor.is_dotted_id();
-    let resolved = crate::record::resolve::resolve_in_dirs(ctx, &read_dirs, id, &prefixes, dotted)?;
+    let resolved = crate::record::resolve::resolve_in_dirs(
+        ctx, cfg, registry, &read_dirs, id, &prefixes, dotted,
+    )?;
     let record = resolved.ok_or_else(|| AppError::NotFound(format!("record not found: {}", id)))?;
     let path = record.path.clone();
 
@@ -627,7 +673,7 @@ pub fn set_status(
         )));
     }
     // Also reject if current status is archived.
-    let content = crate::record::migrate::ensure_front_matter_quiet(ctx, &path)?;
+    let content = crate::record::migrate::ensure_front_matter_quiet(ctx, cfg, registry, &path)?;
     let current_status = crate::record::frontmatter::parse(&content)
         .ok()
         .flatten()
@@ -660,7 +706,7 @@ pub fn set_status(
     )?;
 
     // write in place; directory must already exist (no folder creation).
-    write_atomic(ctx, &path, &new_content)?;
+    write_atomic(ctx, cfg, registry, &path, &new_content)?;
     Ok(())
 }
 
@@ -668,6 +714,8 @@ pub fn set_status(
 /// their own patched content.
 pub fn archive_content(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     source: &Path,
     destination: &Path,
     content: &str,
@@ -679,7 +727,7 @@ pub fn archive_content(
     {
         fs::create_dir_all(parent).map_err(|e| AppError::Runtime(e.to_string()))?;
     }
-    write_atomic(ctx, &dest_safe, content)?;
+    write_atomic(ctx, cfg, registry, &dest_safe, content)?;
     if let Err(e) = fs::remove_file(&source_safe) {
         return Err(AppError::Runtime(format!(
             "archive wrote {} but failed to remove {}: {}",
@@ -698,7 +746,13 @@ pub fn archive_content(
 /// `id`, refreshes `updated_date`, and updates the body heading ID only when the
 /// heading already agrees with the front-matter `id`. The new path is written
 /// atomically before the old path is removed.
-pub fn reassign_id(ctx: &Context, path: &Path, new_id: &str) -> Result<PathBuf, AppError> {
+pub fn reassign_id(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    path: &Path,
+    new_id: &str,
+) -> Result<PathBuf, AppError> {
     if !crate::record::identity::is_valid_id_component(new_id) {
         return Err(AppError::Validation(format!(
             "invalid record id: {}",
@@ -759,7 +813,7 @@ pub fn reassign_id(ctx: &Context, path: &Path, new_id: &str) -> Result<PathBuf, 
     }
     let patched = crate::record::patch::apply_patch(&doc, &ops)?;
 
-    write_atomic(ctx, &destination, &patched)?;
+    write_atomic(ctx, cfg, registry, &destination, &patched)?;
     fs::remove_file(&source).map_err(|error| {
         AppError::Runtime(format!(
             "wrote {} but failed to remove {}: {}",
@@ -778,17 +832,29 @@ impl Store {
     pub fn resolve_path(ctx: &Context, target: &Path) -> Result<PathBuf, AppError> {
         resolve_path(ctx, target)
     }
-    pub fn read(ctx: &Context, target: &Path) -> Result<(Document, String), AppError> {
-        read(ctx, target)
+    pub fn read(
+        ctx: &Context,
+        cfg: &Config,
+        registry: &ArtifactRegistry,
+        target: &Path,
+    ) -> Result<(Document, String), AppError> {
+        read(ctx, cfg, registry, target)
     }
-    pub fn read_document(ctx: &Context, target: &Path) -> Result<(Document, String), AppError> {
-        read_document(ctx, target)
+    pub fn read_document(
+        ctx: &Context,
+        cfg: &Config,
+        registry: &ArtifactRegistry,
+        target: &Path,
+    ) -> Result<(Document, String), AppError> {
+        read_document(ctx, cfg, registry, target)
     }
     pub fn read_document_normalized(
         ctx: &Context,
+        cfg: &Config,
+        registry: &ArtifactRegistry,
         target: &Path,
     ) -> Result<NormalizedRead, AppError> {
-        read_document_normalized(ctx, target)
+        read_document_normalized(ctx, cfg, registry, target)
     }
     pub fn valid_version_token(token: &str) -> bool {
         let mut parts = token.split('.');
@@ -825,53 +891,83 @@ impl Store {
         fs::rename(&source, &destination).map_err(|e| AppError::Runtime(e.to_string()))
     }
 
-    pub fn write_atomic(ctx: &Context, target: &Path, content: &str) -> Result<(), AppError> {
-        write_atomic(ctx, target, content)
+    pub fn write_atomic(
+        ctx: &Context,
+        cfg: &Config,
+        registry: &ArtifactRegistry,
+        target: &Path,
+        content: &str,
+    ) -> Result<(), AppError> {
+        write_atomic(ctx, cfg, registry, target, content)
     }
     pub fn archive(
         ctx: &Context,
+        cfg: &Config,
+        registry: &ArtifactRegistry,
         descriptor: &crate::record::descriptor::RecordDescriptor,
         id: &str,
     ) -> Result<PathBuf, AppError> {
-        archive(ctx, descriptor, id)
+        archive(ctx, cfg, registry, descriptor, id)
     }
     pub fn set_status(
         ctx: &Context,
+        cfg: &Config,
+        registry: &ArtifactRegistry,
         descriptor: &crate::record::descriptor::RecordDescriptor,
         id: &str,
         value: &str,
     ) -> Result<(), AppError> {
-        set_status(ctx, descriptor, id, value)
+        set_status(ctx, cfg, registry, descriptor, id, value)
     }
-    pub fn relocate_if_archived(ctx: &Context, path: &Path) -> Result<PathBuf, RelocateError> {
-        relocate_if_archived(ctx, path)
+    pub fn relocate_if_archived(
+        ctx: &Context,
+        cfg: &Config,
+        registry: &ArtifactRegistry,
+        path: &Path,
+    ) -> Result<PathBuf, RelocateError> {
+        relocate_if_archived(ctx, cfg, registry, path)
     }
     pub fn delete(
         ctx: &Context,
+        cfg: &Config,
+        registry: &ArtifactRegistry,
         descriptor: &crate::record::descriptor::RecordDescriptor,
         id: &str,
     ) -> Result<(), AppError> {
-        delete(ctx, descriptor, id)
+        delete(ctx, cfg, registry, descriptor, id)
     }
     pub fn archive_content(
         ctx: &Context,
+        cfg: &Config,
+        registry: &ArtifactRegistry,
         source: &Path,
         destination: &Path,
         content: &str,
     ) -> Result<(), AppError> {
-        archive_content(ctx, source, destination, content)
+        archive_content(ctx, cfg, registry, source, destination, content)
     }
     pub fn version_token(meta: &fs::Metadata) -> String {
         version_token(meta)
     }
-    pub fn reassign_id(ctx: &Context, path: &Path, new_id: &str) -> Result<PathBuf, AppError> {
-        reassign_id(ctx, path, new_id)
+    pub fn reassign_id(
+        ctx: &Context,
+        cfg: &Config,
+        registry: &ArtifactRegistry,
+        path: &Path,
+        new_id: &str,
+    ) -> Result<PathBuf, AppError> {
+        reassign_id(ctx, cfg, registry, path, new_id)
     }
 }
 
 // aliases
-pub fn read_store(ctx: &Context, target: &Path) -> Result<(Document, String), AppError> {
-    read(ctx, target)
+pub fn read_store(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    target: &Path,
+) -> Result<(Document, String), AppError> {
+    read(ctx, cfg, registry, target)
 }
 
 #[cfg(test)]
@@ -905,13 +1001,20 @@ mod tests {
         }
     }
 
+    fn access(c: &Context) -> (Config, ArtifactRegistry) {
+        let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir)
+            .unwrap_or_default();
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        (cfg, registry)
+    }
+
     #[test]
     fn read_legacy_shape() {
         let dir = tmpdir("legacy");
         let c = ctx(&dir);
         let p = dir.join("legacy.md");
         fs::write(&p, "# T Title\n\n## Description\nBody\n").unwrap();
-        let (doc, token) = read(&c, &p).unwrap();
+        let (doc, token) = read(&c, &access(&c).0, &access(&c).1, &p).unwrap();
         assert!(doc.front_matter.is_none());
         assert!(doc.frontmatter.is_none());
         assert!(!token.is_empty());
@@ -927,7 +1030,7 @@ mod tests {
             "---\nid: X\ntitle: T\n---\n# X T\n\n## Description\nBody\n",
         )
         .unwrap();
-        let (doc, _) = read(&c, &p).unwrap();
+        let (doc, _) = read(&c, &access(&c).0, &access(&c).1, &p).unwrap();
         assert!(doc.front_matter.is_some());
         assert!(doc.frontmatter.is_some());
     }
@@ -937,7 +1040,7 @@ mod tests {
         let dir = tmpdir("missing");
         let c = ctx(&dir);
         let p = dir.join("nope.md");
-        let err = read(&c, &p).unwrap_err();
+        let err = read(&c, &access(&c).0, &access(&c).1, &p).unwrap_err();
         assert!(matches!(err, AppError::NotFound(_)));
     }
 
@@ -947,7 +1050,7 @@ mod tests {
         let c = ctx(&dir);
         let p = dir.join("bad.md");
         fs::write(&p, "---\n: bad\n---\n").unwrap();
-        let err = read(&c, &p).unwrap_err();
+        let err = read(&c, &access(&c).0, &access(&c).1, &p).unwrap_err();
         assert!(matches!(err, AppError::Validation(_)));
     }
 
@@ -956,7 +1059,7 @@ mod tests {
         let dir = tmpdir("escape");
         let c = ctx(&dir);
         let outside = dir.join("..").join("outside.md");
-        let err = read(&c, &outside).unwrap_err();
+        let err = read(&c, &access(&c).0, &access(&c).1, &outside).unwrap_err();
         assert!(matches!(err, AppError::Runtime(_)));
     }
 
@@ -966,7 +1069,7 @@ mod tests {
         let c = ctx(&dir);
         let p = dir.join("rec.md");
         fs::write(&p, "original").unwrap();
-        write_atomic(&c, &p, "updated").unwrap();
+        write_atomic(&c, &access(&c).0, &access(&c).1, &p, "updated").unwrap();
         assert_eq!(fs::read_to_string(&p).unwrap(), "updated");
     }
 
@@ -979,7 +1082,7 @@ mod tests {
         // target as existing directory causes rename to fail
         let dir_target = dir.join("dir_target");
         fs::create_dir_all(&dir_target).unwrap();
-        let res = write_atomic(&c, &dir_target, "content");
+        let res = write_atomic(&c, &access(&c).0, &access(&c).1, &dir_target, "content");
         assert!(res.is_err());
         // no temp files left
         for entry in fs::read_dir(&dir).unwrap() {
@@ -1016,10 +1119,17 @@ mod tests {
         let read_dirs = desc.resolve_read_directories(&cfg, &c.project_dir);
         let prefixes = desc.configured_prefixes(&cfg);
         let archived = dir.join("backlog/archive/milestones/MS-001.md");
-        let resolved =
-            crate::record::resolve::resolve_in_dirs(&c, &read_dirs, "MS-001", &prefixes, false)
-                .expect("read path succeeds")
-                .expect("milestone resolves");
+        let resolved = crate::record::resolve::resolve_in_dirs(
+            &c,
+            &access(&c).0,
+            &access(&c).1,
+            &read_dirs,
+            "MS-001",
+            &prefixes,
+            false,
+        )
+        .expect("read path succeeds")
+        .expect("milestone resolves");
         assert_eq!(
             resolved.path, archived,
             "the archived record moves to the canonical archive folder"
@@ -1027,7 +1137,8 @@ mod tests {
         assert!(!path.exists(), "the active-folder copy is removed");
         assert_eq!(fs::read_to_string(&archived).unwrap(), content);
 
-        let after = relocate_if_archived(&c, &archived).expect("archived folder read is a no-op");
+        let after = relocate_if_archived(&c, &access(&c).0, &access(&c).1, &archived)
+            .expect("archived folder read is a no-op");
         assert_eq!(after, archived);
         assert_eq!(fs::read_to_string(&archived).unwrap(), content);
     }
@@ -1046,7 +1157,7 @@ mod tests {
         let content = "---\nid: TECH-001\ntitle: T\ncustom: kept\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2000-01-01T00:00:00Z'\n---\n\n# TECH-001 T\n\n## Description\n\nBody\n";
         fs::write(&path, content).unwrap();
 
-        let new_path = reassign_id(&c, &path, "TECH-002").unwrap();
+        let new_path = reassign_id(&c, &access(&c).0, &access(&c).1, &path, "TECH-002").unwrap();
         assert_eq!(new_path, dir.join("docs/technical/TECH-002.md"));
         assert!(!path.exists(), "the old path is removed");
         let written = fs::read_to_string(&new_path).unwrap();
@@ -1090,7 +1201,7 @@ mod tests {
         );
         fs::write(&path, &content).unwrap();
 
-        let new_path = reassign_id(&c, &path, "TECH-002").unwrap();
+        let new_path = reassign_id(&c, &access(&c).0, &access(&c).1, &path, "TECH-002").unwrap();
         let written = fs::read_to_string(&new_path).unwrap();
         assert!(written.contains("# OTHER T"), "got: {}", written);
         assert!(written.contains("id: TECH-002"), "got: {}", written);
@@ -1105,7 +1216,7 @@ mod tests {
         let bytes = b"<!doctype html>\n<title>Dashboard</title>\n";
         fs::write(&path, bytes).unwrap();
 
-        let new_path = reassign_id(&c, &path, "UI-002").unwrap();
+        let new_path = reassign_id(&c, &access(&c).0, &access(&c).1, &path, "UI-002").unwrap();
         assert_eq!(new_path, dir.join("docs/technical/UI-002.html"));
         assert!(!path.exists(), "the old path is removed");
         assert_eq!(fs::read(&new_path).unwrap(), bytes);
@@ -1116,9 +1227,53 @@ mod tests {
         let (c, dir) = reassign_fixture("reassign-unsafe");
         let path = dir.join("docs/technical/TECH-001.md");
         fs::write(&path, "---\nid: TECH-001\n---\n").unwrap();
-        let error = reassign_id(&c, &path, "../escape").unwrap_err();
+        let error = reassign_id(&c, &access(&c).0, &access(&c).1, &path, "../escape").unwrap_err();
         assert!(matches!(error, AppError::Validation(_)), "{:?}", error);
         assert!(path.exists(), "a refused id writes nothing");
+    }
+
+    #[test]
+    fn config_defined_type_reads_after_the_configuration_file_is_removed() {
+        let dir = tmpdir("config-removed");
+        let c = ctx(&dir);
+        fs::write(
+            &c.config_path,
+            "project_name: Test\ndocument_types:\n  note:\n    prefix: NOTE\n    directory: docs/notes/\n    enabled: true\n    statuses:\n      - active\n      - archived\n",
+        )
+        .unwrap();
+        let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir).unwrap();
+        let registry = ArtifactRegistry::build(&cfg).unwrap();
+        fs::create_dir_all(dir.join("docs/notes")).unwrap();
+        let path = dir.join("docs/notes/NOTE-001.md");
+        let content = "---\nid: NOTE-001\ntitle: A note\nstatus: active\n---\n\n# NOTE-001 A note\n\n## Description\nBody\n";
+        fs::write(&path, content).unwrap();
+
+        fs::remove_file(&c.config_path).unwrap();
+        let (doc, _token) = read_document(&c, &cfg, &registry, &path)
+            .expect("the supplied configuration and registry serve the read");
+        assert_eq!(doc.source, content);
+    }
+
+    #[test]
+    fn config_defined_type_reads_after_the_configuration_file_becomes_invalid() {
+        let dir = tmpdir("config-invalid");
+        let c = ctx(&dir);
+        fs::write(
+            &c.config_path,
+            "project_name: Test\ndocument_types:\n  note:\n    prefix: NOTE\n    directory: docs/notes/\n    enabled: true\n    statuses:\n      - active\n      - archived\n",
+        )
+        .unwrap();
+        let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir).unwrap();
+        let registry = ArtifactRegistry::build(&cfg).unwrap();
+        fs::create_dir_all(dir.join("docs/notes")).unwrap();
+        let path = dir.join("docs/notes/NOTE-001.md");
+        let content = "---\nid: NOTE-001\ntitle: A note\nstatus: active\n---\n\n# NOTE-001 A note\n\n## Description\nBody\n";
+        fs::write(&path, content).unwrap();
+
+        fs::write(&c.config_path, "document_types: [not a map").unwrap();
+        let (doc, _token) = read_document(&c, &cfg, &registry, &path)
+            .expect("an invalid on-disk configuration is not reloaded");
+        assert_eq!(doc.source, content);
     }
 
     #[test]
@@ -1127,9 +1282,9 @@ mod tests {
         let c = ctx(&dir);
         let p = dir.join("rec.md");
         fs::write(&p, "# T\n").unwrap();
-        let (doc, tok) = Store::read(&c, &p).unwrap();
+        let (doc, tok) = Store::read(&c, &access(&c).0, &access(&c).1, &p).unwrap();
         assert!(!tok.is_empty());
-        Store::write_atomic(&c, &p, "# T2\n").unwrap();
+        Store::write_atomic(&c, &access(&c).0, &access(&c).1, &p, "# T2\n").unwrap();
         assert_eq!(fs::read_to_string(&p).unwrap(), "# T2\n");
         let _ = doc;
     }

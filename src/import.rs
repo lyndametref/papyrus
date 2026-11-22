@@ -1,6 +1,5 @@
 //! One-way import of Backlog.md task and milestone records into Papyrus.
 
-use crate::commands::load_effective_config;
 use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
@@ -96,7 +95,12 @@ struct ExcludedCounts {
     locks: usize,
 }
 
-pub fn run(ctx: &Context, cmd: ImportCmd) -> Result<crate::CommandOutput, AppError> {
+pub fn run(
+    ctx: &Context,
+    cfg: &crate::config::Config,
+    registry: &crate::registry::ArtifactRegistry,
+    cmd: ImportCmd,
+) -> Result<crate::CommandOutput, AppError> {
     match cmd {
         ImportCmd::Backlog {
             from,
@@ -106,6 +110,8 @@ pub fn run(ctx: &Context, cmd: ImportCmd) -> Result<crate::CommandOutput, AppErr
             report,
         } => run_backlog(
             ctx,
+            cfg,
+            registry,
             from,
             source_backlog_dir,
             dry_run,
@@ -114,18 +120,18 @@ pub fn run(ctx: &Context, cmd: ImportCmd) -> Result<crate::CommandOutput, AppErr
         ),
     }
 }
-
+#[allow(clippy::too_many_arguments)]
 #[allow(clippy::vec_init_then_push)]
 fn run_backlog(
     ctx: &Context,
+    cfg: &crate::config::Config,
+    registry: &crate::registry::ArtifactRegistry,
     from: PathBuf,
     source_backlog_dir: Option<PathBuf>,
     dry_run: bool,
     allow_existing: bool,
     report: Option<PathBuf>,
 ) -> Result<crate::CommandOutput, AppError> {
-    let cfg = load_effective_config(&ctx.config_path, &ctx.project_dir)?;
-
     // Source resolution.
     let from_canon = fs::canonicalize(&from)
         .map_err(|e| AppError::Runtime(format!("source project directory: {}", e)))?;
@@ -389,12 +395,12 @@ fn run_backlog(
     let ms_desc = descriptor_for("milestone")
         .ok_or_else(|| AppError::Runtime("milestone descriptor unavailable".to_string()))?;
 
-    let task_dirs = task_desc.resolve_read_directories(&cfg, &ctx.project_dir);
+    let task_dirs = task_desc.resolve_read_directories(cfg, &ctx.project_dir);
     let task_dir_refs: Vec<&Path> = task_dirs.iter().map(|p| p.as_path()).collect();
     let task_observed = identity::observed_numbers_in_dirs(&task_dir_refs, &cfg.task_prefix);
     let task_base = identity::allocate_next(&task_observed);
 
-    let ms_dirs = ms_desc.resolve_read_directories(&cfg, &ctx.project_dir);
+    let ms_dirs = ms_desc.resolve_read_directories(cfg, &ctx.project_dir);
     let ms_dir_refs: Vec<&Path> = ms_dirs.iter().map(|p| p.as_path()).collect();
     let ms_observed = identity::observed_numbers_in_dirs(&ms_dir_refs, &cfg.milestone_prefix);
     let ms_base = identity::allocate_next(&ms_observed);
@@ -447,8 +453,8 @@ fn run_backlog(
     let ms_ordinal_counter = ms_ordinal_base;
 
     // Existing titles for possible-duplicate detection.
-    let existing_task_titles = collect_existing_titles(ctx, &cfg, "task", &task_dirs);
-    let existing_ms_titles = collect_existing_titles(ctx, &cfg, "milestone", &ms_dirs);
+    let existing_task_titles = collect_existing_titles(ctx, cfg, "task", &task_dirs);
+    let existing_ms_titles = collect_existing_titles(ctx, cfg, "milestone", &ms_dirs);
 
     // Snapshots for translation lookups.
     let ms_snapshot = milestone_records.clone();
@@ -456,7 +462,7 @@ fn run_backlog(
     // Process tasks.
     for rec in task_records.iter_mut() {
         // status
-        let (st, mismatch) = normalize_status(&cfg, rec.status_raw.as_deref());
+        let (st, mismatch) = normalize_status(cfg, rec.status_raw.as_deref());
         rec.normalized_status = st;
         rec.status_mismatch = mismatch;
         if mismatch {
@@ -547,16 +553,16 @@ fn run_backlog(
         // dest path
         let dir = if rec.archived {
             task_desc
-                .resolve_archive_directory(&cfg, &ctx.project_dir)
+                .resolve_archive_directory(cfg, &ctx.project_dir)
                 .and_then(|r| r.ok())
                 .unwrap_or_else(|| {
                     task_desc
-                        .resolve_directory(&cfg, &ctx.project_dir)
+                        .resolve_directory(cfg, &ctx.project_dir)
                         .unwrap_or_else(|_| ctx.project_dir.clone())
                 })
         } else {
             task_desc
-                .resolve_directory(&cfg, &ctx.project_dir)
+                .resolve_directory(cfg, &ctx.project_dir)
                 .unwrap_or_else(|_| ctx.project_dir.clone())
         };
         fs::create_dir_all(&dir).map_err(|e| AppError::Runtime(e.to_string()))?;
@@ -567,7 +573,7 @@ fn run_backlog(
 
     // Process milestones.
     for rec in milestone_records.iter_mut() {
-        let (st, mismatch) = normalize_status(&cfg, rec.status_raw.as_deref());
+        let (st, mismatch) = normalize_status(cfg, rec.status_raw.as_deref());
         // milestones may not have status in source; default? We'll normalize if present else keep default? Milestone source has no status field. Set default status? Native milestone has no status front matter! Wait milestone front matter keys: id,title,created,updated,labels,references,release. No status. So don't normalize status for milestones. Oops. Milestones have no status. Set normalized_status unused. We'll not add status. But code above sets; skip.
         let _ = (st, mismatch);
         rec.normalized_status = String::new();
@@ -619,16 +625,16 @@ fn run_backlog(
             // folder, which is also the milestone lifecycle archive
             // destination (ADR-032).
             ms_desc
-                .resolve_read_import_directory(&cfg, &ctx.project_dir)
+                .resolve_read_import_directory(cfg, &ctx.project_dir)
                 .and_then(|r| r.ok())
                 .unwrap_or_else(|| {
                     ms_desc
-                        .resolve_directory(&cfg, &ctx.project_dir)
+                        .resolve_directory(cfg, &ctx.project_dir)
                         .unwrap_or_else(|_| ctx.project_dir.clone())
                 })
         } else {
             ms_desc
-                .resolve_directory(&cfg, &ctx.project_dir)
+                .resolve_directory(cfg, &ctx.project_dir)
                 .unwrap_or_else(|_| ctx.project_dir.clone())
         };
         fs::create_dir_all(&dir).map_err(|e| AppError::Runtime(e.to_string()))?;
@@ -898,14 +904,14 @@ fn run_backlog(
                 )));
             }
 
-            store::write_atomic(ctx, &rec.dest_path, &file_content)?;
+            store::write_atomic(ctx, cfg, registry, &rec.dest_path, &file_content)?;
             let _ = now;
             Ok(())
         };
 
     // Write tasks first.
     for rec in task_records.iter_mut() {
-        if let Err(e) = write_one(rec, &cfg, ctx, &now) {
+        if let Err(e) = write_one(rec, cfg, ctx, &now) {
             // abort with summary
             let mut msg = format!("import aborted: {}", e);
             msg.push_str(&format!(
@@ -921,7 +927,7 @@ fn run_backlog(
     }
     // Write milestones.
     for rec in milestone_records.iter_mut() {
-        if let Err(e) = write_one(rec, &cfg, ctx, &now) {
+        if let Err(e) = write_one(rec, cfg, ctx, &now) {
             let mut msg = format!("import aborted: {}", e);
             msg.push_str(&format!(
                 "\nRecords written before failure: {}",

@@ -2,7 +2,7 @@
 id: TASK-250
 title: "Remove per-record configuration and registry construction from the read path"
 created_date: '2026-11-20T17:41:37Z'
-updated_date: '2026-11-22T08:49:51Z'
+updated_date: '2026-11-22T11:14:29Z'
 labels: []
 references:
   - ADR-037
@@ -13,7 +13,7 @@ references:
   - TC-160
   - TC-171
   - TC-193
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-033
@@ -69,3 +69,5 @@ Definition of done: `src/record/` contains no configuration load or registry bui
 - [ ] `cargo test` reports zero failures and `cargo clippy --all-targets -- -D warnings` is clean.
 ## Comments
 - **task-refiner**: Refined for MS-033: description grounded in migrate.rs managed_descriptor and load_cfg_for, the per-record loads in store.rs and resolve.rs, browser records load_record and resolve_id, and lib.rs phase 2; 8 testable acceptance criteria added; TECH-043 documented. The request-scoped record snapshot and the serving snapshot are explicitly deferred to MS-036. No dependency, ordinal, milestone, or assignee change.
+- **rust-dev**: rust-dev implementation complete on branch task-TASK-250 (uncommitted per orchestrator instruction). One config load and one registry build now serve each pass. Record migrate managed_descriptor and is_managed_path take Config plus ArtifactRegistry; ensure_front_matter, ensure_front_matter_quiet, ensure_front_matter_canonical, migrate_content, scan_migration_conflicts, migrate_corpus and migrate_file thread them. Record store read, read_document, read_document_normalized, write_atomic, archive, delete, set_status, relocate_if_archived, archive_content and reassign_id require both. Record resolve resolve_in_dirs, list_in_dir, duplicate_ids and describe_record require both. Cli dispatch receives Config with the phase 2 registry; task, milestone, release, decision, document, import and search receive both. Browser load_record and resolve_id use the supplied config and registry only. Guard tests scan production sources in src record and src browser records for load_effective_config, load_effective_value, ArtifactRegistry::build, load_cfg_for and fn load_cfg. New tests prove a config-defined record reads after papyrus.config.yml is removed or made invalid between registry build and read. Checks: env -u EDITOR -u VISUAL cargo test passed (1214 tests, 65 suites); cargo clippy --all-targets -- -D warnings clean; cargo fmt --check clean. Measurement on the 382-record corpus (smoke, inventory request): server p50 fell from the pre-refactor recorded 11776-11905 ms to 2245-2287 ms, about 5.2x faster; corpus hash matched 16852d24b236c29d9a109ec5c706645bf3ab5a60615c120a3dcf6e76cb816a15.
+- **orchestrator**: Acceptance met: per-record config and registry construction removed from CLI and browser read paths, guard tests enforce it, config-removed and config-invalid read tests pass; suite 1214 tests green; 382-record inventory p50 11205 ms to 2266 ms.

@@ -151,7 +151,10 @@ pub fn run_with_io<R: BufRead, W: Write>(
         }
     }
 
-    let applied = fix::apply(ctx, &plan, &mut findings)?;
+    let Some(registry) = registry.as_ref() else {
+        return Ok(output(ctx, findings, skipped, &[]));
+    };
+    let applied = fix::apply(ctx, &cfg, registry, &plan, &mut findings)?;
     Ok(output(ctx, findings, skipped, &applied))
 }
 

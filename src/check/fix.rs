@@ -338,6 +338,8 @@ fn is_confirmation(answer: &str) -> bool {
 /// `repair-skipped` findings; applied repairs are returned in plan order.
 pub fn apply(
     ctx: &Context,
+    cfg: &crate::config::Config,
+    registry: &crate::registry::ArtifactRegistry,
     plan: &Plan,
     findings: &mut Vec<Finding>,
 ) -> Result<Vec<Repair>, AppError> {
@@ -367,7 +369,8 @@ pub fn apply(
             ));
             continue;
         }
-        let actual = crate::record::store::reassign_id(ctx, &repair.old_abs, &repair.new_id)?;
+        let actual =
+            crate::record::store::reassign_id(ctx, cfg, registry, &repair.old_abs, &repair.new_id)?;
         let mut applied_repair = repair.clone();
         applied_repair.new_abs = actual.clone();
         applied_repair.new_path = project_relative(&ctx.project_dir, &actual);
@@ -663,7 +666,14 @@ mod tests {
         plan.repairs[0].version = "0.0.0".to_string();
 
         let mut findings = Vec::new();
-        let applied = apply(&ctx, &plan, &mut findings).unwrap();
+        let applied = apply(
+            &ctx,
+            &Config::default(),
+            &crate::registry::ArtifactRegistry::build(&Config::default()).unwrap(),
+            &plan,
+            &mut findings,
+        )
+        .unwrap();
         assert!(applied.is_empty());
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].kind, REPAIR_SKIPPED);
@@ -690,7 +700,14 @@ mod tests {
         write_file(&repair.new_abs, "occupied");
 
         let mut findings = Vec::new();
-        let applied = apply(&ctx, &plan, &mut findings).unwrap();
+        let applied = apply(
+            &ctx,
+            &Config::default(),
+            &crate::registry::ArtifactRegistry::build(&Config::default()).unwrap(),
+            &plan,
+            &mut findings,
+        )
+        .unwrap();
         assert!(applied.is_empty());
         assert_eq!(findings[0].kind, REPAIR_SKIPPED);
         assert_eq!(

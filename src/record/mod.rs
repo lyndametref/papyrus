@@ -35,3 +35,61 @@ pub use store::RelocateError;
 pub(crate) use migrate::{
     SectionList, SectionValue, retired_sections, section_list, section_scalar,
 };
+
+#[cfg(test)]
+mod read_path_guard_tests {
+    use std::fs;
+    use std::path::Path;
+
+    const FORBIDDEN: &[&str] = &[
+        "load_effective_config",
+        "load_effective_value",
+        "ArtifactRegistry::build",
+        "load_cfg_for",
+        "fn load_cfg(",
+    ];
+
+    fn production_source(source: &str) -> &str {
+        // Only production code counts: helpers in the test module may build a
+        // configuration and registry for fixtures.
+        source.split("#[cfg(test)]").next().unwrap_or(source)
+    }
+
+    fn assert_no_reconstruction(path: &Path) {
+        let source =
+            fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {}", path.display(), e));
+        let production = production_source(&source);
+        for forbidden in FORBIDDEN {
+            assert!(
+                !production.contains(forbidden),
+                "{} constructs configuration or a registry in the record read path: {}",
+                path.display(),
+                forbidden
+            );
+        }
+    }
+
+    #[test]
+    fn record_module_builds_no_per_record_configuration_or_registry() {
+        let record_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/record");
+        let mut checked = 0usize;
+        for entry in fs::read_dir(&record_dir).expect("record module directory") {
+            let path = entry.expect("record module entry").path();
+            if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
+                assert_no_reconstruction(&path);
+                checked += 1;
+            }
+        }
+        assert!(
+            checked >= 10,
+            "expected the record module sources, found {}",
+            checked
+        );
+    }
+
+    #[test]
+    fn browser_record_read_helpers_build_no_configuration_or_registry() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/browser/records.rs");
+        assert_no_reconstruction(&path);
+    }
+}

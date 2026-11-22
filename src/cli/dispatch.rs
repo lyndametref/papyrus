@@ -1,5 +1,6 @@
 use crate::CommandOutput;
 use crate::cli::builtin::BuiltinCmd;
+use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
 use crate::registry::ArtifactRegistry;
@@ -13,6 +14,7 @@ pub fn dispatch(
     config_path: PathBuf,
     json: bool,
     no_color: bool,
+    config: Option<&Config>,
     registry: Option<&ArtifactRegistry>,
 ) -> Result<CommandOutput, AppError> {
     let (name, sub) = matches
@@ -21,7 +23,15 @@ pub fn dispatch(
 
     // builtins
     if let Ok(cmd) = BuiltinCmd::from_arg_matches(matches) {
-        return dispatch_builtin(cmd, project_raw, config_path, json, no_color, registry);
+        return dispatch_builtin(
+            cmd,
+            project_raw,
+            config_path,
+            json,
+            no_color,
+            config,
+            registry,
+        );
     }
 
     // document slug?
@@ -37,6 +47,7 @@ pub fn dispatch(
             config_path,
             json,
             no_color,
+            config,
             reg,
         );
     }
@@ -101,6 +112,7 @@ fn dispatch_builtin(
     config_path: PathBuf,
     json: bool,
     no_color: bool,
+    config: Option<&Config>,
     registry: Option<&ArtifactRegistry>,
 ) -> Result<CommandOutput, AppError> {
     use crate::cli::builtin::ConfigCmd;
@@ -139,18 +151,21 @@ fn dispatch_builtin(
         }
         BuiltinCmd::Milestone { action } => {
             let ctx = build_context(project_raw, config_path, json, no_color)?;
-            crate::milestone::run(&ctx, action)
+            let (cfg, registry) = record_access(config, registry)?;
+            crate::milestone::run(&ctx, cfg, registry, action)
         }
         BuiltinCmd::Release { action } => {
             let ctx = build_context(project_raw, config_path, json, no_color)?;
-            crate::release::run(&ctx, action)
+            let (cfg, registry) = record_access(config, registry)?;
+            crate::release::run(&ctx, cfg, registry, action)
         }
         BuiltinCmd::Task { action, id } => {
             let ctx = build_context(project_raw, config_path, json, no_color)?;
+            let (cfg, registry) = record_access(config, registry)?;
             if let Some(a) = action {
-                crate::task::run(&ctx, a)
+                crate::task::run(&ctx, cfg, registry, a)
             } else if let Some(i) = id {
-                crate::task::view(&ctx, &i)
+                crate::task::view(&ctx, cfg, registry, &i)
             } else {
                 Err(AppError::Validation(
                     "missing task subcommand or id".to_string(),
@@ -159,11 +174,13 @@ fn dispatch_builtin(
         }
         BuiltinCmd::Decision { action } => {
             let ctx = build_context(project_raw, config_path, json, no_color)?;
-            crate::decision::run(&ctx, action)
+            let (cfg, registry) = record_access(config, registry)?;
+            crate::decision::run(&ctx, cfg, registry, action)
         }
         BuiltinCmd::Import { action } => {
             let ctx = build_context(project_raw, config_path, json, no_color)?;
-            crate::import::run(&ctx, action)
+            let (cfg, registry) = record_access(config, registry)?;
+            crate::import::run(&ctx, cfg, registry, action)
         }
         BuiltinCmd::Browser {
             host,
@@ -182,9 +199,8 @@ fn dispatch_builtin(
             limit,
         } => {
             let ctx = build_context(project_raw, config_path, json, no_color)?;
-            let registry = registry
-                .ok_or_else(|| AppError::Runtime("artifact registry is unavailable".to_string()))?;
-            crate::search::run(&ctx, registry, &query, &types, limit)
+            let (cfg, registry) = record_access(config, registry)?;
+            crate::search::run(&ctx, cfg, registry, &query, &types, limit)
         }
     }
 }
@@ -198,10 +214,24 @@ fn dispatch_document(
     config_path: PathBuf,
     json: bool,
     no_color: bool,
+    config: Option<&Config>,
     registry: &ArtifactRegistry,
 ) -> Result<CommandOutput, AppError> {
     let ctx = build_context(project_raw, config_path, json, no_color)?;
+    let cfg =
+        config.ok_or_else(|| AppError::Runtime("configuration is unavailable".to_string()))?;
     let generic = !crate::config::is_seed_document_slug(desc.slug.as_str());
     let invocation = crate::cli::tree::parse_document_invocation(sub, slug, generic)?;
-    crate::document::run(&ctx, registry, invocation)
+    crate::document::run(&ctx, cfg, registry, invocation)
+}
+
+fn record_access<'a>(
+    config: Option<&'a Config>,
+    registry: Option<&'a ArtifactRegistry>,
+) -> Result<(&'a Config, &'a ArtifactRegistry), AppError> {
+    let config =
+        config.ok_or_else(|| AppError::Runtime("configuration is unavailable".to_string()))?;
+    let registry = registry
+        .ok_or_else(|| AppError::Runtime("artifact registry is unavailable".to_string()))?;
+    Ok((config, registry))
 }

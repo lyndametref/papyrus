@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 pub fn handle(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     verb: DocumentVerb,
     args: &DocumentArgs,
 ) -> Result<CommandOutput, AppError> {
@@ -18,6 +19,7 @@ pub fn handle(
             let id = create(
                 ctx,
                 scope,
+                registry,
                 args.require("title")?,
                 args.require("task")?,
                 args.get_all("spec"),
@@ -30,6 +32,7 @@ pub fn handle(
         DocumentVerb::Edit => edit(
             ctx,
             scope,
+            registry,
             args.require("id")?,
             args.get("title"),
             args.get("task"),
@@ -39,11 +42,21 @@ pub fn handle(
             args.get("superseded_by"),
             args.flag("editor"),
         ),
-        DocumentVerb::Archive => archive(ctx, scope, args.require("id")?),
-        DocumentVerb::Delete => delete(ctx, scope, args.require("id")?, args.flag("force")),
-        DocumentVerb::Supersede => {
-            supersede(ctx, scope, args.require("old")?, args.require("new")?)
-        }
+        DocumentVerb::Archive => archive(ctx, scope, registry, args.require("id")?),
+        DocumentVerb::Delete => delete(
+            ctx,
+            scope,
+            registry,
+            args.require("id")?,
+            args.flag("force"),
+        ),
+        DocumentVerb::Supersede => supersede(
+            ctx,
+            scope,
+            registry,
+            args.require("old")?,
+            args.require("new")?,
+        ),
         other => Err(crate::document::unsupported_verb(other)),
     }
 }
@@ -426,6 +439,7 @@ fn run_editor(command: &str, path: &Path) -> Result<(), AppError> {
 fn create(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     title_raw: &str,
     task_raw: &str,
     specs_raw: &[String],
@@ -458,8 +472,14 @@ fn create(
     };
     let file_path = active.join(format!("{}.html", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    crate::record::store::write_atomic(ctx, &safe_path, &render_record(&record))
-        .map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::record::store::write_atomic(
+        ctx,
+        &scope.config,
+        registry,
+        &safe_path,
+        &render_record(&record),
+    )
+    .map_err(|e| AppError::Runtime(e.to_string()))?;
     Ok(id)
 }
 
@@ -548,6 +568,7 @@ fn view(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<CommandOut
 fn edit(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     id_raw: &str,
     title_raw: Option<&str>,
     task_raw: Option<&str>,
@@ -644,7 +665,7 @@ fn edit(
         path.clone()
     };
     let safe_dest = Context::ensure_within(&ctx.project_dir, &destination)?;
-    write_archived(ctx, &path, &safe_dest, &record)?;
+    write_archived(ctx, &scope.config, registry, &path, &safe_dest, &record)?;
 
     if let Some(command) = editor_cmd {
         run_editor(&command, &safe_dest)?;
@@ -682,6 +703,8 @@ fn ok_output(ctx: &Context, id: &str) -> CommandOutput {
 /// in-place write is used and nothing is unlinked.
 fn write_archived(
     ctx: &Context,
+    cfg: &crate::config::Config,
+    registry: &crate::registry::ArtifactRegistry,
     source: &Path,
     destination: &Path,
     record: &Mockup,
@@ -690,15 +713,20 @@ fn write_archived(
     let safe_dest = Context::ensure_within(&ctx.project_dir, destination)?;
     let source = Context::ensure_within(&ctx.project_dir, source)?;
     if source == safe_dest {
-        crate::record::store::write_atomic(ctx, &safe_dest, &rendered)
+        crate::record::store::write_atomic(ctx, cfg, registry, &safe_dest, &rendered)
             .map_err(|e| AppError::Runtime(e.to_string()))?;
     } else {
-        crate::record::store::archive_content(ctx, &source, &safe_dest, &rendered)?;
+        crate::record::store::archive_content(ctx, cfg, registry, &source, &safe_dest, &rendered)?;
     }
     Ok(())
 }
 
-fn archive(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<CommandOutput, AppError> {
+fn archive(
+    ctx: &Context,
+    scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
+    id_raw: &str,
+) -> Result<CommandOutput, AppError> {
     let id = sanitize_field(id_raw)?;
     let active = scope.active.clone();
     let archived = scope.archived.clone();
@@ -726,7 +754,7 @@ fn archive(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<Command
         .and_then(|name| name.to_str())
         .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?;
     let destination = archived.join(file_name);
-    write_archived(ctx, &path, &destination, &record)?;
+    write_archived(ctx, &scope.config, registry, &path, &destination, &record)?;
 
     Ok(ok_output(ctx, &id))
 }
@@ -734,6 +762,7 @@ fn archive(ctx: &Context, scope: &DocumentScope, id_raw: &str) -> Result<Command
 pub fn delete(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     id_raw: &str,
     force: bool,
 ) -> Result<CommandOutput, AppError> {
@@ -749,7 +778,7 @@ pub fn delete(
     // An active mockup is archived first; the active file is never unlinked
     // directly. A failed archive step removes nothing.
     if is_active {
-        archive(ctx, scope, &id)?;
+        archive(ctx, scope, registry, &id)?;
     }
 
     if !force {
@@ -786,6 +815,7 @@ pub fn delete(
 pub fn supersede(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     old_raw: &str,
     new_raw: &str,
 ) -> Result<CommandOutput, AppError> {
@@ -817,7 +847,14 @@ pub fn supersede(
     record.status = "archived".to_string();
     record.superseded_by = Some(new.clone());
     let destination = archived.join(format!("{}.html", old));
-    write_archived(ctx, &old_path, &destination, &record)?;
+    write_archived(
+        ctx,
+        &scope.config,
+        registry,
+        &old_path,
+        &destination,
+        &record,
+    )?;
     Ok(ok_output(ctx, &old))
 }
 
