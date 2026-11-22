@@ -2,7 +2,7 @@
 id: TASK-279
 title: "Verify MS-036 performance: NFR targets and cache headers"
 created_date: '2026-11-20T17:43:25Z'
-updated_date: '2026-11-22T20:25:01Z'
+updated_date: '2026-11-22T21:49:15Z'
 labels: []
 references:
   - NFR-007.001
@@ -33,6 +33,7 @@ assignee:
 milestone: MS-036
 dependencies:
   - TASK-278
+  - TASK-313
 ordinal: 90
 documentation:
   - tests/benchmark_baseline.rs
@@ -110,3 +111,4 @@ Every MS-036 acceptance criterion has a recorded pass verdict with a reproducibl
 - [ ] #22 Hardware deviation verdict (supersedes the reference-hardware wording of AC 5, AC 6, and AC 7): the independent re-run uses the available host of 6 physical and 12 logical cores with 15.3 GiB RAM instead of the NFR-007 reference hardware of 4 vCPU and 8 GiB; the hardware deviation is recorded beside every route result and in the run header; the verdict per route is a measured pass or miss against 250 ms for inventory and 100 ms for view and edit on that host, and no verdict states or implies that NFR-007.001 or NFR-007.002 is satisfied; the results and the deviation are handed to MS-037 for the release report and the owner decision.
 ## Comments
 - **planner**: planner: MS-036 is an internal checkpoint (MS-036 AC-9). Verification compiles and discards a build; no RC version, no retained package, no package evidence. Recorded waiver: scope MS-036 only, reason MS-037 AC-6 and AC-7 require exactly one retained release artifact, timestamp 2026-11-22T20:22:22Z (AC #21 supersedes AC 1, AC 2, AC 3, AC 19). ADR-043 decision 21 still requires an RC from MS-035 onward; flagged for the architect to amend with the MS-035 and MS-036 exception. Hardware deviation: verify on the available 6 physical and 12 logical core, 15.3 GiB host and report measured figures with the deviation, never as NFR-007.001 or NFR-007.002 satisfaction (AC #22).
+- **planner**: planner: TASK-313 (read-path optimisation, ordinal 75) added to MS-036 after the TASK-278 threshold misses; it is now a prerequisite of this verification task alongside TASK-278, so its measurements and results table must be present before verification. Prerequisite list is TASK-273 to TASK-278 plus TASK-313.
