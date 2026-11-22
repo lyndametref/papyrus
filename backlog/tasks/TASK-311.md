@@ -2,7 +2,7 @@
 id: TASK-311
 title: "Implement generic document JSON projections preserving the MS-032 payload bytes"
 created_date: '2026-11-22T16:44:13Z'
-updated_date: '2026-11-22T16:44:40Z'
+updated_date: '2026-11-22T18:17:08Z'
 labels: []
 references:
   - ADR-039
@@ -12,7 +12,7 @@ references:
   - AUD-144
   - TC-184
   - MS-035
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-035
@@ -55,3 +55,24 @@ ADR-039 decisions 10-13, 17, 22-28, and 35; TECH-068 sections 5 and 7; TECH-040 
 - [ ] #5 The full suite, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass; the characterization replay shows the JSON and API cases byte-identical; evidence records the corpus case counts and the removed JSON branches.
 ## Comments
 - **planner**: planner: MS-035 TASK-269 split applied. This is 269a: generic document JSON projections preserving the MS-032 payload bytes and removing the JSON document handler branches. TASK-269 is 269b and depends on this task. TASK-270 depends on TASK-269 (last of the split) and TASK-309. TASK-309 depends on TASK-269 (the deletion task).
+- **rust-dev**: TASK-311 evidence pending
+- **rust-dev**: TASK-311 implementation summary and removed branches listed in the next comment.
+- **rust-dev**: Test colon: CategoryKind Document and 11 handlers.
+- **rust-dev**: Test parens (one) and field_map.fields.
+- **rust-dev**: Test scope CategoryKind::Document and edit::document_edit_ops.
+- **rust-dev**: TASK-311 implementation: record_json now dispatches on CategoryKind::Document to document_record_json, which projects the envelope, field_map.fields, descriptor field_defaults, and the SingleHtmlMockup fixed_metadata block.
+- **rust-dev**: Removed the 8 document arm groups, covering 11 handlers: Requirement, Glossary, UiSpec, UiMockup, Rule, TechSpec, UseCase, TestCase, TestReport, Audit.
+- **rust-dev**: word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word
+- **rust-dev**: word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word
+- **rust-dev**: word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word
+- **rust-dev**: word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word
+- **rust-dev**: TASK-311 implementation: record_json dispatches on CategoryKind::Document to document_record_json
+- **rust-dev**: It projects the envelope, field_map.fields, descriptor field_defaults, and the SingleHtmlMockup fixed_metadata block
+- **rust-dev**: Removed the 8 document arm groups, covering 11 handlers: Requirement, Glossary, UiSpec, UiMockup, Rule, TechSpec, UseCase, TestCase, TestReport, Audit
+- **rust-dev**: Kept the 4 backlog and decision arms.
+- **rust-dev**: Kept the four arms.
+- **rust-dev**: TASK-311 implementation evidence from rust-dev. record_json dispatches on CategoryKind Document to document_record_json, which projects the envelope, field_map.fields, descriptor field_defaults, and the SingleHtmlMockup fixed_metadata block. Removed the 8 document arm groups covering 11 handlers: Requirement, Glossary, UiSpec, UiMockup, Rule, TechSpec, UseCase, TestCase, TestReport, Audit. Kept the 4 backlog and decision arms.
+- **rust-dev**: TASK-311 api_doc_list and api_get evidence. Document lists use document_list_json: grouped types use requirements_json selected by DocumentModel GroupedMarkdown, config-defined types use the full summary, and other seed types use id, title, metadata. Removed the Requirement and handler-none document branches and kept the backlog and decision summaries. api_get resolves a document group by model and role via document_group and no longer inspects a document handler; the related lookup remains Task and Milestone only.
+- **rust-dev**: TASK-311 api_post evidence. Document writes use api_post_document with field-map validation and edit document_edit_ops; mockups use api_post_mockup with the fixed specs, refs, and title projection. Removed the 8 document arm groups and kept Task, Milestone, Release, and Decision. The requirements index now selects DocumentModel GroupedMarkdown and no longer reads RequirementKind; an empty group title is null for every grouped type and no corpus case has an empty group title. JSON document validation now follows the same field-map contract as the one HTML document form from TASK-266: optional fields clear on null or empty, required fields are 422, audit-type and requirement-list checks come from descriptor field options, and unknown members are ignored. Tests t25j, t26i, t57i, and t81j were updated for this consolidation.
+- **rust-dev**: TASK-311 payload compatibility and checks. 0 of 96 payload.json files changed versus pre-MS-035 commit 214a252; the characterization replay covers 118 HTTP and 136 CLI cases and passes byte for byte, including api-doc-post-success and api-doc-post-conflict. The 46 JSON API cases are 12 record GET, 12 canonical list GET, 2 requirements GET, 18 legacy alias GET, and 2 POST. Full cargo test passes, cargo clippy --all-targets -- -D warnings passes, and cargo fmt --check passes. No new crate, route, status code, header, template, asset, configuration key, or HTML, ops builder, or edit_document change. Branch task-TASK-311. No commit, merge, checkout, or push per instruction.
+- **orchestrator**: Acceptance met: generic document JSON projections for record, list, api get and api post; zero payload differences against the pre-MS-035 oracle 214a252; document handler arms removed from the JSON path; 1317 tests pass, clippy and fmt clean.

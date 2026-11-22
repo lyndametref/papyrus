@@ -18,8 +18,9 @@ use crate::config::{Config, FieldKind, is_loopback_host, validate_browser_host};
 use crate::context::Context;
 use crate::error::AppError;
 use crate::record::edit::{self, FieldChange};
+use crate::record::field_map::{FieldValue, ResolvedField};
 use crate::registry::{
-    ArtifactCategory as CategoryKind, ArtifactRegistry, TypeDescriptor, TypedHandler,
+    ArtifactCategory as CategoryKind, ArtifactRegistry, DocumentModel, TypeDescriptor, TypedHandler,
 };
 use http::{HttpError, Method, Request, Response};
 use records::Record;
@@ -2466,47 +2467,32 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
     }
 }
 
-fn form_name(record: &Record) -> String {
-    if record.is_group {
-        return "group".to_string();
+/// JSON `form` value for a document record, derived from its model and role.
+fn document_form_name(record: &Record) -> String {
+    match record.descriptor.document_model {
+        DocumentModel::GroupedMarkdown if record.is_group => "group".to_string(),
+        DocumentModel::GroupedMarkdown => "requirement".to_string(),
+        _ if record.descriptor.is_config_defined_document() => "document".to_string(),
+        _ => routes::legacy_url_key(&record.descriptor).to_string(),
     }
-    if record.is_requirement() {
-        return "requirement".to_string();
-    }
-    routes::legacy_url_key(&record.descriptor).to_string()
 }
 
+/// The one generic JSON projection for a document record.
+///
+/// The envelope supplies the identity, title, version, path, and metadata; the
+/// field map supplies the declared content fields in descriptor order. No
+/// document type or typed handler is inspected: the only variation is the
+/// descriptor and the resolved field map (ADR-039 decisions 12 and 17).
 fn record_json(
     record: &Record,
     group: Option<&Record>,
     related: Option<&Record>,
 ) -> serde_json::Value {
+    if record.descriptor.category == CategoryKind::Document {
+        return document_record_json(record, group);
+    }
+    // Backlog and decision records keep their bespoke JSON shapes.
     match record.handler() {
-        Some(TypedHandler::Requirement(_)) => {
-            let group_value = match (record.is_group, record.group_id.as_deref(), group) {
-                (false, Some(id), Some(group)) => {
-                    serde_json::json!({"id": id, "title": group.title})
-                }
-                _ => serde_json::Value::Null,
-            };
-            let story = if record.supports_story() {
-                serde_json::json!(record.story)
-            } else {
-                serde_json::Value::Null
-            };
-            serde_json::json!({
-                "id": record.id,
-                "kind": record.slug(),
-                "form": form_name(record),
-                "title": record.title,
-                "group": group_value,
-                "story": story,
-                "description": record.description,
-                "version": record.version,
-                "path": record.rel_path,
-                "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
-            })
-        }
         Some(TypedHandler::Task) => {
             let milestone_value = match (&record.milestone_id, related) {
                 (Some(id), Some(rel)) => serde_json::json!({"id": id, "title": rel.title}),
@@ -2533,7 +2519,7 @@ fn record_json(
                 "description": record.description,
                 "version": record.version,
                 "path": record.rel_path,
-                "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
+                "metadata": record_metadata_json(record),
             })
         }
         Some(TypedHandler::Milestone) => {
@@ -2551,7 +2537,7 @@ fn record_json(
                 "description": record.description,
                 "version": record.version,
                 "path": record.rel_path,
-                "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
+                "metadata": record_metadata_json(record),
             })
         }
         Some(TypedHandler::Release) => {
@@ -2563,7 +2549,7 @@ fn record_json(
                 "description": record.description,
                 "version": record.version,
                 "path": record.rel_path,
-                "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
+                "metadata": record_metadata_json(record),
             })
         }
         Some(TypedHandler::Decision) => {
@@ -2585,110 +2571,10 @@ fn record_json(
                 "superseded_by": superseded_value,
                 "version": record.version,
                 "path": record.rel_path,
-                "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
+                "metadata": record_metadata_json(record),
             })
         }
-        Some(TypedHandler::Glossary) => {
-            serde_json::json!({
-                "id": record.id,
-                "kind": "glossary",
-                "form": "glossary",
-                "title": record.title,
-                "definition": record.definition,
-                "version": record.version,
-                "path": record.rel_path,
-                "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
-            })
-        }
-        Some(TypedHandler::UiSpec) => {
-            serde_json::json!({
-                "id": record.id,
-                "kind": "ui-spec",
-                "form": "ui-spec",
-                "title": record.title,
-                "view": record.view,
-                "description": record.description,
-                "version": record.version,
-                "path": record.rel_path,
-                "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
-            })
-        }
-        Some(TypedHandler::UiMockup) => {
-            serde_json::json!({
-                "id": record.id,
-                "kind": "ui-mockup",
-                "form": "ui-mockup",
-                "title": record.title,
-                "specs": record.specs,
-                "refs": record.refs,
-                "task": record.mockup_task,
-                "status": record.status.clone().unwrap_or_default(),
-                "superseded_by": record.superseded_by,
-                "version": record.version,
-                "path": record.rel_path,
-                "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
-            })
-        }
-        Some(TypedHandler::Rule) => {
-            serde_json::json!({
-                "id": record.id,
-                "kind": "business-rule",
-                "form": "business-rule",
-                "title": record.title,
-                "description": record.description,
-                "rationale": record.rationale,
-                "applicability": record.applicability,
-                "requirements": record.requirements,
-                "version": record.version,
-                "path": record.rel_path,
-                "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
-            })
-        }
-        Some(TypedHandler::TechSpec) => {
-            serde_json::json!({
-                "id": record.id,
-                "kind": "tech-spec",
-                "form": "tech-spec",
-                "title": record.title,
-                "description": record.description,
-                "version": record.version,
-                "path": record.rel_path,
-                "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
-            })
-        }
-        Some(TypedHandler::UseCase)
-        | Some(TypedHandler::TestCase)
-        | Some(TypedHandler::TestReport) => {
-            let kind = record.slug();
-            let form = record.slug();
-            serde_json::json!({
-                "id": record.id,
-                "kind": kind,
-                "form": form,
-                "title": record.title,
-                "description": record.description,
-                "applicability": record.applicability,
-                "labels": record.labels,
-                "references": record.refs,
-                "version": record.version,
-                "path": record.rel_path,
-                "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
-            })
-        }
-        Some(TypedHandler::Audit) => {
-            serde_json::json!({
-                "id": record.id,
-                "kind": "audit-record",
-                "form": "audit-record",
-                "title": record.title,
-                "audit_type": record.audit_type.clone().unwrap_or_else(|| "security".to_string()),
-                "content": record.description,
-                "version": record.version,
-                "path": record.rel_path,
-                "metadata": crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version).map(|v| v.metadata_json()).unwrap_or(serde_json::json!({})),
-            })
-        }
-        None => serde_json::json!({
+        _ => serde_json::json!({
             "id": record.id,
             "kind": record.slug(),
             "form": "document",
@@ -2704,6 +2590,164 @@ fn record_json(
     }
 }
 
+/// The generic record object for one document record.
+fn document_record_json(record: &Record, group: Option<&Record>) -> serde_json::Value {
+    let mut object = serde_json::Map::new();
+    object.insert(
+        "id".to_string(),
+        serde_json::Value::String(record.id.clone()),
+    );
+    let kind = if record.descriptor.is_config_defined_document() {
+        record.slug()
+    } else {
+        routes::legacy_url_key(&record.descriptor)
+    };
+    object.insert(
+        "kind".to_string(),
+        serde_json::Value::String(kind.to_string()),
+    );
+    object.insert(
+        "form".to_string(),
+        serde_json::Value::String(document_form_name(record)),
+    );
+    object.insert(
+        "title".to_string(),
+        serde_json::Value::String(record.title.clone()),
+    );
+
+    if record.descriptor.document_model == DocumentModel::SingleHtmlMockup {
+        insert_mockup_metadata_json(&mut object, record);
+        insert_record_tail_json(&mut object, record);
+        return serde_json::Value::Object(object);
+    }
+
+    if record.descriptor.document_model == DocumentModel::GroupedMarkdown {
+        object.insert("group".to_string(), document_group_value(record, group));
+    }
+
+    for field in &record.field_map.fields {
+        object.insert(field.key.clone(), document_field_value(record, field));
+    }
+
+    // The general metadata block is part of the frozen JSON shape only where
+    // the descriptor or field map says it belongs; see
+    // `document_json_carries_general_metadata`.
+    if record.descriptor.is_config_defined_document() {
+        object.insert(
+            "status".to_string(),
+            record
+                .status
+                .clone()
+                .map(serde_json::Value::String)
+                .unwrap_or(serde_json::Value::Null),
+        );
+    }
+    if document_json_carries_general_metadata(record) {
+        object.insert("labels".to_string(), serde_json::json!(record.labels));
+        object.insert("references".to_string(), serde_json::json!(record.refs));
+    }
+
+    insert_record_tail_json(&mut object, record);
+    serde_json::Value::Object(object)
+}
+
+fn insert_record_tail_json(
+    object: &mut serde_json::Map<String, serde_json::Value>,
+    record: &Record,
+) {
+    object.insert(
+        "version".to_string(),
+        serde_json::Value::String(record.version.clone()),
+    );
+    object.insert(
+        "path".to_string(),
+        serde_json::Value::String(record.rel_path.clone()),
+    );
+    object.insert("metadata".to_string(), record_metadata_json(record));
+}
+
+fn document_group_value(record: &Record, group: Option<&Record>) -> serde_json::Value {
+    match (record.is_group, record.group_id.as_deref(), group) {
+        (false, Some(id), Some(found)) => serde_json::json!({"id": id, "title": found.title}),
+        _ => serde_json::Value::Null,
+    }
+}
+
+fn document_field_value(record: &Record, field: &ResolvedField) -> serde_json::Value {
+    match &field.value {
+        FieldValue::Text(text) => serde_json::Value::String(text.clone()),
+        FieldValue::Items(items) => serde_json::json!(items),
+        FieldValue::Absent => {
+            if let Some(default) = record.descriptor.field_defaults.get(&field.key) {
+                serde_json::Value::String(default.clone())
+            } else if field.kind == FieldKind::List {
+                serde_json::json!([])
+            } else {
+                serde_json::Value::Null
+            }
+        }
+    }
+}
+
+/// Whether the frozen JSON shape carried `labels` and `references`.
+///
+/// A config-defined document and the narrative document family (the
+/// `description` / `applicability` pair) carry the general metadata block.
+/// Every other seed document exposes only its declared fields. The decision is
+/// read from the descriptor and the field map, never from a slug or a handler.
+fn document_json_carries_general_metadata(record: &Record) -> bool {
+    if record.descriptor.is_config_defined_document() {
+        return true;
+    }
+    let fields = &record.field_map.fields;
+    fields.len() == 2 && fields[0].key == "description" && fields[1].key == "applicability"
+}
+
+/// Fixed metadata projection for a `SingleHtmlMockup` record.
+fn insert_mockup_metadata_json(
+    object: &mut serde_json::Map<String, serde_json::Value>,
+    record: &Record,
+) {
+    let value = |key: &str| {
+        record
+            .field_map
+            .fixed_metadata
+            .iter()
+            .find(|(name, _)| name == key)
+            .map(|(_, value)| value.as_str())
+            .unwrap_or("")
+    };
+    let items = |raw: &str| {
+        raw.split_whitespace()
+            .map(|item| serde_json::Value::String(item.to_string()))
+            .collect::<Vec<_>>()
+    };
+    object.insert(
+        "specs".to_string(),
+        serde_json::Value::Array(items(value("specs"))),
+    );
+    object.insert(
+        "refs".to_string(),
+        serde_json::Value::Array(items(value("refs"))),
+    );
+    object.insert(
+        "task".to_string(),
+        serde_json::Value::String(value("task").to_string()),
+    );
+    object.insert(
+        "status".to_string(),
+        serde_json::Value::String(value("status").to_string()),
+    );
+    object.insert(
+        "superseded_by".to_string(),
+        if value("superseded_by").is_empty() {
+            serde_json::Value::Null
+        } else {
+            serde_json::Value::String(value("superseded_by").to_string())
+        },
+    );
+}
+
 /// `RecordView` metadata for one record, shared by browser JSON
 /// surfaces (TASK-67).
 fn record_metadata_json(record: &Record) -> serde_json::Value {
@@ -2716,7 +2760,7 @@ fn api_requirements(request: &Request, state: &ServerState) -> Result<Response, 
     let slug = type_from_query(request, state)?;
     let cfg = state.config().map_err(|_| HttpError::new(500))?;
     let descriptor = descriptor(state, &slug)?;
-    if !matches!(handler_of(descriptor), Some(TypedHandler::Requirement(_))) {
+    if descriptor.document_model != DocumentModel::GroupedMarkdown {
         return Err(HttpError::new(404));
     }
     let index = records::build_index(&state.context(), &cfg, &state.registry, descriptor, None);
@@ -2728,29 +2772,10 @@ fn api_doc_list(slug: &str, state: &ServerState) -> Result<Response, HttpError> 
     let descriptor = view_descriptor(state, slug).ok_or_else(|| HttpError::new(404))?;
     let descriptor = &descriptor;
     let index = enabled_index(&state.context(), &cfg, state, slug);
-    if let Some(TypedHandler::Requirement(_)) = handler_of(descriptor) {
-        return Ok(Response::json(200, requirements_json(descriptor, &index)));
+    if descriptor.category == CategoryKind::Document {
+        return Ok(Response::json(200, document_list_json(descriptor, &index)));
     }
-    if descriptor.handler().is_none() {
-        let items: Vec<serde_json::Value> = index
-            .records
-            .iter()
-            .map(|record| {
-                serde_json::json!({
-                    "id": record.id,
-                    "kind": record.slug(),
-                    "title": record.title,
-                    "status": record.status,
-                    "labels": record.labels,
-                    "references": record.refs,
-                    "version": record.version,
-                    "path": record.rel_path,
-                    "metadata": record_metadata_json(record),
-                })
-            })
-            .collect();
-        return Ok(Response::json(200, serde_json::json!(items)));
-    }
+    // Backlog and decision lists keep their bespoke summary shape.
     let items: Vec<serde_json::Value> = index
         .records
         .iter()
@@ -2786,22 +2811,59 @@ fn api_doc_list(slug: &str, state: &ServerState) -> Result<Response, HttpError> 
     Ok(Response::json(200, serde_json::json!(items)))
 }
 
+/// The JSON list projection of a document type.
+///
+/// A grouped type keeps the grouped requirement index; a config-defined type
+/// keeps its full record summary; every other document type keeps the
+/// id/title/metadata summary row. No document type is inspected.
+fn document_list_json(descriptor: &TypeDescriptor, index: &records::Index) -> serde_json::Value {
+    if descriptor.document_model == DocumentModel::GroupedMarkdown {
+        return requirements_json(descriptor, index);
+    }
+    if descriptor.is_config_defined_document() {
+        let items: Vec<serde_json::Value> = index
+            .records
+            .iter()
+            .map(|record| {
+                serde_json::json!({
+                    "id": record.id,
+                    "kind": record.slug(),
+                    "title": record.title,
+                    "status": record.status,
+                    "labels": record.labels,
+                    "references": record.refs,
+                    "version": record.version,
+                    "path": record.rel_path,
+                    "metadata": record_metadata_json(record),
+                })
+            })
+            .collect();
+        return serde_json::json!(items);
+    }
+    let items: Vec<serde_json::Value> = index
+        .records
+        .iter()
+        .map(|record| {
+            serde_json::json!({
+                "id": record.id,
+                "title": record.title,
+                "metadata": record_metadata_json(record),
+            })
+        })
+        .collect();
+    serde_json::json!(items)
+}
+
 fn handler_of(descriptor: &TypeDescriptor) -> Option<TypedHandler> {
     descriptor.handler()
 }
 
 fn requirements_json(descriptor: &TypeDescriptor, index: &records::Index) -> serde_json::Value {
-    let is_nfr = matches!(
-        handler_of(descriptor),
-        Some(TypedHandler::Requirement(
-            crate::registry::RequirementKind::NonFunctional
-        ))
-    );
     let groups: Vec<serde_json::Value> = index
         .groups
         .iter()
         .map(|group| {
-            let title = if is_nfr && group.title.trim().is_empty() {
+            let title = if group.title.trim().is_empty() {
                 serde_json::Value::Null
             } else {
                 serde_json::Value::String(group.title.clone())
@@ -2836,6 +2898,10 @@ fn api_get(id: &str, state: &ServerState) -> Result<Response, HttpError> {
     let (record, cfg) = resolve_record(id, state)?;
     let ctx = state.context();
     let index = records::build_index(&ctx, &cfg, &state.registry, &record.descriptor, None);
+    if record.descriptor.category == CategoryKind::Document {
+        let group = document_group(&record, &index);
+        return Ok(Response::json(200, record_json(&record, group, None)));
+    }
     let group = resolved_group(&record, &index);
     let related = match record.handler() {
         Some(TypedHandler::Task) => record.milestone_id.as_ref().and_then(|mid| {
@@ -2856,6 +2922,15 @@ fn api_get(id: &str, state: &ServerState) -> Result<Response, HttpError> {
         200,
         record_json(&record, group, related.as_ref()),
     ))
+}
+
+/// Resolve a grouped member's group record for the JSON projection.
+fn document_group<'a>(record: &Record, index: &'a records::Index) -> Option<&'a Record> {
+    if record.descriptor.document_model != DocumentModel::GroupedMarkdown || record.is_group {
+        return None;
+    }
+    let group_id = record.group_id.as_deref()?;
+    index.groups.iter().find(|group| group.id == group_id)
 }
 
 fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response, HttpError> {
@@ -2879,65 +2954,10 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
         return Ok(json_error(409, "record changed on disk; reload the form"));
     }
 
+    if record.descriptor.category == CategoryKind::Document {
+        return api_post_document(id, object, &record, &cfg, state);
+    }
     match record.handler() {
-        Some(TypedHandler::Requirement(_)) => {
-            let title = object
-                .get("title")
-                .and_then(|value| value.as_str())
-                .ok_or_else(|| HttpError::new(400))?;
-            let title = match records::validate_title(title) {
-                Ok(title) => title,
-                Err(message) => return Ok(json_error(422, &message)),
-            };
-            let mut story_change = FieldChange::Keep;
-            if record.supports_story() {
-                match object.get("story") {
-                    None => {}
-                    Some(serde_json::Value::Null) => story_change = FieldChange::Clear,
-                    Some(serde_json::Value::String(raw)) => {
-                        match records::validate_multiline("User story", raw) {
-                            Ok(value) => story_change = render::change(value),
-                            Err(message) => return Ok(json_error(422, &message)),
-                        }
-                    }
-                    Some(_) => return Err(HttpError::new(400)),
-                }
-            }
-            let mut description_change = FieldChange::Keep;
-            match object.get("description") {
-                None => {}
-                Some(serde_json::Value::Null) => description_change = FieldChange::Clear,
-                Some(serde_json::Value::String(raw)) => {
-                    match records::validate_multiline("Description", raw) {
-                        Ok(value) => description_change = render::change(value),
-                        Err(message) => return Ok(json_error(422, &message)),
-                    }
-                }
-                Some(_) => return Err(HttpError::new(400)),
-            }
-            let ops = edit::requirement_ops(
-                &record.doc,
-                &title,
-                story_change,
-                description_change,
-                record.supports_story(),
-            );
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            let (updated, updated_cfg) = resolve_record(id, state)?;
-            let index = records::build_index(
-                &ctx,
-                &updated_cfg,
-                &state.registry,
-                &updated.descriptor,
-                None,
-            );
-            let group = resolved_group(&updated, &index);
-            let related = None;
-            Ok(Response::json(
-                200,
-                record_json(&updated, group, related.as_ref()),
-            ))
-        }
         Some(TypedHandler::Task) => {
             // title (required if present? if omitted, keep original; spec says title required for POST?
             // Spec: POST accepts version, title (required). We'll require title in body for task too?
@@ -3385,392 +3405,311 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             let _ = superseded_title;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
-        Some(TypedHandler::Glossary) => {
-            let title = match object.get("title") {
-                None => return Err(HttpError::new(400)),
-                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
-                    Ok(t) => t,
-                    Err(m) => return Ok(json_error(422, &m)),
-                },
-                Some(_) => return Err(HttpError::new(400)),
-            };
-
-            let mut definition_change = FieldChange::Keep;
-            if let Some(v) = object.get("definition") {
-                match v {
-                    serde_json::Value::Null => definition_change = FieldChange::Clear,
-                    serde_json::Value::String(raw) => {
-                        match records::validate_multiline("Definition", raw) {
-                            Ok(val) => definition_change = render::change(val),
-                            Err(m) => return Ok(json_error(422, &m)),
-                        }
-                    }
-                    _ => return Err(HttpError::new(400)),
-                }
-            }
-
-            let ops = edit::glossary_ops(&record.doc, &title, definition_change);
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            let (updated, _updated_cfg) = resolve_record(id, state)?;
-            Ok(Response::json(200, record_json(&updated, None, None)))
-        }
-        Some(TypedHandler::UiSpec) => {
-            let title = match object.get("title") {
-                None => return Err(HttpError::new(400)),
-                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
-                    Ok(t) => t,
-                    Err(m) => return Ok(json_error(422, &m)),
-                },
-                Some(_) => return Err(HttpError::new(400)),
-            };
-            let mut view_change = FieldChange::Keep;
-            if let Some(v) = object.get("view") {
-                match v {
-                    serde_json::Value::Null => view_change = FieldChange::Clear,
-                    serde_json::Value::String(raw) => match records::validate_title(raw) {
-                        Ok(val) => view_change = render::change(Some(val)),
-                        Err(m) => return Ok(json_error(422, &m)),
-                    },
-                    _ => return Err(HttpError::new(400)),
-                }
-            }
-            let mut description_change = FieldChange::Keep;
-            if let Some(v) = object.get("description") {
-                match v {
-                    serde_json::Value::Null => description_change = FieldChange::Clear,
-                    serde_json::Value::String(raw) => {
-                        match records::validate_multiline("Description", raw) {
-                            Ok(val) => description_change = render::change(val),
-                            Err(m) => return Ok(json_error(422, &m)),
-                        }
-                    }
-                    _ => return Err(HttpError::new(400)),
-                }
-            }
-            let ops = edit::ui_spec_ops(&record.doc, &title, view_change, description_change);
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            let (updated, _updated_cfg) = resolve_record(id, state)?;
-            Ok(Response::json(200, record_json(&updated, None, None)))
-        }
-        Some(TypedHandler::UiMockup) => {
-            // title: optional, required when present (section 10.3).
-            let title = match object.get("title") {
-                None => record.title.clone(),
-                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
-                    Ok(t) => t,
-                    Err(m) => return Ok(json_error(422, &m)),
-                },
-                Some(_) => return Err(HttpError::new(400)),
-            };
-            // specs: optional; null is 422, wrong types are 400.
-            let specs = match object.get("specs") {
-                None => record.specs.clone(),
-                Some(serde_json::Value::Null) => {
-                    return Ok(json_error(
-                        422,
-                        "At least one UI specification id is required.",
-                    ));
-                }
-                Some(serde_json::Value::Array(items)) => {
-                    let mut raw: Vec<String> = Vec::new();
-                    for item in items {
-                        match item.as_str() {
-                            Some(text) => raw.push(text.to_string()),
-                            None => return Err(HttpError::new(400)),
-                        }
-                    }
-                    match records::validate_specs(&raw) {
-                        Ok(values) => values,
-                        Err(message) => return Ok(json_error(422, &message)),
-                    }
-                }
-                Some(_) => return Err(HttpError::new(400)),
-            };
-            // refs: optional; null or [] clears (section 10.3).
-            let refs = match object.get("refs") {
-                None => record.refs.clone(),
-                Some(serde_json::Value::Null) => Vec::new(),
-                Some(serde_json::Value::Array(items)) => {
-                    let mut raw: Vec<String> = Vec::new();
-                    for item in items {
-                        match item.as_str() {
-                            Some(text) => raw.push(text.to_string()),
-                            None => return Err(HttpError::new(400)),
-                        }
-                    }
-                    match records::validate_refs(&raw) {
-                        Ok(values) => values,
-                        Err(message) => return Ok(json_error(422, &message)),
-                    }
-                }
-                Some(_) => return Err(HttpError::new(400)),
-            };
-            // Read-only task/status/superseded_by and unknown members ignored.
-            let original = std::fs::read_to_string(&record.path).unwrap_or_default();
-            let content = records::edit_ui_mockup(&original, &record.id, &title, &specs, &refs);
-            save_content(&ctx, &cfg, &state.registry, &record, content)?;
-            let (updated, _updated_cfg) = resolve_record(id, state)?;
-            Ok(Response::json(200, record_json(&updated, None, None)))
-        }
-        Some(TypedHandler::Rule) => {
-            // title: optional, required when present
-            let title = match object.get("title") {
-                None => record.title.clone(),
-                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
-                    Ok(t) => t,
-                    Err(m) => return Ok(json_error(422, &m)),
-                },
-                Some(_) => return Err(HttpError::new(400)),
-            };
-            // description/rationale/applicability: optional string or null; null/empty clears
-            let mut description_change = FieldChange::Keep;
-            match object.get("description") {
-                None => {}
-                Some(serde_json::Value::Null) => description_change = FieldChange::Clear,
-                Some(serde_json::Value::String(raw)) => {
-                    match records::validate_multiline("Description", raw) {
-                        Ok(v) => description_change = render::change(v),
-                        Err(m) => return Ok(json_error(422, &m)),
-                    }
-                }
-                Some(_) => return Err(HttpError::new(400)),
-            }
-            let mut rationale_change = FieldChange::Keep;
-            match object.get("rationale") {
-                None => {}
-                Some(serde_json::Value::Null) => rationale_change = FieldChange::Clear,
-                Some(serde_json::Value::String(raw)) => {
-                    match records::validate_multiline("Rationale", raw) {
-                        Ok(v) => rationale_change = render::change(v),
-                        Err(m) => return Ok(json_error(422, &m)),
-                    }
-                }
-                Some(_) => return Err(HttpError::new(400)),
-            }
-            let mut applicability_change = FieldChange::Keep;
-            match object.get("applicability") {
-                None => {}
-                Some(serde_json::Value::Null) => applicability_change = FieldChange::Clear,
-                Some(serde_json::Value::String(raw)) => {
-                    match records::validate_multiline("Applicability", raw) {
-                        Ok(v) => applicability_change = render::change(v),
-                        Err(m) => return Ok(json_error(422, &m)),
-                    }
-                }
-                Some(_) => return Err(HttpError::new(400)),
-            }
-            // requirements: optional array of strings or null; replaces whole list
-            let requirements = match object.get("requirements") {
-                None => record.requirements.clone(),
-                Some(serde_json::Value::Null) => Vec::new(),
-                Some(serde_json::Value::Array(items)) => {
-                    let mut raw: Vec<String> = Vec::new();
-                    for item in items {
-                        match item.as_str() {
-                            Some(text) => raw.push(text.to_string()),
-                            None => return Err(HttpError::new(400)),
-                        }
-                    }
-                    match records::validate_requirement_refs(&raw) {
-                        Ok(v) => v,
-                        Err(m) => return Ok(json_error(422, &m)),
-                    }
-                }
-                Some(_) => return Err(HttpError::new(400)),
-            };
-            let ops = edit::business_rule_ops(
-                &record.doc,
-                &title,
-                description_change,
-                rationale_change,
-                applicability_change,
-                requirements,
-            );
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            let (updated, _updated_cfg) = resolve_record(id, state)?;
-            Ok(Response::json(200, record_json(&updated, None, None)))
-        }
-        Some(TypedHandler::TechSpec) => {
-            let title = match object.get("title") {
-                None => record.title.clone(),
-                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
-                    Ok(t) => t,
-                    Err(m) => return Ok(json_error(422, &m)),
-                },
-                Some(_) => return Err(HttpError::new(400)),
-            };
-            let mut description_change = FieldChange::Keep;
-            match object.get("description") {
-                None => {}
-                Some(serde_json::Value::Null) => {
-                    return Ok(json_error(422, "Description is required."));
-                }
-                Some(serde_json::Value::String(raw)) => {
-                    match records::validate_multiline("Description", raw) {
-                        Ok(Some(value)) => description_change = FieldChange::Set(value),
-                        Ok(None) => return Ok(json_error(422, "Description is required.")),
-                        Err(m) => return Ok(json_error(422, &m)),
-                    }
-                }
-                Some(_) => return Err(HttpError::new(400)),
-            }
-            let ops = edit::tech_spec_ops(&record.doc, &title, description_change);
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            let (updated, _updated_cfg) = resolve_record(id, state)?;
-            Ok(Response::json(200, record_json(&updated, None, None)))
-        }
-        Some(TypedHandler::UseCase)
-        | Some(TypedHandler::TestCase)
-        | Some(TypedHandler::TestReport) => {
-            let title = match object.get("title") {
-                None => record.title.clone(),
-                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
-                    Ok(t) => t,
-                    Err(m) => return Ok(json_error(422, &m)),
-                },
-                Some(_) => return Err(HttpError::new(400)),
-            };
-            let mut description_change = FieldChange::Keep;
-            match object.get("description") {
-                None => {}
-                Some(serde_json::Value::Null) => {
-                    return Ok(json_error(422, "Description is required."));
-                }
-                Some(serde_json::Value::String(raw)) => {
-                    match records::validate_multiline("Description", raw) {
-                        Ok(Some(value)) => description_change = FieldChange::Set(value),
-                        Ok(None) => return Ok(json_error(422, "Description is required.")),
-                        Err(m) => return Ok(json_error(422, &m)),
-                    }
-                }
-                Some(_) => return Err(HttpError::new(400)),
-            }
-            let mut applicability_change = FieldChange::Keep;
-            match object.get("applicability") {
-                None => {}
-                Some(serde_json::Value::Null) => applicability_change = FieldChange::Clear,
-                Some(serde_json::Value::String(raw)) => {
-                    match records::validate_multiline("Applicability", raw) {
-                        Ok(v) => applicability_change = render::change(v),
-                        Err(m) => return Ok(json_error(422, &m)),
-                    }
-                }
-                Some(_) => return Err(HttpError::new(400)),
-            }
-            let labels = match object.get("labels") {
-                None => record.labels.clone(),
-                Some(serde_json::Value::Null) => Vec::new(),
-                Some(serde_json::Value::Array(items)) => {
-                    let mut raw: Vec<String> = Vec::new();
-                    for item in items {
-                        match item.as_str() {
-                            Some(text) => raw.push(text.to_string()),
-                            None => return Err(HttpError::new(400)),
-                        }
-                    }
-                    match records::validate_labels(&raw) {
-                        Ok(v) => v,
-                        Err(m) => return Ok(json_error(422, &m)),
-                    }
-                }
-                Some(_) => return Err(HttpError::new(400)),
-            };
-            let references = match object.get("references") {
-                None => record.refs.clone(),
-                Some(serde_json::Value::Null) => Vec::new(),
-                Some(serde_json::Value::Array(items)) => {
-                    let mut raw: Vec<String> = Vec::new();
-                    for item in items {
-                        match item.as_str() {
-                            Some(text) => raw.push(text.to_string()),
-                            None => return Err(HttpError::new(400)),
-                        }
-                    }
-                    match records::validate_refs(&raw) {
-                        Ok(v) => v,
-                        Err(m) => return Ok(json_error(422, &m)),
-                    }
-                }
-                Some(_) => return Err(HttpError::new(400)),
-            };
-            let ops = edit::use_case_ops(
-                &record.doc,
-                &title,
-                description_change,
-                applicability_change,
-                labels,
-                references,
-            );
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            let (updated, _updated_cfg) = resolve_record(id, state)?;
-            Ok(Response::json(200, record_json(&updated, None, None)))
-        }
-        Some(TypedHandler::Audit) => {
-            let title = match object.get("title") {
-                None => record.title.clone(),
-                Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
-                    Ok(t) => t,
-                    Err(m) => return Ok(json_error(422, &m)),
-                },
-                Some(_) => return Err(HttpError::new(400)),
-            };
-            // audit_type: optional string or null; null/omitted leaves unchanged; empty invalid
-            let mut audit_type_val = record
-                .audit_type
-                .clone()
-                .unwrap_or_else(|| "security".to_string());
-            let audit_type_change = match object.get("audit_type") {
-                None => None,
-                Some(serde_json::Value::Null) => None, // leave unchanged
-                Some(serde_json::Value::String(raw)) => {
-                    let trimmed = raw.trim();
-                    if trimmed.is_empty() {
-                        return Ok(json_error(422, "Audit type is required."));
-                    }
-                    if !["security", "licence", "architecture"].contains(&trimmed) {
-                        return Ok(json_error(
-                            422,
-                            "Audit type must be one of security, licence, or architecture.",
-                        ));
-                    }
-                    Some(trimmed.to_string())
-                }
-                Some(_) => return Err(HttpError::new(400)),
-            };
-            if let Some(v) = audit_type_change {
-                audit_type_val = v;
-            }
-            // content: optional string or null; null/empty clears
-            let mut content_change = FieldChange::Keep;
-            match object.get("content") {
-                None => {}
-                Some(serde_json::Value::Null) => content_change = FieldChange::Clear,
-                Some(serde_json::Value::String(raw)) => {
-                    match records::validate_multiline("Content", raw) {
-                        Ok(v) => content_change = render::change(v),
-                        Err(m) => return Ok(json_error(422, &m)),
-                    }
-                }
-                Some(_) => return Err(HttpError::new(400)),
-            }
-            // If audit_type omitted, leave unchanged: use record's current audit_type for section
-            let final_audit_type = if object.get("audit_type").is_none()
-                || object.get("audit_type") == Some(&serde_json::Value::Null)
-            {
-                record
-                    .audit_type
-                    .clone()
-                    .unwrap_or_else(|| "security".to_string())
-            } else {
-                audit_type_val
-            };
-            let ops = edit::audit_ops(&record.doc, &title, &final_audit_type, content_change);
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            let (updated, _updated_cfg) = resolve_record(id, state)?;
-            Ok(Response::json(200, record_json(&updated, None, None)))
-        }
-        None => Err(HttpError::new(405)),
+        _ => Err(HttpError::new(405)),
     }
+}
+
+/// The JSON submission path for one document record.
+///
+/// Validation and the patch come from the record field map and the descriptor,
+/// exactly as the one HTML document submission does (ADR-039 decisions 22-28).
+/// Every declared field is addressed by its stable key; a field whose verbs
+/// exclude edit is read-only, and `status`, `id`, `group`, and unknown members
+/// are ignored as they always were.
+fn api_post_document(
+    id: &str,
+    object: &serde_json::Map<String, serde_json::Value>,
+    record: &Record,
+    cfg: &Config,
+    state: &ServerState,
+) -> Result<Response, HttpError> {
+    // The JSON API has never accepted a write for a config-defined document;
+    // that surface is the one HTML document form.
+    if record.descriptor.is_config_defined_document() {
+        return Err(HttpError::new(405));
+    }
+    let ctx = state.context();
+    let title = match object.get("title") {
+        None => record.title.clone(),
+        Some(serde_json::Value::String(raw)) => match records::validate_title(raw) {
+            Ok(title) => title,
+            Err(message) => return Ok(json_error(422, &message)),
+        },
+        Some(_) => return Err(HttpError::new(400)),
+    };
+
+    if record.descriptor.document_model == DocumentModel::SingleHtmlMockup {
+        return api_post_mockup(id, object, record, cfg, state, &title);
+    }
+
+    let mut changes: Vec<(&ResolvedField, edit::DocumentFieldChange)> = Vec::new();
+    for field in &record.field_map.fields {
+        if !field.editable {
+            continue;
+        }
+        let Some(value) = object.get(&field.key) else {
+            continue;
+        };
+        let change = match value {
+            serde_json::Value::Null => {
+                if document_field_keeps_null(record, field) {
+                    edit::DocumentFieldChange::Keep
+                } else if field.required {
+                    return Ok(json_error(422, &format!("{} is required.", field.label)));
+                } else {
+                    edit::DocumentFieldChange::Clear
+                }
+            }
+            serde_json::Value::String(raw) => {
+                if field.kind == FieldKind::List {
+                    return Err(HttpError::new(400));
+                }
+                if let Some(message) = document_field_option_error(record, field, raw) {
+                    return Ok(json_error(422, &message));
+                }
+                let validated = if field.kind == FieldKind::Text {
+                    records::validate_single_line(&field.label, raw)
+                } else {
+                    records::validate_multiline(&field.label, raw)
+                };
+                match validated {
+                    Ok(Some(value)) => edit::DocumentFieldChange::Set(value),
+                    Ok(None) => {
+                        if field.required {
+                            return Ok(json_error(422, &format!("{} is required.", field.label)));
+                        }
+                        edit::DocumentFieldChange::Clear
+                    }
+                    Err(message) => return Ok(json_error(422, &message)),
+                }
+            }
+            serde_json::Value::Array(items) => {
+                if field.kind != FieldKind::List {
+                    return Err(HttpError::new(400));
+                }
+                let mut raw: Vec<String> = Vec::new();
+                for item in items {
+                    match item.as_str() {
+                        Some(text) => raw.push(text.to_string()),
+                        None => return Err(HttpError::new(400)),
+                    }
+                }
+                match document_list_values(record, field, &raw) {
+                    Ok(values) => {
+                        if field.required && values.is_empty() {
+                            return Ok(json_error(422, &format!("{} is required.", field.label)));
+                        }
+                        edit::DocumentFieldChange::List(values)
+                    }
+                    Err(message) => return Ok(json_error(422, &message)),
+                }
+            }
+            _ => return Err(HttpError::new(400)),
+        };
+        changes.push((field, change));
+    }
+
+    let labels = match document_submitted_list(object.get("labels"), records::validate_labels) {
+        Ok(values) => values,
+        Err(DocumentMemberError::BadRequest) => return Err(HttpError::new(400)),
+        Err(DocumentMemberError::Invalid(message)) => return Ok(json_error(422, &message)),
+    };
+    let references = match document_submitted_list(object.get("references"), records::validate_refs)
+    {
+        Ok(values) => values,
+        Err(DocumentMemberError::BadRequest) => return Err(HttpError::new(400)),
+        Err(DocumentMemberError::Invalid(message)) => return Ok(json_error(422, &message)),
+    };
+
+    let ops = edit::document_edit_ops(
+        &record.doc,
+        &title,
+        &changes,
+        labels.as_deref(),
+        references.as_deref(),
+    );
+    save_ops(&ctx, cfg, &state.registry, record, ops)?;
+    let (updated, updated_cfg) = resolve_record(id, state)?;
+    let index = records::build_index(
+        &ctx,
+        &updated_cfg,
+        &state.registry,
+        &updated.descriptor,
+        None,
+    );
+    let group = document_group(&updated, &index);
+    Ok(Response::json(200, record_json(&updated, group, None)))
+}
+
+/// Why a submitted `labels` or `references` member was rejected.
+enum DocumentMemberError {
+    BadRequest,
+    Invalid(String),
+}
+
+/// Validate one JSON list member submitted for `labels` or `references`.
+fn document_submitted_list(
+    value: Option<&serde_json::Value>,
+    validate: fn(&[String]) -> Result<Vec<String>, String>,
+) -> Result<Option<Vec<String>>, DocumentMemberError> {
+    let raw = match value {
+        None => return Ok(None),
+        Some(serde_json::Value::Null) => Vec::new(),
+        Some(serde_json::Value::Array(items)) => {
+            let mut raw: Vec<String> = Vec::new();
+            for item in items {
+                match item.as_str() {
+                    Some(text) => raw.push(text.to_string()),
+                    None => return Err(DocumentMemberError::BadRequest),
+                }
+            }
+            raw
+        }
+        Some(_) => return Err(DocumentMemberError::BadRequest),
+    };
+    validate(&raw)
+        .map(Some)
+        .map_err(DocumentMemberError::Invalid)
+}
+
+/// A `null` member that keeps the stored value rather than clearing it.
+///
+/// The audit type is engine-owned record data with a declared default; a
+/// `null` submission leaves it untouched (it was never clearable through the
+/// JSON API).
+fn document_field_keeps_null(record: &Record, field: &ResolvedField) -> bool {
+    document_field_spec(record, &field.key).and_then(|spec| spec.option.as_deref())
+        == Some("audit-type")
+}
+
+/// The descriptor field spec that backs a resolved field, across both roles.
+fn document_field_spec<'a>(record: &'a Record, key: &str) -> Option<&'a crate::config::FieldSpec> {
+    let descriptor = &record.descriptor;
+    descriptor
+        .fields
+        .iter()
+        .chain(
+            descriptor
+                .group
+                .iter()
+                .flat_map(|role| role.fields.iter().flatten()),
+        )
+        .chain(
+            descriptor
+                .member
+                .iter()
+                .flat_map(|role| role.fields.iter().flatten()),
+        )
+        .find(|spec| spec.key == key)
+}
+
+/// Descriptor-option validation for a scalar field (audit types).
+fn document_field_option_error(
+    record: &Record,
+    field: &ResolvedField,
+    raw: &str,
+) -> Option<String> {
+    if document_field_spec(record, &field.key).and_then(|spec| spec.option.as_deref())
+        != Some("audit-type")
+    {
+        return None;
+    }
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Some("Audit type is required.".to_string());
+    }
+    if !["security", "licence", "architecture"].contains(&trimmed) {
+        return Some("Audit type must be one of security, licence, or architecture.".to_string());
+    }
+    None
+}
+
+/// List validation for a declared list field, by its descriptor option.
+fn document_list_values(
+    record: &Record,
+    field: &ResolvedField,
+    raw: &[String],
+) -> Result<Vec<String>, String> {
+    match document_field_spec(record, &field.key).and_then(|spec| spec.option.as_deref()) {
+        Some("requirement") => records::validate_requirement_refs(raw),
+        _ => records::validate_list_items(&field.label, &raw.join("\n")),
+    }
+}
+
+/// The JSON submission path for a `SingleHtmlMockup` record.
+fn api_post_mockup(
+    id: &str,
+    object: &serde_json::Map<String, serde_json::Value>,
+    record: &Record,
+    cfg: &Config,
+    state: &ServerState,
+    title: &str,
+) -> Result<Response, HttpError> {
+    let ctx = state.context();
+    // specs: optional; null is 422, wrong types are 400.
+    let specs = match object.get("specs") {
+        None => mockup_metadata_items(record, "specs"),
+        Some(serde_json::Value::Null) => {
+            return Ok(json_error(
+                422,
+                "At least one UI specification id is required.",
+            ));
+        }
+        Some(serde_json::Value::Array(items)) => {
+            let mut raw: Vec<String> = Vec::new();
+            for item in items {
+                match item.as_str() {
+                    Some(text) => raw.push(text.to_string()),
+                    None => return Err(HttpError::new(400)),
+                }
+            }
+            match records::validate_specs(&raw) {
+                Ok(values) => values,
+                Err(message) => return Ok(json_error(422, &message)),
+            }
+        }
+        Some(_) => return Err(HttpError::new(400)),
+    };
+    // refs: optional; null or [] clears.
+    let refs = match object.get("refs") {
+        None => mockup_metadata_items(record, "refs"),
+        Some(serde_json::Value::Null) => Vec::new(),
+        Some(serde_json::Value::Array(items)) => {
+            let mut raw: Vec<String> = Vec::new();
+            for item in items {
+                match item.as_str() {
+                    Some(text) => raw.push(text.to_string()),
+                    None => return Err(HttpError::new(400)),
+                }
+            }
+            match records::validate_refs(&raw) {
+                Ok(values) => values,
+                Err(message) => return Ok(json_error(422, &message)),
+            }
+        }
+        Some(_) => return Err(HttpError::new(400)),
+    };
+    let original = std::fs::read_to_string(&record.path).unwrap_or_default();
+    let content = records::edit_ui_mockup(&original, &record.id, title, &specs, &refs);
+    save_content(&ctx, cfg, &state.registry, record, content)?;
+    let (updated, _updated_cfg) = resolve_record(id, state)?;
+    Ok(Response::json(200, record_json(&updated, None, None)))
+}
+
+/// One whitespace-separated fixed metadata list from a mockup record.
+fn mockup_metadata_items(record: &Record, key: &str) -> Vec<String> {
+    record
+        .field_map
+        .fixed_metadata
+        .iter()
+        .find(|(name, _)| name == key)
+        .map(|(_, value)| {
+            value
+                .split_whitespace()
+                .map(|item| item.to_string())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -3857,7 +3796,7 @@ mod tests {
 
     #[test]
     fn ui_mockup_record_json_shape() {
-        let record = Record {
+        let mut record = Record {
             id: "MOCK-001".to_string(),
             descriptor: crate::registry::ArtifactRegistry::build(&Config::default())
                 .expect("registry")
@@ -3903,6 +3842,22 @@ mod tests {
             rel_path: "docs/specifications/ui/mockups/MOCK-001.html".to_string(),
             version: "1.2.3".to_string(),
         };
+        record.field_map = crate::record::field_map::DocumentFieldMap::for_mockup(
+            &record.descriptor,
+            vec![
+                (
+                    "status".to_string(),
+                    record.status.clone().unwrap_or_default(),
+                ),
+                ("task".to_string(), record.mockup_task.clone()),
+                ("specs".to_string(), record.specs.join(" ")),
+                ("refs".to_string(), record.refs.join(" ")),
+                (
+                    "superseded_by".to_string(),
+                    record.superseded_by.clone().unwrap_or_default(),
+                ),
+            ],
+        );
         let json = record_json(&record, None, None);
         assert_eq!(json["id"], "MOCK-001");
         assert_eq!(json["kind"], "ui-mockup");
@@ -3934,7 +3889,7 @@ mod tests {
 
     #[test]
     fn tech_spec_record_json_shape() {
-        let record = Record {
+        let mut record = Record {
             id: "TECH-001".to_string(),
             descriptor: crate::registry::ArtifactRegistry::build(&Config::default())
                 .expect("registry")
@@ -3974,12 +3929,21 @@ mod tests {
             refs: Vec::new(),
             mockup_task: String::new(),
             audit_type: None,
-            doc: crate::record::document::parse("# TECH-001 Offline architecture\n").unwrap(),
+            doc: crate::record::document::parse(
+                "# TECH-001 Offline architecture\n\n## Description\nDefines the local browser.\n",
+            )
+            .unwrap(),
             stored_source: String::new(),
             path: std::path::PathBuf::from("docs/technical/TECH-001.md"),
             rel_path: "docs/technical/TECH-001.md".to_string(),
             version: "1.2.3".to_string(),
         };
+        record.field_map = crate::record::field_map::DocumentFieldMap::build(
+            &record.descriptor,
+            false,
+            &record.doc,
+            None,
+        );
         let json = record_json(&record, None, None);
         assert_eq!(json["id"], "TECH-001");
         assert_eq!(json["kind"], "tech-spec");
@@ -3991,7 +3955,13 @@ mod tests {
         assert_eq!(json.as_object().unwrap().len(), 8);
         // A missing description is serialized as JSON null.
         let mut empty = record;
-        empty.description = None;
+        empty.doc = crate::record::document::parse("# TECH-001 Offline architecture\n").unwrap();
+        empty.field_map = crate::record::field_map::DocumentFieldMap::build(
+            &empty.descriptor,
+            false,
+            &empty.doc,
+            None,
+        );
         assert!(record_json(&empty, None, None)["description"].is_null());
     }
 }
