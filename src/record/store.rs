@@ -123,7 +123,22 @@ pub fn read_document_normalized(
     registry: &ArtifactRegistry,
     target: &Path,
 ) -> Result<NormalizedRead, AppError> {
-    let (safe, stored_source) = read_source(ctx, cfg, registry, target)?;
+    read_document_normalized_with_conflicts(ctx, cfg, registry, target, None)
+}
+
+/// Read one record for display with a caller-supplied family conflict scan.
+///
+/// `conflicts` lets a request-scoped snapshot scan a descriptor family once
+/// and reuse it for every record in that family. `None` keeps the per-read
+/// scan used by the CLI and by writes.
+pub fn read_document_normalized_with_conflicts(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    target: &Path,
+    conflicts: Option<&[crate::record::migrate::MigrationConflict]>,
+) -> Result<NormalizedRead, AppError> {
+    let (safe, stored_source) = read_source_with_conflicts(ctx, cfg, registry, target, conflicts)?;
     let normalized = crate::record::line_endings::normalize(&stored_source);
     let document = document::parse(&normalized)?;
     let meta = fs::metadata(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
@@ -139,6 +154,16 @@ fn read_source(
     cfg: &Config,
     registry: &ArtifactRegistry,
     target: &Path,
+) -> Result<(PathBuf, String), AppError> {
+    read_source_with_conflicts(ctx, cfg, registry, target, None)
+}
+
+fn read_source_with_conflicts(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    target: &Path,
+    conflicts: Option<&[crate::record::migrate::MigrationConflict]>,
 ) -> Result<(PathBuf, String), AppError> {
     let safe = resolve_path(ctx, target).map_err(|_| {
         AppError::Runtime(format!(
@@ -173,7 +198,12 @@ fn read_source(
         }
         Err(RelocateError::Other(e)) => return Err(e),
     };
-    let content = crate::record::migrate::ensure_front_matter_quiet(ctx, cfg, registry, &safe)?;
+    let content = match conflicts {
+        Some(conflicts) => crate::record::migrate::ensure_front_matter_quiet_with_conflicts(
+            ctx, cfg, registry, &safe, conflicts,
+        )?,
+        None => crate::record::migrate::ensure_front_matter_quiet(ctx, cfg, registry, &safe)?,
+    };
     // Tolerant read: flag (but preserve) an undeclared status value.
     if let Some(desc) =
         crate::record::migrate::managed_descriptor(cfg, registry, &ctx.project_dir, &safe)

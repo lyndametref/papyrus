@@ -38,6 +38,19 @@
 //! PAPYRUS_BENCH_SUMMARY_FROM_RAW=1 cargo test --release --test benchmark_baseline -- --ignored --nocapture
 //! ```
 //!
+//! A route-limited, no-write measurement of one route (for example the
+//! inventory after a targeted change) needs both variables:
+//!
+//! ```text
+//! PAPYRUS_BENCH_NO_WRITE=1 PAPYRUS_BENCH_ROUTES=inventory \
+//!   PAPYRUS_BENCH_PROFILES=records-382,records-1000 \
+//!   cargo test --release --test benchmark_baseline -- --ignored --nocapture
+//! ```
+//!
+//! `PAPYRUS_BENCH_ROUTES` is a comma-separated subset of the route labels; it
+//! is accepted only with `PAPYRUS_BENCH_NO_WRITE=1` or `PAPYRUS_BENCH_SMOKE=1`
+//! so a partial run can never overwrite a recorded summary.
+//!
 //! TASK-292 CR-2 re-measures one route of a recorded profile without repeating
 //! the expensive routes. The measured route replaces the same route in the
 //! recorded run A JSON; every other route is preserved byte for byte:
@@ -1405,6 +1418,7 @@ fn measure_run(
     profile: &Profile,
     corpus: &Path,
     run_label: &str,
+    routes: &[(&'static str, &'static str)],
     plan: Option<&serde_json::Map<String, Value>>,
     budget: &BandBudget,
 ) -> RunResult {
@@ -1416,10 +1430,10 @@ fn measure_run(
     let (status, _, _) = server.request("/");
     assert_eq!(status, 200, "readiness inventory request");
 
-    let mut routes = Vec::new();
-    for (label, path) in routes_for(profile.name) {
+    let mut measured_routes = Vec::new();
+    for (label, path) in routes.iter().copied() {
         let band_hint = forced_band(profile.name, label).or_else(|| {
-            plan.and_then(|plan| plan.get(*label))
+            plan.and_then(|plan| plan.get(label))
                 .and_then(Value::as_str)
         });
         let forced = forced_band(profile.name, label).is_some();
@@ -1441,7 +1455,7 @@ fn measure_run(
                 ""
             },
         );
-        routes.push(route);
+        measured_routes.push(route);
     }
     drop(server);
 
@@ -1449,7 +1463,7 @@ fn measure_run(
         run: run_label.to_string(),
         corpus_hash,
         corpus_files,
-        routes,
+        routes: measured_routes,
         host: host_json(),
         date: date_with_timezone(),
         commit: git_commit(),
@@ -2155,6 +2169,17 @@ fn benchmark_ms032_baseline() {
             .map(str::to_string)
             .collect()
     });
+    let route_filter: Option<Vec<String>> =
+        std::env::var("PAPYRUS_BENCH_ROUTES").ok().map(|value| {
+            value
+                .split(',')
+                .map(str::trim)
+                .map(str::to_string)
+                .collect()
+        });
+    if route_filter.is_some() && !no_write {
+        panic!("PAPYRUS_BENCH_ROUTES requires PAPYRUS_BENCH_NO_WRITE=1 or PAPYRUS_BENCH_SMOKE=1");
+    }
 
     let root = project_root();
     let benchmark_dir = root.join(".tmp/benchmark");
@@ -2175,6 +2200,15 @@ fn benchmark_ms032_baseline() {
             profile.expected
         );
         let corpus = benchmark_dir.join(profile.name);
+        let routes: Vec<(&'static str, &'static str)> = routes_for(profile.name)
+            .iter()
+            .copied()
+            .filter(|(label, _)| {
+                route_filter
+                    .as_ref()
+                    .is_none_or(|filter| filter.iter().any(|name| name == label))
+            })
+            .collect();
         let mut runs = Vec::new();
         // Owner-approved exemption (TASK-292 C-2): the pathological
         // 1,000-record profile is measured with run A only. Profiles 100 and
@@ -2224,7 +2258,14 @@ fn benchmark_ms032_baseline() {
                 }
                 plan
             });
-            let run = measure_run(&profile, &corpus, run_label, plan.as_ref(), &budget);
+            let run = measure_run(
+                &profile,
+                &corpus,
+                run_label,
+                &routes,
+                plan.as_ref(),
+                &budget,
+            );
             if !no_write {
                 let raw_dir = root.join("docs/benchmarks/raw");
                 fs::create_dir_all(&raw_dir).unwrap();

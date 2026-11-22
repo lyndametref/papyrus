@@ -2,7 +2,7 @@
 id: TASK-275
 title: "Build the inventory from one registry-wide scan"
 created_date: '2026-11-20T17:43:20Z'
-updated_date: '2026-11-22T20:18:03Z'
+updated_date: '2026-11-22T21:14:14Z'
 labels: []
 references:
   - ADR-037
@@ -11,7 +11,7 @@ references:
   - TECH-072
   - NFR-007.002
   - TC-178
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-036
@@ -53,3 +53,6 @@ All acceptance criteria pass; the one-scan count is proven by a test seam or ins
 - [ ] After numbers are recorded from the MS-032 harness at 100 and 1,000 records on the recorded host, with the corpus definition, warm-up count, measured count, and build profile; a p95 from fewer than 100 samples is labelled baseline-only and is never presented as an NFR-007 pass.
 - [ ] The after inventory p95 at 1,000 records is materially below the recorded baseline p95 of 76,532 ms; the final NFR-007.001 verdict and threshold comparison are recorded by TASK-278.
 - [ ] Tests prove the one-scan and one-parse counts and compare the inventory output with a characterization fixture; the full suite, cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check are clean; no user-visible behaviour changes beyond latency.
+## Comments
+- **rust-dev**: rust-dev implementation evidence. Branch task TASK-275; uncommitted per orchestrator instruction (no commit, merge, checkout, or push). Design: RecordSnapshot gains scan_indexes(), built on the TASK-273 listing and parse cache; it lists each enabled descriptor active directory at most once, parses each listed record at most once, and finalizes one Index per enabled descriptor from the shared records. inventory_page calls scan_indexes once and derives every document card count, the Backlog count, and the Decisions aggregate sum from that map; enabled_index and build_index_with_snapshot are gone from the inventory path. List and view paths keep their single descriptor index. Migration conflicts are also request-scoped: migration_conflicts() caches scan_migration_conflicts per descriptor family, and new ensure_front_matter_quiet_with_conflicts and read_document_normalized_with_conflicts thread the cached result, so rendering performs one conflict scan per family instead of one per record; CLI and write paths keep the per-read scan. Counters (unit test registry_scan_lists_each_directory_and_parses_each_record_once): listing_count equals the enabled directory count, parse_count 5 for 2 tasks + 1 milestone + 2 requirements, conflict_scan_count 3 families, all unchanged on a second scan and a cached resolve; scan output matches the per-descriptor index builder. Output: characterization_replay 17 of 17 including the http inventory and http empty-inventory byte and semantic gates, and browser_cli t19a_inventory_hub pass, so membership, INVENTORY_AGGREGATE_AFTER order, titles, notes, counts, hrefs, archive and disabled filtering, merged ordering, and reference visibility are unchanged. Measurement: MS-032 harness inventory-only, PAPYRUS_BENCH_NO_WRITE=1 PAPYRUS_BENCH_PROFILES=records-382,records-1000 PAPYRUS_BENCH_ROUTES=inventory, release LTO+strip, recorded host; corpora 382 (hash 16852d24b236c29d9a109ec5c706645bf3ab5a60615c120a3dcf6e76cb816a15) and 1000 (hash 46d64349137f7017f6ee04bcfd6a3d3042b7b6bc23245749dac400804581988f). Both selected band A by p50, 10 warm-up + 100 measured; 382 ran A-D, 1000 ran A only (owner-approved single-run exemption). 382 run A server p50 205 ms, p95 211 ms (runs B, C, D p95 211, 210, 219) vs baseline p50 11776, p95 11971 baseline-only (20 samples): -98.26% p50, -98.24% p95, 57.4x and 56.7x. 1000 run A server p50 547 ms, p95 556 ms vs baseline p50 75546, p95 76532 baseline-only (20 samples): -99.28% p50, -99.27% p95, 138.1x and 137.6x. After p95 comes from 100 samples, not baseline-only; full NFR verdict is TASK-278. Checks: env -u EDITOR -u VISUAL cargo test --all-targets 1372 passed, 0 failed, 69 suites; cargo clippy --all-targets -- -D warnings clean; cargo fmt --check clean. Files: browser records.rs, browser mod.rs, record migrate.rs, record store.rs, tests benchmark_baseline.rs (route filter env for route-limited no-write runs). Security: no new unsafe, no new crates, snapshot stays request-scoped and display-only, writes still read live bytes and token. Gaps: none in task scope; 1000 p95 556 ms remains above NFR-007.001 250 ms and is for TASK-278 and TASK-279 to record and verify.
+- **orchestrator**: Acceptance met: one registry-wide scan with one listing per enabled directory and at most one parse per record, conflict scans cached per family, inventory renders from the single map; 1372 tests pass; 1000-record inventory p95 76532 ms to 556 ms (-99.3%), still above the 250 ms NFR target pending TASK-278 verdict.

@@ -13,13 +13,14 @@ use crate::error::AppError;
 use crate::record::document::{self, Document};
 use crate::record::field_map::{DocumentFieldMap, ResolvedField};
 use crate::record::identity;
+use crate::record::migrate::MigrationConflict;
 use crate::record::view::RecordView;
 use crate::registry::{
     ArtifactCategory as CategoryKind, ArtifactRegistry, DocumentModel, IdShape, StatusModel,
     TypeDescriptor, TypedHandler,
 };
 use std::cell::{Cell, RefCell};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -141,8 +142,10 @@ pub struct RecordSnapshot<'a> {
     descriptors: Vec<&'a TypeDescriptor>,
     listing: RefCell<Option<SnapshotListing>>,
     records: RefCell<BTreeMap<PathBuf, Option<Record>>>,
+    conflicts: RefCell<BTreeMap<String, Vec<MigrationConflict>>>,
     listing_count: Cell<usize>,
     parse_count: Cell<usize>,
+    conflict_scan_count: Cell<usize>,
 }
 
 #[derive(Default)]
@@ -183,8 +186,10 @@ impl<'a> RecordSnapshot<'a> {
             descriptors: registry.descriptors().collect(),
             listing: RefCell::new(None),
             records: RefCell::new(BTreeMap::new()),
+            conflicts: RefCell::new(BTreeMap::new()),
             listing_count: Cell::new(0),
             parse_count: Cell::new(0),
+            conflict_scan_count: Cell::new(0),
         }
     }
 
@@ -196,6 +201,11 @@ impl<'a> RecordSnapshot<'a> {
     /// Number of distinct record files parsed through this snapshot.
     pub fn parse_count(&self) -> usize {
         self.parse_count.get()
+    }
+
+    /// Number of descriptor-family conflict scans made through this snapshot.
+    pub fn conflict_scan_count(&self) -> usize {
+        self.conflict_scan_count.get()
     }
 
     /// Whether the file-name index has been built.
@@ -276,6 +286,35 @@ impl<'a> RecordSnapshot<'a> {
         candidates
     }
 
+    /// One migration-conflict scan per descriptor family per snapshot.
+    ///
+    /// Every record in a family shares the same listing and conflict result,
+    /// so a request never rescans the family per record.
+    fn migration_conflicts(&self, path: &Path) -> Vec<MigrationConflict> {
+        let Some(descriptor) = crate::record::migrate::managed_descriptor(
+            self.cfg,
+            self.registry,
+            &self.ctx.project_dir,
+            path,
+        ) else {
+            return Vec::new();
+        };
+        let key = descriptor.name.to_string();
+        if let Some(cached) = self.conflicts.borrow().get(&key) {
+            return cached.clone();
+        }
+        self.conflict_scan_count
+            .set(self.conflict_scan_count.get() + 1);
+        let conflicts = crate::record::migrate::scan_migration_conflicts(
+            self.ctx,
+            self.cfg,
+            self.registry,
+            &descriptor,
+        );
+        self.conflicts.borrow_mut().insert(key, conflicts.clone());
+        conflicts
+    }
+
     fn load_cached(
         &self,
         descriptor: &TypeDescriptor,
@@ -285,7 +324,16 @@ impl<'a> RecordSnapshot<'a> {
             return Ok(cached.clone());
         }
         self.parse_count.set(self.parse_count.get() + 1);
-        let record = load_record_with(self.ctx, self.cfg, self.registry, descriptor, path, self)?;
+        let conflicts = self.migration_conflicts(path);
+        let record = load_record_with(
+            self.ctx,
+            self.cfg,
+            self.registry,
+            descriptor,
+            path,
+            self,
+            Some(&conflicts),
+        )?;
         self.records
             .borrow_mut()
             .insert(path.to_path_buf(), record.clone());
@@ -318,7 +366,15 @@ impl<'a> RecordSnapshot<'a> {
             let loaded = if cached {
                 self.load_cached(descriptor, &path)?
             } else {
-                load_record_with(self.ctx, self.cfg, self.registry, descriptor, &path, self)?
+                load_record_with(
+                    self.ctx,
+                    self.cfg,
+                    self.registry,
+                    descriptor,
+                    &path,
+                    self,
+                    None,
+                )?
             };
             if let Some(record) = loaded {
                 // A record auto-relocated out of the active directory by the
@@ -346,6 +402,44 @@ impl<'a> RecordSnapshot<'a> {
             .ok()
             .flatten()
             .map(|resolved| resolved.record.title)
+    }
+
+    /// Build every enabled descriptor's index from one registry-wide scan.
+    ///
+    /// The file-name listing lists each enabled descriptor's active directory
+    /// at most once, and each listed record is parsed at most once through the
+    /// shared parse cache. Every inventory card count and aggregate count is
+    /// derived from this one result; no card or aggregate rescans a directory.
+    pub fn scan_indexes(&self) -> BTreeMap<String, Index> {
+        self.ensure_listing();
+        let listing = self.listing.borrow();
+        let Some(listing) = listing.as_ref() else {
+            return BTreeMap::new();
+        };
+        let mut indexes = BTreeMap::new();
+        for (index, descriptor) in self.descriptors.iter().enumerate() {
+            if !descriptor.enabled {
+                continue;
+            }
+            // A grouped stem can appear under both its group and its member
+            // lookup key; each file still belongs to the index exactly once.
+            let mut paths: BTreeSet<PathBuf> = BTreeSet::new();
+            if let Some(by_key) = listing.by_descriptor.get(&index) {
+                for path in by_key.values().flatten() {
+                    paths.insert(path.clone());
+                }
+            }
+            let mut records = Vec::new();
+            for path in paths {
+                if let Ok(Some(record)) = self.load_cached(descriptor, &path)
+                    && record.path.exists()
+                {
+                    records.push(record);
+                }
+            }
+            indexes.insert(descriptor.slug.clone(), finalize_index(records, descriptor));
+        }
+        indexes
     }
 }
 
@@ -504,7 +598,7 @@ pub fn load_record(
     path: &Path,
 ) -> Result<Option<Record>, AppError> {
     let titles = LegacyTitles { ctx, cfg, registry };
-    load_record_with(ctx, cfg, registry, descriptor, path, &titles)
+    load_record_with(ctx, cfg, registry, descriptor, path, &titles, None)
 }
 
 fn load_record_with(
@@ -514,6 +608,7 @@ fn load_record_with(
     descriptor: &TypeDescriptor,
     path: &Path,
     titles: &dyn RecordTitles,
+    conflicts: Option<&[MigrationConflict]>,
 ) -> Result<Option<Record>, AppError> {
     if descriptor.document_model == DocumentModel::SingleHtmlMockup {
         return load_ui_mockup(ctx, cfg, descriptor, path);
@@ -537,7 +632,9 @@ fn load_record_with(
     {
         return Ok(None);
     }
-    let Ok(read) = crate::record::store::read_document_normalized(ctx, cfg, registry, &safe) else {
+    let Ok(read) = crate::record::store::read_document_normalized_with_conflicts(
+        ctx, cfg, registry, &safe, conflicts,
+    ) else {
         return Ok(None);
     };
     let id = canonical_id(descriptor, &stem).unwrap_or_else(|| stem.clone());
@@ -874,7 +971,16 @@ fn build_index_impl(
             index.records.push(record);
         }
     }
-    index.records.sort_by(|a, b| a.id.cmp(&b.id));
+    finalize_index(index.records, descriptor)
+}
+
+/// Sort one descriptor's records by ID and derive its grouped-family views.
+fn finalize_index(mut records: Vec<Record>, descriptor: &TypeDescriptor) -> Index {
+    records.sort_by(|a, b| a.id.cmp(&b.id));
+    let mut index = Index {
+        records,
+        ..Index::default()
+    };
     if descriptor.id_shape != IdShape::Grouped {
         return index;
     }
@@ -1618,6 +1724,83 @@ mod tests {
         snapshot.resolve("MS-001").unwrap().expect("milestone");
         assert_eq!(snapshot.listing_count(), listings);
         assert_eq!(snapshot.parse_count(), parses);
+    }
+
+    #[test]
+    fn registry_scan_lists_each_directory_and_parses_each_record_once() {
+        let project = SnapshotProject::new("scan");
+        let business = project.root.join("docs/requirements/business");
+        fs::create_dir_all(&business).unwrap();
+        fs::write(
+            business.join("REQ-001.md"),
+            "---\nid: REQ-001\ntitle: \"Group one\"\ncreated_date: '2026-01-04T00:00:00Z'\nupdated_date: '2026-01-04T00:00:00Z'\nlabels: []\nreferences: []\nstatus: active\n---\n# REQ-001 Group one\n\n## Description\nGroup.\n",
+        )
+        .unwrap();
+        fs::write(
+            business.join("REQ-001.001.md"),
+            "---\nid: REQ-001.001\ntitle: \"Member one\"\ncreated_date: '2026-01-04T00:00:00Z'\nupdated_date: '2026-01-04T00:00:00Z'\nlabels: []\nreferences: []\nstatus: active\ngroup: REQ-001\n---\n# REQ-001.001 Member one\n\n## Description\nMember.\n",
+        )
+        .unwrap();
+
+        let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
+        let indexes = snapshot.scan_indexes();
+        let listings = snapshot.listing_count();
+        let parses = snapshot.parse_count();
+        assert_eq!(listings, project.enabled_directory_count());
+        assert_eq!(parses, 5, "two tasks, one milestone, and two requirements");
+        let conflict_scans = snapshot.conflict_scan_count();
+        assert_eq!(
+            conflict_scans, 3,
+            "one conflict scan for each of the task, milestone, and req families"
+        );
+        assert_eq!(indexes["task"].records.len(), 2);
+        assert_eq!(indexes["milestone"].records.len(), 1);
+        assert_eq!(indexes["req"].records.len(), 2);
+        assert_eq!(indexes["req"].groups.len(), 1);
+        assert_eq!(indexes["req"].requirements.len(), 1);
+        assert_eq!(indexes["req"].members["REQ-001"], vec![0]);
+
+        // A grouped stem appears under both lookup keys; the file still
+        // contributes exactly one record and is parsed once.
+        let ids: Vec<&str> = indexes["req"]
+            .records
+            .iter()
+            .map(|record| record.id.as_str())
+            .collect();
+        assert_eq!(ids, vec!["REQ-001", "REQ-001.001"]);
+
+        // Repeated inventory scans reuse the listing and parse cache.
+        let again = snapshot.scan_indexes();
+        assert_eq!(snapshot.listing_count(), listings);
+        assert_eq!(snapshot.parse_count(), parses);
+        assert_eq!(snapshot.conflict_scan_count(), conflict_scans);
+        assert_eq!(again["req"].records.len(), 2);
+        snapshot.resolve("TASK-001").unwrap().expect("cached task");
+        assert_eq!(snapshot.listing_count(), listings);
+        assert_eq!(snapshot.parse_count(), parses);
+        assert_eq!(snapshot.conflict_scan_count(), conflict_scans);
+
+        // The scan result matches the per-descriptor index builder exactly.
+        let descriptor = project.registry.descriptor("req").expect("req").clone();
+        let built = build_index_with_snapshot(
+            &project.ctx,
+            &project.cfg,
+            &project.registry,
+            &descriptor,
+            None,
+            &snapshot,
+        );
+        let scanned: Vec<&str> = indexes["req"]
+            .records
+            .iter()
+            .map(|record| record.id.as_str())
+            .collect();
+        let built_ids: Vec<&str> = built
+            .records
+            .iter()
+            .map(|record| record.id.as_str())
+            .collect();
+        assert_eq!(scanned, built_ids);
     }
 
     #[test]
