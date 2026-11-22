@@ -2,9 +2,10 @@
 id: ADR-0016
 title: "Runtime Config-Derived Command Dispatch for Document Slugs"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-20T20:09:05Z'
+updated_date: '2026-11-22T12:45:34Z'
 labels: []
-references: []
+references:
+  - ADR-042
 ---
 # Runtime Config-Derived Command Dispatch for Document Slugs
 
@@ -77,6 +78,12 @@ Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exact
 - **Decision 4 — engine-generated title arguments.** The title arguments are engine-generated and uniform for every document type and model: the positional `TITLE` on `create` and `create-group`, and `--title` on `create`, `create-group`, and `edit` (ADR-036 decision 24). No type supplies its own title option, there is no `--term`, and the HTML mockup metadata uses the same title contract. Field options are generated from the field sequence, in sequence order, and offered only on the verbs listed by the field's `verbs` (ADR-036 decisions 15, 19, and 20).
 - **Decision 7 — frozen about lines and type order.** The about line `Manage <slug> documents.`, the per-type lines of `papyrus --help`, and the verb and option groups of `papyrus <slug> --help` are frozen: regenerating the tree must reproduce today's about lines and the same ordering of enabled types (the seed `order` values reproduce the current registry order). Per-option help prose and option order are generated from the seed field data (`help`, `label`, and sequence position), so a seed change legitimately changes that prose and order; such a regeneration is not a help regression. Error text and exit codes are unchanged.
 - **Not changed:** decisions 1-3, 5, 6, and 8-10, the builder/derive split, the two-phase startup, `BUILTIN_COMMANDS`, and this record's accepted status.
+
+### Amendment (2026-11-22) — command surface rulings
+
+- **Decision 7 — verb about lines are not frozen per type.** The about line of each verb is engine-generated generic text derived from the document model and the field sequence; per-type verb about text is not preserved (ADR-042 ruling 2, ADR-036 decision 8). TASK-260 attributes every resulting help diff. The frozen surface is narrowed to the root about line, `Manage <slug> documents.`, each enabled type's help line, the type order, and the verb listing of `papyrus <slug> --help`; per-verb about text is generated prose like per-option prose.
+- **Decision 7 — type order is effective configuration map order.** Enabled document types are listed in effective `document_types` map order (slug order), not seed `order`; the current order is the frozen order and seed `order` is presentation-only (ADR-042 ruling 4). The 2026-11-20 amendment's statement that "the seed `order` values reproduce the current registry order" is corrected.
+- **Not changed:** decisions 1-6 and 8-10, the 2026-11-20 amendment's model-derived verbs and title arguments, and this record's accepted status.
 ## Consequences
 
 **Positive:**

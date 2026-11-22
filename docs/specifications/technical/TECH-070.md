@@ -2,7 +2,7 @@
 id: TECH-070
 title: "Descriptor-Driven Document Command Dispatch"
 created_date: '2026-11-16T17:46:54Z'
-updated_date: '2026-11-21T00:29:38Z'
+updated_date: '2026-11-22T12:46:04Z'
 labels: []
 references:
   - ADR-0016
@@ -32,6 +32,7 @@ references:
   - REQ-07.002
   - REQ-07.003
   - REQ-07.004
+  - ADR-042
 status: verified
 ---
 # TECH-070 Descriptor-Driven Document Command Dispatch
@@ -138,6 +139,12 @@ data-only; the command builder, the parser, and the engine read it.
 in descriptor order. Enabled types are ordered by seed `order`, ties broken by
 slug. No module outside `src/cli/` constructs or inspects a `clap::Command`.
 
+**Amendment (2026-11-22).** Enabled document types are listed in effective
+`document_types` map order, which is slug order, not seed `order`. The current
+order is the frozen order; seed `order` remains presentation data and never
+reorders commands or lists (ADR-042 decision 4). The preceding seed-order
+sentence is corrected accordingly.
+
 ## 3. Invocation contract
 
 One parser, `parse_document_invocation`, produces:
@@ -215,6 +222,14 @@ set from its own field sequence and role.
   lines: the root about line, the per-type line `Manage <slug> documents.`,
   each enabled type's help line, each verb's about line, the type order, and
   the verb listing of `papyrus <slug> --help`.
+- **Amendment (2026-11-22).** Per-verb about lines are not frozen per type. The
+  engine generates each verb's about line as generic text from the document model
+  and the field sequence; no per-type verb about text is preserved (ADR-042
+  decision 2, ADR-036 decision 8).
+  The frozen help surface is narrowed to the root about line, `Manage <slug>
+  documents.`, each enabled type's help line, the type order, and the verb listing
+  of `papyrus <slug> --help`; per-verb about text is generated prose like
+  per-option prose.
 - Per-option help prose and option order are generated from field data
   (`label`, `help`, and sequence position), so a seed change may regenerate
   them; such a regeneration is not a help regression.
