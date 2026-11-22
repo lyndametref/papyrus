@@ -7844,7 +7844,7 @@ fn t93_glossary_landing() {
         dir.to_str().unwrap(),
         "glossary",
         "create",
-        "--term",
+        "--title",
         "Alpha",
         "--definition",
         "Def A",

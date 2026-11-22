@@ -794,32 +794,6 @@ fn requirement_verbs() -> Vec<VerbSpec> {
             verb: Verb::Create,
             about: "Create a business requirement".into(),
             args: vec![
-                ArgSpec {
-                    required_unless_present: Some("title_flag".into()),
-                    ..arg(
-                        "title",
-                        None,
-                        None,
-                        "title",
-                        "Requirement title (positional)",
-                        true,
-                        false,
-                        ArgAction::Set,
-                    )
-                },
-                ArgSpec {
-                    required_unless_present: Some("title".into()),
-                    ..arg(
-                        "title_flag",
-                        Some("title"),
-                        None,
-                        "TITLE_FLAG",
-                        "Requirement title (flag)",
-                        false,
-                        false,
-                        ArgAction::Set,
-                    )
-                },
                 arg(
                     "story",
                     Some("story"),
@@ -859,16 +833,6 @@ fn requirement_verbs() -> Vec<VerbSpec> {
             about: "Create a business-requirement group".into(),
             args: vec![
                 arg(
-                    "title",
-                    Some("title"),
-                    None,
-                    "TITLE",
-                    "Group title",
-                    false,
-                    true,
-                    ArgAction::Set,
-                ),
-                arg(
                     "story",
                     Some("story"),
                     None,
@@ -905,16 +869,6 @@ fn requirement_verbs() -> Vec<VerbSpec> {
             about: "Edit a business requirement".into(),
             args: vec![
                 arg_id(),
-                arg(
-                    "title",
-                    Some("title"),
-                    None,
-                    "TITLE",
-                    "Update the title",
-                    false,
-                    false,
-                    ArgAction::Set,
-                ),
                 arg(
                     "story",
                     Some("story"),
@@ -965,16 +919,6 @@ fn glossary_verbs() -> Vec<VerbSpec> {
             about: "Create a glossary term".into(),
             args: vec![
                 arg(
-                    "term",
-                    Some("term"),
-                    None,
-                    "TERM",
-                    "Glossary term",
-                    false,
-                    true,
-                    ArgAction::Set,
-                ),
-                arg(
                     "definition",
                     Some("definition"),
                     None,
@@ -1003,16 +947,6 @@ fn glossary_verbs() -> Vec<VerbSpec> {
             about: "Edit a glossary term".into(),
             args: vec![
                 arg_id(),
-                arg(
-                    "term",
-                    Some("term"),
-                    None,
-                    "TERM",
-                    "Update the glossary term",
-                    false,
-                    false,
-                    ArgAction::Set,
-                ),
                 arg(
                     "definition",
                     Some("definition"),
@@ -1052,16 +986,6 @@ fn rule_verbs() -> Vec<VerbSpec> {
             verb: Verb::Create,
             about: "Create a business rule".into(),
             args: vec![
-                arg(
-                    "title",
-                    None,
-                    None,
-                    "TITLE",
-                    "Business rule title",
-                    true,
-                    true,
-                    ArgAction::Set,
-                ),
                 arg(
                     "description",
                     Some("description"),
@@ -1122,16 +1046,6 @@ fn rule_verbs() -> Vec<VerbSpec> {
             args: vec![
                 arg_id(),
                 arg(
-                    "title",
-                    Some("title"),
-                    None,
-                    "TITLE",
-                    "Update the title",
-                    false,
-                    false,
-                    ArgAction::Set,
-                ),
-                arg(
                     "description",
                     Some("description"),
                     Some('d'),
@@ -1190,16 +1104,6 @@ fn ui_spec_verbs() -> Vec<VerbSpec> {
             verb: Verb::Create,
             about: "Create a UI specification".into(),
             args: vec![
-                arg(
-                    "title",
-                    None,
-                    None,
-                    "TITLE",
-                    "UI specification title",
-                    true,
-                    true,
-                    ArgAction::Set,
-                ),
                 arg(
                     "view",
                     Some("view"),
@@ -1289,16 +1193,6 @@ fn audit_verbs() -> Vec<VerbSpec> {
             about: "".into(),
             args: vec![
                 arg(
-                    "title",
-                    Some("title"),
-                    None,
-                    "TITLE",
-                    "",
-                    false,
-                    true,
-                    ArgAction::Set,
-                ),
-                arg(
                     "content",
                     Some("content"),
                     None,
@@ -1343,16 +1237,6 @@ fn audit_verbs() -> Vec<VerbSpec> {
             about: "".into(),
             args: vec![
                 arg_id(),
-                arg(
-                    "title",
-                    Some("title"),
-                    None,
-                    "TITLE",
-                    "",
-                    false,
-                    false,
-                    ArgAction::Set,
-                ),
                 arg(
                     "content",
                     Some("content"),
@@ -1412,16 +1296,6 @@ fn tech_spec_verbs() -> Vec<VerbSpec> {
             about: "Create a technical specification".into(),
             args: vec![
                 arg(
-                    "title",
-                    None,
-                    None,
-                    "TITLE",
-                    "Technical specification title",
-                    true,
-                    true,
-                    ArgAction::Set,
-                ),
-                arg(
                     "description",
                     Some("description"),
                     None,
@@ -1450,16 +1324,6 @@ fn tech_spec_verbs() -> Vec<VerbSpec> {
             about: "Edit a technical specification".into(),
             args: vec![
                 arg_id(),
-                arg(
-                    "title",
-                    Some("title"),
-                    None,
-                    "TITLE",
-                    "Update the title",
-                    false,
-                    false,
-                    ArgAction::Set,
-                ),
                 arg(
                     "description",
                     Some("description"),
@@ -1500,16 +1364,6 @@ fn use_case_verbs() -> Vec<VerbSpec> {
             about: "Create a use case".into(),
             args: vec![
                 arg(
-                    "title",
-                    None,
-                    None,
-                    "TITLE",
-                    "Use case title",
-                    true,
-                    true,
-                    ArgAction::Set,
-                ),
-                arg(
                     "description",
                     Some("description"),
                     None,
@@ -1548,16 +1402,6 @@ fn use_case_verbs() -> Vec<VerbSpec> {
             about: "Edit a use case".into(),
             args: vec![
                 arg_id(),
-                arg(
-                    "title",
-                    Some("title"),
-                    None,
-                    "TITLE",
-                    "Update the title",
-                    false,
-                    false,
-                    ArgAction::Set,
-                ),
                 arg(
                     "description",
                     Some("description"),
@@ -1608,16 +1452,6 @@ fn test_case_verbs() -> Vec<VerbSpec> {
             about: "Create a test case".into(),
             args: vec![
                 arg(
-                    "title",
-                    None,
-                    None,
-                    "TITLE",
-                    "Test case title",
-                    true,
-                    true,
-                    ArgAction::Set,
-                ),
-                arg(
                     "description",
                     Some("description"),
                     None,
@@ -1656,16 +1490,6 @@ fn test_case_verbs() -> Vec<VerbSpec> {
             about: "Edit a test case".into(),
             args: vec![
                 arg_id(),
-                arg(
-                    "title",
-                    Some("title"),
-                    None,
-                    "TITLE",
-                    "Update the title",
-                    false,
-                    false,
-                    ArgAction::Set,
-                ),
                 arg(
                     "description",
                     Some("description"),
@@ -1716,16 +1540,6 @@ fn test_report_verbs() -> Vec<VerbSpec> {
             about: "Create a test report".into(),
             args: vec![
                 arg(
-                    "title",
-                    None,
-                    None,
-                    "TITLE",
-                    "Test report title",
-                    true,
-                    true,
-                    ArgAction::Set,
-                ),
-                arg(
                     "description",
                     Some("description"),
                     None,
@@ -1764,16 +1578,6 @@ fn test_report_verbs() -> Vec<VerbSpec> {
             about: "Edit a test report".into(),
             args: vec![
                 arg_id(),
-                arg(
-                    "title",
-                    Some("title"),
-                    None,
-                    "TITLE",
-                    "Update the title",
-                    false,
-                    false,
-                    ArgAction::Set,
-                ),
                 arg(
                     "description",
                     Some("description"),
@@ -1822,9 +1626,9 @@ fn ui_mockup_verbs() -> Vec<VerbSpec> {
         VerbSpec {
             verb: Verb::Create,
             about: "".into(),
-            args: vec![
-                arg("title", None, None, "TITLE", "", true, true, ArgAction::Set),
-                arg(
+            args: {
+                let mut args = title_args(Verb::Create);
+                args.push(arg(
                     "task",
                     Some("task"),
                     None,
@@ -1833,8 +1637,8 @@ fn ui_mockup_verbs() -> Vec<VerbSpec> {
                     false,
                     true,
                     ArgAction::Set,
-                ),
-                ArgSpec {
+                ));
+                args.push(ArgSpec {
                     required: true,
                     ..arg(
                         "spec",
@@ -1846,8 +1650,8 @@ fn ui_mockup_verbs() -> Vec<VerbSpec> {
                         false,
                         ArgAction::Append,
                     )
-                },
-                arg(
+                });
+                args.push(arg(
                     "ref",
                     Some("ref"),
                     None,
@@ -1856,8 +1660,9 @@ fn ui_mockup_verbs() -> Vec<VerbSpec> {
                     false,
                     false,
                     ArgAction::Append,
-                ),
-            ],
+                ));
+                args
+            },
         },
         VerbSpec {
             verb: Verb::List,
@@ -1872,19 +1677,10 @@ fn ui_mockup_verbs() -> Vec<VerbSpec> {
         VerbSpec {
             verb: Verb::Edit,
             about: "".into(),
-            args: vec![
-                arg_id(),
-                arg(
-                    "title",
-                    Some("title"),
-                    None,
-                    "TITLE",
-                    "",
-                    false,
-                    false,
-                    ArgAction::Set,
-                ),
-                arg(
+            args: {
+                let mut args = vec![arg_id()];
+                args.extend(title_args(Verb::Edit));
+                args.push(arg(
                     "task",
                     Some("task"),
                     None,
@@ -1893,8 +1689,8 @@ fn ui_mockup_verbs() -> Vec<VerbSpec> {
                     false,
                     false,
                     ArgAction::Set,
-                ),
-                arg(
+                ));
+                args.push(arg(
                     "spec",
                     Some("spec"),
                     None,
@@ -1903,8 +1699,8 @@ fn ui_mockup_verbs() -> Vec<VerbSpec> {
                     false,
                     false,
                     ArgAction::Append,
-                ),
-                arg(
+                ));
+                args.push(arg(
                     "ref",
                     Some("ref"),
                     None,
@@ -1913,8 +1709,8 @@ fn ui_mockup_verbs() -> Vec<VerbSpec> {
                     false,
                     false,
                     ArgAction::Append,
-                ),
-                ArgSpec {
+                ));
+                args.push(ArgSpec {
                     conflicts_with: Some("superseded_by".into()),
                     ..arg(
                         "status",
@@ -1926,8 +1722,8 @@ fn ui_mockup_verbs() -> Vec<VerbSpec> {
                         false,
                         ArgAction::Set,
                     )
-                },
-                ArgSpec {
+                });
+                args.push(ArgSpec {
                     conflicts_with: Some("status".into()),
                     ..arg(
                         "superseded_by",
@@ -1939,12 +1735,13 @@ fn ui_mockup_verbs() -> Vec<VerbSpec> {
                         false,
                         ArgAction::Set,
                     )
-                },
-                ArgSpec {
+                });
+                args.push(ArgSpec {
                     help: "".into(),
                     ..arg_editor()
-                },
-            ],
+                });
+                args
+            },
         },
         VerbSpec {
             verb: Verb::Archive,
@@ -2553,7 +2350,7 @@ pub fn field_options(fields: &[FieldSpec]) -> Vec<FieldOption> {
 ///
 /// Field options come from the role field sequence; title, id, label,
 /// reference, editor, force, and status arguments are the fixed engine
-/// surface. The title shape stays transitional until TASK-257 unifies it.
+/// surface. The title shape is the same fixed contract for every model.
 fn document_model_verb_specs(descriptor: &TypeDescriptor) -> Vec<VerbSpec> {
     CANONICAL_DOCUMENT_VERB_ORDER
         .iter()
@@ -2582,7 +2379,7 @@ fn build_document_verb_spec(descriptor: &TypeDescriptor, verb: Verb) -> VerbSpec
     let mut args: Vec<ArgSpec> = Vec::new();
     match verb {
         Verb::Create => {
-            args.extend(transitional_title_args(descriptor, Verb::Create));
+            args.extend(title_args(Verb::Create));
             args.extend(document_field_args(descriptor, Verb::Create));
             if descriptor.document_model == DocumentModel::GroupedMarkdown {
                 // The engine validates the group so an unknown, archived, or
@@ -2603,14 +2400,14 @@ fn build_document_verb_spec(descriptor: &TypeDescriptor, verb: Verb) -> VerbSpec
             args.push(arg_reference());
         }
         Verb::CreateGroup => {
-            args.extend(transitional_title_args(descriptor, Verb::CreateGroup));
+            args.extend(title_args(Verb::CreateGroup));
             args.extend(document_field_args(descriptor, Verb::CreateGroup));
         }
         Verb::List => {}
         Verb::View => args.push(arg_id()),
         Verb::Edit => {
             args.push(arg_id());
-            args.extend(transitional_title_args(descriptor, Verb::Edit));
+            args.extend(title_args(Verb::Edit));
             args.extend(document_field_args(descriptor, Verb::Edit));
             args.push(arg_editor());
             args.push(arg_label());
@@ -2750,76 +2547,48 @@ fn document_field_args(descriptor: &TypeDescriptor, verb: Verb) -> Vec<ArgSpec> 
     args
 }
 
-fn generic_create_title_args() -> Vec<ArgSpec> {
-    vec![
-        arg(
+/// The fixed title contract of every document model (ADR-036 decision 24,
+/// REQ-07.003).
+///
+/// The title is not a field and is not generated from the field sequence:
+/// `create` and `create-group` take it as the first positional `TITLE` and
+/// also accept `--title`; `edit` accepts `--title` only. The positional is not
+/// a clap requirement, so a missing title reaches the engine and is reported
+/// as one validation outcome (exit 4) rather than a usage error (exit 2).
+fn title_args(verb: Verb) -> Vec<ArgSpec> {
+    match verb {
+        Verb::Create | Verb::CreateGroup => vec![
+            arg(
+                "title",
+                None,
+                None,
+                "TITLE",
+                "Document title",
+                true,
+                false,
+                ArgAction::Set,
+            ),
+            arg(
+                "title_flag",
+                Some("title"),
+                None,
+                "TITLE",
+                "Document title",
+                false,
+                false,
+                ArgAction::Set,
+            ),
+        ],
+        Verb::Edit => vec![arg(
             "title",
-            None,
-            None,
-            "TITLE",
-            "",
-            true,
-            false,
-            ArgAction::Set,
-        ),
-        arg(
-            "title_flag",
             Some("title"),
             None,
             "TITLE",
-            "",
+            "Update the title",
             false,
             false,
             ArgAction::Set,
-        ),
-    ]
-}
-
-fn generic_edit_title_args() -> Vec<ArgSpec> {
-    vec![arg(
-        "title",
-        Some("title"),
-        None,
-        "TITLE",
-        "",
-        false,
-        false,
-        ArgAction::Set,
-    )]
-}
-
-fn generic_create_group_title_args() -> Vec<ArgSpec> {
-    vec![arg(
-        "title",
-        Some("title"),
-        None,
-        "TITLE",
-        "",
-        false,
-        true,
-        ArgAction::Set,
-    )]
-}
-
-/// Title argument shapes stay transitional until TASK-257 unifies them.
-///
-/// They are read from the descriptor's own command metadata rather than from
-/// a slug lookup, so no literal selects an option.
-fn transitional_title_args(descriptor: &TypeDescriptor, verb: Verb) -> Vec<ArgSpec> {
-    if let Some(schema) = &descriptor.schema
-        && let Some(spec) = schema.verbs.iter().find(|spec| spec.verb == verb)
-    {
-        return spec
-            .args
-            .iter()
-            .filter(|arg| matches!(arg.id.as_ref(), "title" | "title_flag" | "term"))
-            .cloned()
-            .collect();
-    }
-    match verb {
-        Verb::Create => generic_create_title_args(),
-        Verb::CreateGroup => generic_create_group_title_args(),
-        Verb::Edit => generic_edit_title_args(),
+        )],
         _ => Vec::new(),
     }
 }
@@ -4569,17 +4338,71 @@ mod tests {
                 "status"
             ]
         );
-        let create = req.verb_spec(Verb::Create).unwrap();
-        let title_flag = create
-            .args
-            .iter()
-            .find(|arg| arg.id == "title_flag")
-            .unwrap();
-        assert_eq!(title_flag.value_name, "TITLE_FLAG");
-        assert_eq!(title_flag.long.as_deref(), Some("title"));
-        let title = create.args.iter().find(|arg| arg.id == "title").unwrap();
-        assert_eq!(title.value_name, "title");
-        assert_eq!(title.required_unless_present.as_deref(), Some("title_flag"));
+        // One title contract for every document model: the first positional
+        // `TITLE` plus `--title` on create and create-group, `--title` only on
+        // edit. The positional never becomes a clap requirement, so a missing
+        // title is an engine validation outcome (exit 4), not a usage error.
+        for descriptor in registry.in_category(ArtifactCategory::Document) {
+            let create = descriptor.verb_spec(Verb::Create).unwrap();
+            let title = &create.args[0];
+            assert_eq!(title.id.as_ref(), "title");
+            assert!(
+                title.positional,
+                "{}: create title is positional",
+                descriptor.slug
+            );
+            assert!(
+                !title.required,
+                "{}: create title is engine-validated",
+                descriptor.slug
+            );
+            assert_eq!(title.value_name, "TITLE");
+            let flag = create
+                .args
+                .iter()
+                .find(|arg| arg.id == "title_flag")
+                .unwrap_or_else(|| panic!("{}: create has --title", descriptor.slug));
+            assert_eq!(flag.long.as_deref(), Some("title"));
+            assert_eq!(flag.value_name, "TITLE");
+            assert!(!flag.positional);
+
+            let edit = descriptor.verb_spec(Verb::Edit).unwrap();
+            let title = edit
+                .args
+                .iter()
+                .find(|arg| arg.id == "title")
+                .unwrap_or_else(|| panic!("{}: edit has --title", descriptor.slug));
+            assert!(!title.positional);
+            assert_eq!(title.long.as_deref(), Some("title"));
+            assert_eq!(title.value_name, "TITLE");
+            assert!(
+                !edit.args.iter().any(|arg| arg.id == "title_flag"),
+                "{}: edit has one title source",
+                descriptor.slug
+            );
+
+            if descriptor.has_verb(Verb::CreateGroup) {
+                let group = descriptor.verb_spec(Verb::CreateGroup).unwrap();
+                let title = &group.args[0];
+                assert_eq!(title.id.as_ref(), "title");
+                assert!(title.positional);
+                assert!(!title.required);
+                assert_eq!(title.value_name, "TITLE");
+                assert!(
+                    group.args.iter().any(|arg| arg.id == "title_flag"),
+                    "{}: create-group has --title",
+                    descriptor.slug
+                );
+            }
+            for spec in descriptor.verb_specs() {
+                assert!(
+                    !spec.args.iter().any(|arg| arg.id == "term"),
+                    "{}: {} must not accept --term",
+                    descriptor.slug,
+                    spec.verb.as_str()
+                );
+            }
+        }
 
         let mockup = registry.descriptor("ui-mockup").unwrap();
         let edit = mockup.verb_spec(Verb::Edit).unwrap();

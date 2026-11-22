@@ -288,7 +288,7 @@ fn milestone_content_management_flow() {
             &p,
             "glossary",
             "create",
-            "--term",
+            "--title",
             "Glossary Term",
             "--definition",
             PHRASE

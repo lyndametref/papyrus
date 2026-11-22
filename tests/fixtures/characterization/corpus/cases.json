@@ -471,7 +471,6 @@
       "argv": [
         "glossary",
         "create",
-        "--term",
         "Corpus term",
         "--definition",
         "Corpus definition"
@@ -493,7 +492,6 @@
         "--json",
         "glossary",
         "create",
-        "--term",
         "Corpus term",
         "--definition",
         "Corpus definition"
@@ -508,6 +506,25 @@
         "payload.json"
       ],
       "record": "docs/glossary/GLO-003.md"
+    },
+    {
+      "id": "glossary/create-term-removed",
+      "kind": "cli",
+      "argv": [
+        "glossary",
+        "create",
+        "--term",
+        "Corpus term",
+        "--definition",
+        "Corpus definition"
+      ],
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
     },
     {
       "id": "glossary/list",
@@ -586,7 +603,7 @@
         "glossary",
         "edit",
         "GLO-001",
-        "--term",
+        "--title",
         "Edited glossary term"
       ],
       "document_type": "glossary",
@@ -607,7 +624,7 @@
         "glossary",
         "edit",
         "GLO-001",
-        "--term",
+        "--title",
         "Edited glossary term"
       ],
       "document_type": "glossary",
@@ -620,6 +637,24 @@
         "payload.json"
       ],
       "record": "docs/glossary/GLO-001.md"
+    },
+    {
+      "id": "glossary/edit-term-removed",
+      "kind": "cli",
+      "argv": [
+        "glossary",
+        "edit",
+        "GLO-001",
+        "--term",
+        "Edited glossary term"
+      ],
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "stdout.txt",
+        "stderr.txt",
+        "exit.json"
+      ]
     },
     {
       "id": "glossary/archive",

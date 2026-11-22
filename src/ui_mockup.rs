@@ -16,11 +16,12 @@ pub fn handle(
 ) -> Result<CommandOutput, AppError> {
     match verb {
         DocumentVerb::Create => {
+            let title = crate::document::required_title(args)?;
             let id = create(
                 ctx,
                 scope,
                 registry,
-                args.require("title")?,
+                &title,
                 args.require("task")?,
                 args.get_all("spec"),
                 args.get_all("ref"),
@@ -29,19 +30,22 @@ pub fn handle(
         }
         DocumentVerb::List => list(ctx, scope),
         DocumentVerb::View => view(ctx, scope, args.require("id")?),
-        DocumentVerb::Edit => edit(
-            ctx,
-            scope,
-            registry,
-            args.require("id")?,
-            args.get("title"),
-            args.get("task"),
-            args.flag("spec").then(|| args.get_all("spec")),
-            args.flag("ref").then(|| args.get_all("ref")),
-            args.get("status"),
-            args.get("superseded_by"),
-            args.flag("editor"),
-        ),
+        DocumentVerb::Edit => {
+            let title = crate::document::optional_title(args)?;
+            edit(
+                ctx,
+                scope,
+                registry,
+                args.require("id")?,
+                title.as_deref(),
+                args.get("task"),
+                args.flag("spec").then(|| args.get_all("spec")),
+                args.flag("ref").then(|| args.get_all("ref")),
+                args.get("status"),
+                args.get("superseded_by"),
+                args.flag("editor"),
+            )
+        }
         DocumentVerb::Archive => archive(ctx, scope, registry, args.require("id")?),
         DocumentVerb::Delete => delete(
             ctx,

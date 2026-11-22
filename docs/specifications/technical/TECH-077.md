@@ -172,8 +172,9 @@ pub fn load_effective_config_tolerant(config_path: &Path, project_dir: &Path) ->
      document_types, materialize only the target seed entry with its seed
      prefix and directory.
   3. yaml_set(file_val, key, parsed).
-  4. Build candidate: default Config YAML + merge_yaml (wholesale) +
-     browser YAML validation + deserialize + Config::validate(Some(project_dir)).
+  4. Build candidate: default Config YAML + merge_yaml (recursive, with
+     `document_types` resolved against the seed table) + browser YAML
+     validation + deserialize + Config::validate(Some(project_dir)).
   5. If invalid, return error before relocation/write; file byte-identical.
   6. Folder relocation (if applicable) then write file_val.
 - A selector is `document_types.<slug>.<path>`. A field item is selected by

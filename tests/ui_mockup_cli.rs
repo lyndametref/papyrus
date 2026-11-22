@@ -157,8 +157,16 @@ fn basic_lifecycle() {
 fn create_requires_args() {
     let d = tmpdir("missing");
     init(&d);
+    // A missing title reaches the engine (exit 4); a missing required
+    // `--task` or `--spec` stays a usage error (exit 2).
+    let out = run(&d, &["ui-mockup", "create", "--task", "T", "--spec", "S"]);
+    assert_eq!(out.status.code(), Some(4));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("title"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let cases: Vec<Vec<&str>> = vec![
-        vec!["ui-mockup", "create", "--task", "T", "--spec", "S"],
         vec!["ui-mockup", "create", "T", "--spec", "S"],
         vec!["ui-mockup", "create", "T", "--task", "T"],
     ];
@@ -702,6 +710,49 @@ fn title_is_required_single_line_and_never_cleared_by_edit() {
     let out = run(&d, &["ui-mockup", "edit", "MOCK-001", "--title", ""]);
     assert_eq!(out.status.code(), Some(4));
     assert_eq!(fs::read_to_string(record(&d, "MOCK-001")).unwrap(), before);
+
+    // `--title` is the second accepted create form, and the two sources are
+    // mutually exclusive on one invocation.
+    let out = run(
+        &d,
+        &[
+            "ui-mockup",
+            "create",
+            "Both",
+            "--title",
+            "Other",
+            "--task",
+            "T",
+            "--spec",
+            "S",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(4));
+    assert!(
+        stderr(&out).contains("conflicting title sources"),
+        "{}",
+        stderr(&out)
+    );
+    assert!(!record(&d, "MOCK-002").exists());
+    let out = run(
+        &d,
+        &[
+            "ui-mockup",
+            "create",
+            "--title",
+            "Flagged",
+            "--task",
+            "T",
+            "--spec",
+            "S",
+        ],
+    );
+    assert!(out.status.success(), "{}", stderr(&out));
+    let content = fs::read_to_string(record(&d, "MOCK-002")).unwrap();
+    assert!(
+        content.contains("<title>MOCK-002 — Flagged</title>"),
+        "{content}"
+    );
     let _ = fs::remove_dir_all(&d);
 }
 

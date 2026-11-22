@@ -101,7 +101,7 @@ fn generic_and_typed_slugs_share_the_document_run_entry() {
     let generic_id = create(&cfg, &registry, &ctx, "note", generic_args);
 
     let mut typed_args = DocumentArgs::default();
-    typed_args.insert("term", vec!["Alpha".to_string()]);
+    typed_args.insert("title", vec!["Alpha".to_string()]);
     typed_args.insert("definition", vec!["First letter.".to_string()]);
     let typed_id = create(&cfg, &registry, &ctx, "glossary", typed_args);
 
@@ -123,7 +123,7 @@ fn typed_and_generic_verbs_delegate_through_the_same_invocation() {
     let (dir, ctx, cfg, registry) = project("verbs");
 
     let mut typed_args = DocumentArgs::default();
-    typed_args.insert("term", vec!["Beta".to_string()]);
+    typed_args.insert("title", vec!["Beta".to_string()]);
     typed_args.insert("definition", vec!["Second letter.".to_string()]);
     let typed_id = create(&cfg, &registry, &ctx, "glossary", typed_args);
 
@@ -249,7 +249,7 @@ fn create_omitting_required_fields_reports_every_key_and_writes_nothing() {
         invocation(
             "glossary",
             DocumentVerb::Create,
-            args(&[("term", &["Term"])]),
+            args(&[("title", &["Term"])]),
         ),
     )
     .err()
@@ -284,7 +284,7 @@ fn a_required_field_cannot_be_cleared_but_an_optional_field_can() {
         &registry,
         &ctx,
         "glossary",
-        args(&[("term", &["Term"]), ("definition", &["Definition"])]),
+        args(&[("title", &["Term"]), ("definition", &["Definition"])]),
     );
     let glossary_path = dir.join("docs/glossary/GLO-001.md");
     let before = fs::read_to_string(&glossary_path).unwrap();
@@ -346,6 +346,7 @@ fn command_options_follow_the_role_field_sequence() {
     assert_eq!(
         longs,
         vec![
+            "title",
             "description",
             "rationale",
             "applicability",

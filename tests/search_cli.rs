@@ -1355,7 +1355,7 @@ fn cross_type_unified_search() {
         &[
             "glossary",
             "create",
-            "--term",
+            "--title",
             "Glossary term",
             "--definition",
             "quick brown fox",

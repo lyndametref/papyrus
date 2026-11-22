@@ -173,17 +173,28 @@ fn ui_spec_create_requires_all_arguments() {
     );
     assert!(d.join("docs/specifications/ui/UI-001.md").exists());
 
+    // A missing title is one validation outcome (exit 4), not a usage error.
     let out = run(
         &d,
         &["ui-spec", "create", "--view", "v", "--description", "d"],
     );
-    assert_eq!(out.status.code(), Some(2));
-    // --title is not part of the command.
+    assert_eq!(out.status.code(), Some(4));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("title"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    // Both title sources on one invocation are rejected.
     let out = run(
         &d,
-        &["ui-spec", "create", "T2", "--title", "T2", "--view", "v"],
+        &["ui-spec", "create", "T2", "--title", "T3", "--view", "v"],
     );
-    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(out.status.code(), Some(4));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("conflicting title sources"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
     let _ = fs::remove_dir_all(&d);
 }

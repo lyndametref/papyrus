@@ -852,3 +852,41 @@ fn nfr_type_mismatch_exits_four() {
     assert_eq!(out.status.code(), Some(4));
     let _ = fs::remove_dir_all(&d);
 }
+
+#[test]
+fn create_group_accepts_positional_and_flag_titles_additively() {
+    let d = tmpdir("grouptitle");
+    init(&d);
+    let p = d.to_str().unwrap();
+    // The positional TITLE is the primary form.
+    let out = bin()
+        .args(["--dir", p, "req", "create-group", "Grouped"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "REQ-001");
+    let group = fs::read_to_string(d.join("docs/requirements/business/REQ-001.md")).unwrap();
+    assert!(group.contains("# REQ-001 Grouped"), "{group}");
+
+    // `--title` keeps its documented name and meaning.
+    let out = bin()
+        .args(["--dir", p, "req", "create-group", "--title", "Flagged"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "REQ-002");
+
+    // Both sources on one invocation are rejected and write nothing.
+    let out = bin()
+        .args(["--dir", p, "req", "create-group", "A", "--title", "B"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(4));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("conflicting title sources"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(!d.join("docs/requirements/business/REQ-003.md").exists());
+    let _ = fs::remove_dir_all(&d);
+}
