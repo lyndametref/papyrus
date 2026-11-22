@@ -2,7 +2,7 @@
 id: TASK-258
 title: "Implement config set, list, get, and unset with selector paths"
 created_date: '2026-11-20T17:42:06Z'
-updated_date: '2026-11-22T12:55:57Z'
+updated_date: '2026-11-22T14:28:25Z'
 labels: []
 references:
   - ADR-036
@@ -17,7 +17,7 @@ references:
   - TC-117
   - TC-172
   - ADR-042
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-034
@@ -73,3 +73,6 @@ The narrowed selector contract is implemented: get/list resolve field leaves; se
 - **task-refiner**: AUD-140 L-1 reproduced: label, help, and frontmatter_key (and the other string-typed field properties) supplied as a non-string fail during deserialization with a bare invalid type message, for example `invalid type: integer 5, expected a string`, and do not name the selector path. A config with document_types.deploy.fields[description].label: 5 must report document_types.deploy.fields[description].label. Cover the keyed and indexed diagnostic forms.
 - **task-refiner**: AUD-140 L-4: REQ-07.002 and TC-114 still contain the stale never-materialize-the-seed wording. ADR-036 decision 32 and the AUD-140 clarification govern: the eleven seed slugs are always effective, a present document_types map is an overlay, and config set writes only the target entry. Implement to ADR-036 d32 and record the requirement wording as owned by requirements-engineer in Phase 2.
 - **planner**: ADR-042 rulings 5 and 6 applied: the field-set/unset blocker is cleared. config get and config list resolve keyed and numeric field leaves; config set and config unset reject every selector inside fields, group.fields, or member.fields as file-edit-only with no write. Only statuses keeps comma syntax; api_aliases and slots are declarative file data. MS-034 AC-3 is narrowed accordingly. The seed-filled-value marker is not introduced because no accepted source defines it.
+- **rust-dev**: test
+- **rust-dev**: rust-dev implementation evidence for MS-034 AC-3 and AUD-140 L-1. Selectors: config get and config list resolve keyed and numeric field leaves (member.fields[story].heading and group.fields[0].heading resolve the same leaf); config list prints effective leaves with keyed field selectors. Unknown keyed selectors, ambiguous matches, and out-of-range indexes exit 4 and name the selector path; no value is printed. Writes: config set and unset reject every fields, group.fields, and member.fields selector as file-edit-only; they also reject api_aliases and slots as declarative file data with the selector path, so fields is never comma-set. Only statuses and document_types.<slug>.statuses keep comma syntax and flow-sequence storage; empty values stay rejected. Target-only seed materialization, validate-before-write, byte-identical rejected writes, and folder relocation are unchanged. AUD-140 L-1 closed: non-string label, help, frontmatter_key, option, key, and heading values report document_types.<slug> field selector plus property with must be a string, keyed when the key is unique and indexed otherwise, and no longer fall through to the bare serde message. Checks: nested_config_cli 22 passed (2 new, 1 updated), config_list_keys_cli 14 passed, config_relocation_cli 7 passed; full cargo test 1254 passed and 0 failed; cargo clippy --all-targets -- -D warnings clean; cargo fmt --check clean. Branch task-TASK-258; no commit per instruction; task status left In-Progress.
+- **orchestrator**: Acceptance met: config get and list resolve keyed and numeric field leaves, set and unset reject field and declarative collection edits as file-edit-only, statuses keep comma syntax with flow storage, target-only materialization and validate-before-write preserved; AUD-140 L-1 field string type errors now carry selector paths; 1254 tests pass.
