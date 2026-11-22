@@ -301,6 +301,7 @@ impl Drop for Server {
 
 struct HttpResponse {
     status: u16,
+    status_line: String,
     headers: Vec<(String, String)>,
     body: Vec<u8>,
 }
@@ -340,6 +341,7 @@ fn parse_response(bytes: &[u8]) -> HttpResponse {
         .collect();
     HttpResponse {
         status,
+        status_line: status_line.to_string(),
         headers,
         body,
     }
@@ -980,6 +982,64 @@ fn t11_archived_records_are_hidden() {
     assert!(!list.contains("REQ-001.001"));
     assert_eq!(get(&server, "/doc/REQ-001.001").status, 404);
     assert_eq!(get(&server, "/doc/REQ-001.001/edit").status, 404);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// AUD-148 F1: an externally archived record still in its active directory is
+// absent from the inventory count and the grouped-member rows, and its link is
+// not rendered.
+#[test]
+fn t314_externally_archived_record_is_absent_from_inventory_and_group_page() {
+    let dir = fixture("aud148-archive");
+    let path = record_path(&dir, "req", "REQ-001.001");
+    let text = fs::read_to_string(&path).unwrap();
+    assert!(text.contains("status: active"), "{text}");
+    fs::write(&path, text.replace("status: active", "status: archived")).unwrap();
+
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let inventory = get(&server, "/").text();
+    assert!(
+        inventory.contains("Business requirements &middot; 3"),
+        "the archived record is absent from the inventory count: {inventory}"
+    );
+    let group = get(&server, "/doc/REQ-001").text();
+    assert!(
+        !group.contains("REQ-001.001"),
+        "the archived record is absent from the grouped member rows: {group}"
+    );
+    let list = get(&server, "/?type=req").text();
+    assert!(!list.contains("REQ-001.001"), "{list}");
+    assert_eq!(get(&server, "/doc/REQ-001.001").status, 404);
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// AUD-148 F3: a grouped member shows the same title on the group page as in
+// the list, using the full loader's heading-first precedence.
+#[test]
+fn t314_group_member_title_matches_the_list() {
+    let dir = fixture("aud148-title");
+    let path = record_path(&dir, "req", "REQ-001.001");
+    let text = fs::read_to_string(&path).unwrap();
+    let heading = text
+        .lines()
+        .find(|line| line.starts_with("# "))
+        .expect("member heading");
+    fs::write(&path, text.replace(heading, "# REQ-001.001 Heading title")).unwrap();
+
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let list = get(&server, "/?type=req").text();
+    let group = get(&server, "/doc/REQ-001").text();
+    assert!(list.contains("Heading title"), "{list}");
+    assert!(
+        group.contains("Heading title"),
+        "the group page uses the same title precedence as the list: {group}"
+    );
+    assert!(
+        !group.contains("Capture payment"),
+        "the group page must not fall back to the front-matter title: {group}"
+    );
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -8686,6 +8746,11 @@ fn t276_first_party_assets_revalidate_with_strong_etag() {
 }
 
 fn assert_incomplete_304(response: &HttpResponse, path: &str) {
+    assert_eq!(
+        response.status_line, "HTTP/1.1 304 Not Modified",
+        "{} 304 status line",
+        path
+    );
     assert!(
         response.header("Content-Type").is_none(),
         "{} 304 Content-Type",
