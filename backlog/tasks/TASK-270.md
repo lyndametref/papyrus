@@ -2,7 +2,7 @@
 id: TASK-270
 title: "Verify MS-035 browser engine: route and semantic equivalence"
 created_date: '2026-11-20T17:42:52Z'
-updated_date: '2026-11-22T19:09:21Z'
+updated_date: '2026-11-22T20:12:09Z'
 labels: []
 references:
   - REQ-06.014
@@ -18,7 +18,7 @@ references:
   - ADR-042
   - TASK-288
   - MS-037
-status: In-Progress
+status: Done
 assignee:
   - quality-gatekeeper
 milestone: MS-035
@@ -83,3 +83,4 @@ Every MS-035 acceptance criterion has a recorded pass verdict with a reproducibl
 ## Comments
 - **task-refiner**: Refinement note: MS-035 AC-9 still uses plural per-component packaging wording; this task applies ADR-043 decision 6 (single-app root scripts build-package.sh). The wording is escalated to the planner in TASK-264; do not edit the milestone. TASK-309 must be Done before the package step.
 - **planner**: planner: MS-035 packaging policy aligned to the internal checkpoint used by MS-032, MS-033, and MS-034. AC-9 to AC-11 now require no RC version and no retained package; the verification build is compiled and discarded. TASK-309 still creates the packaging entry point and it may be exercised, with the artifact discarded. The release boundary TASK-288 in MS-037 uses the same script to produce the single retained release package. Dependencies remain TASK-269 (269b, the last of the split) and TASK-309.
+- **orchestrator**: Verification PASS (AUD-147): AC-1 to AC-9 met, 0 blocker, 0 high, 0 medium, 3 low (decision-page corpus coverage, payload count 94, tracked root deb at the release boundary); code gate clear via AUD-146; 1355 tests pass; verification package discarded.
