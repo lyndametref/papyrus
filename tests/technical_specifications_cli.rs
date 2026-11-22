@@ -156,19 +156,18 @@ fn tech_spec_create_requires_all_arguments() {
     let d = tmpdir("missing");
     init(&d);
 
-    let cases: Vec<Vec<&str>> = vec![
-        vec!["tech-spec", "create", "T"],
-        vec!["tech-spec", "create", "--description", "d"],
-        vec!["tech-spec", "create", "T", "--description"],
-    ];
-    for args in cases {
-        let out = run(&d, &args);
-        assert_eq!(out.status.code(), Some(2), "args={:?}", args);
-    }
-    assert!(!d.join("docs/technical/TECH-001.md").exists());
+    // The title is required; description is an optional field.
+    let out = run(&d, &["tech-spec", "create", "T"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(d.join("docs/technical/TECH-001.md").exists());
 
-    // unknown option
-    let out = run(&d, &["tech-spec", "create", "T", "--bogus", "x"]);
+    let out = run(&d, &["tech-spec", "create"]);
+    assert_eq!(out.status.code(), Some(2));
+    let out = run(&d, &["tech-spec", "create", "T2", "--bogus", "x"]);
     assert_eq!(out.status.code(), Some(2));
 
     let _ = fs::remove_dir_all(&d);

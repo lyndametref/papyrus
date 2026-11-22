@@ -2,7 +2,7 @@
 id: TASK-255
 title: "Implement the field-driven document handler with baseline verbs and status"
 created_date: '2026-11-20T17:41:57Z'
-updated_date: '2026-11-22T12:54:16Z'
+updated_date: '2026-11-22T13:02:37Z'
 labels: []
 references:
   - ADR-036
@@ -15,7 +15,7 @@ references:
   - ADR-0017
   - ADR-042
   - REQ-05.006
-status: ToDo
+status: In-Progress
 assignee:
   - rust-dev
 milestone: MS-034

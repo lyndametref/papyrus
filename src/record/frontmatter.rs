@@ -8,6 +8,8 @@ use std::str;
 pub enum FrontMatterValue {
     Null,
     Integer(i64),
+    /// An explicit YAML sequence, including the empty sequence.
+    Sequence(Vec<String>),
     String(String),
 }
 
@@ -345,8 +347,22 @@ pub fn format_kv_value(key: &str, value: &FrontMatterValue) -> String {
     match value {
         FrontMatterValue::Null => format!("{}: null", key),
         FrontMatterValue::Integer(n) => format!("{}: {}", key, n),
+        FrontMatterValue::Sequence(items) => format_sequence(key, items),
         FrontMatterValue::String(s) => format_kv(key, s),
     }
+}
+
+/// Format an explicit YAML sequence, including a single item and the empty
+/// sequence.
+fn format_sequence(key: &str, items: &[String]) -> String {
+    if items.is_empty() {
+        return format!("{}: []", key);
+    }
+    let mut out = format!("{}:", key);
+    for item in items {
+        out.push_str(&format!("\n  - {}", format_scalar(item)));
+    }
+    out
 }
 
 /// Patch a single key in the raw front-matter text using a typed value.

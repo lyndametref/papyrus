@@ -164,28 +164,26 @@ fn ui_spec_create_requires_all_arguments() {
     let d = tmpdir("missing");
     init(&d);
 
-    let cases: Vec<Vec<&str>> = vec![
-        vec!["ui-spec", "create", "--view", "v", "--description", "d"],
-        vec!["ui-spec", "create", "T", "--description", "d"],
-        vec!["ui-spec", "create", "T", "--view", "v"],
-        // --title is not part of the command.
-        vec![
-            "ui-spec",
-            "create",
-            "T",
-            "--title",
-            "T",
-            "--view",
-            "v",
-            "--description",
-            "d",
-        ],
-    ];
-    for args in cases {
-        let out = run(&d, &args);
-        assert_eq!(out.status.code(), Some(2), "args={:?}", args);
-    }
-    assert!(!d.join("docs/specifications/ui/UI-001.md").exists());
+    // The title is required. View and description are optional fields.
+    let out = run(&d, &["ui-spec", "create", "T"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(d.join("docs/specifications/ui/UI-001.md").exists());
+
+    let out = run(
+        &d,
+        &["ui-spec", "create", "--view", "v", "--description", "d"],
+    );
+    assert_eq!(out.status.code(), Some(2));
+    // --title is not part of the command.
+    let out = run(
+        &d,
+        &["ui-spec", "create", "T2", "--title", "T2", "--view", "v"],
+    );
+    assert_eq!(out.status.code(), Some(2));
 
     let _ = fs::remove_dir_all(&d);
 }

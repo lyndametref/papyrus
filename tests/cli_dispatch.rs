@@ -480,7 +480,7 @@ fn document_invocation_parsing_table() {
                 "NOTE-001",
                 "--title",
                 "New",
-                "-d",
+                "--description",
                 "dd",
                 "--editor",
                 "--label",

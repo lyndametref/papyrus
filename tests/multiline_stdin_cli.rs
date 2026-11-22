@@ -111,7 +111,13 @@ fn tc_040_document_create_reads_multiline_description_from_stdin() {
     let dir = init("tc040");
     let id = stdout(&run_stdin_ok(
         &dir,
-        &["request", "create", "Multiline request", "-d", "-"],
+        &[
+            "request",
+            "create",
+            "Multiline request",
+            "--description",
+            "-",
+        ],
         b"Line one\nLine two\nLine three\n",
     ));
     assert_eq!(id, "RQT-001");
@@ -133,13 +139,13 @@ fn tc_041_document_edit_replaces_description_and_preserves_metadata() {
             "request",
             "create",
             "Multiline request",
-            "-d",
+            "--description",
             "Single line summary",
         ],
     );
     run_stdin_ok(
         &dir,
-        &["request", "edit", &id, "-d", "-"],
+        &["request", "edit", &id, "--description", "-"],
         b"First paragraph\n\nSecond paragraph\n",
     );
     let content = view(&dir, "request", &id);
@@ -159,7 +165,13 @@ fn tc_042_decision_create_reads_multiline_decision_from_stdin() {
     let dir = init("tc042");
     let id = stdout(&run_stdin_ok(
         &dir,
-        &["decision", "create", "Adopt multiline input", "-d", "-"],
+        &[
+            "decision",
+            "create",
+            "Adopt multiline input",
+            "--decision",
+            "-",
+        ],
         b"Decision one\nDecision two\nDecision three\n",
     ));
     assert_eq!(id, "ADR-001");
@@ -179,7 +191,7 @@ fn tc_043_decision_edit_reads_multiline_context_from_stdin() {
             "decision",
             "create",
             "Context edit",
-            "-d",
+            "--decision",
             "Decision text",
             "--context",
             "Initial context",
@@ -213,7 +225,7 @@ fn tc_044_decision_edit_reads_multiline_consequences_from_stdin() {
             "decision",
             "create",
             "Consequences edit",
-            "-d",
+            "--decision",
             "Decision text",
             "--context",
             "Known context",
@@ -240,7 +252,7 @@ fn tc_045_task_create_reads_multiline_description_from_stdin() {
     let dir = init("tc045");
     let id = stdout(&run_stdin_ok(
         &dir,
-        &["task", "create", "Multiline task", "-d", "-"],
+        &["task", "create", "Multiline task", "--description", "-"],
         b"Task line one\nTask line two\nTask line three\n",
     ));
     assert_eq!(id, "TASK-001");
@@ -256,11 +268,17 @@ fn tc_046_task_edit_reads_multiline_description_and_keeps_status() {
     let dir = init("tc046");
     let id = create(
         &dir,
-        &["task", "create", "Task", "-d", "Original description"],
+        &[
+            "task",
+            "create",
+            "Task",
+            "--description",
+            "Original description",
+        ],
     );
     run_stdin_ok(
         &dir,
-        &["task", "edit", &id, "-d", "-"],
+        &["task", "edit", &id, "--description", "-"],
         b"Edited line one\nEdited line two\n",
     );
     let content = view(&dir, "task", &id);
@@ -277,7 +295,13 @@ fn tc_047_milestone_create_reads_multiline_description_from_stdin() {
     let dir = init("tc047");
     let id = stdout(&run_stdin_ok(
         &dir,
-        &["milestone", "create", "Multiline milestone", "-d", "-"],
+        &[
+            "milestone",
+            "create",
+            "Multiline milestone",
+            "--description",
+            "-",
+        ],
         b"Milestone line one\nMilestone line two\nMilestone line three\n",
     ));
     assert_eq!(id, "MS-001");
@@ -297,13 +321,13 @@ fn tc_048_milestone_edit_reads_multiline_description_and_keeps_status() {
             "milestone",
             "create",
             "Milestone",
-            "-d",
+            "--description",
             "Original milestone description",
         ],
     );
     run_stdin_ok(
         &dir,
-        &["milestone", "edit", &id, "-d", "-"],
+        &["milestone", "edit", &id, "--description", "-"],
         b"Edited milestone one\nEdited milestone two\n",
     );
     let content = view(&dir, "milestone", &id);
@@ -337,7 +361,16 @@ fn tc_050_identifiers_with_embedded_newlines_are_rejected() {
     let task_before = worker(dir.join(format!("backlog/tasks/{task_id}.md")));
     let request_before = worker(dir.join(format!("docs/requests/{request_id}.md")));
 
-    let edit = run(&dir, &["task", "edit", &format!("{task_id}\nX"), "-d", "x"]);
+    let edit = run(
+        &dir,
+        &[
+            "task",
+            "edit",
+            &format!("{task_id}\nX"),
+            "--description",
+            "x",
+        ],
+    );
     assert_eq!(edit.status.code(), Some(4));
     let view = run(&dir, &["request", "view", &format!("{request_id}\nX")]);
     assert_eq!(view.status.code(), Some(4));
@@ -372,7 +405,7 @@ fn tc_052_literal_value_does_not_read_standard_input() {
             "request",
             "create",
             "Single line request",
-            "-d",
+            "--description",
             "single line description",
         ],
         b"\xff\xfe",
@@ -391,7 +424,13 @@ fn tc_053_editor_path_still_writes_multiline_description() {
     let dir = init("tc053");
     let id = create(
         &dir,
-        &["request", "create", "Editor request", "-d", "Single line"],
+        &[
+            "request",
+            "create",
+            "Editor request",
+            "--description",
+            "Single line",
+        ],
     );
     let script = dir.join("editor.sh");
     fs::write(
@@ -457,12 +496,16 @@ fn tc_054_help_documents_the_stdin_path() {
 fn empty_and_whitespace_only_stdin_exit_4_without_allocating_an_id() {
     let dir = init("empty");
     for input in [b"".as_slice(), b"  \n\t\n ".as_slice()] {
-        let out = run_stdin(&dir, &["request", "create", "Empty", "-d", "-"], input);
+        let out = run_stdin(
+            &dir,
+            &["request", "create", "Empty", "--description", "-"],
+            input,
+        );
         assert_eq!(out.status.code(), Some(4));
     }
     let id = stdout(&run_stdin_ok(
         &dir,
-        &["request", "create", "After failures", "-d", "-"],
+        &["request", "create", "After failures", "--description", "-"],
         b"line\n",
     ));
     assert_eq!(id, "RQT-001", "failed input must not allocate an ID");
@@ -473,7 +516,7 @@ fn invalid_utf8_stdin_exits_4() {
     let dir = init("utf8");
     let out = run_stdin(
         &dir,
-        &["task", "create", "Bad bytes", "-d", "-"],
+        &["task", "create", "Bad bytes", "--description", "-"],
         b"ok\n\xff\n",
     );
     assert_eq!(out.status.code(), Some(4));
@@ -489,7 +532,7 @@ fn multiple_sentinels_exit_4_before_reading_or_writing() {
             "decision",
             "create",
             "Conflict",
-            "-d",
+            "--decision",
             "-",
             "--context",
             "-",
@@ -508,7 +551,7 @@ fn crlf_input_is_normalized_and_internal_blank_lines_are_preserved() {
     let dir = init("crlf");
     let id = stdout(&run_stdin_ok(
         &dir,
-        &["task", "create", "CRLF task", "-d", "-"],
+        &["task", "create", "CRLF task", "--description", "-"],
         b"one\r\ntwo\r\n\r\nthree\r\n",
     ));
     let raw = worker(dir.join(format!("backlog/tasks/{id}.md")));

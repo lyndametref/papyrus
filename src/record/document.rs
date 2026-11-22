@@ -167,6 +167,11 @@ pub fn section_text(doc: &Document, name: &str) -> Option<String> {
     None
 }
 
+/// The section name of a declared `## ` heading.
+pub fn section_name(heading: &str) -> &str {
+    heading.strip_prefix("## ").unwrap_or(heading)
+}
+
 pub fn section_lines(doc: &Document, name: &str) -> Vec<String> {
     match section_text(doc, name) {
         Some(text) => text.lines().map(|s| s.to_string()).collect(),

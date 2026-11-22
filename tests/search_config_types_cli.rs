@@ -80,7 +80,7 @@ fn add_note(project: &Path) {
 }
 
 fn create_note(project: &Path, title: &str, description: &str, extra: &[&str]) -> String {
-    let mut args: Vec<&str> = vec!["note", "create", title, "-d", description];
+    let mut args: Vec<&str> = vec!["note", "create", title, "--description", description];
     args.extend_from_slice(extra);
     stdout(&assert_ok(run(project, &args))).trim().to_string()
 }
@@ -371,7 +371,7 @@ fn t113_10_builtin_req_mockup_and_rule_titles_are_unchanged() {
             "Capture payment",
             "--group",
             "REQ-001",
-            "-d",
+            "--description",
             "cashier flow",
         ],
     ));
@@ -428,7 +428,13 @@ fn t113_11_ordering_limit_and_repeated_type_filter() {
     create_note(&d, "Order Marker Two", "order-marker", &[]);
     assert_ok(run(
         &d,
-        &["task", "create", "Order Marker Task", "-d", "order-marker"],
+        &[
+            "task",
+            "create",
+            "Order Marker Task",
+            "--description",
+            "order-marker",
+        ],
     ));
 
     let out = assert_ok(search(&d, &["order-marker"]));

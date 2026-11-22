@@ -77,7 +77,10 @@ fn add_document_type(project: &Path, slug: &str, prefix: &str, directory: &str) 
 }
 
 fn create_note(project: &Path, title: &str, description: &str) -> String {
-    run_ok(project, &["note", "create", title, "-d", description])
+    run_ok(
+        project,
+        &["note", "create", title, "--description", description],
+    )
 }
 
 fn write_record(project: &Path, id: &str, content: &str) {
@@ -860,7 +863,7 @@ fn t114_16_non_document_lists_use_the_shared_layout_without_a_filter() {
             "release",
             "create",
             "Release One",
-            "-d",
+            "--description",
             "Release description",
         ],
     );
@@ -870,7 +873,7 @@ fn t114_16_non_document_lists_use_the_shared_layout_without_a_filter() {
             "milestone",
             "create",
             "Milestone One",
-            "-d",
+            "--description",
             "Milestone description",
             "--release",
             "REL-001",
@@ -996,7 +999,7 @@ fn t182_01_newly_configured_type_omits_references_and_keeps_the_shared_layout() 
             "recipe",
             "create",
             "Recipe One",
-            "-d",
+            "--description",
             "body one",
             "--label",
             "cooking",
@@ -1004,7 +1007,16 @@ fn t182_01_newly_configured_type_omits_references_and_keeps_the_shared_layout() 
             "REF-R1",
         ],
     );
-    run_ok(&d, &["recipe", "create", "Recipe Two", "-d", "body two"]);
+    run_ok(
+        &d,
+        &[
+            "recipe",
+            "create",
+            "Recipe Two",
+            "--description",
+            "body two",
+        ],
+    );
     run_ok(&d, &["recipe", "status", "REC-002", "review"]);
     let server = Server::start(&d);
 
@@ -1054,7 +1066,7 @@ fn t182_02_cli_list_and_view_keep_generic_references() {
             "note",
             "create",
             "CLI note",
-            "-d",
+            "--description",
             "body",
             "--label",
             "alpha",
@@ -1124,7 +1136,16 @@ fn t182_03_glossary_landing_page_display_is_unchanged() {
 #[test]
 fn t182_04_list_views_and_assets_require_no_network_access() {
     let d = init("182-04");
-    run_ok(&d, &["milestone", "create", "Milestone One", "-d", "body"]);
+    run_ok(
+        &d,
+        &[
+            "milestone",
+            "create",
+            "Milestone One",
+            "--description",
+            "body",
+        ],
+    );
     let server = Server::start(&d);
     for path in ["/?type=note", "/?type=milestone", "/?type=ui-mockup"] {
         let html = get(&server, path).text();

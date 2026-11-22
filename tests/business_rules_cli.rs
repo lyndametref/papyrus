@@ -114,7 +114,7 @@ fn rule_basic_lifecycle() {
     assert!(s.contains("## Description\ndesc text"));
 
     // edit description only
-    let out = run(&d, &["rule", "edit", "RUL-001", "-d", "desc2"]);
+    let out = run(&d, &["rule", "edit", "RUL-001", "--description", "desc2"]);
     assert!(out.status.success());
     let out = run(&d, &["rule", "view", "RUL-001"]);
     let s = stdout(&out);
@@ -276,7 +276,7 @@ fn rule_sanitization_rejects_bad_input() {
     let before = fs::read_to_string(record(&d, "RUL-001")).unwrap();
     let out = run(&d, &["rule", "edit", "RUL-001", "--title", "x/y"]);
     assert_eq!(out.status.code(), Some(4));
-    let out = run(&d, &["rule", "edit", "RUL-001", "-d", "a\tb"]);
+    let out = run(&d, &["rule", "edit", "RUL-001", "--description", "a\tb"]);
     assert_eq!(out.status.code(), Some(4));
     assert_eq!(fs::read_to_string(record(&d, "RUL-001")).unwrap(), before);
 
@@ -291,23 +291,31 @@ fn rule_sanitization_rejects_bad_input() {
 fn rule_missing_required_args_exit_2() {
     let d = tmpdir("usage");
     init(&d);
-    let cases: &[&[&str]] = &[
-        &["rule", "create", "T"],
-        &["rule", "create", "T", "--description", "d"],
-        &[
-            "rule",
-            "create",
-            "T",
-            "--description",
-            "d",
-            "--rationale",
-            "r",
-        ],
-        &["rule", "create", "T", "--foo"],
+    let cases: &[(&[&str], i32)] = &[
+        (&["rule", "create", "T"], 4),
+        (&["rule", "create", "T", "--description", "d"], 4),
+        (
+            &[
+                "rule",
+                "create",
+                "T",
+                "--description",
+                "d",
+                "--rationale",
+                "r",
+            ],
+            4,
+        ),
+        (&["rule", "create", "T", "--foo"], 2),
     ];
-    for args in cases {
+    for (args, expected) in cases {
         let out = run(&d, args);
-        assert_eq!(out.status.code(), Some(2), "args={:?}", args);
+        assert_eq!(out.status.code(), Some(*expected), "args={:?}", args);
+    }
+    let out = run(&d, &["rule", "create", "T"]);
+    let message = String::from_utf8_lossy(&out.stderr);
+    for key in ["description", "rationale", "applicability"] {
+        assert!(message.contains(key), "{message}");
     }
     let _ = fs::remove_dir_all(&d);
 }

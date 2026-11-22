@@ -40,7 +40,7 @@ fn req_group_and_requirement_lifecycle() {
             "G",
             "--story",
             "s",
-            "-d",
+            "--description",
             "d",
         ])
         .output()
@@ -171,7 +171,7 @@ fn nfr_basic() {
             "create-group",
             "--title",
             "NG",
-            "-d",
+            "--description",
             "desc",
         ])
         .output()
@@ -180,7 +180,15 @@ fn nfr_basic() {
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "NFR-001");
     let out = bin()
         .args([
-            "--dir", p, "nfr", "create", "NR", "-d", "nd", "--group", "NFR-001",
+            "--dir",
+            p,
+            "nfr",
+            "create",
+            "NR",
+            "--description",
+            "nd",
+            "--group",
+            "NFR-001",
         ])
         .output()
         .unwrap();
@@ -361,7 +369,7 @@ fn sanitization_story_desc_group_id() {
                 "create-group",
                 "--title",
                 "G3",
-                "-d",
+                "--description",
                 bad,
             ])
             .output()

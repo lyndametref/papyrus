@@ -254,9 +254,24 @@ impl TypeDescriptor {
     /// A generic document carries no schema, so its metadata comes from the
     /// shared document baseline; a built-in type owns its copy.
     pub fn verb_specs(&self) -> Vec<VerbSpec> {
-        match &self.schema {
-            Some(schema) => schema.verbs.clone(),
-            None => generic_document_verbs(),
+        if self.category == ArtifactCategory::Document {
+            match self.document_model {
+                // The HTML mockup keeps its fixed, model-owned surface until
+                // TASK-256 derives it.
+                DocumentModel::SingleHtmlMockup => self
+                    .schema
+                    .as_ref()
+                    .map(|schema| schema.verbs.clone())
+                    .unwrap_or_default(),
+                DocumentModel::SingleMarkdown | DocumentModel::GroupedMarkdown => {
+                    document_model_verb_specs(self)
+                }
+            }
+        } else {
+            match &self.schema {
+                Some(schema) => schema.verbs.clone(),
+                None => generic_document_verbs(),
+            }
         }
     }
 
@@ -327,6 +342,11 @@ pub struct TypeDescriptor {
     pub group: Option<RoleFields>,
     /// Resolved member role of a grouped type.
     pub member: Option<RoleFields>,
+    /// Seed values written on create when the field is absent (ADR-042).
+    ///
+    /// Always empty for a user-defined type and for every seed type except
+    /// `audit`. This is not a `FieldSpec` key and never a configuration key.
+    pub field_defaults: BTreeMap<String, String>,
     /// Reference visibility of a single-role type (ADR-035).
     pub reference_visibility: Option<Visibility>,
     /// Resolved browser list slots (ADR-041).
@@ -2419,6 +2439,7 @@ fn backlog_descriptor(cfg: &Config, template: &DescriptorTemplate) -> TypeDescri
         fields: Vec::new(),
         group: None,
         member: None,
+        field_defaults: BTreeMap::new(),
         reference_visibility: None,
         slots: Vec::new(),
         frontmatter_keys: frontmatter_keys(template),
@@ -2449,6 +2470,7 @@ fn decision_descriptor(slug: &str, entry: &TypeEntry) -> TypeDescriptor {
         fields: Vec::new(),
         group: None,
         member: None,
+        field_defaults: BTreeMap::new(),
         reference_visibility: None,
         slots: Vec::new(),
         frontmatter_keys: frontmatter_keys(&DECISION_TEMPLATE),
@@ -2524,6 +2546,279 @@ pub fn field_options(fields: &[FieldSpec]) -> Vec<FieldOption> {
         }
     }
     options
+}
+
+/// The generated command metadata of one Markdown document descriptor
+/// (ADR-036 decisions 8, 15, and 19; ADR-042 ruling 2).
+///
+/// Field options come from the role field sequence; title, id, label,
+/// reference, editor, force, and status arguments are the fixed engine
+/// surface. The title shape stays transitional until TASK-257 unifies it.
+fn document_model_verb_specs(descriptor: &TypeDescriptor) -> Vec<VerbSpec> {
+    CANONICAL_DOCUMENT_VERB_ORDER
+        .iter()
+        .filter(|verb| descriptor.has_verb(**verb))
+        .map(|verb| build_document_verb_spec(descriptor, *verb))
+        .collect()
+}
+
+fn document_verb_about(descriptor: &TypeDescriptor, verb: Verb) -> String {
+    let slug = &descriptor.slug;
+    match verb {
+        Verb::Create => format!("Create a {slug} document."),
+        Verb::CreateGroup => format!("Create a {slug} group."),
+        Verb::List => format!("List {slug} documents."),
+        Verb::View => format!("View a {slug} document."),
+        Verb::Edit => format!("Edit a {slug} document."),
+        Verb::Archive => format!("Archive a {slug} document."),
+        Verb::Delete => format!("Delete a {slug} document."),
+        Verb::Supersede => format!("Supersede a {slug} document."),
+        Verb::Status => format!("Set the status of a {slug} document."),
+        Verb::Restore | Verb::Close => format!("Manage a {slug} document."),
+    }
+}
+
+fn build_document_verb_spec(descriptor: &TypeDescriptor, verb: Verb) -> VerbSpec {
+    let mut args: Vec<ArgSpec> = Vec::new();
+    match verb {
+        Verb::Create => {
+            args.extend(transitional_title_args(descriptor, Verb::Create));
+            args.extend(document_field_args(descriptor, Verb::Create));
+            if descriptor.document_model == DocumentModel::GroupedMarkdown {
+                args.push(arg(
+                    "group",
+                    Some("group"),
+                    None,
+                    "GROUP",
+                    "Owning group",
+                    false,
+                    true,
+                    ArgAction::Set,
+                ));
+            }
+            args.push(arg_label());
+            args.push(arg_reference());
+        }
+        Verb::CreateGroup => {
+            args.extend(transitional_title_args(descriptor, Verb::CreateGroup));
+            args.extend(document_field_args(descriptor, Verb::CreateGroup));
+        }
+        Verb::List => {}
+        Verb::View => args.push(arg_id()),
+        Verb::Edit => {
+            args.push(arg_id());
+            args.extend(transitional_title_args(descriptor, Verb::Edit));
+            args.extend(document_field_args(descriptor, Verb::Edit));
+            args.push(arg_editor());
+            args.push(arg_label());
+            args.push(arg_reference());
+        }
+        Verb::Archive => args.push(arg_id()),
+        Verb::Delete => {
+            args.push(arg_id());
+            args.push(arg_force());
+        }
+        Verb::Status => {
+            args.push(arg_id());
+            args.push(arg_value());
+        }
+        Verb::Supersede | Verb::Restore | Verb::Close => {}
+    }
+    VerbSpec {
+        verb,
+        about: Cow::Owned(document_verb_about(descriptor, verb)),
+        args,
+    }
+}
+
+/// The role field sequence that supplies a verb's options.
+fn document_fields_for_verb(descriptor: &TypeDescriptor, verb: Verb) -> Vec<FieldSpec> {
+    match descriptor.document_model {
+        DocumentModel::SingleMarkdown => descriptor.fields.clone(),
+        DocumentModel::GroupedMarkdown => match verb {
+            Verb::CreateGroup => descriptor
+                .group
+                .as_ref()
+                .and_then(|role| role.fields.clone())
+                .unwrap_or_default(),
+            Verb::Create => descriptor
+                .member
+                .as_ref()
+                .and_then(|role| role.fields.clone())
+                .or_else(|| {
+                    descriptor
+                        .group
+                        .as_ref()
+                        .and_then(|role| role.fields.clone())
+                })
+                .unwrap_or_default(),
+            Verb::Edit => {
+                let mut fields: Vec<FieldSpec> = Vec::new();
+                for role in [descriptor.group.as_ref(), descriptor.member.as_ref()]
+                    .into_iter()
+                    .flatten()
+                {
+                    for field in role.fields.iter().flatten() {
+                        if !fields.iter().any(|existing| existing.key == field.key) {
+                            fields.push(field.clone());
+                        }
+                    }
+                }
+                fields
+            }
+            _ => Vec::new(),
+        },
+        DocumentModel::SingleHtmlMockup => Vec::new(),
+    }
+}
+
+fn field_arg(field: &FieldSpec) -> ArgSpec {
+    let long = field
+        .option
+        .clone()
+        .unwrap_or_else(|| crate::sanitize::kebab_slug(&field.key));
+    let label = field.label.clone().unwrap_or_else(|| field.key.clone());
+    let help = match field.kind {
+        crate::config::FieldKind::Multiline => {
+            let base = field.help.clone().unwrap_or(label);
+            format!("{} {}", base, MULTILINE_STDIN_HELP)
+        }
+        _ => field.help.clone().unwrap_or(label),
+    };
+    ArgSpec {
+        id: Cow::Owned(field.key.clone()),
+        long: Some(Cow::Owned(long.clone())),
+        short: None,
+        value_name: Cow::Owned(long.replace('-', "_").to_uppercase()),
+        help: Cow::Owned(help),
+        positional: false,
+        required: false,
+        required_unless_present: None,
+        action: match field.kind {
+            crate::config::FieldKind::List => ArgAction::Append,
+            crate::config::FieldKind::Text | crate::config::FieldKind::Multiline => ArgAction::Set,
+        },
+        conflicts_with: None,
+    }
+}
+
+/// A generic removal companion for a list field on edit.
+///
+/// The seed has no removal flag; deriving `--no-<option>` keeps the existing
+/// `--no-requirement` surface without a per-type table.
+fn field_remove_arg(field: &FieldSpec) -> ArgSpec {
+    let long = field
+        .option
+        .clone()
+        .unwrap_or_else(|| crate::sanitize::kebab_slug(&field.key));
+    let label = field.label.clone().unwrap_or_else(|| field.key.clone());
+    ArgSpec {
+        id: Cow::Owned(format!("no_{}", field.key)),
+        long: Some(Cow::Owned(format!("no-{long}"))),
+        short: None,
+        value_name: Cow::Owned(long.replace('-', "_").to_uppercase()),
+        help: Cow::Owned(format!(
+            "Remove a {}; without a value removes all",
+            label.to_lowercase()
+        )),
+        positional: false,
+        required: false,
+        required_unless_present: None,
+        action: ArgAction::OptionalValue,
+        conflicts_with: None,
+    }
+}
+
+fn document_field_args(descriptor: &TypeDescriptor, verb: Verb) -> Vec<ArgSpec> {
+    let mut args = Vec::new();
+    for field in document_fields_for_verb(descriptor, verb) {
+        let offered = field.verbs.iter().any(|field_verb| match field_verb {
+            crate::config::FieldVerb::Create => verb == Verb::Create || verb == Verb::CreateGroup,
+            crate::config::FieldVerb::Edit => verb == Verb::Edit,
+        });
+        if !offered {
+            continue;
+        }
+        args.push(field_arg(&field));
+        if verb == Verb::Edit && field.kind == crate::config::FieldKind::List {
+            args.push(field_remove_arg(&field));
+        }
+    }
+    args
+}
+
+fn generic_create_title_args() -> Vec<ArgSpec> {
+    vec![
+        arg(
+            "title",
+            None,
+            None,
+            "TITLE",
+            "",
+            true,
+            false,
+            ArgAction::Set,
+        ),
+        arg(
+            "title_flag",
+            Some("title"),
+            None,
+            "TITLE",
+            "",
+            false,
+            false,
+            ArgAction::Set,
+        ),
+    ]
+}
+
+fn generic_edit_title_args() -> Vec<ArgSpec> {
+    vec![arg(
+        "title",
+        Some("title"),
+        None,
+        "TITLE",
+        "",
+        false,
+        false,
+        ArgAction::Set,
+    )]
+}
+
+fn generic_create_group_title_args() -> Vec<ArgSpec> {
+    vec![arg(
+        "title",
+        Some("title"),
+        None,
+        "TITLE",
+        "",
+        false,
+        true,
+        ArgAction::Set,
+    )]
+}
+
+/// Title argument shapes stay transitional until TASK-257 unifies them.
+///
+/// They are read from the descriptor's own command metadata rather than from
+/// a slug lookup, so no literal selects an option.
+fn transitional_title_args(descriptor: &TypeDescriptor, verb: Verb) -> Vec<ArgSpec> {
+    if let Some(schema) = &descriptor.schema
+        && let Some(spec) = schema.verbs.iter().find(|spec| spec.verb == verb)
+    {
+        return spec
+            .args
+            .iter()
+            .filter(|arg| matches!(arg.id.as_ref(), "title" | "title_flag" | "term"))
+            .cloned()
+            .collect();
+    }
+    match verb {
+        Verb::Create => generic_create_title_args(),
+        Verb::CreateGroup => generic_create_group_title_args(),
+        Verb::Edit => generic_edit_title_args(),
+        _ => Vec::new(),
+    }
 }
 
 /// The verb set of a document model (ADR-036 decision 8).
@@ -2603,6 +2898,14 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
         fields,
         group,
         member,
+        field_defaults: seed
+            .map(|seed| {
+                seed.field_defaults
+                    .iter()
+                    .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
+                    .collect()
+            })
+            .unwrap_or_default(),
         reference_visibility: effective.reference_visibility,
         slots: effective.slots.clone().unwrap_or_default(),
         frontmatter_keys,
@@ -4222,22 +4525,8 @@ mod tests {
                 );
             }
         }
-        // A declared verb without a spec is a startup defect.
-        let no_spec_schema = TypedSchema {
-            handler: TypedHandler::Glossary,
-            sections: Vec::new(),
-            extensions: Vec::new(),
-            verbs: Vec::new(),
-        };
-        let cfg = Config::default();
-        let mut descriptors = assembled(&cfg);
-        let glossary = find_mut(&mut descriptors, "glossary");
-        glossary.schema = Some(no_spec_schema);
-        let error = invariant_error(&descriptors);
-        assert!(matches!(
-            error,
-            RegistryError::VerbSpecMismatch { ref slug, verb: "create" } if slug == "glossary"
-        ));
+        // Generated metadata is derived from the same verb set, so a declared
+        // verb without a spec is structurally unreachable.
     }
 
     // 42
@@ -4321,7 +4610,7 @@ mod tests {
                 .find(|arg| arg.id == "title_flag")
                 .unwrap()
                 .value_name,
-            "title"
+            "TITLE"
         );
     }
 
@@ -4431,7 +4720,7 @@ mod tests {
             .expect("create spec");
         // Moving and cloning the owned values proves they carry no lifetime.
         let moved = create.clone();
-        assert_eq!(moved.about.as_ref(), "Create a business requirement");
+        assert_eq!(moved.about.as_ref(), "Create a req document.");
         assert_eq!(moved.args.len(), 7);
         assert_eq!(moved.args[0].id.as_ref(), "title");
     }

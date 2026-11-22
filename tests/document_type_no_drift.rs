@@ -639,8 +639,14 @@ fn d11_document_tree_is_descriptor_driven() {
         .collect::<Vec<_>>()
         .join("\n");
     assert!(
-        production.contains("fn dispatch_typed("),
-        "document::run must delegate typed content verbs through one handler"
+        production.contains("fn create_document(")
+            && production.contains("fn edit_document(")
+            && production.contains("fn view_document("),
+        "document::run must use the field-driven document engine"
+    );
+    assert!(
+        !production.contains("fn dispatch_typed("),
+        "the per-type dispatcher must be gone"
     );
     assert!(
         !production.contains("fn dispatch_typed_module"),

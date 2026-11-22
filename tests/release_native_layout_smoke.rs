@@ -1172,7 +1172,7 @@ fn t98_04_invisible_before_import_readable_after() {
             "Visible Requirement",
             "--group",
             "REQ-001",
-            "-d",
+            "--description",
             "Visible requirement body.",
         ],
     );

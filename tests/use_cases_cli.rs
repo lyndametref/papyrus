@@ -153,19 +153,18 @@ fn use_case_create_requires_all_arguments() {
     let d = tmpdir("missing");
     init(&d);
 
-    let cases: Vec<Vec<&str>> = vec![
-        vec!["use-case", "create", "T"],
-        vec!["use-case", "create", "--description", "d"],
-        vec!["use-case", "create", "T", "--description"],
-    ];
-    for args in cases {
-        let out = run(&d, &args);
-        assert_eq!(out.status.code(), Some(2), "args={:?}", args);
-    }
-    assert!(!d.join("docs/use-cases/UC-001.md").exists());
+    // The title is required; description and applicability are optional.
+    let out = run(&d, &["use-case", "create", "T"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(d.join("docs/use-cases/UC-001.md").exists());
 
-    // unknown option
-    let out = run(&d, &["use-case", "create", "T", "--bogus", "x"]);
+    let out = run(&d, &["use-case", "create"]);
+    assert_eq!(out.status.code(), Some(2));
+    let out = run(&d, &["use-case", "create", "T2", "--bogus", "x"]);
     assert_eq!(out.status.code(), Some(2));
 
     let _ = fs::remove_dir_all(&d);

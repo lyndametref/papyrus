@@ -75,7 +75,7 @@ fn create_release(project: &Path) -> String {
             "release",
             "create",
             "Release One",
-            "-d",
+            "--description",
             "First body",
             "--label",
             "alpha",

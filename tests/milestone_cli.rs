@@ -33,7 +33,15 @@ fn milestone_and_release_basic_lifecycle() {
 
     // release create
     let out = bin()
-        .args(["--dir", p, "release", "create", "R1", "-d", "rdesc"])
+        .args([
+            "--dir",
+            p,
+            "release",
+            "create",
+            "R1",
+            "--description",
+            "rdesc",
+        ])
         .output()
         .unwrap();
     assert!(out.status.success());
@@ -47,7 +55,7 @@ fn milestone_and_release_basic_lifecycle() {
             "milestone",
             "create",
             "M1",
-            "-d",
+            "--description",
             "mdesc",
             "--release",
             "REL-001",
@@ -142,7 +150,15 @@ fn milestone_and_release_basic_lifecycle() {
     // release edit
     let out = bin()
         .args([
-            "--dir", p, "release", "edit", "REL-001", "--title", "R2", "-d", "d2",
+            "--dir",
+            p,
+            "release",
+            "edit",
+            "REL-001",
+            "--title",
+            "R2",
+            "--description",
+            "d2",
         ])
         .output()
         .unwrap();
