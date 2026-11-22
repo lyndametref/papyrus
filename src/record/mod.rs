@@ -3,6 +3,7 @@
 pub mod descriptor;
 pub mod document;
 pub mod edit;
+pub mod field_map;
 pub mod frontmatter;
 pub mod identity;
 pub mod line_endings;
@@ -18,6 +19,7 @@ pub mod view;
 pub use descriptor::RecordDescriptor;
 pub use descriptor::descriptors as record_descriptors;
 pub use document::{Document, Section, parse as parse_document, render as render_document};
+pub use field_map::{DocumentFieldMap, FieldRole, FieldValue, ResolvedField};
 pub use frontmatter::FrontMatter;
 pub use identity::*;
 pub use patch::{Patch, PatchOp, apply_patch};

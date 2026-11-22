@@ -10,12 +10,14 @@ use crate::browser::records::{Index, Record, filter_statuses};
 use crate::browser::routes::{self, BrowserRoutes, NavGroup, PageRoute};
 use crate::config::Config;
 use crate::record::edit::FieldChange;
+use crate::record::field_map::{FieldRole, FieldValue};
 use crate::registry::{ArtifactCategory as CategoryKind, TypeDescriptor, TypedHandler};
 
 pub const LIST_TEMPLATE: &str = include_str!("templates/list.html");
 pub const VIEW_TEMPLATE: &str = include_str!("templates/view.html");
 pub const EDIT_TEMPLATE: &str = include_str!("templates/edit.html");
 pub const ERROR_TEMPLATE: &str = include_str!("templates/error.html");
+pub const DOCUMENT_EDIT_TEMPLATE: &str = include_str!("templates/document_edit.html");
 
 /// Escape a value for HTML text and double-quoted attribute contexts.
 pub fn escape(value: &str) -> String {
@@ -4019,11 +4021,135 @@ pub fn inventory_page(cfg: &Config, chrome: Chrome<'_>, cards: &[InventoryCard])
     )
 }
 
-pub const DOCUMENT_DETAIL_TEMPLATE: &str = include_str!("templates/document_detail.html");
-pub const DOCUMENT_EDIT_TEMPLATE: &str = include_str!("templates/document_edit.html");
+/// One generic document view for every document model (ADR-039 decision 19,
+/// TECH-068 section 4.1). Content comes only from the record field map.
+#[allow(clippy::too_many_arguments)]
+pub fn document_view_page(
+    record: &Record,
+    resolved_group: Option<&Record>,
+    members: &[Record],
+    resolved_dependencies: &[Option<Record>],
+    resolved_refs: &[Option<Record>],
+    dependents: &[Record],
+    cfg: &Config,
+    chrome: Chrome<'_>,
+) -> RecordPage {
+    let mut content = String::new();
+    let mut details = String::new();
+    let mut has_math = false;
+    let mut has_diagram = false;
+    let mut next_diagram = 1u32;
 
-/// Generic document detail page (section 4.1).
-pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -> RecordPage {
+    if record.descriptor.document_model == crate::registry::DocumentModel::SingleHtmlMockup {
+        content.push_str(&fixed_metadata_block(record));
+    } else {
+        for field in &record.field_map.fields {
+            let body = match &field.value {
+                FieldValue::Absent if !field.required => continue,
+                FieldValue::Absent => String::new(),
+                FieldValue::Text(text) => {
+                    let prose = math::prose_with_diagrams(text, "", &mut next_diagram);
+                    has_math |= prose.has_math;
+                    has_diagram |= prose.has_diagram;
+                    prose.html
+                }
+                FieldValue::Items(items) => {
+                    let items: String = items
+                        .iter()
+                        .map(|item| format!("<li>{}</li>", escape(item)))
+                        .collect();
+                    format!("<ul class=\"req-list\">{items}</ul>")
+                }
+            };
+            content.push_str(&format!(
+                "<section class=\"record-section\"><h2>{}</h2>{}</section>",
+                escape(&field.label),
+                body
+            ));
+        }
+
+        if record.field_map.role == FieldRole::Group {
+            content.push_str(&format!(
+                "<section class=\"record-section\"><h2>Requirements in this group</h2>{}</section>",
+                member_list(members)
+            ));
+        }
+
+        if record.field_map.role == FieldRole::Member
+            && let Some(group_id) = record.group_id.as_deref()
+        {
+            if let Some(group) = resolved_group {
+                details.push_str(&format!(
+                    "<details><summary>Owning group</summary><p><a href=\"/doc/{}\">{} {}</a></p></details>",
+                    escape(&group.id),
+                    escape(group_id),
+                    escape(&group.title)
+                ));
+            } else {
+                details.push_str(&format!(
+                    "<details><summary>Owning group</summary><p>{} <span class=\"unresolved\">(not an active group)</span></p></details>",
+                    escape(group_id)
+                ));
+            }
+        }
+
+        let extra = extra_metadata_block(&record.field_map.extra_metadata);
+        content.push_str(&extra);
+    }
+
+    if !record.refs.is_empty() {
+        details.push_str(&format!(
+            "<details><summary>References ({})</summary><ul class=\"req-list\">",
+            record.refs.len()
+        ));
+        for (i, rref) in record.refs.iter().enumerate() {
+            let resolved = resolved_refs.get(i).and_then(|r| r.as_ref());
+            match resolved {
+                Some(rel) => details.push_str(&format!(
+                    "<li><a href=\"/doc/{}\">{}</a></li>",
+                    escape(&rel.id),
+                    escape(rref)
+                )),
+                None => details.push_str(&format!("<li>{}</li>", escape(rref))),
+            }
+        }
+        details.push_str("</ul></details>");
+    }
+    if !record.dependencies.is_empty() {
+        details.push_str(&format!(
+            "<details><summary>Dependencies ({})</summary><ul class=\"req-list\">",
+            record.dependencies.len()
+        ));
+        for (i, dep) in record.dependencies.iter().enumerate() {
+            let resolved = resolved_dependencies.get(i).and_then(|r| r.as_ref());
+            match resolved {
+                Some(rel) => details.push_str(&format!(
+                    "<li><a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a></li>",
+                    escape(&rel.id),
+                    escape(dep),
+                    escape(&rel.title)
+                )),
+                None => details.push_str(&format!("<li>{}</li>", escape(dep))),
+            }
+        }
+        details.push_str("</ul></details>");
+    }
+    if !dependents.is_empty() {
+        details.push_str(&format!(
+            "<details><summary>Dependents ({})</summary><ul class=\"req-list\">",
+            dependents.len()
+        ));
+        for dep in dependents {
+            details.push_str(&format!(
+                "<li><a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a></li>",
+                escape(&dep.id),
+                escape(&dep.id),
+                escape(&dep.title)
+            ));
+        }
+        details.push_str("</ul></details>");
+    }
+
     let view = record_view(record);
     let created = view
         .as_ref()
@@ -4043,64 +4169,21 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
     } else {
         updated
     };
-
-    let mut tags = String::new();
-    for label in &record.labels {
-        tags.push_str(&format!("<span class=\"tag\">{}</span>", escape(label)));
-    }
+    let tags: String = record
+        .labels
+        .iter()
+        .map(|label| format!("<span class=\"tag\">{}</span>", escape(label)))
+        .collect();
     let label_tags = if tags.is_empty() {
         String::new()
     } else {
-        format!("<p class=\"taglist\">{}</p>", tags)
+        format!("<p class=\"taglist\">{tags}</p>")
     };
-
-    let mut has_math = false;
-    let mut has_diagram = false;
-    let mut next_diagram = 1u32;
-    let description = record
-        .description
-        .as_deref()
-        .filter(|value| !value.trim().is_empty())
-        .map(|value| {
-            let prose = math::prose_with_diagrams(value, "", &mut next_diagram);
-            has_math |= prose.has_math;
-            has_diagram |= prose.has_diagram;
-            prose.html
-        })
-        .unwrap_or_else(|| "<p>No description.</p>".to_string());
-
-    let skip = [
-        "id",
-        "title",
-        "created_date",
-        "updated_date",
-        "labels",
-        "references",
-        "status",
-        "decision_type",
-        "audit_type",
-    ];
-    let metadata = record_view_extra_rows(record, &skip);
-
-    let mut references = String::new();
-    if !record.refs.is_empty() {
-        let items: String = record
-            .refs
-            .iter()
-            .map(|value| format!("<li>{}</li>", escape(value)))
-            .collect();
-        references = format!(
-            "<details><summary>References ({})</summary><ul class=\"req-list\">{}</ul></details>",
-            record.refs.len(),
-            items
-        );
-    }
-
-    let content = format!(
-        "<section class=\"record-section\"><h2>Description</h2>{}</section>{}",
-        description, metadata
-    );
-
+    let details_html = if details.is_empty() {
+        String::new()
+    } else {
+        details
+    };
     let id = escape(&record.id);
     let title = escape(&record.title);
     let status = escape(&record.status_text());
@@ -4113,15 +4196,15 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
         escape(&created),
         escape(&updated),
         label_tags,
-        references,
+        details_html,
         id
     );
 
     let body = render_template(
-        DOCUMENT_DETAIL_TEMPLATE,
+        VIEW_TEMPLATE,
         &[],
         &[
-            ("breadcrumb", &breadcrumb(record, None, None, None)),
+            ("breadcrumb", &document_breadcrumb(record)),
             ("page_head", &page_head),
             ("meta", ""),
             ("content", &content),
@@ -4136,6 +4219,65 @@ pub fn document_detail_page(record: &Record, cfg: &Config, chrome: Chrome<'_>) -
         &page_assets(has_math, has_diagram),
     );
     RecordPage { html, has_diagram }
+}
+
+fn document_breadcrumb(record: &Record) -> String {
+    let label = record.type_label();
+    let type_key = routes::legacy_url_key(record.slug());
+    format!(
+        "<nav class=\"breadcrumb\" aria-label=\"Breadcrumb\"><ol><li><a href=\"/?type={}\">{}</a></li><li><span aria-current=\"page\">{}</span></li></ol></nav>",
+        escape(type_key),
+        escape(&label),
+        escape(&record.id)
+    )
+}
+
+fn extra_metadata_block(extra: &[(String, String)]) -> String {
+    if extra.is_empty() {
+        return String::new();
+    }
+    let mut rows = String::new();
+    for (key, value) in extra {
+        let value = if value.trim().is_empty() {
+            "(none)"
+        } else {
+            value.as_str()
+        };
+        rows.push_str(&format!(
+            "<div><dt>{}</dt><dd>{}</dd></div>",
+            escape(&metadata_dt(key)),
+            escape(value)
+        ));
+    }
+    format!("<div class=\"meta\"><dl class=\"dl\">{rows}</dl></div>")
+}
+
+fn fixed_metadata_block(record: &Record) -> String {
+    let mut rows = String::new();
+    for (key, value) in &record.field_map.fixed_metadata {
+        let value = if value.trim().is_empty() {
+            "(none)"
+        } else {
+            value.as_str()
+        };
+        rows.push_str(&format!(
+            "<div><dt>{}</dt><dd>{}</dd></div>",
+            escape(&fixed_metadata_label(key)),
+            escape(value)
+        ));
+    }
+    format!("<div class=\"meta summary-card\"><dl class=\"dl\">{rows}</dl></div>")
+}
+
+fn fixed_metadata_label(key: &str) -> String {
+    match key {
+        "specs" => "UI specifications".to_string(),
+        "refs" => "References".to_string(),
+        "superseded_by" => "Superseded by".to_string(),
+        "task" => "Task".to_string(),
+        "status" => "Status".to_string(),
+        other => metadata_dt(other),
+    }
 }
 
 /// Submitted values for the generic document edit form.

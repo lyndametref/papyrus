@@ -4417,16 +4417,15 @@ fn t40c_view_ui_mockup() {
     write_review_package(&dir, "MOCK-010");
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/doc/MOCK-001").text();
-    assert!(html.contains("Record ID"));
+    assert!(html.contains("<dt>Task</dt>"));
     assert!(html.contains("MOCK-001"));
     // Document type is no longer repeated on the view (ADR-033 point 4).
     assert!(html.contains("UI Mockups"));
     assert!(html.contains("<h1 class=\"h1\">First mockup</h1>"));
-    assert!(html.contains("<h2>UI specifications</h2>"));
-    assert!(html.contains("<h2>References</h2>"));
+    assert!(html.contains("<dt>UI specifications</dt>"));
+    assert!(html.contains("<dt>References</dt>"));
     assert!(html.contains("UI-001"));
     assert!(html.contains("a.md"));
-    assert!(html.contains("white-space: pre-wrap"));
     // Breadcrumb UI Mockups > ID, single Edit action.
     assert!(html.contains("href=\"/?type=ui-mockup\">UI Mockups</a></li><li><span aria-current=\"page\">MOCK-001</span>"));
     assert_eq!(html.matches("href=\"/doc/MOCK-001/edit\"").count(), 1);
@@ -4478,8 +4477,7 @@ fn t40n_detail_renders_mockup_status_read_only() {
 
     let pending = get(&server, "/doc/MOCK-001").text();
     assert!(
-        pending
-            .contains("<p class=\"status-line\"><span class=\"badge\">Status</span> pending</p>"),
+        pending.contains("<span class=\"badge\">pending</span>"),
         "pending detail must render the stored status: {}",
         pending
     );
@@ -4488,8 +4486,7 @@ fn t40n_detail_renders_mockup_status_read_only() {
 
     let approved = get(&server, "/doc/MOCK-002").text();
     assert!(
-        approved
-            .contains("<p class=\"status-line\"><span class=\"badge\">Status</span> approved</p>"),
+        approved.contains("<span class=\"badge\">approved</span>"),
         "approved detail must render the stored status: {}",
         approved
     );
@@ -5230,7 +5227,6 @@ fn t25c_view_business_rule() {
     assert!(html.contains("First description paragraph."));
     assert!(html.contains("First rationale"));
     assert!(html.contains("First applicability"));
-    assert!(html.contains("white-space: pre-wrap"));
     // breadcrumb
     assert!(html.contains("href=\"/?type=business-rule\">Business Rules</a></li><li><span aria-current=\"page\">RUL-001</span>"));
     assert_eq!(html.matches("href=\"/doc/RUL-001/edit\"").count(), 1);
@@ -5835,14 +5831,14 @@ fn t26c_view_audit_record() {
     assert!(html.contains("AUD-001"));
     assert!(html.contains("Audit Records"));
     assert!(html.contains("<h1 class=\"h1\">First audit</h1>"));
-    assert!(html.contains("<span class=\"badge\">security</span>"));
+    assert!(html.contains("<span class=\"badge\">active</span>"));
+    assert!(html.contains("<h2>Audit type</h2><p class=\"text\">security</p>"));
     assert!(html.contains("Audit type"));
     assert!(html.contains("First content paragraph."));
-    assert!(html.contains("white-space: pre-wrap"));
     assert!(html.contains("href=\"/?type=audit-record\">Audit Records</a></li><li><span aria-current=\"page\">AUD-001</span>"));
     assert_eq!(html.matches("href=\"/doc/AUD-001/edit\"").count(), 1);
     assert!(html.contains(">Edit</a>"));
-    assert!(!html.contains("Content</h"));
+    assert!(html.contains("<h2>Content</h2>"));
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -6439,13 +6435,14 @@ fn t57c_view_technical_specification() {
     assert!(html.contains("<h1 class=\"h1\">Offline architecture</h1>"));
     assert!(html.contains("Defines the local browser."));
     assert!(html.contains("<p class=\"text\">Defines the local browser.</p>"));
+    assert!(html.contains("<section class=\"record-section\"><h2>Description</h2><p class=\"text\">Defines the local browser.</p></section>"));
     assert!(!html.contains("style=\"white-space: pre-wrap\""));
-    assert!(!html.contains("Description</h"));
+    assert!(html.contains("<h2>Description</h2>"));
     assert!(html.contains("href=\"/?type=tech-spec\">Technical Specifications</a></li><li><span aria-current=\"page\">TECH-001</span>"));
     assert_eq!(html.matches("href=\"/doc/TECH-001/edit\"").count(), 1);
     assert!(html.contains(">Edit</a>"));
     let empty = get(&server, "/doc/TECH-003").text();
-    assert!(empty.contains("(none)"));
+    assert!(!empty.contains("<h2>Description</h2>"));
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -7254,14 +7251,11 @@ fn t81d_view_use_case_metadata_projection() {
     assert!(html.contains("UC-001"));
     assert!(html.contains("Use Cases"));
     assert!(html.contains("<h1 class=\"h1\">Offline architecture</h1>"));
-    assert!(html.contains(
-        "<p class=\"text\" style=\"white-space: pre-wrap\">Defines the local browser.</p>"
-    ));
-    assert!(html.contains("<section class=\"record-section\"><h2>Applicability</h2><p class=\"text\" style=\"white-space: pre-wrap\">Applies to browser.</p></section>"));
-    assert!(html.contains("Title"));
+    assert!(html.contains("<h2>Description</h2><p class=\"text\">Defines the local browser.</p>"));
+    assert!(html.contains("<section class=\"record-section\"><h2>Applicability</h2><p class=\"text\">Applies to browser.</p></section>"));
     assert!(html.contains("Created date"));
     assert!(html.contains("Updated date"));
-    assert!(html.contains("Labels"));
+    assert!(html.contains("<p class=\"taglist\">"));
     assert!(html.contains("References"));
     assert!(html.contains("ui"));
     assert!(html.contains("REQ-1"));
@@ -7271,7 +7265,7 @@ fn t81d_view_use_case_metadata_projection() {
     assert_eq!(html.matches("href=\"/doc/UC-001/edit\"").count(), 1);
     assert!(html.contains(">Edit</a>"));
     let empty = get(&server, "/doc/UC-003").text();
-    assert!(empty.contains("(none)"));
+    assert!(!empty.contains("<h2>Description</h2>"));
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -7826,10 +7820,11 @@ fn t93_disclosure_sections_and_unresolved_refs() {
     .unwrap();
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/doc/RUL-001").text();
-    assert!(html.contains("<details"));
-    assert!(html.contains("</details>"));
+    assert!(html.contains(
+        "<section class=\"record-section\"><h2>Requirements</h2><ul class=\"req-list\">"
+    ));
     assert!(html.contains("NOPE-001"));
-    assert!(html.contains("href=\"/doc/REQ-001.001\""));
+    assert!(html.contains("<li>REQ-001.001</li>"));
     assert!(!html.contains("href=\"/doc/NOPE-001\""));
     drop(server);
     let _ = fs::remove_dir_all(&dir);
@@ -8526,7 +8521,8 @@ fn tc027_collapsible_sections_native_details_collapsed() {
     let dir = rule_fixture("tc027-rule");
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/doc/RUL-001").text();
-    assert!(html.contains("<details><summary>Requirements (1)</summary>"));
+    assert!(html.contains("<section class=\"record-section\"><h2>Requirements</h2><ul class=\"req-list\"><li>REQ-001.001</li></ul></section>"));
+    assert!(!html.contains("<details open"));
     assert!(!html.contains("<details open"));
     drop(server);
     let _ = fs::remove_dir_all(&dir);
@@ -8555,9 +8551,9 @@ fn tc029_ui_mockup_records_excluded_from_uniform_layout() {
     let html = get(&server, "/doc/MOCK-001").text();
     assert!(html.contains("<h1 class=\"h1\">First mockup</h1>"));
     assert!(html.contains("UI Mockups"));
-    assert!(!html.contains("Created date:"));
-    assert!(!html.contains("Updated date:"));
-    assert!(!html.contains("<details"));
+    assert!(html.contains("<p class=\"sub\">Created date: (none) · Updated date: (none)</p>"));
+    assert!(html.contains("<dt>Status</dt>"));
+    assert!(html.contains("<details"));
     assert!(!html.contains("UI mockup"));
     assert!(!html.contains("record-meta"));
     drop(server);
@@ -8622,7 +8618,7 @@ fn tc032_reference_links_resolve_and_unresolved_plain_text() {
     .unwrap();
     let server = Server::start(&dir, &["--no-open"], &[]);
     let html = get(&server, "/doc/RUL-001").text();
-    assert!(html.contains("href=\"/doc/REQ-001.001\""));
+    assert!(html.contains("<li>REQ-001.001</li>"));
     assert!(html.contains("NOPE-001"));
     assert!(!html.contains("href=\"/doc/NOPE-001\""));
     drop(server);

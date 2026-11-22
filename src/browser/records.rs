@@ -11,6 +11,7 @@ use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
 use crate::record::document::{self, Document};
+use crate::record::field_map::DocumentFieldMap;
 use crate::record::identity;
 use crate::record::view::RecordView;
 use crate::registry::{
@@ -33,6 +34,8 @@ pub const MAX_TEXT_CHARS: usize = 20000;
 pub struct Record {
     pub id: String,
     pub descriptor: TypeDescriptor,
+    /// The model-neutral content projection of a document record.
+    pub field_map: DocumentFieldMap,
     /// A grouped family's group record (`REQ-001`) rather than a member.
     pub is_group: bool,
     pub title: String,
@@ -261,6 +264,7 @@ fn default_record(
     Record {
         id,
         descriptor,
+        field_map: DocumentFieldMap::default(),
         is_group,
         title: String::new(),
         story: None,
@@ -533,6 +537,10 @@ pub fn load_record(
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty());
     }
+    if record.descriptor.category == CategoryKind::Document {
+        record.field_map =
+            DocumentFieldMap::build(&record.descriptor, is_group, &record.doc, view.as_ref());
+    }
     if let Some(mid) = record.milestone_id.clone() {
         record.milestone_title = resolve_title(ctx, cfg, registry, &mid);
     }
@@ -600,6 +608,22 @@ fn load_ui_mockup(
     record.specs = meta_record.specs.clone();
     record.refs = meta_record.refs.clone();
     record.mockup_task = meta_record.task.clone();
+    record.field_map = DocumentFieldMap::for_mockup(
+        &record.descriptor,
+        vec![
+            (
+                "status".to_string(),
+                record.status.clone().unwrap_or_default(),
+            ),
+            ("task".to_string(), record.mockup_task.clone()),
+            ("specs".to_string(), record.specs.join(" ")),
+            ("refs".to_string(), record.refs.join(" ")),
+            (
+                "superseded_by".to_string(),
+                record.superseded_by.clone().unwrap_or_default(),
+            ),
+        ],
+    );
     record.stored_source = record.doc.source.clone();
     let _ = cfg;
     Ok(Some(record))
