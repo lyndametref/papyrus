@@ -126,9 +126,9 @@ mod tests {
             sidebar: "<nav id=\"site-nav\">nav</nav>",
             main: "<main>math</main>",
             width: PageWidth::Capped,
-            assets: "<link rel=\"stylesheet\" href=\"/assets/katex/katex.min.css\">",
+            assets: "<link rel=\"stylesheet\" href=\"/assets/katex/0.16.11/katex.min.css\">",
         });
-        assert!(with_assets.contains("/assets/katex/katex.min.css"));
+        assert!(with_assets.contains("/assets/katex/0.16.11/katex.min.css"));
         assert!(with_assets.find("app.css") < with_assets.find("katex.min.css"));
     }
 

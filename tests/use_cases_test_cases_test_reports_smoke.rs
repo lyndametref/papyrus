@@ -670,7 +670,14 @@ fn milestone_use_cases_test_cases_test_reports_flow() {
     assert_eq!(res.status, 303);
     assert_eq!(res.header("Location"), Some("/doc/UC-001"));
 
-    let view = server.get("/doc/UC-001").text();
+    let view_response = server.get("/doc/UC-001");
+    let view = view_response.text();
+    assert_eq!(view_response.header("Cache-Control"), Some("no-store"));
+    assert!(view_response.header("ETag").is_none());
+    let json_response = server.get("/api/doc/UC-001");
+    assert_eq!(json_response.status, 200);
+    assert_eq!(json_response.header("Cache-Control"), Some("no-store"));
+    assert!(json_response.header("ETag").is_none());
     assert!(view.contains("<h1 class=\"h1\">quick brown fox browser edited</h1>"));
     assert!(view.contains("New body\nsecond line"));
     let cli = run_ok(&["--dir", &d, "use-case", "view", "UC-001"]);
@@ -689,7 +696,8 @@ fn milestone_use_cases_test_cases_test_reports_flow() {
     let res = server.get("/assets/app.css");
     assert_eq!(res.status, 200);
     assert!(res.header("Content-Type").unwrap().starts_with("text/css"));
-    assert_eq!(res.header("Cache-Control"), Some("no-store"));
+    assert_eq!(res.header("Cache-Control"), Some("no-cache"));
+    assert!(res.header("ETag").is_some());
     assert!(!res.body.is_empty());
     assert_no_external_refs(&res.text(), "stylesheet");
     let res = server.get("/assets/app.js");
@@ -699,7 +707,8 @@ fn milestone_use_cases_test_cases_test_reports_flow() {
             .unwrap()
             .starts_with("text/javascript")
     );
-    assert_eq!(res.header("Cache-Control"), Some("no-store"));
+    assert_eq!(res.header("Cache-Control"), Some("no-cache"));
+    assert!(res.header("ETag").is_some());
     assert!(!res.body.is_empty());
     assert_no_external_refs(&res.text(), "script");
 

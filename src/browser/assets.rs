@@ -4,7 +4,25 @@
 //! runtime asset directory, no path join, and no filesystem access: an asset
 //! path is matched byte-exactly against the entries below.
 //!
-//! The contract is `docs/architecture/adr/ADR-0027-vendored-embedded-browser-assets-and-packaging-notices.md`.
+//! Vendor files carry their packaged asset version in the URL, a literal
+//! compile-time path that mirrors the embedding path. First-party files stay
+//! unversioned and are revalidated by a strong SHA-256 `ETag`.
+//!
+//! The contract is `docs/architecture/adr/ADR-0027-vendored-embedded-browser-assets-and-packaging-notices.md`
+//! and `docs/architecture/adr/ADR-038-cacheable-immutable-browser-assets.md`.
+
+use std::collections::BTreeMap;
+
+use crate::browser::sha256;
+
+/// How an embedded asset is cached (ADR-038 decision 5).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AssetKind {
+    /// A vendored file served from a versioned, immutable URL.
+    Vendor,
+    /// A first-party file served unversioned with a strong `ETag`.
+    FirstParty,
+}
 
 /// One embedded file, addressed by its exact request path.
 pub struct Asset {
@@ -14,144 +32,119 @@ pub struct Asset {
     pub mime: &'static str,
     /// The file contents, embedded at compile time.
     pub bytes: &'static [u8],
+    /// The embedded file path relative to this module. The version-binding
+    /// test uses it to prove the URL version and the embedded directory agree.
+    pub embedded: &'static str,
+    /// The cache class produced by this entry.
+    pub kind: AssetKind,
 }
 
 const CSS: &str = "text/css; charset=utf-8";
 const JS: &str = "text/javascript; charset=utf-8";
 const WOFF2: &str = "font/woff2";
 
+macro_rules! first_party_asset {
+    ($path:literal, $mime:expr, $file:literal) => {
+        Asset {
+            path: $path,
+            mime: $mime,
+            bytes: include_bytes!($file),
+            embedded: $file,
+            kind: AssetKind::FirstParty,
+        }
+    };
+}
+
+macro_rules! vendor_asset {
+    ($mime:expr, $package:literal, $version:literal, $file:literal) => {
+        Asset {
+            path: concat!("/assets/", $package, "/", $version, "/", $file),
+            mime: $mime,
+            bytes: include_bytes!(concat!("vendor/", $package, "/", $version, "/", $file)),
+            embedded: concat!("vendor/", $package, "/", $version, "/", $file),
+            kind: AssetKind::Vendor,
+        }
+    };
+}
+
 /// Every embedded browser asset, one entry per served file.
 pub static ASSETS: &[Asset] = &[
-    Asset {
-        path: "/assets/app.css",
-        mime: CSS,
-        bytes: include_bytes!("app.css"),
-    },
-    Asset {
-        path: "/assets/app.js",
-        mime: JS,
-        bytes: include_bytes!("app.js"),
-    },
-    Asset {
-        path: "/assets/nav-state.js",
-        mime: JS,
-        bytes: include_bytes!("nav-state.js"),
-    },
-    Asset {
-        path: "/assets/katex/katex.min.css",
-        mime: CSS,
-        bytes: include_bytes!("vendor/katex/0.16.11/katex.min.css"),
-    },
-    Asset {
-        path: "/assets/katex/katex.min.js",
-        mime: JS,
-        bytes: include_bytes!("vendor/katex/0.16.11/katex.min.js"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_AMS-Regular.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_AMS-Regular.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Caligraphic-Bold.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Caligraphic-Bold.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Caligraphic-Regular.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Caligraphic-Regular.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Fraktur-Bold.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Fraktur-Bold.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Fraktur-Regular.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Fraktur-Regular.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Main-Bold.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Main-Bold.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Main-BoldItalic.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Main-BoldItalic.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Main-Italic.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Main-Italic.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Main-Regular.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Main-Regular.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Math-BoldItalic.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Math-BoldItalic.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Math-Italic.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Math-Italic.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_SansSerif-Bold.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_SansSerif-Bold.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_SansSerif-Italic.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_SansSerif-Italic.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_SansSerif-Regular.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_SansSerif-Regular.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Script-Regular.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Script-Regular.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Size1-Regular.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Size1-Regular.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Size2-Regular.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Size2-Regular.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Size3-Regular.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Size3-Regular.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Size4-Regular.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Size4-Regular.woff2"),
-    },
-    Asset {
-        path: "/assets/katex/fonts/KaTeX_Typewriter-Regular.woff2",
-        mime: WOFF2,
-        bytes: include_bytes!("vendor/katex/0.16.11/fonts/KaTeX_Typewriter-Regular.woff2"),
-    },
-    Asset {
-        path: "/assets/mermaid/mermaid.min.js",
-        mime: JS,
-        bytes: include_bytes!("vendor/mermaid/11.17.2/mermaid.min.js"),
-    },
+    first_party_asset!("/assets/app.css", CSS, "app.css"),
+    first_party_asset!("/assets/app.js", JS, "app.js"),
+    first_party_asset!("/assets/nav-state.js", JS, "nav-state.js"),
+    vendor_asset!(CSS, "katex", "0.16.11", "katex.min.css"),
+    vendor_asset!(JS, "katex", "0.16.11", "katex.min.js"),
+    vendor_asset!(WOFF2, "katex", "0.16.11", "fonts/KaTeX_AMS-Regular.woff2"),
+    vendor_asset!(
+        WOFF2,
+        "katex",
+        "0.16.11",
+        "fonts/KaTeX_Caligraphic-Bold.woff2"
+    ),
+    vendor_asset!(
+        WOFF2,
+        "katex",
+        "0.16.11",
+        "fonts/KaTeX_Caligraphic-Regular.woff2"
+    ),
+    vendor_asset!(WOFF2, "katex", "0.16.11", "fonts/KaTeX_Fraktur-Bold.woff2"),
+    vendor_asset!(
+        WOFF2,
+        "katex",
+        "0.16.11",
+        "fonts/KaTeX_Fraktur-Regular.woff2"
+    ),
+    vendor_asset!(WOFF2, "katex", "0.16.11", "fonts/KaTeX_Main-Bold.woff2"),
+    vendor_asset!(
+        WOFF2,
+        "katex",
+        "0.16.11",
+        "fonts/KaTeX_Main-BoldItalic.woff2"
+    ),
+    vendor_asset!(WOFF2, "katex", "0.16.11", "fonts/KaTeX_Main-Italic.woff2"),
+    vendor_asset!(WOFF2, "katex", "0.16.11", "fonts/KaTeX_Main-Regular.woff2"),
+    vendor_asset!(
+        WOFF2,
+        "katex",
+        "0.16.11",
+        "fonts/KaTeX_Math-BoldItalic.woff2"
+    ),
+    vendor_asset!(WOFF2, "katex", "0.16.11", "fonts/KaTeX_Math-Italic.woff2"),
+    vendor_asset!(
+        WOFF2,
+        "katex",
+        "0.16.11",
+        "fonts/KaTeX_SansSerif-Bold.woff2"
+    ),
+    vendor_asset!(
+        WOFF2,
+        "katex",
+        "0.16.11",
+        "fonts/KaTeX_SansSerif-Italic.woff2"
+    ),
+    vendor_asset!(
+        WOFF2,
+        "katex",
+        "0.16.11",
+        "fonts/KaTeX_SansSerif-Regular.woff2"
+    ),
+    vendor_asset!(
+        WOFF2,
+        "katex",
+        "0.16.11",
+        "fonts/KaTeX_Script-Regular.woff2"
+    ),
+    vendor_asset!(WOFF2, "katex", "0.16.11", "fonts/KaTeX_Size1-Regular.woff2"),
+    vendor_asset!(WOFF2, "katex", "0.16.11", "fonts/KaTeX_Size2-Regular.woff2"),
+    vendor_asset!(WOFF2, "katex", "0.16.11", "fonts/KaTeX_Size3-Regular.woff2"),
+    vendor_asset!(WOFF2, "katex", "0.16.11", "fonts/KaTeX_Size4-Regular.woff2"),
+    vendor_asset!(
+        WOFF2,
+        "katex",
+        "0.16.11",
+        "fonts/KaTeX_Typewriter-Regular.woff2"
+    ),
+    vendor_asset!(JS, "mermaid", "11.17.2", "mermaid.min.js"),
 ];
 
 /// Resolve an exact asset request path.
@@ -162,103 +155,44 @@ pub fn lookup(path: &str) -> Option<&'static Asset> {
     ASSETS.iter().find(|asset| asset.path == path)
 }
 
+/// Compute the strong `ETag` for every first-party asset once at startup.
+///
+/// The value is a double quote, the SHA-256 of the exact embedded bytes as 64
+/// lowercase hexadecimal characters, and a double quote. The caller holds the
+/// map for the process lifetime, so validation never re-hashes a request body
+/// and a reload cannot change a validator.
+pub fn first_party_etags() -> BTreeMap<&'static str, String> {
+    ASSETS
+        .iter()
+        .filter(|asset| asset.kind == AssetKind::FirstParty)
+        .map(|asset| {
+            let digest = sha256::digest(asset.bytes);
+            (asset.path, format!("\"{}\"", sha256::hex(&digest)))
+        })
+        .collect()
+}
+
+/// The strong `ETag` for a first-party asset from the startup map.
+///
+/// Vendor assets have no validator and return `None`.
+pub fn etag<'a>(
+    etags: &'a BTreeMap<&'static str, String>,
+    asset: &'static Asset,
+) -> Option<&'a str> {
+    etags.get(asset.path).map(String::as_str)
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
 
-    use super::ASSETS;
-
-    const K: [u32; 64] = [
-        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
-        0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
-        0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
-        0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
-        0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
-        0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
-        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
-        0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
-        0xc67178f2,
-    ];
-
-    fn sha256(data: &[u8]) -> [u8; 32] {
-        let mut state: [u32; 8] = [
-            0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
-            0x5be0cd19,
-        ];
-        let bit_len = (data.len() as u64).wrapping_mul(8);
-        let mut message = data.to_vec();
-        message.push(0x80);
-        while message.len() % 64 != 56 {
-            message.push(0);
-        }
-        message.extend_from_slice(&bit_len.to_be_bytes());
-        for chunk in message.as_chunks::<64>().0 {
-            let mut words = [0u32; 64];
-            for (index, word) in words.iter_mut().take(16).enumerate() {
-                let start = index * 4;
-                *word = u32::from_be_bytes([
-                    chunk[start],
-                    chunk[start + 1],
-                    chunk[start + 2],
-                    chunk[start + 3],
-                ]);
-            }
-            for index in 16..64 {
-                let s0 = words[index - 15].rotate_right(7)
-                    ^ words[index - 15].rotate_right(18)
-                    ^ (words[index - 15] >> 3);
-                let s1 = words[index - 2].rotate_right(17)
-                    ^ words[index - 2].rotate_right(19)
-                    ^ (words[index - 2] >> 10);
-                words[index] = words[index - 16]
-                    .wrapping_add(s0)
-                    .wrapping_add(words[index - 7])
-                    .wrapping_add(s1);
-            }
-            let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut h] = state;
-            for index in 0..64 {
-                let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
-                let ch = (e & f) ^ ((!e) & g);
-                let temp1 = h
-                    .wrapping_add(s1)
-                    .wrapping_add(ch)
-                    .wrapping_add(K[index])
-                    .wrapping_add(words[index]);
-                let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
-                let maj = (a & b) ^ (a & c) ^ (b & c);
-                let temp2 = s0.wrapping_add(maj);
-                h = g;
-                g = f;
-                f = e;
-                e = d.wrapping_add(temp1);
-                d = c;
-                c = b;
-                b = a;
-                a = temp1.wrapping_add(temp2);
-            }
-            state[0] = state[0].wrapping_add(a);
-            state[1] = state[1].wrapping_add(b);
-            state[2] = state[2].wrapping_add(c);
-            state[3] = state[3].wrapping_add(d);
-            state[4] = state[4].wrapping_add(e);
-            state[5] = state[5].wrapping_add(f);
-            state[6] = state[6].wrapping_add(g);
-            state[7] = state[7].wrapping_add(h);
-        }
-        let mut digest = [0u8; 32];
-        for (index, word) in state.iter().enumerate() {
-            digest[index * 4..index * 4 + 4].copy_from_slice(&word.to_be_bytes());
-        }
-        digest
-    }
-
-    fn hex(digest: &[u8; 32]) -> String {
-        digest.iter().map(|byte| format!("{byte:02x}")).collect()
-    }
+    use super::{ASSETS, AssetKind, etag, first_party_etags, lookup};
+    use crate::browser::sha256;
 
     struct ManifestRow {
         asset_path: String,
+        package: String,
+        version: String,
         bytes: usize,
         sha256: String,
     }
@@ -276,13 +210,15 @@ mod tests {
             if !asset_path.starts_with("/assets/") {
                 continue;
             }
-            let (bytes_index, sha_index) = match fields.len() {
-                7 => (5, 6),
-                3 => (1, 2),
+            let (package, version, bytes_index, sha_index) = match fields.len() {
+                7 => (fields[1].to_string(), fields[2].to_string(), 5, 6),
+                3 => (String::new(), String::new(), 1, 2),
                 width => panic!("unexpected manifest row width {width}: {line}"),
             };
             rows.push(ManifestRow {
                 asset_path: asset_path.to_string(),
+                package,
+                version,
                 bytes: fields[bytes_index]
                     .parse()
                     .unwrap_or_else(|_| panic!("invalid byte count in: {line}")),
@@ -292,16 +228,30 @@ mod tests {
         rows
     }
 
-    #[test]
-    fn sha256_matches_standard_vectors() {
-        assert_eq!(
-            hex(&sha256(b"")),
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        );
-        assert_eq!(
-            hex(&sha256(b"abc")),
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-        );
+    /// Split a served vendor path into `(package, version, file)`.
+    fn vendor_path_parts(path: &str) -> Option<(&str, &str, &str)> {
+        let rest = path.strip_prefix("/assets/")?;
+        let mut parts = rest.splitn(3, '/');
+        let package = parts.next()?;
+        let version = parts.next()?;
+        let file = parts.next()?;
+        if package.is_empty() || version.is_empty() || file.is_empty() {
+            return None;
+        }
+        Some((package, version, file))
+    }
+
+    /// Split an embedded path into `(package, version, file)`.
+    fn embedded_path_parts(path: &str) -> Option<(&str, &str, &str)> {
+        let rest = path.strip_prefix("vendor/")?;
+        let mut parts = rest.splitn(3, '/');
+        let package = parts.next()?;
+        let version = parts.next()?;
+        let file = parts.next()?;
+        if package.is_empty() || version.is_empty() || file.is_empty() {
+            return None;
+        }
+        Some((package, version, file))
     }
 
     #[test]
@@ -331,10 +281,46 @@ mod tests {
             );
             assert_eq!(
                 row.sha256,
-                hex(&sha256(asset.bytes)),
+                sha256::hex(&sha256::digest(asset.bytes)),
                 "sha256 mismatch for {}",
                 asset.path
             );
+
+            // Version binding: the served path version, the manifest
+            // `version` column, and the embedded directory are one value.
+            match asset.kind {
+                AssetKind::Vendor => {
+                    let (package, version, file) = vendor_path_parts(asset.path)
+                        .unwrap_or_else(|| panic!("vendor path is not versioned: {}", asset.path));
+                    let (embedded_package, embedded_version, embedded_file) =
+                        embedded_path_parts(asset.embedded).unwrap_or_else(|| {
+                            panic!("embedded vendor path is not versioned: {}", asset.embedded)
+                        });
+                    assert_eq!(package, embedded_package, "package {}", asset.path);
+                    assert_eq!(version, embedded_version, "version {}", asset.path);
+                    assert_eq!(file, embedded_file, "file {}", asset.path);
+                    assert_eq!(
+                        row.version, version,
+                        "manifest version for {} is not the served version",
+                        asset.path
+                    );
+                    assert_eq!(
+                        row.package.to_ascii_lowercase(),
+                        package,
+                        "manifest package for {} is not the served package",
+                        asset.path
+                    );
+                }
+                AssetKind::FirstParty => {
+                    assert!(
+                        vendor_path_parts(asset.path).is_none(),
+                        "first-party path gained a version segment: {}",
+                        asset.path
+                    );
+                    assert_eq!(row.package, "", "first-party row package {}", asset.path);
+                    assert_eq!(row.version, "", "first-party row version {}", asset.path);
+                }
+            }
         }
 
         for row in &rows {
@@ -343,6 +329,52 @@ mod tests {
                 "manifest row for an asset that is not embedded: {}",
                 row.asset_path
             );
+        }
+    }
+
+    #[test]
+    fn first_party_etags_are_strong_sha256_and_stable() {
+        let etags = first_party_etags();
+        let mut seen = 0;
+        for asset in ASSETS {
+            match asset.kind {
+                AssetKind::Vendor => {
+                    assert!(etag(&etags, asset).is_none(), "vendor {}", asset.path)
+                }
+                AssetKind::FirstParty => {
+                    seen += 1;
+                    let value = etag(&etags, asset).expect("first-party etag");
+                    let expected = format!("\"{}\"", sha256::hex(&sha256::digest(asset.bytes)));
+                    assert_eq!(value, expected, "etag for {}", asset.path);
+                    assert_eq!(value.len(), 66);
+                    assert!(value.starts_with('"') && value.ends_with('"'));
+                    assert!(
+                        value[1..65]
+                            .bytes()
+                            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()),
+                        "etag is not lowercase hex: {value}"
+                    );
+                    let again = etag(&etags, asset).expect("first-party etag");
+                    assert!(
+                        std::ptr::eq(value, again),
+                        "etag for {} is recomputed per call",
+                        asset.path
+                    );
+                }
+            }
+        }
+        assert_eq!(seen, 3, "exactly three first-party assets");
+    }
+
+    #[test]
+    fn unversioned_vendor_paths_are_absent() {
+        for path in [
+            "/assets/katex/katex.min.css",
+            "/assets/katex/katex.min.js",
+            "/assets/katex/fonts/KaTeX_Main-Regular.woff2",
+            "/assets/mermaid/mermaid.min.js",
+        ] {
+            assert!(lookup(path).is_none(), "unversioned alias {path}");
         }
     }
 }

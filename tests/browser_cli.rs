@@ -7,7 +7,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdout, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use papyrus::browser::assets::{self, ASSETS};
+use papyrus::browser::assets::{self, ASSETS, AssetKind};
+use papyrus::browser::sha256;
 
 fn bin() -> Command {
     Command::new(env!("CARGO_BIN_EXE_papyrus"))
@@ -401,6 +402,57 @@ fn request(
 
 fn get(server: &Server, path: &str) -> HttpResponse {
     request(server.port, "GET", path, &[], None)
+}
+
+const IMMUTABLE_CACHE: &str = "public, max-age=31536000, immutable";
+
+fn etag_of(asset: &assets::Asset) -> String {
+    format!("\"{}\"", sha256::hex(&sha256::digest(asset.bytes)))
+}
+
+fn assert_no_compression(response: &HttpResponse, path: &str) {
+    assert!(
+        response.header("Content-Encoding").is_none(),
+        "{} must not carry Content-Encoding",
+        path
+    );
+    assert!(
+        response.header("Vary").is_none(),
+        "{} must not carry Vary",
+        path
+    );
+    assert!(
+        response.header("Transfer-Encoding").is_none(),
+        "{} must not carry Transfer-Encoding",
+        path
+    );
+}
+
+fn assert_asset_security_headers(response: &HttpResponse, path: &str) {
+    assert_eq!(
+        response.header("X-Content-Type-Options"),
+        Some("nosniff"),
+        "{} nosniff",
+        path
+    );
+    assert_eq!(
+        response.header("Referrer-Policy"),
+        Some("no-referrer"),
+        "{} referrer policy",
+        path
+    );
+    assert_eq!(
+        response.header("X-Frame-Options"),
+        Some("DENY"),
+        "{} frame options",
+        path
+    );
+    assert_eq!(
+        response.header("Connection"),
+        Some("close"),
+        "{} connection",
+        path
+    );
 }
 
 fn post_form(server: &Server, path: &str, body: &str) -> HttpResponse {
@@ -1661,7 +1713,7 @@ fn unknown_path_is_404_for_every_method() {
     assert_eq!(edit.header("Allow"), Some("GET, HEAD, POST"));
     let asset = request(server.port, "OPTIONS", "/assets/app.css", &[], None);
     assert_eq!(asset.status, 405);
-    assert_eq!(asset.header("Allow"), Some("GET, HEAD, POST"));
+    assert_eq!(asset.header("Allow"), Some("GET, HEAD"));
     // The request log prints the method token exactly as sent.
     server.wait_for_stderr("DELETE /nope 404");
     assert!(!server.stderr_text().contains("OTHER "));
@@ -1680,6 +1732,7 @@ fn head_matches_get_without_body() {
         "/doc/REQ-001.001/edit",
         "/assets/app.css",
         "/assets/app.js",
+        "/assets/katex/0.16.11/katex.min.js",
         "/api/requirements",
         "/api/doc/REQ-001.001",
     ] {
@@ -1698,6 +1751,7 @@ fn head_matches_get_without_body() {
             "Content-Type",
             "Connection",
             "Cache-Control",
+            "ETag",
             "X-Content-Type-Options",
             "Referrer-Policy",
             "X-Frame-Options",
@@ -1711,6 +1765,32 @@ fn head_matches_get_without_body() {
             );
         }
     }
+
+    for path in [
+        "/",
+        "/doc/REQ-001.001",
+        "/api/requirements",
+        "/api/doc/REQ-001.001",
+    ] {
+        assert_eq!(
+            get(&server, path).header("Cache-Control"),
+            Some("no-store"),
+            "{} stays no-store",
+            path
+        );
+    }
+    assert_eq!(
+        get(&server, "/assets/app.css").header("Cache-Control"),
+        Some("no-cache")
+    );
+    assert_eq!(
+        get(&server, "/assets/app.js").header("Cache-Control"),
+        Some("no-cache")
+    );
+    assert_eq!(
+        get(&server, "/assets/katex/0.16.11/katex.min.js").header("Cache-Control"),
+        Some(IMMUTABLE_CACHE)
+    );
 
     let get_missing = get(&server, "/nope");
     let head_missing = request(server.port, "HEAD", "/nope", &[], None);
@@ -8282,9 +8362,9 @@ fn readme_documents_browser_debug() {
     assert!(readme.contains("Request headers and bodies are never logged"));
 }
 
-// TASK-143 AC #1, #2, #8: the asset table serves every entry by exact match,
-// with binary bodies, unchanged global headers, 404 on a miss for every method,
-// and 405 with the existing Allow header on a wrong method.
+// TASK-143 AC #1, #2, #8 and TASK-276 AC #5, #7, #10, #11: the asset table
+// serves every entry by exact match with class-specific caching, binary bodies,
+// the security headers, no compression, and the method/error matrix.
 #[test]
 fn t143_asset_table_serves_every_entry() {
     let dir = fixture("assets-table");
@@ -8299,12 +8379,6 @@ fn t143_asset_table_serves_every_entry() {
             "Content-Type {}",
             asset.path
         );
-        assert_eq!(
-            response.header("Cache-Control"),
-            Some("no-store"),
-            "Cache-Control {}",
-            asset.path
-        );
         let length = asset.bytes.len().to_string();
         assert_eq!(
             response.header("Content-Length"),
@@ -8313,6 +8387,53 @@ fn t143_asset_table_serves_every_entry() {
             asset.path
         );
         assert_eq!(response.body, asset.bytes, "body {}", asset.path);
+        assert_asset_security_headers(&response, asset.path);
+        assert_no_compression(&response, asset.path);
+        assert!(
+            response.header("Last-Modified").is_none(),
+            "{} Last-Modified",
+            asset.path
+        );
+        assert!(
+            response.header("Expires").is_none(),
+            "{} Expires",
+            asset.path
+        );
+        assert!(
+            response.header("Content-Security-Policy").is_none(),
+            "{} CSP",
+            asset.path
+        );
+
+        match asset.kind {
+            AssetKind::Vendor => {
+                assert_eq!(
+                    response.header("Cache-Control"),
+                    Some(IMMUTABLE_CACHE),
+                    "immutable Cache-Control {}",
+                    asset.path
+                );
+                assert!(
+                    response.header("ETag").is_none(),
+                    "vendor ETag {}",
+                    asset.path
+                );
+            }
+            AssetKind::FirstParty => {
+                assert_eq!(
+                    response.header("Cache-Control"),
+                    Some("no-cache"),
+                    "revalidated Cache-Control {}",
+                    asset.path
+                );
+                assert_eq!(
+                    response.header("ETag"),
+                    Some(etag_of(asset).as_str()),
+                    "strong ETag {}",
+                    asset.path
+                );
+            }
+        }
 
         let head = request(server.port, "HEAD", asset.path, &[], None);
         assert_eq!(head.status, 200, "HEAD {}", asset.path);
@@ -8331,26 +8452,93 @@ fn t143_asset_table_serves_every_entry() {
         );
         assert_eq!(
             head.header("Cache-Control"),
-            Some("no-store"),
+            response.header("Cache-Control"),
             "HEAD Cache-Control {}",
+            asset.path
+        );
+        assert_eq!(
+            head.header("ETag"),
+            response.header("ETag"),
+            "HEAD ETag {}",
             asset.path
         );
     }
 
-    for method in ["PUT", "DELETE", "OPTIONS"] {
-        let response = request(server.port, method, "/assets/katex/katex.min.js", &[], None);
-        assert_eq!(response.status, 405, "{} asset", method);
-        assert_eq!(response.header("Allow"), Some("GET, HEAD, POST"));
+    // Immutable vendor responses ignore every conditional value.
+    for asset in ASSETS
+        .iter()
+        .filter(|asset| asset.kind == AssetKind::Vendor)
+    {
+        let exact = etag_of(asset);
+        let weak = format!("W/{exact}");
+        for value in ["*", exact.as_str(), weak.as_str(), "not-a-tag"] {
+            let response = request(
+                server.port,
+                "GET",
+                asset.path,
+                &[("If-None-Match", value)],
+                None,
+            );
+            assert_eq!(response.status, 200, "GET {} {value}", asset.path);
+            assert_eq!(
+                response.body, asset.bytes,
+                "full body {} {value}",
+                asset.path
+            );
+            let head = request(
+                server.port,
+                "HEAD",
+                asset.path,
+                &[("If-None-Match", value)],
+                None,
+            );
+            assert_eq!(head.status, 200, "HEAD {} {value}", asset.path);
+            assert!(head.body.is_empty(), "HEAD body {} {value}", asset.path);
+        }
     }
-    let post = request(
-        server.port,
-        "POST",
+
+    // The unversioned vendor paths are gone for every method.
+    for path in [
+        "/assets/katex/katex.min.css",
         "/assets/katex/katex.min.js",
-        &[],
-        Some(b""),
-    );
-    assert_eq!(post.status, 405, "POST asset");
-    assert_eq!(post.header("Allow"), Some("GET, HEAD, POST"));
+        "/assets/katex/fonts/KaTeX_Main-Regular.woff2",
+        "/assets/mermaid/mermaid.min.js",
+    ] {
+        for method in ["GET", "HEAD"] {
+            let response = request(server.port, method, path, &[], None);
+            assert_eq!(response.status, 404, "{} {}", method, path);
+            assert_eq!(response.header("Cache-Control"), Some("no-store"));
+            assert!(response.header("ETag").is_none());
+        }
+        let response = request(server.port, "POST", path, &[], Some(b""));
+        assert_eq!(response.status, 404, "POST {}", path);
+        assert_eq!(response.header("Cache-Control"), Some("no-store"));
+        assert!(response.header("ETag").is_none());
+    }
+
+    // PUT, DELETE, OPTIONS, and POST on a vendor or first-party URL are 405
+    // with Allow: GET, HEAD, before any conditional handling.
+    for path in ["/assets/katex/0.16.11/katex.min.js", "/assets/app.css"] {
+        for method in ["PUT", "DELETE", "OPTIONS"] {
+            let response = request(server.port, method, path, &[], None);
+            assert_eq!(response.status, 405, "{} {}", method, path);
+            assert_eq!(
+                response.header("Allow"),
+                Some("GET, HEAD"),
+                "{} {}",
+                method,
+                path
+            );
+            assert_eq!(response.header("Cache-Control"), Some("no-store"));
+            assert!(response.header("ETag").is_none());
+            assert_no_compression(&response, path);
+        }
+        let post = request(server.port, "POST", path, &[], Some(b""));
+        assert_eq!(post.status, 405, "POST {}", path);
+        assert_eq!(post.header("Allow"), Some("GET, HEAD"));
+        assert_eq!(post.header("Cache-Control"), Some("no-store"));
+        assert!(post.header("ETag").is_none());
+    }
 
     for path in ["/assets/nope", "/assets/", "/assets/app.css/"] {
         for method in ["GET", "HEAD"] {
@@ -8364,7 +8552,7 @@ fn t143_asset_table_serves_every_entry() {
     let query = request(
         server.port,
         "GET",
-        "/assets/katex/katex.min.js?x=1",
+        "/assets/katex/0.16.11/katex.min.js?x=1",
         &[],
         None,
     );
@@ -8373,6 +8561,183 @@ fn t143_asset_table_serves_every_entry() {
         query.body,
         include_bytes!("../src/browser/vendor/katex/0.16.11/katex.min.js")
     );
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// TASK-276 AC #7 and #8: the first-party 200/304 matrix for every revalidated
+// asset, including combined and repeated If-None-Match lines.
+#[test]
+fn t276_first_party_assets_revalidate_with_strong_etag() {
+    let dir = fixture("assets-304");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    for asset in ASSETS
+        .iter()
+        .filter(|asset| asset.kind == AssetKind::FirstParty)
+    {
+        let etag = etag_of(asset);
+        let response = get(&server, asset.path);
+        assert_eq!(response.status, 200, "{} initial", asset.path);
+        assert_eq!(response.header("Cache-Control"), Some("no-cache"));
+        assert_eq!(response.header("ETag"), Some(etag.as_str()));
+        assert_eq!(response.body, asset.bytes);
+
+        let conditional = request(
+            server.port,
+            "GET",
+            asset.path,
+            &[("If-None-Match", etag.as_str())],
+            None,
+        );
+        assert_eq!(conditional.status, 304, "{} exact GET", asset.path);
+        assert!(conditional.body.is_empty(), "{} 304 body", asset.path);
+        assert_eq!(conditional.header("ETag"), Some(etag.as_str()));
+        assert_eq!(conditional.header("Cache-Control"), Some("no-cache"));
+        assert_incomplete_304(&conditional, asset.path);
+        assert_asset_security_headers(&conditional, asset.path);
+        assert_no_compression(&conditional, asset.path);
+
+        let head = request(
+            server.port,
+            "HEAD",
+            asset.path,
+            &[("If-None-Match", etag.as_str())],
+            None,
+        );
+        assert_eq!(head.status, 304, "{} exact HEAD", asset.path);
+        assert!(head.body.is_empty());
+        assert_eq!(head.header("ETag"), Some(etag.as_str()));
+        assert_incomplete_304(&head, asset.path);
+
+        for value in ["\"stale\"", "\"unknown\"", "not-a-tag", "W/\"weak\""] {
+            let response = request(
+                server.port,
+                "GET",
+                asset.path,
+                &[("If-None-Match", value)],
+                None,
+            );
+            assert_eq!(response.status, 200, "{} {value}", asset.path);
+            assert_eq!(
+                response.body, asset.bytes,
+                "{} full body {value}",
+                asset.path
+            );
+        }
+
+        let star = request(
+            server.port,
+            "GET",
+            asset.path,
+            &[("If-None-Match", "*")],
+            None,
+        );
+        assert_eq!(star.status, 304, "{} star", asset.path);
+        assert!(star.body.is_empty());
+
+        let weak = format!("W/{etag}");
+        let weak_response = request(
+            server.port,
+            "GET",
+            asset.path,
+            &[("If-None-Match", weak.as_str())],
+            None,
+        );
+        assert_eq!(weak_response.status, 200, "{} weak", asset.path);
+        assert_eq!(weak_response.body, asset.bytes);
+
+        let list = format!("\"stale\", {etag}");
+        let listed = request(
+            server.port,
+            "GET",
+            asset.path,
+            &[("If-None-Match", list.as_str())],
+            None,
+        );
+        assert_eq!(listed.status, 304, "{} comma list", asset.path);
+
+        let repeated = request(
+            server.port,
+            "GET",
+            asset.path,
+            &[
+                ("If-None-Match", "\"stale\""),
+                ("If-None-Match", etag.as_str()),
+            ],
+            None,
+        );
+        assert_eq!(repeated.status, 304, "{} repeated headers", asset.path);
+
+        let stale = request(
+            server.port,
+            "GET",
+            asset.path,
+            &[("If-None-Match", "\"stale\"")],
+            None,
+        );
+        assert_eq!(stale.status, 200, "{} stale", asset.path);
+        assert_eq!(stale.body, asset.bytes);
+    }
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+fn assert_incomplete_304(response: &HttpResponse, path: &str) {
+    assert!(
+        response.header("Content-Type").is_none(),
+        "{} 304 Content-Type",
+        path
+    );
+    assert!(
+        response.header("Content-Length").is_none(),
+        "{} 304 Content-Length",
+        path
+    );
+    assert!(
+        response.header("Content-Security-Policy").is_none(),
+        "{} 304 CSP",
+        path
+    );
+}
+
+// TASK-276 AC #9: HTML, JSON, and error responses stay no-store, carry no
+// validator, and never turn a conditional request into a 304.
+#[test]
+fn t276_no_store_survives_for_html_json_and_errors() {
+    let dir = fixture("assets-no-store");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+
+    for (path, status) in [
+        ("/", 200),
+        ("/doc/REQ-001.001", 200),
+        ("/api/requirements", 200),
+        ("/api/doc/REQ-001.001", 200),
+        ("/doc/DOES-NOT-EXIST", 404),
+        ("/api/doc/DOES-NOT-EXIST", 404),
+    ] {
+        for headers in [&[][..], &[("If-None-Match", "*")][..]] {
+            let response = request(server.port, "GET", path, headers, None);
+            assert_eq!(response.status, status, "{} status", path);
+            assert_eq!(
+                response.header("Cache-Control"),
+                Some("no-store"),
+                "{} Cache-Control",
+                path
+            );
+            assert!(response.header("ETag").is_none(), "{} ETag", path);
+            assert!(!response.body.is_empty(), "{} body", path);
+            assert_no_compression(&response, path);
+        }
+    }
+
+    let method = request(server.port, "DELETE", "/assets/app.css", &[], None);
+    assert_eq!(method.status, 405);
+    assert_eq!(method.header("Cache-Control"), Some("no-store"));
+    assert!(method.header("ETag").is_none());
+    assert_no_compression(&method, "/assets/app.css 405");
 
     drop(server);
     let _ = fs::remove_dir_all(&dir);
@@ -8422,7 +8787,12 @@ fn t143_table_wide_offline_scan() {
                     matches!(extension, "woff2" | "woff" | "ttf"),
                     "unexpected font extension in url({value})"
                 );
-                let sibling = format!("/assets/katex/fonts/{stem}.woff2");
+                let directory = asset
+                    .path
+                    .rsplit_once('/')
+                    .expect("stylesheet has a directory")
+                    .0;
+                let sibling = format!("{directory}/fonts/{stem}.woff2");
                 assert!(
                     assets::lookup(&sibling).is_some(),
                     "url({value}) has no woff2 sibling {sibling}"
@@ -8452,6 +8822,18 @@ fn t143_table_wide_offline_scan() {
         for external in ["http://", "https://", "//cdn"] {
             assert!(!html.contains(external), "external {external} in {path}");
         }
+        assert!(
+            !html.contains("/assets/katex/katex.min.css"),
+            "unversioned KaTeX stylesheet in {path}"
+        );
+        assert!(
+            !html.contains("/assets/katex/katex.min.js"),
+            "unversioned KaTeX script in {path}"
+        );
+        assert!(
+            !html.contains("/assets/mermaid/mermaid.min.js"),
+            "unversioned Mermaid script in {path}"
+        );
         for chunk in html.split("<link").skip(1) {
             let tag = &chunk[..chunk.find('>').unwrap_or(chunk.len())];
             if let Some(href) = attribute(tag, "href") {
@@ -8487,6 +8869,112 @@ fn t143_asset_module_is_filesystem_free() {
             "src/browser/assets.rs must not contain {forbidden:?}"
         );
     }
+}
+
+// TASK-276 AC #15 / ADR-038 decision 30: the Debian assembly guard passes on
+// the committed tree and rejects every vendor-version mismatch class.
+fn asset_guard_fixture(name: &str) -> PathBuf {
+    let root = test_root(&format!("asset-guard-{name}"));
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"));
+    fs::create_dir_all(root.join("scripts")).unwrap();
+    fs::copy(
+        source.join("scripts/build-deb.sh"),
+        root.join("scripts/build-deb.sh"),
+    )
+    .unwrap();
+
+    let vendor = root.join("src/browser/vendor");
+    fs::create_dir_all(vendor.join("katex/0.16.11")).unwrap();
+    fs::create_dir_all(vendor.join("mermaid/11.17.2")).unwrap();
+    fs::write(vendor.join("katex/0.16.11/.keep"), b"").unwrap();
+    fs::write(vendor.join("mermaid/11.17.2/.keep"), b"").unwrap();
+    fs::copy(
+        source.join("src/browser/vendor/MANIFEST.md"),
+        vendor.join("MANIFEST.md"),
+    )
+    .unwrap();
+
+    let copyright = root.join("packaging/deb/usr/share/doc/papyrus");
+    fs::create_dir_all(&copyright).unwrap();
+    fs::copy(
+        source.join("packaging/deb/usr/share/doc/papyrus/copyright"),
+        copyright.join("copyright"),
+    )
+    .unwrap();
+    root
+}
+
+fn run_asset_guard(root: &Path) -> std::process::Output {
+    Command::new("bash")
+        .arg(root.join("scripts/build-deb.sh"))
+        .arg("--check-assets-only")
+        .current_dir(root)
+        .output()
+        .expect("run build-deb.sh --check-assets-only")
+}
+
+fn assert_guard_fails(name: &str, mutate: impl FnOnce(&Path), needle: &str) {
+    let root = asset_guard_fixture(name);
+    mutate(&root);
+    let output = run_asset_guard(&root);
+    assert!(!output.status.success(), "{name} must fail the guard");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(needle),
+        "{name} stderr did not contain {needle:?}: {stderr}"
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn t276_build_path_rejects_asset_version_mismatches() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let output = run_asset_guard(root);
+    assert!(
+        output.status.success(),
+        "committed tree failed the asset guard: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    assert_guard_fails(
+        "no-version",
+        |root| {
+            fs::remove_dir_all(root.join("src/browser/vendor/katex/0.16.11")).unwrap();
+        },
+        "no version directory",
+    );
+
+    assert_guard_fails(
+        "multiple-versions",
+        |root| {
+            fs::create_dir_all(root.join("src/browser/vendor/katex/0.16.12")).unwrap();
+        },
+        "more than one version directory",
+    );
+
+    assert_guard_fails(
+        "manifest-version",
+        |root| {
+            let path = root.join("src/browser/vendor/MANIFEST.md");
+            let text = fs::read_to_string(&path).unwrap();
+            fs::write(
+                &path,
+                text.replace("| KaTeX | 0.16.11 |", "| KaTeX | 0.16.12 |"),
+            )
+            .unwrap();
+        },
+        "manifest version",
+    );
+
+    assert_guard_fails(
+        "copyright-version",
+        |root| {
+            let path = root.join("packaging/deb/usr/share/doc/papyrus/copyright");
+            let text = fs::read_to_string(&path).unwrap();
+            fs::write(&path, text.replace("katex/0.16.11/", "katex/0.16.12/")).unwrap();
+        },
+        "copyright version",
+    );
 }
 
 // TC-024

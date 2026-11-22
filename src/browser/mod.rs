@@ -10,6 +10,7 @@ pub mod math;
 pub mod records;
 pub mod render;
 pub mod routes;
+pub mod sha256;
 pub mod shell;
 
 use crate::CommandOutput;
@@ -25,6 +26,7 @@ use crate::registry::{
 use http::{HttpError, Method, Request, Response};
 use records::Record;
 use routes::BrowserRoutes;
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::net::{IpAddr, TcpListener, TcpStream};
 use std::ops::Deref;
@@ -202,6 +204,8 @@ struct ServerState {
     host: String,
     port: u16,
     debug: bool,
+    /// The strong first-party validators, computed once at startup.
+    etags: BTreeMap<&'static str, String>,
     current: RwLock<Arc<ServingSnapshot>>,
     reload: Mutex<LastReloadFailure>,
 }
@@ -224,6 +228,7 @@ impl ServerState {
             host: &self.host,
             port: self.port,
             debug: self.debug,
+            etags: &self.etags,
         }
     }
 
@@ -291,6 +296,7 @@ struct RequestState<'a> {
     host: &'a str,
     port: u16,
     debug: bool,
+    etags: &'a BTreeMap<&'static str, String>,
 }
 
 impl Deref for RequestState<'_> {
@@ -372,6 +378,7 @@ pub fn run(
         host: options.host.clone(),
         port: options.port,
         debug,
+        etags: assets::first_party_etags(),
         current: RwLock::new(Arc::new(snapshot)),
         reload: Mutex::new(None),
     });
@@ -820,6 +827,27 @@ fn html_doc_id(path: &str) -> Option<&str> {
     Some(id)
 }
 
+/// Build the response for an asset hit. The asset kind selects the only two
+/// cacheable classes; the method check and conditional evaluation stay here in
+/// the asset route (ADR-038 decisions 20 and 21).
+fn asset_response(
+    request: &Request,
+    asset: &'static assets::Asset,
+    etags: &BTreeMap<&'static str, String>,
+) -> Response {
+    match asset.kind {
+        assets::AssetKind::Vendor => Response::immutable_asset(asset.mime, asset.bytes),
+        assets::AssetKind::FirstParty => {
+            let etag = assets::etag(etags, asset).expect("first-party assets have an ETag");
+            if request.if_none_match_matches(etag) {
+                Response::not_modified(etag)
+            } else {
+                Response::revalidated_asset(asset.mime, asset.bytes, etag)
+            }
+        }
+    }
+}
+
 fn handle_request(request: Request, state: &RequestState<'_>) -> Response {
     let api = request.target.path.starts_with("/api/");
     let path = request.target.path.clone();
@@ -854,8 +882,8 @@ fn route(request: Request, state: &RequestState<'_>) -> Result<Response, HttpErr
     if path.starts_with("/assets/") {
         return match assets::lookup(&path) {
             Some(asset) => match method {
-                Method::Get | Method::Head => Ok(Response::bytes(200, asset.mime, asset.bytes)),
-                _ => Err(HttpError::new(405)),
+                Method::Get | Method::Head => Ok(asset_response(&request, asset, state.etags)),
+                _ => Ok(error_response(405, false, state).with_header("Allow", "GET, HEAD")),
             },
             None => Err(HttpError::new(404)),
         };
@@ -4080,6 +4108,7 @@ mod tests {
             host: "127.0.0.1".to_string(),
             port: 6420,
             debug: false,
+            etags: assets::first_party_etags(),
             current: RwLock::new(Arc::new(snapshot)),
             reload: Mutex::new(None),
         }

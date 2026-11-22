@@ -27,16 +27,16 @@ Assemble the Papyrus Debian package from the release binary.
   --out <dir>          Directory that receives the .deb. Defaults to the
                        project-local .tmp/deb directory (or PAPYRUS_DEB_OUT
                        when set).
+  --check-assets-only  Verify vendor asset versions and exit without building.
   -h, --help           Print this help and exit.
 EOF
 }
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# shellcheck source=scripts/package-out.sh
-source "${ROOT}/scripts/package-out.sh"
 
 VERSION=""
 OUT_DIR=""
+CHECK_ASSETS_ONLY=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -49,6 +49,10 @@ while [[ $# -gt 0 ]]; do
             [[ $# -ge 2 ]] || { echo "error: --out requires a value" >&2; exit 2; }
             OUT_DIR="$2"
             shift 2
+            ;;
+        --check-assets-only)
+            CHECK_ASSETS_ONLY=1
+            shift
             ;;
         -h|--help)
             usage
@@ -63,6 +67,115 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$ROOT"
+
+# Verify the packaged asset versions before assembling anything. The asset
+# version is the vendor directory name, the manifest `version` column, and the
+# version each copyright section cites; it is independent of the Papyrus
+# package version (ADR-038 decisions 29 and 30).
+check_asset_versions() {
+    local vendor_root="src/browser/vendor"
+    local manifest="${vendor_root}/MANIFEST.md"
+    local copyright="packaging/deb/usr/share/doc/papyrus/copyright"
+    if [[ ! -d "$vendor_root" ]]; then
+        echo "error: vendor asset tree not found: ${vendor_root}" >&2
+        return 1
+    fi
+    if [[ ! -f "$manifest" ]]; then
+        echo "error: asset manifest not found: ${manifest}" >&2
+        return 1
+    fi
+    if [[ ! -f "$copyright" ]]; then
+        echo "error: copyright file not found: ${copyright}" >&2
+        return 1
+    fi
+
+    local failed=0
+    local package_dir package
+    for package_dir in "$vendor_root"/*/; do
+        [[ -d "$package_dir" ]] || continue
+        package="$(basename "$package_dir")"
+
+        local -a versions=()
+        local entry
+        for entry in "$package_dir"*/; do
+            [[ -d "$entry" ]] || continue
+            versions+=("$(basename "$entry")")
+        done
+        if (( ${#versions[@]} == 0 )); then
+            echo "error: vendor package '$package' has no version directory under ${package_dir}" >&2
+            failed=1
+            continue
+        fi
+        if (( ${#versions[@]} > 1 )); then
+            echo "error: vendor package '$package' has more than one version directory: ${versions[*]}" >&2
+            failed=1
+            continue
+        fi
+        local version="${versions[0]}"
+
+        local -a row_versions=()
+        local row_version
+        while IFS= read -r row_version; do
+            if [[ -n "$row_version" ]]; then
+                row_versions+=("$row_version")
+            fi
+        done < <(awk -F'|' -v prefix="/assets/${package}/" '
+            /^[[:space:]]*\|/ {
+                path = $2
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", path)
+                gsub(/`/, "", path)
+                if (index(path, prefix) == 1) {
+                    value = $4
+                    gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+                    print value
+                }
+            }' "$manifest")
+        if (( ${#row_versions[@]} == 0 )); then
+            echo "error: manifest has no version row for vendor package '$package'" >&2
+            failed=1
+        else
+            for row_version in "${row_versions[@]}"; do
+                if [[ "$row_version" != "$version" ]]; then
+                    echo "error: manifest version '$row_version' for vendor package '$package' does not match directory version '$version'" >&2
+                    failed=1
+                fi
+            done
+        fi
+
+        local -a cited_versions=()
+        local cited_version
+        while IFS= read -r cited_version; do
+            if [[ -n "$cited_version" ]]; then
+                cited_versions+=("$cited_version")
+            fi
+        done < <(grep -oE "src/browser/vendor/${package}/[^/[:space:]]+" "$copyright" 2>/dev/null | sed -E "s#.*/${package}/([^/]+).*#\1#" | sort -u || true)
+        if (( ${#cited_versions[@]} == 0 )); then
+            echo "error: copyright cites no version for vendor package '$package'" >&2
+            failed=1
+        else
+            for cited_version in "${cited_versions[@]}"; do
+                if [[ "$cited_version" != "$version" ]]; then
+                    echo "error: copyright version '$cited_version' for vendor package '$package' does not match directory version '$version'" >&2
+                    failed=1
+                fi
+            done
+        fi
+    done
+
+    if (( failed != 0 )); then
+        echo "error: asset version check failed; refusing to build the package" >&2
+        return 1
+    fi
+    return 0
+}
+
+if (( CHECK_ASSETS_ONLY )); then
+    check_asset_versions || exit 1
+    exit 0
+fi
+
+# shellcheck source=scripts/package-out.sh
+source "${ROOT}/scripts/package-out.sh"
 
 if [[ -z "$VERSION" ]]; then
     VERSION="${PAPYRUS_DEB_VERSION:-}"

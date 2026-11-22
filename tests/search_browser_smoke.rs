@@ -360,6 +360,8 @@ fn milestone_search_and_browser_flow() {
     let view = server.get("/doc/REQ-001.001");
     assert_eq!(view.status, 200);
     let view_html = view.text();
+    assert_eq!(view.header("Cache-Control"), Some("no-store"));
+    assert!(view.header("ETag").is_none());
     assert!(view_html.contains("Capture payment"));
     assert!(view_html.contains("quick brown fox"));
 
@@ -389,6 +391,8 @@ fn milestone_search_and_browser_flow() {
     let index_value: serde_json::Value = serde_json::from_str(&index.text()).unwrap();
     assert_eq!(index_value["groups"][0]["id"], "REQ-001");
     assert_eq!(index_value["requirements"][0]["id"], "REQ-001.001");
+    assert_eq!(index.header("Cache-Control"), Some("no-store"));
+    assert!(index.header("ETag").is_none());
     let record = server.get("/api/doc/REQ-001.001");
     assert_eq!(record.status, 200);
     let record_value: serde_json::Value = serde_json::from_str(&record.text()).unwrap();
@@ -399,7 +403,8 @@ fn milestone_search_and_browser_flow() {
     let css = server.get("/assets/app.css");
     assert_eq!(css.status, 200);
     assert_eq!(css.header("Content-Type"), Some("text/css; charset=utf-8"));
-    assert_eq!(css.header("Cache-Control"), Some("no-store"));
+    assert_eq!(css.header("Cache-Control"), Some("no-cache"));
+    assert!(css.header("ETag").is_some());
     assert!(!css.body.is_empty());
     let js = server.get("/assets/app.js");
     assert_eq!(js.status, 200);
@@ -408,6 +413,8 @@ fn milestone_search_and_browser_flow() {
         Some("text/javascript; charset=utf-8")
     );
     assert!(!js.body.is_empty());
+    assert_eq!(js.header("Cache-Control"), Some("no-cache"));
+    assert!(js.header("ETag").is_some());
 
     // 320 px markup hooks and no external references.
     for html in [&business_html, &nfr_html, &view_html] {

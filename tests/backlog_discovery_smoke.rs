@@ -358,8 +358,11 @@ fn milestone_backlog_discovery_flow() {
             ty
         );
     }
-    let task_page = server.get("/?type=task").text();
+    let task_page_response = server.get("/?type=task");
+    let task_page = task_page_response.text();
     assert!(task_page.contains("TASK-001"), "{task_page}");
+    assert_eq!(task_page_response.header("Cache-Control"), Some("no-store"));
+    assert!(task_page_response.header("ETag").is_none());
     assert!(task_page.contains("class=\"board-card\""), "{task_page}");
     assert!(task_page.contains("Change status</button>"), "{task_page}");
     let milestone_page = server.get("/?type=milestone").text();
@@ -419,7 +422,8 @@ fn milestone_backlog_discovery_flow() {
     let css = server.get("/assets/app.css");
     assert_eq!(css.status, 200);
     assert_eq!(css.header("Content-Type"), Some("text/css; charset=utf-8"));
-    assert_eq!(css.header("Cache-Control"), Some("no-store"));
+    assert_eq!(css.header("Cache-Control"), Some("no-cache"));
+    assert!(css.header("ETag").is_some());
     assert!(!css.body.is_empty());
     let js = server.get("/assets/app.js");
     assert_eq!(js.status, 200);
@@ -428,6 +432,10 @@ fn milestone_backlog_discovery_flow() {
         Some("text/javascript; charset=utf-8")
     );
     assert!(!js.body.is_empty());
+    assert_eq!(js.header("Cache-Control"), Some("no-cache"));
+    assert!(js.header("ETag").is_some());
+    assert_eq!(tasks.header("Cache-Control"), Some("no-store"));
+    assert!(tasks.header("ETag").is_none());
 
     // 320 px markup hooks and no external references.
     for html in [&task_page, &milestone_page, &release_page, &updated] {

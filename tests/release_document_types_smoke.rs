@@ -1267,9 +1267,14 @@ fn t117_08_browser_matrix_over_http() {
                 .contains(content_type),
             "{path} content type"
         );
-        assert_eq!(asset.header("Cache-Control"), Some("no-store"));
+        assert_eq!(asset.header("Cache-Control"), Some("no-cache"));
+        assert!(asset.header("ETag").is_some());
     }
     let page = get(&server, "/?type=note");
+    assert_eq!(page.header("Cache-Control"), Some("no-store"));
+    assert!(page.header("ETag").is_none());
+    assert_eq!(api.header("Cache-Control"), Some("no-store"));
+    assert!(api.header("ETag").is_none());
     assert!(
         page.header("Content-Security-Policy")
             .unwrap_or("")
