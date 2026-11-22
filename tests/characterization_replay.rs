@@ -35,16 +35,8 @@ fn replay(kind: &'static str, tag: &str) {
     let manifest = load_manifest(&root);
     assert_eq!(manifest.schema, "papyrus.characterization-cases/1");
     assert!(
-        manifest
-            .unreachable
-            .iter()
-            .any(|entry| entry["renderer"] == "conflict_page_test_case")
-    );
-    assert!(
-        manifest
-            .unreachable
-            .iter()
-            .any(|entry| entry["renderer"] == "conflict_page_test_report")
+        manifest.unreachable.is_empty(),
+        "every declared renderer must now have a call site (TASK-267)"
     );
     assert!(
         manifest.cases.iter().any(|case| case.kind == kind),

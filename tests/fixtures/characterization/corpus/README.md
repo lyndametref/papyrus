@@ -48,9 +48,7 @@ pinned to commit `d60f71c9` and must not change.
 ```jsonc
 {
   "schema": "papyrus.characterization-cases/1",
-  "unreachable": [
-    { "renderer": "conflict_page_test_case", "reason": "no call site: ..." }
-  ],
+  "unreachable": [],
   "cases": [
     {
       "id": "req/create",              // stable path; also the expected/ subdirectory
@@ -77,10 +75,8 @@ pinned to commit `d60f71c9` and must not change.
   the case produces it: `record.*`, `stdout.txt`, `stderr.txt`, `exit.json`,
   `payload.json` (`--json` stdout or API body), `http.json`, `page.html`
   (rendered page), `body.txt` (non-HTML, non-JSON response body such as assets).
-- `unreachable` records renderers that have no call site in the pre-refactor
-  dispatcher. `conflict_page_test_case` and `conflict_page_test_report` are
-  never selected: the stale-version branch routes both through
-  `conflict_page_use_case`. TASK-242 owns the full nine-function inventory.
+- `unreachable` records renderers that have no call site. Since TASK-267 every
+  declared renderer is reachable; the list is empty.
 
 ## Coverage
 
@@ -96,11 +92,9 @@ pinned to commit `d60f71c9` and must not change.
   document route with a disallowed method (405).
 - Conflicts: twelve stale-version `POST /doc/<ID>` cases, one per document
   type across `note`, `ui-mockup`, `rule`, `audit`, `tech-spec`, `use-case`,
-  `test-case`, `test-report`, `req`, `nfr`, `glossary`, and `ui-spec`, covering
-  every reachable conflict renderer (`conflict_page` for `req`/`nfr`/`glossary`/
-  `ui-spec`, plus the dedicated `document_conflict_page`, `conflict_page_ui_mockup`,
-  `conflict_page_business_rule`, `conflict_page_audit_record`,
-  `conflict_page_tech_spec`, and `conflict_page_use_case`).
+  `test-case`, `test-report`, `req`, `nfr`, `glossary`, and `ui-spec`. Every
+  document type now renders the one `document_conflict_page` (ADR-039
+  decision 23).
 - Writes: `POST /api/doc/<ID>` success (200 JSON) and stale-version conflict
   (409 JSON); `POST /doc/<ID>` form success (303 redirect) and validation
   failure (422 edit page with field errors).

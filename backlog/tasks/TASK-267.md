@@ -2,7 +2,7 @@
 id: TASK-267
 title: "Collapse the nine conflict pages and five not-found pages into one generic pair"
 created_date: '2026-11-20T17:42:43Z'
-updated_date: '2026-11-22T16:36:56Z'
+updated_date: '2026-11-22T17:43:19Z'
 labels: []
 references:
   - ADR-039
@@ -11,7 +11,7 @@ references:
   - ADR-0033
   - TC-184
   - REQ-05.007
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-035
@@ -55,3 +55,6 @@ Exactly one conflict builder and one not-found builder remain for documents; the
 - [ ] #8 Unknown or disabled document list types still return the generic 404 error page through the route table, and no per-type 404 route exists.
 - [ ] #9 The 404 and 409 response headers and no-store behavior are unchanged, and no write occurs on a stale-token conflict or a not-found request.
 - [ ] #10 Tests cover the stale-token conflict and all three 404 triggers, assert no ID echo, assert no write on conflict, and compare the Backlog and Decision 404 output; cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass.
+## Comments
+- **rust-dev**: TASK-267 evidence: Deleted document conflict renderers conflict_page (renamed backlog_decision_conflict_page) plus conflict_page_ui_mockup, conflict_page_business_rule, conflict_page_audit_record, conflict_page_tech_spec, conflict_page_use_case, conflict_page_test_case, conflict_page_test_report; kept document_conflict_page. Deleted tech_spec_not_found_page, use_case_not_found_page, test_case_not_found_page, test_report_not_found_page; kept document_not_found_page. Removed routes NotFoundPage, Presentation.not_found, with_not_found, not_found_slug, IdRule, id_rules, BrowserRoutes.not_found_page, push_id_rule, id_matches_rule. document_conflict_page reached from document_form_post stale-token branch with 409, submitted values, live token, no write, not a route. document_not_found_page reached from handle_request for every HTML doc 404 (unknown, archived, disabled) via view.html, no ID echo. Templates unchanged. Tests added: t267_one_document_not_found_page_for_unknown_archived_and_disabled, t267_backlog_and_decision_404_match_the_one_document_page, t267_only_one_document_conflict_and_not_found_renderer_remain. Updated characterization_replay and corpus cases.json and README. cargo test green with EDITOR and VISUAL unset; clippy -D warnings and fmt --check pass. Branch task-TASK-267; no commit created per instruction; status left In-Progress.
+- **orchestrator**: Acceptance met: one document conflict page and one document not-found page remain, both reachable; eight conflict renderers and four typed not-found renderers deleted with the NotFoundPage dispatch layer; backlog and decision conflict surface preserved byte-identically; tests, clippy and fmt green.

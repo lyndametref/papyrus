@@ -1,15 +1,6 @@
 {
   "schema": "papyrus.characterization-cases/1",
-  "unreachable": [
-    {
-      "renderer": "conflict_page_test_case",
-      "reason": "no call site: the stale-version branch routes TestCase through conflict_page_use_case"
-    },
-    {
-      "renderer": "conflict_page_test_report",
-      "reason": "no call site: the stale-version branch routes TestReport through conflict_page_use_case"
-    }
-  ],
+  "unreachable": [],
   "cases": [
     {
       "id": "req/create",
@@ -3892,7 +3883,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "conflict_page_ui_mockup"
+      "renderer": "document_conflict_page"
     },
     {
       "id": "http/conflict-rule",
@@ -3908,7 +3899,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "conflict_page_business_rule"
+      "renderer": "document_conflict_page"
     },
     {
       "id": "http/conflict-audit",
@@ -3924,7 +3915,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "conflict_page_audit_record"
+      "renderer": "document_conflict_page"
     },
     {
       "id": "http/conflict-tech-spec",
@@ -3940,7 +3931,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "conflict_page_tech_spec"
+      "renderer": "document_conflict_page"
     },
     {
       "id": "http/conflict-use-case",
@@ -3956,7 +3947,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "conflict_page_use_case"
+      "renderer": "document_conflict_page"
     },
     {
       "id": "http/conflict-test-case",
@@ -3972,7 +3963,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "conflict_page_use_case"
+      "renderer": "document_conflict_page"
     },
     {
       "id": "http/conflict-test-report",
@@ -3988,7 +3979,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "conflict_page_use_case"
+      "renderer": "document_conflict_page"
     },
     {
       "id": "http/conflict-req",
@@ -4004,7 +3995,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "conflict_page"
+      "renderer": "document_conflict_page"
     },
     {
       "id": "http/not-found-tech-spec",
@@ -4019,7 +4010,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "tech_spec_not_found_page"
+      "renderer": "document_not_found_page"
     },
     {
       "id": "http/not-found-use-case",
@@ -4034,7 +4025,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "use_case_not_found_page"
+      "renderer": "document_not_found_page"
     },
     {
       "id": "http/not-found-test-case",
@@ -4049,7 +4040,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "test_case_not_found_page"
+      "renderer": "document_not_found_page"
     },
     {
       "id": "http/not-found-test-report",
@@ -4064,7 +4055,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "test_report_not_found_page"
+      "renderer": "document_not_found_page"
     },
     {
       "id": "http/not-found-note",
@@ -4141,7 +4132,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "conflict_page"
+      "renderer": "document_conflict_page"
     },
     {
       "id": "http/conflict-glossary",
@@ -4157,7 +4148,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "conflict_page"
+      "renderer": "document_conflict_page"
     },
     {
       "id": "http/conflict-ui-spec",
@@ -4173,7 +4164,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "conflict_page"
+      "renderer": "document_conflict_page"
     },
     {
       "id": "http/api-doc-post-success",

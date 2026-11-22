@@ -5,9 +5,7 @@
 //! the registry; the static [`PRESENTATION`] table only supplies labels,
 //! headings, curated text, navigation order, and legacy URL keys.
 
-use crate::registry::{
-    ArtifactCategory as CategoryKind, ArtifactRegistry, IdShape, TypeDescriptor,
-};
+use crate::registry::{ArtifactCategory as CategoryKind, ArtifactRegistry, TypeDescriptor};
 
 /// The three sidebar groups (REQ-06.003).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,16 +31,6 @@ impl NavGroup {
             CategoryKind::Document => NavGroup::Documents,
         }
     }
-}
-
-/// Which 404 page an ID shape selects.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NotFoundPage {
-    TechSpec,
-    UseCase,
-    TestCase,
-    TestReport,
-    GenericDocument,
 }
 
 /// The route kind that owns a rendered page, for the width decision.
@@ -88,8 +76,6 @@ pub struct Presentation {
     /// Legacy list API paths kept as aliases of this type's list. Purely
     /// presentational: the table never decides whether a type exists.
     pub api_paths: &'static [&'static str],
-    /// Not-found page rendered for this type's ID shape.
-    pub not_found: NotFoundPage,
     /// Category whose aggregate navigation entry this slug represents.
     pub aggregate_group: Option<NavGroup>,
     /// Declared family slot columns `(key, label)` for the shared list layout,
@@ -116,7 +102,6 @@ const fn builtin(
         legacy_type,
         order,
         api_paths: &[],
-        not_found: NotFoundPage::GenericDocument,
         aggregate_group: None,
         list_slots: &[],
     }
@@ -124,11 +109,6 @@ const fn builtin(
 
 const fn with_api(mut entry: Presentation, api_paths: &'static [&'static str]) -> Presentation {
     entry.api_paths = api_paths;
-    entry
-}
-
-const fn with_not_found(mut entry: Presentation, not_found: NotFoundPage) -> Presentation {
-    entry.not_found = not_found;
     entry
 }
 
@@ -252,65 +232,53 @@ pub const PRESENTATION: &[Presentation] = &[
         ),
         &["/api/audit-records", "/api/audit-record"],
     ),
-    with_not_found(
-        with_api(
-            builtin(
-                "tech-spec",
-                "Technical Specifications",
-                "Technical Specifications",
-                "technical specifications",
-                "Technical specifications in this project.",
-                None,
-                40,
-            ),
-            &["/api/tech-specs", "/api/tech-spec"],
+    with_api(
+        builtin(
+            "tech-spec",
+            "Technical Specifications",
+            "Technical Specifications",
+            "technical specifications",
+            "Technical specifications in this project.",
+            None,
+            40,
         ),
-        NotFoundPage::TechSpec,
+        &["/api/tech-specs", "/api/tech-spec"],
     ),
-    with_not_found(
-        with_api(
-            builtin(
-                "use-case",
-                "Use Cases",
-                "Use Cases",
-                "use cases",
-                "Use cases in this project.",
-                None,
-                50,
-            ),
-            &["/api/use-cases", "/api/use-case"],
+    with_api(
+        builtin(
+            "use-case",
+            "Use Cases",
+            "Use Cases",
+            "use cases",
+            "Use cases in this project.",
+            None,
+            50,
         ),
-        NotFoundPage::UseCase,
+        &["/api/use-cases", "/api/use-case"],
     ),
-    with_not_found(
-        with_api(
-            builtin(
-                "test-case",
-                "Test Cases",
-                "Test Cases",
-                "test cases",
-                "Test cases in this project.",
-                None,
-                60,
-            ),
-            &["/api/test-cases", "/api/test-case"],
+    with_api(
+        builtin(
+            "test-case",
+            "Test Cases",
+            "Test Cases",
+            "test cases",
+            "Test cases in this project.",
+            None,
+            60,
         ),
-        NotFoundPage::TestCase,
+        &["/api/test-cases", "/api/test-case"],
     ),
-    with_not_found(
-        with_api(
-            builtin(
-                "test-report",
-                "Test Reports",
-                "Test Reports",
-                "test reports",
-                "Test reports in this project.",
-                None,
-                70,
-            ),
-            &["/api/test-reports", "/api/test-report"],
+    with_api(
+        builtin(
+            "test-report",
+            "Test Reports",
+            "Test Reports",
+            "test reports",
+            "Test reports in this project.",
+            None,
+            70,
         ),
-        NotFoundPage::TestReport,
+        &["/api/test-reports", "/api/test-report"],
     ),
     with_slots(
         builtin(
@@ -384,14 +352,6 @@ fn aggregate_slug(group: NavGroup) -> Option<&'static str> {
     PRESENTATION
         .iter()
         .find(|entry| entry.aggregate_group == Some(group))
-        .map(|entry| entry.slug)
-}
-
-/// The presentation slug whose not-found template a page selector names.
-pub fn not_found_slug(page: NotFoundPage) -> Option<&'static str> {
-    PRESENTATION
-        .iter()
-        .find(|entry| entry.not_found == page)
         .map(|entry| entry.slug)
 }
 
@@ -517,14 +477,6 @@ pub struct InventoryEntry {
     pub url_key: String,
 }
 
-/// One enabled descriptor's prefix and ID shape.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct IdRule {
-    pub prefix: String,
-    pub id_shape: IdShape,
-    pub not_found: NotFoundPage,
-}
-
 /// The immutable startup route table.
 #[derive(Clone, Debug)]
 pub struct BrowserRoutes {
@@ -536,8 +488,6 @@ pub struct BrowserRoutes {
     pub nav: Vec<NavItem>,
     /// Document inventory cards.
     pub inventory: Vec<InventoryEntry>,
-    /// Enabled descriptor ID rules for not-found selection.
-    pub id_rules: Vec<IdRule>,
     /// Descriptor slug -> representative sidebar entry slug.
     pub nav_selection: std::collections::BTreeMap<String, String>,
     /// The aggregate slug that serves every enabled decision descriptor.
@@ -553,7 +503,6 @@ impl BrowserRoutes {
         let mut type_values = std::collections::BTreeMap::new();
         let mut nav = Vec::new();
         let mut inventory = Vec::new();
-        let mut id_rules = Vec::new();
         let mut nav_selection = std::collections::BTreeMap::new();
 
         let mut backlog_items: Vec<&TypeDescriptor> =
@@ -578,7 +527,6 @@ impl BrowserRoutes {
             if let Some(aggregate) = &backlog_aggregate {
                 nav_selection.insert(descriptor.slug.clone(), aggregate.clone());
             }
-            push_id_rule(descriptor, &mut id_rules);
         }
         if let Some(aggregate) = backlog_aggregate
             && backlog_items
@@ -609,7 +557,6 @@ impl BrowserRoutes {
             if let Some(aggregate) = &decision_aggregate {
                 nav_selection.insert(descriptor.slug.clone(), aggregate.clone());
             }
-            push_id_rule(descriptor, &mut id_rules);
         }
         if let Some(aggregate) = &decision_aggregate {
             type_values.insert(aggregate.clone(), aggregate.clone());
@@ -644,7 +591,6 @@ impl BrowserRoutes {
                 note: inventory_note(&descriptor.slug),
                 url_key: legacy_url_key(&descriptor.slug).to_string(),
             });
-            push_id_rule(descriptor, &mut id_rules);
         }
 
         for descriptor in registry.descriptors() {
@@ -678,7 +624,6 @@ impl BrowserRoutes {
             type_values,
             nav,
             inventory,
-            id_rules,
             nav_selection,
             decision_view: decision_aggregate,
             default_type,
@@ -742,14 +687,6 @@ impl BrowserRoutes {
             PageRoute::Other => PageWidth::Capped,
         }
     }
-
-    /// Choose the not-found page for an ID, if an enabled type claims it.
-    pub fn not_found_page(&self, id: &str) -> Option<NotFoundPage> {
-        self.id_rules
-            .iter()
-            .find(|rule| id_matches_rule(rule, id))
-            .map(|rule| rule.not_found)
-    }
 }
 
 fn presentation_order(descriptor: &TypeDescriptor) -> u32 {
@@ -764,35 +701,6 @@ fn nav_item(descriptor: &TypeDescriptor) -> NavItem {
         label: label(&descriptor.slug),
         url_key: legacy_url_key(&descriptor.slug).to_string(),
         group: NavGroup::from_category(descriptor.category),
-    }
-}
-
-fn push_id_rule(descriptor: &TypeDescriptor, rules: &mut Vec<IdRule>) {
-    let not_found = presentation(&descriptor.slug)
-        .map(|entry| entry.not_found)
-        .unwrap_or(NotFoundPage::GenericDocument);
-    if descriptor.prefix.is_empty() {
-        return;
-    }
-    rules.push(IdRule {
-        prefix: descriptor.prefix.clone(),
-        id_shape: descriptor.id_shape,
-        not_found,
-    });
-}
-
-fn id_matches_rule(rule: &IdRule, id: &str) -> bool {
-    match rule.id_shape {
-        IdShape::Grouped => {
-            crate::record::identity::parse_id_parts(id, &rule.prefix, true).is_some()
-                || crate::record::identity::parse_id_parts(id, &rule.prefix, false).is_some()
-        }
-        IdShape::Dotted => {
-            crate::record::identity::parse_id_parts(id, &rule.prefix, true).is_some()
-        }
-        IdShape::Plain => {
-            crate::record::identity::parse_id_parts(id, &rule.prefix, false).is_some()
-        }
     }
 }
 
