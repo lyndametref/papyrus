@@ -77,19 +77,24 @@ fn effective_value_from_raw(overlay: &yaml_serde::Value) -> Result<yaml_serde::V
 
 /// Validate a raw file value as a candidate configuration.
 ///
-/// The raw `document_types` declarations are checked first so unknown keys and
-/// enum values keep their selector-path diagnostics; the resulting effective
-/// configuration is then validated by [`Config::validate`].
+/// One deterministic pass: the raw declaration validator reports unknown keys,
+/// unknown enum values, entry and field type errors, field grammar, reserved
+/// and duplicate field keys, and slot rules with their selector paths; the
+/// browser keys are checked next; only a shape-valid file is deserialized and
+/// checked by [`Config::validate`] for the remaining entry invariants. Every
+/// collected diagnostic is returned together (TECH-077 section 8).
 fn validate_candidate(
     file_val: &yaml_serde::Value,
     project_dir: &Path,
 ) -> Result<Config, AppError> {
-    let structural = validate_document_types_declarations(file_val);
-    if !structural.is_empty() {
-        return Err(AppError::Validation(structural.join("\n")));
-    }
+    let mut errors = validate_document_types_declarations(file_val);
     let val = effective_value_from_raw(file_val)?;
-    validate_browser_yaml(&val).map_err(AppError::Validation)?;
+    if let Err(reason) = validate_browser_yaml(&val) {
+        errors.push(reason);
+    }
+    if !errors.is_empty() {
+        return Err(AppError::Validation(errors.join("\n")));
+    }
     let cfg: Config =
         yaml_serde::from_value(val).map_err(|e| AppError::Validation(e.to_string()))?;
     cfg.validate(Some(project_dir))
@@ -139,17 +144,7 @@ fn validate_browser_yaml(val: &yaml_serde::Value) -> Result<(), String> {
 
 pub fn load_effective_config(config_path: &Path, project_dir: &Path) -> Result<Config, AppError> {
     let raw = read_raw_config(config_path)?;
-    let structural = validate_document_types_declarations(&raw);
-    if !structural.is_empty() {
-        return Err(AppError::Validation(structural.join("\n")));
-    }
-    let val = effective_value_from_raw(&raw)?;
-    validate_browser_yaml(&val).map_err(AppError::Validation)?;
-    let cfg: Config =
-        yaml_serde::from_value(val).map_err(|e| AppError::Validation(e.to_string()))?;
-    cfg.validate(Some(project_dir))
-        .map_err(AppError::Validation)?;
-    Ok(cfg)
+    validate_candidate(&raw, project_dir)
 }
 
 pub fn load_effective_config_tolerant(
@@ -286,6 +281,7 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
             key
         )));
     }
+    reject_bracketed_selector(key, "set")?;
     // The key is classified before the value is parsed (ADR-0024 decision 1).
     // A list-valued key takes the comma-separated form and never enters the
     // YAML scalar path, so a comma stays separators here and ordinary data for
@@ -375,6 +371,7 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
             key
         )));
     }
+    reject_bracketed_selector(key, "unset")?;
     let mut file_val = if ctx.config_path.exists() {
         let raw = std::fs::read_to_string(&ctx.config_path)
             .map_err(|e| AppError::Runtime(e.to_string()))?;
@@ -409,6 +406,21 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
         json,
         ..Default::default()
     })
+}
+
+/// Reject an indexed or keyed sequence selector for `config set`/`unset`.
+///
+/// The YAML mutators operate on dotted mapping keys only, so a bracketed
+/// selector would otherwise create a literal `slots[0]` key (L-6). `config get`
+/// still accepts both forms.
+fn reject_bracketed_selector(key: &str, command: &str) -> Result<(), AppError> {
+    if key.contains('[') || key.contains(']') {
+        return Err(AppError::Validation(format!(
+            "{}: bracketed selectors are not supported by config {}; use the dotted mapping key without an index",
+            key, command
+        )));
+    }
+    Ok(())
 }
 
 /// Parse and sanitize a scalar `config set` value (specification section 8.2).

@@ -2,7 +2,7 @@
 id: TASK-252
 title: "Verify MS-033 model foundation: identical old-config load and validated schema"
 created_date: '2026-11-20T17:41:41Z'
-updated_date: '2026-11-22T12:13:06Z'
+updated_date: '2026-11-22T11:45:43Z'
 labels: []
 references:
   - REQ-07.002
@@ -34,6 +34,7 @@ assignee:
 milestone: MS-033
 dependencies:
   - TASK-251
+  - TASK-306
 ordinal: 90
 documentation:
   - docs/audits

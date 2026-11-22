@@ -12,11 +12,12 @@
 //! default of a user-defined type: the former `ContentModel::Generic` hidden
 //! rule becomes `Visible` (ADR-036 decision 33, REQ-06.019, TC-185).
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use papyrus::commands::load_effective_config;
-use papyrus::config::{Config, DocTypeEntry, FieldSpec, FieldVerb, is_list_valued_key};
+use papyrus::config::{Config, FieldSpec, FieldVerb, is_list_valued_key, yaml_get};
 use papyrus::registry::{
     ArtifactCategory, ArtifactRegistry, DocumentModel, StatusModel, TypeDescriptor, Verb,
 };
@@ -158,7 +159,7 @@ fn project_fields(fields: &[FieldSpec]) -> Vec<FieldView> {
             let option = field
                 .option
                 .clone()
-                .unwrap_or_else(|| field.key.replace('_', "-"));
+                .unwrap_or_else(|| papyrus::sanitize::kebab_slug(&field.key));
             FieldView::new(
                 field.heading.as_deref(),
                 field.frontmatter_key.as_deref(),
@@ -436,7 +437,144 @@ fn user_defined_roles() -> Vec<RoleView> {
     )]
 }
 
-fn expected_document(slug: &str, entry: &DocTypeEntry) -> Projection {
+/// Independent fixture facts for the fields under the M-6 oracle.
+///
+/// These values come from the raw fixture declaration plus the literal seed
+/// facts below, never from the effective `Config` entry or the descriptor, so a
+/// fill or replace bug cannot move both sides of the comparison.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FactEntry {
+    prefix: String,
+    directory: String,
+    enabled: bool,
+    statuses: Option<Vec<String>>,
+    default_status: Option<String>,
+}
+
+impl FactEntry {
+    fn new(
+        prefix: &str,
+        directory: &str,
+        enabled: bool,
+        statuses: Option<&[&str]>,
+        default_status: Option<&str>,
+    ) -> Self {
+        Self {
+            prefix: prefix.to_string(),
+            directory: directory.to_string(),
+            enabled,
+            statuses: statuses.map(|values| values.iter().map(|v| (*v).to_string()).collect()),
+            default_status: default_status.map(str::to_string),
+        }
+    }
+}
+
+const SEED_SLUGS: &[&str] = &[
+    "req",
+    "nfr",
+    "glossary",
+    "rule",
+    "ui-spec",
+    "ui-mockup",
+    "audit",
+    "tech-spec",
+    "use-case",
+    "test-case",
+    "test-report",
+];
+
+const ACTIVE_ARCHIVED: &[&str] = &["active", "archived"];
+
+fn seed_facts(slug: &str) -> Option<FactEntry> {
+    let facts = match slug {
+        "req" => FactEntry::new(
+            "REQ",
+            "requirements/business/",
+            true,
+            Some(ACTIVE_ARCHIVED),
+            None,
+        ),
+        "nfr" => FactEntry::new(
+            "NFR",
+            "requirements/non-functional/",
+            true,
+            Some(ACTIVE_ARCHIVED),
+            None,
+        ),
+        "glossary" => FactEntry::new("GLO", "glossary/", true, Some(ACTIVE_ARCHIVED), None),
+        "rule" => FactEntry::new("RUL", "business-rules/", true, Some(ACTIVE_ARCHIVED), None),
+        "ui-spec" => FactEntry::new(
+            "UI",
+            "specifications/ui/",
+            true,
+            Some(ACTIVE_ARCHIVED),
+            None,
+        ),
+        "ui-mockup" => FactEntry::new("MOCK", "specifications/ui/mockups/", true, None, None),
+        "audit" => FactEntry::new("AUD", "audit-records/", true, Some(ACTIVE_ARCHIVED), None),
+        "tech-spec" => FactEntry::new("TECH", "technical/", true, Some(ACTIVE_ARCHIVED), None),
+        "use-case" => FactEntry::new("UC", "use-cases/", true, Some(ACTIVE_ARCHIVED), None),
+        "test-case" => FactEntry::new("TC", "test-cases/", true, Some(ACTIVE_ARCHIVED), None),
+        "test-report" => FactEntry::new("TR", "test-reports/", true, Some(ACTIVE_ARCHIVED), None),
+        _ => return None,
+    };
+    Some(facts)
+}
+
+fn user_facts() -> FactEntry {
+    FactEntry::new("", "", true, Some(ACTIVE_ARCHIVED), None)
+}
+
+fn fixture_facts(path: &Path) -> BTreeMap<String, FactEntry> {
+    let text =
+        fs::read_to_string(path).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+    let value: yaml_serde::Value =
+        yaml_serde::from_str(&text).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+    let mut facts: BTreeMap<String, FactEntry> = SEED_SLUGS
+        .iter()
+        .map(|slug| ((*slug).to_string(), seed_facts(slug).expect("seed facts")))
+        .collect();
+    let Some(yaml_serde::Value::Mapping(entries)) = yaml_get(&value, "document_types") else {
+        return facts;
+    };
+    for (key, declared) in entries {
+        let yaml_serde::Value::String(slug) = key else {
+            continue;
+        };
+        if !matches!(declared, yaml_serde::Value::Mapping(_)) {
+            continue;
+        }
+        let mut entry = seed_facts(slug).unwrap_or_else(user_facts);
+        if let Some(yaml_serde::Value::String(prefix)) = yaml_get(declared, "prefix") {
+            entry.prefix = prefix.clone();
+        }
+        if let Some(yaml_serde::Value::String(directory)) = yaml_get(declared, "directory") {
+            entry.directory = directory.clone();
+        }
+        if let Some(yaml_serde::Value::Bool(enabled)) = yaml_get(declared, "enabled") {
+            entry.enabled = *enabled;
+        }
+        if let Some(yaml_serde::Value::Sequence(statuses)) = yaml_get(declared, "statuses") {
+            let values: Vec<String> = statuses
+                .iter()
+                .filter_map(|status| match status {
+                    yaml_serde::Value::String(status) => Some(status.clone()),
+                    _ => None,
+                })
+                .collect();
+            entry.statuses = Some(values);
+        }
+        if let Some(yaml_serde::Value::String(default_status)) =
+            yaml_get(declared, "default_status")
+        {
+            entry.default_status = Some(default_status.clone());
+        }
+        facts.insert(slug.clone(), entry);
+    }
+    facts
+}
+
+fn expected_document(slug: &str, facts: &FactEntry) -> Projection {
     let seed = seed_oracle(slug);
     let (model, roles, reference_visibility) = match &seed {
         Some(seed) => (
@@ -462,7 +600,7 @@ fn expected_document(slug: &str, entry: &DocTypeEntry) -> Projection {
             None,
         )
     } else {
-        let declared = entry
+        let declared = facts
             .statuses
             .clone()
             .unwrap_or_else(|| vec!["active".to_string(), "archived".to_string()]);
@@ -475,7 +613,7 @@ fn expected_document(slug: &str, entry: &DocTypeEntry) -> Projection {
         (
             statuses,
             Some(
-                entry
+                facts
                     .default_status
                     .clone()
                     .unwrap_or_else(|| "active".to_string()),
@@ -483,10 +621,10 @@ fn expected_document(slug: &str, entry: &DocTypeEntry) -> Projection {
         )
     };
     Projection {
-        prefix: entry.prefix.clone(),
+        prefix: facts.prefix.clone(),
         directory_key: "doc_directory".to_string(),
-        directory: entry.directory.clone(),
-        enabled: entry.enabled,
+        directory: facts.directory.clone(),
+        enabled: facts.enabled,
         statuses,
         default_status,
         model,
@@ -606,36 +744,61 @@ fn expected_decision(entry: &papyrus::config::TypeEntry) -> Projection {
     }
 }
 
-fn expected_projection(cfg: &Config, descriptor: &TypeDescriptor) -> Projection {
+fn expected_projection(
+    cfg: &Config,
+    descriptor: &TypeDescriptor,
+    facts: &BTreeMap<String, FactEntry>,
+) -> Projection {
     match descriptor.category {
         ArtifactCategory::Backlog => expected_backlog(&descriptor.slug, cfg),
         ArtifactCategory::Decision => expected_decision(&cfg.decision_types[&descriptor.slug]),
         ArtifactCategory::Document => {
-            expected_document(&descriptor.slug, &cfg.document_types[&descriptor.slug])
+            let entry = facts
+                .get(&descriptor.slug)
+                .unwrap_or_else(|| panic!("missing fixture facts for {}", descriptor.slug));
+            expected_document(&descriptor.slug, entry)
         }
     }
 }
 
-fn assert_registry_projects(cfg: &Config, registry: &ArtifactRegistry, label: &str) {
-    let declared: Vec<&str> = cfg.document_types.keys().map(String::as_str).collect();
+fn projection_mismatches(
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    facts: &BTreeMap<String, FactEntry>,
+    label: &str,
+) -> Vec<String> {
+    let mut mismatches = Vec::new();
+    let expected: Vec<&str> = facts.keys().map(String::as_str).collect();
     let projected: Vec<&str> = registry
         .in_category(ArtifactCategory::Document)
         .map(|descriptor| descriptor.slug.as_str())
         .collect();
-    assert_eq!(
-        projected, declared,
-        "{label}: every declared document type must project exactly once, in order"
-    );
-
+    if expected != projected {
+        mismatches.push(format!(
+            "{label}: every effective document type must project exactly once, in order; expected {expected:?}, got {projected:?}"
+        ));
+    }
     for descriptor in registry.descriptors() {
         let actual = project(descriptor);
-        let expected = expected_projection(cfg, descriptor);
-        assert_eq!(
-            actual, expected,
-            "{label}: descriptor projection drifted for {}",
-            descriptor.slug
-        );
+        let expected = expected_projection(cfg, descriptor, facts);
+        if actual != expected {
+            mismatches.push(format!(
+                "{label}: descriptor projection drifted for {}: expected {expected:?}, got {actual:?}",
+                descriptor.slug
+            ));
+        }
     }
+    mismatches
+}
+
+fn assert_registry_projects(
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    facts: &BTreeMap<String, FactEntry>,
+    label: &str,
+) {
+    let mismatches = projection_mismatches(cfg, registry, facts, label);
+    assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
 }
 
 const CONFIG_FIXTURES: &[&str] = &[
@@ -684,7 +847,8 @@ fn every_repository_configuration_loads_unedited_and_projects_identically() {
             .unwrap_or_else(|error| panic!("{relative} must load unedited: {error}"));
         let registry = ArtifactRegistry::build(&cfg)
             .unwrap_or_else(|error| panic!("{relative} must build a registry: {error}"));
-        assert_registry_projects(&cfg, &registry, relative);
+        let facts = fixture_facts(&path);
+        assert_registry_projects(&cfg, &registry, &facts, relative);
         let after = fs::read(&path).expect("config bytes readable after load");
         assert_eq!(before, after, "{relative} was modified by the load");
     }
@@ -856,7 +1020,7 @@ fn descriptor_field_options(descriptor: &TypeDescriptor, verb: Verb) -> Vec<Stri
                     field
                         .option
                         .clone()
-                        .unwrap_or_else(|| field.key.replace('_', "-")),
+                        .unwrap_or_else(|| papyrus::sanitize::kebab_slug(&field.key)),
                 );
             }
         }
@@ -941,6 +1105,47 @@ fn cli_help_projection_matches_the_frozen_goldens() {
             }
         }
     }
+}
+
+#[test]
+fn equivalence_check_fails_when_one_effective_field_is_mutated() {
+    let path = manifest().join("tests/fixtures/cli-help/papyrus.config.yml");
+    let project_dir = path.parent().expect("config has a parent");
+    let facts = fixture_facts(&path);
+    let cfg = load_effective_config(&path, project_dir).expect("cli-help configuration loads");
+    let registry = ArtifactRegistry::build(&cfg).expect("cli-help registry builds");
+    assert!(
+        projection_mismatches(&cfg, &registry, &facts, "baseline").is_empty(),
+        "the unmutated fixture must satisfy the independent oracle"
+    );
+
+    let mut prefix_drift = cfg.clone();
+    prefix_drift
+        .document_types
+        .get_mut("glossary")
+        .expect("glossary")
+        .prefix = "WRONG".to_string();
+    let drifted = ArtifactRegistry::build(&prefix_drift).expect("drifted registry builds");
+    assert!(
+        !projection_mismatches(&prefix_drift, &drifted, &facts, "prefix").is_empty(),
+        "a mutated prefix must fail the independent oracle"
+    );
+
+    let mut status_drift = cfg;
+    status_drift
+        .document_types
+        .get_mut("glossary")
+        .expect("glossary")
+        .statuses = Some(vec![
+        "active".to_string(),
+        "archived".to_string(),
+        "drifted".to_string(),
+    ]);
+    let drifted = ArtifactRegistry::build(&status_drift).expect("drifted registry builds");
+    assert!(
+        !projection_mismatches(&status_drift, &drifted, &facts, "statuses").is_empty(),
+        "a mutated status list must fail the independent oracle"
+    );
 }
 
 #[test]

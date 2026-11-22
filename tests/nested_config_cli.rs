@@ -25,6 +25,17 @@ impl Project {
         Self { path }
     }
 
+    fn initialized(name: &str) -> Self {
+        let project = Self::new(name);
+        let out = project.run(&["init", "Proj", "--no-git"]);
+        assert!(
+            out.status.success(),
+            "init failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        project
+    }
+
     fn write(&self, content: &str) {
         fs::write(self.path.join("papyrus.config.yml"), content).expect("write config");
     }
@@ -212,10 +223,14 @@ fn fill_and_replace_follow_the_seed_rules() {
             .trim(),
         "true"
     );
+    let list = project.ok(&["config", "list"]);
     assert!(
-        !project
-            .ok(&["config", "list"])
-            .contains("document_types.req.")
+        list.contains("document_types.req.prefix: REQ"),
+        "an undeclared seed slug stays effective (REQ-01.002, TC-114): {list}"
+    );
+    assert!(
+        list.contains("document_types.req.statuses: [active, archived]"),
+        "{list}"
     );
 
     project.write(
@@ -508,4 +523,320 @@ fn init_writes_minimal_entries_that_resolve_from_the_seed() {
         String::from_utf8_lossy(&repair.stderr)
     );
     assert!(!project.read().contains("bad slug"));
+}
+
+#[test]
+fn config_set_and_unset_keep_every_seed_type_effective() {
+    let project = Project::new("cross-type");
+    project.write("project_name: X\n");
+    project.ok(&["config", "set", "document_types.req.enabled", "false"]);
+
+    let list = project.ok(&["config", "list"]);
+    for line in [
+        "document_types.nfr.prefix: NFR",
+        "document_types.glossary.prefix: GLO",
+        "document_types.audit.prefix: AUD",
+        "document_types.test-report.prefix: TR",
+        "document_types.req.enabled: false",
+    ] {
+        assert!(list.contains(line), "missing {line:?} after set:\n{list}");
+    }
+    project.ok(&["nfr", "--help"]);
+
+    // The file stays minimal: only the edited entry is written.
+    let config = project.read();
+    assert!(
+    config.contains(
+        "document_types:\n  req:\n    prefix: REQ\n    directory: requirements/business/\n    enabled: false\n"
+    ),
+    "{config}"
+);
+    assert!(!config.contains("\n  nfr:\n"), "{config}");
+    assert!(!config.contains("\n  glossary:\n"), "{config}");
+
+    project.ok(&["config", "unset", "document_types.req.enabled"]);
+    let list = project.ok(&["config", "list"]);
+    for line in [
+        "document_types.nfr.prefix: NFR",
+        "document_types.glossary.prefix: GLO",
+        "document_types.req.enabled: true",
+    ] {
+        assert!(list.contains(line), "missing {line:?} after unset:\n{list}");
+    }
+    project.ok(&["nfr", "--help"]);
+
+    // Unset on a file that declares no document_types is a no-op edit and
+    // still leaves every seed effective.
+    let bare = Project::new("cross-type-bare");
+    bare.write("project_name: X\n");
+    bare.ok(&["config", "unset", "document_types.req.enabled"]);
+    let list = bare.ok(&["config", "list"]);
+    assert!(list.contains("document_types.nfr.prefix: NFR"), "{list}");
+    assert!(
+        list.contains("document_types.glossary.prefix: GLO"),
+        "{list}"
+    );
+    bare.ok(&["nfr", "--help"]);
+}
+
+#[test]
+fn user_defined_defaults_are_visible_without_being_written() {
+    let project = Project::new("user-defaults");
+    let declared = "document_types:\n  note:\n    prefix: NOTE\n    directory: notes/\n";
+    project.write(declared);
+
+    let list = project.ok(&["config", "list"]);
+    for line in [
+        "document_types.note.enabled: true",
+        "document_types.note.statuses: [active, archived]",
+        "document_types.note.api_aliases: []",
+        "document_types.note.reference_visibility: visible",
+        "document_types.note.fields[description].heading: ## Description",
+        "document_types.note.fields[description].kind: multiline",
+    ] {
+        assert!(list.contains(line), "missing {line:?}:\n{list}");
+    }
+    assert!(
+        !list.contains("document_types.note.default_status"),
+        "a user-defined type has no default_status: {list}"
+    );
+
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.note.statuses"])
+            .trim(),
+        "[active, archived]"
+    );
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.note.slots"])
+            .trim(),
+        "[]"
+    );
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.note.api_aliases"])
+            .trim(),
+        "[]"
+    );
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.note.reference_visibility"])
+            .trim(),
+        "visible"
+    );
+    let order: u32 = project
+        .ok(&["config", "get", "document_types.note.order"])
+        .trim()
+        .parse()
+        .expect("order is an integer");
+    assert!(order > 110, "order must follow the seed types: {order}");
+
+    let missing = project.run(&["config", "get", "document_types.note.default_status"]);
+    assert_eq!(missing.status.code(), Some(4));
+    assert!(
+        String::from_utf8_lossy(&missing.stderr).contains("document_types.note.default_status"),
+        "{}",
+        String::from_utf8_lossy(&missing.stderr)
+    );
+    assert_eq!(
+        project.read(),
+        declared,
+        "projected defaults must never be written to the file"
+    );
+
+    project.write(
+        "document_types:\n  note:\n    prefix: NOTE\n    directory: notes/\n    order: 7\n    statuses: [active, archived, review]\n    default_status: review\n    reference_visibility: hidden\n    api_aliases: [/api/notes]\n    slots:\n      - key: owner\n        label: Owner\n    fields:\n      - key: body\n        heading: '## Body'\n",
+    );
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.note.order"])
+            .trim(),
+        "7"
+    );
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.note.default_status"])
+            .trim(),
+        "review"
+    );
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.note.reference_visibility"])
+            .trim(),
+        "hidden"
+    );
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.note.api_aliases"])
+            .trim(),
+        "[/api/notes]"
+    );
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.note.slots[0].key"])
+            .trim(),
+        "owner"
+    );
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.note.fields[body].key"])
+            .trim(),
+        "body"
+    );
+}
+
+#[test]
+fn config_set_type_errors_use_selector_paths() {
+    let project = Project::new("entry-types");
+    project.write("project_name: X\n");
+    for (key, value, needle) in [
+        (
+            "document_types.req.order",
+            "abc",
+            "document_types.req.order: must be a non-negative integer",
+        ),
+        (
+            "document_types.req.order",
+            "-1",
+            "document_types.req.order: must be a non-negative integer",
+        ),
+        (
+            "document_types.req.enabled",
+            "abc",
+            "document_types.req.enabled: must be a boolean",
+        ),
+        (
+            "document_types.req.slots",
+            "bogus",
+            "document_types.req.slots: must be a sequence of mappings",
+        ),
+    ] {
+        let stderr = project.rejected(&["config", "set", key, value]);
+        assert!(stderr.contains(needle), "{key}={value}: {stderr}");
+    }
+
+    project.write(
+    "document_types:\n  deploy:\n    prefix: DEP\n    directory: deploy/\n    statuses: active\n",
+);
+    let stderr = project.rejected(&["config", "set", "task_prefix", "PAP"]);
+    assert!(
+        stderr.contains("document_types.deploy.statuses: must be a sequence of strings"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn bracketed_selectors_are_rejected_and_plain_leaf_categories_round_trip() {
+    let project = Project::initialized("bracket-selectors");
+    for key in [
+        "document_types.req.slots[0].key",
+        "document_types.req.group.fields[story].heading",
+    ] {
+        let stderr = project.rejected(&["config", "set", key, "x"]);
+        assert!(stderr.contains(key), "{key}: {stderr}");
+        let stderr = project.rejected(&["config", "unset", key]);
+        assert!(stderr.contains(key), "{key}: {stderr}");
+    }
+
+    for (key, value, default) in [
+        ("task_prefix", "PAP", "TASK"),
+        (
+            "statuses",
+            "ToDo, Done",
+            "[ToDo, Initiated, Refined, Implemented, Validated, Done]",
+        ),
+        ("decision_types.adr.enabled", "false", "true"),
+        ("document_types.req.enabled", "false", "true"),
+        (
+            "document_types.req.statuses",
+            "active, archived, review",
+            "[active, archived]",
+        ),
+    ] {
+        project.ok(&["config", "set", key, value]);
+        let set = project.ok(&["config", "get", key]);
+        assert!(
+            set.trim().contains(value.split(',').next().unwrap().trim()) || set.trim() == value,
+            "{key} did not round-trip: {set}"
+        );
+        project.ok(&["config", "unset", key]);
+        let after = project.ok(&["config", "get", key]);
+        assert_eq!(after.trim(), default, "{key} did not restore the default");
+    }
+}
+
+fn list_json(project: &Project) -> serde_json::Value {
+    let out = project.run(&["--json", "config", "list"]);
+    assert!(
+        out.status.success(),
+        "config list --json failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    serde_json::from_str(String::from_utf8_lossy(&out.stdout).trim()).unwrap()
+}
+
+fn indexed_selector(selector: &str, json: &serde_json::Value) -> String {
+    let mut out = Vec::new();
+    let mut current = json;
+    for part in selector.split('.') {
+        if let Some(open) = part.find('[') {
+            assert!(part.ends_with(']'), "{selector}");
+            let key = &part[..open];
+            let inner = &part[open + 1..part.len() - 1];
+            current = &current[key];
+            if inner.chars().all(|c| c.is_ascii_digit()) {
+                out.push(part.to_string());
+                current = &current[inner.parse::<usize>().unwrap()];
+            } else {
+                let array = current.as_array().unwrap_or_else(|| panic!("{selector}"));
+                let index = array
+                    .iter()
+                    .position(|item| item.get("key").and_then(|key| key.as_str()) == Some(inner))
+                    .unwrap_or_else(|| panic!("{selector}: no entry {inner}"));
+                out.push(format!("{}[{}]", key, index));
+                current = &array[index];
+            }
+        } else {
+            current = &current[part];
+            out.push(part.to_string());
+        }
+    }
+    out.join(".")
+}
+
+#[test]
+fn every_config_list_leaf_resolves_with_config_get_in_keyed_and_indexed_form() {
+    let project = Project::initialized("list-leaf-resolve");
+    let text = project.ok(&["config", "list"]);
+    let json = list_json(&project);
+    let mut checked = 0usize;
+    for line in text.lines() {
+        let (selector, _) = line.split_once(": ").unwrap_or_else(|| panic!("{line}"));
+        let keyed = project.run(&["config", "get", selector]);
+        assert!(
+            keyed.status.success(),
+            "config get {selector} failed: {}",
+            String::from_utf8_lossy(&keyed.stderr)
+        );
+        checked += 1;
+        if selector.contains('[') {
+            let indexed = indexed_selector(selector, &json);
+            let indexed_out = project.run(&["config", "get", &indexed]);
+            assert!(
+                indexed_out.status.success(),
+                "config get {indexed} failed: {}",
+                String::from_utf8_lossy(&indexed_out.stderr)
+            );
+            assert_eq!(
+                String::from_utf8_lossy(&keyed.stdout),
+                String::from_utf8_lossy(&indexed_out.stdout),
+                "{selector} and {indexed} disagree"
+            );
+        }
+    }
+    assert!(
+        checked > 200,
+        "expected the full listing, checked {checked}"
+    );
 }

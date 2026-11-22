@@ -2,7 +2,7 @@
 id: ADR-036
 title: "Config-declared document field schema and one descriptor model"
 created_date: '2026-11-20T18:28:00Z'
-updated_date: '2026-11-20T19:13:08Z'
+updated_date: '2026-11-22T12:03:30Z'
 labels: []
 references:
   - RE-010
@@ -36,6 +36,10 @@ superseded_by: null
 ## Status
 accepted
 ## Decision
+### Clarification (2026-11-22) — seed slugs are always effective
+
+- **Decision 32, "An absent slug stays absent":** the eleven seed slugs of decision 29 are always part of the effective configuration and resolve from the seed table whether or not the project file declares them; a partially declared `document_types` map does not remove the other seed types. "An absent slug stays absent" applies to non-seed (user-defined) slugs, and to the written file, which never gains entries that the command did not target. The fill and replace rules for a declared entry in decision 32 are unchanged. ADR-041's seed slot sets are likewise always effective.
+- No other decision, downstream constraint, or status changes.
 ## Supersession
 
 1. This ADR supersedes ADR-0017 decisions 1, 2, 3, 4, 7, 9, and 10 and downstream constraints 1 and 4, and only those. ADR-0017 decisions 5, 6, and 8 and downstream constraints 2, 3, 5, and 6 remain in force. ADR-0017 keeps its accepted status because the supersession is by decision, not in full.
