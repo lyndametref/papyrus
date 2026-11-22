@@ -98,7 +98,7 @@ pub fn run() -> Result<CommandOutput, error::AppError> {
     let is_version = prescan.version;
 
     // Phase 2: config
-    let (_cfg_opt, registry_opt): (Option<crate::config::Config>, Option<ArtifactRegistry>) =
+    let (cfg_opt, registry_opt): (Option<crate::config::Config>, Option<ArtifactRegistry>) =
         if is_init {
             (None, None)
         } else if is_config {
@@ -151,6 +151,7 @@ pub fn run() -> Result<CommandOutput, error::AppError> {
         config_path,
         json,
         no_color,
+        cfg_opt.as_ref(),
         registry_opt.as_ref(),
     )
 }

@@ -9,6 +9,7 @@ use std::path::Path;
 pub fn handle(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     record: &crate::record::descriptor::RecordDescriptor,
     verb: DocumentVerb,
     args: &DocumentArgs,
@@ -18,6 +19,7 @@ pub fn handle(
             let id = create(
                 ctx,
                 scope,
+                registry,
                 args.require("title")?,
                 args.require_text("description")?,
                 args.get_all("label"),
@@ -25,11 +27,12 @@ pub fn handle(
             )?;
             Ok(crate::document::typed_created(ctx, id))
         }
-        DocumentVerb::List => list(ctx, scope, record),
-        DocumentVerb::View => view(ctx, scope, record, args.require("id")?),
+        DocumentVerb::List => list(ctx, scope, registry, record),
+        DocumentVerb::View => view(ctx, scope, registry, record, args.require("id")?),
         DocumentVerb::Edit => edit(
             ctx,
             scope,
+            registry,
             record,
             args.require("id")?,
             args.get("title"),
@@ -58,9 +61,11 @@ fn sanitize_field(raw: &str) -> Result<String, AppError> {
 fn ensure_dirs(dir: &Path) -> Result<(), AppError> {
     fs::create_dir_all(dir).map_err(|e| AppError::Runtime(e.to_string()))
 }
-
+#[allow(clippy::too_many_arguments)]
 fn active_or_archived(
     ctx: &Context,
+    cfg: &crate::config::Config,
+    registry: &crate::registry::ArtifactRegistry,
     active: &Path,
     archived: &Path,
     id: &str,
@@ -69,6 +74,8 @@ fn active_or_archived(
 ) -> Result<crate::record::resolve::ResolvedRecord, AppError> {
     crate::record::resolve::resolve_in_dirs(
         ctx,
+        cfg,
+        registry,
         &[active.to_path_buf(), archived.to_path_buf()],
         id,
         &[prefix.to_string()],
@@ -136,6 +143,7 @@ fn run_editor(command: &str, path: &Path) -> Result<(), AppError> {
 fn create(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     title_raw: &str,
     description_raw: sanitize::Text,
     labels_raw: &[String],
@@ -201,13 +209,14 @@ fn create(
     let file_content = crate::record::patch::apply_patch(&parsed, &ops)?;
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    crate::record::store::write_atomic(ctx, &safe_path, &file_content)?;
+    crate::record::store::write_atomic(ctx, &scope.config, registry, &safe_path, &file_content)?;
     Ok(id)
 }
 
 fn list(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     record: &crate::record::descriptor::RecordDescriptor,
 ) -> Result<CommandOutput, AppError> {
     let dotted = record.is_dotted_id();
@@ -216,6 +225,8 @@ fn list(
 
     let records = crate::record::resolve::list_in_dir(
         ctx,
+        &scope.config,
+        registry,
         &active,
         std::slice::from_ref(&scope.prefix),
         dotted,
@@ -269,6 +280,7 @@ fn list(
 fn view(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
 ) -> Result<CommandOutput, AppError> {
@@ -278,11 +290,20 @@ fn view(
     let archived = scope.archived.clone();
     let _ = ensure_dirs(&active);
     let _ = ensure_dirs(&archived);
-    let record = active_or_archived(ctx, &active, &archived, &requested, &scope.prefix, dotted)?;
+    let record = active_or_archived(
+        ctx,
+        &scope.config,
+        registry,
+        &active,
+        &archived,
+        &requested,
+        &scope.prefix,
+        dotted,
+    )?;
     let id = record.id.clone();
     let path = record.path;
 
-    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
+    let content = crate::record::migrate::ensure_front_matter(ctx, &scope.config, registry, &path)?;
     let json = if ctx.json {
         Some(serde_json::json!({
             "id": id,
@@ -320,6 +341,7 @@ fn frontmatter_list_tech(content: &str, key: &str) -> Vec<String> {
 fn edit(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
     title_raw: Option<&str>,
@@ -334,12 +356,21 @@ fn edit(
     let archived = scope.archived.clone();
     let _ = ensure_dirs(&active);
     let _ = ensure_dirs(&archived);
-    let resolved = active_or_archived(ctx, &active, &archived, &requested, &scope.prefix, dotted)?;
+    let resolved = active_or_archived(
+        ctx,
+        &scope.config,
+        registry,
+        &active,
+        &archived,
+        &requested,
+        &scope.prefix,
+        dotted,
+    )?;
     resolved.ensure_writable()?;
     let id = resolved.id.clone();
     let path = resolved.path.clone();
 
-    let (doc, _token) = crate::record::store::read_document(ctx, &path)?;
+    let (doc, _token) = crate::record::store::read_document(ctx, &scope.config, registry, &path)?;
     let content = doc.source.clone();
     let mut record = record_from_document(&doc, &id);
 
@@ -419,7 +450,7 @@ fn edit(
 
     if new_content != content {
         let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
-        crate::record::store::write_atomic(ctx, &safe_path, &new_content)?;
+        crate::record::store::write_atomic(ctx, &scope.config, registry, &safe_path, &new_content)?;
     }
 
     let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;

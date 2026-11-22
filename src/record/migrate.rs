@@ -1,5 +1,6 @@
 //! Lazy, per-record migration of managed document record types to front matter.
 
+use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
 use crate::record::descriptor::RecordDescriptor;
@@ -7,6 +8,7 @@ use crate::record::document;
 use crate::record::frontmatter;
 use crate::record::frontmatter::FrontMatterValue;
 use crate::record::patch::{self, PatchOp};
+use crate::registry::ArtifactRegistry;
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -68,8 +70,13 @@ impl std::fmt::Display for MigrationConflict {
     }
 }
 
-pub fn is_managed_path(project_dir: &Path, path: &Path) -> bool {
-    managed_descriptor(project_dir, path).is_some()
+pub fn is_managed_path(
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    project_dir: &Path,
+    path: &Path,
+) -> bool {
+    managed_descriptor(cfg, registry, project_dir, path).is_some()
 }
 
 /// Resolve the descriptor of a managed record.
@@ -78,26 +85,29 @@ pub fn is_managed_path(project_dir: &Path, path: &Path) -> bool {
 /// configured read locations (active, archive, or legacy alias)
 /// and its stem is a native Papyrus stem for that family. Backlog-shaped
 /// stems resolve to no descriptor and are therefore invisible.
-pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<RecordDescriptor> {
+pub fn managed_descriptor(
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    project_dir: &Path,
+    path: &Path,
+) -> Option<RecordDescriptor> {
     if path.extension().and_then(|e| e.to_str()) != Some("md") {
         return None;
     }
     let stem = path.file_stem()?.to_str()?;
-    let cfg = load_cfg_for(project_dir);
     let parent = path.parent()?;
     // Backlog families keep their static descriptors.
     for desc in crate::record::descriptor::descriptors() {
-        if !desc.matches_stem(&cfg, stem) {
+        if !desc.matches_stem(cfg, stem) {
             continue;
         }
-        for dir in desc.resolve_read_directories(&cfg, project_dir) {
+        for dir in desc.resolve_read_directories(cfg, project_dir) {
             if dir == parent {
                 return Some(desc.clone());
             }
         }
     }
     // Document types, including config-defined ones, come from the registry.
-    let registry = crate::registry::ArtifactRegistry::build(&cfg).ok()?;
     for descriptor in registry.in_category(crate::registry::ArtifactCategory::Document) {
         let Some(desc) = registry.record_descriptor(&descriptor.slug) else {
             continue;
@@ -107,10 +117,10 @@ pub fn managed_descriptor(project_dir: &Path, path: &Path) -> Option<RecordDescr
         if !crate::config::is_seed_document_slug(&descriptor.slug) && !descriptor.enabled {
             continue;
         }
-        if !desc.matches_stem(&cfg, stem) {
+        if !desc.matches_stem(cfg, stem) {
             continue;
         }
-        for dir in desc.resolve_read_directories(&cfg, project_dir) {
+        for dir in desc.resolve_read_directories(cfg, project_dir) {
             if dir == parent {
                 return Some(desc.clone());
             }
@@ -166,26 +176,43 @@ pub fn has_front_matter(content: &str) -> bool {
     frontmatter::has_front_matter(content)
 }
 
-pub fn ensure_front_matter(ctx: &Context, path: &Path) -> Result<String, AppError> {
-    ensure_front_matter_internal(ctx, path, true).map(|(content, _)| content)
+pub fn ensure_front_matter(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    path: &Path,
+) -> Result<String, AppError> {
+    ensure_front_matter_internal(ctx, cfg, registry, path, true).map(|(content, _)| content)
 }
 
 /// Read adoption without writing a progress line. Used by request handlers
 /// whose stdout is a protocol stream.
-pub fn ensure_front_matter_quiet(ctx: &Context, path: &Path) -> Result<String, AppError> {
-    ensure_front_matter_internal(ctx, path, false).map(|(content, _)| content)
+pub fn ensure_front_matter_quiet(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    path: &Path,
+) -> Result<String, AppError> {
+    ensure_front_matter_internal(ctx, cfg, registry, path, false).map(|(content, _)| content)
 }
 
 /// Like [`ensure_front_matter`], but returns the record path unchanged.
 ///
 /// Lazy adoption never relocates or renames a record, so the returned path is
 /// always the path that was given.
-pub fn ensure_front_matter_canonical(ctx: &Context, path: &Path) -> Result<PathBuf, AppError> {
-    ensure_front_matter_internal(ctx, path, true).map(|(_, canonical)| canonical)
+pub fn ensure_front_matter_canonical(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    path: &Path,
+) -> Result<PathBuf, AppError> {
+    ensure_front_matter_internal(ctx, cfg, registry, path, true).map(|(_, canonical)| canonical)
 }
 
 fn ensure_front_matter_internal(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     path: &Path,
     announce: bool,
 ) -> Result<(String, PathBuf), AppError> {
@@ -202,14 +229,14 @@ fn ensure_front_matter_internal(
         )));
     }
     let content = fs::read_to_string(&safe).map_err(|e| AppError::Runtime(e.to_string()))?;
-    let Some(desc) = managed_descriptor(&ctx.project_dir, &safe) else {
+    let Some(desc) = managed_descriptor(cfg, registry, &ctx.project_dir, &safe) else {
         return Ok((content, safe));
     };
 
     // Conflict detection applies to both shapes. A record that already
     // carries front matter is returned byte-identically: adoption never
     // completes missing keys and never retires sections on read.
-    let conflicts = scan_migration_conflicts(ctx, &desc);
+    let conflicts = scan_migration_conflicts(ctx, cfg, registry, &desc);
     if let Some(reason) = blocking_conflict_for_path(ctx, &safe, &desc, &content, &conflicts) {
         return Err(AppError::Validation(format!(
             "migration conflict at {}: {}",
@@ -221,11 +248,12 @@ fn ensure_front_matter_internal(
         return Ok((content, safe));
     }
 
-    let (new_content, changed, action, keys) = migrate_content(ctx, &safe, &content, false)?;
+    let (new_content, changed, action, keys) =
+        migrate_content(ctx, cfg, registry, &safe, &content, false)?;
     if !changed {
         return Ok((content, safe));
     }
-    crate::record::store::write_atomic(ctx, &safe, &new_content)?;
+    crate::record::store::write_atomic(ctx, cfg, registry, &safe, &new_content)?;
     if announce {
         let rel = rel_path(&ctx.project_dir, &safe);
         println!("{}\t{}\t{}", rel, action, keys.join(","));
@@ -247,11 +275,13 @@ pub fn rel_path(project_dir: &Path, path: &Path) -> String {
 /// Retirement is a separate, write-only operation ([`retire_legacy_body_ops`]).
 pub fn migrate_content(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     path: &Path,
     content: &str,
     _dry_run: bool,
 ) -> Result<(String, bool, String, Vec<String>), AppError> {
-    let desc = match managed_descriptor(&ctx.project_dir, path) {
+    let desc = match managed_descriptor(cfg, registry, &ctx.project_dir, path) {
         Some(d) => d,
         None => return Ok((content.to_string(), false, String::new(), Vec::new())),
     };
@@ -267,7 +297,7 @@ pub fn migrate_content(
 
     if desc.name == "task" || desc.name == "milestone" {
         let doc = document::parse(content)?;
-        let ops = adoption_ops(ctx, path, &desc, content, &doc)?;
+        let ops = adoption_ops(ctx, cfg, path, &desc, content, &doc)?;
         let new_content = patch::apply_patch(&doc, &ops)?;
         return Ok((
             new_content,
@@ -303,7 +333,6 @@ pub fn migrate_content(
     }
 
     if desc.doc_type_key.is_some() && desc.name != "audit record" && desc.name != "release" {
-        let cfg = load_cfg(ctx);
         let status = desc
             .doc_type_key
             .as_deref()
@@ -447,12 +476,12 @@ fn heading_id_title(doc: &document::Document, path: &Path) -> (String, String) {
 /// milestone, deriving every value from the legacy body where present.
 fn adoption_ops(
     ctx: &Context,
+    cfg: &Config,
     path: &Path,
     desc: &RecordDescriptor,
     content: &str,
     doc: &document::Document,
 ) -> Result<Vec<PatchOp>, AppError> {
-    let cfg = load_cfg(ctx);
     let (id, title) = heading_id_title(doc, path);
     let created = created_date(ctx, path, desc, content);
     let updated = frontmatter::utc_now();
@@ -480,7 +509,7 @@ fn adoption_ops(
 
         let task_desc = crate::record::descriptor::descriptor_for("task")
             .ok_or_else(|| AppError::Runtime("task descriptor is unavailable".to_string()))?;
-        let dirs = task_desc.resolve_read_directories(&cfg, &ctx.project_dir);
+        let dirs = task_desc.resolve_read_directories(cfg, &ctx.project_dir);
         let dir_refs: Vec<&Path> = dirs.iter().map(PathBuf::as_path).collect();
         let ordinal = crate::record::identity::scan_max_ordinal_in_dirs(&dir_refs);
 
@@ -783,19 +812,24 @@ fn candidate_frontmatter_id(_desc: &RecordDescriptor, content: &str) -> Option<S
     Some(id.to_string())
 }
 
-fn collect_candidates(ctx: &Context, desc: &RecordDescriptor) -> Vec<Candidate> {
+fn collect_candidates(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    desc: &RecordDescriptor,
+) -> Vec<Candidate> {
     let mut out = Vec::new();
-    let cfg = load_cfg(ctx);
-    for dir in desc.resolve_read_directories(&cfg, &ctx.project_dir) {
-        collect_candidates_dir(ctx, desc, &cfg, &dir, &mut out);
+    for dir in desc.resolve_read_directories(cfg, &ctx.project_dir) {
+        collect_candidates_dir(ctx, cfg, registry, desc, &dir, &mut out);
     }
     out
 }
 
 fn collect_candidates_dir(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     desc: &RecordDescriptor,
-    cfg: &crate::config::Config,
     dir: &Path,
     out: &mut Vec<Candidate>,
 ) {
@@ -808,13 +842,13 @@ fn collect_candidates_dir(
     for e in rd.flatten() {
         let path = e.path();
         if path.is_dir() {
-            collect_candidates_dir(ctx, desc, cfg, &path, out);
+            collect_candidates_dir(ctx, cfg, registry, desc, &path, out);
             continue;
         }
         if path.extension().and_then(|e| e.to_str()) != Some("md") {
             continue;
         }
-        if !is_managed_path(&ctx.project_dir, &path) {
+        if !is_managed_path(cfg, registry, &ctx.project_dir, &path) {
             continue;
         }
         let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
@@ -843,9 +877,13 @@ fn collect_candidates_dir(
     }
 }
 
-pub fn scan_migration_conflicts(ctx: &Context, desc: &RecordDescriptor) -> Vec<MigrationConflict> {
-    let cfg = load_cfg(ctx);
-    let candidates = collect_candidates(ctx, desc);
+pub fn scan_migration_conflicts(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    desc: &RecordDescriptor,
+) -> Vec<MigrationConflict> {
+    let candidates = collect_candidates(ctx, cfg, registry, desc);
     // Deduplicate by canonical path; read directories never overlap, but a
     // symlink could still surface the same file twice.
     let mut seen: HashSet<PathBuf> = HashSet::new();
@@ -895,7 +933,7 @@ pub fn scan_migration_conflicts(ctx: &Context, desc: &RecordDescriptor) -> Vec<M
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or_default();
-        if let Some(key) = candidate_id_key(desc, &cfg, Some(&content), stem) {
+        if let Some(key) = candidate_id_key(desc, cfg, Some(&content), stem) {
             groups.entry(key).or_default().push(c.rel.clone());
         }
     }
@@ -926,12 +964,12 @@ pub fn scan_migration_conflicts(ctx: &Context, desc: &RecordDescriptor) -> Vec<M
 
 pub(crate) fn check_conflicts_for_path(
     ctx: &Context,
+    cfg: &Config,
     path: &Path,
     desc: &RecordDescriptor,
     content: &str,
     conflicts: &[MigrationConflict],
 ) -> Option<String> {
-    let cfg = load_cfg(ctx);
     let rel = rel_path(&ctx.project_dir, path);
     let stem = path
         .file_stem()
@@ -940,10 +978,10 @@ pub(crate) fn check_conflicts_for_path(
 
     if let (Some(fm_id), Some(stem_key), Some(stem_prefix)) = (
         candidate_frontmatter_id(desc, content),
-        stem_key(desc, &cfg, stem),
-        matching_prefix_of(desc, &cfg, stem),
+        stem_key(desc, cfg, stem),
+        matching_prefix_of(desc, cfg, stem),
     ) {
-        let fm_key = id_value_key(desc, &cfg, &fm_id);
+        let fm_key = id_value_key(desc, cfg, &fm_id);
         let same = fm_key.as_ref() == Some(&stem_key);
         if !same {
             let filename_id =
@@ -956,7 +994,7 @@ pub(crate) fn check_conflicts_for_path(
         }
     }
 
-    let sid = candidate_id_key(desc, &cfg, Some(content), stem);
+    let sid = candidate_id_key(desc, cfg, Some(content), stem);
     for c in conflicts {
         match c {
             MigrationConflict::DuplicateId { id, paths } => {
@@ -1038,26 +1076,28 @@ pub fn path_migration_conflict(
 }
 
 // Dry-run traversal and migration helpers.
-pub fn migrate_corpus(ctx: &Context, dry_run: bool) -> Result<Vec<MigrationEntry>, AppError> {
+pub fn migrate_corpus(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    dry_run: bool,
+) -> Result<Vec<MigrationEntry>, AppError> {
     let mut entries = Vec::new();
-    let cfg = load_cfg(ctx);
     let mut seen: HashSet<PathBuf> = HashSet::new();
     // Backlog families plus every registry document record (ADR-0017).
     let mut managed: Vec<RecordDescriptor> = crate::record::descriptor::descriptors().to_vec();
-    if let Ok(registry) = crate::registry::ArtifactRegistry::build(&cfg) {
-        managed.extend(
-            registry
-                .in_category(crate::registry::ArtifactCategory::Document)
-                .filter_map(|descriptor| registry.record_descriptor(&descriptor.slug).cloned()),
-        );
-    }
+    managed.extend(
+        registry
+            .in_category(crate::registry::ArtifactCategory::Document)
+            .filter_map(|descriptor| registry.record_descriptor(&descriptor.slug).cloned()),
+    );
     for desc in &managed {
-        for dir in desc.resolve_read_directories(&cfg, &ctx.project_dir) {
+        for dir in desc.resolve_read_directories(cfg, &ctx.project_dir) {
             let canon = dir.canonicalize().unwrap_or_else(|_| dir.clone());
             if !seen.insert(canon) || !dir.exists() {
                 continue;
             }
-            collect_dir(ctx, &dir, dry_run, &mut entries)?;
+            collect_dir(ctx, cfg, registry, &dir, dry_run, &mut entries)?;
         }
     }
     let verbose = dry_run;
@@ -1072,6 +1112,8 @@ pub fn migrate_corpus(ctx: &Context, dry_run: bool) -> Result<Vec<MigrationEntry
 
 fn collect_dir(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     dir: &Path,
     dry_run: bool,
     entries: &mut Vec<MigrationEntry>,
@@ -1083,29 +1125,31 @@ fn collect_dir(
         let entry = entry.map_err(|e| AppError::Runtime(e.to_string()))?;
         let path = entry.path();
         if path.is_dir() {
-            collect_dir(ctx, &path, dry_run, entries)?;
+            collect_dir(ctx, cfg, registry, &path, dry_run, entries)?;
             continue;
         }
         if path.extension().and_then(|e| e.to_str()) != Some("md") {
             continue;
         }
-        if !is_managed_path(&ctx.project_dir, &path) {
+        if !is_managed_path(cfg, registry, &ctx.project_dir, &path) {
             continue;
         }
-        process_file(ctx, &path, dry_run, entries)?;
+        process_file(ctx, cfg, registry, &path, dry_run, entries)?;
     }
     Ok(())
 }
 
 fn process_file(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     path: &Path,
     dry_run: bool,
     entries: &mut Vec<MigrationEntry>,
 ) -> Result<(), AppError> {
     let content = fs::read_to_string(path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let rel = rel_path(&ctx.project_dir, path);
-    let desc = managed_descriptor(&ctx.project_dir, path);
+    let desc = managed_descriptor(cfg, registry, &ctx.project_dir, path);
     if dry_run {
         if frontmatter::has_front_matter(&content) {
             let (action, keys) = match desc {
@@ -1145,11 +1189,12 @@ fn process_file(
     if desc.is_none() {
         return Ok(());
     }
-    let (new_content, changed, action, keys) = migrate_content(ctx, path, &content, false)?;
+    let (new_content, changed, action, keys) =
+        migrate_content(ctx, cfg, registry, path, &content, false)?;
     if !changed {
         return Ok(());
     }
-    crate::record::store::write_atomic(ctx, path, &new_content)?;
+    crate::record::store::write_atomic(ctx, cfg, registry, path, &new_content)?;
     entries.push(MigrationEntry {
         path: rel,
         action,
@@ -1158,7 +1203,12 @@ fn process_file(
     Ok(())
 }
 
-pub fn migrate_file(ctx: &Context, path: &Path) -> Result<Option<MigrationEntry>, AppError> {
+pub fn migrate_file(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    path: &Path,
+) -> Result<Option<MigrationEntry>, AppError> {
     let safe = crate::record::store::resolve_path(ctx, path)?;
     if !safe.exists() {
         return Err(AppError::NotFound(format!(
@@ -1170,14 +1220,15 @@ pub fn migrate_file(ctx: &Context, path: &Path) -> Result<Option<MigrationEntry>
     if frontmatter::has_front_matter(&content) {
         return Ok(None);
     }
-    if managed_descriptor(&ctx.project_dir, &safe).is_none() {
+    if managed_descriptor(cfg, registry, &ctx.project_dir, &safe).is_none() {
         return Ok(None);
     }
-    let (new_content, changed, action, keys) = migrate_content(ctx, &safe, &content, false)?;
+    let (new_content, changed, action, keys) =
+        migrate_content(ctx, cfg, registry, &safe, &content, false)?;
     if !changed {
         return Ok(None);
     }
-    crate::record::store::write_atomic(ctx, &safe, &new_content)?;
+    crate::record::store::write_atomic(ctx, cfg, registry, &safe, &new_content)?;
     let rel = rel_path(&ctx.project_dir, &safe);
     println!("{}\t{}\t{}", rel, action, keys.join(","));
     Ok(Some(MigrationEntry {
@@ -1197,15 +1248,6 @@ pub fn is_timestamp_pub(v: &str) -> bool {
         && v.as_bytes()[13] == b':'
         && v.as_bytes()[16] == b':'
         && v.as_bytes()[19] == b'Z'
-}
-
-fn load_cfg(ctx: &Context) -> crate::config::Config {
-    crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir).unwrap_or_default()
-}
-
-fn load_cfg_for(project_dir: &Path) -> crate::config::Config {
-    let config_path = project_dir.join("papyrus.config.yml");
-    crate::commands::load_effective_config(&config_path, project_dir).unwrap_or_default()
 }
 
 fn required_keys(desc: &RecordDescriptor) -> Vec<String> {
@@ -1278,6 +1320,13 @@ mod tests {
         }
     }
 
+    fn access(c: &Context) -> (Config, ArtifactRegistry) {
+        let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir)
+            .unwrap_or_default();
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        (cfg, registry)
+    }
+
     fn write(path: &Path, content: &str) {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).unwrap();
@@ -1299,7 +1348,7 @@ mod tests {
         let legacy = "# TASK-001 Old Title\n\n## Status\nDone\n\n## Description\nLegacy body.\n\n## Acceptance Criteria\n- [ ] first thing\n";
         let path = dir.join("backlog/tasks/TASK-001.md");
         write(&path, legacy);
-        let result = ensure_front_matter(&c, &path).unwrap();
+        let result = ensure_front_matter(&c, &access(&c).0, &access(&c).1, &path).unwrap();
         let (fm, body) = frontmatter::split(&result).unwrap();
         let fm = fm.expect("front matter expected");
         assert_eq!(body, legacy, "body must stay byte-identical on read");
@@ -1325,7 +1374,7 @@ mod tests {
         let legacy = "# TASK-003 Derived\n\n## Status\nIn Progress\n\n## Assignee\n- alice\n- bob\n\n## Milestone\nMS-001\n\n## Labels\n- bug\n\n## Dependencies\n- TASK-002\n\n## Description\nBody\n";
         let path = dir.join("backlog/tasks/TASK-003.md");
         write(&path, legacy);
-        let result = ensure_front_matter(&c, &path).unwrap();
+        let result = ensure_front_matter(&c, &access(&c).0, &access(&c).1, &path).unwrap();
         let (fm, _) = frontmatter::split(&result).unwrap();
         let fm = fm.unwrap();
         assert!(fm.raw.contains("id: TASK-003"), "{}", fm.raw);
@@ -1353,7 +1402,7 @@ mod tests {
             &path,
             "# TASK-004 Body Only\n\n## Description\nNo status.\n",
         );
-        let result = ensure_front_matter(&c, &path).unwrap();
+        let result = ensure_front_matter(&c, &access(&c).0, &access(&c).1, &path).unwrap();
         let (fm, _) = frontmatter::split(&result).unwrap();
         assert!(
             fm.unwrap().raw.contains("status: ToDo"),
@@ -1368,7 +1417,7 @@ mod tests {
         let legacy = "# MS-001 Mile\n\n## Release\nREL-001\n\n## Description\nDesc.\n";
         let path = dir.join("backlog/milestones/MS-001.md");
         write(&path, legacy);
-        let result = ensure_front_matter(&c, &path).unwrap();
+        let result = ensure_front_matter(&c, &access(&c).0, &access(&c).1, &path).unwrap();
         let (fm, body) = frontmatter::split(&result).unwrap();
         assert!(fm.unwrap().raw.contains("release: REL-001"));
         assert_eq!(body, legacy);
@@ -1382,7 +1431,7 @@ mod tests {
         let minimal = format!("---\nid: TASK-006\ntitle: Interop\n---\n{}", body);
         let path = dir.join("backlog/tasks/TASK-006.md");
         write(&path, &minimal);
-        let result = ensure_front_matter(&c, &path).unwrap();
+        let result = ensure_front_matter(&c, &access(&c).0, &access(&c).1, &path).unwrap();
         assert_eq!(result, minimal);
         assert_eq!(fs::read_to_string(&path).unwrap(), minimal);
     }
@@ -1394,9 +1443,9 @@ mod tests {
         let legacy = "# TASK-002 Title\n\n## Description\nBody\n";
         let path = dir.join("backlog/tasks/TASK-002.md");
         write(&path, legacy);
-        let first = ensure_front_matter(&c, &path).unwrap();
+        let first = ensure_front_matter(&c, &access(&c).0, &access(&c).1, &path).unwrap();
         let first_bytes = fs::read_to_string(&path).unwrap();
-        let second = ensure_front_matter(&c, &path).unwrap();
+        let second = ensure_front_matter(&c, &access(&c).0, &access(&c).1, &path).unwrap();
         assert_eq!(first, second);
         assert_eq!(fs::read_to_string(&path).unwrap(), first_bytes);
     }
@@ -1500,7 +1549,7 @@ mod tests {
             &task_record("\n## Description\nB\n").replace("TASK-001", "TASK-0007"),
         );
         let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let conflicts = scan_migration_conflicts(&c, &desc);
+        let conflicts = scan_migration_conflicts(&c, &access(&c).0, &access(&c).1, &desc);
         assert!(conflicts.iter().any(|c| matches!(
             c,
             MigrationConflict::DuplicateId { id, paths }
@@ -1522,10 +1571,26 @@ mod tests {
             &tpl.replace("{n}", "9"),
         );
         let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let conflicts = scan_migration_conflicts(&c, &desc);
+        let conflicts = scan_migration_conflicts(&c, &access(&c).0, &access(&c).1, &desc);
         assert!(conflicts.is_empty(), "{:?}", conflicts);
-        assert!(ensure_front_matter(&c, &dir.join("backlog/tasks/TASK-008.md")).is_ok());
-        assert!(ensure_front_matter(&c, &dir.join("backlog/tasks/TASK-009.md")).is_ok());
+        assert!(
+            ensure_front_matter(
+                &c,
+                &access(&c).0,
+                &access(&c).1,
+                &dir.join("backlog/tasks/TASK-008.md")
+            )
+            .is_ok()
+        );
+        assert!(
+            ensure_front_matter(
+                &c,
+                &access(&c).0,
+                &access(&c).1,
+                &dir.join("backlog/tasks/TASK-009.md")
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -1536,7 +1601,7 @@ mod tests {
         let path = dir.join("backlog/tasks/TASK-005.md");
         write(&path, &content);
         let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let conflicts = scan_migration_conflicts(&c, &desc);
+        let conflicts = scan_migration_conflicts(&c, &access(&c).0, &access(&c).1, &desc);
         assert!(conflicts.iter().any(|c| matches!(
             c,
             MigrationConflict::FrontmatterFilenameMismatch { path: p, .. }
@@ -1556,7 +1621,7 @@ mod tests {
         let mut perms = fs::metadata(&tasks_dir).unwrap().permissions();
         perms.set_readonly(true);
         fs::set_permissions(&tasks_dir, perms).unwrap();
-        let result = ensure_front_matter(&c, &path);
+        let result = ensure_front_matter(&c, &access(&c).0, &access(&c).1, &path);
         fs::set_permissions(&tasks_dir, fs::Permissions::from_mode(original_mode)).unwrap();
         assert!(result.is_err());
         assert_eq!(fs::read_to_string(&path).unwrap(), legacy);
@@ -1569,7 +1634,8 @@ mod tests {
         let legacy = "# TASK-004 Title\n\n## Description\nBody\n";
         let path = dir.join("backlog/tasks/archived/TASK-004.md");
         write(&path, legacy);
-        let canonical = ensure_front_matter_canonical(&c, &path).unwrap();
+        let canonical =
+            ensure_front_matter_canonical(&c, &access(&c).0, &access(&c).1, &path).unwrap();
         assert_eq!(canonical, path, "read must not relocate the record");
         assert!(path.exists());
     }
@@ -1581,8 +1647,8 @@ mod tests {
         let content = "## Description\n\nBody line\n";
         let path = dir.join("backlog/tasks/task-5 - Parsed-Title.md");
         write(&path, content);
-        assert!(managed_descriptor(&dir, &path).is_none());
-        let result = ensure_front_matter(&c, &path).unwrap();
+        assert!(managed_descriptor(&access(&c).0, &access(&c).1, &dir, &path).is_none());
+        let result = ensure_front_matter(&c, &access(&c).0, &access(&c).1, &path).unwrap();
         assert_eq!(result, content);
         assert_eq!(fs::read_to_string(&path).unwrap(), content);
     }
@@ -1596,7 +1662,7 @@ mod tests {
         );
         let path = dir.join("backlog/tasks/TASK-005.md");
         write(&path, &content);
-        let result = ensure_front_matter(&c, &path).unwrap();
+        let result = ensure_front_matter(&c, &access(&c).0, &access(&c).1, &path).unwrap();
         assert_eq!(result, content);
         assert_eq!(fs::read_to_string(&path).unwrap(), content);
     }
@@ -1613,7 +1679,7 @@ mod tests {
         write(&dir.join("backlog/tasks/TASK-006.md"), &retired);
         write(&dir.join("backlog/tasks/TASK-007.md"), &clean);
 
-        let entries = migrate_corpus(&c, true).unwrap();
+        let entries = migrate_corpus(&c, &access(&c).0, &access(&c).1, true).unwrap();
         let find = |suffix: &str| {
             entries
                 .iter()
@@ -1646,7 +1712,9 @@ mod tests {
         let legacy = "# TASK-010 Title\n\n## Description\nBody\n";
         let path = dir.join("backlog/tasks/TASK-010.md");
         write(&path, legacy);
-        let entry = migrate_file(&c, &path).unwrap().expect("entry expected");
+        let entry = migrate_file(&c, &access(&c).0, &access(&c).1, &path)
+            .unwrap()
+            .expect("entry expected");
         assert_eq!(entry.action, "added-front-matter");
         assert!(entry.keys.iter().any(|k| k == "status"));
         assert!(fs::read_to_string(&path).unwrap().starts_with("---\n"));
@@ -1666,7 +1734,7 @@ mod tests {
             &b,
             &task_record("\n## Description\nB\n").replace("TASK-001", "TASK-0007"),
         );
-        let err = ensure_front_matter(&c, &a).unwrap_err();
+        let err = ensure_front_matter(&c, &access(&c).0, &access(&c).1, &a).unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("duplicate id"), "{}", msg);
         assert!(msg.contains("TASK-7"), "{}", msg);
@@ -1680,7 +1748,7 @@ mod tests {
         let path = dir.join("docs/audit-records/AUD-001.md");
         write(&path, legacy);
 
-        let result = ensure_front_matter(&c, &path).unwrap();
+        let result = ensure_front_matter(&c, &access(&c).0, &access(&c).1, &path).unwrap();
         assert!(result.contains("status: active"), "{result}");
         assert!(result.contains("type: security"), "{result}");
         assert!(!result.contains("## Audit Type"), "{result}");
@@ -1695,12 +1763,12 @@ mod tests {
         let path = dir.join("docs/audit-records/deprecated/AUD-002.md");
         write(&path, legacy);
 
-        assert!(managed_descriptor(&dir, &path).is_none());
-        let result = ensure_front_matter(&c, &path).unwrap();
+        assert!(managed_descriptor(&access(&c).0, &access(&c).1, &dir, &path).is_none());
+        let result = ensure_front_matter(&c, &access(&c).0, &access(&c).1, &path).unwrap();
         assert_eq!(result, legacy);
         assert_eq!(fs::read_to_string(&path).unwrap(), legacy);
 
-        let entries = migrate_corpus(&c, true).unwrap();
+        let entries = migrate_corpus(&c, &access(&c).0, &access(&c).1, true).unwrap();
         assert!(
             !entries
                 .iter()
@@ -1723,10 +1791,11 @@ mod tests {
         let path = dir.join("docs/notes/NOTE-001.md");
         write(&path, legacy);
 
-        let desc = managed_descriptor(&dir, &path).expect("generic record is managed");
+        let desc = managed_descriptor(&access(&c).0, &access(&c).1, &dir, &path)
+            .expect("generic record is managed");
         assert_eq!(desc.doc_type_key.as_deref(), Some("note"));
 
-        let result = ensure_front_matter(&c, &path).unwrap();
+        let result = ensure_front_matter(&c, &access(&c).0, &access(&c).1, &path).unwrap();
         assert!(result.contains("status: active"), "{result}");
         assert!(result.contains("Body"), "{result}");
     }
@@ -1743,6 +1812,6 @@ mod tests {
         let path = dir.join("docs/notes/NOTE-001.md");
         write(&path, "# NOTE-001 A note\n\n## Description\nBody\n");
 
-        assert!(managed_descriptor(&dir, &path).is_none());
+        assert!(managed_descriptor(&access(&c).0, &access(&c).1, &dir, &path).is_none());
     }
 }

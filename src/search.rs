@@ -6,7 +6,6 @@
 
 use crate::CommandOutput;
 use crate::SearchType;
-use crate::commands::load_effective_config;
 use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
@@ -39,6 +38,7 @@ struct Hit {
 
 pub fn run(
     ctx: &Context,
+    cfg: &Config,
     registry: &ArtifactRegistry,
     query_raw: &str,
     types: &[SearchType],
@@ -46,25 +46,24 @@ pub fn run(
 ) -> Result<CommandOutput, AppError> {
     let query = sanitize_query(query_raw)?;
     let needle = query.to_lowercase();
-    let cfg = load_effective_config(&ctx.config_path, &ctx.project_dir)?;
 
     let mut hits = Vec::new();
     if types.is_empty() || types.contains(&SearchType::Doc) {
         for descriptor in document_type_descriptors(registry) {
-            collect_document_type(ctx, &cfg, descriptor, &needle, &mut hits)?;
+            collect_document_type(ctx, cfg, registry, descriptor, &needle, &mut hits)?;
         }
     }
     if types.is_empty() || types.contains(&SearchType::Task) {
-        collect_backlog_store(ctx, &cfg, "task", "task", &needle, &mut hits)?;
+        collect_backlog_store(ctx, cfg, "task", "task", &needle, &mut hits)?;
     }
     if types.is_empty() || types.contains(&SearchType::Milestone) {
-        collect_backlog_store(ctx, &cfg, "milestone", "milestone", &needle, &mut hits)?;
+        collect_backlog_store(ctx, cfg, "milestone", "milestone", &needle, &mut hits)?;
     }
     if types.is_empty() || types.contains(&SearchType::Release) {
-        collect_backlog_store(ctx, &cfg, "release", "release", &needle, &mut hits)?;
+        collect_backlog_store(ctx, cfg, "release", "release", &needle, &mut hits)?;
     }
     if types.is_empty() || types.contains(&SearchType::Decision) {
-        collect_decision_store(ctx, &cfg, &needle, &mut hits)?;
+        collect_decision_store(ctx, cfg, &needle, &mut hits)?;
     }
 
     hits.sort_by(|a, b| {
@@ -117,6 +116,7 @@ fn document_type_descriptors(registry: &ArtifactRegistry) -> Vec<&TypeDescriptor
 fn collect_document_type(
     ctx: &Context,
     cfg: &Config,
+    registry: &ArtifactRegistry,
     descriptor: &TypeDescriptor,
     needle: &str,
     hits: &mut Vec<Hit>,
@@ -150,7 +150,7 @@ fn collect_document_type(
         let safe = Context::ensure_within(&ctx.project_dir, &path)?;
         // Read-path auto-relocation required by REQ-05.007. Failure is a
         // validation outcome naming the source record (Behavior 4.2).
-        let safe = crate::record::store::relocate_if_archived(ctx, &safe)
+        let safe = crate::record::store::relocate_if_archived(ctx, cfg, registry, &safe)
             .map_err(|error| AppError::Validation(error.to_string()))?;
         // A relocated record left the active directory and is not returned.
         if safe.parent() != Some(active.as_path()) {

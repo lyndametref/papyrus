@@ -1,4 +1,3 @@
-use crate::commands::load_effective_config;
 use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
@@ -51,7 +50,12 @@ pub enum ReleaseCmd {
     },
 }
 
-pub fn run(ctx: &Context, cmd: ReleaseCmd) -> Result<crate::CommandOutput, AppError> {
+pub fn run(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    cmd: ReleaseCmd,
+) -> Result<crate::CommandOutput, AppError> {
     match cmd {
         ReleaseCmd::Create {
             title,
@@ -59,7 +63,15 @@ pub fn run(ctx: &Context, cmd: ReleaseCmd) -> Result<crate::CommandOutput, AppEr
             label,
             reference,
         } => {
-            let id = create(ctx, &title, description.as_deref(), &label, &reference)?;
+            let id = create(
+                ctx,
+                cfg,
+                registry,
+                &title,
+                description.as_deref(),
+                &label,
+                &reference,
+            )?;
             let text = id.clone();
             let json = if ctx.json {
                 Some(serde_json::json!({"id": id}))
@@ -72,9 +84,9 @@ pub fn run(ctx: &Context, cmd: ReleaseCmd) -> Result<crate::CommandOutput, AppEr
                 ..Default::default()
             })
         }
-        ReleaseCmd::List => list(ctx),
-        ReleaseCmd::View { id } => view(ctx, &id),
-        ReleaseCmd::Close { id } => close(ctx, &id),
+        ReleaseCmd::List => list(ctx, cfg, registry),
+        ReleaseCmd::View { id } => view(ctx, cfg, registry, &id),
+        ReleaseCmd::Close { id } => close(ctx, cfg, registry, &id),
         ReleaseCmd::Edit {
             id,
             title,
@@ -83,6 +95,8 @@ pub fn run(ctx: &Context, cmd: ReleaseCmd) -> Result<crate::CommandOutput, AppEr
             reference,
         } => edit(
             ctx,
+            cfg,
+            registry,
             &id,
             title.as_deref(),
             description.as_deref(),
@@ -95,10 +109,6 @@ pub fn run(ctx: &Context, cmd: ReleaseCmd) -> Result<crate::CommandOutput, AppEr
 fn sanitize_text(input: &str) -> Result<String, AppError> {
     sanitize::sanitize_name(input)
         .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))
-}
-
-fn load_config(ctx: &Context) -> Result<Config, AppError> {
-    load_effective_config(&ctx.config_path, &ctx.project_dir)
 }
 
 fn releases_dir(ctx: &Context, cfg: &Config) -> Result<PathBuf, AppError> {
@@ -114,10 +124,19 @@ fn release_prefixes(cfg: &Config) -> Vec<String> {
 fn resolve_release(
     ctx: &Context,
     cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
     id: &str,
 ) -> Result<Option<crate::record::resolve::ResolvedRecord>, AppError> {
     let dir = releases_dir(ctx, cfg)?;
-    crate::record::resolve::resolve_in_dirs(ctx, &[dir], id, &release_prefixes(cfg), false)
+    crate::record::resolve::resolve_in_dirs(
+        ctx,
+        cfg,
+        registry,
+        &[dir],
+        id,
+        &release_prefixes(cfg),
+        false,
+    )
 }
 
 fn ensure_dir(dir: &std::path::Path, project_dir: &std::path::Path) -> Result<(), AppError> {
@@ -168,12 +187,13 @@ fn release_from_document(
 
 pub fn create(
     ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
     title_raw: &str,
     desc_raw: Option<&str>,
     labels_raw: &[String],
     references_raw: &[String],
 ) -> Result<String, AppError> {
-    let cfg = load_config(ctx)?;
     let title = sanitize_text(title_raw)?;
     let desc = match desc_raw {
         Some(s) => Some(sanitize_text(s)?),
@@ -197,7 +217,7 @@ pub fn create(
         }
     }
 
-    let dir = releases_dir(ctx, &cfg)?;
+    let dir = releases_dir(ctx, cfg)?;
     ensure_dir(&dir, &ctx.project_dir)?;
 
     let next = crate::record::identity::next_number_in_dirs(&[&dir], &cfg.release_prefix);
@@ -248,7 +268,7 @@ pub fn create(
     let file_content = crate::record::patch::apply_patch(&parsed, &ops)?;
     let file_path = dir.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    crate::record::store::write_atomic(ctx, &safe_path, &file_content)?;
+    crate::record::store::write_atomic(ctx, cfg, registry, &safe_path, &file_content)?;
     Ok(id)
 }
 
@@ -257,16 +277,20 @@ pub fn create(
 /// A missing or empty stored `status` is treated as `planned` so imported and
 /// legacy records remain closable. Any other status is rejected with a
 /// validation outcome (exit 4) before any write, leaving the file untouched.
-pub fn close(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
+pub fn close(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    id_raw: &str,
+) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let record = resolve_release(ctx, &cfg, &requested)?
+    let record = resolve_release(ctx, cfg, registry, &requested)?
         .ok_or_else(|| AppError::NotFound(format!("not found: {}", requested)))?;
     record.ensure_writable()?;
     let id = record.id.clone();
     let path = record.path.clone();
 
-    let (doc, _token) = crate::record::store::read_document(ctx, &path)?;
+    let (doc, _token) = crate::record::store::read_document(ctx, cfg, registry, &path)?;
     let current = doc
         .front_matter
         .as_ref()
@@ -289,7 +313,7 @@ pub fn close(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErr
         ],
     )?;
     let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
-    crate::record::store::write_atomic(ctx, &safe_write, &new_content)?;
+    crate::record::store::write_atomic(ctx, cfg, registry, &safe_write, &new_content)?;
 
     let json = ctx
         .json
@@ -301,12 +325,22 @@ pub fn close(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErr
     })
 }
 
-pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
-    let cfg = load_config(ctx)?;
-    let dir = releases_dir(ctx, &cfg)?;
+pub fn list(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+) -> Result<crate::CommandOutput, AppError> {
+    let dir = releases_dir(ctx, cfg)?;
     let _ = ensure_dir(&dir, &ctx.project_dir);
 
-    let records = crate::record::resolve::list_in_dir(ctx, &dir, &release_prefixes(&cfg), false)?;
+    let records = crate::record::resolve::list_in_dir(
+        ctx,
+        cfg,
+        registry,
+        &dir,
+        &release_prefixes(cfg),
+        false,
+    )?;
     let mut items: Vec<(String, String, String)> = Vec::new();
     for record in records {
         let content = fs::read_to_string(&record.path).unwrap_or_default();
@@ -354,15 +388,19 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
     })
 }
 
-pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppError> {
+pub fn view(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
+    id_raw: &str,
+) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let dir = releases_dir(ctx, &cfg)?;
+    let dir = releases_dir(ctx, cfg)?;
     let _ = ensure_dir(&dir, &ctx.project_dir);
-    let record = resolve_release(ctx, &cfg, &requested)?
+    let record = resolve_release(ctx, cfg, registry, &requested)?
         .ok_or_else(|| AppError::NotFound(format!("not found: {}", requested)))?;
     let id = record.id.clone();
-    let content = crate::record::migrate::ensure_front_matter(ctx, &record.path)?;
+    let content = crate::record::migrate::ensure_front_matter(ctx, cfg, registry, &record.path)?;
 
     let text = content.clone();
     let json = if ctx.json {
@@ -381,9 +419,11 @@ pub fn view(ctx: &Context, id_raw: &str) -> Result<crate::CommandOutput, AppErro
         ..Default::default()
     })
 }
-
+#[allow(clippy::too_many_arguments)]
 pub fn edit(
     ctx: &Context,
+    cfg: &Config,
+    registry: &crate::registry::ArtifactRegistry,
     id_raw: &str,
     title_raw: Option<&str>,
     desc_raw: Option<&str>,
@@ -391,16 +431,15 @@ pub fn edit(
     references_raw: &[String],
 ) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let cfg = load_config(ctx)?;
-    let dir = releases_dir(ctx, &cfg)?;
+    let dir = releases_dir(ctx, cfg)?;
     let _ = ensure_dir(&dir, &ctx.project_dir);
-    let record = resolve_release(ctx, &cfg, &requested)?
+    let record = resolve_release(ctx, cfg, registry, &requested)?
         .ok_or_else(|| AppError::NotFound(format!("not found: {}", requested)))?;
     record.ensure_writable()?;
     let id = record.id.clone();
     let path = record.path.clone();
 
-    let (doc, _token) = crate::record::store::read_document(ctx, &path)?;
+    let (doc, _token) = crate::record::store::read_document(ctx, cfg, registry, &path)?;
     let content = doc.source.clone();
     let (parsed_id, parsed_title, parsed_desc) = release_from_document(&doc);
     let mut title_val = if parsed_title.is_empty() {
@@ -487,7 +526,7 @@ pub fn edit(
 
     if new_content != content {
         let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
-        crate::record::store::write_atomic(ctx, &safe_write, &new_content)?;
+        crate::record::store::write_atomic(ctx, cfg, registry, &safe_write, &new_content)?;
     }
 
     let _safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
@@ -506,6 +545,12 @@ pub fn edit(
 
 #[cfg(test)]
 mod native_layout_tests {
+    fn access(c: &Context) -> (crate::config::Config, crate::registry::ArtifactRegistry) {
+        let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir)
+            .unwrap_or_default();
+        let registry = crate::registry::ArtifactRegistry::build(&cfg).expect("registry");
+        (cfg, registry)
+    }
     use super::*;
 
     fn tmpdir(name: &str) -> PathBuf {
@@ -544,7 +589,10 @@ mod native_layout_tests {
         .unwrap();
 
         let cfg = Config::default();
-        let record = resolve_release(&c, &cfg, "REL-1").unwrap().unwrap();
+        let registry = crate::registry::ArtifactRegistry::build(&cfg).unwrap();
+        let record = resolve_release(&c, &cfg, &registry, "REL-1")
+            .unwrap()
+            .unwrap();
         assert_eq!(record.id, "REL-001");
         assert_eq!(
             record.path.file_name().and_then(|s| s.to_str()),
@@ -557,7 +605,11 @@ mod native_layout_tests {
             "---\nid: REL-002\ntitle: Hidden\n---\n\n# REL-002 Hidden\n",
         )
         .unwrap();
-        assert!(resolve_release(&c, &cfg, "REL-002").unwrap().is_none());
+        assert!(
+            resolve_release(&c, &cfg, &registry, "REL-002")
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
@@ -578,7 +630,7 @@ mod native_layout_tests {
         )
         .unwrap();
 
-        let id = create(&c, "Two", None, &[], &[]).unwrap();
+        let id = create(&c, &access(&c).0, &access(&c).1, "Two", None, &[], &[]).unwrap();
         assert_eq!(id, "REL-002", "releases allocate from the active directory");
         assert!(!dir.join("backlog/releases/REL-010.md").exists());
         assert!(!archive.join("REL-002.md").exists());

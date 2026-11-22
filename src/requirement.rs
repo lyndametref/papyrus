@@ -56,6 +56,7 @@ pub fn handle(
             let id = create_group(
                 ctx,
                 scope,
+                registry,
                 kind,
                 args.require("title")?,
                 args.get("story"),
@@ -63,11 +64,12 @@ pub fn handle(
             )?;
             Ok(crate::document::typed_created(ctx, id))
         }
-        DocumentVerb::List => list(ctx, scope, record),
-        DocumentVerb::View => view(ctx, scope, record, args.require("id")?),
+        DocumentVerb::List => list(ctx, scope, registry, record),
+        DocumentVerb::View => view(ctx, scope, registry, record, args.require("id")?),
         DocumentVerb::Edit => edit(
             ctx,
             scope,
+            registry,
             record,
             kind,
             args.require("id")?,
@@ -100,6 +102,7 @@ pub fn sanitize_text(input: &str) -> Result<String, AppError> {
 fn resolve_kind_record(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &ArtifactRegistry,
     record: &crate::record::descriptor::RecordDescriptor,
     id: &str,
 ) -> Result<crate::record::resolve::ResolvedRecord, AppError> {
@@ -107,6 +110,8 @@ fn resolve_kind_record(
     let dirs = [scope.active.clone(), scope.archived.clone()];
     if let Some(record) = crate::record::resolve::resolve_in_dirs(
         ctx,
+        &scope.config,
+        registry,
         &dirs,
         id,
         std::slice::from_ref(&scope.prefix),
@@ -118,6 +123,8 @@ fn resolve_kind_record(
     if dotted
         && let Some(record) = crate::record::resolve::resolve_in_dirs(
             ctx,
+            &scope.config,
+            registry,
             &dirs,
             id,
             std::slice::from_ref(&scope.prefix),
@@ -133,9 +140,11 @@ fn ensure_dirs(dir: &Path) -> Result<(), AppError> {
     fs::create_dir_all(dir).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_group(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &ArtifactRegistry,
     kind: Kind,
     title_raw: &str,
     story_raw: Option<&str>,
@@ -162,7 +171,7 @@ pub fn create_group(
 
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    crate::record::store::write_atomic(ctx, &safe_path, &content)?;
+    crate::record::store::write_atomic(ctx, &scope.config, registry, &safe_path, &content)?;
     Ok(id)
 }
 
@@ -234,7 +243,7 @@ pub fn create(
             .descriptor(other_kind.key())
             .filter(|other| crate::record::identity::is_group_id(&group_id, &other.prefix))
             .map(|other| {
-                DocumentScope::resolve(ctx, other)
+                DocumentScope::resolve(ctx, &scope.config, other)
                     .map(|other_scope| {
                         other_scope.active.join(format!("{}.md", group_id)).exists()
                             || other_scope
@@ -277,7 +286,8 @@ pub fn create(
         )));
     }
 
-    let (group_doc, _token) = crate::record::store::read_document(ctx, &group_active_safe)?;
+    let (group_doc, _token) =
+        crate::record::store::read_document(ctx, &scope.config, registry, &group_active_safe)?;
     let group_parsed = parsed_from_document(&group_doc);
     let group_title = group_parsed.title.clone();
     if group_title.is_empty() {
@@ -336,13 +346,14 @@ pub fn create(
     let file_content = crate::record::patch::apply_patch(&parsed, &ops)?;
     let file_path = active.join(format!("{}.md", req_id));
     let safe_file = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    crate::record::store::write_atomic(ctx, &safe_file, &file_content)?;
+    crate::record::store::write_atomic(ctx, &scope.config, registry, &safe_file, &file_content)?;
     Ok(req_id)
 }
 
 pub fn list(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &ArtifactRegistry,
     record: &crate::record::descriptor::RecordDescriptor,
 ) -> Result<crate::CommandOutput, AppError> {
     let dotted = record.is_dotted_id();
@@ -351,6 +362,8 @@ pub fn list(
 
     let mut records = crate::record::resolve::list_in_dir(
         ctx,
+        &scope.config,
+        registry,
         &active,
         std::slice::from_ref(&scope.prefix),
         dotted,
@@ -360,6 +373,8 @@ pub fn list(
         // dotted requirement records.
         for group in crate::record::resolve::list_in_dir(
             ctx,
+            &scope.config,
+            registry,
             &active,
             std::slice::from_ref(&scope.prefix),
             false,
@@ -518,15 +533,16 @@ fn body_document_requirement(
 pub fn view(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &ArtifactRegistry,
     record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
 ) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let resolved = resolve_kind_record(ctx, scope, record, &requested)?;
+    let resolved = resolve_kind_record(ctx, scope, registry, record, &requested)?;
     let id = resolved.id.clone();
     let path = resolved.path;
 
-    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
+    let content = crate::record::migrate::ensure_front_matter(ctx, &scope.config, registry, &path)?;
 
     let text = content.clone();
     let json = if ctx.json {
@@ -565,6 +581,7 @@ fn frontmatter_list_req(content: &str, key: &str) -> Vec<String> {
 pub fn edit(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &ArtifactRegistry,
     record: &crate::record::descriptor::RecordDescriptor,
     kind: Kind,
     id_raw: &str,
@@ -576,12 +593,13 @@ pub fn edit(
     editor: bool,
 ) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let resolved = resolve_kind_record(ctx, scope, record, &requested)?;
+    let resolved = resolve_kind_record(ctx, scope, registry, record, &requested)?;
     resolved.ensure_writable()?;
     let id = resolved.id.clone();
     let path = resolved.path.clone();
 
-    let (doc_read, _token) = crate::record::store::read_document(ctx, &path)?;
+    let (doc_read, _token) =
+        crate::record::store::read_document(ctx, &scope.config, registry, &path)?;
     let content = doc_read.source.clone();
     let mut parsed = parsed_from_document(&doc_read);
 
@@ -668,7 +686,13 @@ pub fn edit(
 
     if new_content != content {
         let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
-        crate::record::store::write_atomic(ctx, &safe_write, &new_content)?;
+        crate::record::store::write_atomic(
+            ctx,
+            &scope.config,
+            registry,
+            &safe_write,
+            &new_content,
+        )?;
     }
 
     let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
@@ -708,6 +732,12 @@ pub fn edit(
 
 #[cfg(test)]
 mod native_layout_tests {
+    fn access(c: &Context) -> (crate::config::Config, crate::registry::ArtifactRegistry) {
+        let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir)
+            .unwrap_or_default();
+        let registry = crate::registry::ArtifactRegistry::build(&cfg).expect("registry");
+        (cfg, registry)
+    }
     use super::*;
     use std::path::PathBuf;
 
@@ -738,7 +768,7 @@ mod native_layout_tests {
     fn req_scope(c: &Context) -> DocumentScope {
         let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir).unwrap();
         let registry = crate::registry::ArtifactRegistry::build(&cfg).unwrap();
-        DocumentScope::resolve(c, registry.descriptor("req").unwrap()).unwrap()
+        DocumentScope::resolve(c, &cfg, registry.descriptor("req").unwrap()).unwrap()
     }
 
     fn req_record(c: &Context) -> crate::record::descriptor::RecordDescriptor {
@@ -766,12 +796,12 @@ mod native_layout_tests {
         .unwrap();
 
         let record = req_record(&c);
-        let one = view(&c, &scope, &record, "REQ-01.001").unwrap();
+        let one = view(&c, &scope, &access(&c).1, &record, "REQ-01.001").unwrap();
         assert_eq!(one.json.unwrap()["id"], "REQ-01.001");
-        let two = view(&c, &scope, &record, "REQ-1.2").unwrap();
+        let two = view(&c, &scope, &access(&c).1, &record, "REQ-1.2").unwrap();
         assert_eq!(two.json.unwrap()["id"], "REQ-01.002");
 
-        let listed = list(&c, &scope, &record).unwrap();
+        let listed = list(&c, &scope, &access(&c).1, &record).unwrap();
         assert!(listed.text.contains("REQ-01.001"));
         assert!(listed.text.contains("REQ-01.002"));
     }

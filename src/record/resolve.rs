@@ -4,9 +4,11 @@
 //! cosmetic `-<slug>` (or ` - <slug>`) suffix. The reported identity is always
 //! the canonical ID portion of the stem or front-matter `id`, never the slug.
 
+use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
 use crate::record::identity::{ParsedId, parse_id_parts};
+use crate::registry::ArtifactRegistry;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -88,6 +90,8 @@ fn wanted_keys(input: &str, prefixes: &[String], dotted: bool) -> Vec<String> {
 
 fn describe_record(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     path: &Path,
     prefixes: &[String],
     dotted: bool,
@@ -115,14 +119,14 @@ fn describe_record(
     };
     // Tolerant status: preserve verbatim; flag whether it is declared.
     let status_declared = {
-        let cfg = crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir)
-            .unwrap_or_default();
         let status = crate::record::frontmatter::parse(&content)
             .ok()
             .flatten()
             .and_then(|fm| crate::record::frontmatter::current_value_string(&fm.raw, "status"));
-        if let Some(desc) = crate::record::migrate::managed_descriptor(&ctx.project_dir, &safe) {
-            let declared = desc.declared_statuses(&cfg);
+        if let Some(desc) =
+            crate::record::migrate::managed_descriptor(cfg, registry, &ctx.project_dir, &safe)
+        {
+            let declared = desc.declared_statuses(cfg);
             status
                 .as_ref()
                 .map(|v| declared.is_empty() || declared.iter().any(|d| d == v))
@@ -147,6 +151,8 @@ fn describe_record(
 /// the record is a duplicate: resolution fails and writes are refused.
 pub fn resolve_in_dirs(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     dirs: &[PathBuf],
     input: &str,
     prefixes: &[String],
@@ -159,7 +165,12 @@ pub fn resolve_in_dirs(
     let mut found: Vec<ResolvedRecord> = Vec::new();
     for dir in dirs {
         for original_path in md_files(dir)? {
-            let path = match crate::record::store::relocate_if_archived(ctx, &original_path) {
+            let path = match crate::record::store::relocate_if_archived(
+                ctx,
+                cfg,
+                registry,
+                &original_path,
+            ) {
                 Ok(p) => p,
                 Err(crate::record::store::RelocateError::WriteFailed { source }) => {
                     return Err(AppError::Validation(format!(
@@ -179,7 +190,7 @@ pub fn resolve_in_dirs(
                 }
                 Err(crate::record::store::RelocateError::Other(e)) => return Err(e),
             };
-            let Some(record) = describe_record(ctx, &path, prefixes, dotted)? else {
+            let Some(record) = describe_record(ctx, cfg, registry, &path, prefixes, dotted)? else {
                 continue;
             };
             let stem_key = parse_any(
@@ -220,28 +231,31 @@ pub fn resolve_in_dirs(
 /// Canonical entries of one directory, used by list commands.
 pub fn list_in_dir(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     dir: &Path,
     prefixes: &[String],
     dotted: bool,
 ) -> Result<Vec<ResolvedRecord>, AppError> {
     let mut records = Vec::new();
     for original_path in md_files(dir)? {
-        let path = match crate::record::store::relocate_if_archived(ctx, &original_path) {
-            Ok(p) => p,
-            Err(crate::record::store::RelocateError::WriteFailed { source }) => source,
-            Err(crate::record::store::RelocateError::UnlinkFailed {
-                source,
-                destination,
-            }) => {
-                return Err(AppError::Runtime(format!(
-                    "archive wrote {} but failed to remove {}",
-                    destination.display(),
-                    source.display()
-                )));
-            }
-            Err(crate::record::store::RelocateError::Other(e)) => return Err(e),
-        };
-        if let Some(record) = describe_record(ctx, &path, prefixes, dotted)? {
+        let path =
+            match crate::record::store::relocate_if_archived(ctx, cfg, registry, &original_path) {
+                Ok(p) => p,
+                Err(crate::record::store::RelocateError::WriteFailed { source }) => source,
+                Err(crate::record::store::RelocateError::UnlinkFailed {
+                    source,
+                    destination,
+                }) => {
+                    return Err(AppError::Runtime(format!(
+                        "archive wrote {} but failed to remove {}",
+                        destination.display(),
+                        source.display()
+                    )));
+                }
+                Err(crate::record::store::RelocateError::Other(e)) => return Err(e),
+            };
+        if let Some(record) = describe_record(ctx, cfg, registry, &path, prefixes, dotted)? {
             records.push(record);
         }
     }
@@ -252,6 +266,8 @@ pub fn list_in_dir(
 /// Report whether a family has duplicate canonical IDs across its locations.
 pub fn duplicate_ids(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     dirs: &[PathBuf],
     prefixes: &[String],
     dotted: bool,
@@ -259,7 +275,7 @@ pub fn duplicate_ids(
     let mut seen: Vec<(String, Vec<PathBuf>)> = Vec::new();
     for dir in dirs {
         for path in md_files(dir)? {
-            let Some(record) = describe_record(ctx, &path, prefixes, dotted)? else {
+            let Some(record) = describe_record(ctx, cfg, registry, &path, prefixes, dotted)? else {
                 continue;
             };
             if let Some((_, paths)) = seen.iter_mut().find(|(id, _)| *id == record.id) {

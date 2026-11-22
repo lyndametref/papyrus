@@ -8,6 +8,7 @@ use std::fs;
 pub fn handle(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     record: &crate::record::descriptor::RecordDescriptor,
     verb: DocumentVerb,
     args: &DocumentArgs,
@@ -18,6 +19,7 @@ pub fn handle(
             let id = create(
                 ctx,
                 scope,
+                registry,
                 args.require("term")?,
                 &definition,
                 args.get_all("label"),
@@ -25,13 +27,14 @@ pub fn handle(
             )?;
             Ok(crate::document::typed_created(ctx, id))
         }
-        DocumentVerb::List => list(ctx, scope, record),
-        DocumentVerb::View => view(ctx, scope, record, args.require("id")?),
+        DocumentVerb::List => list(ctx, scope, registry, record),
+        DocumentVerb::View => view(ctx, scope, registry, record, args.require("id")?),
         DocumentVerb::Edit => {
             let definition = resolve_definition_optional(args)?;
             edit(
                 ctx,
                 scope,
+                registry,
                 record,
                 args.require("id")?,
                 args.get("term"),
@@ -79,12 +82,15 @@ fn sanitize_text(input: &str) -> Result<String, AppError> {
 fn resolve_glossary(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     record: &crate::record::descriptor::RecordDescriptor,
     id: &str,
 ) -> Result<crate::record::resolve::ResolvedRecord, AppError> {
     let dotted = record.is_dotted_id();
     crate::record::resolve::resolve_in_dirs(
         ctx,
+        &scope.config,
+        registry,
         &[scope.active.clone(), scope.archived.clone()],
         id,
         std::slice::from_ref(&scope.prefix),
@@ -128,9 +134,11 @@ fn body_document(id: &str, term: &str, definition: &str) -> crate::record::docum
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     term_raw: &str,
     definition_text: &sanitize::Text,
     labels_raw: &[String],
@@ -200,13 +208,14 @@ pub fn create(
     let file_content = crate::record::patch::apply_patch(&parsed, &ops)?;
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    crate::record::store::write_atomic(ctx, &safe_path, &file_content)?;
+    crate::record::store::write_atomic(ctx, &scope.config, registry, &safe_path, &file_content)?;
     Ok(id)
 }
 
 pub fn list(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     record: &crate::record::descriptor::RecordDescriptor,
 ) -> Result<crate::CommandOutput, AppError> {
     let dotted = record.is_dotted_id();
@@ -215,6 +224,8 @@ pub fn list(
 
     let records = crate::record::resolve::list_in_dir(
         ctx,
+        &scope.config,
+        registry,
         &active,
         std::slice::from_ref(&scope.prefix),
         dotted,
@@ -270,15 +281,16 @@ pub fn list(
 pub fn view(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
 ) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let resolved = resolve_glossary(ctx, scope, record, &requested)?;
+    let resolved = resolve_glossary(ctx, scope, registry, record, &requested)?;
     let id = resolved.id.clone();
     let path = resolved.path;
 
-    let content = crate::record::migrate::ensure_front_matter(ctx, &path)?;
+    let content = crate::record::migrate::ensure_front_matter(ctx, &scope.config, registry, &path)?;
     let text = content.clone();
     let json = if ctx.json {
         Some(serde_json::json!({
@@ -316,6 +328,7 @@ fn frontmatter_list_glo(content: &str, key: &str) -> Vec<String> {
 pub fn edit(
     ctx: &Context,
     scope: &DocumentScope,
+    registry: &crate::registry::ArtifactRegistry,
     record: &crate::record::descriptor::RecordDescriptor,
     id_raw: &str,
     term_raw: Option<&str>,
@@ -325,12 +338,12 @@ pub fn edit(
     editor: bool,
 ) -> Result<crate::CommandOutput, AppError> {
     let requested = sanitize_text(id_raw)?;
-    let resolved = resolve_glossary(ctx, scope, record, &requested)?;
+    let resolved = resolve_glossary(ctx, scope, registry, record, &requested)?;
     resolved.ensure_writable()?;
     let id = resolved.id.clone();
     let path = resolved.path.clone();
 
-    let (doc, _token) = crate::record::store::read_document(ctx, &path)?;
+    let (doc, _token) = crate::record::store::read_document(ctx, &scope.config, registry, &path)?;
     let content = doc.source.clone();
     let mut gd = record_from_document(&doc);
     if gd.id.is_empty() {
@@ -417,7 +430,13 @@ pub fn edit(
 
     if new_content != content {
         let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
-        crate::record::store::write_atomic(ctx, &safe_write, &new_content)?;
+        crate::record::store::write_atomic(
+            ctx,
+            &scope.config,
+            registry,
+            &safe_write,
+            &new_content,
+        )?;
     }
 
     let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;

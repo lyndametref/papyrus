@@ -331,7 +331,7 @@ pub fn load_record(
     {
         return Ok(None);
     }
-    let Ok(read) = crate::record::store::read_document_normalized(ctx, &safe) else {
+    let Ok(read) = crate::record::store::read_document_normalized(ctx, cfg, registry, &safe) else {
         return Ok(None);
     };
     let id = canonical_id(descriptor, &stem).unwrap_or_else(|| stem.clone());
@@ -737,14 +737,17 @@ pub fn resolve_id(
         let dirs = vec![dir];
         let prefixes = vec![descriptor.prefix.clone()];
         let dotted = descriptor.id_shape != IdShape::Plain;
-        let mut resolved =
-            crate::record::resolve::resolve_in_dirs(ctx, &dirs, id, &prefixes, dotted)
-                .ok()
-                .flatten();
+        let mut resolved = crate::record::resolve::resolve_in_dirs(
+            ctx, cfg, registry, &dirs, id, &prefixes, dotted,
+        )
+        .ok()
+        .flatten();
         if resolved.is_none() && dotted {
-            resolved = crate::record::resolve::resolve_in_dirs(ctx, &dirs, id, &prefixes, false)
-                .ok()
-                .flatten();
+            resolved = crate::record::resolve::resolve_in_dirs(
+                ctx, cfg, registry, &dirs, id, &prefixes, false,
+            )
+            .ok()
+            .flatten();
         }
         if let Some(found) = resolved {
             if let Some(record) = load_record(ctx, cfg, registry, descriptor, &found.path)? {
@@ -1140,6 +1143,8 @@ pub fn decision_exists(ctx: &Context, cfg: &Config, registry: &ArtifactRegistry,
                 };
                 crate::record::resolve::resolve_in_dirs(
                     ctx,
+                    cfg,
+                    registry,
                     &dirs,
                     id,
                     std::slice::from_ref(&descriptor.prefix),

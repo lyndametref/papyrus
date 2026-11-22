@@ -1099,7 +1099,7 @@ fn board_cleanup_submit(request: &Request, state: &ServerState) -> Result<Respon
     let mut archived = 0usize;
     let mut failures: Vec<String> = Vec::new();
     for id in &selected {
-        match crate::task::archive(&ctx, id) {
+        match crate::task::archive(&ctx, &cfg, &state.registry, id) {
             Ok(_) => archived += 1,
             Err(error) => failures.push(format!("{} \u{2014} {}", id, error)),
         }
@@ -1152,7 +1152,7 @@ fn board_milestone_cleanup_submit(
     if milestone.status.as_deref() != Some("closed") {
         return Err(HttpError::new(404));
     }
-    match crate::milestone::archive(&ctx, milestone_id) {
+    match crate::milestone::archive(&ctx, &cfg, &state.registry, milestone_id) {
         Ok(_) => {
             let type_key = routes::legacy_url_key(board_task_slug(state));
             Ok(Response::redirect(&format!(
@@ -1231,7 +1231,7 @@ fn board_release_cleanup_submit(
     let total = closed.len();
     let mut failures: Vec<String> = Vec::new();
     for id in &closed {
-        match crate::milestone::archive(&ctx, id) {
+        match crate::milestone::archive(&ctx, &cfg, &state.registry, id) {
             Ok(_) => archived += 1,
             Err(error) => failures.push(format!("{} \u{2014} {}", id, error)),
         }
@@ -1343,21 +1343,29 @@ fn resolve_record(id: &str, state: &ServerState) -> Result<(Record, Config), Htt
 /// Apply one browser patch list and write once through the shared store.
 fn save_ops(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     record: &Record,
     ops: Vec<crate::record::patch::PatchOp>,
 ) -> Result<(), HttpError> {
     let content = edit::apply(&record.doc, &ops).map_err(|_| HttpError::new(500))?;
     // Browser saves use LF with exactly one trailing newline (ADR-0013 D2).
     let content = crate::record::line_endings::normalize(&content);
-    save_content(ctx, record, content)
+    save_content(ctx, cfg, registry, record, content)
 }
 
 /// Write already-rendered content only when it differs from the bytes stored on
 /// disk. A no-op save performs no write and does not refresh `updated_date`;
 /// the first save of a CRLF record still performs the one-time LF conversion.
-fn save_content(ctx: &Context, record: &Record, content: String) -> Result<(), HttpError> {
+fn save_content(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    record: &Record,
+    content: String,
+) -> Result<(), HttpError> {
     if content != record.stored_source {
-        crate::record::store::write_atomic(ctx, &record.path, &content)
+        crate::record::store::write_atomic(ctx, cfg, registry, &record.path, &content)
             .map_err(|_| HttpError::new(500))?;
     }
     Ok(())
@@ -1833,7 +1841,15 @@ fn board_status_submit(
         ));
     }
     let ctx = state.context();
-    if save_ops(&ctx, record, edit::task_status_ops(&record.doc, status)).is_err() {
+    if save_ops(
+        &ctx,
+        cfg,
+        &state.registry,
+        record,
+        edit::task_status_ops(&record.doc, status),
+    )
+    .is_err()
+    {
         let message = format!(
             "Could not change the status of {}. Nothing was saved. Try again.",
             record.id
@@ -1913,7 +1929,7 @@ fn save_generic_document(
         &labels.unwrap_or_default(),
         &references.unwrap_or_default(),
     );
-    save_ops(&ctx, record, ops)?;
+    save_ops(&ctx, cfg, &state.registry, record, ops)?;
     Ok(Response::redirect(&format!("/doc/{}", record.id)))
 }
 
@@ -2114,7 +2130,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 description_change,
                 record.supports_story(),
             );
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Some(TypedHandler::Task) => {
@@ -2261,7 +2277,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 deps,
                 acs,
             );
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Some(TypedHandler::Milestone) => {
@@ -2317,7 +2333,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             }
             let title = title.unwrap_or_default();
             let ops = edit::milestone_ops(&record.doc, &title, description_change, release_change);
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Some(TypedHandler::Release) => {
@@ -2357,7 +2373,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             }
             let title = title.unwrap_or_default();
             let ops = edit::release_ops(&record.doc, &title, description_change);
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Some(TypedHandler::Decision) => {
@@ -2502,7 +2518,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 context_change,
                 consequences_change,
             );
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Some(TypedHandler::Glossary) => {
@@ -2546,7 +2562,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
 
             let title = title.unwrap_or_default();
             let ops = edit::glossary_ops(&record.doc, &title, definition_change);
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Some(TypedHandler::UiSpec) => {
@@ -2600,7 +2616,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 None => FieldChange::Keep,
             };
             let ops = edit::ui_spec_ops(&record.doc, &title, view_change, description_change);
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Some(TypedHandler::UiMockup) => {
@@ -2655,7 +2671,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             let refs = refs.unwrap_or_default();
             let original = std::fs::read_to_string(&record.path).unwrap_or_default();
             let content = records::edit_ui_mockup(&original, &record.id, &title, &specs, &refs);
-            save_content(&ctx, &record, content)?;
+            save_content(&ctx, &cfg, &state.registry, &record, content)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Some(TypedHandler::Rule) => {
@@ -2727,7 +2743,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 applicability_change,
                 requirements,
             );
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Some(TypedHandler::TechSpec) => {
@@ -2769,7 +2785,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             }
             let title = title.unwrap_or_default();
             let ops = edit::tech_spec_ops(&record.doc, &title, description_change);
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Some(TypedHandler::UseCase)
@@ -2850,7 +2866,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 labels,
                 references,
             );
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         Some(TypedHandler::Audit) => {
@@ -2909,7 +2925,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
                 audit_type_value
             };
             let ops = edit::audit_ops(&record.doc, &title, &final_audit_type, content_change);
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
         None => save_generic_document(&record, &cfg, state, &fields, chrome),
@@ -3372,7 +3388,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 description_change,
                 record.supports_story(),
             );
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             let (updated, updated_cfg) = resolve_record(id, state)?;
             let index = records::build_index(
                 &ctx,
@@ -3580,7 +3596,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 deps,
                 acs,
             );
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             let (updated, updated_cfg) = resolve_record(id, state)?;
             let related = updated.milestone_id.as_ref().and_then(|mid| {
                 records::resolve_id(&ctx, &updated_cfg, &state.registry, mid)
@@ -3638,7 +3654,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 }
             }
             let ops = edit::milestone_ops(&record.doc, &title, description_change, release_change);
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             let (updated, updated_cfg) = resolve_record(id, state)?;
             let related = updated.release_id.as_ref().and_then(|rid| {
                 records::resolve_id(&ctx, &updated_cfg, &state.registry, rid)
@@ -3674,7 +3690,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 }
             }
             let ops = edit::release_ops(&record.doc, &title, description_change);
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -3824,7 +3840,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 context_change,
                 consequences_change,
             );
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             let (updated, updated_cfg) = resolve_record(id, state)?;
             let superseded_title = updated.superseded_by.as_ref().and_then(|sid| {
                 records::resolve_id(&ctx, &updated_cfg, &state.registry, sid)
@@ -3860,7 +3876,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             }
 
             let ops = edit::glossary_ops(&record.doc, &title, definition_change);
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -3898,7 +3914,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 }
             }
             let ops = edit::ui_spec_ops(&record.doc, &title, view_change, description_change);
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -3958,7 +3974,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
             // Read-only task/status/superseded_by and unknown members ignored.
             let original = std::fs::read_to_string(&record.path).unwrap_or_default();
             let content = records::edit_ui_mockup(&original, &record.id, &title, &specs, &refs);
-            save_content(&ctx, &record, content)?;
+            save_content(&ctx, &cfg, &state.registry, &record, content)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -4036,7 +4052,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 applicability_change,
                 requirements,
             );
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -4065,7 +4081,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 Some(_) => return Err(HttpError::new(400)),
             }
             let ops = edit::tech_spec_ops(&record.doc, &title, description_change);
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -4151,7 +4167,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 labels,
                 references,
             );
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }
@@ -4215,7 +4231,7 @@ fn api_post(id: &str, request: Request, state: &ServerState) -> Result<Response,
                 audit_type_val
             };
             let ops = edit::audit_ops(&record.doc, &title, &final_audit_type, content_change);
-            save_ops(&ctx, &record, ops)?;
+            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             let (updated, _updated_cfg) = resolve_record(id, state)?;
             Ok(Response::json(200, record_json(&updated, None, None)))
         }

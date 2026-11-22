@@ -1,6 +1,5 @@
 //! Generic, descriptor-driven document handler (ADR-0018, ADR-0017).
 
-use crate::commands::load_effective_config;
 use crate::config::Config;
 use crate::context::Context;
 use crate::error::AppError;
@@ -153,8 +152,11 @@ pub struct DocumentScope {
 }
 
 impl DocumentScope {
-    pub fn resolve(ctx: &Context, descriptor: &TypeDescriptor) -> Result<Self, AppError> {
-        let config = load_config(ctx)?;
+    pub fn resolve(
+        ctx: &Context,
+        config: &Config,
+        descriptor: &TypeDescriptor,
+    ) -> Result<Self, AppError> {
         let base = match descriptor.directory.config_key {
             "doc_directory" => config.doc_directory.clone(),
             other => {
@@ -172,7 +174,7 @@ impl DocumentScope {
         let archived = Context::ensure_within(&ctx.project_dir, &active.join("archived"))?;
         Ok(DocumentScope {
             id_padding: config.id_padding as usize,
-            config,
+            config: config.clone(),
             active,
             archived,
             prefix: descriptor.prefix.clone(),
@@ -218,6 +220,7 @@ impl DocumentInvocation {
 
 pub fn run(
     ctx: &Context,
+    cfg: &Config,
     registry: &ArtifactRegistry,
     mut invocation: DocumentInvocation,
 ) -> Result<crate::CommandOutput, AppError> {
@@ -249,7 +252,7 @@ pub fn run(
 
     resolve_stdin_description(&mut invocation)?;
 
-    let scope = DocumentScope::resolve(ctx, descriptor)?;
+    let scope = DocumentScope::resolve(ctx, cfg, descriptor)?;
     let record = registry
         .record_descriptor(&descriptor.slug)
         .ok_or_else(|| {
@@ -267,10 +270,14 @@ pub fn run(
         | DocumentVerb::Edit
         | DocumentVerb::Supersede => match &descriptor.schema {
             None => match invocation.verb {
-                DocumentVerb::Create => create_generic(ctx, descriptor, record, invocation),
-                DocumentVerb::List => list_records(ctx, record),
-                DocumentVerb::View => view_record(ctx, record, invocation.id),
-                DocumentVerb::Edit => edit_generic(ctx, descriptor, record, invocation),
+                DocumentVerb::Create => {
+                    create_generic(ctx, cfg, registry, descriptor, record, invocation)
+                }
+                DocumentVerb::List => list_records(ctx, cfg, registry, record),
+                DocumentVerb::View => view_record(ctx, cfg, registry, record, invocation.id),
+                DocumentVerb::Edit => {
+                    edit_generic(ctx, cfg, registry, descriptor, record, invocation)
+                }
                 other => Err(AppError::Validation(format!(
                     "document_types.{}: verb {} is not supported by the generic model",
                     slug,
@@ -300,13 +307,20 @@ pub fn run(
                     &invocation.args,
                 ),
                 _ => match invocation.verb {
-                    DocumentVerb::Archive => archive_record(ctx, record, invocation.id),
+                    DocumentVerb::Archive => {
+                        archive_record(ctx, cfg, registry, record, invocation.id)
+                    }
                     DocumentVerb::Delete => {
-                        delete_record(ctx, record, invocation.id, invocation.force)
+                        delete_record(ctx, cfg, registry, record, invocation.id, invocation.force)
                     }
-                    DocumentVerb::Status => {
-                        status_record(ctx, record, invocation.id, invocation.status_value)
-                    }
+                    DocumentVerb::Status => status_record(
+                        ctx,
+                        cfg,
+                        registry,
+                        record,
+                        invocation.id,
+                        invocation.status_value,
+                    ),
                     _ => unreachable!("outer match limits record verbs"),
                 },
             }
@@ -360,24 +374,26 @@ fn dispatch_typed(
             };
             crate::requirement::handle(ctx, scope, registry, record, kind, verb, args)
         }
-        TypedHandler::Glossary => crate::glossary::handle(ctx, scope, record, verb, args),
-        TypedHandler::Rule => crate::rule::handle(ctx, scope, record, verb, args),
-        TypedHandler::UiSpec => crate::ui_spec::handle(ctx, scope, record, verb, args),
-        TypedHandler::Audit => crate::audit::handle(ctx, scope, record, verb, args),
-        TypedHandler::TechSpec => crate::tech_spec::handle(ctx, scope, record, verb, args),
-        TypedHandler::UseCase => crate::use_case::handle(ctx, scope, record, verb, args),
-        TypedHandler::TestCase => crate::test_case::handle(ctx, scope, record, verb, args),
-        TypedHandler::TestReport => crate::test_report::handle(ctx, scope, record, verb, args),
-        TypedHandler::UiMockup => crate::ui_mockup::handle(ctx, scope, verb, args),
+        TypedHandler::Glossary => crate::glossary::handle(ctx, scope, registry, record, verb, args),
+        TypedHandler::Rule => crate::rule::handle(ctx, scope, registry, record, verb, args),
+        TypedHandler::UiSpec => crate::ui_spec::handle(ctx, scope, registry, record, verb, args),
+        TypedHandler::Audit => crate::audit::handle(ctx, scope, registry, record, verb, args),
+        TypedHandler::TechSpec => {
+            crate::tech_spec::handle(ctx, scope, registry, record, verb, args)
+        }
+        TypedHandler::UseCase => crate::use_case::handle(ctx, scope, registry, record, verb, args),
+        TypedHandler::TestCase => {
+            crate::test_case::handle(ctx, scope, registry, record, verb, args)
+        }
+        TypedHandler::TestReport => {
+            crate::test_report::handle(ctx, scope, registry, record, verb, args)
+        }
+        TypedHandler::UiMockup => crate::ui_mockup::handle(ctx, scope, registry, verb, args),
         other => Err(AppError::Validation(format!(
             "document_types.{}: unsupported typed handler {:?}",
             descriptor.slug, other
         ))),
     }
-}
-
-fn load_config(ctx: &Context) -> Result<Config, AppError> {
-    load_effective_config(&ctx.config_path, &ctx.project_dir)
 }
 
 fn sanitize_field(input: &str) -> Result<String, AppError> {
@@ -424,8 +440,11 @@ fn resolve_stdin_description(invocation: &mut DocumentInvocation) -> Result<(), 
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn create_generic(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     descriptor: &TypeDescriptor,
     record: &RecordDescriptor,
     invocation: DocumentInvocation,
@@ -457,8 +476,7 @@ fn create_generic(
         }
     }
 
-    let cfg = load_config(ctx)?;
-    let active = record.resolve_directory(&cfg, &ctx.project_dir)?;
+    let active = record.resolve_directory(cfg, &ctx.project_dir)?;
     fs::create_dir_all(&active).map_err(|e| AppError::Runtime(e.to_string()))?;
 
     let archived_dir = active.join("archived");
@@ -534,7 +552,7 @@ fn create_generic(
     let file_content = patch::apply_patch(&parsed, &ops)?;
     let file_path = active.join(format!("{}.md", id));
     let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    record::store::write_atomic(ctx, &safe_path, &file_content)?;
+    record::store::write_atomic(ctx, cfg, registry, &safe_path, &file_content)?;
 
     let json = if ctx.json {
         Some(json!({"id": id}))
@@ -550,6 +568,8 @@ fn create_generic(
 
 fn list_records(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     record: &RecordDescriptor,
 ) -> Result<crate::CommandOutput, AppError> {
     // Read-path auto-relocation: records whose status is `archived` but which
@@ -558,18 +578,17 @@ fn list_records(
     // this surfaces as `Err(Validation)`; on source-unlink failure as
     // `Err(Runtime)` naming both paths. The operation fails loudly rather than
     // returning a read-only handle.
-    let cfg = load_config(ctx)?;
-    let active = record.resolve_directory(&cfg, &ctx.project_dir)?;
+    let active = record.resolve_directory(cfg, &ctx.project_dir)?;
     let _ = fs::create_dir_all(&active);
-    let prefixes = record.configured_prefixes(&cfg);
+    let prefixes = record.configured_prefixes(cfg);
     let dotted = record.is_dotted_id();
-    let records = record::resolve::list_in_dir(ctx, &active, &prefixes, dotted)?;
+    let records = record::resolve::list_in_dir(ctx, cfg, registry, &active, &prefixes, dotted)?;
     let mut items: Vec<(String, String, String)> = Vec::new();
     for record in records {
         if record.path.parent() != Some(active.as_path()) {
             continue;
         }
-        let (doc_read, _token) = record::store::read_document(ctx, &record.path)?;
+        let (doc_read, _token) = record::store::read_document(ctx, cfg, registry, &record.path)?;
         let content = doc_read.source.clone();
         let (_, t) = document::heading_id_title_with_frontmatter(&doc_read);
         let title = if t.is_empty() { record.id.clone() } else { t };
@@ -606,22 +625,31 @@ fn list_records(
 
 fn view_record(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     record: &RecordDescriptor,
     id: Option<String>,
 ) -> Result<crate::CommandOutput, AppError> {
     let id_raw = id.ok_or_else(|| AppError::Validation("id is required".to_string()))?;
     let requested = sanitize_field(&id_raw)?;
-    let cfg = load_config(ctx)?;
-    let active = record.resolve_directory(&cfg, &ctx.project_dir)?;
+    let active = record.resolve_directory(cfg, &ctx.project_dir)?;
     let _ = fs::create_dir_all(&active);
-    let prefixes = record.configured_prefixes(&cfg);
+    let prefixes = record.configured_prefixes(cfg);
     let dotted = record.is_dotted_id();
-    let resolved = record::resolve::resolve_in_dirs(ctx, &[active], &requested, &prefixes, dotted)?;
+    let resolved = record::resolve::resolve_in_dirs(
+        ctx,
+        cfg,
+        registry,
+        &[active],
+        &requested,
+        &prefixes,
+        dotted,
+    )?;
     let record =
         resolved.ok_or_else(|| AppError::NotFound(format!("record not found: {}", requested)))?;
     let id = record.id.clone();
     let path = record.path.clone();
-    let (doc, _token) = record::store::read_document(ctx, &path)?;
+    let (doc, _token) = record::store::read_document(ctx, cfg, registry, &path)?;
     let content = doc.source.clone();
 
     let json = if ctx.json {
@@ -644,6 +672,8 @@ fn view_record(
 
 fn edit_generic(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     _descriptor: &TypeDescriptor,
     record: &RecordDescriptor,
     invocation: DocumentInvocation,
@@ -654,13 +684,14 @@ fn edit_generic(
         .ok_or_else(|| AppError::Validation("id is required".to_string()))?;
     let requested = sanitize_field(&id_raw)?;
 
-    let cfg = load_config(ctx)?;
-    let active = record.resolve_directory(&cfg, &ctx.project_dir)?;
+    let active = record.resolve_directory(cfg, &ctx.project_dir)?;
     let _ = fs::create_dir_all(&active);
-    let prefixes = record.configured_prefixes(&cfg);
+    let prefixes = record.configured_prefixes(cfg);
     let dotted = record.is_dotted_id();
     let resolved = record::resolve::resolve_in_dirs(
         ctx,
+        cfg,
+        registry,
         std::slice::from_ref(&active),
         &requested,
         &prefixes,
@@ -678,7 +709,7 @@ fn edit_generic(
         )));
     }
 
-    let (doc, _token) = record::store::read_document(ctx, &path)?;
+    let (doc, _token) = record::store::read_document(ctx, cfg, registry, &path)?;
     let content = doc.source.clone();
 
     let mut ops: Vec<PatchOp> = Vec::new();
@@ -767,7 +798,7 @@ fn edit_generic(
     let new_content = patch::apply_patch(&doc, &ops)?;
     if new_content != content {
         let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
-        record::store::write_atomic(ctx, &safe_path, &new_content)?;
+        record::store::write_atomic(ctx, cfg, registry, &safe_path, &new_content)?;
     }
 
     let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
@@ -792,12 +823,14 @@ fn edit_generic(
 
 pub fn archive_record(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     record: &RecordDescriptor,
     id: Option<String>,
 ) -> Result<crate::CommandOutput, AppError> {
     let id_raw = id.ok_or_else(|| AppError::Validation("id is required".to_string()))?;
     let requested = sanitize_field(&id_raw)?;
-    let _ = record::store::archive(ctx, record, &requested)?;
+    let _ = record::store::archive(ctx, cfg, registry, record, &requested)?;
     let json = if ctx.json {
         Some(json!({"status": "ok", "id": requested}))
     } else {
@@ -812,6 +845,8 @@ pub fn archive_record(
 
 pub fn delete_record(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     record: &RecordDescriptor,
     id: Option<String>,
     force: bool,
@@ -840,7 +875,7 @@ pub fn delete_record(
             });
         }
     }
-    record::store::delete(ctx, record, &requested)?;
+    record::store::delete(ctx, cfg, registry, record, &requested)?;
     let json = if ctx.json {
         Some(json!({"status": "ok", "id": requested}))
     } else {
@@ -855,6 +890,8 @@ pub fn delete_record(
 
 pub fn status_record(
     ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
     record: &RecordDescriptor,
     id: Option<String>,
     value: Option<String>,
@@ -868,16 +905,15 @@ pub fn status_record(
     let value =
         value.ok_or_else(|| AppError::Validation("status value is required".to_string()))?;
     // Auto-relocate archived-in-active records and surface undeclared statuses.
-    let cfg = load_config(ctx)?;
-    let read_dirs = record.resolve_read_directories(&cfg, &ctx.project_dir);
-    let prefixes = record.configured_prefixes(&cfg);
+    let read_dirs = record.resolve_read_directories(cfg, &ctx.project_dir);
+    let prefixes = record.configured_prefixes(cfg);
     let dotted = record.is_dotted_id();
-    if let Some(rec) =
-        record::resolve::resolve_in_dirs(ctx, &read_dirs, &requested, &prefixes, dotted)?
-    {
-        let _ = record::store::read_document(ctx, &rec.path)?;
+    if let Some(rec) = record::resolve::resolve_in_dirs(
+        ctx, cfg, registry, &read_dirs, &requested, &prefixes, dotted,
+    )? {
+        let _ = record::store::read_document(ctx, cfg, registry, &rec.path)?;
     }
-    record::store::set_status(ctx, record, &requested, &value)?;
+    record::store::set_status(ctx, cfg, registry, record, &requested, &value)?;
     let json = if ctx.json {
         Some(json!({"status": "ok", "id": requested}))
     } else {
@@ -909,6 +945,16 @@ fn run_editor(command: &str, path: &std::path::Path) -> Result<(), AppError> {
 
 #[cfg(test)]
 mod tests {
+    fn access(c: &Context) -> (crate::config::Config, crate::registry::ArtifactRegistry) {
+        let cfg = crate::commands::load_effective_config(&c.config_path, &c.project_dir)
+            .unwrap_or_default();
+        let registry = crate::registry::ArtifactRegistry::build(&cfg).expect("registry");
+        (cfg, registry)
+    }
+
+    fn load_config(ctx: &Context) -> Result<Config, AppError> {
+        crate::commands::load_effective_config(&ctx.config_path, &ctx.project_dir)
+    }
     use super::*;
     use crate::context::Context;
     use crate::registry::ArtifactRegistry;
@@ -979,7 +1025,7 @@ mod tests {
         let cfg = load_config(ctx).unwrap();
         let reg = ArtifactRegistry::build(&cfg).unwrap();
         let descriptor = reg.descriptor(slug).unwrap_or_else(|| panic!("{slug}"));
-        DocumentScope::resolve(ctx, descriptor).unwrap()
+        DocumentScope::resolve(ctx, &load_config(ctx).unwrap(), descriptor).unwrap()
     }
 
     fn typed_args(pairs: &[(&str, &[&str])]) -> DocumentArgs {
@@ -1048,6 +1094,7 @@ mod tests {
         let reg = registry(&c);
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1102,6 +1149,7 @@ mod tests {
         let reg = registry(&c);
         let res = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1125,6 +1173,7 @@ mod tests {
         let reg = registry(&c);
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "note",
@@ -1151,6 +1200,7 @@ mod tests {
         let reg = registry(&c);
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1168,6 +1218,7 @@ mod tests {
         // archive it
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1183,6 +1234,7 @@ mod tests {
         .unwrap();
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1207,6 +1259,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1222,6 +1275,7 @@ mod tests {
         .unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1237,6 +1291,7 @@ mod tests {
         .unwrap();
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1261,6 +1316,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1276,6 +1332,7 @@ mod tests {
         .unwrap();
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1300,6 +1357,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1315,6 +1373,7 @@ mod tests {
         .unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1330,6 +1389,7 @@ mod tests {
         .unwrap();
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1355,6 +1415,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1370,6 +1431,7 @@ mod tests {
         .unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1399,6 +1461,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1419,6 +1482,7 @@ mod tests {
         fs::write(&path, content).unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1446,6 +1510,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1464,6 +1529,7 @@ mod tests {
         let meta_before = fs::metadata(&path).unwrap().modified().unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1491,6 +1557,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1506,6 +1573,7 @@ mod tests {
         .unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1522,6 +1590,7 @@ mod tests {
         // idempotent
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1550,6 +1619,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "note",
@@ -1565,6 +1635,7 @@ mod tests {
         .unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "note",
@@ -1581,6 +1652,7 @@ mod tests {
         // archive then status rejected
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "note",
@@ -1596,6 +1668,7 @@ mod tests {
         .unwrap();
         let res = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "note",
@@ -1619,6 +1692,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1634,6 +1708,7 @@ mod tests {
         .unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1662,6 +1737,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1682,6 +1758,7 @@ mod tests {
         fs::write(&path, content).unwrap();
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1711,6 +1788,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1731,6 +1809,7 @@ mod tests {
         fs::write(&path, content).unwrap();
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1747,6 +1826,7 @@ mod tests {
         assert!(out.text.contains("weird"));
         let res = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1770,6 +1850,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1789,6 +1870,7 @@ mod tests {
         fs::write(&path, content).unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -1818,6 +1900,7 @@ mod tests {
         let _ = crate::requirement::create_group(
             &c,
             &req_scope,
+            &access(&c).1,
             crate::requirement::Kind::Req,
             "G",
             None,
@@ -1841,6 +1924,7 @@ mod tests {
         let _ = crate::requirement::create_group(
             &c,
             &nfr_scope,
+            &access(&c).1,
             crate::requirement::Kind::Nfr,
             "NG",
             None,
@@ -1864,6 +1948,7 @@ mod tests {
 
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "req",
@@ -1880,6 +1965,7 @@ mod tests {
         assert!(out.text.contains(&rid));
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "req",
@@ -1896,6 +1982,7 @@ mod tests {
         assert!(out.text.contains(&rid));
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "req",
@@ -1911,6 +1998,7 @@ mod tests {
         .unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "req",
@@ -1926,6 +2014,7 @@ mod tests {
         .unwrap();
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "req",
@@ -1943,6 +2032,7 @@ mod tests {
 
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "nfr",
@@ -1958,6 +2048,7 @@ mod tests {
         .unwrap();
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "nfr",
@@ -1983,18 +2074,25 @@ mod tests {
         let id = crate::ui_mockup::handle(
             &c,
             &scope,
+            &access(&c).1,
             DocumentVerb::Create,
             &typed_args(&[("title", &["M"]), ("task", &["T"]), ("spec", &["S"])]),
         )
         .unwrap()
         .text;
-        let out =
-            crate::ui_mockup::handle(&c, &scope, DocumentVerb::List, &DocumentArgs::default())
-                .unwrap();
+        let out = crate::ui_mockup::handle(
+            &c,
+            &scope,
+            &access(&c).1,
+            DocumentVerb::List,
+            &DocumentArgs::default(),
+        )
+        .unwrap();
         assert!(out.text.contains(&id));
         let out = crate::ui_mockup::handle(
             &c,
             &scope,
+            &access(&c).1,
             DocumentVerb::View,
             &typed_args(&[("id", &[id.as_str()])]),
         )
@@ -2023,6 +2121,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -2057,7 +2156,7 @@ mod tests {
             force: true,
             args: DocumentArgs::default(),
         };
-        run(&c, &reg, inv).unwrap();
+        run(&c, &access(&c).0, &reg, inv).unwrap();
         let after = std::fs::read_to_string(&path).unwrap();
         let updated_after = after
             .lines()
@@ -2079,6 +2178,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -2099,6 +2199,7 @@ mod tests {
         std::fs::write(&path, content).unwrap();
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -2128,6 +2229,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -2148,6 +2250,7 @@ mod tests {
         std::fs::write(&path, content).unwrap();
         let res = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -2176,6 +2279,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -2196,6 +2300,7 @@ mod tests {
         std::fs::write(&path, content).unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -2224,6 +2329,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -2244,6 +2350,7 @@ mod tests {
         std::fs::write(&path, content).unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -2272,6 +2379,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -2292,6 +2400,7 @@ mod tests {
         std::fs::write(&path, content).unwrap();
         let res = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -2324,6 +2433,7 @@ mod tests {
         let reg = registry(&c);
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "thing",
@@ -2340,6 +2450,7 @@ mod tests {
         assert_eq!(out.text, "THING-001");
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "thing",
@@ -2356,6 +2467,7 @@ mod tests {
         assert!(out.text.contains("THING-001"));
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "thing",
@@ -2372,6 +2484,7 @@ mod tests {
         assert!(out.text.contains("THING-001"));
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "thing",
@@ -2387,6 +2500,7 @@ mod tests {
         .unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "thing",
@@ -2402,6 +2516,7 @@ mod tests {
         .unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "thing",
@@ -2417,6 +2532,7 @@ mod tests {
         .unwrap();
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "thing",
@@ -2440,6 +2556,7 @@ mod tests {
         let reg = registry(&c);
         run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -2477,6 +2594,7 @@ mod tests {
         let reg = registry(&c);
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -2493,6 +2611,7 @@ mod tests {
         assert_eq!(out.text, "DEP-001");
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "deploy",
@@ -2512,6 +2631,7 @@ mod tests {
         let _ = crate::requirement::create_group(
             &c,
             &req_scope,
+            &access(&c).1,
             crate::requirement::Kind::Req,
             "G",
             None,
@@ -2534,6 +2654,7 @@ mod tests {
         .unwrap();
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "req",
@@ -2550,6 +2671,7 @@ mod tests {
         assert!(out.text.contains(&rid));
         let out = run(
             &c,
+            &access(&c).0,
             &reg,
             generic_invocation(
                 "req",
@@ -2575,6 +2697,7 @@ mod tests {
         let gid = crate::requirement::create_group(
             &c,
             &req_scope,
+            &access(&c).1,
             crate::requirement::Kind::Req,
             "G",
             None,
@@ -2586,6 +2709,7 @@ mod tests {
         let id = crate::ui_mockup::handle(
             &c,
             &mock_scope,
+            &access(&c).1,
             DocumentVerb::Create,
             &typed_args(&[("title", &["M1"]), ("task", &["T"]), ("spec", &["S"])]),
         )
@@ -2594,6 +2718,7 @@ mod tests {
         let id2 = crate::ui_mockup::handle(
             &c,
             &mock_scope,
+            &access(&c).1,
             DocumentVerb::Create,
             &typed_args(&[("title", &["M2"]), ("task", &["T"]), ("spec", &["S"])]),
         )
@@ -2602,6 +2727,7 @@ mod tests {
         crate::ui_mockup::handle(
             &c,
             &mock_scope,
+            &access(&c).1,
             DocumentVerb::Edit,
             &typed_args(&[("id", &[id.as_str()]), ("superseded_by", &[id2.as_str()])]),
         )
@@ -2609,6 +2735,7 @@ mod tests {
         let out = crate::ui_mockup::handle(
             &c,
             &mock_scope,
+            &access(&c).1,
             DocumentVerb::View,
             &typed_args(&[("id", &[id.as_str()])]),
         )
