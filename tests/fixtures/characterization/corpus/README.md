@@ -1,7 +1,7 @@
 # Characterization corpus (TASK-240, MS-032)
 
 Frozen pre-refactor behaviour of every document type and every browser route
-(250 cases, 779 artifacts),
+(252 cases, 783 artifacts),
 captured as byte-for-byte artifacts. MS-033 onward replays this corpus to prove
 that the refactor changed nothing except the deltas listed in
 [`EXPECTED-DELTAS.md`](EXPECTED-DELTAS.md).
@@ -88,6 +88,9 @@ pinned to commit `d60f71c9` and must not change.
   `business-rule` and `audit-record`), `GET /doc/<ID>`, `GET /doc/<ID>/edit`,
   `GET /api/docs/<slug>`, `GET /api/doc/<ID>`, and every legacy path declared in
   `Presentation::api_paths`.
+- Grouped requirement index: `GET /api/requirements?type=req` and
+  `GET /api/requirements?type=nfr` return the JSON index for each grouped type
+  (TASK-292 CR-3).
 - Shared surfaces: `GET /`, `GET /?type=task`, `/assets/app.css`,
   `/assets/app.js`, `/assets/nav-state.js`, an unknown path (404), and a
   document route with a disallowed method (405).

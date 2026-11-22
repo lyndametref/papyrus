@@ -2,7 +2,7 @@
 id: TASK-292
 title: "Correct the MS-032 baseline: complete route coverage, variance record, and characterization gaps"
 created_date: '2026-11-22T01:32:21Z'
-updated_date: '2026-11-22T06:19:21Z'
+updated_date: '2026-11-22T06:31:47Z'
 labels: []
 references:
   - AUD-136
@@ -11,7 +11,7 @@ references:
   - NFR-007.001
   - NFR-007.002
   - AUD-137
-status: In-Progress
+status: Done
 assignee:
   - rust-dev
 milestone: MS-032
@@ -93,3 +93,10 @@ Definition of done for the re-audit: CR-1 to CR-5 each have a recorded result in
 - **rust-dev**: TASK-292 delivery: work is on branch task TASK-243 with no new commit, per the orchestrator instruction not to commit.
 - **orchestrator**: Acceptance met: C-1 all 11 routes measured at 1000; C-2 variance recorded with owner-approved 1000 exemption; C-3 250 cases and 779 artifacts; C-4 to C-6 fixed. Suite 1138 passed, 0 failed; no src diff.
 - **planner**: Planner reopened TASK-292 for AUD-137 CR-1 to CR-5: correction scope and acceptance criteria appended without changing the existing C-1 to C-6 content, dependencies stay TASK-241 and TASK-242, ordinal stays 55, and TASK-243 still depends on TASK-292. CR-4 planning part is done: TASK-243 AC-2 amended and ADR-040 accepted.
+- **rust-dev**: TASK-292 CR-1 (AUD-137 F-1): the historical 382 comparison table now uses the cached server_p50 and server_p95 statistics instead of the empty server_ms vector produced by a from-raw rebuild. The regenerated table reports inventory p50 11776 ms and p95 11971 ms, requirement group p50 3552 ms, grouped member p50 3666 ms and p95 3736 ms, so no measured value reads 0 ms. Added summary_from_raw_reports_measured_382_server_values, which rebuilds the summary from the recorded 382 run A raw JSON and asserts those measured values; the old builder returned 0 because run_from_raw leaves server_ms empty.
+- **rust-dev**: TASK-292 CR-2 (AUD-137 F-2): edit-single-html-mockup was re-measured at the records-1000 profile with the full data-driven band A protocol of 10 warm-up plus 100 measured requests. The run A raw JSON and the summary now record band A with 100 measured samples, server p50 3 ms and p95 3 ms, replacing the forced band B 20-sample entry. Every other route in run A was preserved unchanged, and the new benchmark_remeasure_single_route command re-measures one cheap route and rebuilds the summary from raw.
+- **rust-dev**: TASK-292 CR-3 (AUD-137 F-3): added characterization cases api-requirements-req and api-requirements-nfr for GET api requirements with type=req and with type=nfr. They were captured through the documented characterization capture command and replay byte-identically. The corpus now has 252 cases and 783 artifacts, up from 250 and 779, and the characterization README records the new count and the grouped requirement index route.
+- **rust-dev**: TASK-292 CR-4 (AUD-137 F-4): no harness change was required. The variance comparison in the summary now cites ADR-040 and its resolution-aware tolerance: a rerun is in band when it lies inside the widened interval or within an absolute floor of 3 ms of the recorded value. The six sub-5 ms out-of-band values on edit-single-html-mockup are accepted as clock-resolution noise. The decision and the amended TASK-243 AC-2 are already recorded.
+- **rust-dev**: TASK-292 CR-5 (AUD-137 F-5): the blanket latency statement is now scoped to data-driven band B only. The summary has an Explicitly assigned bands table that lists the five remaining forced band B routes at records-1000 with the reason each was forced, and it states that a forced band is not latency-driven. edit-single-html-mockup is no longer forced.
+- **rust-dev**: TASK-292 re-audit verification: env -u EDITOR -u VISUAL cargo test gives 1139 passed, 0 failed, 26 ignored; cargo clippy --all-targets -- -D warnings is clean; cargo fmt --all -- --check is clean. There is no diff under src, Cargo files, packaging or scripts, so no production behaviour changed. The summary regenerated from raw with PAPYRUS_BENCH_SUMMARY_FROM_RAW is unchanged, and the characterization replay and the new from-raw regression pass. Work remains uncommitted on the task branch per the orchestrator instruction; status stays In-Progress.
+- **orchestrator**: CR-1 to CR-5 closed: comparison table now reports measured 382 values with a from-raw regression; 1000 mockup route re-measured at 10 plus 100; api requirements cases added (252 cases, 783 artifacts); ADR-040 tolerance cited; forced bands documented. Suite 1139 passed, no src diff.

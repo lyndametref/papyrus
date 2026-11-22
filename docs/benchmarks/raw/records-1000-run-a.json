@@ -283,27 +283,27 @@
     {
       "label": "edit-single-html-mockup",
       "path": "/doc/MOCK-001/edit",
-      "band": "B",
-      "warmups": 2,
-      "measured": 20,
+      "band": "A",
+      "warmups": 10,
+      "measured": 100,
       "truncated": false,
-      "forced_band": true,
+      "forced_band": false,
       "full_protocol_measured": 100,
-      "reason": "band B assigned by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); no value is extrapolated",
-      "baseline_only_p95": true,
+      "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
+      "baseline_only_p95": false,
       "server_observed_ms": {
-        "p50": 2,
-        "p95": 2,
+        "p50": 3,
+        "p95": 3,
         "min": 2,
-        "max": 2,
-        "mean": 2.0
+        "max": 3,
+        "mean": 2.89
       },
       "wall_us": {
-        "p50": 2756,
-        "p95": 2848,
-        "min": 2702,
-        "max": 2866,
-        "mean": 2762.55
+        "p50": 3393,
+        "p95": 3458,
+        "min": 2660,
+        "max": 3489,
+        "mean": 3334.6
       }
     },
     {

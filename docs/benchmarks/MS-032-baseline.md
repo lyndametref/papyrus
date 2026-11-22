@@ -12,7 +12,7 @@ Status: recorded (TASK-241). This is the pre-refactor baseline; no production be
 
 ## Baseline-only status
 
-The reduced sample counts come from pre-refactor per-request latency, not measurement uncertainty: the recorded reconnaissance measured 74.37 s per inventory request at 1,000 records and 23.90 s per grouped-member view at 1,000 records. A p95 computed from fewer than 100 samples is **baseline-only** and is never compared against the NFR-007.001 or NFR-007.002 thresholds. MS-036 measures the post-refactor engine with the full NFR-007 protocol of 10 warm-up + 100 measured requests per route, so this baseline deviation never enters the acceptance comparison. NFR-007.001 to NFR-007.003 are unchanged.
+The reduced sample counts of a **data-driven band B** come from pre-refactor per-request latency, not measurement uncertainty: the recorded reconnaissance measured 74.37 s per inventory request at 1,000 records and 23.90 s per grouped-member view at 1,000 records. A p95 computed from fewer than 100 samples is **baseline-only** and is never compared against the NFR-007.001 or NFR-007.002 thresholds. MS-036 measures the post-refactor engine with the full NFR-007 protocol of 10 warm-up + 100 measured requests per route, so this baseline deviation never enters the acceptance comparison. NFR-007.001 to NFR-007.003 are unchanged. Bands assigned explicitly by the task are not caused by latency; they are listed separately under Explicitly assigned bands.
 
 Owner-approved exemption from duplicate runs for `records-1000` (TASK-292 C-2): this profile was measured with a single baseline run (run A only) because the pre-refactor engine needs roughly 75 s per inventory request at 1,000 records, which makes duplicate runs impractical. Its figures are **single-run baseline-only** and are never compared against the NFR-007.001 or NFR-007.002 thresholds. The 100 and 382 profiles keep the recorded A and B runs plus two no-write confirmation reruns (C and D).
 
@@ -24,7 +24,7 @@ Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz with 6 physical and 12 logical cores, 1
 
 The harness generates a deterministic Papyrus project under `./.tmp/benchmark/<profile>/` (deleted and recreated for every run), boots one real `papyrus --dir <corpus> browser --port <free> --no-open --debug` process on `127.0.0.1`, performs one unmeasured readiness request, then measures every measured route with the protocol below. Every request uses its own loopback TCP connection because the server sends `Connection: close`.
 
-Band selection is deterministic. Run A performs two common warm-ups, then the first five measured samples. Their p50 selects band A (p50 < 1000 ms, 10 warm-up + 100 measured) or band B (p50 >= 1000 ms, 2 warm-up + 20 measured); those five samples count toward the measured total. Band A then tops up to ten warm-ups before the remaining samples. Later runs reuse the same band, warm-up count and measured count. Percentiles are nearest-rank over the measured samples. The six routes added at 1,000 records by TASK-292 C-1 are assigned band B explicitly (2 warm-up + 20 measured) as the task directs; all other bands remain data-driven.
+Band selection is deterministic. Run A performs two common warm-ups, then the first five measured samples. Their p50 selects band A (p50 < 1000 ms, 10 warm-up + 100 measured) or band B (p50 >= 1000 ms, 2 warm-up + 20 measured); those five samples count toward the measured total. Band A then tops up to ten warm-ups before the remaining samples. Later runs reuse the same band, warm-up count and measured count. Percentiles are nearest-rank over the measured samples. The routes added at 1,000 records by TASK-292 C-1 are assigned band B explicitly (2 warm-up + 20 measured) as the task directs, except `edit-single-html-mockup`, which TASK-292 CR-2 re-measures with the data-driven band A protocol because its p50 is about 2 ms. Explicitly assigned bands are listed separately; all other bands remain data-driven.
 
 - Server-observed latency: the `{method} {path} {status} {n}ms` line printed by `src/browser/mod.rs::handle_connection` when `--debug` is set. Millisecond resolution.
 - Wall time: client-side `std::time::Instant` around connect, request, and read. Microsecond resolution.
@@ -42,7 +42,7 @@ Band selection is deterministic. Run A performs two common warm-ups, then the fi
 
 ## Sample counts and bands
 
-Every count below the full 10 warm-up + 100 measured protocol is band B and is caused by pre-refactor per-request latency, not measurement uncertainty.
+Every data-driven count below the full 10 warm-up + 100 measured protocol is band B and is caused by pre-refactor per-request latency, not measurement uncertainty. Bands that the task assigned explicitly are listed separately under Explicitly assigned bands and are never presented as latency-driven.
 
 ### `records-100` (100 active records, 4 runs)
 
@@ -82,15 +82,27 @@ Every count below the full 10 warm-up + 100 measured protocol is band B and is c
 |---|---|---|---|---|
 | inventory | B | 2 | 20 | band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty |
 | view-single-markdown | B | 2 | 20 | band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty |
-| view-grouped-group | B | 2 | 20 | band B assigned by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); no value is extrapolated |
+| view-grouped-group | B | 2 | 20 | band B forced by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); forced deliberately, not a latency-driven reduction; no value is extrapolated |
 | view-grouped-member | B | 2 | 20 | band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty |
 | view-single-html-mockup | A | 10 | 100 | band A: full NFR-007 protocol (10 warm-up + 100 measured) |
-| view-unresolved-reference | B | 2 | 20 | band B assigned by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); no value is extrapolated |
-| edit-single-markdown | B | 2 | 20 | band B assigned by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); no value is extrapolated |
-| edit-grouped-group | B | 2 | 20 | band B assigned by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); no value is extrapolated |
+| view-unresolved-reference | B | 2 | 20 | band B forced by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); forced deliberately, not a latency-driven reduction; no value is extrapolated |
+| edit-single-markdown | B | 2 | 20 | band B forced by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); forced deliberately, not a latency-driven reduction; no value is extrapolated |
+| edit-grouped-group | B | 2 | 20 | band B forced by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); forced deliberately, not a latency-driven reduction; no value is extrapolated |
 | edit-grouped-member | B | 2 | 20 | band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty |
-| edit-single-html-mockup | B | 2 | 20 | band B assigned by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); no value is extrapolated |
-| edit-unresolved-reference | B | 2 | 20 | band B assigned by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); no value is extrapolated |
+| edit-single-html-mockup | A | 10 | 100 | band A: full NFR-007 protocol (10 warm-up + 100 measured) |
+| edit-unresolved-reference | B | 2 | 20 | band B forced by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); forced deliberately, not a latency-driven reduction; no value is extrapolated |
+
+### Explicitly assigned bands
+
+These bands were assigned by the task rather than selected from measured latency, so the reduced count is not caused by pre-refactor latency. Each row records why the band was forced.
+
+| Profile | Route | Band | Warm-up | Measured | Reason |
+|---|---|---|---|---|---|
+| `records-1000` | view-grouped-group | B | 2 | 20 | band B forced by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); forced deliberately, not a latency-driven reduction; no value is extrapolated |
+| `records-1000` | view-unresolved-reference | B | 2 | 20 | band B forced by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); forced deliberately, not a latency-driven reduction; no value is extrapolated |
+| `records-1000` | edit-single-markdown | B | 2 | 20 | band B forced by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); forced deliberately, not a latency-driven reduction; no value is extrapolated |
+| `records-1000` | edit-grouped-group | B | 2 | 20 | band B forced by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); forced deliberately, not a latency-driven reduction; no value is extrapolated |
+| `records-1000` | edit-unresolved-reference | B | 2 | 20 | band B forced by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); forced deliberately, not a latency-driven reduction; no value is extrapolated |
 
 ## Results
 
@@ -130,7 +142,7 @@ Recorded variance (run B minus run A):
 | edit-single-html-mockup | 100 | 3 | 3 | +0 | 3.958 | 3.761 | -197 |
 | edit-unresolved-reference | 100 | 351 | 351 | +0 | 352.077 | 352.228 | +151 |
 
-Confirmation reruns (no-write, TASK-292 C-2). Each rerun p95 must stay inside the A-B range widened by 10 percent of the nearer bound: the accepted interval is `[min(A,B) * 0.9, max(A,B) * 1.1]`. The 1000-record profile is exempt (owner-approved single-run baseline-only). The `edit-single-html-mockup` route is a sub-5 ms route whose server p95 has millisecond resolution; its out-of-band reruns are recorded exactly as measured, never rounded or excluded.
+Confirmation reruns (no-write, TASK-292 C-2). Each rerun p95 must stay inside the A-B range widened by 10 percent of the nearer bound: the accepted interval is `[min(A,B) * 0.9, max(A,B) * 1.1]`. The 1000-record profile is exempt (owner-approved single-run baseline-only). The `edit-single-html-mockup` route is a sub-5 ms route whose server p95 has millisecond resolution; its out-of-band reruns are recorded exactly as measured, never rounded or excluded. The resolution-aware tolerance of ADR-040 accepts a rerun that lies inside the widened interval or within an absolute floor of 3 ms of the recorded value; the six sub-5 ms values are accepted as clock-resolution noise under that rule.
 
 | Route | Server A-B p95 range (ms) | Widened server interval (ms) | Server C p95 (ms) | C in range | Server D p95 (ms) | D in range |
 |---|---|---|---|---|---|---|
@@ -196,7 +208,7 @@ Recorded variance (run B minus run A):
 | edit-single-html-mockup | 100 | 1 | 1 | +0 | 1.710 | 1.953 | +243 |
 | edit-unresolved-reference | 20 | 3735 | 3732 | -3 | 3735.425 | 3733.212 | -2213 |
 
-Confirmation reruns (no-write, TASK-292 C-2). Each rerun p95 must stay inside the A-B range widened by 10 percent of the nearer bound: the accepted interval is `[min(A,B) * 0.9, max(A,B) * 1.1]`. The 1000-record profile is exempt (owner-approved single-run baseline-only). The `edit-single-html-mockup` route is a sub-5 ms route whose server p95 has millisecond resolution; its out-of-band reruns are recorded exactly as measured, never rounded or excluded.
+Confirmation reruns (no-write, TASK-292 C-2). Each rerun p95 must stay inside the A-B range widened by 10 percent of the nearer bound: the accepted interval is `[min(A,B) * 0.9, max(A,B) * 1.1]`. The 1000-record profile is exempt (owner-approved single-run baseline-only). The `edit-single-html-mockup` route is a sub-5 ms route whose server p95 has millisecond resolution; its out-of-band reruns are recorded exactly as measured, never rounded or excluded. The resolution-aware tolerance of ADR-040 accepts a rerun that lies inside the widened interval or within an absolute floor of 3 ms of the recorded value; the six sub-5 ms values are accepted as clock-resolution noise under that rule.
 
 | Route | Server A-B p95 range (ms) | Widened server interval (ms) | Server C p95 (ms) | C in range | Server D p95 (ms) | D in range |
 |---|---|---|---|---|---|---|
@@ -243,7 +255,7 @@ Run A, measured latency per route:
 | edit-single-markdown | B | 20 | 2942 | 2973 * | 2942.539 | 2973.277 * |
 | edit-grouped-group | B | 20 | 23200 | 23642 * | 23200.687 | 23643.173 * |
 | edit-grouped-member | B | 20 | 23596 | 23820 * | 23597.141 | 23820.567 * |
-| edit-single-html-mockup | B | 20 | 2 | 2 * | 2.756 | 2.848 * |
+| edit-single-html-mockup | A | 100 | 3 | 3 | 3.393 | 3.458 |
 | edit-unresolved-reference | B | 20 | 23504 | 23777 * | 23505.211 | 23777.482 * |
 
 Single run (owner-approved exemption from duplicate runs, TASK-292 C-2): run B was not executed for this profile because the pre-refactor engine needs roughly 75 s per inventory request at 1,000 records. The single-run p95 is baseline-only and is never compared against the NFR-007 thresholds.
@@ -265,11 +277,11 @@ The historical `/doc/REQ-07.001` view is represented by `REQ-001` in the generat
 
 | Metric | Historical (382 records) | Measured `records-382` run A |
 |---|---|---|
-| Inventory server-observed p50 | 14.2 s (single figure) | 0 ms (band B, n=20) |
-| Inventory server-observed p95 | 14.2 s (single figure) | 0 * ms (band B, n=20) |
-| Requirement group view (`REQ-001`) server p50 | 1.8 s (single figure) | 0 ms (band B, n=20) |
-| Grouped member view (`REQ-001.001`) server p50 | 1.8 s (single figure) | 0 ms (band B, n=20) |
-| Grouped member view (`REQ-001.001`) server p95 | 1.8 s (single figure) | 0 * ms (band B, n=20) |
+| Inventory server-observed p50 | 14.2 s (single figure) | 11776 ms (band B, n=20) |
+| Inventory server-observed p95 | 14.2 s (single figure) | 11971 * ms (band B, n=20) |
+| Requirement group view (`REQ-001`) server p50 | 1.8 s (single figure) | 3552 ms (band B, n=20) |
+| Grouped member view (`REQ-001.001`) server p50 | 1.8 s (single figure) | 3666 ms (band B, n=20) |
+| Grouped member view (`REQ-001.001`) server p95 | 1.8 s (single figure) | 3736 * ms (band B, n=20) |
 
 ## Root causes exercised by the measured paths
 

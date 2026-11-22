@@ -37,6 +37,14 @@
 //! ```text
 //! PAPYRUS_BENCH_SUMMARY_FROM_RAW=1 cargo test --release --test benchmark_baseline -- --ignored --nocapture
 //! ```
+//!
+//! TASK-292 CR-2 re-measures one route of a recorded profile without repeating
+//! the expensive routes. The measured route replaces the same route in the
+//! recorded run A JSON; every other route is preserved byte for byte:
+//!
+//! ```text
+//! PAPYRUS_BENCH_REMEASURE_ROUTE=edit-single-html-mockup cargo test --release --test benchmark_baseline -- --ignored --nocapture benchmark_remeasure_single_route
+//! ```
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -1144,15 +1152,16 @@ fn routes_for(_profile: &str) -> &'static [(&'static str, &'static str)] {
     ROUTES
 }
 
-/// TASK-292 C-1 directs the six previously omitted 1,000-record routes to be
+/// TASK-292 C-1 directs the previously omitted 1,000-record routes to be
 /// measured with band B (2 warm-up + 20 measured). Those labels are assigned
 /// band B explicitly; every other route keeps data-driven band selection.
+/// TASK-292 CR-2 removes `edit-single-html-mockup` from this list: its p50 is
+/// about 2 ms, so it is re-measured with the full band A protocol instead.
 const RECORDS_1000_BAND_B: &[&str] = &[
     "view-grouped-group",
     "view-unresolved-reference",
     "edit-single-markdown",
     "edit-grouped-group",
-    "edit-single-html-mockup",
     "edit-unresolved-reference",
 ];
 
@@ -1214,7 +1223,7 @@ impl RouteRun {
         }
         if self.forced_band {
             return format!(
-                "band B assigned by TASK-292 C-1 at 1,000 records (2 warm-up + {} measured); no value is extrapolated",
+                "band B forced by TASK-292 C-1 at 1,000 records (2 warm-up + {} measured); forced deliberately, not a latency-driven reduction; no value is extrapolated",
                 self.measured()
             );
         }
@@ -1460,6 +1469,7 @@ fn route_json(route: &RouteRun) -> Value {
         "warmups": route.warmups,
         "measured": route.measured(),
         "truncated": route.truncated,
+        "forced_band": route.forced_band,
         "full_protocol_measured": BAND_A_SAMPLES,
         "reason": route.reason(),
         "baseline_only_p95": route.baseline_only(),
@@ -1592,13 +1602,15 @@ fn summary_markdown(results: &[(Profile, Vec<RunResult>)]) -> String {
 
     out.push_str("## Baseline-only status\n\n");
     out.push_str(
-        "The reduced sample counts come from pre-refactor per-request latency, not measurement \
-         uncertainty: the recorded reconnaissance measured 74.37 s per inventory request at 1,000 \
-         records and 23.90 s per grouped-member view at 1,000 records. A p95 computed from fewer \
-         than 100 samples is **baseline-only** and is never compared against the NFR-007.001 or \
-         NFR-007.002 thresholds. MS-036 measures the post-refactor engine with the full NFR-007 \
-         protocol of 10 warm-up + 100 measured requests per route, so this baseline deviation never \
-         enters the acceptance comparison. NFR-007.001 to NFR-007.003 are unchanged.\n\n\
+        "The reduced sample counts of a **data-driven band B** come from pre-refactor per-request \
+         latency, not measurement uncertainty: the recorded reconnaissance measured 74.37 s per \
+         inventory request at 1,000 records and 23.90 s per grouped-member view at 1,000 records. \
+         A p95 computed from fewer than 100 samples is **baseline-only** and is never compared \
+         against the NFR-007.001 or NFR-007.002 thresholds. MS-036 measures the post-refactor \
+         engine with the full NFR-007 protocol of 10 warm-up + 100 measured requests per route, so \
+         this baseline deviation never enters the acceptance comparison. NFR-007.001 to NFR-007.003 \
+         are unchanged. Bands assigned explicitly by the task are not caused by latency; they are \
+         listed separately under Explicitly assigned bands.\n\n\
          Owner-approved exemption from duplicate runs for `records-1000` (TASK-292 C-2): this \
          profile was measured with a single baseline run (run A only) because the pre-refactor \
          engine needs roughly 75 s per inventory request at 1,000 records, which makes duplicate \
@@ -1627,9 +1639,11 @@ fn summary_markdown(results: &[(Profile, Vec<RunResult>)]) -> String {
          band B (p50 >= 1000 ms, 2 warm-up + 20 measured); those five samples count toward the \
          measured total. Band A then tops up to ten warm-ups before the remaining samples. Later \
          runs reuse the same band, warm-up count and measured count. Percentiles are nearest-rank \
-         over the measured samples. The six routes added at 1,000 records by TASK-292 C-1 are \
-         assigned band B explicitly (2 warm-up + 20 measured) as the task directs; all other bands \
-         remain data-driven.\n\n",
+         over the measured samples. The routes added at 1,000 records by TASK-292 C-1 are assigned \
+         band B explicitly (2 warm-up + 20 measured) as the task directs, except \
+         `edit-single-html-mockup`, which TASK-292 CR-2 re-measures with the data-driven band A \
+         protocol because its p50 is about 2 ms. Explicitly assigned bands are listed separately; \
+         all other bands remain data-driven.\n\n",
     );
     out.push_str(
         "- Server-observed latency: the `{method} {path} {status} {n}ms` line printed by \
@@ -1661,8 +1675,10 @@ fn summary_markdown(results: &[(Profile, Vec<RunResult>)]) -> String {
 
     out.push_str("## Sample counts and bands\n\n");
     out.push_str(
-        "Every count below the full 10 warm-up + 100 measured protocol is band B and is caused by \
-         pre-refactor per-request latency, not measurement uncertainty.\n\n",
+        "Every data-driven count below the full 10 warm-up + 100 measured protocol is band B and is \
+         caused by pre-refactor per-request latency, not measurement uncertainty. Bands that the \
+         task assigned explicitly are listed separately under Explicitly assigned bands and are \
+         never presented as latency-driven.\n\n",
     );
     for (profile, runs) in results {
         out.push_str(&format!(
@@ -1686,6 +1702,37 @@ fn summary_markdown(results: &[(Profile, Vec<RunResult>)]) -> String {
         }
         out.push('\n');
     }
+
+    out.push_str("### Explicitly assigned bands\n\n");
+    out.push_str(
+        "These bands were assigned by the task rather than selected from measured latency, so the \
+         reduced count is not caused by pre-refactor latency. Each row records why the band was \
+         forced.\n\n",
+    );
+    out.push_str("| Profile | Route | Band | Warm-up | Measured | Reason |\n");
+    out.push_str("|---|---|---|---|---|---|\n");
+    let mut any_forced = false;
+    for (profile, runs) in results {
+        for route in &runs[0].routes {
+            if !route.forced_band {
+                continue;
+            }
+            any_forced = true;
+            out.push_str(&format!(
+                "| `{}` | {} | {} | {} | {} | {} |\n",
+                profile.name,
+                route.label,
+                route.band,
+                route.warmups,
+                route.measured(),
+                route.reason()
+            ));
+        }
+    }
+    if !any_forced {
+        out.push_str("| none | | | | | no band was forced |\n");
+    }
+    out.push('\n');
 
     out.push_str("## Results\n\n");
     out.push_str(
@@ -1744,7 +1791,10 @@ fn summary_markdown(results: &[(Profile, Vec<RunResult>)]) -> String {
                          profile is exempt (owner-approved single-run baseline-only). The \
                          `edit-single-html-mockup` route is a sub-5 ms route whose server p95 has \
                          millisecond resolution; its out-of-band reruns are recorded exactly as \
-                         measured, never rounded or excluded.\n\n",
+                         measured, never rounded or excluded. The resolution-aware tolerance of \
+                         ADR-040 accepts a rerun that lies inside the widened interval or within an \
+                         absolute floor of 3 ms of the recorded value; the six sub-5 ms values are \
+                         accepted as clock-resolution noise under that rule.\n\n",
                     );
                     out.push_str("| Route | Server A-B p95 range (ms) | Widened server interval (ms) | Server C p95 (ms) | C in range | Server D p95 (ms) | D in range |\n");
                     out.push_str("|---|---|---|---|---|---|---|\n");
@@ -1867,31 +1917,31 @@ fn summary_markdown(results: &[(Profile, Vec<RunResult>)]) -> String {
         out.push_str("|---|---|---|\n");
         out.push_str(&format!(
             "| Inventory server-observed p50 | 14.2 s (single figure) | {} ms (band {}, n={}) |\n",
-            percentile(&inventory.server_ms, 50),
+            inventory.server_p50,
             inventory.band,
             inventory.measured()
         ));
         out.push_str(&format!(
             "| Inventory server-observed p95 | 14.2 s (single figure) | {} ms (band {}, n={}) |\n",
-            p95_cell(inventory, percentile(&inventory.server_ms, 95)),
+            p95_cell(inventory, inventory.server_p95),
             inventory.band,
             inventory.measured()
         ));
         out.push_str(&format!(
             "| Requirement group view (`REQ-001`) server p50 | 1.8 s (single figure) | {} ms (band {}, n={}) |\n",
-            percentile(&group.server_ms, 50),
+            group.server_p50,
             group.band,
             group.measured()
         ));
         out.push_str(&format!(
             "| Grouped member view (`REQ-001.001`) server p50 | 1.8 s (single figure) | {} ms (band {}, n={}) |\n",
-            percentile(&member.server_ms, 50),
+            member.server_p50,
             member.band,
             member.measured()
         ));
         out.push_str(&format!(
             "| Grouped member view (`REQ-001.001`) server p95 | 1.8 s (single figure) | {} ms (band {}, n={}) |\n",
-            p95_cell(member, percentile(&member.server_ms, 95)),
+            p95_cell(member, member.server_p95),
             member.band,
             member.measured()
         ));
@@ -2322,4 +2372,143 @@ fn summary_reports_confirmations_and_commit_provenance() {
     assert!(summary.contains("Harness commit: `harness`"));
     assert!(!summary.contains("Omitted at this profile"));
     assert!(summary.contains("| inventory | B | 20 |"));
+    assert!(summary.contains("Every data-driven count below the full"));
+    assert!(summary.contains("### Explicitly assigned bands"));
+    assert!(!summary.contains(
+        "Every count below the full 10 warm-up + 100 measured protocol is band B and is caused by"
+    ));
+}
+
+/// TASK-292 CR-1: the historical comparison table must be rebuilt from the
+/// cached server statistics. A from-raw `RunResult` has no server sample
+/// vectors, so reading `server_ms` there reports 0 ms even though the raw JSON
+/// records the measured values.
+#[test]
+fn summary_from_raw_reports_measured_382_server_values() {
+    let root = project_root();
+    let results = results_from_raw(&root);
+    let summary = summary_markdown(&results);
+    let section = summary
+        .split("## Comparison with the historical 382-record figures")
+        .nth(1)
+        .expect("the summary has a historical comparison section");
+    assert!(
+        section.contains(
+            "| Inventory server-observed p50 | 14.2 s (single figure) | 11776 ms (band B, n=20) |"
+        ),
+        "{section}"
+    );
+    assert!(
+        section.contains(
+            "| Inventory server-observed p95 | 14.2 s (single figure) | 11971 * ms (band B, n=20) |"
+        ),
+        "{section}"
+    );
+    assert!(
+        section.contains(
+            "| Requirement group view (`REQ-001`) server p50 | 1.8 s (single figure) | 3552 ms"
+        ),
+        "{section}"
+    );
+    assert!(
+        section.contains(
+            "| Grouped member view (`REQ-001.001`) server p50 | 1.8 s (single figure) | 3666 ms"
+        ),
+        "{section}"
+    );
+    assert!(
+        section.contains(
+            "| Grouped member view (`REQ-001.001`) server p95 | 1.8 s (single figure) | 3736 * ms"
+        ),
+        "{section}"
+    );
+    assert!(
+        !section.contains("| 0 ms"),
+        "the from-raw table must not report a zero measured value: {section}"
+    );
+    assert!(summary.contains("### Explicitly assigned bands"));
+    assert!(
+        summary.contains("| `records-1000` | view-grouped-group | B | 2 | 20 |"),
+        "forced bands are recorded separately with their reason"
+    );
+    assert!(
+        !summary.contains("| `records-1000` | edit-single-html-mockup |"),
+        "CR-2 removes edit-single-html-mockup from the forced bands"
+    );
+    assert!(!summary.contains(
+        "Every count below the full 10 warm-up + 100 measured protocol is band B and is caused by"
+    ));
+}
+
+/// TASK-292 CR-2: re-measure one cheap route of a recorded profile with the
+/// data-driven full protocol and replace only that route in run A, so the
+/// expensive routes are never repeated. The summary is then rebuilt from the
+/// updated raw JSON.
+#[test]
+#[ignore = "benchmark route re-measure: run explicitly with PAPYRUS_BENCH_REMEASURE_ROUTE=<label>"]
+fn benchmark_remeasure_single_route() {
+    let label = std::env::var("PAPYRUS_BENCH_REMEASURE_ROUTE")
+        .expect("PAPYRUS_BENCH_REMEASURE_ROUTE must name one measured route");
+    let profile_name =
+        std::env::var("PAPYRUS_BENCH_PROFILE").unwrap_or_else(|_| "records-1000".to_string());
+    let profile = profiles()
+        .into_iter()
+        .find(|profile| profile.name == profile_name)
+        .unwrap_or_else(|| panic!("unknown profile {profile_name}"));
+    let (_, path) = ROUTES
+        .iter()
+        .find(|(name, _)| *name == label)
+        .copied()
+        .unwrap_or_else(|| panic!("unknown route {label}"));
+
+    let root = project_root();
+    let corpus = root.join(".tmp/benchmark").join(profile.name);
+    generate_corpus(&corpus, &profile);
+    let raw_path = root.join(format!("docs/benchmarks/raw/{}-run-a.json", profile.name));
+    let text = fs::read_to_string(&raw_path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", raw_path.display()));
+    let mut value: Value = serde_json::from_str(&text)
+        .unwrap_or_else(|error| panic!("parse {}: {error}", raw_path.display()));
+
+    let server = Server::start(&corpus);
+    let (status, _, _) = server.request("/");
+    assert_eq!(status, 200, "readiness inventory request");
+    let route = measure_route(&server, &label, path, None, false, &BandBudget::recorded());
+    drop(server);
+    eprintln!(
+        "re-measured {} {}: band {} {} warm-up + {} measured; server p50 {} ms p95 {} ms",
+        profile.name,
+        label,
+        route.band,
+        route.warmups,
+        route.measured(),
+        route.server_p50,
+        route.server_p95
+    );
+    assert_eq!(
+        route.band, BAND_A,
+        "CR-2 requires {label} to be selected into the data-driven band A"
+    );
+    assert_eq!(
+        route.measured(),
+        BAND_A_SAMPLES,
+        "CR-2 requires the full band A protocol for {label}"
+    );
+
+    let routes = value["routes"].as_array_mut().expect("routes array");
+    let slot = routes
+        .iter_mut()
+        .find(|route| route["label"].as_str() == Some(label.as_str()))
+        .unwrap_or_else(|| panic!("recorded run A has no route {label}"));
+    *slot = route_json(&route);
+    fs::write(
+        &raw_path,
+        serde_json::to_string_pretty(&value).unwrap() + "\n",
+    )
+    .unwrap_or_else(|error| panic!("write {}: {error}", raw_path.display()));
+
+    let results = results_from_raw(&root);
+    let summary = summary_markdown(&results);
+    fs::write(root.join("docs/benchmarks/MS-032-baseline.md"), summary)
+        .expect("write the regenerated summary");
 }

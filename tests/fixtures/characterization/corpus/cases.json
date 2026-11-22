@@ -2643,6 +2643,20 @@
       ]
     },
     {
+      "id": "http/api-requirements-req",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/requirements?type=req"
+      },
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
       "id": "http/list-nfr",
       "kind": "http",
       "request": {
@@ -2707,6 +2721,20 @@
       "request": {
         "method": "GET",
         "path": "/api/doc/NFR-001.001"
+      },
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/api-requirements-nfr",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/api/requirements?type=nfr"
       },
       "document_type": "nfr",
       "model": "GroupedMarkdown",
