@@ -74,7 +74,7 @@ impl Default for TypeEntry {
 
 /// The front-matter and engine-owned keys a document field may never declare
 /// as its `key` or `frontmatter_key` (ADR-036 decision 23).
-pub const RESERVED_FIELD_KEYS: [&str; 8] = [
+pub const RESERVED_FIELD_KEYS: [&str; 13] = [
     "id",
     "title",
     "status",
@@ -83,6 +83,11 @@ pub const RESERVED_FIELD_KEYS: [&str; 8] = [
     "created_date",
     "updated_date",
     "group",
+    "version",
+    "kind",
+    "form",
+    "path",
+    "metadata",
 ];
 
 /// Option names the fixed engine and global command surface already owns.
@@ -136,7 +141,7 @@ pub const DOCUMENT_ENTRY_KEYS: [&str; 16] = [
 
 /// Every key a field item may declare (ADR-036 decision 11,
 /// TECH-077 section 3).
-pub const FIELD_SPEC_KEYS: [&str; 9] = [
+pub const FIELD_SPEC_KEYS: [&str; 10] = [
     "key",
     "heading",
     "frontmatter_key",
@@ -146,6 +151,7 @@ pub const FIELD_SPEC_KEYS: [&str; 9] = [
     "required",
     "verbs",
     "help",
+    "values",
 ];
 
 /// The keys a role block may declare (ADR-036 decision 27).
@@ -190,6 +196,62 @@ impl FieldKind {
 
 fn default_field_verbs() -> Vec<FieldVerb> {
     vec![FieldVerb::Create, FieldVerb::Edit]
+}
+
+/// The value domain of a declared field (AUD-145 M1).
+///
+/// The domain is descriptor data, not a per-type option-string branch: an
+/// `Allowed` list validates a scalar against its declared values, and
+/// `RecordIds` validates every item of a list field as a record ID.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum FieldValues {
+    /// No value restriction beyond the field kind.
+    #[default]
+    Free,
+    /// The exact scalar values the field accepts.
+    Allowed(Vec<String>),
+    /// Every list item must be a valid record ID.
+    RecordIds,
+}
+
+impl FieldValues {
+    pub fn is_free(&self) -> bool {
+        matches!(self, FieldValues::Free)
+    }
+}
+
+impl Serialize for FieldValues {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            FieldValues::Free => serializer.serialize_none(),
+            FieldValues::Allowed(values) => values.serialize(serializer),
+            FieldValues::RecordIds => serializer.serialize_str("record-ids"),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for FieldValues {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error as _;
+        let value = yaml_serde::Value::deserialize(deserializer)?;
+        match value {
+            yaml_serde::Value::Null => Ok(FieldValues::Free),
+            yaml_serde::Value::String(text) if text == "record-ids" => Ok(FieldValues::RecordIds),
+            yaml_serde::Value::Sequence(items) => {
+                let mut values = Vec::with_capacity(items.len());
+                for item in items {
+                    match item {
+                        yaml_serde::Value::String(text) => values.push(text),
+                        _ => return Err(D::Error::custom("values must be strings")),
+                    }
+                }
+                Ok(FieldValues::Allowed(values))
+            }
+            _ => Err(D::Error::custom(
+                "values must be a sequence of strings or \"record-ids\"",
+            )),
+        }
+    }
 }
 
 /// Whether a role's references are rendered (ADR-035, ADR-036 decision 27).
@@ -244,6 +306,9 @@ pub struct FieldSpec {
     /// Option help text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub help: Option<String>,
+    /// Value domain; free text when absent.
+    #[serde(default, skip_serializing_if = "FieldValues::is_free")]
+    pub values: FieldValues,
 }
 
 impl FieldSpec {
@@ -371,6 +436,7 @@ const REQ_FIELDS: &[SeedField] = &[
         required: false,
         verbs: CREATE_AND_EDIT,
         help: Some("User story"),
+        values: SeedFieldValues::Free,
     },
     SeedField {
         key: "description",
@@ -382,6 +448,7 @@ const REQ_FIELDS: &[SeedField] = &[
         required: false,
         verbs: CREATE_AND_EDIT,
         help: Some("Description"),
+        values: SeedFieldValues::Free,
     },
 ];
 
@@ -395,6 +462,7 @@ const GLOSSARY_FIELDS: &[SeedField] = &[SeedField {
     required: true,
     verbs: CREATE_AND_EDIT,
     help: Some("Definition of the term."),
+    values: SeedFieldValues::Free,
 }];
 
 const RULE_FIELDS: &[SeedField] = &[
@@ -408,6 +476,7 @@ const RULE_FIELDS: &[SeedField] = &[
         required: true,
         verbs: CREATE_AND_EDIT,
         help: Some("Description"),
+        values: SeedFieldValues::Free,
     },
     SeedField {
         key: "rationale",
@@ -419,6 +488,7 @@ const RULE_FIELDS: &[SeedField] = &[
         required: true,
         verbs: CREATE_ONLY,
         help: Some("Explain why the rule exists"),
+        values: SeedFieldValues::Free,
     },
     SeedField {
         key: "applicability",
@@ -430,6 +500,7 @@ const RULE_FIELDS: &[SeedField] = &[
         required: true,
         verbs: CREATE_ONLY,
         help: Some("Describe when and where the rule applies"),
+        values: SeedFieldValues::Free,
     },
     SeedField {
         key: "requirements",
@@ -441,6 +512,7 @@ const RULE_FIELDS: &[SeedField] = &[
         required: false,
         verbs: CREATE_AND_EDIT,
         help: Some("Reference a business requirement. Repeatable"),
+        values: SeedFieldValues::RecordIds,
     },
 ];
 
@@ -455,6 +527,7 @@ const UI_SPEC_FIELDS: &[SeedField] = &[
         required: false,
         verbs: CREATE_AND_EDIT,
         help: Some("View"),
+        values: SeedFieldValues::Free,
     },
     SeedField {
         key: "description",
@@ -466,6 +539,7 @@ const UI_SPEC_FIELDS: &[SeedField] = &[
         required: false,
         verbs: CREATE_AND_EDIT,
         help: Some("Description"),
+        values: SeedFieldValues::Free,
     },
 ];
 
@@ -480,6 +554,7 @@ const AUDIT_FIELDS: &[SeedField] = &[
         required: false,
         verbs: CREATE_AND_EDIT,
         help: Some("Audit type"),
+        values: SeedFieldValues::Allowed(&["security", "licence", "architecture"]),
     },
     SeedField {
         key: "content",
@@ -491,6 +566,7 @@ const AUDIT_FIELDS: &[SeedField] = &[
         required: true,
         verbs: CREATE_AND_EDIT,
         help: Some("Content"),
+        values: SeedFieldValues::Free,
     },
 ];
 
@@ -505,6 +581,7 @@ const DESCRIPTION_APPLICABILITY_FIELDS: &[SeedField] = &[
         required: false,
         verbs: CREATE_AND_EDIT,
         help: Some("Description"),
+        values: SeedFieldValues::Free,
     },
     SeedField {
         key: "applicability",
@@ -516,6 +593,7 @@ const DESCRIPTION_APPLICABILITY_FIELDS: &[SeedField] = &[
         required: false,
         verbs: CREATE_AND_EDIT,
         help: Some("Applicability"),
+        values: SeedFieldValues::Free,
     },
 ];
 
@@ -529,6 +607,7 @@ const TECH_SPEC_FIELDS: &[SeedField] = &[SeedField {
     required: false,
     verbs: CREATE_AND_EDIT,
     help: Some("Description"),
+    values: SeedFieldValues::Free,
 }];
 
 const SEED_ACTIVE_ARCHIVED: &[&str] = &["active", "archived"];
@@ -587,6 +666,15 @@ pub struct SeedField {
     pub required: bool,
     pub verbs: &'static [FieldVerb],
     pub help: Option<&'static str>,
+    pub values: SeedFieldValues,
+}
+
+/// The value domain declared by a seed field.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SeedFieldValues {
+    Free,
+    Allowed(&'static [&'static str]),
+    RecordIds,
 }
 
 /// One role's seed field sequence and reference visibility.
@@ -642,6 +730,9 @@ pub struct SeedDocumentType {
     pub preserve_trailing_newline: bool,
     /// Whether the list JSON shape carries the glossary `term` alias.
     pub list_json_term_alias: bool,
+    /// Whether the document JSON shape carries the general `labels` and
+    /// `references` keys (seed presentation fact, not field-map shape).
+    pub json_general_metadata: bool,
     pub record: SeedRecord,
 }
 
@@ -680,6 +771,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         editor_readopts_front_matter: false,
         preserve_trailing_newline: true,
         list_json_term_alias: false,
+        json_general_metadata: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "business requirement",
@@ -715,6 +807,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         editor_readopts_front_matter: false,
         preserve_trailing_newline: true,
         list_json_term_alias: false,
+        json_general_metadata: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "non-functional requirement",
@@ -744,6 +837,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         editor_readopts_front_matter: false,
         preserve_trailing_newline: true,
         list_json_term_alias: true,
+        json_general_metadata: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "glossary term",
@@ -773,6 +867,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         editor_readopts_front_matter: false,
         preserve_trailing_newline: false,
         list_json_term_alias: false,
+        json_general_metadata: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "business rule",
@@ -802,6 +897,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         editor_readopts_front_matter: true,
         preserve_trailing_newline: false,
         list_json_term_alias: false,
+        json_general_metadata: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "ui specification",
@@ -831,6 +927,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         editor_readopts_front_matter: false,
         preserve_trailing_newline: false,
         list_json_term_alias: false,
+        json_general_metadata: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "ui mockup",
@@ -860,6 +957,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         editor_readopts_front_matter: false,
         preserve_trailing_newline: false,
         list_json_term_alias: false,
+        json_general_metadata: false,
         field_defaults: AUDIT_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "audit record",
@@ -889,6 +987,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         editor_readopts_front_matter: false,
         preserve_trailing_newline: false,
         list_json_term_alias: false,
+        json_general_metadata: false,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "technical specification",
@@ -918,6 +1017,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         editor_readopts_front_matter: false,
         preserve_trailing_newline: false,
         list_json_term_alias: false,
+        json_general_metadata: true,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "use case",
@@ -947,6 +1047,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         editor_readopts_front_matter: false,
         preserve_trailing_newline: false,
         list_json_term_alias: false,
+        json_general_metadata: true,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "test case",
@@ -976,6 +1077,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         editor_readopts_front_matter: false,
         preserve_trailing_newline: false,
         list_json_term_alias: false,
+        json_general_metadata: true,
         field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "test report",
@@ -1007,6 +1109,13 @@ fn field_spec(field: &SeedField) -> FieldSpec {
         required: field.required,
         verbs: field.verbs.to_vec(),
         help: field.help.map(str::to_string),
+        values: match field.values {
+            SeedFieldValues::Free => FieldValues::Free,
+            SeedFieldValues::Allowed(values) => {
+                FieldValues::Allowed(values.iter().map(|value| (*value).to_string()).collect())
+            }
+            SeedFieldValues::RecordIds => FieldValues::RecordIds,
+        },
     }
 }
 
@@ -1081,6 +1190,7 @@ fn user_defined_entry(_slug: &str) -> DocTypeEntry {
             required: false,
             verbs: vec![FieldVerb::Create, FieldVerb::Edit],
             help: None,
+            values: FieldValues::Free,
         }]),
         group: None,
         member: None,
@@ -1451,6 +1561,30 @@ fn validate_field_sequence(
             if !offers_create {
                 errors.push(format!("{}.required: must be offered on create", selector));
             }
+        }
+
+        match mapping_get(field, "values") {
+            None | Some(yaml_serde::Value::Null) => {}
+            Some(yaml_serde::Value::String(marker)) if marker == "record-ids" => {}
+            Some(yaml_serde::Value::Sequence(values)) => {
+                if values.is_empty() {
+                    errors.push(format!("{}.values: must not be empty", selector));
+                }
+                for value in values {
+                    let valid = value_as_str(value).is_some_and(|text| !text.is_empty());
+                    if !valid {
+                        errors.push(format!(
+                            "{}.values: must be a sequence of non-empty strings",
+                            selector
+                        ));
+                        break;
+                    }
+                }
+            }
+            Some(_) => errors.push(format!(
+                "{}.values: must be a sequence of non-empty strings or record-ids",
+                selector
+            )),
         }
 
         validate_enum_key(
@@ -3135,6 +3269,7 @@ mod tests {
             required: false,
             verbs: vec![FieldVerb::Create, FieldVerb::Edit],
             help: None,
+            values: FieldValues::Free,
         }
     }
 
@@ -4307,6 +4442,29 @@ mod tests {
     }
 
     #[test]
+    fn reserved_field_keys_include_envelope_and_concurrency_keys() {
+        for key in ["version", "kind", "form", "path", "metadata"] {
+            assert!(
+                RESERVED_FIELD_KEYS.contains(&key),
+                "{key} must be a reserved field key"
+            );
+        }
+        let as_key = FieldSpec {
+            key: "version".to_string(),
+            heading: Some("## Version".to_string()),
+            frontmatter_key: None,
+            option: None,
+            label: None,
+            kind: FieldKind::Text,
+            required: false,
+            verbs: vec![FieldVerb::Create, FieldVerb::Edit],
+            help: None,
+            values: FieldValues::Free,
+        };
+        assert_eq!(as_key.reserved_key(), Some("version"));
+    }
+
+    #[test]
     fn reserved_field_keys_cover_every_engine_owned_key() {
         assert_eq!(
             RESERVED_FIELD_KEYS,
@@ -4319,6 +4477,11 @@ mod tests {
                 "created_date",
                 "updated_date",
                 "group",
+                "version",
+                "kind",
+                "form",
+                "path",
+                "metadata",
             ]
         );
         for reserved in RESERVED_FIELD_KEYS {
@@ -5820,6 +5983,7 @@ mod tests {
                         required: true,
                         verbs: vec![FieldVerb::Edit],
                         help: None,
+                        values: FieldValues::Free,
                     },
                     FieldSpec {
                         key: "third".to_string(),
@@ -5831,6 +5995,7 @@ mod tests {
                         required: false,
                         verbs: vec![FieldVerb::Create, FieldVerb::Edit],
                         help: None,
+                        values: FieldValues::Free,
                     },
                     FieldSpec {
                         key: "fourth".to_string(),
@@ -5842,6 +6007,7 @@ mod tests {
                         required: false,
                         verbs: vec![FieldVerb::Create, FieldVerb::Edit],
                         help: None,
+                        values: FieldValues::Free,
                     },
                     field("9", Some("## Nine")),
                 ]),

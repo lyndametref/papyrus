@@ -4,7 +4,7 @@ set -euo pipefail
 # Packaging entry point for the Papyrus deployable component.
 #
 # Usage:
-#   scripts/build-package.sh --version <version> --out <dir>
+#   scripts/build-package.sh --version <version> --out <dir> [--force]
 #   scripts/build-package.sh --help
 #
 # Builds the release binary, delegates the Debian assembly to
@@ -13,7 +13,7 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: scripts/build-package.sh --version <version> --out <dir>
+Usage: scripts/build-package.sh --version <version> --out <dir> [--force]
        scripts/build-package.sh --help
 
 Build the Papyrus release binary and its Debian package.
@@ -21,8 +21,10 @@ Build the Papyrus release binary and its Debian package.
   --version <version>  Package version, for example 0.2.0, 0.2.0-rc.1, or
                        0.0.0-test. Authoritative for the control Version:
                        field and the papyrus_<version>_amd64.deb name.
-  --out <dir>          Directory that receives the deliverable. Its contents
-                       are removed before writing, so reruns are idempotent.
+  --out <dir>          Directory that receives the deliverable. It must be
+                       absent or empty; inside the repository only a path under
+                       the project-local .tmp directory is accepted.
+  --force              Remove the contents of a non-empty --out directory.
   -h, --help           Print this help and exit.
 
 Requires cargo, rustc, and dpkg-deb on PATH.
@@ -31,9 +33,12 @@ EOF
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck source=scripts/package-out.sh
+source "${SCRIPT_DIR}/package-out.sh"
 
 VERSION=""
 OUT_DIR=""
+FORCE="false"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -46,6 +51,10 @@ while [[ $# -gt 0 ]]; do
             [[ $# -ge 2 ]] || { echo "error: --out requires a value" >&2; exit 2; }
             OUT_DIR="$2"
             shift 2
+            ;;
+        --force)
+            FORCE="true"
+            shift
             ;;
         -h|--help)
             usage
@@ -69,10 +78,7 @@ if [[ -z "$OUT_DIR" ]]; then
     usage >&2
     exit 2
 fi
-if [[ ! "$VERSION" =~ ^[0-9][0-9A-Za-z.+~-]*$ ]]; then
-    echo "error: invalid version: $VERSION (expected e.g. 1.2.3 or 1.2.3-rc.1)" >&2
-    exit 2
-fi
+package_validate_version "$VERSION" || exit 2
 
 for tool in cargo rustc dpkg-deb; do
     if ! command -v "$tool" >/dev/null 2>&1; then
@@ -81,24 +87,8 @@ for tool in cargo rustc dpkg-deb; do
     fi
 done
 
-mkdir -p "$OUT_DIR"
-OUT_DIR="$(cd "$OUT_DIR" && pwd)"
-
-if [[ "$OUT_DIR" == "/" ]]; then
-    echo "error: refusing to use the filesystem root as --out" >&2
-    exit 2
-fi
-if [[ "$OUT_DIR" == "$ROOT" ]]; then
-    echo "error: --out must not be the repository root" >&2
-    exit 2
-fi
-if [[ "$ROOT" == "$OUT_DIR"/* ]]; then
-    echo "error: --out must not be a parent of the repository root" >&2
-    exit 2
-fi
-
-# Clean the destination component directory so reruns are idempotent.
-find "$OUT_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+# Validate the destination before creating or cleaning anything.
+OUT_DIR="$(package_prepare_out "$OUT_DIR" "$FORCE")" || exit $?
 
 echo "Building papyrus ${VERSION}..." >&2
 cd "$ROOT"

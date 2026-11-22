@@ -355,6 +355,9 @@ pub struct TypeDescriptor {
     pub preserve_trailing_newline: bool,
     /// Whether the list JSON shape carries the glossary `term` alias (seed flag).
     pub list_json_term_alias: bool,
+    /// Whether the document JSON shape carries the general `labels` and
+    /// `references` keys (seed presentation fact).
+    pub json_general_metadata: bool,
 }
 
 impl TypeDescriptor {
@@ -384,6 +387,7 @@ impl TypeDescriptor {
         self.group
             .as_ref()
             .and_then(|role| role.reference_visibility)
+            .or(self.reference_visibility)
             .unwrap_or(Visibility::Visible)
     }
 
@@ -392,6 +396,7 @@ impl TypeDescriptor {
         self.member
             .as_ref()
             .and_then(|role| role.reference_visibility)
+            .or(self.reference_visibility)
             .unwrap_or(Visibility::Visible)
     }
 }
@@ -1377,6 +1382,7 @@ fn backlog_descriptor(cfg: &Config, template: &DescriptorTemplate) -> TypeDescri
         editor_readopts_front_matter: false,
         preserve_trailing_newline: false,
         list_json_term_alias: false,
+        json_general_metadata: false,
     }
 }
 
@@ -1415,6 +1421,7 @@ fn decision_descriptor(slug: &str, entry: &TypeEntry) -> TypeDescriptor {
         editor_readopts_front_matter: false,
         preserve_trailing_newline: false,
         list_json_term_alias: false,
+        json_general_metadata: false,
     }
 }
 
@@ -1916,6 +1923,7 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
         editor_readopts_front_matter: seed.is_some_and(|seed| seed.editor_readopts_front_matter),
         preserve_trailing_newline: seed.is_some_and(|seed| seed.preserve_trailing_newline),
         list_json_term_alias: seed.is_some_and(|seed| seed.list_json_term_alias),
+        json_general_metadata: seed.is_none_or(|seed| seed.json_general_metadata),
     })
 }
 
@@ -3181,6 +3189,36 @@ mod tests {
 
     // 21
     #[test]
+    fn role_reference_visibility_is_independent_and_falls_back_to_the_descriptor() {
+        let cfg = Config::default();
+        let descriptors = mutated(&cfg, "req", |descriptor| {
+            descriptor.reference_visibility = Some(Visibility::Hidden);
+            descriptor
+                .group
+                .as_mut()
+                .expect("req group")
+                .reference_visibility = Some(Visibility::Visible);
+            descriptor
+                .member
+                .as_mut()
+                .expect("req member")
+                .reference_visibility = None;
+        });
+        let req = find(&descriptors, "req");
+        assert_eq!(
+            req.group_reference_visibility(),
+            Visibility::Visible,
+            "the group role keeps its declared visibility"
+        );
+        assert_eq!(
+            req.member_reference_visibility(),
+            Visibility::Hidden,
+            "an absent member visibility falls back to the descriptor value"
+        );
+        assert_eq!(req.single_reference_visibility(), Visibility::Hidden);
+    }
+
+    #[test]
     fn build_rejects_invalid_derived_options_instead_of_panicking() {
         use crate::config::{FieldKind, FieldSpec, FieldVerb, RoleFields};
 
@@ -3194,6 +3232,7 @@ mod tests {
             required: false,
             verbs: vec![FieldVerb::Create, FieldVerb::Edit],
             help: None,
+            values: crate::config::FieldValues::Free,
         };
 
         let mut reserved = entry("DEP", "deployment/");
@@ -4155,6 +4194,7 @@ mod tests {
             required: false,
             verbs: vec![crate::config::FieldVerb::Create],
             help: None,
+            values: crate::config::FieldValues::Free,
         };
         let member_field = FieldSpec {
             key: "member_note".to_string(),
@@ -4166,6 +4206,7 @@ mod tests {
             required: false,
             verbs: vec![crate::config::FieldVerb::Create],
             help: None,
+            values: crate::config::FieldValues::Free,
         };
         let mut req = entry("REQ", "requirements/business/");
         req.group = Some(RoleFields {

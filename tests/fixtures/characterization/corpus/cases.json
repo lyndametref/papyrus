@@ -2623,7 +2623,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "view_page"
+      "renderer": "document_view_page"
     },
     {
       "id": "http/edit-req",
@@ -2638,7 +2638,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "edit_page"
+      "renderer": "document_edit_page"
     },
     {
       "id": "http/api-list-req",
@@ -2710,7 +2710,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "view_page"
+      "renderer": "document_view_page"
     },
     {
       "id": "http/edit-nfr",
@@ -2725,7 +2725,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "edit_page"
+      "renderer": "document_edit_page"
     },
     {
       "id": "http/api-list-nfr",
@@ -2797,7 +2797,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "view_page"
+      "renderer": "document_view_page"
     },
     {
       "id": "http/edit-glossary",
@@ -2812,7 +2812,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "edit_page_glossary"
+      "renderer": "document_edit_page"
     },
     {
       "id": "http/api-list-glossary",
@@ -2870,7 +2870,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "view_page"
+      "renderer": "document_view_page"
     },
     {
       "id": "http/edit-rule",
@@ -2885,7 +2885,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "edit_page_business_rule"
+      "renderer": "document_edit_page"
     },
     {
       "id": "http/api-list-rule",
@@ -2971,7 +2971,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "view_page"
+      "renderer": "document_view_page"
     },
     {
       "id": "http/edit-audit",
@@ -2986,7 +2986,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "edit_page_audit_record"
+      "renderer": "document_edit_page"
     },
     {
       "id": "http/api-list-audit",
@@ -3072,7 +3072,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "view_page"
+      "renderer": "document_view_page"
     },
     {
       "id": "http/edit-tech-spec",
@@ -3087,7 +3087,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "edit_page_tech_spec"
+      "renderer": "document_edit_page"
     },
     {
       "id": "http/api-list-tech-spec",
@@ -3173,7 +3173,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "view_page"
+      "renderer": "document_view_page"
     },
     {
       "id": "http/edit-ui-spec",
@@ -3188,7 +3188,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "edit_page_ui_spec"
+      "renderer": "document_edit_page"
     },
     {
       "id": "http/api-list-ui-spec",
@@ -3288,7 +3288,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "view_page"
+      "renderer": "document_view_page"
     },
     {
       "id": "http/edit-ui-mockup",
@@ -3303,7 +3303,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "edit_page_ui_mockup"
+      "renderer": "document_edit_page"
     },
     {
       "id": "http/api-list-ui-mockup",
@@ -3403,7 +3403,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "view_page"
+      "renderer": "document_view_page"
     },
     {
       "id": "http/edit-use-case",
@@ -3418,7 +3418,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "edit_page_use_case"
+      "renderer": "document_edit_page"
     },
     {
       "id": "http/api-list-use-case",
@@ -3504,7 +3504,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "view_page"
+      "renderer": "document_view_page"
     },
     {
       "id": "http/edit-test-case",
@@ -3519,7 +3519,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "edit_page_use_case"
+      "renderer": "document_edit_page"
     },
     {
       "id": "http/api-list-test-case",
@@ -3605,7 +3605,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "view_page"
+      "renderer": "document_view_page"
     },
     {
       "id": "http/edit-test-report",
@@ -3620,7 +3620,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "edit_page_use_case"
+      "renderer": "document_edit_page"
     },
     {
       "id": "http/api-list-test-report",
@@ -4226,7 +4226,7 @@
         "http.json",
         "page.html"
       ],
-      "renderer": "edit_page"
+      "renderer": "document_edit_page"
     },
     {
       "id": "http/not-found-req",

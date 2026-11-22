@@ -8,7 +8,8 @@ set -euo pipefail
 #
 # Version precedence: --version, then PAPYRUS_DEB_VERSION, then the Cargo.toml
 # package version. Output directory precedence: --out, then PAPYRUS_DEB_OUT,
-# then the project root.
+# then the project-local .tmp/deb directory. The shared out policy in
+# scripts/package-out.sh rejects unsafe paths before anything is created.
 #
 # Run directly with no version to derive the version from Cargo.toml and write
 # the .deb to the project root, as before. The version and output options are
@@ -24,12 +25,15 @@ Assemble the Papyrus Debian package from the release binary.
   --version <version>  Package version. Defaults to the Cargo.toml package
                        version (or PAPYRUS_DEB_VERSION when set).
   --out <dir>          Directory that receives the .deb. Defaults to the
-                       project root (or PAPYRUS_DEB_OUT when set).
+                       project-local .tmp/deb directory (or PAPYRUS_DEB_OUT
+                       when set).
   -h, --help           Print this help and exit.
 EOF
 }
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/package-out.sh
+source "${ROOT}/scripts/package-out.sh"
 
 VERSION=""
 OUT_DIR=""
@@ -70,16 +74,13 @@ if [[ -z "$VERSION" ]]; then
     echo "error: cannot determine the package version from Cargo.toml" >&2
     exit 1
 fi
-if [[ ! "$VERSION" =~ ^[0-9][0-9A-Za-z.+~-]*$ ]]; then
-    echo "error: invalid package version: $VERSION" >&2
-    exit 2
-fi
+package_validate_version "$VERSION" || exit 2
 
 if [[ -z "$OUT_DIR" ]]; then
-    OUT_DIR="${PAPYRUS_DEB_OUT:-$ROOT}"
+    OUT_DIR="${PAPYRUS_DEB_OUT:-$ROOT/.tmp/deb}"
 fi
-mkdir -p "$OUT_DIR"
-OUT_DIR="$(cd "$OUT_DIR" && pwd)"
+OUT_DIR="$(package_validate_out "$OUT_DIR")" || exit $?
+mkdir -p -- "$OUT_DIR"
 
 ARCH="amd64"
 PKG="papyrus_${VERSION}_${ARCH}"
