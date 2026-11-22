@@ -243,21 +243,29 @@ pub fn current_key_block(raw: &str, key: &str) -> Option<String> {
 }
 
 pub fn current_value_string(raw: &str, key: &str) -> Option<String> {
-    if let Ok(yaml_serde::Value::Mapping(m)) = yaml_serde::from_str::<yaml_serde::Value>(raw)
-        && let Some(v) = m.get(yaml_serde::Value::String(key.to_string()))
-    {
-        return Some(match v {
-            yaml_serde::Value::String(s) => s.clone(),
-            yaml_serde::Value::Bool(b) => b.to_string(),
-            yaml_serde::Value::Number(n) => n.to_string(),
-            yaml_serde::Value::Null => String::new(),
-            other => yaml_serde::to_string(other)
-                .unwrap_or_default()
-                .trim()
-                .to_string(),
-        });
-    }
-    None
+    let data = yaml_serde::from_str::<yaml_serde::Value>(raw).ok()?;
+    value_string(&data, key)
+}
+
+/// Render one already-parsed front-matter value as a plain string.
+///
+/// Callers that already hold a [`FrontMatter`] use this to avoid parsing the
+/// same YAML a second time just to read one key.
+pub fn value_string(data: &yaml_serde::Value, key: &str) -> Option<String> {
+    let yaml_serde::Value::Mapping(mapping) = data else {
+        return None;
+    };
+    let value = mapping.get(yaml_serde::Value::String(key.to_string()))?;
+    Some(match value {
+        yaml_serde::Value::String(s) => s.clone(),
+        yaml_serde::Value::Bool(b) => b.to_string(),
+        yaml_serde::Value::Number(n) => n.to_string(),
+        yaml_serde::Value::Null => String::new(),
+        other => yaml_serde::to_string(other)
+            .unwrap_or_default()
+            .trim()
+            .to_string(),
+    })
 }
 
 fn double_quote(t: &str) -> String {

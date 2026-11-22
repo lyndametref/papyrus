@@ -1,5 +1,7 @@
 # MS-036 post-refactor benchmark results (NFR-007.001, NFR-007.002, NFR-007.003)
 
+> **TASK-313 update:** the read path was optimised and re-measured after this TASK-278 record. The post-optimisation results and verdicts are appended under "TASK-313 read-path optimisation re-measurement" at the end of this document. The TASK-278 figures and verdicts below remain the pre-optimisation record.
+
 Status: recorded measurement. Measurement only; no production behaviour was changed. The full NFR-007 protocol was run on the available host, which deviates from the NFR-007 reference hardware (6 physical / 12 logical cores and 15.3 GiB instead of 4 vCPU / 8 GiB). **NFR-007.001 and NFR-007.002 are not marked satisfied by this run.** A pass below means only that the measured p95 was within the threshold on the available host.
 
 - Run dates: `2026-11-22T22:39:59+01:00` to `2026-11-22T22:47:08+01:00`
@@ -223,3 +225,83 @@ Conditional matrix: every immutable vendor asset answered a conditional `If-None
 ## Reproducibility
 
 The run is reproducible from the recorded command and corpus hashes. The corpus generator deletes and recreates `./.tmp/benchmark/<profile>/` for every run; a second run must reproduce the same file count and SHA-256 manifest. No corpus parameter was tuned toward a target. The measurement changes no production source and adds no crate.
+
+## TASK-313 read-path optimisation re-measurement
+
+Status: post-optimisation measurement of the read path on the same available host. The production read path was changed by TASK-313; every other row, header, status code and payload is unchanged (characterization replay green). **NFR-007.001 and NFR-007.002 remain unmarked**: this run is a measured pass on the available host, not satisfaction of the reference-hardware requirement.
+
+- Measured tree: `b51bd66a9330d164f2b57debe864d24e9743ed83` plus the TASK-313 working-tree changes in `src/browser` and `src/record` (release build, LTO and strip); the measurement harness `tests/benchmark_baseline.rs` was unmodified (`harness_worktree_modified: false`).
+- Run dates: `2026-11-22T23:19:03+01:00` to `2026-11-22T23:22:14+01:00`
+- Harness command: `cargo test --release --test benchmark_baseline -- --ignored --nocapture benchmark_ms036`
+- Build profile: `release (lto=true, strip=true)`; rustc `rustc 1.99.1 (58cf8f9c3 2026-10-13)`
+- Host and hardware deviation: unchanged from the run header above (6 physical / 12 logical cores, 15.3 GiB; NFR-007 reference 4 vCPU / 8 GiB). Every figure is a measured figure on the available host.
+- Protocol: full NFR-007 protocol. All routes, all profiles, two runs, every route band A with 10 warm-up and 100 measured sequential requests (no route was assigned band B).
+- Corpora: unchanged deterministic corpora; 1,000-record corpus hash `46d64349137f7017f6ee04bcfd6a3d3042b7b6bc23245749dac400804581988f`, 1,001 files.
+- Raw result files: `docs/benchmarks/raw/ms036-{records-100,records-382,records-1000}-run-{a,b}.json` and `ms036-second-load.json`. The TASK-313 run regenerated these files; the pre-optimisation TASK-278 values remain in git history at `6e071ca`.
+
+### All measured profiles
+
+| Profile | Route | Band | n | Run A p50 (ms) | Run A p95 (ms) | Run B p50 (ms) | Run B p95 (ms) | Target (ms) | Verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| `records-100` | inventory | A | 100 | 26 | 27 | 25 | 26 | n/a | recorded (no threshold) |
+| `records-100` | view-single-markdown | A | 100 | 1 | 1 | 2 | 3 | n/a | recorded (no threshold) |
+| `records-100` | view-grouped-group | A | 100 | 7 | 12 | 7 | 7 | n/a | recorded (no threshold) |
+| `records-100` | view-grouped-member | A | 100 | 7 | 7 | 7 | 7 | n/a | recorded (no threshold) |
+| `records-100` | view-single-html-mockup | A | 100 | 0 | 2 | 1 | 2 | n/a | recorded (no threshold) |
+| `records-100` | view-unresolved-reference | A | 100 | 7 | 7 | 7 | 15 | n/a | recorded (no threshold) |
+| `records-100` | edit-single-markdown | A | 100 | 2 | 2 | 1 | 2 | n/a | recorded (no threshold) |
+| `records-100` | edit-grouped-group | A | 100 | 1 | 2 | 2 | 2 | n/a | recorded (no threshold) |
+| `records-100` | edit-grouped-member | A | 100 | 7 | 15 | 7 | 13 | n/a | recorded (no threshold) |
+| `records-100` | edit-single-html-mockup | A | 100 | 0 | 1 | 0 | 1 | n/a | recorded (no threshold) |
+| `records-100` | edit-unresolved-reference | A | 100 | 7 | 15 | 7 | 7 | n/a | recorded (no threshold) |
+| `records-382` | inventory | A | 100 | 92 | 94 | 92 | 94 | n/a | recorded (no threshold) |
+| `records-382` | view-single-markdown | A | 100 | 3 | 4 | 3 | 3 | n/a | recorded (no threshold) |
+| `records-382` | view-grouped-group | A | 100 | 26 | 27 | 25 | 26 | n/a | recorded (no threshold) |
+| `records-382` | view-grouped-member | A | 100 | 25 | 25 | 25 | 27 | n/a | recorded (no threshold) |
+| `records-382` | view-single-html-mockup | A | 100 | 1 | 1 | 1 | 1 | n/a | recorded (no threshold) |
+| `records-382` | view-unresolved-reference | A | 100 | 25 | 25 | 24 | 25 | n/a | recorded (no threshold) |
+| `records-382` | edit-single-markdown | A | 100 | 3 | 3 | 3 | 3 | n/a | recorded (no threshold) |
+| `records-382` | edit-grouped-group | A | 100 | 1 | 1 | 1 | 1 | n/a | recorded (no threshold) |
+| `records-382` | edit-grouped-member | A | 100 | 25 | 26 | 25 | 25 | n/a | recorded (no threshold) |
+| `records-382` | edit-single-html-mockup | A | 100 | 3 | 3 | 2 | 2 | n/a | recorded (no threshold) |
+| `records-382` | edit-unresolved-reference | A | 100 | 25 | 25 | 25 | 25 | n/a | recorded (no threshold) |
+| `records-1000` | inventory | A | 100 | 242 | 248 | 243 | 248 | 250 | pass (measured) |
+| `records-1000` | view-single-markdown | A | 100 | 8 | 8 | 8 | 8 | 100 | pass (measured) |
+| `records-1000` | view-grouped-group | A | 100 | 64 | 65 | 64 | 66 | 100 | pass (measured) |
+| `records-1000` | view-grouped-member | A | 100 | 63 | 65 | 63 | 64 | 100 | pass (measured) |
+| `records-1000` | view-single-html-mockup | A | 100 | 1 | 1 | 1 | 1 | 100 | pass (measured) |
+| `records-1000` | view-unresolved-reference | A | 100 | 63 | 64 | 63 | 65 | 100 | pass (measured) |
+| `records-1000` | edit-single-markdown | A | 100 | 8 | 8 | 8 | 8 | 100 | pass (measured) |
+| `records-1000` | edit-grouped-group | A | 100 | 1 | 1 | 2 | 2 | 100 | pass (measured) |
+| `records-1000` | edit-grouped-member | A | 100 | 63 | 67 | 63 | 64 | 100 | pass (measured) |
+| `records-1000` | edit-single-html-mockup | A | 100 | 1 | 1 | 1 | 1 | 100 | pass (measured) |
+| `records-1000` | edit-unresolved-reference | A | 100 | 62 | 64 | 63 | 64 | 100 | pass (measured) |
+
+### Before and after at 1,000 records
+
+Pre-optimisation figures are the TASK-278 full-protocol results recorded above. Post-optimisation figures are both TASK-313 runs. A pass is a measured p95 within the threshold on the available host; it is not NFR-007.001 or NFR-007.002 satisfaction.
+
+| Route | TASK-278 p95 (ms) | TASK-313 run A p50/p95 (ms) | TASK-313 run B p50/p95 (ms) | Target (ms) | Verdict | Δ p95 vs TASK-278 (run A / run B) |
+|---|---|---|---|---|---|---|
+| inventory | 550 | 242 / 248 | 243 / 248 | 250 | pass (measured) | -302 / -302 |
+| view-single-markdown | 39 | 8 / 8 | 8 / 8 | 100 | pass (measured) | -31 / -31 |
+| view-grouped-group | 126 | 64 / 65 | 64 / 66 | 100 | pass (measured) | -61 / -60 |
+| view-grouped-member | 121 | 63 / 65 | 63 / 64 | 100 | pass (measured) | -56 / -57 |
+| view-single-html-mockup | 4 | 1 / 1 | 1 / 1 | 100 | pass (measured) | -3 / -3 |
+| view-unresolved-reference | 120 | 63 / 64 | 63 / 65 | 100 | pass (measured) | -56 / -55 |
+| edit-single-markdown | 39 | 8 / 8 | 8 / 8 | 100 | pass (measured) | -31 / -31 |
+| edit-grouped-group | 120 | 1 / 1 | 2 / 2 | 100 | pass (measured) | -119 / -118 |
+| edit-grouped-member | 120 | 63 / 67 | 63 / 64 | 100 | pass (measured) | -53 / -56 |
+| edit-single-html-mockup | 4 | 1 / 1 | 1 / 1 | 100 | pass (measured) | -3 / -3 |
+| edit-unresolved-reference | 119 | 62 / 64 | 63 / 64 | 100 | pass (measured) | -55 / -55 |
+
+### Route notes
+
+- **Inventory p95 248 ms in both 1,000-record runs against 250 ms**: measured pass at 1,000 records; the two 1,000-record runs measured 248 ms and 248 ms p95, down from 550 ms. Inventory now builds one file-name listing per descriptor directory, validates each listed file through the same front-matter read contract, and counts without parsing document bodies, read projections or field maps.
+- **Grouped group, grouped member and unresolved-reference view and edit**: p95 64 to 67 ms at 1,000 records against 100 ms, down from 118 to 126 ms. Group and member pages build their family rows from front-matter-only records; the page record itself is still read in full, and a record already parsed in full is reused from the request snapshot. Edit pages no longer build a family index unless a grouped member needs its owning group link.
+- **SingleMarkdown view and edit** p95 8 ms at 1,000 records (from 39 ms); **SingleHtmlMockup view and edit** p95 1 ms. Both remain well inside target and neither regressed against TASK-278.
+- **NFR-007.003 second-load transfer** is unchanged: zero vendor body bytes on the second load, bodyless 304 responses for first-party assets, and full `no-store` HTML and JSON. The same `ms036-second-load.json` evidence was regenerated by this run.
+
+### Remaining misses
+
+None on the available host for the measured routes. NFR-007.001 and NFR-007.002 are still not marked satisfied because the NFR-007 reference hardware (4 vCPU / 8 GiB) was not used; the figures remain measured passes with the recorded hardware deviation.

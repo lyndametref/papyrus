@@ -26,26 +26,43 @@ pub struct RecordView {
 
 impl RecordView {
     pub fn from_content(content: &str, display_id: &str, version: &str) -> Result<Self, AppError> {
-        let mut metadata = Vec::new();
-        if let Some(fm) = frontmatter::parse(content)? {
-            let keys = ordered_keys(&fm.raw);
-            let yaml_value = fm.data.clone();
-            for key in keys {
-                let value = if let yaml_serde::Value::Mapping(m) = &yaml_value {
-                    m.get(yaml_serde::Value::String(key.clone()))
-                        .cloned()
-                        .unwrap_or(yaml_serde::Value::Null)
-                } else {
-                    yaml_serde::Value::Null
-                };
-                metadata.push((key, yaml_to_json(&value)));
-            }
+        match frontmatter::parse(content)? {
+            Some(fm) => Ok(Self::from_front_matter(&fm, display_id, version)),
+            None => Ok(Self {
+                id: display_id.to_string(),
+                metadata: Vec::new(),
+                version: version.to_string(),
+            }),
         }
-        Ok(Self {
+    }
+
+    /// Project one already-parsed front matter without re-parsing the source.
+    ///
+    /// The browser read paths parse the front matter once and reuse it for the
+    /// display projection, so no path parses the same YAML twice.
+    pub fn from_front_matter(
+        front_matter: &frontmatter::FrontMatter,
+        display_id: &str,
+        version: &str,
+    ) -> Self {
+        let mut metadata = Vec::new();
+        let keys = ordered_keys(&front_matter.raw);
+        let yaml_value = front_matter.data.clone();
+        for key in keys {
+            let value = if let yaml_serde::Value::Mapping(m) = &yaml_value {
+                m.get(yaml_serde::Value::String(key.clone()))
+                    .cloned()
+                    .unwrap_or(yaml_serde::Value::Null)
+            } else {
+                yaml_serde::Value::Null
+            };
+            metadata.push((key, yaml_to_json(&value)));
+        }
+        Self {
             id: display_id.to_string(),
             metadata,
             version: version.to_string(),
-        })
+        }
     }
 
     /// Lenient projection: falls back to empty metadata when the front
