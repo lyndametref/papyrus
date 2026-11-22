@@ -599,6 +599,153 @@ fn t114_09_disabled_type_is_invisible_but_lifecycle_lists_it() {
     let _ = fs::remove_dir_all(&d);
 }
 
+// TASK-267 ------------------------------------------------------------------
+#[test]
+fn t267_one_document_not_found_page_for_unknown_archived_and_disabled() {
+    let d = init("267-404");
+    create_note(&d, "Archive me", "body");
+    run_ok(&d, &["note", "archive", "NOTE-001"]);
+    // A record whose type is disabled still exists on disk but must be
+    // unreachable through the document route.
+    write_doc(
+        &d,
+        "docs/use-cases/UC-001.md",
+        "---\nid: UC-001\ntitle: Hidden use case\nstatus: active\ncreated_date: 2026-01-01T00:00:00Z\nupdated_date: 2026-01-01T00:00:00Z\n---\n# UC-001 Hidden use case\n\n## Description\nBody\n",
+    );
+    run_ok(
+        &d,
+        &["config", "set", "document_types.use-case.enabled", "false"],
+    );
+    let server = Server::start(&d);
+
+    let archived = get(&server, "/doc/NOTE-001");
+    let unknown = get(&server, "/doc/NOTE-999");
+    let disabled = get(&server, "/doc/UC-001");
+    for (label, response) in [
+        ("archived", &archived),
+        ("unknown", &unknown),
+        ("disabled", &disabled),
+    ] {
+        assert_eq!(response.status, 404, "{label} must be 404");
+    }
+    let body = archived.text();
+    assert_eq!(body, unknown.text(), "archived and unknown bodies differ");
+    assert_eq!(body, disabled.text(), "disabled and unknown bodies differ");
+    assert!(!body.contains("NOTE-001"), "the requested ID must not echo");
+    assert!(!body.contains("NOTE-999"), "the requested ID must not echo");
+    assert!(!body.contains("UC-001"), "the requested ID must not echo");
+    assert!(!body.contains("Record not found"), "{body}");
+    assert!(body.contains("Not found"), "{body}");
+
+    // The conflict page is not a route.
+    let conflict_route = get(&server, "/doc/NOTE-001/conflict");
+    assert_eq!(conflict_route.status, 404);
+    assert!(!conflict_route.text().contains("record changed on disk"));
+
+    drop(server);
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn t267_backlog_and_decision_404_match_the_one_document_page() {
+    let d = init("267-bd404");
+    let server = Server::start(&d);
+    let document = get(&server, "/doc/REQ-999.001");
+    assert_eq!(document.status, 404);
+    let body = document.text();
+    for path in ["/doc/TASK-999", "/doc/MS-999", "/doc/ADR-999"] {
+        let response = get(&server, path);
+        assert_eq!(response.status, 404, "{path}");
+        assert_eq!(response.text(), body, "{path} changed the 404 body");
+    }
+    assert!(!body.contains("TASK-999"));
+    assert!(!body.contains("MS-999"));
+    assert!(!body.contains("ADR-999"));
+    drop(server);
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn t267_only_one_document_conflict_and_not_found_renderer_remain() {
+    let browser = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/browser");
+    let render_rs = fs::read_to_string(browser.join("render.rs")).unwrap();
+    let defined: Vec<&str> = render_rs
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("pub fn "))
+        .map(|rest| rest.split(['(', '<']).next().unwrap_or("").trim())
+        .collect();
+    let conflict_pages: Vec<&str> = defined
+        .iter()
+        .copied()
+        .filter(|name| name.contains("conflict_page"))
+        .collect();
+    assert_eq!(
+        conflict_pages,
+        vec!["backlog_decision_conflict_page", "document_conflict_page"],
+        "only the one document conflict renderer and the bespoke backlog/decision one may remain"
+    );
+    let not_found_pages: Vec<&str> = defined
+        .iter()
+        .copied()
+        .filter(|name| name.contains("not_found_page"))
+        .collect();
+    assert_eq!(
+        not_found_pages,
+        vec!["document_not_found_page"],
+        "one document not-found renderer may remain"
+    );
+
+    for deleted in [
+        "conflict_page",
+        "conflict_page_ui_mockup",
+        "conflict_page_business_rule",
+        "conflict_page_audit_record",
+        "conflict_page_tech_spec",
+        "conflict_page_use_case",
+        "conflict_page_test_case",
+        "conflict_page_test_report",
+        "tech_spec_not_found_page",
+        "use_case_not_found_page",
+        "test_case_not_found_page",
+        "test_report_not_found_page",
+    ] {
+        assert!(
+            !defined.contains(&deleted),
+            "the deleted renderer {deleted} is still defined"
+        );
+    }
+
+    let mod_rs = fs::read_to_string(browser.join("mod.rs")).unwrap();
+    assert!(mod_rs.contains("render::document_conflict_page"));
+    assert!(mod_rs.contains("render::document_not_found_page"));
+    for deleted in [
+        "conflict_page_ui_mockup",
+        "conflict_page_business_rule",
+        "conflict_page_audit_record",
+        "conflict_page_tech_spec",
+        "conflict_page_use_case",
+        "conflict_page_test_case",
+        "conflict_page_test_report",
+        "tech_spec_not_found_page",
+        "use_case_not_found_page",
+        "test_case_not_found_page",
+        "test_report_not_found_page",
+    ] {
+        assert!(
+            !mod_rs.contains(&format!("render::{deleted}(")),
+            "the deleted renderer {deleted} still has a call site"
+        );
+    }
+
+    let routes_rs = fs::read_to_string(browser.join("routes.rs")).unwrap();
+    for removed in ["NotFoundPage", "not_found_page", "not_found_slug", "IdRule"] {
+        assert!(
+            !routes_rs.contains(removed),
+            "the per-type 404 selector {removed} is still present"
+        );
+    }
+}
+
 // T-114-10 -----------------------------------------------------------------
 #[test]
 fn t114_10_generic_edit_round_trip_noop_and_conflict() {

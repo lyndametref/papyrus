@@ -2066,7 +2066,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
         };
         return Ok(Response::html(
             409,
-            render::conflict_page(&record, &submitted, &cfg, chrome),
+            render::backlog_decision_conflict_page(&record, &submitted, &cfg, chrome),
         ));
     }
 
