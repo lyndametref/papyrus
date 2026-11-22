@@ -1,7 +1,7 @@
 # Characterization corpus (TASK-240, MS-032)
 
 Frozen pre-refactor behaviour of every document type and every browser route
-(252 cases, 783 artifacts),
+(254 cases, 789 artifacts),
 captured as byte-for-byte artifacts. MS-033 onward replays this corpus to prove
 that the refactor changed nothing except the deltas listed in
 [`EXPECTED-DELTAS.md`](EXPECTED-DELTAS.md).
