@@ -964,10 +964,11 @@ fn inventory_page(state: &RequestState<'_>) -> Result<Response, HttpError> {
     let cfg = &state.config;
     let ctx = state.context();
     let snapshot = records::RecordSnapshot::new(&ctx, cfg, &state.registry);
-    // One registry-wide scan serves every card and both aggregate cards.
-    let indexes = snapshot.scan_indexes();
-    let count_for =
-        |slug: &str| -> usize { indexes.get(slug).map_or(0, |index| index.records.len()) };
+    // One registry-wide listing serves every card and both aggregate cards.
+    // Inventory only renders counts, so each listed file is read and validated
+    // up to its front matter instead of the full document body.
+    let counts = snapshot.scan_counts();
+    let count_for = |slug: &str| -> usize { counts.get(slug).copied().unwrap_or(0) };
     let (project, bind_note) = chrome_for(cfg, state);
     let chrome = render::Chrome {
         project: &project,
@@ -1649,24 +1650,46 @@ fn view_page(id: &str, state: &RequestState<'_>) -> Result<Response, HttpError> 
     let ctx = state.context();
     let snapshot = records::RecordSnapshot::new(&ctx, cfg, &state.registry);
     let record = display_record(id, &snapshot)?;
-    let index = records::build_index_with_snapshot(
-        &ctx,
-        cfg,
-        &state.registry,
-        &record.descriptor,
-        None,
-        &snapshot,
-    );
-    let group = resolved_group(&record, &index);
+    // A grouped page needs its family rows; a task page needs its dependents.
+    // Every other document type renders from the page record and its directly
+    // resolved references, so no directory-wide index is built for it.
+    let index = if record.descriptor.document_model == DocumentModel::GroupedMarkdown {
+        Some(records::build_grouped_index_with_snapshot(
+            &ctx,
+            cfg,
+            &state.registry,
+            &record.descriptor,
+            &snapshot,
+        ))
+    } else if record.handler() == Some(TypedHandler::Task) {
+        Some(records::build_index_with_snapshot(
+            &ctx,
+            cfg,
+            &state.registry,
+            &record.descriptor,
+            None,
+            &snapshot,
+        ))
+    } else {
+        None
+    };
+    let group = index
+        .as_ref()
+        .and_then(|index| resolved_group(&record, index));
     let members: Vec<records::Record> = if record.is_group {
         index
-            .members
-            .get(&record.id)
-            .map(|positions| {
-                positions
-                    .iter()
-                    .filter_map(|position| index.requirements.get(*position).cloned())
-                    .collect()
+            .as_ref()
+            .map(|index| {
+                index
+                    .members
+                    .get(&record.id)
+                    .map(|positions| {
+                        positions
+                            .iter()
+                            .filter_map(|position| index.requirements.get(*position).cloned())
+                            .collect()
+                    })
+                    .unwrap_or_default()
             })
             .unwrap_or_default()
     } else {
@@ -1718,13 +1741,18 @@ fn view_page(id: &str, state: &RequestState<'_>) -> Result<Response, HttpError> 
         };
     let dependents: Vec<records::Record> = if record.handler() == Some(TypedHandler::Task) {
         index
-            .records
-            .iter()
-            .filter(|candidate| {
-                candidate.id != record.id && candidate.dependencies.contains(&record.id)
+            .as_ref()
+            .map(|index| {
+                index
+                    .records
+                    .iter()
+                    .filter(|candidate| {
+                        candidate.id != record.id && candidate.dependencies.contains(&record.id)
+                    })
+                    .cloned()
+                    .collect()
             })
-            .cloned()
-            .collect()
+            .unwrap_or_default()
     } else {
         Vec::new()
     };
@@ -1770,15 +1798,24 @@ fn edit_page(id: &str, state: &RequestState<'_>) -> Result<Response, HttpError> 
     let ctx = state.context();
     let snapshot = records::RecordSnapshot::new(&ctx, cfg, &state.registry);
     let record = display_record(id, &snapshot)?;
-    let index = records::build_index_with_snapshot(
-        &ctx,
-        cfg,
-        &state.registry,
-        &record.descriptor,
-        None,
-        &snapshot,
-    );
-    let group = resolved_group(&record, &index);
+    // The edit page only needs the owning group link for a grouped member. A
+    // group record has no group link, and every other type needs no index at
+    // all, so the family is parsed only when the page actually reads it.
+    let index =
+        if record.descriptor.document_model == DocumentModel::GroupedMarkdown && !record.is_group {
+            Some(records::build_grouped_index_with_snapshot(
+                &ctx,
+                cfg,
+                &state.registry,
+                &record.descriptor,
+                &snapshot,
+            ))
+        } else {
+            None
+        };
+    let group = index
+        .as_ref()
+        .and_then(|index| resolved_group(&record, index));
     let (project, bind_note) = chrome_for(cfg, state);
     let chrome = render::Chrome {
         project: &project,

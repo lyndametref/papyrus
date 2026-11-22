@@ -823,6 +823,9 @@ struct Candidate {
     frontmatter_key: Option<String>,
     stem_key: Option<String>,
     stem_prefix: Option<String>,
+    /// Canonical duplicate-detection key, computed once from the content read
+    /// during candidate collection.
+    id_key: Option<String>,
 }
 
 fn candidate_frontmatter_id(_desc: &RecordDescriptor, content: &str) -> Option<String> {
@@ -830,7 +833,7 @@ fn candidate_frontmatter_id(_desc: &RecordDescriptor, content: &str) -> Option<S
         return None;
     }
     let fm = frontmatter::parse(content).ok().flatten()?;
-    let id = frontmatter::current_value_string(&fm.raw, "id")?;
+    let id = frontmatter::value_string(&fm.data, "id")?;
     let id = id.trim();
     if id.is_empty() {
         return None;
@@ -892,6 +895,10 @@ fn collect_candidates_dir(
             .and_then(|value| id_value_key(desc, cfg, value));
         let number = stem_key(desc, cfg, stem);
         let prefix = matching_prefix_of(desc, cfg, stem);
+        // `candidate_id_key` uses the front-matter ID when it maps to a
+        // canonical key, otherwise the stem key. Both halves are already
+        // computed here, so the content is never parsed a second time.
+        let id_key = fm_key.clone().or_else(|| number.clone());
         out.push(Candidate {
             path,
             rel,
@@ -899,6 +906,7 @@ fn collect_candidates_dir(
             frontmatter_key: fm_key,
             stem_key: number,
             stem_prefix: prefix,
+            id_key,
         });
     }
 }
@@ -953,13 +961,7 @@ pub fn scan_migration_conflicts(
     // Duplicate IDs across every read location of the family.
     let mut groups: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for c in &candidates {
-        let content = fs::read_to_string(&c.path).unwrap_or_default();
-        let stem = c
-            .path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or_default();
-        if let Some(key) = candidate_id_key(desc, cfg, Some(&content), stem) {
+        if let Some(key) = c.id_key.clone() {
             groups.entry(key).or_default().push(c.rel.clone());
         }
     }

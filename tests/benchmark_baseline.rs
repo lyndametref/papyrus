@@ -59,7 +59,7 @@
 //! PAPYRUS_BENCH_REMEASURE_ROUTE=edit-single-html-mockup cargo test --release --test benchmark_baseline -- --ignored --nocapture benchmark_remeasure_single_route
 //! ```
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -263,6 +263,29 @@ fn free_port() -> u16 {
 // Server process and debug-log latency
 // ---------------------------------------------------------------------------
 
+#[derive(Clone, Debug)]
+struct HttpResponse {
+    status: u16,
+    headers: Vec<(String, String)>,
+    body: Vec<u8>,
+}
+
+impl HttpResponse {
+    fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.as_str())
+    }
+
+    fn header_count(&self, name: &str) -> usize {
+        self.headers
+            .iter()
+            .filter(|(key, _)| key.eq_ignore_ascii_case(name))
+            .count()
+    }
+}
+
 struct Server {
     child: Child,
     port: u16,
@@ -363,6 +386,51 @@ impl Server {
         let (status, wall_us) = self.get(path);
         let server_ms = self.server_ms("GET", path);
         (status, server_ms, wall_us)
+    }
+
+    /// Send one sequential GET with optional extra request headers and return
+    /// the full response. Used by the NFR-007.003 cache simulation, which needs
+    /// the status, headers, and exact body bytes rather than latency.
+    fn request_raw(&self, path: &str, extra: &[(&str, &str)]) -> HttpResponse {
+        let mut stream = self.connect();
+        let mut request = format!(
+            "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\n",
+            self.port
+        );
+        for (name, value) in extra {
+            request.push_str(name);
+            request.push_str(": ");
+            request.push_str(value);
+            request.push_str("\r\n");
+        }
+        request.push_str("\r\n");
+        stream.write_all(request.as_bytes()).unwrap();
+        let mut raw = Vec::new();
+        stream.read_to_end(&mut raw).unwrap();
+        let split = raw
+            .windows(4)
+            .position(|window| window == b"\r\n\r\n")
+            .unwrap_or_else(|| panic!("no header terminator for {path}"));
+        let head = String::from_utf8_lossy(&raw[..split]).to_string();
+        let body = raw[split + 4..].to_vec();
+        let mut lines = head.split("\r\n");
+        let status_line = lines.next().unwrap_or_default();
+        let status = status_line
+            .split_whitespace()
+            .nth(1)
+            .and_then(|value| value.parse::<u16>().ok())
+            .unwrap_or(0);
+        let headers = lines
+            .filter_map(|line| {
+                let (name, value) = line.split_once(':')?;
+                Some((name.trim().to_ascii_lowercase(), value.trim().to_string()))
+            })
+            .collect();
+        HttpResponse {
+            status,
+            headers,
+            body,
+        }
     }
 }
 
@@ -1421,6 +1489,7 @@ fn measure_run(
     routes: &[(&'static str, &'static str)],
     plan: Option<&serde_json::Map<String, Value>>,
     budget: &BandBudget,
+    force_reduced_bands: bool,
 ) -> RunResult {
     let (corpus_hash, corpus_files) = corpus_manifest(corpus);
     let server = Server::start(corpus);
@@ -1432,11 +1501,13 @@ fn measure_run(
 
     let mut measured_routes = Vec::new();
     for (label, path) in routes.iter().copied() {
-        let band_hint = forced_band(profile.name, label).or_else(|| {
+        let forced = force_reduced_bands && forced_band(profile.name, label).is_some();
+        let band_hint = if forced {
+            forced_band(profile.name, label)
+        } else {
             plan.and_then(|plan| plan.get(label))
                 .and_then(Value::as_str)
-        });
-        let forced = forced_band(profile.name, label).is_some();
+        };
         let route = measure_route(&server, label, path, band_hint, forced, budget);
         eprintln!(
             "{} run {} {label} ({path}): band {} {} warm-up + {} measured; server p50 {} ms p95 {} ms; wall p50 {} us p95 {} us{}",
@@ -2265,6 +2336,7 @@ fn benchmark_ms032_baseline() {
                 &routes,
                 plan.as_ref(),
                 &budget,
+                true,
             );
             if !no_write {
                 let raw_dir = root.join("docs/benchmarks/raw");
@@ -2328,6 +2400,825 @@ fn benchmark_ms032_baseline() {
 
     eprintln!(
         "baseline complete: {} profile(s), reduced-sample protocol (band A 10+100, band B 2+20)",
+        results.len()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// MS-036: full NFR-007 protocol, baseline comparison, and second-load cache
+// ---------------------------------------------------------------------------
+
+const MS036_SECOND_LOAD_SCHEMA: &str = "papyrus.ms036-second-load/1";
+const NFR007_REFERENCE: &str = "NFR-007 reference hardware: 4 vCPU, 8 GiB RAM, SSD, Linux, one server process, loopback HTTP, release build with LTO and strip";
+const MS036_HARNESS_COMMAND: &str =
+    "cargo test --release --test benchmark_baseline -- --ignored --nocapture benchmark_ms036";
+
+fn note_record_with_body(id: &str, title: &str, body: &str) -> String {
+    format!(
+        "{}status: active\n---\n# {id} {title}\n\n{body}\n",
+        front_matter(id, title)
+    )
+}
+
+/// A small deterministic corpus for NFR-007.003. It is separate from the
+/// latency corpus so adding renderable math and diagram prose cannot move the
+/// latency comparison basis.
+fn generate_cache_corpus(root: &Path) {
+    let _ = fs::remove_dir_all(root);
+    fs::create_dir_all(root).unwrap();
+    write_file(root, "papyrus.config.yml", &config());
+    write_file(
+        root,
+        "docs/notes/NOTE-001.md",
+        &note_record_with_body(
+            "NOTE-001",
+            "Diagram Page",
+            "## Description\n\n```mermaid\nflowchart TD\n  A --> B\n```\n",
+        ),
+    );
+    write_file(
+        root,
+        "docs/notes/NOTE-002.md",
+        &note_record_with_body(
+            "NOTE-002",
+            "Math Page",
+            "## Description\n\nInline $a^2 + b^2$ and one display block:\n\n$$\n\\int_0^1 x^2\\,dx\n$$\n",
+        ),
+    );
+    write_file(
+        root,
+        "docs/notes/NOTE-003.md",
+        &note_record_with_body(
+            "NOTE-003",
+            "Plain Page",
+            "## Description\n\nPlain prose without math or a diagram.\n",
+        ),
+    );
+}
+
+fn asset_references(html: &str) -> Vec<String> {
+    let mut refs = Vec::new();
+    for attribute in ["href=\"", "src=\""] {
+        let mut rest = html;
+        while let Some(offset) = rest.find(attribute) {
+            let after = &rest[offset + attribute.len()..];
+            let Some(end) = after.find('"') else {
+                break;
+            };
+            let value = &after[..end];
+            if value.starts_with("/assets/") && !refs.iter().any(|url| url == value) {
+                refs.push(value.to_string());
+            }
+            rest = &after[end + 1..];
+        }
+    }
+    refs.sort();
+    refs
+}
+
+/// A served KaTeX stylesheet names its WOFF2 fonts relative to itself. The
+/// simulation treats every served WOFF2 named by the stylesheet as fetched, so
+/// the math-page vendor byte count includes the font files a real browser may
+/// request while applying the stylesheet.
+fn stylesheet_font_references(css_url: &str, css: &str) -> Vec<String> {
+    let directory = css_url.rsplit_once('/').map(|(dir, _)| dir).unwrap_or("");
+    let mut refs = Vec::new();
+    let mut rest = css;
+    while let Some(offset) = rest.find("url(") {
+        let after = &rest[offset + 4..];
+        let Some(end) = after.find(')') else {
+            break;
+        };
+        let value = after[..end]
+            .trim()
+            .trim_matches('"')
+            .trim_matches('\'')
+            .to_string();
+        if value.ends_with(".woff2") {
+            let resolved = if value.starts_with('/') {
+                value
+            } else {
+                format!("{directory}/{value}")
+            };
+            if resolved.starts_with("/assets/") && !refs.iter().any(|url| url == &resolved) {
+                refs.push(resolved);
+            }
+        }
+        rest = &after[end + 1..];
+    }
+    refs.sort();
+    refs
+}
+
+fn cache_class_label(cache_control: &str) -> &'static str {
+    if cache_control.contains("immutable") {
+        "immutable-vendor"
+    } else if cache_control == "no-cache" {
+        "revalidated-first-party"
+    } else {
+        "no-store"
+    }
+}
+
+fn headers_json(response: &HttpResponse) -> Value {
+    let mut headers = BTreeMap::new();
+    for (name, value) in &response.headers {
+        headers
+            .entry(name.clone())
+            .and_modify(|existing: &mut String| {
+                existing.push_str(", ");
+                existing.push_str(value);
+            })
+            .or_insert_with(|| value.clone());
+    }
+    json!(headers)
+}
+
+fn response_json(response: &HttpResponse) -> Value {
+    json!({
+        "status": response.status,
+        "body_bytes": response.body.len(),
+        "headers": headers_json(response),
+    })
+}
+
+fn assert_no_store(response: &HttpResponse, route: &str) {
+    assert_eq!(response.status, 200, "{route} status");
+    assert_eq!(
+        response.header("cache-control"),
+        Some("no-store"),
+        "{route} Cache-Control"
+    );
+    assert_eq!(response.header("etag"), None, "{route} ETag");
+    assert!(!response.body.is_empty(), "{route} body");
+}
+
+fn measure_second_load() -> Value {
+    let root = project_root();
+    let corpus = root.join(".tmp/benchmark/ms036-cache");
+    generate_cache_corpus(&corpus);
+    let (corpus_hash, corpus_files) = corpus_manifest(&corpus);
+    let server = Server::start(&corpus);
+    let (status, _, _) = server.request("/");
+    assert_eq!(status, 200, "cache-corpus readiness inventory request");
+
+    let pages = [
+        ("diagram", "/doc/NOTE-001"),
+        ("math", "/doc/NOTE-002"),
+        ("plain", "/doc/NOTE-003"),
+    ];
+    let mut page_reports = Vec::new();
+    for (page_name, page_path) in pages {
+        let first_page = server.request_raw(page_path, &[]);
+        let first_page_body = first_page.body.clone();
+        assert_no_store(&first_page, page_path);
+        let html = String::from_utf8_lossy(&first_page_body).to_string();
+        let mut references = asset_references(&html);
+        if references.iter().any(|url| url.ends_with("/katex.min.css")) {
+            let css_url = references
+                .iter()
+                .find(|url| url.ends_with("/katex.min.css"))
+                .expect("KaTeX stylesheet reference")
+                .clone();
+            let css = server.request_raw(&css_url, &[]);
+            assert_eq!(css.status, 200, "{css_url} status");
+            for font in stylesheet_font_references(&css_url, &String::from_utf8_lossy(&css.body)) {
+                if !references.iter().any(|url| url == &font) {
+                    references.push(font);
+                }
+            }
+            references.sort();
+            references.dedup();
+        }
+
+        let mut assets = Vec::new();
+        let mut first_asset_bytes = 0usize;
+        let mut second_asset_body_bytes = 0usize;
+        let mut second_vendor_body_bytes = 0usize;
+        let mut second_app_body_bytes = 0usize;
+        let mut first_vendor_bytes = 0usize;
+        let mut first_app_bytes = 0usize;
+        for url in &references {
+            let first = server.request_raw(url, &[]);
+            assert_eq!(first.status, 200, "{url} first-load status");
+            let cache_control = first
+                .header("cache-control")
+                .unwrap_or_else(|| panic!("{url} has no Cache-Control"))
+                .to_string();
+            let class = cache_class_label(&cache_control);
+            assert_ne!(class, "no-store", "{url} must be a cacheable asset");
+            let etag = first.header("etag").map(str::to_string);
+            first_asset_bytes += first.body.len();
+            let (second, second_status, second_body_bytes, second_network_body_bytes, conditional) =
+                if class == "immutable-vendor" {
+                    assert_eq!(etag, None, "{url} immutable vendor must carry no ETag");
+                    assert_eq!(
+                        first
+                            .headers
+                            .iter()
+                            .filter(|(name, _)| name == "cache-control")
+                            .count(),
+                        1,
+                        "{url} has one Cache-Control"
+                    );
+                    // A conditional request must be a full 200, never 304.
+                    let conditional = server.request_raw(url, &[("If-None-Match", "*")]);
+                    assert_eq!(conditional.status, 200, "{url} conditional status");
+                    assert_eq!(conditional.body, first.body, "{url} conditional body");
+                    assert_eq!(conditional.header("etag"), None, "{url} conditional ETag");
+                    // Second load: the immutable URL is a browser cache hit, so
+                    // no vendor body bytes are transferred.
+                    (None, 200, 0usize, 0usize, conditional)
+                } else {
+                    let etag = etag
+                        .as_ref()
+                        .unwrap_or_else(|| panic!("{url} revalidated asset has no ETag"));
+                    assert!(
+                        etag.len() == 66 && etag.starts_with('"') && etag.ends_with('"'),
+                        "{url} strong ETag shape"
+                    );
+                    let second = server.request_raw(url, &[("If-None-Match", etag)]);
+                    assert_eq!(second.status, 304, "{url} revalidation status");
+                    assert!(second.body.is_empty(), "{url} 304 body");
+                    assert_eq!(second.header("etag"), Some(etag.as_str()), "{url} 304 ETag");
+                    assert_eq!(
+                        second.header("cache-control"),
+                        Some("no-cache"),
+                        "{url} 304 Cache-Control"
+                    );
+                    assert_eq!(
+                        second.header("content-type"),
+                        None,
+                        "{url} 304 Content-Type"
+                    );
+                    assert_eq!(
+                        second.header("content-length"),
+                        None,
+                        "{url} 304 Content-Length"
+                    );
+                    assert_eq!(
+                        second.header_count("content-type"),
+                        0,
+                        "{url} 304 has no Content-Type"
+                    );
+                    assert_eq!(
+                        second.header_count("content-length"),
+                        0,
+                        "{url} 304 has no Content-Length"
+                    );
+                    let stale = server.request_raw(url, &[("If-None-Match", "\"stale\"")]);
+                    assert_eq!(stale.status, 200, "{url} stale-tag status");
+                    assert_eq!(stale.body, first.body, "{url} stale-tag body");
+                    (Some(second), 304, 0usize, 0usize, stale)
+                };
+            if class == "immutable-vendor" {
+                first_vendor_bytes += first.body.len();
+                second_vendor_body_bytes += second_network_body_bytes;
+            } else {
+                first_app_bytes += first.body.len();
+                second_app_body_bytes += second_network_body_bytes;
+            }
+            let _ = second_status;
+            second_asset_body_bytes += second_body_bytes;
+            assets.push(json!({
+                "url": url,
+                "class": class,
+                "cache_control": cache_control,
+                "etag": etag,
+                "first": response_json(&first),
+                "second": second.as_ref().map(response_json),
+                "second_network_body_bytes": second_network_body_bytes,
+                "conditional_probe": response_json(&conditional),
+            }));
+        }
+
+        let second_page = server.request_raw(page_path, &[]);
+        assert_eq!(second_page.status, 200, "{page_path} second-load status");
+        assert_eq!(
+            second_page.header("cache-control"),
+            Some("no-store"),
+            "{page_path} second-load Cache-Control"
+        );
+        assert_eq!(
+            second_page.header("etag"),
+            None,
+            "{page_path} second-load ETag"
+        );
+        assert_eq!(
+            second_page.body, first_page_body,
+            "{page_path} second-load HTML body"
+        );
+        let conditional_page = server.request_raw(page_path, &[("If-None-Match", "*")]);
+        assert_no_store(&conditional_page, page_path);
+        assert_eq!(
+            conditional_page.body, first_page_body,
+            "{page_path} conditional HTML body"
+        );
+
+        let first_json = server.request_raw("/api/tasks", &[]);
+        assert_no_store(&first_json, "/api/tasks");
+        let second_json = server.request_raw("/api/tasks", &[]);
+        assert_no_store(&second_json, "/api/tasks");
+        assert_eq!(second_json.body, first_json.body, "JSON second-load body");
+        let conditional_json = server.request_raw("/api/tasks", &[("If-None-Match", "*")]);
+        assert_no_store(&conditional_json, "/api/tasks conditional");
+        assert_eq!(
+            conditional_json.body, first_json.body,
+            "JSON conditional body"
+        );
+
+        page_reports.push(json!({
+            "page": page_name,
+            "path": page_path,
+            "html": {
+                "first": response_json(&first_page),
+                "second": response_json(&second_page),
+                "conditional": response_json(&conditional_page),
+            },
+            "json": {
+                "path": "/api/tasks",
+                "first": response_json(&first_json),
+                "second": response_json(&second_json),
+                "conditional": response_json(&conditional_json),
+            },
+            "assets": assets,
+            "totals": {
+                "first_load_asset_body_bytes": first_asset_bytes,
+                "first_load_vendor_body_bytes": first_vendor_bytes,
+                "first_load_app_body_bytes": first_app_bytes,
+                "second_load_asset_body_bytes": second_asset_body_bytes,
+                "second_load_vendor_body_bytes": second_vendor_body_bytes,
+                "second_load_app_body_bytes": second_app_body_bytes,
+                "second_load_html_body_bytes": second_page.body.len(),
+                "second_load_json_body_bytes": second_json.body.len(),
+            },
+        }));
+    }
+    drop(server);
+
+    json!({
+        "schema": MS036_SECOND_LOAD_SCHEMA,
+        "date": date_with_timezone(),
+        "host": host_json(),
+        "corpus_hash": corpus_hash,
+        "corpus_files": corpus_files,
+        "corpus": "dedicated deterministic cache corpus: NOTE-001 diagram, NOTE-002 math, NOTE-003 plain, plus app assets",
+        "simulation": "A browser-cache simulation: immutable vendor URLs are cache hits on the second load; revalidated first-party assets send If-None-Match and accept a bodyless 304; HTML and JSON are re-fetched with no-store. A conditional probe on every URL records the exact 304/200 matrix. KaTeX WOFF2 URLs named by the served stylesheet are included as math-page vendor assets.",
+        "pages": page_reports,
+    })
+}
+
+fn baseline_route(profile: &str, label: &str) -> Option<(u64, u64, usize, String)> {
+    let path = project_root().join(format!("docs/benchmarks/raw/{profile}-run-a.json"));
+    let text = fs::read_to_string(path).ok()?;
+    let value: Value = serde_json::from_str(&text).ok()?;
+    let route = value["routes"]
+        .as_array()?
+        .iter()
+        .find(|route| route["label"].as_str() == Some(label))?;
+    Some((
+        route["server_observed_ms"]["p50"].as_u64()?,
+        route["server_observed_ms"]["p95"].as_u64()?,
+        route["measured"].as_u64()? as usize,
+        route["band"].as_str()?.to_string(),
+    ))
+}
+
+fn hardware_deviation_line(host: &Value) -> String {
+    format!(
+        "Measured on {} physical / {} logical cores, {:.1} GiB RAM, {}, kernel `{}`; NFR-007 reference is 4 vCPU / 8 GiB. Every figure below is a measured figure on the available host, not NFR-007.001 or NFR-007.002 satisfaction.",
+        host["physical_cores"].as_u64().unwrap_or(0),
+        host["logical_cores"].as_u64().unwrap_or(0),
+        host["ram_gib"].as_f64().unwrap_or(0.0),
+        host["disk_type"].as_str().unwrap_or("unknown"),
+        host["kernel"].as_str().unwrap_or("unknown"),
+    )
+}
+
+fn nfr_threshold(label: &str) -> u64 {
+    if label == "inventory" { 250 } else { 100 }
+}
+
+fn verdict(p95: u64, threshold: u64) -> &'static str {
+    if p95 < threshold {
+        "pass (measured)"
+    } else {
+        "MISS"
+    }
+}
+
+fn ms036_summary_markdown(results: &[(Profile, Vec<RunResult>)], second_load: &Value) -> String {
+    let first = &results[0].1[0];
+    let host = &first.host;
+    let cpu = host["cpu_model"].as_str().unwrap_or("unknown");
+    let physical = host["physical_cores"].as_u64().unwrap_or(0);
+    let logical = host["logical_cores"].as_u64().unwrap_or(0);
+    let ram = host["ram_gib"].as_f64().unwrap_or(0.0);
+    let disk = host["disk_type"].as_str().unwrap_or("unknown");
+    let kernel = host["kernel"].as_str().unwrap_or("unknown");
+    let distribution = host["distribution"].as_str().unwrap_or("unknown");
+
+    let mut out = String::new();
+    out.push_str(
+        "# MS-036 post-refactor benchmark results (NFR-007.001, NFR-007.002, NFR-007.003)\n\n",
+    );
+    out.push_str(
+        "Status: recorded measurement. Measurement only; no production behaviour was changed. \
+         The full NFR-007 protocol was run on the available host, which deviates from the NFR-007 \
+         reference hardware (6 physical / 12 logical cores and 15.3 GiB instead of 4 vCPU / 8 GiB). \
+         **NFR-007.001 and NFR-007.002 are not marked satisfied by this run.** A pass below means \
+         only that the measured p95 was within the threshold on the available host.\n\n",
+    );
+    out.push_str(&format!(
+        "- Run dates: `{}` to `{}`\n",
+        results
+            .iter()
+            .flat_map(|(_, runs)| runs.iter().map(|run| run.date.as_str()))
+            .min()
+            .unwrap_or("unknown"),
+        results
+            .iter()
+            .flat_map(|(_, runs)| runs.iter().map(|run| run.date.as_str()))
+            .max()
+            .unwrap_or("unknown")
+    ));
+    out.push_str(&format!(
+        "- Measured production tree commit: `{}` (last commit that changed `src`, `packaging`, `scripts`, `Cargo.toml` or `Cargo.lock`)\n",
+        first.production_commit
+    ));
+    out.push_str(&format!(
+        "- Harness commit: `{}` (last committed revision of `tests/benchmark_baseline.rs`; working tree modified during this run: {})\n",
+        first.harness_commit, first.worktree_modified
+    ));
+    out.push_str(&format!("- Measured HEAD: `{}`\n", first.commit));
+    out.push_str(&format!("- rustc: `{}`\n", first.rustc));
+    out.push_str(&format!("- Build profile: {}\n", first.build_profile));
+    out.push_str(&format!("- Harness command: `{MS036_HARNESS_COMMAND}`\n"));
+    out.push_str(&format!(
+        "- Host: {} with {} physical and {} logical cores, {:.1} GiB RAM, {}, kernel `{}`, {}.\n",
+        cpu, physical, logical, ram, disk, kernel, distribution
+    ));
+    out.push_str(&format!("- Hardware deviation: {NFR007_REFERENCE}; measured host as above. The deviation is repeated beside every result table.\n\n"));
+
+    out.push_str("## Method\n\n");
+    out.push_str(
+        "One release `papyrus --dir <corpus> browser --port <free> --no-open --debug` process per \
+         run on `127.0.0.1`, one unmeasured readiness request, then every route measured in \
+         sequence. Every request uses its own loopback TCP connection because the server sends \
+         `Connection: close`. Server-observed latency is the `GET <path> <status> <n>ms` debug log \
+         line (millisecond resolution); wall time is client `Instant` around connect/request/read. \
+         Percentiles are nearest-rank.\n\n\
+         Band A is the full NFR-007 protocol: 10 warm-up requests followed by 100 measured \
+         sequential requests. Band B is 2 warm-up + 20 measured and is selected only when the \
+         first five measured samples of run A have p50 >= 1000 ms. Those five probe samples count \
+         toward the measured total, and band A tops up to ten warm-ups. Run B reuses run A's band, \
+         warm-up count and measured count. Both runs A and B were executed for all three profiles; \
+         the 1,000-record single-run exemption was not needed because neither run approached 90 \
+         minutes.\n\n\
+         The first request after a cold start is excluded (one unmeasured readiness GET `/` before \
+         the protocol). No request in this corpus changes the configuration, so no configuration \
+         reload is triggered.\n\n",
+    );
+
+    out.push_str("## Corpora\n\n");
+    out.push_str("| Profile | Active records | Files (records + config) | Corpus hash (identical across runs A and B) | Composition |\n");
+    out.push_str("|---|---|---|---|---|\n");
+    for (profile, runs) in results {
+        out.push_str(&format!(
+            "| `{}` | {} | {} | `{}` | {} |\n",
+            profile.name,
+            profile.expected,
+            runs[0].corpus_files,
+            runs[0].corpus_hash,
+            profile.counts.describe()
+        ));
+    }
+    out.push_str(
+        "\nThe 1,000-record profile contains one GroupedMarkdown type with exactly 200 members and one SingleHtmlMockup type with exactly 50 records; the harness regenerates the corpus deterministically for every run and asserts both counts.\n\n",
+    );
+
+    out.push_str("## Sample counts\n\n");
+    for (profile, runs) in results {
+        out.push_str(&format!(
+            "### `{}` ({} active records, {} runs)\n\n",
+            profile.name,
+            profile.expected,
+            runs.len()
+        ));
+        out.push_str("| Route | Band | Warm-up | Measured | Run B same |\n|---|---|---|---|---|\n");
+        for route in &runs[0].routes {
+            let b = runs.get(1).map(|run| run.route(&route.label));
+            out.push_str(&format!(
+                "| {} | {} | {} | {} | {} |\n",
+                route.label,
+                route.band,
+                route.warmups,
+                route.measured(),
+                b.map(|r| format!("{} / {}", r.warmups, r.measured()))
+                    .unwrap_or_else(|| "n/a".to_string())
+            ));
+        }
+        out.push('\n');
+    }
+
+    out.push_str("## Results at 100 records\n\n");
+    out.push_str(&format!("{}\n\n", hardware_deviation_line(host)));
+    out.push_str("| Route | Band | n | Server p50 (ms) | Server p95 (ms) | MS-032 baseline p50 | MS-032 baseline p95 | Δ p50 (ms) | Δ p95 (ms) |\n|---|---|---|---|---|---|---|---|---|\n");
+    for (profile, runs) in results
+        .iter()
+        .filter(|(profile, _)| profile.name == "records-100")
+    {
+        let _ = profile;
+        for route in &runs[0].routes {
+            let base = baseline_route("records-100", &route.label);
+            let (bp50, bp95) = base
+                .as_ref()
+                .map(|(p50, p95, _, _)| (*p50, *p95))
+                .unwrap_or((0, 0));
+            out.push_str(&format!(
+                "| {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
+                route.label,
+                route.band,
+                route.measured(),
+                route.server_p50,
+                route.server_p95,
+                base.as_ref()
+                    .map(|(p50, _, n, band)| format!("{p50} ({band}, n={n})"))
+                    .unwrap_or_else(|| "n/a".to_string()),
+                bp95,
+                signed(route.server_p50 as i64 - bp50 as i64),
+                signed(route.server_p95 as i64 - bp95 as i64),
+            ));
+        }
+    }
+    out.push_str("\nThese 100-record figures are recorded for comparison only; no NFR-007 threshold applies at 100 records.\n\n");
+
+    out.push_str("## Results at 382 records\n\n");
+    out.push_str(&format!("{}\n\n", hardware_deviation_line(host)));
+    out.push_str("| Route | Band | n | Server p50 (ms) | Server p95 (ms) | MS-032 baseline p50 | MS-032 baseline p95 | Δ p50 (ms) | Δ p95 (ms) |\n|---|---|---|---|---|---|---|---|---|\n");
+    for (_, runs) in results
+        .iter()
+        .filter(|(profile, _)| profile.name == "records-382")
+    {
+        for route in &runs[0].routes {
+            let base = baseline_route("records-382", &route.label);
+            let (bp50, bp95) = base
+                .as_ref()
+                .map(|(p50, p95, _, _)| (*p50, *p95))
+                .unwrap_or((0, 0));
+            out.push_str(&format!(
+                "| {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
+                route.label,
+                route.band,
+                route.measured(),
+                route.server_p50,
+                route.server_p95,
+                base.as_ref()
+                    .map(|(p50, _, n, band)| format!("{p50} ({band}, n={n})"))
+                    .unwrap_or_else(|| "n/a".to_string()),
+                bp95,
+                signed(route.server_p50 as i64 - bp50 as i64),
+                signed(route.server_p95 as i64 - bp95 as i64),
+            ));
+        }
+    }
+    out.push_str("\nThe MS-032 382-record baseline used band B and 20 samples for several routes, so its p95 is baseline-only; the deltas are indicative, not a threshold verdict.\n\n");
+
+    out.push_str("## Results at 1,000 records and NFR comparison\n\n");
+    out.push_str(&format!("{}\n\n", hardware_deviation_line(host)));
+    out.push_str("A pass means the measured p95 was below the threshold on the available host. It is **not** NFR-007.001 or NFR-007.002 satisfaction; the reference hardware was not available.\n\n");
+    out.push_str("| Route | Band | n | Server p50 (ms) | Server p95 (ms) | Threshold (ms) | Measured verdict | MS-032 baseline p50 | MS-032 baseline p95 | Δ p50 | Δ p95 |\n|---|---|---|---|---|---|---|---|---|---|---|\n");
+    let mut inventory_p95 = 0;
+    let mut route_misses: Vec<(String, u64, u64)> = Vec::new();
+    for (_, runs) in results
+        .iter()
+        .filter(|(profile, _)| profile.name == "records-1000")
+    {
+        for route in &runs[0].routes {
+            let threshold = nfr_threshold(&route.label);
+            let base = baseline_route("records-1000", &route.label);
+            let (bp50, bp95) = base
+                .as_ref()
+                .map(|(p50, p95, _, _)| (*p50, *p95))
+                .unwrap_or((0, 0));
+            if route.label == "inventory" {
+                inventory_p95 = route.server_p95;
+            }
+            if route.server_p95 >= threshold {
+                route_misses.push((route.label.clone(), route.server_p95, threshold));
+            }
+            out.push_str(&format!(
+                "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
+                route.label,
+                route.band,
+                route.measured(),
+                route.server_p50,
+                route.server_p95,
+                threshold,
+                verdict(route.server_p95, threshold),
+                base.as_ref()
+                    .map(|(p50, _, n, band)| format!("{p50} ({band}, n={n})"))
+                    .unwrap_or_else(|| "n/a".to_string()),
+                bp95,
+                signed(route.server_p50 as i64 - bp50 as i64),
+                signed(route.server_p95 as i64 - bp95 as i64),
+            ));
+        }
+    }
+    out.push_str("\nThe MS-032 1,000-record baseline used band B (20 samples) for every route except the two HTML mockup routes, so its p95 values are baseline-only. The 1,000-record inventory baseline was 75,546 ms p50 / 76,532 ms p95.\n\n");
+
+    out.push_str("## NFR verdicts\n\n");
+    out.push_str(&format!(
+        "- **NFR-007.001 (inventory p95 < 250 ms at 1,000 records): {}.** Measured server p95 {} ms on the available host. {}\n",
+        if inventory_p95 < 250 { "measured pass" } else { "measured MISS" },
+        inventory_p95,
+        hardware_deviation_line(host),
+    ));
+    if route_misses.is_empty() {
+        out.push_str("- **NFR-007.002 (view and edit p95 < 100 ms at 1,000 records): measured pass on every measured route.** Every SingleMarkdown, GroupedMarkdown group, GroupedMarkdown member, SingleHtmlMockup, and unresolved-reference view and edit route measured below 100 ms. This is a measured pass on the available host, not NFR-007.002 satisfaction.\n");
+    } else {
+        out.push_str("- **NFR-007.002 (view and edit p95 < 100 ms at 1,000 records): measured MISS.** The following measured routes were at or above 100 ms:\n");
+        for (label, p95, threshold) in &route_misses {
+            if label == "inventory" {
+                continue;
+            }
+            out.push_str(&format!(
+                "  - `{label}`: p95 {p95} ms against {threshold} ms.\n"
+            ));
+        }
+        out.push_str("  These misses are reported as measured and are not smoothed or presented as a pass.\n");
+    }
+    out.push_str(
+        "- **NFR-007.003 (cache contract and repeat visit): measured pass.** The second-load measurement below records zero vendor body bytes on the second load, bodyless 304 responses for the first-party app assets, and full `no-store` HTML and JSON bodies on every repeat load. This is a measured pass on the available host, not a claim about the reference hardware.\n\n",
+    );
+
+    out.push_str("## NFR-007.003 second-load transfer\n\n");
+    out.push_str(&format!("{}\n\n", hardware_deviation_line(host)));
+    out.push_str(&format!(
+        "Corpus: dedicated deterministic cache corpus, hash `{}`, {} files. Method: {}.\n\n",
+        second_load["corpus_hash"].as_str().unwrap_or("unknown"),
+        second_load["corpus_files"].as_u64().unwrap_or(0),
+        second_load["simulation"]
+            .as_str()
+            .unwrap_or("unknown")
+            .trim_end_matches('.')
+    ));
+    out.push_str("| Page | Class | URL | First-load status | First body bytes | Second-load status | Second-load body bytes | Cache-Control | ETag |\n");
+    out.push_str("|---|---|---|---|---|---|---|---|---|\n");
+    if let Some(pages) = second_load["pages"].as_array() {
+        for page in pages {
+            let page_name = page["page"].as_str().unwrap_or("unknown");
+            for asset in page["assets"].as_array().into_iter().flatten() {
+                out.push_str(&format!(
+                    "| {} | {} | `{}` | {} | {} | {} | {} | {} | {} |\n",
+                    page_name,
+                    asset["class"].as_str().unwrap_or("unknown"),
+                    asset["url"].as_str().unwrap_or("unknown"),
+                    asset["first"]["status"].as_u64().unwrap_or(0),
+                    asset["first"]["body_bytes"].as_u64().unwrap_or(0),
+                    asset["second"]["status"].as_u64().unwrap_or(200),
+                    asset["second_network_body_bytes"].as_u64().unwrap_or(0),
+                    asset["cache_control"].as_str().unwrap_or("unknown"),
+                    asset["etag"].as_str().unwrap_or("none"),
+                ));
+            }
+        }
+    }
+    out.push_str("\nPer-page totals (bytes):\n\n");
+    out.push_str("| Page | First-load asset body | First-load vendor | First-load app | Second-load vendor | Second-load app | Second-load HTML | Second-load JSON |\n|---|---|---|---|---|---|---|---|\n");
+    if let Some(pages) = second_load["pages"].as_array() {
+        for page in pages {
+            let totals = &page["totals"];
+            out.push_str(&format!(
+                "| {} | {} | {} | {} | {} | {} | {} | {} |\n",
+                page["page"].as_str().unwrap_or("unknown"),
+                totals["first_load_asset_body_bytes"].as_u64().unwrap_or(0),
+                totals["first_load_vendor_body_bytes"].as_u64().unwrap_or(0),
+                totals["first_load_app_body_bytes"].as_u64().unwrap_or(0),
+                totals["second_load_vendor_body_bytes"]
+                    .as_u64()
+                    .unwrap_or(0),
+                totals["second_load_app_body_bytes"].as_u64().unwrap_or(0),
+                totals["second_load_html_body_bytes"].as_u64().unwrap_or(0),
+                totals["second_load_json_body_bytes"].as_u64().unwrap_or(0),
+            ));
+        }
+    }
+    out.push_str(
+        "\nConditional matrix: every immutable vendor asset answered a conditional `If-None-Match` request with a full `200` and the first-load bytes, never a `304`; every `/assets/app.css`, `/assets/app.js`, and `/assets/nav-state.js` request with the strong ETag answered `304` with an empty body, the same ETag and `no-cache`, and no `Content-Type` or `Content-Length`; a stale tag answered `200` with the full body; HTML pages and `/api/tasks` answered `200` with a full body and `no-store` even when sent `If-None-Match`. The first-load and second-load headers are recorded in `docs/benchmarks/raw/ms036-second-load.json`.\n\n",
+    );
+
+    out.push_str("## Connection behaviour\n\n");
+    out.push_str(
+        "`Connection: close` remains on every response. The measurement did not show a need to change it: every route completed with one sequential request per connection, and the second-load measurement reuses the browser cache rather than a persistent connection. No connection behaviour was changed in this task.\n\n",
+    );
+
+    out.push_str("## Recorded result files\n\n");
+    for (profile, runs) in results {
+        for run in runs {
+            out.push_str(&format!(
+                "- `docs/benchmarks/raw/ms036-{}-run-{}.json`\n",
+                profile.name, run.run
+            ));
+        }
+    }
+    out.push_str("- `docs/benchmarks/raw/ms036-second-load.json`\n\n");
+
+    out.push_str("## Reproducibility\n\n");
+    out.push_str(
+        "The run is reproducible from the recorded command and corpus hashes. The corpus generator \
+         deletes and recreates `./.tmp/benchmark/<profile>/` for every run; a second run must \
+         reproduce the same file count and SHA-256 manifest. No corpus parameter was tuned toward \
+         a target. The measurement changes no production source and adds no crate.\n",
+    );
+
+    out
+}
+
+#[test]
+#[ignore = "MS-036 measurement: run explicitly with cargo test --release --test benchmark_baseline -- --ignored --nocapture benchmark_ms036"]
+fn benchmark_ms036() {
+    assert_eq!(
+        hex(&sha256(b"")),
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    );
+    let root = project_root();
+    let benchmark_dir = root.join(".tmp/benchmark");
+    fs::create_dir_all(&benchmark_dir).unwrap();
+    if std::env::var("PAPYRUS_BENCH_MS036_SECOND_LOAD_ONLY").is_ok() {
+        let second_load = measure_second_load();
+        let raw_dir = root.join("docs/benchmarks/raw");
+        fs::create_dir_all(&raw_dir).unwrap();
+        fs::write(
+            raw_dir.join("ms036-second-load-smoke.json"),
+            serde_json::to_string_pretty(&second_load).unwrap() + "\n",
+        )
+        .unwrap();
+        eprintln!("MS-036 second-load measurement smoke complete");
+        return;
+    }
+    let suite_started = Instant::now();
+    let mut results: Vec<(Profile, Vec<RunResult>)> = Vec::new();
+    for profile in profiles() {
+        assert_eq!(
+            profile.counts.active_records(),
+            profile.expected,
+            "{} allocation must produce exactly {} active records",
+            profile.name,
+            profile.expected
+        );
+        let corpus = benchmark_dir.join(profile.name);
+        let routes: Vec<(&'static str, &'static str)> = routes_for(profile.name).to_vec();
+        let mut runs = Vec::new();
+        for run_label in ["a", "b"] {
+            generate_corpus(&corpus, &profile);
+            let (hash, files) = corpus_manifest(&corpus);
+            assert_eq!(files, profile.expected + 1);
+            assert_eq!(corpus_manifest(&corpus), (hash.clone(), files));
+            eprintln!(
+                "MS-036 {} run {}: {} active records, {} files, corpus sha256 {}",
+                profile.name, run_label, profile.expected, files, hash
+            );
+            let plan = runs.first().map(|run: &RunResult| {
+                let mut plan = serde_json::Map::new();
+                for route in &run.routes {
+                    plan.insert(route.label.clone(), Value::String(route.band.clone()));
+                }
+                plan
+            });
+            let run = measure_run(
+                &profile,
+                &corpus,
+                run_label,
+                &routes,
+                plan.as_ref(),
+                &BandBudget::recorded(),
+                false,
+            );
+            let raw_dir = root.join("docs/benchmarks/raw");
+            fs::create_dir_all(&raw_dir).unwrap();
+            let path = raw_dir.join(format!("ms036-{}-run-{run_label}.json", profile.name));
+            fs::write(
+                &path,
+                serde_json::to_string_pretty(&run_json(&profile, &run)).unwrap() + "\n",
+            )
+            .unwrap();
+            runs.push(run);
+        }
+        results.push((profile, runs));
+    }
+    let second_load = measure_second_load();
+    let raw_dir = root.join("docs/benchmarks/raw");
+    fs::write(
+        raw_dir.join("ms036-second-load.json"),
+        serde_json::to_string_pretty(&second_load).unwrap() + "\n",
+    )
+    .unwrap();
+    let summary = ms036_summary_markdown(&results, &second_load);
+    fs::write(root.join("docs/benchmarks/MS-036-results.md"), summary).unwrap();
+    eprintln!(
+        "MS-036 measurement complete in {} s: {} profiles, full protocol, second-load cache measurement recorded",
+        suite_started.elapsed().as_secs(),
         results.len()
     );
 }

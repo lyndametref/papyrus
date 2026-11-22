@@ -102,6 +102,25 @@ pub fn read_document(
     Ok((doc, token))
 }
 
+/// Read one record as validated, migrated, normalised source without parsing
+/// the document body.
+///
+/// The browser list and inventory paths only need record identity and
+/// front-matter metadata, so they reuse the same read-source contract as the
+/// display reader and parse only the front matter themselves. Returns the
+/// record path after any read-path relocation together with the LF-normalised
+/// source.
+pub fn read_normalized_source_with_conflicts(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    target: &Path,
+    conflicts: Option<&[crate::record::migrate::MigrationConflict]>,
+) -> Result<(PathBuf, String), AppError> {
+    let (safe, stored_source) = read_source_with_conflicts(ctx, cfg, registry, target, conflicts)?;
+    Ok((safe, crate::record::line_endings::normalize(&stored_source)))
+}
+
 /// One read of a record for the browser edit surface (ADR-0013 D2).
 #[derive(Debug)]
 pub struct NormalizedRead {

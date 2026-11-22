@@ -246,9 +246,20 @@ fn edit_breadcrumb(record: &Record, _resolved_group: Option<&Record>) -> String 
 }
 
 fn record_view(record: &Record) -> Option<crate::record::view::RecordView> {
-    crate::record::view::RecordView::from_content(&record.doc.source, &record.id, &record.version)
-        .ok()
-        .filter(|view| !view.metadata.is_empty())
+    let view = match &record.doc.front_matter {
+        Some(front_matter) => crate::record::view::RecordView::from_front_matter(
+            front_matter,
+            &record.id,
+            &record.version,
+        ),
+        None => crate::record::view::RecordView::from_content(
+            &record.doc.source,
+            &record.id,
+            &record.version,
+        )
+        .ok()?,
+    };
+    (!view.metadata.is_empty()).then_some(view)
 }
 
 fn metadata_dt(key: &str) -> String {
@@ -293,8 +304,8 @@ fn record_view_extra_rows(record: &Record, skip: &[&str]) -> String {
 }
 
 /// List-row metadata line rendered from the shared `RecordView` (TASK-67).
-fn record_view_list_meta(record: &Record, skip: &[&str]) -> String {
-    let Some(view) = record_view(record) else {
+fn record_view_list_meta(view: Option<&crate::record::view::RecordView>, skip: &[&str]) -> String {
+    let Some(view) = view else {
         return String::new();
     };
     let mut parts = vec![
@@ -357,7 +368,6 @@ fn metadata_block(record: &Record, resolved_group: Option<&Record>, group_id_onl
         created
     };
     let updated = view
-        .as_ref()
         .map(|v| v.value_text("updated_date"))
         .unwrap_or_default();
     let updated = if updated.is_empty() {
@@ -414,14 +424,15 @@ fn metadata_block_backlog(
 }
 
 fn requirement_link(record: &Record) -> String {
+    let view = record_view(record);
     format!(
         "<li>{}<a href=\"/doc/{}\"><span class=\"req-id\">{}</span> {}</a>{} {}</li>",
         row_status(record),
         escape(&record.id),
         escape(&record.id),
         escape(&record.title),
-        row_dates(record),
-        record_view_list_meta(record, &[])
+        row_dates(view.as_ref()),
+        record_view_list_meta(view.as_ref(), &[])
     )
 }
 
@@ -445,10 +456,8 @@ fn row_status(record: &Record) -> String {
 }
 
 /// Read-only Created and Updated cells, in that order.
-fn row_dates(record: &Record) -> String {
-    let view = record_view(record);
+fn row_dates(view: Option<&crate::record::view::RecordView>) -> String {
     let created = view
-        .as_ref()
         .map(|v| v.value_text("created_date"))
         .unwrap_or_default();
     let created = if created.is_empty() {

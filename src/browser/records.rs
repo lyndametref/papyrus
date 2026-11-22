@@ -142,6 +142,9 @@ pub struct RecordSnapshot<'a> {
     descriptors: Vec<&'a TypeDescriptor>,
     listing: RefCell<Option<SnapshotListing>>,
     records: RefCell<BTreeMap<PathBuf, Option<Record>>>,
+    /// Front-matter-only records used by list, group and reference read paths.
+    /// A record already parsed in full by `records` is reused verbatim.
+    light_records: RefCell<BTreeMap<PathBuf, Option<Record>>>,
     conflicts: RefCell<BTreeMap<String, Vec<MigrationConflict>>>,
     listing_count: Cell<usize>,
     parse_count: Cell<usize>,
@@ -186,6 +189,7 @@ impl<'a> RecordSnapshot<'a> {
             descriptors: registry.descriptors().collect(),
             listing: RefCell::new(None),
             records: RefCell::new(BTreeMap::new()),
+            light_records: RefCell::new(BTreeMap::new()),
             conflicts: RefCell::new(BTreeMap::new()),
             listing_count: Cell::new(0),
             parse_count: Cell::new(0),
@@ -338,6 +342,189 @@ impl<'a> RecordSnapshot<'a> {
             .borrow_mut()
             .insert(path.to_path_buf(), record.clone());
         Ok(record)
+    }
+
+    /// Parse only the front matter of one record for a list or member row.
+    ///
+    /// The full parse cache is consulted first, so a record already read for
+    /// the page itself is never parsed twice. Light records are memoised for
+    /// the rest of the request in their own cache: they are not interchangeable
+    /// with a full [`Record`] (no body sections and no field map), so the two
+    /// caches stay separate.
+    fn load_light_cached(
+        &self,
+        descriptor: &TypeDescriptor,
+        path: &Path,
+    ) -> Result<Option<Record>, AppError> {
+        if let Some(cached) = self.records.borrow().get(path) {
+            return Ok(cached.clone());
+        }
+        if let Some(cached) = self.light_records.borrow().get(path) {
+            return Ok(cached.clone());
+        }
+        self.parse_count.set(self.parse_count.get() + 1);
+        let record = load_light_record(self, descriptor, path)?;
+        self.light_records
+            .borrow_mut()
+            .insert(path.to_path_buf(), record.clone());
+        Ok(record)
+    }
+
+    /// Whether one listed path contributes a record to its descriptor's index.
+    ///
+    /// This mirrors [`load_record_with`]'s acceptance rules (readable, UTF-8,
+    /// valid front matter, declared decision type, still present after any
+    /// read-path relocation) without parsing the document body, the CQRS read
+    /// projection, or the field map.
+    fn record_counted(&self, descriptor: &TypeDescriptor, path: &Path) -> bool {
+        if descriptor.document_model == DocumentModel::SingleHtmlMockup {
+            return matches!(
+                load_ui_mockup(self.ctx, self.cfg, descriptor, path),
+                Ok(Some(_))
+            );
+        }
+        let Some(stem) = path.file_stem().and_then(|value| value.to_str()) else {
+            return false;
+        };
+        if !matches_stem(descriptor, stem) {
+            return false;
+        }
+        if descriptor.category == CategoryKind::Decision
+            && crate::decision::type_key_for_id(self.cfg, stem).is_none()
+        {
+            return false;
+        }
+        let Ok((safe, _source, _front_matter)) = self.read_snapshot_source(path) else {
+            return false;
+        };
+        safe.exists()
+    }
+
+    /// Fallback store read for a rare or stateful record, returning the parsed
+    /// front matter so the caller never parses it a second time.
+    fn slow_snapshot_source(
+        &self,
+        target: &Path,
+        conflicts: Option<&[MigrationConflict]>,
+    ) -> Result<
+        (
+            PathBuf,
+            String,
+            Option<crate::record::frontmatter::FrontMatter>,
+        ),
+        AppError,
+    > {
+        let (safe, normalized) = crate::record::store::read_normalized_source_with_conflicts(
+            self.ctx,
+            self.cfg,
+            self.registry,
+            target,
+            conflicts,
+        )?;
+        let front_matter = crate::record::frontmatter::parse(&normalized)?;
+        Ok((safe, normalized, front_matter))
+    }
+
+    /// Read one record for a display list without repeating the store reads.
+    ///
+    /// The shared store read performs a relocation probe and an adoption read
+    /// before reading the record again. A listed record that already carries
+    /// front matter, is not being relocated, and has no blocking conflict can
+    /// be read once and normalized directly. Every rare or stateful case (no
+    /// front matter, an archived record still in its active folder, a blocking
+    /// conflict, malformed front matter, an unreadable file) falls back to the
+    /// shared store so its writes, errors and warnings stay unchanged.
+    fn read_snapshot_source(
+        &self,
+        target: &Path,
+    ) -> Result<
+        (
+            PathBuf,
+            String,
+            Option<crate::record::frontmatter::FrontMatter>,
+        ),
+        AppError,
+    > {
+        let safe = Context::ensure_within(&self.ctx.project_dir, target)?;
+        let Ok(content) = fs::read_to_string(&safe) else {
+            return self.slow_snapshot_source(target, None);
+        };
+        let Ok(Some(front_matter)) = crate::record::frontmatter::parse(&content) else {
+            return self.slow_snapshot_source(target, None);
+        };
+        if let Some(descriptor) = crate::record::migrate::managed_descriptor(
+            self.cfg,
+            self.registry,
+            &self.ctx.project_dir,
+            &safe,
+        ) {
+            let status = crate::record::frontmatter::value_string(&front_matter.data, "status");
+            let Ok(active) = descriptor.resolve_directory(self.cfg, &self.ctx.project_dir) else {
+                return self.slow_snapshot_source(target, None);
+            };
+            if status.as_deref() == Some("archived") && safe.parent() == Some(active.as_path()) {
+                return self.slow_snapshot_source(target, None);
+            }
+            let conflicts = self.migration_conflicts(target);
+            if crate::record::migrate::blocking_conflict_for_path(
+                self.ctx,
+                &safe,
+                &descriptor,
+                &content,
+                &conflicts,
+            )
+            .is_some()
+            {
+                return self.slow_snapshot_source(target, Some(&conflicts));
+            }
+            let declared = descriptor.declared_statuses(self.cfg);
+            if let Some(status) = status
+                && !declared.is_empty()
+                && !declared.iter().any(|declared| declared == &status)
+            {
+                eprintln!(
+                    "warning: undeclared status '{}' at {}",
+                    status,
+                    safe.display()
+                );
+            }
+        }
+        Ok((
+            safe,
+            crate::record::line_endings::normalize(&content),
+            Some(front_matter),
+        ))
+    }
+
+    /// Count each enabled descriptor's listed records without parsing bodies.
+    ///
+    /// Inventory only needs one count per card. The file-name listing is built
+    /// once, and each listed file is read and validated the same way a full
+    /// load would reject it, but only its front matter is parsed.
+    pub fn scan_counts(&self) -> BTreeMap<String, usize> {
+        self.ensure_listing();
+        let listing = self.listing.borrow();
+        let Some(listing) = listing.as_ref() else {
+            return BTreeMap::new();
+        };
+        let mut counts = BTreeMap::new();
+        for (index, descriptor) in self.descriptors.iter().enumerate() {
+            if !descriptor.enabled {
+                continue;
+            }
+            let mut paths: BTreeSet<&PathBuf> = BTreeSet::new();
+            if let Some(by_key) = listing.by_descriptor.get(&index) {
+                for path in by_key.values().flatten() {
+                    paths.insert(path);
+                }
+            }
+            let count = paths
+                .into_iter()
+                .filter(|path| self.record_counted(descriptor, path))
+                .count();
+            counts.insert(descriptor.slug.clone(), count);
+        }
+        counts
     }
 
     /// Resolve one record ID against the snapshot, memoising the parsed record.
@@ -807,6 +994,153 @@ fn load_record_with(
     Ok(Some(record))
 }
 
+/// Load one record with its front matter only for a list, member or group row.
+///
+/// The source is still read, migrated and validated through the same store
+/// contract as a full load, so identity, titles, statuses and owning-group
+/// links are identical. The document body is kept as source (the display
+/// projection reads it lazily) but is not split into sections, and no typed
+/// handler projection or field map is built.
+fn load_light_record(
+    snapshot: &RecordSnapshot<'_>,
+    descriptor: &TypeDescriptor,
+    path: &Path,
+) -> Result<Option<Record>, AppError> {
+    if descriptor.document_model == DocumentModel::SingleHtmlMockup {
+        return load_ui_mockup(snapshot.ctx, snapshot.cfg, descriptor, path);
+    }
+    let Some(stem) = path.file_stem().and_then(|value| value.to_str()) else {
+        return Ok(None);
+    };
+    if !matches_stem(descriptor, stem) {
+        return Ok(None);
+    }
+    if descriptor.category == CategoryKind::Decision
+        && crate::decision::type_key_for_id(snapshot.cfg, stem).is_none()
+    {
+        return Ok(None);
+    }
+    let Ok((safe, normalized, front_matter)) = snapshot.read_snapshot_source(path) else {
+        return Ok(None);
+    };
+    // A record auto-relocated out of the active directory by the read path is
+    // no longer part of the display snapshot.
+    if !safe.exists() {
+        return Ok(None);
+    }
+    let id = canonical_id(descriptor, stem).unwrap_or_else(|| stem.to_string());
+    let is_group = is_group_id(descriptor, stem);
+    let rel_path = relative_path(&snapshot.ctx.project_dir, &safe);
+    let version = fs::metadata(&safe)
+        .map(|meta| crate::record::store::version_token(&meta))
+        .unwrap_or_default();
+    let heading = heading_line(&normalized);
+    let title = front_matter
+        .as_ref()
+        .and_then(|front_matter| {
+            crate::record::frontmatter::value_string(&front_matter.data, "title")
+        })
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| heading_title_from(heading.as_deref()));
+    let group = front_matter
+        .as_ref()
+        .and_then(|front_matter| {
+            crate::record::frontmatter::value_string(&front_matter.data, "group")
+        })
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let document = Document {
+        source: normalized,
+        front_matter: front_matter.clone(),
+        frontmatter: front_matter,
+        heading,
+        preamble: Vec::new(),
+        sections: Vec::new(),
+    };
+    let mut record = default_record(
+        id,
+        descriptor.clone(),
+        is_group,
+        document,
+        safe,
+        rel_path,
+        version,
+    );
+    record.title = non_empty_or(title, stem);
+    let view = record.doc.front_matter.as_ref().map(|front_matter| {
+        RecordView::from_front_matter(front_matter, &record.id, &record.version)
+    });
+    if let Some(view) = &view {
+        record.labels = view.list_value("labels");
+        record.refs = view.list_value("references");
+        record.status = view
+            .str_value("status")
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+    }
+    if record.descriptor.document_model == DocumentModel::GroupedMarkdown && !is_group {
+        if let Some(group_id) = group {
+            record.group_id = Some(group_id);
+        } else if let Some(group) = group_section_line(&record.doc.source) {
+            let mut parts = group.splitn(2, char::is_whitespace);
+            record.group_id = parts
+                .next()
+                .map(|part| part.trim().to_string())
+                .filter(|part| !part.is_empty());
+            record.group_title = parts
+                .next()
+                .map(|part| part.trim().to_string())
+                .filter(|part| !part.is_empty());
+        }
+    }
+    Ok(Some(record))
+}
+
+/// The title part of a heading line, using the same split as
+/// [`document::heading_id_title`].
+fn heading_title_from(heading: Option<&str>) -> String {
+    let rest = heading.unwrap_or("").trim_start_matches('#').trim();
+    let mut parts = rest.splitn(2, char::is_whitespace);
+    let _id = parts.next();
+    parts.next().unwrap_or("").trim().to_string()
+}
+
+/// The heading line of a document, using the same leading-blank and `# `
+/// rules as [`document::parse`].
+fn heading_line(content: &str) -> Option<String> {
+    let start = crate::record::frontmatter::find_block(content)
+        .map(|(_, _, body_start)| body_start)
+        .unwrap_or(0);
+    for line in content[start..].split('\n') {
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if line.trim().is_empty() {
+            continue;
+        }
+        return line.starts_with("# ").then(|| line.to_string());
+    }
+    None
+}
+
+/// The first non-empty line of a legacy `## Group` section, if present.
+fn group_section_line(content: &str) -> Option<String> {
+    let mut inside = false;
+    for line in content.split('\n') {
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if inside {
+            if line.starts_with("## ") {
+                break;
+            }
+            let value = line.trim();
+            if !value.is_empty() {
+                return Some(value.to_string());
+            }
+        } else if line.trim() == "## Group" {
+            inside = true;
+        }
+    }
+    None
+}
+
 fn resolve_title(
     ctx: &Context,
     cfg: &Config,
@@ -907,7 +1241,7 @@ pub fn build_index(
     descriptor: &TypeDescriptor,
     status: Option<&str>,
 ) -> Index {
-    build_index_impl(ctx, cfg, registry, descriptor, status, None)
+    build_index_impl(ctx, cfg, registry, descriptor, status, None, false)
 }
 
 /// Build one descriptor's index, sharing the request record snapshot's parse
@@ -920,7 +1254,31 @@ pub fn build_index_with_snapshot(
     status: Option<&str>,
     snapshot: &RecordSnapshot<'_>,
 ) -> Index {
-    build_index_impl(ctx, cfg, registry, descriptor, status, Some(snapshot))
+    build_index_impl(
+        ctx,
+        cfg,
+        registry,
+        descriptor,
+        status,
+        Some(snapshot),
+        false,
+    )
+}
+
+/// Build one grouped descriptor's index from front-matter-only records.
+///
+/// The group and member view and edit pages only need each member's identity,
+/// title, status and owning group for their row links. Parsing the document
+/// body, the read projection and the field map for hundreds of siblings is
+/// wasted work on that path; the page record itself is still read in full.
+pub fn build_grouped_index_with_snapshot(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    descriptor: &TypeDescriptor,
+    snapshot: &RecordSnapshot<'_>,
+) -> Index {
+    build_index_impl(ctx, cfg, registry, descriptor, None, Some(snapshot), true)
 }
 
 fn build_index_impl(
@@ -930,6 +1288,7 @@ fn build_index_impl(
     descriptor: &TypeDescriptor,
     status: Option<&str>,
     snapshot: Option<&RecordSnapshot<'_>>,
+    light: bool,
 ) -> Index {
     let mut index = Index::default();
     if !descriptor.enabled {
@@ -953,9 +1312,10 @@ fn build_index_impl(
         if !matches_stem(descriptor, stem) {
             continue;
         }
-        let loaded = match snapshot {
-            Some(snapshot) => snapshot.load_cached(descriptor, &path),
-            None => load_record(ctx, cfg, registry, descriptor, &path),
+        let loaded = match (snapshot, light) {
+            (Some(snapshot), true) => snapshot.load_light_cached(descriptor, &path),
+            (Some(snapshot), false) => snapshot.load_cached(descriptor, &path),
+            (None, _) => load_record(ctx, cfg, registry, descriptor, &path),
         };
         if let Ok(Some(record)) = loaded {
             // A record auto-relocated out of the active directory by the read
@@ -1982,5 +2342,144 @@ mod tests {
         assert!(output.contains("<h1>TASK-99 Landing</h1>"));
         assert!(output.contains("<!-- specs: UI-010 -->"));
         assert!(output.contains("<!-- refs: docs/x.md -->"));
+    }
+    #[test]
+    fn scan_counts_match_full_index_record_counts() {
+        let project = SnapshotProject::new("counts-match");
+        let business = project.root.join("docs/requirements/business");
+        fs::create_dir_all(&business).unwrap();
+        fs::write(
+            business.join("REQ-001.md"),
+            "---\nid: REQ-001\ntitle: \"Group one\"\ncreated_date: '2026-01-04T00:00:00Z'\nupdated_date: '2026-01-04T00:00:00Z'\nlabels: []\nreferences: []\nstatus: active\n---\n# REQ-001 Group one\n\n## Description\nGroup.\n",
+        )
+        .unwrap();
+        fs::write(
+            business.join("REQ-001.001.md"),
+            "---\nid: REQ-001.001\ntitle: \"Member one\"\ncreated_date: '2026-01-04T00:00:00Z'\nupdated_date: '2026-01-04T00:00:00Z'\nlabels: []\nreferences: []\nstatus: active\ngroup: REQ-001\n---\n# REQ-001.001 Member one\n\n## Description\nMember.\n",
+        )
+        .unwrap();
+        let mockups = project.root.join("docs/specifications/ui/mockups");
+        fs::create_dir_all(&mockups).unwrap();
+        fs::write(
+            mockups.join("MOCK-001.html"),
+            "<!doctype html>\n<html><head><title>MOCK-001 \u{2014} Mock one</title></head><body>\n<!-- mockup-id: MOCK-001 -->\n<!-- status: pending -->\n<!-- task: TASK-001 -->\n<!-- specs: UI-001 -->\n<!-- refs: docs/a.md -->\n<h1>MOCK-001 Mock one</h1>\n</body></html>\n",
+        )
+        .unwrap();
+
+        let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
+        let counts = snapshot.scan_counts();
+        let indexes = snapshot.scan_indexes();
+        assert_eq!(counts.len(), indexes.len());
+        for (slug, index) in &indexes {
+            assert_eq!(
+                counts.get(slug).copied().unwrap_or(0),
+                index.records.len(),
+                "count mismatch for {slug}"
+            );
+        }
+        assert_eq!(counts["req"], 2);
+        assert_eq!(counts["ui-mockup"], 1);
+    }
+
+    #[test]
+    fn grouped_light_index_matches_the_full_index_shape() {
+        let project = SnapshotProject::new("light-index");
+        let business = project.root.join("docs/requirements/business");
+        fs::create_dir_all(&business).unwrap();
+        fs::write(
+            business.join("REQ-001.md"),
+            "---\nid: REQ-001\ntitle: \"Group one\"\ncreated_date: '2026-01-04T00:00:00Z'\nupdated_date: '2026-01-04T00:00:00Z'\nlabels: [group]\nreferences: []\nstatus: active\n---\n# REQ-001 Group one\n\n## Description\nGroup.\n",
+        )
+        .unwrap();
+        for (id, title) in [("REQ-001.001", "Member one"), ("REQ-001.002", "Member two")] {
+            fs::write(
+                business.join(format!("{id}.md")),
+                format!(
+                    "---\nid: {id}\ntitle: \"{title}\"\ncreated_date: '2026-01-04T00:00:00Z'\nupdated_date: '2026-01-04T00:00:00Z'\nlabels: [member]\nreferences: []\nstatus: active\n---\n# {id} {title}\n\n## Group\nREQ-001 Group one\n\n## Description\nMember.\n"
+                ),
+            )
+            .unwrap();
+        }
+
+        let descriptor = project.registry.descriptor("req").expect("req").clone();
+        let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
+        let full = build_index_with_snapshot(
+            &project.ctx,
+            &project.cfg,
+            &project.registry,
+            &descriptor,
+            None,
+            &snapshot,
+        );
+        let light = build_grouped_index_with_snapshot(
+            &project.ctx,
+            &project.cfg,
+            &project.registry,
+            &descriptor,
+            &snapshot,
+        );
+        assert_eq!(light.records.len(), full.records.len());
+        for (light, full) in light.records.iter().zip(&full.records) {
+            assert_eq!(light.id, full.id);
+            assert_eq!(light.title, full.title);
+            assert_eq!(light.status, full.status);
+            assert_eq!(light.group_id, full.group_id);
+            assert_eq!(light.group_title, full.group_title);
+            assert_eq!(light.is_group, full.is_group);
+            assert_eq!(light.labels, full.labels);
+            assert_eq!(light.refs, full.refs);
+        }
+        assert_eq!(light.groups.len(), full.groups.len());
+        assert_eq!(light.requirements.len(), full.requirements.len());
+        assert_eq!(light.members, full.members);
+        assert_eq!(light.other, full.other);
+    }
+
+    #[test]
+    fn snapshot_source_matches_the_shared_store_read() {
+        let project = SnapshotProject::new("source-parity");
+        let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
+        let target = project.root.join("backlog/tasks/TASK-001.md");
+        let fast = snapshot.read_snapshot_source(&target).expect("fast read");
+        let slow = crate::record::store::read_normalized_source_with_conflicts(
+            &project.ctx,
+            &project.cfg,
+            &project.registry,
+            &target,
+            None,
+        )
+        .expect("store read");
+        assert_eq!(fast.0, slow.0);
+        assert_eq!(fast.1, slow.1);
+        assert!(fast.2.is_some());
+    }
+
+    #[test]
+    fn snapshot_source_falls_back_to_adoption_for_legacy_records() {
+        let project = SnapshotProject::new("source-adoption");
+        let target = project.root.join("backlog/tasks/TASK-009.md");
+        fs::write(
+            &target,
+            "# TASK-009 Legacy task\n\n## Description\nLegacy.\n",
+        )
+        .unwrap();
+        let snapshot = RecordSnapshot::new(&project.ctx, &project.cfg, &project.registry);
+        let (_, normalized, front_matter) = snapshot
+            .read_snapshot_source(&target)
+            .expect("adoption read");
+        assert!(normalized.starts_with("---\n"));
+        assert!(front_matter.is_some());
+        assert_eq!(
+            normalized,
+            crate::record::store::read_normalized_source_with_conflicts(
+                &project.ctx,
+                &project.cfg,
+                &project.registry,
+                &target,
+                None,
+            )
+            .expect("store read")
+            .1
+        );
     }
 }
