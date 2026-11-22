@@ -92,6 +92,15 @@ fn record(d: &Path, relative: &str) -> PathBuf {
     d.join("docs").join(relative)
 }
 
+fn sequence(values: &[&str]) -> yaml_serde::Value {
+    yaml_serde::Value::Sequence(
+        values
+            .iter()
+            .map(|value| yaml_serde::Value::String((*value).to_string()))
+            .collect(),
+    )
+}
+
 // F1: create-group runs the shared pipeline, including stdin.
 #[test]
 fn f1_create_group_resolves_stdin_before_allocation() {
@@ -619,5 +628,401 @@ fn f15_backlog_list_fields_are_sequences() {
             "{key}: {content}"
         );
     }
+    let _ = fs::remove_dir_all(&d);
+}
+
+// F7: the clap auto-generated help flag is reserved for every document command,
+// and a config that declares it is rejected with an exit-4 selector-path
+// diagnostic instead of panicking while clap builds the command tree.
+#[test]
+fn f7_reserved_help_option_rejects_every_document_command() {
+    use papyrus::config::{DocTypeEntry, FieldKind, FieldSpec, FieldVerb, RoleFields};
+    use papyrus::registry::DocumentModel;
+
+    let field = |key: &str| FieldSpec {
+        key: key.to_string(),
+        heading: Some(format!("## {}", key)),
+        frontmatter_key: None,
+        option: Some("help".to_string()),
+        label: None,
+        kind: FieldKind::Text,
+        required: false,
+        verbs: vec![FieldVerb::Create, FieldVerb::Edit],
+        help: None,
+    };
+
+    // Every seed descriptor: both validation layers reject the reserved option
+    // before a command is built, so no descriptor ever reaches clap.
+    let defaults = Config::default();
+    for (slug, seeded) in &defaults.document_types {
+        let mut entry: DocTypeEntry = seeded.clone();
+        let model = DocumentModel::for_slug(slug);
+        match model {
+            DocumentModel::SingleHtmlMockup => {
+                entry.fields = Some(vec![field("custom")]);
+            }
+            DocumentModel::GroupedMarkdown => {
+                entry.group = Some(RoleFields {
+                    fields: Some(vec![field("custom")]),
+                    reference_visibility: entry
+                        .group
+                        .as_ref()
+                        .and_then(|role| role.reference_visibility),
+                });
+            }
+            DocumentModel::SingleMarkdown => {
+                entry.fields = Some(vec![field("custom")]);
+            }
+        }
+        let mut cfg = defaults.clone();
+        cfg.document_types.insert(slug.clone(), entry);
+
+        let config_error = cfg
+            .validate(None)
+            .expect_err("config layer must reject help");
+        assert!(
+            config_error.contains(&format!("document_types.{}.", slug)),
+            "{slug}: {config_error}"
+        );
+        let registry_error =
+            ArtifactRegistry::build(&cfg).expect_err("registry layer must reject help");
+        assert!(
+            registry_error
+                .to_string()
+                .contains(&format!("document_types.{}.", slug)),
+            "{slug}: {registry_error}"
+        );
+        if model != DocumentModel::SingleHtmlMockup {
+            assert!(
+                config_error.contains("reserved option name: help"),
+                "{slug}: {config_error}"
+            );
+            assert!(
+                registry_error
+                    .to_string()
+                    .contains("reserved option name: help"),
+                "{slug}: {registry_error}"
+            );
+        }
+    }
+
+    // A real project run reports exit 4 for both a verb call and its --help
+    // flag, with no panic and no command build.
+    let d = tmpdir("f7-help");
+    init(&d);
+    write_config(
+        &d,
+        "project_name: Test\ndocument_types:\n  deploy:\n    prefix: DEP\n    directory: deployment/\n    fields:\n      - key: description\n        heading: '## Description'\n        option: help\n",
+    );
+    for args in [
+        vec!["deploy", "create", "T", "--description", "d"],
+        vec!["deploy", "create", "--help"],
+    ] {
+        let out = run(&d, &args);
+        assert_eq!(out.status.code(), Some(4), "{}", stderr(&out));
+        assert!(
+            stderr(&out).contains(
+                "document_types.deploy.fields[description].option: reserved option name: help"
+            ),
+            "{}",
+            stderr(&out)
+        );
+        assert!(!stderr(&out).contains("panicked"), "{}", stderr(&out));
+    }
+    let _ = fs::remove_dir_all(&d);
+}
+
+// F15: every backlog edit path writes labels, references, documentation,
+// dependencies and assignee as sequences, including a bracketed value.
+#[test]
+fn f15_backlog_edit_list_fields_are_sequences() {
+    let d = tmpdir("f15-backlog-edit");
+    init(&d);
+
+    // Task: create with no values is an empty sequence.
+    assert!(run(&d, &["task", "create", "Target"]).status.success());
+    let task = record(&d, "../backlog/tasks/TASK-001.md");
+    let content = fs::read_to_string(&task).unwrap();
+    assert_eq!(frontmatter_value(&content, "labels"), sequence(&[]));
+
+    let out = run(&d, &["task", "edit", "TASK-001", "--label", "[]"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    let content = fs::read_to_string(&task).unwrap();
+    assert_eq!(frontmatter_value(&content, "labels"), sequence(&["[]"]));
+    assert!(content.contains("labels:\n  - \"[]\"\n"), "{content}");
+
+    assert!(
+        run(&d, &["task", "edit", "TASK-001", "--label", "single"])
+            .status
+            .success()
+    );
+    assert!(
+        run(
+            &d,
+            &[
+                "task", "edit", "TASK-001", "--label", "multi-a", "--label", "multi-b",
+            ],
+        )
+        .status
+        .success()
+    );
+    let content = fs::read_to_string(&task).unwrap();
+    assert_eq!(
+        frontmatter_value(&content, "labels"),
+        sequence(&["[]", "single", "multi-a", "multi-b"])
+    );
+
+    assert!(
+        run(
+            &d,
+            &[
+                "task",
+                "edit",
+                "TASK-001",
+                "--reference",
+                "[]",
+                "--reference",
+                "REQ-001",
+                "--documentation",
+                "[]",
+                "--documentation",
+                "docs/a.md",
+                "--assignee",
+                "[]",
+                "--assignee",
+                "alice",
+            ],
+        )
+        .status
+        .success()
+    );
+    let content = fs::read_to_string(&task).unwrap();
+    for (key, expected) in [
+        ("references", vec!["[]", "REQ-001"]),
+        ("documentation", vec!["[]", "docs/a.md"]),
+        ("assignee", vec!["[]", "alice"]),
+    ] {
+        assert_eq!(
+            frontmatter_value(&content, key),
+            sequence(&expected),
+            "{key}: {content}"
+        );
+    }
+
+    assert!(run(&d, &["task", "create", "Dependency"]).status.success());
+    assert!(
+        run(
+            &d,
+            &["task", "edit", "TASK-001", "--depends-on", "TASK-002"]
+        )
+        .status
+        .success()
+    );
+    let content = fs::read_to_string(&task).unwrap();
+    assert_eq!(
+        frontmatter_value(&content, "dependencies"),
+        sequence(&["TASK-002"])
+    );
+
+    // Empty values: an edit without list flags leaves every sequence unchanged.
+    let before = fs::read_to_string(&task).unwrap();
+    assert!(
+        run(&d, &["task", "edit", "TASK-001", "--title", "Renamed"])
+            .status
+            .success()
+    );
+    let content = fs::read_to_string(&task).unwrap();
+    for key in [
+        "labels",
+        "references",
+        "documentation",
+        "assignee",
+        "dependencies",
+    ] {
+        assert_eq!(
+            frontmatter_value(&content, key),
+            frontmatter_value(&before, key),
+            "{key}: {content}"
+        );
+    }
+
+    // Milestone edit: bracketed, single, multiple and empty values.
+    assert!(run(&d, &["milestone", "create", "M1"]).status.success());
+    let milestone = record(&d, "../backlog/milestones/MS-001.md");
+    let content = fs::read_to_string(&milestone).unwrap();
+    assert_eq!(frontmatter_value(&content, "labels"), sequence(&[]));
+    assert!(
+        run(&d, &["milestone", "edit", "MS-001", "--label", "[]"])
+            .status
+            .success()
+    );
+    let content = fs::read_to_string(&milestone).unwrap();
+    assert_eq!(frontmatter_value(&content, "labels"), sequence(&["[]"]));
+    assert!(
+        run(
+            &d,
+            &[
+                "milestone",
+                "edit",
+                "MS-001",
+                "--label",
+                "single",
+                "--label",
+                "multi-a",
+                "--label",
+                "multi-b",
+                "--reference",
+                "[]",
+                "--reference",
+                "REQ-001",
+            ],
+        )
+        .status
+        .success()
+    );
+    let content = fs::read_to_string(&milestone).unwrap();
+    assert_eq!(
+        frontmatter_value(&content, "labels"),
+        sequence(&["[]", "single", "multi-a", "multi-b"])
+    );
+    assert_eq!(
+        frontmatter_value(&content, "references"),
+        sequence(&["[]", "REQ-001"])
+    );
+    let before = fs::read_to_string(&milestone).unwrap();
+    assert!(
+        run(&d, &["milestone", "edit", "MS-001", "--title", "Renamed"])
+            .status
+            .success()
+    );
+    let content = fs::read_to_string(&milestone).unwrap();
+    for key in ["labels", "references"] {
+        assert_eq!(
+            frontmatter_value(&content, key),
+            frontmatter_value(&before, key),
+            "{key}: {content}"
+        );
+    }
+
+    // Release edit: bracketed, single, multiple and empty values.
+    assert!(run(&d, &["release", "create", "R1"]).status.success());
+    let release = record(&d, "../backlog/releases/REL-001.md");
+    let content = fs::read_to_string(&release).unwrap();
+    assert_eq!(frontmatter_value(&content, "labels"), sequence(&[]));
+    assert!(
+        run(&d, &["release", "edit", "REL-001", "--label", "[]"])
+            .status
+            .success()
+    );
+    let content = fs::read_to_string(&release).unwrap();
+    assert_eq!(frontmatter_value(&content, "labels"), sequence(&["[]"]));
+    assert!(
+        run(
+            &d,
+            &[
+                "release",
+                "edit",
+                "REL-001",
+                "--label",
+                "single",
+                "--label",
+                "multi-a",
+                "--label",
+                "multi-b",
+                "--reference",
+                "[]",
+                "--reference",
+                "REQ-001",
+            ],
+        )
+        .status
+        .success()
+    );
+    let content = fs::read_to_string(&release).unwrap();
+    assert_eq!(
+        frontmatter_value(&content, "labels"),
+        sequence(&["[]", "single", "multi-a", "multi-b"])
+    );
+    assert_eq!(
+        frontmatter_value(&content, "references"),
+        sequence(&["[]", "REQ-001"])
+    );
+    let before = fs::read_to_string(&release).unwrap();
+    assert!(
+        run(&d, &["release", "edit", "REL-001", "--title", "Renamed"])
+            .status
+            .success()
+    );
+    let content = fs::read_to_string(&release).unwrap();
+    for key in ["labels", "references"] {
+        assert_eq!(
+            frontmatter_value(&content, key),
+            frontmatter_value(&before, key),
+            "{key}: {content}"
+        );
+    }
+
+    // Decision edit: bracketed, single, multiple and empty values.
+    assert!(run(&d, &["decision", "create", "D"]).status.success());
+    let decision = fs::read_dir(d.join("decisions"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| path.extension().is_some_and(|ext| ext == "md"))
+        .expect("decision record");
+    let content = fs::read_to_string(&decision).unwrap();
+    assert_eq!(frontmatter_value(&content, "labels"), sequence(&[]));
+    assert!(
+        run(&d, &["decision", "edit", "ADR-001", "--label", "[]"])
+            .status
+            .success()
+    );
+    let content = fs::read_to_string(&decision).unwrap();
+    assert_eq!(frontmatter_value(&content, "labels"), sequence(&["[]"]));
+    assert!(
+        run(
+            &d,
+            &[
+                "decision",
+                "edit",
+                "ADR-001",
+                "--label",
+                "single",
+                "--label",
+                "multi-a",
+                "--label",
+                "multi-b",
+                "--reference",
+                "[]",
+                "--reference",
+                "REQ-001",
+            ],
+        )
+        .status
+        .success()
+    );
+    let content = fs::read_to_string(&decision).unwrap();
+    assert_eq!(
+        frontmatter_value(&content, "labels"),
+        sequence(&["[]", "single", "multi-a", "multi-b"])
+    );
+    assert_eq!(
+        frontmatter_value(&content, "references"),
+        sequence(&["[]", "REQ-001"])
+    );
+    let before = fs::read_to_string(&decision).unwrap();
+    assert!(
+        run(&d, &["decision", "edit", "ADR-001", "--title", "Renamed"])
+            .status
+            .success()
+    );
+    let content = fs::read_to_string(&decision).unwrap();
+    for key in ["labels", "references"] {
+        assert_eq!(
+            frontmatter_value(&content, key),
+            frontmatter_value(&before, key),
+            "{key}: {content}"
+        );
+    }
+
     let _ = fs::remove_dir_all(&d);
 }

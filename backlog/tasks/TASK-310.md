@@ -2,7 +2,7 @@
 id: TASK-310
 title: "Correct MS-034 field-driven CLI engine findings F1-F15 per AUD-141"
 created_date: '2026-11-22T15:26:32Z'
-updated_date: '2026-11-22T15:54:52Z'
+updated_date: '2026-11-22T16:16:50Z'
 labels: []
 references:
   - AUD-141
@@ -130,3 +130,7 @@ Every finding F1-F15 has a recorded correction, a regression test, and a result;
 - **rust-dev**: F15 labels, references, documentation, dependencies and assignee are FrontMatterValue.Sequence in document, task, milestone, release, decision, edit, migrate and import paths; sentinel joins and splits are gone. Tests: tests.document_engine_corrections.rs f15_labels_and_references_are_sequences and f15_backlog_list_fields_are_sequences; frontmatter.rs sequences_keep_bracketed_and_empty_items.
 - **rust-dev**: Status left In-Progress.
 - **orchestrator**: Acceptance met: F1 to F15 corrected with regression tests (atomic ID reservation, YAML-safe scalars with pre-write parse, escaped mockup metadata, shared create-group pipeline, canonical group references, role-scoped edits, config surface validation, title sanitizer, shared resolver, de-vacuous tests, archived resolution, cleanup, seed-carried handler, legacy group accepted, sequence API for labels and references); 1287 tests pass.
+- **orchestrator**: Reopened for the AUD-142 residuals: B1 reserved clap help option still panics; B2 sequence API missing on task, milestone, release and decision edit paths.
+- **rust-dev**: B1 F7 fixed: the reserved option set now includes the clap auto-generated help flag, so config validation and registry validate_derived_surface reject it with the exit-4 document_types.<slug>.<path> selector diagnostic instead of panicking at command build. Tests: config.rs derived_option_names_are_validated_before_a_command_is_built; registry.rs build_rejects_invalid_derived_options_instead_of_panicking; tests.document_engine_corrections.rs f7_reserved_help_option_rejects_every_document_command, which builds every seed descriptor from an adversarial config declaring help as a derived option and asserts exit 4 for both the verb and its help flag with no panic.
+- **rust-dev**: B2 F15 fixed: task, milestone, release and decision edit now write labels, references, documentation, dependencies and assignee as FrontMatterValue.Sequence, and the bracketed sentinel interpretation is removed from frontmatter.rs format_kv. Tests: tests.document_engine_corrections.rs f15_backlog_edit_list_fields_are_sequences covers all four edit paths with bracketed, single, multiple and empty values. Full suite 1289 passed, 0 failed, 26 ignored; clippy -D warnings and fmt clean; no characterization or golden deltas.
+- **orchestrator**: B1 and B2 closed (AUD-143): help reserved in both validators with an adversarial regression, and all four backlog edit paths use FrontMatterValue Sequence with the sentinel removed; 1289 tests pass.

@@ -397,10 +397,6 @@ fn is_list_key(key: &str) -> bool {
 fn format_kv(key: &str, value: &str) -> String {
     let v = value.trim_end_matches('\n');
     if is_list_key(key) {
-        // Empty list marker passed through as-is.
-        if v.trim() == "[]" {
-            return format!("{}: []", key);
-        }
         let items: Vec<&str> = v
             .lines()
             .map(|l| l.trim())

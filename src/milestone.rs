@@ -708,9 +708,9 @@ pub fn edit(
                 fm_labels.push(lv);
             }
         }
-        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+        ops.push(crate::record::patch::PatchOp::SetFrontMatterValue(
             "labels".into(),
-            fm_labels.join("\n"),
+            crate::record::frontmatter::FrontMatterValue::Sequence(fm_labels),
         ));
     }
     if !references_raw.is_empty() {
@@ -722,9 +722,9 @@ pub fn edit(
                 fm_refs.push(rv);
             }
         }
-        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+        ops.push(crate::record::patch::PatchOp::SetFrontMatterValue(
             "references".into(),
-            fm_refs.join("\n"),
+            crate::record::frontmatter::FrontMatterValue::Sequence(fm_refs),
         ));
     }
 

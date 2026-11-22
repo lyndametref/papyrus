@@ -3171,6 +3171,18 @@ mod tests {
             "{error}"
         );
 
+        // The clap auto-generated help flag is reserved too (AUD-142 B1).
+        let mut help = entry("DEP", "deployment/");
+        help.fields = Some(vec![field("custom", Some("help"))]);
+        let error =
+            ArtifactRegistry::build(&config_with("deploy", help)).expect_err("reserved help");
+        assert!(
+            error.to_string().contains(
+                "document_types.deploy.fields[custom].option: reserved option name: help"
+            ),
+            "{error}"
+        );
+
         let mut duplicate = entry("REQ", "requirements/");
         duplicate.group = Some(RoleFields {
             fields: Some(vec![field("group_only", Some("same"))]),

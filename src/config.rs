@@ -88,8 +88,10 @@ pub const RESERVED_FIELD_KEYS: [&str; 8] = [
 /// Option names the fixed engine and global command surface already owns.
 ///
 /// A field-derived long option must never shadow one of these names, nor a
-/// reserved field key that is also an option (`title`, `status`).
-pub const RESERVED_OPTION_NAMES: [&str; 14] = [
+/// reserved field key that is also an option (`title`, `status`). `help` is the
+/// only long flag clap auto-generates on a derived verb command; `--version`
+/// exists only on the root command, so a derived `version` option is safe.
+pub const RESERVED_OPTION_NAMES: [&str; 15] = [
     "title",
     "id",
     "value",
@@ -104,6 +106,7 @@ pub const RESERVED_OPTION_NAMES: [&str; 14] = [
     "no-color",
     "no_color",
     "status",
+    "help",
 ];
 
 /// The entry keys that select behaviour and are not configuration keys
@@ -5067,6 +5070,26 @@ mod tests {
         assert!(
             error.contains(
                 "document_types.deploy.fields[custom].option: reserved option name: json"
+            ),
+            "{error}"
+        );
+
+        // The clap auto-generated help flag is reserved too (AUD-142 B1).
+        let mut help = field("custom", Some("## Custom"));
+        help.option = Some("help".to_string());
+        let error = validate_single(
+            "deploy",
+            DocTypeEntry {
+                prefix: "DEP".to_string(),
+                directory: "deployment/".to_string(),
+                fields: Some(vec![help]),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(
+            error.contains(
+                "document_types.deploy.fields[custom].option: reserved option name: help"
             ),
             "{error}"
         );
