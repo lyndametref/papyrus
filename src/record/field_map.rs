@@ -6,7 +6,7 @@
 //! document: the browser list and view renderers never read a typed content
 //! field.
 
-use crate::config::{FieldKind, FieldSpec, FieldVerb, Visibility};
+use crate::config::{FieldKind, FieldSpec, FieldVerb};
 use crate::record::document::{self, Document};
 use crate::record::view::RecordView;
 use crate::registry::{DocumentModel, TypeDescriptor};
@@ -89,8 +89,6 @@ pub struct DocumentFieldMap {
     pub fixed_metadata: Vec<(String, String)>,
     /// Undeclared stored front-matter keys, read-only.
     pub extra_metadata: Vec<(String, String)>,
-    /// Reference visibility resolved for this type and role.
-    pub reference_visibility: Visibility,
 }
 
 impl Default for DocumentFieldMap {
@@ -100,7 +98,6 @@ impl Default for DocumentFieldMap {
             fields: Vec::new(),
             fixed_metadata: Vec::new(),
             extra_metadata: Vec::new(),
-            reference_visibility: Visibility::Visible,
         }
     }
 }
@@ -113,7 +110,7 @@ impl DocumentFieldMap {
         doc: &Document,
         view: Option<&RecordView>,
     ) -> Self {
-        let (role, specs, visibility) = role_fields(descriptor, is_group);
+        let (role, specs) = role_fields(descriptor, is_group);
         let fields = specs
             .iter()
             .map(|spec| resolve_field(spec, doc, view))
@@ -123,20 +120,16 @@ impl DocumentFieldMap {
             fields,
             fixed_metadata: Vec::new(),
             extra_metadata: extra_metadata(specs, view),
-            reference_visibility: visibility,
         }
     }
 
     /// Build the map for a `SingleHtmlMockup` record from its metadata comment.
-    pub fn for_mockup(descriptor: &TypeDescriptor, fixed_metadata: Vec<(String, String)>) -> Self {
+    pub fn for_mockup(_descriptor: &TypeDescriptor, fixed_metadata: Vec<(String, String)>) -> Self {
         Self {
             role: FieldRole::Single,
             fields: Vec::new(),
             fixed_metadata,
             extra_metadata: Vec::new(),
-            reference_visibility: descriptor
-                .reference_visibility
-                .unwrap_or(Visibility::Visible),
         }
     }
 
@@ -161,18 +154,9 @@ impl DocumentFieldMap {
     }
 }
 
-fn role_fields(
-    descriptor: &TypeDescriptor,
-    is_group: bool,
-) -> (FieldRole, &[FieldSpec], Visibility) {
+fn role_fields(descriptor: &TypeDescriptor, is_group: bool) -> (FieldRole, &[FieldSpec]) {
     match descriptor.document_model {
-        DocumentModel::SingleHtmlMockup => (
-            FieldRole::Single,
-            &[],
-            descriptor
-                .reference_visibility
-                .unwrap_or(Visibility::Visible),
-        ),
+        DocumentModel::SingleHtmlMockup => (FieldRole::Single, &[]),
         DocumentModel::GroupedMarkdown => {
             let (role, fields) = if is_group {
                 (FieldRole::Group, descriptor.group.as_ref())
@@ -182,19 +166,9 @@ fn role_fields(
             let specs = fields
                 .and_then(|role| role.fields.as_deref())
                 .unwrap_or(&[]);
-            let visibility = fields
-                .and_then(|role| role.reference_visibility)
-                .or(descriptor.reference_visibility)
-                .unwrap_or(Visibility::Visible);
-            (role, specs, visibility)
+            (role, specs)
         }
-        DocumentModel::SingleMarkdown => (
-            FieldRole::Single,
-            descriptor.fields.as_slice(),
-            descriptor
-                .reference_visibility
-                .unwrap_or(Visibility::Visible),
-        ),
+        DocumentModel::SingleMarkdown => (FieldRole::Single, descriptor.fields.as_slice()),
     }
 }
 
@@ -207,19 +181,23 @@ fn resolve_field(spec: &FieldSpec, doc: &Document, view: Option<&RecordView>) ->
         .frontmatter_key
         .as_deref()
         .and_then(|key| view.and_then(|view| frontmatter_value(view, key, spec.kind)));
-    // A field with both storage locations displays the body value. An absent
-    // body falls back to the front-matter value so metadata-only records stay
-    // readable; the two locations are never concatenated or repaired.
-    let value = match spec.kind {
-        FieldKind::List => match body {
-            Some(text) => items_from_text(&text),
-            None => frontmatter.unwrap_or(FieldValue::Absent),
-        },
-        FieldKind::Text | FieldKind::Multiline => body
-            .map(FieldValue::Text)
-            .or(frontmatter)
-            .filter(|value| !matches!(value, FieldValue::Text(text) if text.trim().is_empty()))
-            .unwrap_or(FieldValue::Absent),
+    // TECH-040 section 3.5: a body-only field reads its section, a
+    // front-matter-only field reads its key, and a field with both reads the
+    // body without merging or falling back to the front matter.
+    let value = if spec.heading.is_some() {
+        match (body, spec.kind) {
+            (Some(text), FieldKind::List) => items_from_text(&text),
+            (Some(text), FieldKind::Text | FieldKind::Multiline) => FieldValue::Text(text),
+            (None, _) => FieldValue::Absent,
+        }
+    } else if spec.frontmatter_key.is_some() {
+        frontmatter.unwrap_or(FieldValue::Absent)
+    } else {
+        FieldValue::Absent
+    };
+    let value = match value {
+        FieldValue::Text(text) if text.trim().is_empty() => FieldValue::Absent,
+        other => other,
     };
     ResolvedField {
         key: spec.key.clone(),
@@ -344,7 +322,6 @@ mod tests {
         assert!(field.required);
         assert!(field.editable);
         assert!(!field.missing_required());
-        assert_eq!(map.reference_visibility, Visibility::Visible);
     }
 
     #[test]
@@ -366,7 +343,6 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["story", "description"]
         );
-        assert_eq!(group.reference_visibility, Visibility::Hidden);
 
         let member = DocumentFieldMap::build(
             &descriptor("req"),
@@ -376,7 +352,56 @@ mod tests {
         );
         assert_eq!(member.role, FieldRole::Member);
         assert_eq!(member.fields.len(), 2);
-        assert_eq!(member.reference_visibility, Visibility::Hidden);
+    }
+
+    #[test]
+    fn group_and_member_roles_use_their_own_field_sequences() {
+        let mut descriptor = descriptor("req");
+        let field = |key: &str| FieldSpec {
+            key: key.to_string(),
+            heading: Some(format!("## {key}")),
+            frontmatter_key: None,
+            option: None,
+            label: None,
+            kind: FieldKind::Text,
+            required: false,
+            verbs: vec![FieldVerb::Create, FieldVerb::Edit],
+            help: None,
+            values: crate::config::FieldValues::Free,
+        };
+        descriptor.group.as_mut().expect("group role").fields = Some(vec![field("group_only")]);
+        descriptor.member.as_mut().expect("member role").fields = Some(vec![field("member_only")]);
+        let source = "---\nid: REQ-001\ntitle: T\n---\n# REQ-001 T\n";
+        let group = DocumentFieldMap::build(
+            &descriptor,
+            true,
+            &doc(source),
+            Some(&view(source, "REQ-001")),
+        );
+        let member = DocumentFieldMap::build(
+            &descriptor,
+            false,
+            &doc(source),
+            Some(&view(source, "REQ-001.001")),
+        );
+        assert_eq!(group.role, FieldRole::Group);
+        assert_eq!(
+            group
+                .fields
+                .iter()
+                .map(|f| f.key.as_str())
+                .collect::<Vec<_>>(),
+            ["group_only"]
+        );
+        assert_eq!(member.role, FieldRole::Member);
+        assert_eq!(
+            member
+                .fields
+                .iter()
+                .map(|f| f.key.as_str())
+                .collect::<Vec<_>>(),
+            ["member_only"]
+        );
     }
 
     #[test]
@@ -441,7 +466,7 @@ A
     }
 
     #[test]
-    fn audit_type_reads_the_frontmatter_key_when_the_body_is_absent() {
+    fn audit_type_with_both_locations_does_not_fall_back_to_frontmatter() {
         let source =
             "---\nid: AUD-001\ntitle: T\ntype: quality\n---\n# AUD-001 T\n\n## Content\nContent.\n";
         let map = DocumentFieldMap::build(
@@ -451,7 +476,7 @@ A
             Some(&view(source, "AUD-001")),
         );
         let field = map.field("audit_type").expect("audit type");
-        assert_eq!(field.value, FieldValue::Text("quality".to_string()));
+        assert_eq!(field.value, FieldValue::Absent);
     }
 
     #[test]
@@ -489,6 +514,5 @@ A
         assert_eq!(map.role, FieldRole::Single);
         assert_eq!(map.fixed_metadata.len(), 5);
         assert_eq!(map.display_value("specs").as_deref(), Some("UI-001"));
-        assert_eq!(map.reference_visibility, Visibility::Visible);
     }
 }

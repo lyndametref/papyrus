@@ -778,7 +778,7 @@ fn d15_deferred_document_ops_builders_are_absent() {
         .join("\n");
     for builder in DEFERRED_DOCUMENT_OPS_BUILDERS {
         assert!(
-            !production.contains(&format!("pub fn {builder}(")),
+            !production.contains(&format!("fn {builder}(")),
             "document ops builder must be deleted after MS-035 TASK-269: {builder}"
         );
     }
@@ -790,7 +790,7 @@ fn d15_deferred_document_ops_builders_are_absent() {
         "decision_ops",
     ] {
         assert!(
-            production.contains(&format!("pub fn {builder}(")),
+            production.contains(&format!("fn {builder}(")),
             "backlog/decision builder must remain: {builder}"
         );
     }
@@ -910,6 +910,65 @@ fn d18_document_renderers_do_not_read_typed_record_fields() {
         "D-18 typed document field read in a document renderer:\n{}",
         violations.join("\n")
     );
+}
+
+// D-18 (description arm) ---------------------------------------------------
+#[test]
+fn d18_document_arms_do_not_read_record_description() {
+    let mut violations = Vec::new();
+    for path in src_files() {
+        let rel = relative(&path);
+        if !(rel.starts_with("src/browser/") || rel == "src/document.rs") {
+            continue;
+        }
+        let content = fs::read_to_string(&path).unwrap_or_default();
+        let lines: Vec<&str> = content.lines().collect();
+        for (index, line) in lines.iter().enumerate() {
+            if !production_line(&lines, index) || !field_read(line, "description") {
+                continue;
+            }
+            let mut context = "";
+            for previous in lines[..=index].iter().rev() {
+                let trimmed = previous.trim();
+                if trimmed.starts_with("fn ")
+                    || trimmed.starts_with("Some(TypedHandler::")
+                    || trimmed.starts_with("None => {")
+                {
+                    context = trimmed;
+                    break;
+                }
+            }
+            let backlog_or_decision = ["Task", "Milestone", "Release", "Decision"]
+                .iter()
+                .any(|name| context.contains(name));
+            if !backlog_or_decision {
+                violations.push(format!("{}:{}: {}", rel, index + 1, line.trim()));
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "D-18 document arm reads record.description:\n{}",
+        violations.join("\n")
+    );
+}
+
+/// Whether one source line belongs to production code, following the same
+/// `#[cfg(test)]` skip rule as the other scanners.
+fn production_line(lines: &[&str], index: usize) -> bool {
+    let mut cursor = 0usize;
+    while cursor < lines.len() {
+        if lines[cursor].trim_start().starts_with("#[cfg(test)]") {
+            let end = skip_cfg_test_item(lines, cursor + 1);
+            if index >= cursor && index < end {
+                return false;
+            }
+            cursor = end;
+        } else {
+            cursor += 1;
+        }
+    }
+    true
 }
 
 // D-05 (TASK-268) ----------------------------------------------------------

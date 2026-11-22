@@ -4497,6 +4497,12 @@ fn t40n_detail_renders_mockup_status_read_only() {
     let edit = get(&server, "/doc/MOCK-002/edit").text();
     assert!(!edit.contains("name=\"status\""));
     assert!(!edit.contains("name=\"status_change\""));
+    assert_eq!(
+        edit.matches(">References<").count(),
+        1,
+        "the mockup form renders one References control, not a duplicate empty read-only row"
+    );
+    assert!(!edit.contains("id=\"references\""));
 
     // Archived mockups stay unreachable.
     run_ok(&[
@@ -5348,6 +5354,26 @@ fn t25f_repeated_requirements_in_order() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+#[test]
+fn m2_document_edit_page_has_exactly_one_version_control() {
+    let dir = rule_fixture("m2-version");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    for path in ["/doc/RUL-001/edit", "/doc/RUL-002/edit"] {
+        let html = get(&server, path).text();
+        assert_eq!(
+            html.matches("name=\"version\"").count(),
+            1,
+            "{path} must render exactly one version control"
+        );
+        assert_eq!(html.matches("name=\"kind\"").count(), 0);
+        assert_eq!(html.matches("name=\"form\"").count(), 0);
+        assert_eq!(html.matches("name=\"path\"").count(), 0);
+        assert_eq!(html.matches("name=\"metadata\"").count(), 0);
+    }
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 // T-25g
 #[test]
 fn t25g_validation_422_no_write() {
@@ -5409,6 +5435,15 @@ fn t25g_validation_422_no_write() {
                 ("requirements", "a\u{0007}b"),
             ]),
             "Requirements cannot contain control characters.",
+            "requirements",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("requirements", "bad id"),
+            ]),
+            "Requirement references must be valid record IDs.",
             "requirements",
         ),
     ];
@@ -5955,6 +5990,16 @@ fn t26f_validation_422_no_write() {
             ]),
             "Content contains a line starting with ## .",
             "content",
+        ),
+        (
+            form_body(&[
+                ("version", &version),
+                ("title", "Ok"),
+                ("audit_type", "nonsense"),
+                ("content", "ok"),
+            ]),
+            "Audit type must be one of security, licence, or architecture.",
+            "audit_type",
         ),
     ];
     for (body, message, field) in cases {

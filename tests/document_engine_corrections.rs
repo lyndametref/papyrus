@@ -649,6 +649,7 @@ fn f7_reserved_help_option_rejects_every_document_command() {
         required: false,
         verbs: vec![FieldVerb::Create, FieldVerb::Edit],
         help: None,
+        values: papyrus::config::FieldValues::Free,
     };
 
     // Every seed descriptor: both validation layers reject the reserved option

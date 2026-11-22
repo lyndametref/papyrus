@@ -1837,7 +1837,7 @@ fn document_form_post(
         let change = match field.kind {
             FieldKind::List => {
                 let occurrences = form_fields(fields, &field.key);
-                match records::validate_list_items(&field.label, &occurrences.join("\n")) {
+                match records::validate_document_field_list(record, field, &occurrences) {
                     Ok(items) => {
                         if field.required && items.is_empty() {
                             errors
@@ -1859,12 +1859,7 @@ fn document_form_post(
                     edit::DocumentFieldChange::Keep
                 } else {
                     let raw = form_field(fields, &field.key).unwrap_or("");
-                    let validated = if field.kind == FieldKind::Text {
-                        records::validate_single_line(&field.label, raw)
-                    } else {
-                        records::validate_multiline(&field.label, raw)
-                    };
-                    match validated {
+                    match records::validate_document_field_value(record, field, raw) {
                         Ok(Some(value)) => edit::DocumentFieldChange::Set(value),
                         Ok(None) => {
                             if field.required {
@@ -2476,10 +2471,8 @@ fn record_json(
     group: Option<&Record>,
     related: Option<&Record>,
 ) -> serde_json::Value {
-    if record.descriptor.category == CategoryKind::Document {
-        return document_record_json(record, group);
-    }
-    // Backlog and decision records keep their bespoke JSON shapes.
+    // Document records use the field map; backlog and decision records keep
+    // their bespoke JSON shapes.
     match record.handler() {
         Some(TypedHandler::Task) => {
             let milestone_value = match (&record.milestone_id, related) {
@@ -2562,19 +2555,7 @@ fn record_json(
                 "metadata": record_metadata_json(record),
             })
         }
-        _ => serde_json::json!({
-            "id": record.id,
-            "kind": record.slug(),
-            "form": "document",
-            "title": record.title,
-            "description": record.description,
-            "status": record.status,
-            "labels": record.labels,
-            "references": record.refs,
-            "version": record.version,
-            "path": record.rel_path,
-            "metadata": record_metadata_json(record),
-        }),
+        None => document_record_json(record, group),
     }
 }
 
@@ -2684,11 +2665,7 @@ fn document_field_value(record: &Record, field: &ResolvedField) -> serde_json::V
 /// Every other seed document exposes only its declared fields. The decision is
 /// read from the descriptor and the field map, never from a slug or a handler.
 fn document_json_carries_general_metadata(record: &Record) -> bool {
-    if record.descriptor.is_config_defined_document() {
-        return true;
-    }
-    let fields = &record.field_map.fields;
-    fields.len() == 2 && fields[0].key == "description" && fields[1].key == "applicability"
+    record.descriptor.json_general_metadata
 }
 
 /// Fixed metadata projection for a `SingleHtmlMockup` record.
@@ -3452,15 +3429,7 @@ fn api_post_document(
                 if field.kind == FieldKind::List {
                     return Err(HttpError::new(400));
                 }
-                if let Some(message) = document_field_option_error(record, field, raw) {
-                    return Ok(json_error(422, &message));
-                }
-                let validated = if field.kind == FieldKind::Text {
-                    records::validate_single_line(&field.label, raw)
-                } else {
-                    records::validate_multiline(&field.label, raw)
-                };
-                match validated {
+                match records::validate_document_field_value(record, field, raw) {
                     Ok(Some(value)) => edit::DocumentFieldChange::Set(value),
                     Ok(None) => {
                         if field.required {
@@ -3482,7 +3451,7 @@ fn api_post_document(
                         None => return Err(HttpError::new(400)),
                     }
                 }
-                match document_list_values(record, field, &raw) {
+                match records::validate_document_field_list(record, field, &raw) {
                     Ok(values) => {
                         if field.required && values.is_empty() {
                             return Ok(json_error(422, &format!("{} is required.", field.label)));
@@ -3566,62 +3535,10 @@ fn document_submitted_list(
 /// `null` submission leaves it untouched (it was never clearable through the
 /// JSON API).
 fn document_field_keeps_null(record: &Record, field: &ResolvedField) -> bool {
-    document_field_spec(record, &field.key).and_then(|spec| spec.option.as_deref())
-        == Some("audit-type")
-}
-
-/// The descriptor field spec that backs a resolved field, across both roles.
-fn document_field_spec<'a>(record: &'a Record, key: &str) -> Option<&'a crate::config::FieldSpec> {
-    let descriptor = &record.descriptor;
-    descriptor
-        .fields
-        .iter()
-        .chain(
-            descriptor
-                .group
-                .iter()
-                .flat_map(|role| role.fields.iter().flatten()),
-        )
-        .chain(
-            descriptor
-                .member
-                .iter()
-                .flat_map(|role| role.fields.iter().flatten()),
-        )
-        .find(|spec| spec.key == key)
-}
-
-/// Descriptor-option validation for a scalar field (audit types).
-fn document_field_option_error(
-    record: &Record,
-    field: &ResolvedField,
-    raw: &str,
-) -> Option<String> {
-    if document_field_spec(record, &field.key).and_then(|spec| spec.option.as_deref())
-        != Some("audit-type")
-    {
-        return None;
-    }
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Some("Audit type is required.".to_string());
-    }
-    if !["security", "licence", "architecture"].contains(&trimmed) {
-        return Some("Audit type must be one of security, licence, or architecture.".to_string());
-    }
-    None
-}
-
-/// List validation for a declared list field, by its descriptor option.
-fn document_list_values(
-    record: &Record,
-    field: &ResolvedField,
-    raw: &[String],
-) -> Result<Vec<String>, String> {
-    match document_field_spec(record, &field.key).and_then(|spec| spec.option.as_deref()) {
-        Some("requirement") => records::validate_requirement_refs(raw),
-        _ => records::validate_list_items(&field.label, &raw.join("\n")),
-    }
+    matches!(
+        records::document_field_spec(record, &field.key).map(|spec| &spec.values),
+        Some(crate::config::FieldValues::Allowed(_))
+    )
 }
 
 /// The JSON submission path for a `SingleHtmlMockup` record.
