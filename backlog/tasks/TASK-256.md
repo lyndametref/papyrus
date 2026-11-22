@@ -2,7 +2,7 @@
 id: TASK-256
 title: "Implement GroupedMarkdown create-group, group semantics, and HTML mockup supersede"
 created_date: '2026-11-20T17:41:57Z'
-updated_date: '2026-11-22T12:55:53Z'
+updated_date: '2026-11-22T13:53:26Z'
 labels: []
 references:
   - ADR-036
@@ -16,7 +16,7 @@ references:
   - TC-120
   - TC-121
   - ADR-042
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-034
@@ -77,3 +77,5 @@ Grouped create-group, member create, membership immutability, no-cascade archive
 - **task-refiner**: Grounding (grouped): src requirement.rs create_group (line 144), create (179), edit (581), group validation (235-311), and list (360-430); ID helpers in src record identity.rs (is_group_id, next_number, format_id, next_seq_number, format_seq_id). The seed roles are REQ_FIELDS for both req and nfr (src config.rs 339-362). nfr currently ignores --story because Kind::supports_story is false, while REQ-05.002 lists story for both roles; the field-driven engine will start writing it, so cover it with a test and record it as a corrected behavior.
 - **task-refiner**: Grounding (mockup): src ui_mockup.rs handle (line 10), create, edit, archive, delete, and supersede; fixed metadata parsing and rendering; HTML file is Papyrus-owned. REQ-05.008 fixes create <TITLE> --task <TASK> --spec <SPEC-ID>, repeatable --spec and --ref, and metadata keys status, task, specs, refs, references, superseded_by.
 - **planner**: ADR-042 ruling 3 clears the mockup approval blocker: the CLI edit verb keeps --status and --superseded-by exactly as today; the browser edit form continues to offer only title, specs, and refs; the status verb remains absent. TASK-256 stays one task and is not split: a split would add a dependency edge to TASK-259 and change ordinals, which the split condition forbids.
+- **rust-dev**: TASK-256 evidence: branch task-TASK-256 (working tree, not committed per orchestrator instruction). GroupedMarkdown: create-group keeps a plain-ID group record with title plus group.fields sections; member create requires --group, resolves only an existing active same-type group, rejects missing, unknown, archived, and cross-type with one exit-4 validation and no write; dotted ID via next_seq_number and format_seq_id; the reserved front-matter group key is written by the engine (no legacy ## Group section, no field or edit option, immutable); archive and delete resolve plain group IDs via a store fallback and never cascade; list merges groups then members by ID and excludes archived. nfr now writes --story for both roles. SingleHtmlMockup: kept ui_mockup handle because the engine patch path cannot reproduce the HTML metadata block byte-for-byte; create requires title, --task, and at least one --spec and starts pending; the fixed metadata block carries status, task, specs, and refs comments plus references and superseded_by visible lines; archive and supersede remain the only writers of archived and edit --status archived is rejected; supersede leaves the successor unchanged; no status verb; fields: empty. Browser records now read the front-matter group key with a legacy ## Group fallback. Deltas: characterization req create, req create-json, nfr create, nfr create-json store the group as front matter (documented in EXPECTED-DELTAS item 7); help goldens verb-req-create, verb-nfr-create, err-missing-required change because --group is engine-validated (exit 4) instead of clap-required; search tests updated because a member no longer embeds the group title. Checks: env -u EDITOR -u VISUAL cargo test, cargo clippy --all-targets -- -D warnings, cargo fmt --check all clean. TCs: TC-120 and TC-121 covered in tests req_cli.rs and tests ui_mockup_cli.rs; engine integration coverage added in tests document_dispatch.rs.
+- **orchestrator**: Acceptance met: create-group plain IDs with engine-validated active same-type group, dotted members, engine-owned group link, no cascade, merged order; mockup fixed metadata with archive and supersede, CLI status path preserved, no status verb; group-link storage delta documented as EXPECTED-DELTAS item 7; suite and characterization green.

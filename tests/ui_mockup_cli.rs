@@ -570,6 +570,138 @@ fn help() {
     ] {
         assert!(s.contains(sub), "help missing {}", sub);
     }
+    assert!(
+        !s.contains("create-group"),
+        "the grouped-only verb must not appear for the HTML model"
+    );
+    assert!(
+        !s.contains("status"),
+        "the fixed-metadata model has no status verb"
+    );
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn fixed_metadata_block_carries_the_six_keys_and_starts_pending() {
+    let d = tmpdir("metadata");
+    init(&d);
+    let out = create(
+        &d,
+        "Metadata",
+        "TASK-007",
+        &["UI-001", "UI-002"],
+        &["REF-1"],
+    );
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(stdout(&out).trim(), "MOCK-001");
+
+    let content = fs::read_to_string(record(&d, "MOCK-001")).unwrap();
+    assert!(
+        !content.starts_with("---"),
+        "a mockup carries no YAML front matter"
+    );
+    for needle in [
+        "<!-- status: pending -->",
+        "<!-- task: TASK-007 -->",
+        "<!-- specs: UI-001 UI-002 -->",
+        "<!-- refs: REF-1 -->",
+        "<p>References: REF-1</p>",
+        "<p>Superseded by: </p>",
+    ] {
+        assert!(content.contains(needle), "missing {needle} in {content}");
+    }
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn approval_is_recorded_by_edit_status_and_archive_is_the_only_archived_writer() {
+    let d = tmpdir("approval");
+    init(&d);
+    create(&d, "Approve me", "T", &["S"], &[]);
+
+    let out = run(
+        &d,
+        &["ui-mockup", "edit", "MOCK-001", "--status", "approved"],
+    );
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(record(&d, "MOCK-001").exists());
+    let content = fs::read_to_string(record(&d, "MOCK-001")).unwrap();
+    assert!(content.contains("<!-- status: approved -->"), "{content}");
+
+    // `edit --status archived` is not a path to archived.
+    let before = fs::read_to_string(record(&d, "MOCK-001")).unwrap();
+    let out = run(
+        &d,
+        &["ui-mockup", "edit", "MOCK-001", "--status", "archived"],
+    );
+    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(fs::read_to_string(record(&d, "MOCK-001")).unwrap(), before);
+
+    // A backwards transition is rejected.
+    let out = run(
+        &d,
+        &["ui-mockup", "edit", "MOCK-001", "--status", "pending"],
+    );
+    assert_eq!(out.status.code(), Some(4));
+
+    // `archive` is the only path to archived for an approved mockup.
+    let out = run(&d, &["ui-mockup", "archive", "MOCK-001"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    let archived = fs::read_to_string(archived_record(&d, "MOCK-001")).unwrap();
+    assert!(archived.contains("<!-- status: archived -->"), "{archived}");
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn supersede_archives_the_old_mockup_and_leaves_the_successor_unchanged() {
+    let d = tmpdir("supersede-successor");
+    init(&d);
+    create(&d, "Old", "T", &["S"], &[]);
+    create(&d, "New", "T", &["S"], &[]);
+    let successor = fs::read_to_string(record(&d, "MOCK-002")).unwrap();
+
+    let out = run(&d, &["ui-mockup", "supersede", "MOCK-001", "MOCK-002"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+
+    let old = fs::read_to_string(archived_record(&d, "MOCK-001")).unwrap();
+    assert!(old.contains("<!-- status: archived -->"), "{old}");
+    assert!(old.contains("<p>Superseded by: MOCK-002</p>"), "{old}");
+    assert!(!record(&d, "MOCK-001").exists());
+    assert_eq!(
+        fs::read_to_string(record(&d, "MOCK-002")).unwrap(),
+        successor,
+        "the successor is unchanged by supersession"
+    );
+
+    // A superseded mockup refuses further status transitions.
+    let out = run(
+        &d,
+        &["ui-mockup", "edit", "MOCK-001", "--status", "pending"],
+    );
+    assert_eq!(out.status.code(), Some(4));
+    // Re-archiving an already archived superseded mockup is an idempotent
+    // no-op success; status transitions such as --status remain blocked.
+    let out = run(&d, &["ui-mockup", "archive", "MOCK-001"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn title_is_required_single_line_and_never_cleared_by_edit() {
+    let d = tmpdir("title");
+    init(&d);
+    let out = create(&d, "", "T", &["S"], &[]);
+    assert_eq!(out.status.code(), Some(4));
+    assert!(!record(&d, "MOCK-001").exists());
+    let out = create(&d, "a\nb", "T", &["S"], &[]);
+    assert_eq!(out.status.code(), Some(4));
+    assert!(!record(&d, "MOCK-001").exists());
+
+    create(&d, "Keep", "T", &["S"], &[]);
+    let before = fs::read_to_string(record(&d, "MOCK-001")).unwrap();
+    let out = run(&d, &["ui-mockup", "edit", "MOCK-001", "--title", ""]);
+    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(fs::read_to_string(record(&d, "MOCK-001")).unwrap(), before);
     let _ = fs::remove_dir_all(&d);
 }
 

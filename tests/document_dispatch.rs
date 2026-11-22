@@ -429,3 +429,255 @@ fn dual_storage_and_list_fields_write_sections_and_yaml_sequences() {
 
     cleanup(&dir);
 }
+
+fn run_verb(
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    ctx: &Context,
+    slug: &str,
+    verb: DocumentVerb,
+    pairs: &[(&str, &[&str])],
+) -> String {
+    document::run(ctx, cfg, registry, invocation(slug, verb, args(pairs)))
+        .unwrap()
+        .text
+}
+
+#[test]
+fn grouped_create_writes_plain_groups_and_dotted_members_with_the_group_key() {
+    let (dir, ctx, cfg, registry) = project_with("grouped-engine", None);
+
+    let group_id = run_verb(
+        &cfg,
+        &registry,
+        &ctx,
+        "req",
+        DocumentVerb::CreateGroup,
+        &[("title", &["Group one"]), ("story", &["Group story"])],
+    );
+    assert_eq!(group_id, "REQ-001");
+    let group_path = dir.join("docs/requirements/business/REQ-001.md");
+    let group = fs::read_to_string(&group_path).unwrap();
+    assert!(!group.contains("group:"), "{group}");
+    assert!(group.contains("## User Story\nGroup story"), "{group}");
+
+    let member_id = run_verb(
+        &cfg,
+        &registry,
+        &ctx,
+        "req",
+        DocumentVerb::Create,
+        &[
+            ("title", &["Member one"]),
+            ("group", &["REQ-001"]),
+            ("story", &["Member story"]),
+        ],
+    );
+    assert_eq!(member_id, "REQ-001.001");
+    let member_path = dir.join("docs/requirements/business/REQ-001.001.md");
+    let member = fs::read_to_string(&member_path).unwrap();
+    assert!(member.contains("group: REQ-001\n"), "{member}");
+    assert!(!member.contains("## Group"), "{member}");
+    assert!(member.contains("## User Story\nMember story"), "{member}");
+
+    cleanup(&dir);
+}
+
+#[test]
+fn membership_is_immutable_at_the_engine_layer() {
+    let (dir, ctx, cfg, registry) = project_with("grouped-immutable", None);
+    for title in ["Group one", "Group two"] {
+        run_verb(
+            &cfg,
+            &registry,
+            &ctx,
+            "req",
+            DocumentVerb::CreateGroup,
+            &[("title", &[title])],
+        );
+    }
+    run_verb(
+        &cfg,
+        &registry,
+        &ctx,
+        "req",
+        DocumentVerb::Create,
+        &[("title", &["Member"]), ("group", &["REQ-001"])],
+    );
+    let path = dir.join("docs/requirements/business/REQ-001.001.md");
+    let before = fs::read_to_string(&path).unwrap();
+    assert!(before.contains("group: REQ-001\n"), "{before}");
+
+    // The engine has no group field, so a stray `group` argument is ignored.
+    run_verb(
+        &cfg,
+        &registry,
+        &ctx,
+        "req",
+        DocumentVerb::Edit,
+        &[
+            ("id", &["REQ-001.001"]),
+            ("title", &["Renamed"]),
+            ("group", &["REQ-002"]),
+        ],
+    );
+    let after = fs::read_to_string(&path).unwrap();
+    assert!(after.contains("group: REQ-001\n"), "{after}");
+    assert!(after.contains("# REQ-001.001 Renamed"), "{after}");
+
+    cleanup(&dir);
+}
+
+#[test]
+fn group_archive_and_delete_do_not_cascade_to_members() {
+    let (dir, ctx, cfg, registry) = project_with("grouped-cascade", None);
+    run_verb(
+        &cfg,
+        &registry,
+        &ctx,
+        "req",
+        DocumentVerb::CreateGroup,
+        &[("title", &["Group"])],
+    );
+    for title in ["One", "Two"] {
+        run_verb(
+            &cfg,
+            &registry,
+            &ctx,
+            "req",
+            DocumentVerb::Create,
+            &[("title", &[title]), ("group", &["REQ-001"])],
+        );
+    }
+    let base = dir.join("docs/requirements/business");
+    let one = fs::read_to_string(base.join("REQ-001.001.md")).unwrap();
+    let two = fs::read_to_string(base.join("REQ-001.002.md")).unwrap();
+
+    run_verb(
+        &cfg,
+        &registry,
+        &ctx,
+        "req",
+        DocumentVerb::Archive,
+        &[("id", &["REQ-001"])],
+    );
+    assert!(!base.join("REQ-001.md").exists());
+    assert!(base.join("archived/REQ-001.md").exists());
+    assert_eq!(
+        fs::read_to_string(base.join("REQ-001.001.md")).unwrap(),
+        one
+    );
+    assert_eq!(
+        fs::read_to_string(base.join("REQ-001.002.md")).unwrap(),
+        two
+    );
+
+    run_verb(
+        &cfg,
+        &registry,
+        &ctx,
+        "req",
+        DocumentVerb::Delete,
+        &[("id", &["REQ-001"]), ("force", &[])],
+    );
+    assert!(!base.join("REQ-001.md").exists());
+    assert!(!base.join("archived/REQ-001.md").exists());
+    assert!(base.join("REQ-001.001.md").exists());
+    assert!(base.join("REQ-001.002.md").exists());
+
+    cleanup(&dir);
+}
+
+#[test]
+fn grouped_list_merges_groups_then_their_members() {
+    let (dir, ctx, cfg, registry) = project_with("grouped-list", None);
+    for (title, member) in [("Group one", "One"), ("Group two", "Two")] {
+        let group = run_verb(
+            &cfg,
+            &registry,
+            &ctx,
+            "req",
+            DocumentVerb::CreateGroup,
+            &[("title", &[title])],
+        );
+        run_verb(
+            &cfg,
+            &registry,
+            &ctx,
+            "req",
+            DocumentVerb::Create,
+            &[("title", &[member]), ("group", &[group.as_str()])],
+        );
+    }
+    let listed = run_verb(&cfg, &registry, &ctx, "req", DocumentVerb::List, &[]);
+    let ids: Vec<&str> = listed
+        .lines()
+        .map(|line| line.split(' ').next().unwrap_or_default())
+        .collect();
+    assert_eq!(
+        ids,
+        vec!["REQ-001", "REQ-001.001", "REQ-002", "REQ-002.001"]
+    );
+    cleanup(&dir);
+}
+
+#[test]
+fn nfr_engine_writes_the_seed_story_field() {
+    let (dir, ctx, cfg, registry) = project_with("nfr-story-engine", None);
+    run_verb(
+        &cfg,
+        &registry,
+        &ctx,
+        "nfr",
+        DocumentVerb::CreateGroup,
+        &[("title", &["NG"]), ("story", &["NFR group story"])],
+    );
+    run_verb(
+        &cfg,
+        &registry,
+        &ctx,
+        "nfr",
+        DocumentVerb::Create,
+        &[
+            ("title", &["NR"]),
+            ("group", &["NFR-001"]),
+            ("story", &["NFR member story"]),
+        ],
+    );
+    let group =
+        fs::read_to_string(dir.join("docs/requirements/non-functional/NFR-001.md")).unwrap();
+    assert!(group.contains("## User Story\nNFR group story"), "{group}");
+    let member =
+        fs::read_to_string(dir.join("docs/requirements/non-functional/NFR-001.001.md")).unwrap();
+    assert!(
+        member.contains("## User Story\nNFR member story"),
+        "{member}"
+    );
+    assert!(member.contains("group: NFR-001\n"), "{member}");
+    cleanup(&dir);
+}
+
+#[test]
+fn mockup_descriptor_is_fixed_metadata_only() {
+    let (_dir, _ctx, _cfg, registry) = project_with("mockup-descriptor", None);
+    let mockup = registry.descriptor("ui-mockup").unwrap();
+    assert!(mockup.fields.is_empty(), "the model declares no fields");
+    assert!(mockup.group.is_none() && mockup.member.is_none());
+    assert_eq!(
+        mockup.document_model,
+        papyrus::registry::DocumentModel::SingleHtmlMockup
+    );
+    assert_eq!(mockup.id_shape, papyrus::registry::IdShape::Plain);
+    assert!(mockup.has_verb(papyrus::registry::Verb::Supersede));
+    assert!(!mockup.has_verb(papyrus::registry::Verb::Status));
+    assert!(!mockup.has_verb(papyrus::registry::Verb::CreateGroup));
+
+    for slug in ["req", "nfr"] {
+        let grouped = registry.descriptor(slug).unwrap();
+        assert!(grouped.has_verb(papyrus::registry::Verb::CreateGroup));
+        assert!(grouped.has_verb(papyrus::registry::Verb::Status));
+        assert!(!grouped.has_verb(papyrus::registry::Verb::Supersede));
+        assert!(grouped.fields.is_empty());
+        assert!(grouped.group.is_some() && grouped.member.is_some());
+    }
+}

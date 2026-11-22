@@ -261,7 +261,9 @@ pub fn run(
             ))
         })?;
 
-    // The HTML mockup keeps its fixed, metadata-driven surface until TASK-256.
+    // The HTML mockup keeps its fixed, metadata-driven module surface: the
+    // engine patch path cannot reproduce the HTML metadata block byte-for-byte,
+    // so MS-035 owns the consolidation with the browser.
     if descriptor.document_model == DocumentModel::SingleHtmlMockup {
         return crate::ui_mockup::handle(ctx, &scope, registry, invocation.verb, &invocation.args);
     }
@@ -665,14 +667,8 @@ fn append_field_create_ops(
     args: &DocumentArgs,
     body_ops: &mut Vec<PatchOp>,
 ) -> Result<(), AppError> {
-    let skip_story = matches!(
-        descriptor.handler(),
-        Some(TypedHandler::Requirement(
-            crate::registry::RequirementKind::NonFunctional
-        ))
-    );
     for field in fields {
-        if !field_offered(field, DocumentVerb::Create) || (skip_story && field.key == "story") {
+        if !field_offered(field, DocumentVerb::Create) {
             continue;
         }
         let default = descriptor.field_defaults.get(&field.key);
@@ -820,16 +816,12 @@ fn create_document(
     let mut body_ops = Vec::new();
     append_field_create_ops(descriptor, &fields, &args, &mut body_ops)?;
     if let Some(group) = &group_link {
-        let group_op = PatchOp::SetSection(
-            "## Group".to_string(),
-            scalar_section_body(&format!("{} {}", group.id, group.title)),
-        );
-        let insert_at = body_ops
-            .iter()
-            .position(|op| matches!(op, PatchOp::SetSection(_, _)))
-            .map(|index| index + 1)
-            .unwrap_or(0);
-        body_ops.insert(insert_at, group_op);
+        // The group link is a reserved, engine-owned front-matter key. It is
+        // never a field, has no option, and cannot be changed after creation.
+        ops.push(PatchOp::SetFrontMatterValue(
+            "group".to_string(),
+            record::frontmatter::FrontMatterValue::String(group.id.clone()),
+        ));
     }
     ops.extend(body_ops);
 
@@ -861,17 +853,8 @@ fn create_group_document(
     let next = record::identity::next_number(&active, &archived, &scope.prefix);
     let id = record::identity::format_id(&scope.prefix, next as i64, scope.id_padding);
 
-    let skip_story = matches!(
-        descriptor.handler(),
-        Some(TypedHandler::Requirement(
-            crate::registry::RequirementKind::NonFunctional
-        ))
-    );
     let mut ops = vec![PatchOp::SetHeadingTitle(title.clone())];
     for field in &fields {
-        if skip_story && field.key == "story" {
-            continue;
-        }
         if !field_offered(field, DocumentVerb::CreateGroup) || args.get(&field.key).is_none() {
             continue;
         }
@@ -909,13 +892,13 @@ fn create_group_document(
 
 struct GroupLink {
     id: String,
-    title: String,
 }
 
 /// Resolve the owning group of a grouped member create.
 ///
-/// The full group-link rules are TASK-256; this keeps the existing create
-/// behavior, including cross-type and archived-group rejection.
+/// The group must already exist as an active record of the same document type.
+/// An unknown, archived, or cross-type group is one validation outcome and
+/// writes nothing (ADR-036 decision 9).
 fn resolve_group(
     ctx: &Context,
     cfg: &Config,
@@ -940,31 +923,29 @@ fn resolve_group(
                 "group type mismatch: {group_id}"
             )));
         }
-        return Err(AppError::NotFound(format!("group not found: {group_id}")));
+        return Err(AppError::Validation(format!("group not found: {group_id}")));
     }
 
     let active_path = scope.active.join(format!("{group_id}.md"));
     let archived_path = scope.archived.join(format!("{group_id}.md"));
     let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
     let archived_safe = Context::ensure_within(&ctx.project_dir, &archived_path)?;
-    let path = if active_safe.exists() {
-        active_safe
-    } else if archived_safe.exists() {
+    if active_safe.exists() {
+        // Read the group so a boundary escape or unreadable record is rejected
+        // before a member is allocated; the title itself is not stored again.
+        let (doc, _token) = record::store::read_document(ctx, cfg, registry, &active_safe)?;
+        let (_, title) = document::heading_id_title(&doc);
+        if title.is_empty() {
+            return Err(AppError::Runtime(format!("group has no title: {group_id}")));
+        }
+        return Ok(GroupLink { id: group_id });
+    }
+    if archived_safe.exists() {
         return Err(AppError::Validation(format!(
             "group is archived: {group_id}"
         )));
-    } else {
-        return Err(AppError::NotFound(format!("group not found: {group_id}")));
-    };
-    let (doc, _token) = record::store::read_document(ctx, cfg, registry, &path)?;
-    let (_, title) = document::heading_id_title(&doc);
-    if title.is_empty() {
-        return Err(AppError::Runtime(format!("group has no title: {group_id}")));
     }
-    Ok(GroupLink {
-        id: group_id,
-        title,
-    })
+    Err(AppError::Validation(format!("group not found: {group_id}")))
 }
 
 fn list_documents(

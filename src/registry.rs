@@ -256,8 +256,8 @@ impl TypeDescriptor {
     pub fn verb_specs(&self) -> Vec<VerbSpec> {
         if self.category == ArtifactCategory::Document {
             match self.document_model {
-                // The HTML mockup keeps its fixed, model-owned surface until
-                // TASK-256 derives it.
+                // The HTML mockup keeps its fixed, model-owned module surface;
+                // MS-035 owns its consolidation with the browser.
                 DocumentModel::SingleHtmlMockup => self
                     .schema
                     .as_ref()
@@ -2585,6 +2585,9 @@ fn build_document_verb_spec(descriptor: &TypeDescriptor, verb: Verb) -> VerbSpec
             args.extend(transitional_title_args(descriptor, Verb::Create));
             args.extend(document_field_args(descriptor, Verb::Create));
             if descriptor.document_model == DocumentModel::GroupedMarkdown {
+                // The engine validates the group so an unknown, archived, or
+                // cross-type group is one exit-4 validation outcome; clap must
+                // not turn a missing --group into an exit-2 usage error.
                 args.push(arg(
                     "group",
                     Some("group"),
@@ -2592,7 +2595,7 @@ fn build_document_verb_spec(descriptor: &TypeDescriptor, verb: Verb) -> VerbSpec
                     "GROUP",
                     "Owning group",
                     false,
-                    true,
+                    false,
                     ArgAction::Set,
                 ));
             }

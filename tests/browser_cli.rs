@@ -1199,7 +1199,8 @@ fn t16_immutable_fields_are_ignored() {
     assert_eq!(post_form(&server, "/doc/REQ-001.001", &body).status, 303);
     let saved = fs::read_to_string(&path).unwrap();
     assert!(saved.contains("# REQ-001.001 Renamed"));
-    assert!(saved.contains("## Group\nREQ-001 Payments Group"));
+    assert!(saved.contains("group: REQ-001\n"), "{saved}");
+    assert!(!saved.contains("REQ-999"));
     assert!(!path.with_file_name("REQ-999.999.md").exists());
     drop(server);
     let _ = fs::remove_dir_all(&dir);

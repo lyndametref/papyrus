@@ -630,6 +630,13 @@ fn edit(
         if !ALLOWED_STATUSES.contains(&st.as_str()) {
             return Err(AppError::Validation(format!("unknown status: {}", st)));
         }
+        // `archive` and `supersede` are the only writers of `archived`.
+        if st == "archived" {
+            return Err(AppError::Validation(format!(
+                "status 'archived' is not allowed here; use archive: {}",
+                id
+            )));
+        }
         if record.superseded_by.is_some() {
             return Err(AppError::Validation(format!(
                 "status transitions blocked for superseded mockup: {}",
