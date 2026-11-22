@@ -2,7 +2,7 @@
 id: TECH-027
 title: "Glossary Terms Milestone Packaging and Verification"
 created_date: '2026-11-16T17:46:46Z'
-updated_date: '2026-11-21T16:27:09Z'
+updated_date: '2026-11-22T15:46:06Z'
 labels: []
 references:
   - ADR-0001
@@ -41,6 +41,7 @@ references:
   - REQ-07.002
   - REQ-07.003
   - REQ-07.004
+  - ADR-043
 status: verified
 ---
 # TECH-027 Glossary Terms Milestone Packaging and Verification
@@ -51,17 +52,17 @@ Verify the glossary document type as one milestone verification of the descripto
 
 This is a verification step. No product behaviour is added and no product code is changed here. The glossary type is one seed descriptor: its command, option, help, field order, status model, and archive behaviour are derived from the descriptor and the document engine. No per-type document module exists to exercise.
 
-Every milestone verification builds a throwaway verification binary and a throwaway verification package. The package is installed in an isolated root, the installed binary is exercised, and both are deleted. Only the single release boundary produces a retained release package; no milestone verification publishes, promotes, or keeps one, and no intermediate release or release candidate exists.
+Every milestone verification that passes and carries the packaging gate publishes an RC package for its RC version; a milestone whose packaging the user has explicitly waived publishes no package and needs no component build script. The package is produced by the component build script into the git-ignored `builds/<version>/`, installed in an isolated root from a transient `./.tmp/` copy, and exercised. The RC package is a verification build that is not a release artifact: it is retained in `builds/<version>/`, never overwritten or deleted, and never staged, committed, tagged, pushed, or uploaded. Exactly one final release artifact is produced at the single release boundary, by the same script with the final version.
 
 ## Scope
 
 ### In scope
 
-- Build `target/release/papyrus` and one verification package from the current source with the pinned Rust 1.99.1 toolchain, using the packaging script unchanged to produce the package in the project root, then moving the package under `./.tmp/`.
+- Build `target/release/papyrus` and one RC package from the current source with the pinned Rust 1.99.1 toolchain, by running `scripts/build-package.sh --version <version> --out builds/<version>/.build/<component>` and assembling the component archive, `MANIFEST.txt`, and the `.sha256` file under the git-ignored `builds/<version>/`.
 - Run the verification gates of section 2 and the installed-binary checks of sections 3 and 4.
-- Verify package metadata: `Package: papyrus`, `Architecture: amd64`, `Version` equal to the Cargo package version, `Depends: libc6 (>= 2.34)`, GPL-3.0-or-later copyright, and the documented asset Version binding.
+- Verify package metadata: `Package: papyrus`, `Architecture: amd64`, `Version` equal to the version supplied to the build script, `Depends: libc6 (>= 2.34)`, GPL-3.0-or-later copyright, and the documented asset Version binding.
 - Verify the package inventory contains only the binary and the copyright file. No source file and no per-type document module is packaged, alongside no runtime asset file, template, configuration file, or man page.
-- Install and uninstall the verification package in an isolated Debian Forky environment without modifying the host, then delete the isolated roots and the package.
+- Install and uninstall the verification package in an isolated Debian Forky environment without modifying the host, then delete the isolated roots and the transient `./.tmp/` copy; the RC package stays in `builds/<version>/`.
 - Smoke-test the installed binary:
   - CLI baseline: `--help`, `--version`, `init`, and generated help for the glossary slug.
   - The glossary lifecycle: create with the fixed title and required definition, list, view, edit, status, archive, and delete, with generated IDs preserved and only supplied fields written.
@@ -70,12 +71,12 @@ Every milestone verification builds a throwaway verification binary and a throwa
 - Verify offline operation: search and browser work with no internet access, using only loopback and locally served assets.
 - Verify the browser configuration keys (`browser_host`, `browser_port`, `browser_open`) behave as documented in the installed binary.
 - Add one milestone-level integration test under `tests/` covering the glossary lifecycle, search, and browser together against the built binary, without duplicating the existing contract coverage in the per-feature suites.
-- Record the verification evidence in `docs/packaging.md`, including the gate results, the measurements, the findings, and the statement that the verification build was discarded.
+- Record the verification evidence in `docs/packaging.md`, including the gate results, the measurements, the findings, and the statement that the RC package is kept in `builds/<version>/`.
 
 ### Out of scope
 
 - New product behaviour, commands, options, record types, or UI changes.
-- A retained release package, a version bump, a tag, a release candidate, or release sign-off. The release boundary owns the one retained package and the release evidence (TECH-069 section 6).
+- A version bump, a tag, release sign-off, or a second final artifact. The release boundary owns the one final release artifact and the release evidence (TECH-069 section 6); the RC package for the milestone is published and kept in `builds/<version>/`.
 - New per-type document modules, per-type command blocks, per-type browser renderers, or per-type field tables. The seed table is the only built-in type definition.
 - Verification on a Debian release other than Forky, and support claims beyond Forky.
 - Real-GUI rendering checks in Firefox, Edge, or Safari; verification is HTTP, markup, asset, and console level.
@@ -90,19 +91,19 @@ Every milestone verification builds a throwaway verification binary and a throwa
 
 1. `cargo build --release` succeeds with the pinned Rust 1.99.1 toolchain (`rust-toolchain.toml`) and produces `target/release/papyrus`.
 2. `target/release/papyrus --help` lists `glossary`, `search`, `browser`, every other enabled document slug, and the built-in non-document commands. A stale binary that lacks a required command is never packaged; the release build runs first.
-3. `./scripts/build-deb.sh` runs after the release build and produces the verification package `papyrus_<version>_amd64.deb` in the project root, where `<version>` is read from `Cargo.toml`. The verification moves the package into a staging directory under `./.tmp/`; the staging directory and the package are deleted when the verification ends, including on failure.
-4. The verification package is never a release artifact. It is not published, tagged, version-bumped, promoted, or copied outside `./.tmp/`; no release candidate is produced from it. Only the release boundary builds the one retained package, once, with its size and SHA-256 recorded.
-5. `dpkg-deb -I papyrus_<version>_amd64.deb` reports `Package: papyrus`, `Version: <Cargo version>`, `Architecture: amd64`, `Depends: libc6 (>= 2.34)`, `Section: utils`, `Priority: optional`, a `Maintainer` value, a `Homepage` value, and a `Description` naming Papyrus as a project-level backlog and documentation manager.
+3. `./scripts/build-package.sh --version <version> --out builds/<version>/.build/<component>` runs after the release build and produces `papyrus_<version>_amd64.deb` in the output directory, where `<version>` is the version supplied to the script and is authoritative for the control `Version:` field and the artifact name. The script invokes `scripts/build-deb.sh` for the Debian assembly, which keeps the staged tree, `DEBIAN/control`, the copyright file, the `amd64` architecture, and the asset Version check; the version is injected without editing a tracked file. Packaging then assembles the component archive, `MANIFEST.txt`, and the `.sha256` file under the git-ignored `builds/<version>/`. A transient install-test copy of the package is staged under `./.tmp/` and is not the package.
+4. The RC package is never a release artifact. It is not staged, committed, tagged, pushed, or uploaded, and it is not overwritten: a version directory is immutable, and a superseded package is marked rather than deleted. Exactly one final release artifact is built at the single release boundary, by the same script with the final version, with its size and SHA-256 recorded.
+5. `dpkg-deb -I papyrus_<version>_amd64.deb` reports `Package: papyrus`, `Version: <supplied version>`, `Architecture: amd64`, `Depends: libc6 (>= 2.34)`, `Section: utils`, `Priority: optional`, a `Maintainer` value, a `Homepage` value, and a `Description` naming Papyrus as a project-level backlog and documentation manager.
 6. The packaged copyright file (`/usr/share/doc/papyrus/copyright`) is in Debian copyright format and declares `GPL-3.0-or-later`, matching the `license` field in `Cargo.toml`, with one notice section per bundled asset family.
 7. Package inventory: `dpkg-deb -c` lists exactly `/usr/bin/papyrus` (0755) and `/usr/share/doc/papyrus/copyright` (0644), plus their directories. It lists no `.rs` source file and no per-type document module, no `.css`, `.js`, or `.html` file, no template, no configuration file, and no man page.
-8. Asset Version packaging check: the packaging step enumerates the version directories of `src/browser/vendor/<package>/<version>/` and reads the `version` column of `src/browser/vendor/MANIFEST.md`. It fails the build when a package has no version directory, more than one, a manifest row with a different version, or a copyright section citing a different version. The asset Version is unrelated to the Papyrus package version and appears in the versioned asset URL.
+8. Asset Version packaging check: the Debian assembly step enumerates the version directories of `src/browser/vendor/<package>/<version>/` and reads the `version` column of `src/browser/vendor/MANIFEST.md`. It fails the build when a package has no version directory, more than one, a manifest row with a different version, or a copyright section citing a different version. The asset Version is unrelated to the Papyrus package version and appears in the versioned asset URL.
 9. Binary size gate: `stat -c %s target/release/papyrus` is at most 12,582,912 bytes (12 MiB). The measured size is recorded. The binary embeds the whole asset table and requires no runtime asset directory.
 10. `target/release/papyrus --version` and the installed binary's `--version` both print `papyrus <version>`, equal to the package Version.
-11. No verification package survives the step: the staging directory, the isolated dpkg root, the isolated admin directory, and the fixture projects are removed before the evidence is finalised.
+11. The transient `./.tmp/` copy, the isolated dpkg root, the isolated admin directory, and the fixture projects are removed before the evidence is finalised; the RC package stays in `builds/<version>/`.
 
 ### 2. Verification gates
 
-Every milestone verification runs the same gates on the pinned toolchain. A failing gate blocks the verification; the verification build is never retained or handed forward as a release.
+Every milestone verification runs the same gates on the pinned toolchain. A failing gate blocks the verification; the RC package is never promoted to a release artifact.
 
 | Gate | Pass condition |
 |---|---|
@@ -128,7 +129,7 @@ Every milestone verification runs the same gates on the pinned toolchain. A fail
 
 ### 3. Isolated install and uninstall
 
-1. Verification runs on Debian Forky amd64 using an isolated dpkg database and install root, so the host's package database and filesystem are never modified: `fakeroot dpkg --instdir=<root> --admindir=<adm> --force-depends -i <staging>/papyrus_<version>_amd64.deb`. A container, chroot, or virtual machine on Forky may be used instead with the same checks.
+1. Verification runs on Debian Forky amd64 using an isolated dpkg database and install root, so the host's package database and filesystem are never modified: `fakeroot dpkg --instdir=<root> --admindir=<adm> --force-depends -i <staging>/papyrus_<version>_amd64.deb`, where `<staging>` holds a transient copy of the package under `./.tmp/`. A container, chroot, or virtual machine on Forky may be used instead with the same checks.
 2. The isolated root and admin directories are created under `./.tmp/` and are removed after the run, including on failure.
 3. Before and after the run, the host reports papyrus as not installed (`dpkg -l papyrus` has no installed entry).
 4. `dpkg -i` in the isolated root succeeds with exit 0.
@@ -216,8 +217,8 @@ All commands run against the installed binary with `--dir <project>` pointing at
 
 1. `docs/packaging.md` states the supported release as Debian Forky only (amd64) and states that other releases are not claimed or verified.
 2. `docs/packaging.md` contains the build and package commands, the isolated install and uninstall procedure, and the smoke-test checklist covering sections 4.1 to 4.5, with the staging paths under `./.tmp/`.
-3. The verification record states the date with timezone, the environment (distribution, glibc, Rust and Cargo, clippy, `dpkg`, `fakeroot`, `unshare`), the isolation method, the gate table, the test counts, the verification package name and size, the binary size, the production LOC as an informational measurement against the internal target, and the NFR-007.001 to NFR-007.003 measurements with p50 and p95.
-4. The record states that the verification build was discarded, names any expected delta, and lists every finding with its expected and observed values and a disposition.
+3. The verification record states the date with timezone, the environment (distribution, glibc, Rust and Cargo, clippy, `dpkg`, `fakeroot`, `unshare`), the isolation method, the gate table, the test counts, the verification package name, size, and SHA-256, the binary size, the production LOC as an informational measurement against the internal target, and the NFR-007.001 to NFR-007.003 measurements with p50 and p95.
+4. The record states that the verification build was compiled from the committed verified tree and that the RC package is kept in the git-ignored `builds/<version>/`, names any expected delta, and lists every finding with its expected and observed values and a disposition.
 5. The record states release readiness for this increment only as an input to the release boundary; it does not claim a release.
 6. The runtime dependency-license audit is referenced as unchanged; no runtime dependency was added.
 7. A defect in product code, a stale documentation statement, or a verification limitation is recorded with a disposition and attributed to its owning surface; this step fixes none of them.
@@ -228,12 +229,12 @@ All commands run against the installed binary with `--dir <project>` pointing at
 |---|---|
 | Source tree | The descriptor-driven document engine, the seed table, the glossary seed type, and the bespoke backlog and decision surfaces. |
 | Toolchain | Rust 1.99.1 via `rust-toolchain.toml`; `dpkg-deb`, `dpkg`, `fakeroot`, `unshare` and `ip`; Debian Forky amd64. |
-| Packaging script | `scripts/build-deb.sh`, used unchanged for the milestone verification and the single release boundary; reads the version from `Cargo.toml`. |
-| Verification package | `papyrus_<version>_amd64.deb` produced in the project root and moved under `./.tmp/`; installed, exercised, and deleted. |
+| Packaging script | `scripts/build-package.sh --version <version> --out builds/<version>/.build/<component>`; it invokes `scripts/build-deb.sh` for the Debian assembly, the package layout, and the asset Version check. |
+| Verification package | `papyrus_<version>_amd64.deb` under `builds/<version>/.build/<component>`, assembled into the component archive under `builds/<version>/`; installed from a transient `./.tmp/` copy and kept in `builds/<version>/`. |
 | Isolated root and admin | `./.tmp/` directories for `dpkg --instdir` and `--admindir`; removed after the run. |
 | Fixture corpus and harness | The captured equivalence fixtures and the benchmark harness, reused unchanged. |
 | Integration test | The milestone-level glossary test under `tests/`. |
-| Verification record | The gate table, measurements, findings, and discarded-build statement in `docs/packaging.md`. |
+| Verification record | The gate table, measurements, findings, and package-retention statement in `docs/packaging.md`. |
 
 ## Validation and error behavior
 
@@ -256,7 +257,9 @@ All commands run against the installed binary with `--dir <project>` pointing at
 | The installed binary is missing from `PATH` after install, or remains after purge | Blocked. |
 | Any smoke check fails | Blocked; record the failing command and output. |
 | Outbound traffic succeeds inside the offline namespace | Offline claim not verified; investigate and record the limitation. |
-| A verification package or an intermediate release candidate is retained | Blocked; a milestone verification keeps no package. |
+| The RC package is overwritten, rebuilt in place, deleted, or staged, committed, tagged, pushed, or uploaded | Blocked; a package version is immutable and is not a release artifact. |
+| More than one final release artifact exists | Blocked; exactly one final release artifact is kept. |
+| The working tree is dirty after the packaging run | Blocked; the packaged tree must equal the committed tree, so the version is injected without editing a tracked file. |
 | A defect or a requirement, rule, or ADR conflict is found | Record with a disposition; do not edit requirements, rules, ADRs, or product code here. |
 
 ## Verification matrix
@@ -265,7 +268,7 @@ All commands run against the installed binary with `--dir <project>` pointing at
 |---|---|---|
 | T-01 | Release build succeeds and exposes glossary, search, and browser | `cargo build --release`; `--help` output |
 | T-02 | Every verification gate of section 2 passes | Gate table output recorded in the verification record |
-| T-03 | Verification package builds with the Cargo version and amd64 architecture | `./scripts/build-deb.sh`; move the package into `./.tmp/`; `dpkg-deb -I` |
+| T-03 | Verification package builds with the supplied version and amd64 architecture | `./scripts/build-package.sh --version <version> --out builds/<version>/.build/<component>`; `dpkg-deb -I` on the transient `./.tmp/` copy |
 | T-04 | Metadata, copyright, and the asset Version binding | `dpkg-deb -I`; copyright inspection; version-directory and manifest check |
 | T-05 | Inventory holds only the binary and the copyright file; no per-type document module | `dpkg-deb -c`; asset requests from the installed binary |
 | T-06 | Installs and uninstalls in an isolated Forky root, host untouched | Isolated `dpkg -i`, `-r`, `--purge`; host `dpkg -l` before and after |
@@ -278,15 +281,15 @@ All commands run against the installed binary with `--dir <project>` pointing at
 | T-13 | Offline operation | Isolated network namespace run with a failing outbound connection |
 | T-14 | Browser configuration keys and embedded assets | `config` commands; asset requests from an empty working directory |
 | T-15 | Milestone-level integration test without duplicate contract coverage | The new test file; `cargo test` |
-| T-16 | Verification record complete, including expected deltas, LOC, and discarded build | `docs/packaging.md` review |
+| T-16 | Verification record complete, including expected deltas, LOC, and the retained RC package | `docs/packaging.md` review |
 
 ## Assumptions
 
 - Assumption: the verification host is Debian Forky amd64 with the pinned toolchain, `fakeroot`, `dpkg-deb`, `ip`, and `unshare -rn` available.
 - Assumption: isolated install via `fakeroot dpkg --instdir/--admindir` is sufficient; a Forky container, chroot, or virtual machine may substitute with the same checks.
-- Assumption: scratch directories live under `./.tmp/` and are removed before the step ends.
-- Assumption: the package Version is the `Cargo.toml` version; a version bump belongs to the release boundary.
-- Assumption: `scripts/build-deb.sh` is the packaging script for both the milestone verification and the single release boundary, is used unchanged, and does not force a rebuild; no separate build-package script exists, and the release build runs first.
+- Assumption: scratch directories live under `./.tmp/` and are removed before the step ends; the package under `builds/<version>/` is not scratch and is not removed.
+- Assumption: the package Version is the version supplied to the component build script; a version bump belongs to the release boundary.
+- Assumption: packaging runs the component build script `scripts/build-package.sh --version <version> --out builds/<version>/.build/<component>`, which invokes `scripts/build-deb.sh` for the Debian assembly; the build script is the only packaging entry point, `--version` is authoritative for the control `Version:` field and the artifact name, and `build-deb.sh` keeps its `Cargo.toml`-derived default only when run directly. The release build runs first, so a package is never produced from a stale binary.
 - Assumption: the production LOC figure is reported at every verification as information and at the release boundary; it never blocks verification or release.
 - Assumption: the glossary type is seed data and its command, options, and field order are derived from the descriptor; a change to a field, heading, or label is a seed change rather than a per-type module change.
 - Assumption: the glossary title is the fixed positional title; the former term option is removed and is not accepted.
@@ -295,7 +298,7 @@ All commands run against the installed binary with `--dir <project>` pointing at
 - Assumption: no UI change ships, so the approved mockups remain the layout reference and no new mockup is produced.
 - Assumption: browser-version support is verified at markup, feature-subset, and HTTP level, not in a real GUI browser.
 - Assumption: the offline check is environment-dependent; the documented fallback applies when `unshare -rn` is unavailable.
-- Assumption: the retained release package and the release evidence are produced only at the single release boundary.
+- Assumption: exactly one final release artifact and the release evidence are produced at the single release boundary; RC packages are kept under `builds/<version>/` and are not release artifacts.
 
 ## Open questions
 

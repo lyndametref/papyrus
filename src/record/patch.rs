@@ -89,7 +89,12 @@ pub fn apply_patch(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> 
                 if !noop {
                     let (new_raw, _) = frontmatter::patch_raw(&f.raw, key, Some(value));
                     let new_value: yaml_serde::Value =
-                        yaml_serde::from_str(&new_raw).unwrap_or_else(|_| f.value.clone());
+                        yaml_serde::from_str(&new_raw).map_err(|error| {
+                            AppError::Validation(format!(
+                                "rendered front matter for '{}' is not valid YAML: {}",
+                                key, error
+                            ))
+                        })?;
                     f.raw = new_raw;
                     f.value = new_value;
                     changed = true;
@@ -138,8 +143,14 @@ pub fn apply_patch(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> 
                 };
                 if !noop {
                     let (new_raw, _) = frontmatter::patch_raw_value(&f.raw, key, value);
+                    frontmatter::verify_value(&new_raw, key, value)?;
                     let new_value: yaml_serde::Value =
-                        yaml_serde::from_str(&new_raw).unwrap_or_else(|_| f.value.clone());
+                        yaml_serde::from_str(&new_raw).map_err(|error| {
+                            AppError::Validation(format!(
+                                "rendered front matter for '{}' is not valid YAML: {}",
+                                key, error
+                            ))
+                        })?;
                     f.raw = new_raw;
                     f.value = new_value;
                     changed = true;
@@ -251,7 +262,9 @@ pub fn apply_patch(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> 
             body_source.to_string()
         };
         if let Some(f) = &fm {
-            return Ok(frontmatter::wrap(&f.raw, &new_body));
+            let rendered = frontmatter::wrap(&f.raw, &new_body);
+            frontmatter::parse(&rendered)?;
+            return Ok(rendered);
         }
         // No front matter but heading changed.
         return Ok(new_body);
@@ -264,7 +277,9 @@ pub fn apply_patch(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> 
         preamble,
         sections,
     };
-    Ok(document::render(&new_doc))
+    let rendered = document::render(&new_doc);
+    frontmatter::parse(&rendered)?;
+    Ok(rendered)
 }
 
 // aliases

@@ -278,9 +278,9 @@ fn exit_code_matrix() {
         .unwrap();
     assert_eq!(out.status.code(), Some(4));
 
-    // 4: sanitization reject
+    // 4: sanitization reject (control character)
     let out = bin()
-        .args(["--dir", p, "req", "create-group", "--title", "a/b"])
+        .args(["--dir", p, "req", "create-group", "--title", "a\tb"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(4));

@@ -180,9 +180,13 @@ fn ui_spec_create_requires_all_arguments() {
     );
     assert_eq!(out.status.code(), Some(4));
     assert!(
-        String::from_utf8_lossy(&out.stderr).contains("title"),
+        String::from_utf8_lossy(&out.stderr).contains("title is required"),
         "{}",
         String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        !d.join("docs/specifications/ui/UI-002.md").exists(),
+        "a missing title writes no record"
     );
     // Both title sources on one invocation are rejected.
     let out = run(
@@ -407,9 +411,18 @@ fn ui_spec_sanitization_rejects_bad_input_and_writes_nothing() {
     let d = tmpdir("san");
     init(&d);
 
-    for bad in ["   ", "a/b", "x\\y", "a\nb", "a\rb", "a\tb", "a\u{1}b"] {
+    // A title is display text: path separators are legal (F8).
+    for good in ["a/b", "x\\y"] {
+        let out = create(&d, good, "v", "d");
+        assert_eq!(out.status.code(), Some(0), "title good={:?}", good);
+    }
+    fs::remove_dir_all(d.join("docs/specifications/ui")).unwrap();
+    fs::create_dir_all(d.join("docs/specifications/ui")).unwrap();
+    for bad in ["   ", "a\nb", "a\rb", "a\tb", "a\u{1}b"] {
         let out = create(&d, bad, "v", "d");
         assert_eq!(out.status.code(), Some(4), "title bad={:?}", bad);
+    }
+    for bad in ["a/b", "x\\y", "a\nb", "a\rb", "a\tb", "a\u{1}b"] {
         let out = create(&d, "T", bad, "d");
         assert_eq!(out.status.code(), Some(4), "view bad={:?}", bad);
         let out = create(&d, "T", "v", bad);

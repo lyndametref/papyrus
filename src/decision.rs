@@ -428,16 +428,8 @@ pub fn create(
     let body = crate::record::document::render(&body_doc);
     let parsed = crate::record::document::parse(&body)?;
     let now = crate::record::frontmatter::utc_now();
-    let labels_value = if labels.is_empty() {
-        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
-    } else {
-        crate::record::frontmatter::FrontMatterValue::String(labels.join("\n"))
-    };
-    let refs_value = if references.is_empty() {
-        crate::record::frontmatter::FrontMatterValue::String("[]".to_string())
-    } else {
-        crate::record::frontmatter::FrontMatterValue::String(references.join("\n"))
-    };
+    let labels_value = crate::record::frontmatter::FrontMatterValue::Sequence(labels.clone());
+    let refs_value = crate::record::frontmatter::FrontMatterValue::Sequence(references.clone());
     let ops = vec![
         crate::record::patch::PatchOp::SetFrontMatterValue(
             "id".to_string(),
@@ -734,9 +726,9 @@ pub fn edit(
                 fm_labels.push(lv);
             }
         }
-        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+        ops.push(crate::record::patch::PatchOp::SetFrontMatterValue(
             "labels".into(),
-            fm_labels.join("\n"),
+            crate::record::frontmatter::FrontMatterValue::Sequence(fm_labels),
         ));
     }
     if !references_raw.is_empty() {
@@ -748,9 +740,9 @@ pub fn edit(
                 fm_refs.push(rv);
             }
         }
-        ops.push(crate::record::patch::PatchOp::SetFrontMatter(
+        ops.push(crate::record::patch::PatchOp::SetFrontMatterValue(
             "references".into(),
-            fm_refs.join("\n"),
+            crate::record::frontmatter::FrontMatterValue::Sequence(fm_refs),
         ));
     }
 

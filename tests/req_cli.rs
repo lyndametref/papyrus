@@ -114,22 +114,37 @@ fn req_errors() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(4));
-    assert!(String::from_utf8_lossy(&out.stderr).contains("group"));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("missing required argument: group"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(!d.join("docs/requirements/business/REQ-001.md").exists());
     // unknown group is one validation outcome (BR-009)
     let out = bin()
         .args(["--dir", p, "req", "create", "R", "--group", "REQ-999"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(4));
-    // conflicting title exit 4
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("group not found: REQ-999"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(!d.join("docs/requirements/business/REQ-999.001.md").exists());
+    // conflicting title exit 4, with a concrete cause
     let out = bin()
         .args([
             "--dir", p, "req", "create", "A", "--title", "B", "--group", "REQ-999",
         ])
         .output()
         .unwrap();
-    // group not found checked first? Actually title conflict resolved before group? Our create resolves title before loading config? It sanitizes title first, so conflict -> 4 even if group missing. Accept 4.
     assert_eq!(out.status.code(), Some(4));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("conflicting title sources"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     // unknown view exit 3
     let out = bin()
         .args(["--dir", p, "req", "view", "NOPE"])
@@ -214,7 +229,17 @@ fn sanitization_rejects_bad() {
     let d = tmpdir("san");
     init(&d);
     let p = d.to_str().unwrap();
-    for bad in ["a/b", "x\\y", "   ", "a\nb"] {
+    // A title is display text: path separators are legal (F8).
+    for good in ["a/b", "x\\y"] {
+        let out = bin()
+            .args(["--dir", p, "req", "create-group", "--title", good])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(0), "good={}", good);
+    }
+    fs::remove_dir_all(d.join("docs/requirements")).unwrap();
+    fs::create_dir_all(d.join("docs/requirements")).unwrap();
+    for bad in ["   ", "a\nb"] {
         let out = bin()
             .args(["--dir", p, "req", "create-group", "--title", bad])
             .output()
@@ -676,7 +701,7 @@ fn list_merges_groups_then_their_members_in_order() {
 }
 
 #[test]
-fn create_options_follow_the_group_and_member_field_sequences() {
+fn group_and_member_field_sequences_drive_help_order() {
     let d = tmpdir("group-options");
     init(&d);
     let create_group = run_help(&d, &["req", "create-group", "--help"]);

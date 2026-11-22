@@ -830,14 +830,9 @@ fn run_backlog(
                         FrontMatterValue::String(rec.normalized_status.clone()),
                     ));
                     // assignee list
-                    let assignee_val = if rec.assignee.is_empty() {
-                        "[]".to_string()
-                    } else {
-                        rec.assignee.join("\n")
-                    };
                     ops.push(PatchOp::SetFrontMatterValue(
                         "assignee".to_string(),
-                        FrontMatterValue::String(assignee_val),
+                        FrontMatterValue::Sequence(rec.assignee.clone()),
                     ));
                     // milestone
                     match &rec.milestone_target {
@@ -855,14 +850,9 @@ fn run_backlog(
                         }
                     }
                     // dependencies list
-                    let deps_val = if rec.dependencies_target.is_empty() {
-                        "[]".to_string()
-                    } else {
-                        rec.dependencies_target.join("\n")
-                    };
                     ops.push(PatchOp::SetFrontMatterValue(
                         "dependencies".to_string(),
-                        FrontMatterValue::String(deps_val),
+                        FrontMatterValue::Sequence(rec.dependencies_target.clone()),
                     ));
                     // ordinal
                     ops.push(PatchOp::SetFrontMatterValue(

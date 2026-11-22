@@ -434,12 +434,15 @@ fn milestone_technical_specifications_flow() {
     ] {
         assert_eq!(run_status(&dir, &args), 2, "args={args:?}");
     }
-    for args in [
-        vec!["tech-spec", "create", "", "--description", "d"],
-        vec!["tech-spec", "create", "a/b", "--description", "d"],
-    ] {
-        assert_eq!(run_status(&dir, &args), 4, "args={args:?}");
-    }
+    assert_eq!(
+        run_status(&dir, &["tech-spec", "create", "", "--description", "d"]),
+        4
+    );
+    // A title is display text: path separators are legal (F8).
+    assert_eq!(
+        run_status(&dir, &["tech-spec", "create", "a/b", "--description", "d"]),
+        0
+    );
 
     // Search over technical specifications.
     let out = search(&dir, &[PHRASE]);

@@ -2,7 +2,7 @@
 id: TASK-310
 title: "Correct MS-034 field-driven CLI engine findings F1-F15 per AUD-141"
 created_date: '2026-11-22T15:26:32Z'
-updated_date: '2026-11-22T15:26:32Z'
+updated_date: '2026-11-22T16:16:50Z'
 labels: []
 references:
   - AUD-141
@@ -28,7 +28,7 @@ references:
   - TC-121
   - TC-125
   - TC-126
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-034
@@ -111,3 +111,26 @@ Every finding F1-F15 has a recorded correction, a regression test, and a result;
 - [ ] F15: labels, references, documentation, dependencies and assignee are written as FrontMatterValue::Sequence (create and edit), the bracket-sentinel joined string and line splitting are gone, and round-trip tests cover empty, single, multiple and bracketed values.
 - [ ] Correction-only scope: no new features, no requirement, ADR, technical-specification or approved test-case edits, no new crates, and no dependency, ordinal, milestone or assignee changes outside this task. The full suite is green and cargo clippy --all-targets -- -D warnings and cargo fmt --check are clean.
 - [ ] Evidence: the task comment maps every finding F1-F15 to its correction, files, regression test and result, and records the F14 decision; any characterization, golden or fixture change is updated through the documented capture path and recorded as a delta.
+## Comments
+- **rust-dev**: TASK-310 implemented all 15 AUD-141 findings. Branch task.TASK-310, commit ad82aa4. Tests 1287 passed, clippy -D warnings and fmt clean; no characterization or golden deltas.
+- **rust-dev**: F1 create-group now runs resolve_field_stdin, ensure_required_fields with descriptor.field_defaults, and the shared create-op builder, so stdin '-', required group fields, frontmatter_key and defaults match create. Tests: document.rs create_group_enforces_required_fields_and_applies_shared_field_ops; tests.document_engine_corrections.rs f1_create_group_resolves_stdin_before_allocation.
+- **rust-dev**: F2 identity.reserve_number and reserve_seq_number reserve the final path with create_new and retry on AlreadyExists; document, grouped member and HTML mockup creates use them. Tests: identity.rs reservation_never_replaces_an_existing_target; tests.document_engine_corrections.rs f2_concurrent_creates_produce_one_file_per_create.
+- **rust-dev**: F3 format_scalar quotes indicator-leading, flow-punctuation, control and non-string-parsing scalars; scalar keys are never coerced to sequences; patch re-parses and verifies every typed value before writing. Tests: frontmatter.rs yaml_indicator_scalars_round_trip_as_strings, scalar_never_coerces_to_a_sequence, sequences_keep_bracketed_and_empty_items, verify_value_rejects_a_non_round_tripping_render; tests.document_engine_corrections.rs f3_yaml_unsafe_titles_round_trip.
+- **rust-dev**: F4 every mockup field is HTML or comment escaped, metadata is parsed only from the fixed comment block, and the raw encoded title is preserved on unrelated edits. Tests: ui_mockup.rs injection_titles_do_not_change_metadata, visible_paragraphs_are_not_metadata_sources, unrelated_render_preserves_the_raw_encoded_title; tests.document_engine_corrections.rs f4_mockup_title_cannot_inject_metadata, f4_encoded_title_survives_an_unrelated_edit.
+- **rust-dev**: F5 resolve_group uses resolve_in_dirs, accepts every view and list reference form including dotted members, and writes the canonical group ID. Test: tests.document_engine_corrections.rs f5_group_references_are_canonicalized.
+- **rust-dev**: F6 edit resolves the canonical role first, uses only that role's fields, and rejects other-role options as one exit-4 validation outcome with no write. Test: tests.document_engine_corrections.rs f6_edit_is_role_scoped_and_help_matches_the_role_fields.
+- **rust-dev**: F7 config validation and registry build reject reserved option names, cross-role duplicate options, HTML mockup fields, and empty derived options with selector paths; every seed descriptor builds its command and help without panic. Tests: config.rs derived_option_names_are_validated_before_a_command_is_built; registry.rs build_rejects_invalid_derived_options_instead_of_panicking; tests.document_engine_corrections.rs f7_every_seed_descriptor_builds_its_command_and_help.
+- **rust-dev**: F8 sanitize_title_text allows slash and backslash but rejects empty, whitespace, multiline, NUL and control titles; fields keep the stricter name rules. Tests: sanitize.rs title_tests and the updated document CLI sanitization tests.
+- **rust-dev**: F9 registry.role_fields and registry.fields_for_verb are the only resolver, used by help, create-group, create and edit. Test: tests.document_engine_corrections.rs f6_edit_is_role_scoped_and_help_matches_the_role_fields; registry descriptor tests stay green.
+- **rust-dev**: F10 handler assertions name the concrete TypedHandler per seed slug, req errors assert one concrete cause and no write, and missing-title asserts the exact message and no record. Tests: registry.rs default_document_set_has_the_eleven_typed_slugs; tests.req_cli.rs req_errors; tests.ui_spec_cli.rs ui_spec_create_requires_all_arguments.
+- **rust-dev**: F11 all document types resolve the archived folder, so the config-defined archived-edit guard returns exit 4 and writes nothing. Test: tests.document_engine_corrections.rs f11_archived_config_defined_edit_is_rejected_without_a_write.
+- **rust-dev**: F12 removed the duplicate list reader, list_ops_value, the second slug handler table, unused CreateOptions and GroupRequirement, stale transitional comments, and stale too_many_arguments allows; the Supersede arm is documented as unreachable for Markdown because the HTML mockup is routed earlier. Clippy and fmt are clean.
+- **rust-dev**: F13 SeedDocumentType now carries handler, TypeDescriptor.handler reads the seed, and the second slug table is gone; the concrete handler map test covers every seed slug.
+- **rust-dev**: F14 decision: legacy ## Group sections are accepted, not rejected. Legacy groups and members stay resolvable and new members can be created under a legacy group; new members still write the reserved front-matter group key. Fixture tests.fixtures.legacy-group; test tests.document_engine_corrections.rs f14_legacy_group_section_accepts_new_members.
+- **rust-dev**: F15 labels, references, documentation, dependencies and assignee are FrontMatterValue.Sequence in document, task, milestone, release, decision, edit, migrate and import paths; sentinel joins and splits are gone. Tests: tests.document_engine_corrections.rs f15_labels_and_references_are_sequences and f15_backlog_list_fields_are_sequences; frontmatter.rs sequences_keep_bracketed_and_empty_items.
+- **rust-dev**: Status left In-Progress.
+- **orchestrator**: Acceptance met: F1 to F15 corrected with regression tests (atomic ID reservation, YAML-safe scalars with pre-write parse, escaped mockup metadata, shared create-group pipeline, canonical group references, role-scoped edits, config surface validation, title sanitizer, shared resolver, de-vacuous tests, archived resolution, cleanup, seed-carried handler, legacy group accepted, sequence API for labels and references); 1287 tests pass.
+- **orchestrator**: Reopened for the AUD-142 residuals: B1 reserved clap help option still panics; B2 sequence API missing on task, milestone, release and decision edit paths.
+- **rust-dev**: B1 F7 fixed: the reserved option set now includes the clap auto-generated help flag, so config validation and registry validate_derived_surface reject it with the exit-4 document_types.<slug>.<path> selector diagnostic instead of panicking at command build. Tests: config.rs derived_option_names_are_validated_before_a_command_is_built; registry.rs build_rejects_invalid_derived_options_instead_of_panicking; tests.document_engine_corrections.rs f7_reserved_help_option_rejects_every_document_command, which builds every seed descriptor from an adversarial config declaring help as a derived option and asserts exit 4 for both the verb and its help flag with no panic.
+- **rust-dev**: B2 F15 fixed: task, milestone, release and decision edit now write labels, references, documentation, dependencies and assignee as FrontMatterValue.Sequence, and the bracketed sentinel interpretation is removed from frontmatter.rs format_kv. Tests: tests.document_engine_corrections.rs f15_backlog_edit_list_fields_are_sequences covers all four edit paths with bracketed, single, multiple and empty values. Full suite 1289 passed, 0 failed, 26 ignored; clippy -D warnings and fmt clean; no characterization or golden deltas.
+- **orchestrator**: B1 and B2 closed (AUD-143): help reserved in both validators with an adversarial regression, and all four backlog edit paths use FrontMatterValue Sequence with the sentinel removed; 1289 tests pass.

@@ -318,8 +318,8 @@ pub fn migrate_content(
         PatchOp::SetFrontMatter("title".into(), title),
         PatchOp::SetFrontMatter("created_date".into(), created),
         PatchOp::SetFrontMatter("updated_date".into(), updated),
-        PatchOp::SetFrontMatter("labels".into(), "[]".into()),
-        PatchOp::SetFrontMatter("references".into(), "[]".into()),
+        PatchOp::SetFrontMatterValue("labels".into(), FrontMatterValue::Sequence(Vec::new())),
+        PatchOp::SetFrontMatterValue("references".into(), FrontMatterValue::Sequence(Vec::new())),
     ];
 
     let doc = document::parse(content)?;
@@ -445,14 +445,6 @@ fn list_value(section: SectionList) -> Vec<String> {
     }
 }
 
-fn list_ops_value(items: &[String]) -> String {
-    if items.is_empty() {
-        "[]".to_string()
-    } else {
-        items.join("\n")
-    }
-}
-
 fn null_or_string(value: Option<String>) -> FrontMatterValue {
     match value.filter(|v| !v.trim().is_empty()) {
         Some(v) => FrontMatterValue::String(v),
@@ -493,9 +485,9 @@ fn adoption_ops(
         PatchOp::SetFrontMatterValue("updated_date".into(), FrontMatterValue::String(updated)),
         PatchOp::SetFrontMatterValue(
             "labels".into(),
-            FrontMatterValue::String(list_ops_value(&list_value(section_list(doc, "Labels")))),
+            FrontMatterValue::Sequence(list_value(section_list(doc, "Labels"))),
         ),
-        PatchOp::SetFrontMatterValue("references".into(), FrontMatterValue::String("[]".into())),
+        PatchOp::SetFrontMatterValue("references".into(), FrontMatterValue::Sequence(Vec::new())),
     ];
 
     if desc.name == "task" {
@@ -519,12 +511,12 @@ fn adoption_ops(
         ));
         ops.push(PatchOp::SetFrontMatterValue(
             "assignee".into(),
-            FrontMatterValue::String(list_ops_value(&assignee)),
+            FrontMatterValue::Sequence(assignee.clone()),
         ));
         ops.push(PatchOp::SetFrontMatterValue("milestone".into(), milestone));
         ops.push(PatchOp::SetFrontMatterValue(
             "dependencies".into(),
-            FrontMatterValue::String(list_ops_value(&dependencies)),
+            FrontMatterValue::Sequence(dependencies.clone()),
         ));
         ops.push(PatchOp::SetFrontMatterValue(
             "ordinal".into(),
@@ -532,7 +524,7 @@ fn adoption_ops(
         ));
         ops.push(PatchOp::SetFrontMatterValue(
             "documentation".into(),
-            FrontMatterValue::String("[]".into()),
+            FrontMatterValue::Sequence(Vec::new()),
         ));
         ops.push(PatchOp::SetFrontMatterValue(
             "type".into(),
@@ -605,7 +597,7 @@ pub(crate) fn retire_legacy_body_ops(
                     );
                     continue;
                 }
-                SectionList::Valid(items) => Some(FrontMatterValue::String(list_ops_value(&items))),
+                SectionList::Valid(items) => Some(FrontMatterValue::Sequence(items)),
             }
         } else {
             match section_scalar(doc, section_name) {
