@@ -2,7 +2,7 @@
 id: TASK-261
 title: "Verify MS-034 CLI engine: command equivalence and help attribution"
 created_date: '2026-11-20T17:42:17Z'
-updated_date: '2026-11-22T16:03:32Z'
+updated_date: '2026-11-22T16:21:14Z'
 labels: []
 references:
   - REQ-07.003
@@ -14,7 +14,7 @@ references:
   - AUD-140
   - ADR-042
   - TECH-024
-status: In-Progress
+status: Done
 assignee:
   - quality-gatekeeper
 milestone: MS-034
@@ -80,3 +80,4 @@ Every criterion has a pass or a recorded finding with evidence; the suite and qu
 - **planner**: ADR-042 item 7 applied: AC #1-#3 are replaced by the internal-checkpoint rule and the packaging waiver wording used by MS-032 (AUD-138) and MS-033 (AUD-140); no RC version or RC package is required. MS-034 AC-8 and TASK-307 still state the old RC-gate premise; they were not changed by this planner pass and are reported as an open decision to the orchestrator.
 - **planner**: Planner: TASK-307 archived as premise invalid (build-deb.sh is the single build script per the TASK-235 architect ruling; MS-037 AC-6 corrected) and removed from this task's dependencies; MS-034 AC-8 corrected to the internal-checkpoint rule. Verification scope remains MS-034 AC-1 to AC-7.
 - **code-auditor**: AUD-142 re-audit: corrections required, AUD-141 not fully closed; F7 help-option panic and F15 edit sentinel remain open, TASK-310 needs two corrections.
+- **orchestrator**: Verification PASS (AUD-144): AC-1 to AC-8 met, 0 blocker, 0 high, 0 medium, 2 low; code gate clear via AUD-143; suite 1289 passed; clippy and fmt clean; packaging waived per the MS-037 single-release rule.
