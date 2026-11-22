@@ -2,7 +2,7 @@
 id: TASK-248
 title: "Implement nested config parsing, validation, and emission for document entries"
 created_date: '2026-11-20T17:41:37Z'
-updated_date: '2026-11-22T08:53:21Z'
+updated_date: '2026-11-22T10:32:13Z'
 labels: []
 references:
   - ADR-036
@@ -23,7 +23,7 @@ references:
   - TC-172
   - TC-190
   - TC-191
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-033
@@ -83,3 +83,9 @@ Definition of done: the loader, validator, selector resolver, and emitter cover 
 ## Comments
 - **task-refiner**: Refined for MS-033: description grounded in load_effective_value, merge_yaml, Config::validate, the config get, set, unset and list commands, to_config_yaml and init; 11 testable acceptance criteria added; TECH-077 documented. The field-edit-only rule is taken from REQ-07.002 and REQ-01.002. No dependency, ordinal, milestone, or assignee change.
 - **planner**: Non-blocking refinement notes: (1) TASK-249's seed-slug wording named request as a seed entry; it is corrected to user-defined per ADR-036 decision 30 and REQ-07.002, so no further action. (2) config set field-selector semantics: TASK-248 scope already fixes keyed and indexed selector forms and the single-change validate-then-write rule; this is recorded for traceability, not a defect.
+- **rust-dev**: test comment
+- **rust-dev**: Diagnostics: unknown entry keys
+- **rust-dev**: Implemented the nested document-type configuration surface in the config, commands and init modules.
+- **rust-dev**: Diagnostics: one aggregated pass for unknown entry and field keys, unknown kind, verb and reference_visibility values, reserved entry keys (model, title, content, id_shape), field order and enabled, field key and frontmatter_key reserved keys, missing heading and frontmatter_key, duplicate field keys per role, grouped top-level fields and roles on a non-grouped type. Field paths use keyed selectors when the key is unique and indexed selectors otherwise; every line carries document_types followed by the slug and path.
+- **rust-dev**: Implemented the nested document-type configuration surface in the config, commands and init modules. Diagnostics: one aggregated pass for unknown entry and field keys, unknown kind, verb and reference_visibility values, reserved entry keys (model, title, content, id_shape), field order and enabled, field key and frontmatter_key reserved keys, missing heading and frontmatter_key, duplicate field keys per role, grouped top-level fields and roles on a non-grouped type. Field paths use keyed selectors when the key is unique and indexed selectors otherwise; every line carries document_types followed by the slug and path. Fill and merge: scalars fill from the seed and present scalars override; fields, group fields, member fields, statuses, slots and api_aliases replace wholesale including an empty fields sequence; group and member resolve independently; prefix and directory are never filled; an absent slug stays absent. Selectors and commands: config get and config list resolve keyed and numeric forms including the req group story heading selector; config list prints every field property with its keyed selector path; config set refuses field sequence edits, materializes only the target entry with seed prefix and directory, and stores statuses as a flow sequence; config unset restores the seed statuses or removes a scalar override. Emission and init: mapping sequences render as block sequences, flat string lists stay inline, quoted headings such as the User Story heading round-trip, and init writes minimal entries with prefix and directory plus enabled only when disabled. Checks: env -u EDITOR -u VISUAL cargo test --no-fail-fast passed all 65 test targets; cargo clippy --all-targets -- -D warnings clean; cargo fmt --check clean. Characterization replay and CLI help goldens stay green. TASK-249: the seed values are still absent, so the seed label, seed fields and req group and member field selectors of TC-109, TC-172 and TC-191 become observable once the seed table lands; the fill, flattening and selector mechanics are in place. Open item: TC-114 says the other seed types stay effective after config set, while the amended ADR-0019 decision 8 and the task acceptance also require an absent slug to stay absent. With only req written, nfr is absent under the wholesale entry set. Implemented the documented wholesale and absent-slug rule; the clashing TC-114 clause needs a decision.
+- **orchestrator**: Acceptance met: nested parsing and document_types diagnostics, seed fill and collection replace, block-sequence emission with round-trip, selector resolution for get and list, set materializing one entry and refusing field edits, unset restoring seed statuses, minimal init; full suite green, clippy and fmt clean. TC-114 clause conflict recorded.

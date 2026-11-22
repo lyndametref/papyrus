@@ -89,12 +89,59 @@ pub const RESERVED_FIELD_KEYS: [&str; 8] = [
 /// (ADR-036 decision 6, REQ-07.004).
 pub const RESERVED_ENTRY_KEYS: [&str; 4] = ["model", "title", "content", "id_shape"];
 
+/// Every key a document-type entry may declare (ADR-036 decision 34,
+/// TECH-077 section 2).
+pub const DOCUMENT_ENTRY_KEYS: [&str; 16] = [
+    "prefix",
+    "directory",
+    "enabled",
+    "label",
+    "plural",
+    "order",
+    "summary",
+    "type_alias",
+    "reference_visibility",
+    "statuses",
+    "default_status",
+    "slots",
+    "api_aliases",
+    "fields",
+    "group",
+    "member",
+];
+
+/// Every key a field item may declare (ADR-036 decision 11,
+/// TECH-077 section 3).
+pub const FIELD_SPEC_KEYS: [&str; 9] = [
+    "key",
+    "heading",
+    "frontmatter_key",
+    "option",
+    "label",
+    "kind",
+    "required",
+    "verbs",
+    "help",
+];
+
+/// The keys a role block may declare (ADR-036 decision 27).
+pub const ROLE_BLOCK_KEYS: [&str; 2] = ["fields", "reference_visibility"];
+
 /// The verbs a field's option is offered on (ADR-036 decision 19).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum FieldVerb {
     Create,
     Edit,
+}
+
+impl FieldVerb {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Create => "create",
+            Self::Edit => "edit",
+        }
+    }
 }
 
 /// The accepted value form of a field (ADR-036 decision 17).
@@ -107,6 +154,16 @@ pub enum FieldKind {
     List,
 }
 
+impl FieldKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Text => "text",
+            Self::Multiline => "multiline",
+            Self::List => "list",
+        }
+    }
+}
+
 fn default_field_verbs() -> Vec<FieldVerb> {
     vec![FieldVerb::Create, FieldVerb::Edit]
 }
@@ -117,6 +174,15 @@ fn default_field_verbs() -> Vec<FieldVerb> {
 pub enum Visibility {
     Visible,
     Hidden,
+}
+
+impl Visibility {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Visible => "visible",
+            Self::Hidden => "hidden",
+        }
+    }
 }
 
 /// One declared document field (ADR-036 decision 11).
@@ -286,6 +352,495 @@ pub(crate) const DEFAULT_DOCUMENT_TYPES: [(&str, &str, &str, bool); 11] = [
     ("test-case", "TC", "test-cases/", true),
     ("test-report", "TR", "test-reports/", true),
 ];
+
+fn mapping_get<'a>(mapping: &'a yaml_serde::Mapping, key: &str) -> Option<&'a yaml_serde::Value> {
+    mapping.get(yaml_serde::Value::String(key.to_string()))
+}
+
+fn mapping_contains(mapping: &yaml_serde::Mapping, key: &str) -> bool {
+    mapping.contains_key(yaml_serde::Value::String(key.to_string()))
+}
+
+fn value_as_str(value: &yaml_serde::Value) -> Option<&str> {
+    match value {
+        yaml_serde::Value::String(text) => Some(text),
+        _ => None,
+    }
+}
+
+fn key_name(key: &yaml_serde::Value) -> String {
+    match key {
+        yaml_serde::Value::String(text) => text.clone(),
+        other => render_yaml_flow(other),
+    }
+}
+
+fn document_model(slug: &str) -> crate::registry::DocumentModel {
+    crate::registry::DocumentModel::for_slug(slug)
+}
+
+fn field_selector_labels(sequence: &[yaml_serde::Value]) -> Vec<String> {
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    for item in sequence {
+        if let yaml_serde::Value::Mapping(mapping) = item
+            && let Some(key) = mapping_get(mapping, "key").and_then(value_as_str)
+            && !key.is_empty()
+        {
+            *counts.entry(key.to_string()).or_default() += 1;
+        }
+    }
+    sequence
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            let key = match item {
+                yaml_serde::Value::Mapping(mapping) => {
+                    mapping_get(mapping, "key").and_then(value_as_str)
+                }
+                _ => None,
+            };
+            match key {
+                Some(key) if counts.get(key).copied().unwrap_or(0) == 1 && !key.is_empty() => {
+                    key.to_string()
+                }
+                _ => index.to_string(),
+            }
+        })
+        .collect()
+}
+
+fn push_unknown_keys(
+    mapping: &yaml_serde::Mapping,
+    allowed: &[&str],
+    base: &str,
+    reserved_message: &str,
+    errors: &mut Vec<String>,
+) {
+    let mut unknown: Vec<(String, String)> = mapping
+        .keys()
+        .map(key_name)
+        .filter(|name| !allowed.contains(&name.as_str()))
+        .map(|name| {
+            let message = if RESERVED_ENTRY_KEYS.contains(&name.as_str()) {
+                reserved_message.to_string()
+            } else {
+                "unknown key".to_string()
+            };
+            (name, message)
+        })
+        .collect();
+    unknown.sort();
+    for (name, message) in unknown {
+        errors.push(format!("{}.{}: {}", base, name, message));
+    }
+}
+
+fn validate_enum_key(
+    mapping: &yaml_serde::Mapping,
+    key: &str,
+    allowed: &[&str],
+    base: &str,
+    errors: &mut Vec<String>,
+) {
+    let Some(value) = mapping_get(mapping, key) else {
+        return;
+    };
+    let valid = value_as_str(value).is_some_and(|text| allowed.contains(&text));
+    if !valid {
+        let rendered = match allowed {
+            [] => String::new(),
+            [only] => (*only).to_string(),
+            [first, second] => format!("{} or {}", first, second),
+            _ => {
+                let (last, rest) = allowed.split_last().expect("three or more values");
+                format!("{}, or {}", rest.join(", "), last)
+            }
+        };
+        errors.push(format!("{}.{}: must be {}", base, key, rendered));
+    }
+}
+
+fn validate_field_sequence(
+    slug: &str,
+    path: &str,
+    value: &yaml_serde::Value,
+    errors: &mut Vec<String>,
+) {
+    let yaml_serde::Value::Sequence(sequence) = value else {
+        errors.push(format!(
+            "document_types.{}.{}: must be a sequence",
+            slug, path
+        ));
+        return;
+    };
+    let labels = field_selector_labels(sequence);
+    for (index, item) in sequence.iter().enumerate() {
+        let selector = format!("document_types.{}.{}[{}]", slug, path, labels[index]);
+        let yaml_serde::Value::Mapping(field) = item else {
+            errors.push(format!("{}: field must be a mapping", selector));
+            continue;
+        };
+        let mut unknown: Vec<String> = field
+            .keys()
+            .map(key_name)
+            .filter(|name| !FIELD_SPEC_KEYS.contains(&name.as_str()))
+            .collect();
+        unknown.sort();
+        for name in unknown {
+            let message = if name == "order" || name == "enabled" {
+                "not a valid field key"
+            } else {
+                "unknown key"
+            };
+            errors.push(format!("{}.{}: {}", selector, name, message));
+        }
+        match mapping_get(field, "key").and_then(value_as_str) {
+            Some(key) if !key.is_empty() => {}
+            _ => errors.push(format!("{}.key: must be a non-empty string", selector)),
+        }
+        validate_enum_key(
+            field,
+            "kind",
+            &["text", "multiline", "list"],
+            &selector,
+            errors,
+        );
+        if let Some(verbs) = mapping_get(field, "verbs") {
+            match verbs {
+                yaml_serde::Value::Sequence(values) => {
+                    for verb in values {
+                        let valid = value_as_str(verb)
+                            .is_some_and(|text| text == "create" || text == "edit");
+                        if !valid {
+                            let name = value_as_str(verb).unwrap_or("<non-string>");
+                            errors.push(format!(
+                                "{}.verbs: invalid verb {}; must be create or edit",
+                                selector, name
+                            ));
+                        }
+                    }
+                }
+                _ => errors.push(format!(
+                    "{}.verbs: must be a sequence of create and edit",
+                    selector
+                )),
+            }
+        }
+        if let Some(required) = mapping_get(field, "required")
+            && !matches!(required, yaml_serde::Value::Bool(_))
+        {
+            errors.push(format!("{}.required: must be a boolean", selector));
+        }
+    }
+}
+
+fn validate_role_value(
+    slug: &str,
+    role: &str,
+    value: &yaml_serde::Value,
+    errors: &mut Vec<String>,
+) {
+    let base = format!("document_types.{}.{}", slug, role);
+    let yaml_serde::Value::Mapping(mapping) = value else {
+        errors.push(format!("{}: must be a mapping", base));
+        return;
+    };
+    push_unknown_keys(
+        mapping,
+        &ROLE_BLOCK_KEYS,
+        &base,
+        "not a configuration key",
+        errors,
+    );
+    validate_enum_key(
+        mapping,
+        "reference_visibility",
+        &["visible", "hidden"],
+        &base,
+        errors,
+    );
+    if let Some(fields) = mapping_get(mapping, "fields") {
+        validate_field_sequence(slug, &format!("{}.fields", role), fields, errors);
+    }
+}
+
+/// Validate the declared shape of every `document_types` entry.
+///
+/// This runs on the raw file before deserialization so an unknown key or an
+/// unknown enum value is reported with its selector path instead of a serde
+/// message. Diagnostics are aggregated in a deterministic order: slugs in
+/// ascending order, entry keys, the role blocks, and finally the field
+/// sequence (TECH-077 sections 1 and 8).
+pub fn validate_document_types_declarations(root: &yaml_serde::Value) -> Vec<String> {
+    let Some(document_types) = mapping_get_declared(root, "document_types") else {
+        return Vec::new();
+    };
+    let yaml_serde::Value::Mapping(entries) = document_types else {
+        return vec!["document_types: must be a mapping".to_string()];
+    };
+
+    let mut errors = Vec::new();
+    let mut slugs: Vec<String> = Vec::new();
+    for key in entries.keys() {
+        match key {
+            yaml_serde::Value::String(slug) => slugs.push(slug.clone()),
+            other => errors.push(format!(
+                "document_types: keys must be strings, found {}",
+                render_yaml_flow(other)
+            )),
+        }
+    }
+    slugs.sort();
+
+    for slug in slugs {
+        let entry = entries
+            .get(yaml_serde::Value::String(slug.clone()))
+            .expect("slug came from the mapping keys");
+        let base = format!("document_types.{}", slug);
+        let yaml_serde::Value::Mapping(mapping) = entry else {
+            errors.push(format!("{}: must be a mapping", base));
+            continue;
+        };
+        push_unknown_keys(
+            mapping,
+            &DOCUMENT_ENTRY_KEYS,
+            &base,
+            "not a configuration key",
+            &mut errors,
+        );
+        validate_enum_key(
+            mapping,
+            "reference_visibility",
+            &["visible", "hidden"],
+            &base,
+            &mut errors,
+        );
+
+        let grouped = document_model(&slug) == crate::registry::DocumentModel::GroupedMarkdown;
+        if grouped {
+            for role in ["group", "member"] {
+                if let Some(value) = mapping_get(mapping, role) {
+                    validate_role_value(&slug, role, value, &mut errors);
+                }
+            }
+            if mapping_contains(mapping, "fields") {
+                errors.push(format!("{}.fields: not allowed on a grouped type", base));
+            }
+        } else {
+            for role in ["group", "member"] {
+                if mapping_contains(mapping, role) {
+                    errors.push(format!(
+                        "{}.{}: not allowed on a non-grouped type",
+                        base, role
+                    ));
+                }
+            }
+            if let Some(fields) = mapping_get(mapping, "fields") {
+                validate_field_sequence(&slug, "fields", fields, &mut errors);
+            }
+        }
+    }
+    errors
+}
+
+fn mapping_get_declared<'a>(
+    root: &'a yaml_serde::Value,
+    key: &str,
+) -> Option<&'a yaml_serde::Value> {
+    match root {
+        yaml_serde::Value::Mapping(mapping) => mapping_get(mapping, key),
+        _ => None,
+    }
+}
+
+/// Fill one declared entry from its seed entry.
+///
+/// Scalars fill when absent and override when present; every collection
+/// replaces wholesale, including an empty one. `prefix` and `directory` are
+/// never filled (ADR-036 decision 32).
+fn fill_entry_from_seed(
+    seed: &yaml_serde::Value,
+    declared: &yaml_serde::Value,
+) -> yaml_serde::Value {
+    match (seed, declared) {
+        (yaml_serde::Value::Mapping(seed_map), yaml_serde::Value::Mapping(declared_map)) => {
+            let mut merged = seed_map.clone();
+            for (key, value) in declared_map {
+                let name = key_name(key);
+                if matches!(name.as_str(), "group" | "member")
+                    && let Some(seed_role) = mapping_get(seed_map, &name)
+                    && mapping_contains(declared_map, &name)
+                {
+                    let role = fill_entry_from_seed(seed_role, value);
+                    merged.insert(key.clone(), role);
+                } else {
+                    merged.insert(key.clone(), value.clone());
+                }
+            }
+            // `prefix` and `directory` are declared by every entry.
+            for required in ["prefix", "directory"] {
+                if !mapping_contains(declared_map, required) {
+                    merged.remove(yaml_serde::Value::String(required.to_string()));
+                }
+            }
+            yaml_serde::Value::Mapping(merged)
+        }
+        (_, declared) => declared.clone(),
+    }
+}
+
+/// Resolve a declared `document_types` mapping against the seed.
+///
+/// The entry set stays wholesale: only declared slugs survive. Each surviving
+/// entry is filled from the seed entry of the same slug, and a user-defined
+/// slug is left exactly as declared (its defaults belong to the seed table).
+pub fn resolve_document_types(declared: &yaml_serde::Value) -> yaml_serde::Value {
+    let yaml_serde::Value::Mapping(entries) = declared else {
+        return declared.clone();
+    };
+    let seed = Config::default();
+    let mut resolved = yaml_serde::Mapping::new();
+    for (key, declared_entry) in entries {
+        let slug = key_name(key);
+        let value = match seed.document_types.get(&slug) {
+            Some(seed_entry) => match yaml_serde::to_value(seed_entry) {
+                Ok(seed_value) => fill_entry_from_seed(&seed_value, declared_entry),
+                Err(_) => declared_entry.clone(),
+            },
+            None => declared_entry.clone(),
+        };
+        resolved.insert(key.clone(), value);
+    }
+    yaml_serde::Value::Mapping(resolved)
+}
+
+/// One component of a configuration selector path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SelectorSegment {
+    pub key: String,
+    pub selector: Option<Selector>,
+}
+
+/// A keyed or indexed sequence element selector.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Selector {
+    Index(usize),
+    Key(String),
+}
+
+/// Parse a configuration selector such as
+/// `document_types.req.group.fields[story].heading`.
+pub fn parse_selector(selector: &str) -> Result<Vec<SelectorSegment>, String> {
+    if selector.is_empty() {
+        return Err("selector must not be empty".to_string());
+    }
+    let mut segments = Vec::new();
+    for part in selector.split('.') {
+        if part.is_empty() {
+            return Err("selector contains an empty segment".to_string());
+        }
+        if let Some(open) = part.find('[') {
+            if !part.ends_with(']') {
+                return Err("selector has an unterminated bracket".to_string());
+            }
+            let key = &part[..open];
+            let inner = &part[open + 1..part.len() - 1];
+            if key.is_empty() || inner.is_empty() || inner.contains('[') || inner.contains(']') {
+                return Err("selector has an invalid bracket form".to_string());
+            }
+            let selector = if inner.chars().all(|c| c.is_ascii_digit()) {
+                Selector::Index(
+                    inner
+                        .parse::<usize>()
+                        .map_err(|_| "selector index is out of range".to_string())?,
+                )
+            } else {
+                Selector::Key(inner.to_string())
+            };
+            segments.push(SelectorSegment {
+                key: key.to_string(),
+                selector: Some(selector),
+            });
+        } else {
+            segments.push(SelectorSegment {
+                key: part.to_string(),
+                selector: None,
+            });
+        }
+    }
+    Ok(segments)
+}
+
+/// Whether a selector path is syntactically valid and sanitized.
+pub fn valid_config_selector(selector: &str) -> bool {
+    let Ok(segments) = parse_selector(selector) else {
+        return false;
+    };
+    segments.iter().all(|segment| {
+        if crate::sanitize::sanitize_path_component(&segment.key).is_none() {
+            return false;
+        }
+        match &segment.selector {
+            None => true,
+            Some(Selector::Index(_)) => true,
+            Some(Selector::Key(key)) => crate::sanitize::sanitize_path_component(key).is_some(),
+        }
+    })
+}
+
+/// Whether a selector addresses a field sequence or a field property.
+pub fn selector_targets_field(selector: &str) -> bool {
+    parse_selector(selector)
+        .map(|segments| segments.iter().any(|segment| segment.key == "fields"))
+        .unwrap_or(false)
+}
+
+/// Resolve one selector path against an effective configuration value.
+pub fn resolve_selector<'a>(
+    root: &'a yaml_serde::Value,
+    selector: &str,
+) -> Result<&'a yaml_serde::Value, String> {
+    let segments = parse_selector(selector)?;
+    let mut current = root;
+    for segment in segments {
+        let yaml_serde::Value::Mapping(mapping) = current else {
+            return Err("selector did not resolve".to_string());
+        };
+        current = mapping_get(mapping, &segment.key)
+            .ok_or_else(|| "selector did not resolve".to_string())?;
+        match segment.selector {
+            None => {}
+            Some(Selector::Index(index)) => {
+                let yaml_serde::Value::Sequence(sequence) = current else {
+                    return Err("selector did not resolve".to_string());
+                };
+                current = sequence
+                    .get(index)
+                    .ok_or_else(|| "selector index is out of range".to_string())?;
+            }
+            Some(Selector::Key(key)) => {
+                let yaml_serde::Value::Sequence(sequence) = current else {
+                    return Err("selector did not resolve".to_string());
+                };
+                let mut matches = sequence.iter().filter(|item| {
+                    matches!(
+                        item,
+                        yaml_serde::Value::Mapping(mapping)
+                            if mapping_get(mapping, "key").and_then(value_as_str) == Some(key.as_str())
+                    )
+                });
+                let first = matches
+                    .next()
+                    .ok_or_else(|| "selector did not resolve".to_string())?;
+                if matches.next().is_some() {
+                    return Err("selector is ambiguous".to_string());
+                }
+                current = first;
+            }
+        }
+    }
+    Ok(current)
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, deny_unknown_fields)]
@@ -554,6 +1109,9 @@ impl Config {
 
             // statuses
             validate_doc_entry_statuses(slug, entry, &mut errors);
+
+            // Role blocks and field sequences (ADR-036 decisions 21 to 27).
+            validate_doc_entry_fields(slug, entry, &mut errors);
         }
 
         if errors.is_empty() {
@@ -626,11 +1184,119 @@ impl Config {
                     default_status.clone(),
                 ));
             }
+            for (label, value) in [
+                ("label", v.label.as_ref()),
+                ("plural", v.plural.as_ref()),
+                ("summary", v.summary.as_ref()),
+                ("type_alias", v.type_alias.as_ref()),
+            ] {
+                if let Some(value) = value {
+                    out.push((format!("document_types.{}.{}", k, label), value.clone()));
+                }
+            }
+            if let Some(order) = v.order {
+                out.push((format!("document_types.{}.order", k), order.to_string()));
+            }
+            if let Some(visibility) = v.reference_visibility {
+                out.push((
+                    format!("document_types.{}.reference_visibility", k),
+                    visibility.as_str().to_string(),
+                ));
+            }
+            if let Some(slots) = &v.slots {
+                for (index, slot) in slots.iter().enumerate() {
+                    out.push((
+                        format!("document_types.{}.slots[{}].key", k, index),
+                        slot.key.clone(),
+                    ));
+                    out.push((
+                        format!("document_types.{}.slots[{}].label", k, index),
+                        slot.label.clone(),
+                    ));
+                }
+            }
+            if let Some(aliases) = &v.api_aliases {
+                out.push((
+                    format!("document_types.{}.api_aliases", k),
+                    format!("[{}]", aliases.join(", ")),
+                ));
+            }
+            if let Some(fields) = &v.fields {
+                push_field_leaves(&mut out, &format!("document_types.{}.fields", k), fields);
+            }
+            if let Some(group) = &v.group {
+                if let Some(visibility) = group.reference_visibility {
+                    out.push((
+                        format!("document_types.{}.group.reference_visibility", k),
+                        visibility.as_str().to_string(),
+                    ));
+                }
+                if let Some(fields) = &group.fields {
+                    push_field_leaves(
+                        &mut out,
+                        &format!("document_types.{}.group.fields", k),
+                        fields,
+                    );
+                }
+            }
+            if let Some(member) = &v.member {
+                if let Some(visibility) = member.reference_visibility {
+                    out.push((
+                        format!("document_types.{}.member.reference_visibility", k),
+                        visibility.as_str().to_string(),
+                    ));
+                }
+                if let Some(fields) = &member.fields {
+                    push_field_leaves(
+                        &mut out,
+                        &format!("document_types.{}.member.fields", k),
+                        fields,
+                    );
+                }
+            }
         }
         out.push(("browser_host".to_string(), self.browser_host.clone()));
         out.push(("browser_port".to_string(), self.browser_port.to_string()));
         out.push(("browser_open".to_string(), self.browser_open.to_string()));
         out
+    }
+
+    /// Build the value written by `init`: the full configuration with each
+    /// document entry reduced to the keys that are never filled from the seed
+    /// (`prefix`, `directory`, plus `enabled` only when disabled)
+    /// (REQ-07.002, RE-010 D14).
+    pub fn init_value(&self) -> Result<yaml_serde::Value, String> {
+        let mut value = yaml_serde::to_value(self).map_err(|error| error.to_string())?;
+        let yaml_serde::Value::Mapping(root) = &mut value else {
+            return Err("configuration must serialize to a mapping".to_string());
+        };
+        let mut document_types = yaml_serde::Mapping::new();
+        for (slug, entry) in &self.document_types {
+            let mut minimal = yaml_serde::Mapping::new();
+            minimal.insert(
+                yaml_serde::Value::String("prefix".to_string()),
+                yaml_serde::Value::String(entry.prefix.clone()),
+            );
+            minimal.insert(
+                yaml_serde::Value::String("directory".to_string()),
+                yaml_serde::Value::String(entry.directory.clone()),
+            );
+            if !entry.enabled {
+                minimal.insert(
+                    yaml_serde::Value::String("enabled".to_string()),
+                    yaml_serde::Value::Bool(false),
+                );
+            }
+            document_types.insert(
+                yaml_serde::Value::String(slug.clone()),
+                yaml_serde::Value::Mapping(minimal),
+            );
+        }
+        root.insert(
+            yaml_serde::Value::String("document_types".to_string()),
+            yaml_serde::Value::Mapping(document_types),
+        );
+        Ok(value)
     }
 }
 
@@ -765,6 +1431,102 @@ fn validate_doc_entry_statuses(slug: &str, entry: &DocTypeEntry, errors: &mut Ve
     }
 }
 
+fn spec_selector_labels(fields: &[FieldSpec]) -> Vec<String> {
+    let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
+    for field in fields {
+        if !field.key.is_empty() {
+            *counts.entry(field.key.as_str()).or_default() += 1;
+        }
+    }
+    fields
+        .iter()
+        .enumerate()
+        .map(|(index, field)| {
+            if !field.key.is_empty() && counts.get(field.key.as_str()) == Some(&1) {
+                field.key.clone()
+            } else {
+                index.to_string()
+            }
+        })
+        .collect()
+}
+
+fn validate_field_specs(slug: &str, path: &str, fields: &[FieldSpec], errors: &mut Vec<String>) {
+    let labels = spec_selector_labels(fields);
+    let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
+    for field in fields {
+        if !field.key.is_empty() {
+            *counts.entry(field.key.as_str()).or_default() += 1;
+        }
+    }
+    for (index, field) in fields.iter().enumerate() {
+        let selector = format!("document_types.{}.{}[{}]", slug, path, labels[index]);
+        if RESERVED_FIELD_KEYS.contains(&field.key.as_str()) {
+            errors.push(format!(
+                "{}.key: reserved field key: {}",
+                selector, field.key
+            ));
+        }
+        if let Some(frontmatter_key) = field.frontmatter_key.as_deref()
+            && RESERVED_FIELD_KEYS.contains(&frontmatter_key)
+        {
+            errors.push(format!(
+                "{}.frontmatter_key: reserved field key: {}",
+                selector, frontmatter_key
+            ));
+        }
+        if field.key.is_empty() {
+            errors.push(format!("{}.key: must not be empty", selector));
+        }
+        if !field.stores_value() {
+            errors.push(format!(
+                "{}: must declare heading or frontmatter_key",
+                selector
+            ));
+        }
+        if !field.key.is_empty() && counts.get(field.key.as_str()).copied().unwrap_or(0) > 1 {
+            errors.push(format!(
+                "document_types.{}.{}[{}].key: duplicate field key: {}",
+                slug, path, index, field.key
+            ));
+        }
+    }
+}
+
+fn validate_doc_entry_fields(slug: &str, entry: &DocTypeEntry, errors: &mut Vec<String>) {
+    let grouped = document_model(slug) == crate::registry::DocumentModel::GroupedMarkdown;
+    if grouped {
+        if entry.fields.is_some() {
+            errors.push(format!(
+                "document_types.{}.fields: not allowed on a grouped type",
+                slug
+            ));
+        }
+        for (name, role) in [("group", &entry.group), ("member", &entry.member)] {
+            if let Some(role) = role
+                && let Some(fields) = &role.fields
+            {
+                validate_field_specs(slug, &format!("{}.fields", name), fields, errors);
+            }
+        }
+    } else {
+        for (name, present) in [
+            ("group", entry.group.is_some()),
+            ("member", entry.member.is_some()),
+        ] {
+            if present {
+                errors.push(format!(
+                    "document_types.{}.{}: not allowed on a non-grouped type",
+                    slug, name
+                ));
+            }
+        }
+        if let Some(fields) = &entry.fields {
+            validate_field_specs(slug, "fields", fields, errors);
+        }
+    }
+}
+
 /// Validate a browser bind host (specification section 1.10).
 ///
 /// A host is an IPv4 literal, an IPv6 literal, or a DNS host name. The value
@@ -806,6 +1568,42 @@ pub fn validate_browser_host(host: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn push_field_leaves(out: &mut Vec<(String, String)>, base: &str, fields: &[FieldSpec]) {
+    let labels = spec_selector_labels(fields);
+    for (index, field) in fields.iter().enumerate() {
+        let selector = format!("{}[{}]", base, labels[index]);
+        out.push((format!("{}.key", selector), field.key.clone()));
+        if let Some(heading) = &field.heading {
+            out.push((format!("{}.heading", selector), heading.clone()));
+        }
+        if let Some(frontmatter_key) = &field.frontmatter_key {
+            out.push((
+                format!("{}.frontmatter_key", selector),
+                frontmatter_key.clone(),
+            ));
+        }
+        if let Some(option) = &field.option {
+            out.push((format!("{}.option", selector), option.clone()));
+        }
+        if let Some(label) = &field.label {
+            out.push((format!("{}.label", selector), label.clone()));
+        }
+        out.push((
+            format!("{}.kind", selector),
+            field.kind.as_str().to_string(),
+        ));
+        out.push((format!("{}.required", selector), field.required.to_string()));
+        let verbs: Vec<&str> = field.verbs.iter().map(|verb| verb.as_str()).collect();
+        out.push((
+            format!("{}.verbs", selector),
+            format!("[{}]", verbs.join(", ")),
+        ));
+        if let Some(help) = &field.help {
+            out.push((format!("{}.help", selector), help.clone()));
+        }
+    }
+}
+
 /// Whether a host is a loopback address for the non-loopback warning.
 ///
 /// Loopback means an IPv4 address in `127.0.0.0/8`, the IPv6 address `::1`, or
@@ -832,8 +1630,10 @@ pub fn merge_yaml(base: &mut yaml_serde::Value, overlay: &yaml_serde::Value) {
                     _ => false,
                 };
                 if is_document_types {
-                    // Replace wholesale when present.
-                    b.insert(k.clone(), v.clone());
+                    // Replace wholesale when present, then fill each declared
+                    // entry from the seed entry of the same slug (ADR-036
+                    // decision 32).
+                    b.insert(k.clone(), resolve_document_types(v));
                 } else if let Some(existing) = b.get_mut(k) {
                     merge_yaml(existing, v);
                 } else {
@@ -933,8 +1733,9 @@ pub fn validate_key_path(key: &str) -> bool {
 
 /// Render a configuration value as YAML for persistence.
 ///
-/// Mappings stay in block style, sequences are rendered inline as flow
-/// sequences (`[a, b]`), and scalars are quoted by the YAML serializer so the
+/// Mappings stay in block style. A sequence whose elements are mappings is
+/// rendered as a block sequence, while a flat scalar list stays inline as a
+/// flow sequence (`[a, b]`). Scalars are quoted by the YAML serializer so the
 /// result reparses to the same value. An empty mapping renders as `{}`.
 /// The output is round-tripped through the parser before it is returned.
 pub fn to_config_yaml(value: &yaml_serde::Value) -> Result<String, String> {
@@ -980,6 +1781,13 @@ pub fn render_yaml_flow(value: &yaml_serde::Value) -> String {
     }
 }
 
+fn is_block_sequence(sequence: &[yaml_serde::Value]) -> bool {
+    !sequence.is_empty()
+        && sequence
+            .iter()
+            .any(|item| matches!(item, yaml_serde::Value::Mapping(inner) if !inner.is_empty()))
+}
+
 fn render_block_mapping(mapping: &yaml_serde::Mapping, indent: usize, out: &mut String) {
     let pad = " ".repeat(indent);
     for (key, value) in mapping {
@@ -989,8 +1797,52 @@ fn render_block_mapping(mapping: &yaml_serde::Mapping, indent: usize, out: &mut 
                 out.push_str(&format!("{}{}:\n", pad, key));
                 render_block_mapping(inner, indent + 2, out);
             }
+            yaml_serde::Value::Sequence(sequence) if is_block_sequence(sequence) => {
+                out.push_str(&format!("{}{}:\n", pad, key));
+                render_block_sequence(sequence, indent + 2, out);
+            }
             other => {
                 out.push_str(&format!("{}{}: {}\n", pad, key, render_yaml_flow(other)));
+            }
+        }
+    }
+}
+
+fn render_block_sequence(sequence: &[yaml_serde::Value], indent: usize, out: &mut String) {
+    let pad = " ".repeat(indent);
+    for item in sequence {
+        match item {
+            yaml_serde::Value::Mapping(mapping) if !mapping.is_empty() => {
+                render_block_sequence_mapping(mapping, indent, out);
+            }
+            yaml_serde::Value::Sequence(inner) if is_block_sequence(inner) => {
+                out.push_str(&format!("{}-\n", pad));
+                render_block_sequence(inner, indent + 2, out);
+            }
+            other => {
+                out.push_str(&format!("{}- {}\n", pad, render_yaml_flow(other)));
+            }
+        }
+    }
+}
+
+fn render_block_sequence_mapping(mapping: &yaml_serde::Mapping, indent: usize, out: &mut String) {
+    let pad = " ".repeat(indent);
+    for (index, (key, value)) in mapping.iter().enumerate() {
+        let marker = if index == 0 { "- " } else { "  " };
+        let prefix = format!("{}{}", pad, marker);
+        let key = render_yaml_scalar(key);
+        match value {
+            yaml_serde::Value::Mapping(inner) if !inner.is_empty() => {
+                out.push_str(&format!("{}{}:\n", prefix, key));
+                render_block_mapping(inner, indent + 4, out);
+            }
+            yaml_serde::Value::Sequence(sequence) if is_block_sequence(sequence) => {
+                out.push_str(&format!("{}{}:\n", prefix, key));
+                render_block_sequence(sequence, indent + 4, out);
+            }
+            other => {
+                out.push_str(&format!("{}{}: {}\n", prefix, key, render_yaml_flow(other)));
             }
         }
     }
@@ -1002,7 +1854,11 @@ fn render_yaml_scalar(value: &yaml_serde::Value) -> String {
         yaml_serde::Value::Bool(flag) => flag.to_string(),
         yaml_serde::Value::Number(number) => number.to_string(),
         yaml_serde::Value::String(text) => {
-            if text.chars().any(char::is_control) {
+            if text.starts_with('#') {
+                // Body headings keep a stable double-quoted form so a
+                // round-trip reproduces `"## User Story"` (ADR-0024).
+                serde_json::to_string(text).unwrap_or_else(|_| "\"\"".to_string())
+            } else if text.chars().any(char::is_control) {
                 // JSON string escaping is valid YAML double-quoted syntax and
                 // keeps a single line; a literal block would break the layout.
                 serde_json::to_string(text).unwrap_or_else(|_| "\"\"".to_string())
@@ -1752,7 +2608,7 @@ mod tests {
     }
 
     #[test]
-    fn config_set_materializes_defaults_and_refuses_an_invalid_result() {
+    fn config_set_materializes_only_the_target_entry_and_refuses_an_invalid_result() {
         let project = TempProject::new("config-set");
         let ctx = project.context();
 
@@ -1763,20 +2619,38 @@ mod tests {
         let yaml_serde::Value::Mapping(mapping) = document_types else {
             panic!("document_types must be a mapping");
         };
-        assert_eq!(mapping.len(), Config::default().document_types.len());
-        assert!(yaml_get(&value, "document_types.req").is_some());
-        assert!(yaml_get(&value, "document_types.deploy").is_none());
+        assert_eq!(mapping.len(), 1, "only the target entry is written");
+        assert!(yaml_get(&value, "document_types.glossary").is_some());
+        assert!(yaml_get(&value, "document_types.req").is_none());
+        assert_eq!(
+            yaml_get(&value, "document_types.glossary.prefix").and_then(|v| match v {
+                yaml_serde::Value::String(text) => Some(text.as_str()),
+                _ => None,
+            }),
+            Some("GLO")
+        );
+        assert_eq!(
+            yaml_get(&value, "document_types.glossary.directory").and_then(|v| match v {
+                yaml_serde::Value::String(text) => Some(text.as_str()),
+                _ => None,
+            }),
+            Some("glossary/")
+        );
         assert!(matches!(
             yaml_get(&value, "document_types.glossary.enabled"),
             Some(yaml_serde::Value::Bool(false))
         ));
 
         let before = project.read_config();
-        let err = config_set(&ctx, "document_types.glossary.prefix", "REQ")
+        let err = config_set(&ctx, "document_types.glossary.statuses", "active,review")
             .err()
             .expect("config set must refuse an invalid result");
         assert!(matches!(err, AppError::Validation(_)), "{:?}", err);
-        assert!(err.message().contains("already used"), "{}", err);
+        assert!(
+            err.message().contains("document_types.glossary.statuses"),
+            "{}",
+            err
+        );
         assert_eq!(project.read_config(), before);
     }
 
@@ -2275,5 +3149,80 @@ mod tests {
             yaml_serde::from_str::<DocTypeEntry>("prefix: DEP\ndirectory: deploy/\ntemplate: x\n")
                 .is_err()
         );
+    }
+    #[test]
+    fn to_config_yaml_renders_mapping_sequences_as_blocks_and_flat_lists_inline() {
+        let value: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  deploy:\n    prefix: DEP\n    directory: deploy/\n    fields:\n      - key: description\n        heading: '## User Story'\n        verbs: [create]\n",
+        )
+        .unwrap();
+        let rendered = to_config_yaml(&value).unwrap();
+        assert!(
+            rendered.contains(
+                "    fields:\n      - key: description\n        heading: \"## User Story\"\n        verbs: [create]\n"
+            ),
+            "{rendered}"
+        );
+        assert!(!rendered.contains("[{key:"), "{rendered}");
+        let reparsed: yaml_serde::Value = yaml_serde::from_str(&rendered).unwrap();
+        assert_eq!(reparsed, value);
+    }
+
+    #[test]
+    fn init_value_is_minimal_and_marks_only_disabled_entries() {
+        let mut config = Config::default();
+        config.document_types.get_mut("req").unwrap().enabled = false;
+        let value = config.init_value().unwrap();
+        let rendered = to_config_yaml(&value).unwrap();
+        assert!(
+            rendered.contains(
+                "  req:\n    prefix: REQ\n    directory: requirements/business/\n    enabled: false\n"
+            ),
+            "{rendered}"
+        );
+        assert!(
+            rendered
+                .contains("  nfr:\n    prefix: NFR\n    directory: requirements/non-functional/\n"),
+            "{rendered}"
+        );
+        assert!(
+            !rendered.contains("statuses: [active, archived]"),
+            "{rendered}"
+        );
+        assert!(!rendered.contains("    fields:"), "{rendered}");
+        let reparsed: Config = yaml_serde::from_value(value).unwrap();
+        assert!(!reparsed.document_types["req"].enabled);
+        assert_eq!(reparsed.document_types["nfr"].statuses, None);
+    }
+
+    #[test]
+    fn validate_document_types_declarations_names_unknown_keys_and_enums() {
+        let value: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  deploy:\n    prefix: DEP\n    directory: deploy/\n    model: SingleMarkdown\n    fields:\n      - key: description\n        heading: '## Description'\n        kind: paragraph\n        order: 1\n",
+        )
+        .unwrap();
+        let errors = validate_document_types_declarations(&value);
+        assert_eq!(
+            errors,
+            vec![
+                "document_types.deploy.model: not a configuration key",
+                "document_types.deploy.fields[description].order: not a valid field key",
+                "document_types.deploy.fields[description].kind: must be text, multiline, or list",
+            ]
+        );
+    }
+
+    #[test]
+    fn resolve_selector_reads_keyed_and_indexed_field_forms() {
+        let value: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  deploy:\n    prefix: DEP\n    directory: deploy/\n    fields:\n      - key: story\n        heading: '## User Story'\n      - key: description\n        heading: '## Description'\n",
+        )
+        .unwrap();
+        let keyed =
+            resolve_selector(&value, "document_types.deploy.fields[story].heading").unwrap();
+        let indexed = resolve_selector(&value, "document_types.deploy.fields[0].heading").unwrap();
+        assert_eq!(keyed, indexed);
+        assert!(resolve_selector(&value, "document_types.deploy.fields[9].heading").is_err());
+        assert!(resolve_selector(&value, "document_types.deploy.fields[unknown].heading").is_err());
     }
 }

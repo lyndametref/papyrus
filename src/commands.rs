@@ -1,7 +1,8 @@
 use crate::CommandOutput;
 use crate::config::{
-    Config, is_list_valued_key, merge_yaml, parse_list_value, render_yaml_flow, to_config_yaml,
-    validate_browser_host, validate_key_path, yaml_get, yaml_set, yaml_unset,
+    Config, is_list_valued_key, merge_yaml, parse_list_value, render_yaml_flow, resolve_selector,
+    selector_targets_field, to_config_yaml, valid_config_selector, validate_browser_host,
+    validate_document_types_declarations, yaml_get, yaml_set, yaml_unset,
 };
 use crate::context::Context;
 use crate::error::AppError;
@@ -55,21 +56,50 @@ fn yaml_scalar_to_string(v: &yaml_serde::Value) -> String {
     }
 }
 
-pub fn load_effective_value(config_path: &Path) -> Result<yaml_serde::Value, AppError> {
+fn read_raw_config(config_path: &Path) -> Result<yaml_serde::Value, AppError> {
     if !config_path.exists() {
         return Err(AppError::Runtime(format!(
             "configuration file not found: {}; run `papyrus init` to create it",
             config_path.display()
         )));
     }
+    let raw = std::fs::read_to_string(config_path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    yaml_serde::from_str(&raw).map_err(|e| AppError::Validation(e.to_string()))
+}
+
+fn effective_value_from_raw(overlay: &yaml_serde::Value) -> Result<yaml_serde::Value, AppError> {
     let default_cfg = Config::default();
     let mut base =
         yaml_serde::to_value(&default_cfg).map_err(|e| AppError::Runtime(e.to_string()))?;
-    let raw = std::fs::read_to_string(config_path).map_err(|e| AppError::Runtime(e.to_string()))?;
-    let overlay: yaml_serde::Value =
-        yaml_serde::from_str(&raw).map_err(|e| AppError::Validation(e.to_string()))?;
-    merge_yaml(&mut base, &overlay);
+    merge_yaml(&mut base, overlay);
     Ok(base)
+}
+
+/// Validate a raw file value as a candidate configuration.
+///
+/// The raw `document_types` declarations are checked first so unknown keys and
+/// enum values keep their selector-path diagnostics; the resulting effective
+/// configuration is then validated by [`Config::validate`].
+fn validate_candidate(
+    file_val: &yaml_serde::Value,
+    project_dir: &Path,
+) -> Result<Config, AppError> {
+    let structural = validate_document_types_declarations(file_val);
+    if !structural.is_empty() {
+        return Err(AppError::Validation(structural.join("\n")));
+    }
+    let val = effective_value_from_raw(file_val)?;
+    validate_browser_yaml(&val).map_err(AppError::Validation)?;
+    let cfg: Config =
+        yaml_serde::from_value(val).map_err(|e| AppError::Validation(e.to_string()))?;
+    cfg.validate(Some(project_dir))
+        .map_err(AppError::Validation)?;
+    Ok(cfg)
+}
+
+pub fn load_effective_value(config_path: &Path) -> Result<yaml_serde::Value, AppError> {
+    let overlay = read_raw_config(config_path)?;
+    effective_value_from_raw(&overlay)
 }
 
 /// Validate the browser keys in the merged YAML before deserialization.
@@ -108,7 +138,12 @@ fn validate_browser_yaml(val: &yaml_serde::Value) -> Result<(), String> {
 }
 
 pub fn load_effective_config(config_path: &Path, project_dir: &Path) -> Result<Config, AppError> {
-    let val = load_effective_value(config_path)?;
+    let raw = read_raw_config(config_path)?;
+    let structural = validate_document_types_declarations(&raw);
+    if !structural.is_empty() {
+        return Err(AppError::Validation(structural.join("\n")));
+    }
+    let val = effective_value_from_raw(&raw)?;
     validate_browser_yaml(&val).map_err(AppError::Validation)?;
     let cfg: Config =
         yaml_serde::from_value(val).map_err(|e| AppError::Validation(e.to_string()))?;
@@ -156,7 +191,7 @@ pub fn config_list(ctx: &Context) -> Result<CommandOutput, AppError> {
 }
 
 pub fn config_get(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
-    if !valid_sanitized_key(key) {
+    if !valid_config_selector(key) {
         return Err(AppError::Validation("invalid key".to_string()));
     }
     let val = load_effective_value(&ctx.config_path)?;
@@ -213,11 +248,18 @@ pub fn config_get(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
         }
     }
 
-    let found =
-        yaml_get(&val, key).ok_or_else(|| AppError::NotFound(format!("key not found: {}", key)))?;
-    // A list-valued key is printed in flow form, including a block-style list
-    // read from a hand-edited file (specification items 13-16).
-    let text = if is_list_valued_key(key) && matches!(found, yaml_serde::Value::Sequence(_)) {
+    let found = match resolve_selector(&val, key) {
+        Ok(found) => found,
+        Err(reason) if key.starts_with("document_types.") => {
+            return Err(AppError::Validation(format!("{}: {}", key, reason)));
+        }
+        Err(_) => {
+            return Err(AppError::NotFound(format!("key not found: {}", key)));
+        }
+    };
+    // A sequence is printed in flow form, including a block-style list read
+    // from a hand-edited file and a field's verbs list.
+    let text = if matches!(found, yaml_serde::Value::Sequence(_)) {
         render_yaml_flow(found)
     } else {
         yaml_scalar_to_string(found)
@@ -235,8 +277,14 @@ pub fn config_get(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
 }
 
 pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput, AppError> {
-    if !valid_sanitized_key(key) {
+    if !valid_config_selector(key) {
         return Err(AppError::Validation("invalid key".to_string()));
+    }
+    if selector_targets_field(key) {
+        return Err(AppError::Validation(format!(
+            "{}: fields are configuration file data and cannot be changed by config set",
+            key
+        )));
     }
     // The key is classified before the value is parsed (ADR-0024 decision 1).
     // A list-valued key takes the comma-separated form and never enters the
@@ -261,29 +309,20 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
         file_val = yaml_serde::Value::Mapping(yaml_serde::Mapping::new());
     }
 
-    // Materialize the full default document_types map when absent, so editing
-    // document_types.<slug>.<field> never drops the default set.
-    if key.starts_with("document_types.") && yaml_get(&file_val, "document_types").is_none() {
-        let default_cfg = Config::default();
-        let default_val =
-            yaml_serde::to_value(&default_cfg).map_err(|e| AppError::Runtime(e.to_string()))?;
-        let default_dt = yaml_get(&default_val, "document_types")
-            .cloned()
-            .ok_or_else(|| AppError::Runtime("default document_types missing".to_string()))?;
-        yaml_set(&mut file_val, "document_types", default_dt).map_err(AppError::Validation)?;
+    // Materialize only the target entry when the file declares no
+    // `document_types` map. The entry carries its seed prefix and directory,
+    // which are never filled (REQ-07.002, TC-114).
+    if key.starts_with("document_types.") {
+        let slug = key.split('.').nth(1).unwrap_or_default();
+        let entry_key = format!("document_types.{}", slug);
+        if yaml_get(&file_val, &entry_key).is_none() {
+            materialize_target_entry(&mut file_val, key)?;
+        }
     }
 
     yaml_set(&mut file_val, key, parsed.clone()).map_err(AppError::Validation)?;
 
-    // validate merged effective
-    let default_cfg = Config::default();
-    let mut base = yaml_serde::to_value(&default_cfg).unwrap();
-    merge_yaml(&mut base, &file_val);
-    validate_browser_yaml(&base).map_err(AppError::Validation)?;
-    let cfg: Config = yaml_serde::from_value(base)
-        .map_err(|e| AppError::Validation(format!("{}: {}", key, e)))?;
-    cfg.validate(Some(&ctx.project_dir))
-        .map_err(AppError::Validation)?;
+    validate_candidate(&file_val, &ctx.project_dir)?;
 
     // Folder relocation, if applicable, runs before persistence.
     let mut relocation_cross_device = false;
@@ -327,8 +366,14 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
 }
 
 pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
-    if !valid_sanitized_key(key) {
+    if !valid_config_selector(key) {
         return Err(AppError::Validation("invalid key".to_string()));
+    }
+    if selector_targets_field(key) {
+        return Err(AppError::Validation(format!(
+            "{}: fields are configuration file data and cannot be changed by config unset",
+            key
+        )));
     }
     let mut file_val = if ctx.config_path.exists() {
         let raw = std::fs::read_to_string(&ctx.config_path)
@@ -343,15 +388,7 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
 
     yaml_unset(&mut file_val, key).map_err(AppError::Validation)?;
 
-    // validate merged
-    let default_cfg = Config::default();
-    let mut base = yaml_serde::to_value(&default_cfg).unwrap();
-    merge_yaml(&mut base, &file_val);
-    validate_browser_yaml(&base).map_err(AppError::Validation)?;
-    let cfg: Config =
-        yaml_serde::from_value(base).map_err(|e| AppError::Validation(e.to_string()))?;
-    cfg.validate(Some(&ctx.project_dir))
-        .map_err(AppError::Validation)?;
+    validate_candidate(&file_val, &ctx.project_dir)?;
 
     // write or remove
     let is_empty_map = matches!(&file_val, yaml_serde::Value::Mapping(m) if m.is_empty());
@@ -490,12 +527,43 @@ fn folder_paths(
     Ok((source, destination))
 }
 
-fn valid_sanitized_key(key: &str) -> bool {
-    if !validate_key_path(key) {
-        return false;
-    }
-    key.split('.')
-        .all(|p| crate::sanitize::sanitize_path_component(p).is_some())
+/// Materialize the single target entry from the seed prefix and directory.
+fn materialize_target_entry(file_val: &mut yaml_serde::Value, key: &str) -> Result<(), AppError> {
+    let slug = key
+        .split('.')
+        .nth(1)
+        .filter(|slug| !slug.is_empty())
+        .ok_or_else(|| AppError::Validation("invalid key".to_string()))?;
+    let defaults = Config::default();
+    let seed = defaults.document_types.get(slug).ok_or_else(|| {
+        AppError::Validation(format!(
+            "document_types.{}.directory: cannot be introduced by config set; add the entry and its prefix and directory to the configuration file",
+            slug
+        ))
+    })?;
+    let mut entry = yaml_serde::Mapping::new();
+    entry.insert(
+        yaml_serde::Value::String("prefix".to_string()),
+        yaml_serde::Value::String(seed.prefix.clone()),
+    );
+    entry.insert(
+        yaml_serde::Value::String("directory".to_string()),
+        yaml_serde::Value::String(seed.directory.clone()),
+    );
+    let mut document_types = match yaml_get(file_val, "document_types") {
+        Some(yaml_serde::Value::Mapping(existing)) => existing.clone(),
+        _ => yaml_serde::Mapping::new(),
+    };
+    document_types.insert(
+        yaml_serde::Value::String(slug.to_string()),
+        yaml_serde::Value::Mapping(entry),
+    );
+    yaml_set(
+        file_val,
+        "document_types",
+        yaml_serde::Value::Mapping(document_types),
+    )
+    .map_err(AppError::Validation)
 }
 
 fn effective_project_name_from_dir(project_dir: &std::path::Path) -> String {

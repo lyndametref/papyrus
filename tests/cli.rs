@@ -92,13 +92,13 @@ fn init_writes_the_eleven_document_types_with_seeded_flow_statuses() {
         assert!(cfg.contains(&format!("\n  {}:\n", slug)), "{}", cfg);
     }
     assert!(!cfg.contains("\n  deploy:\n"), "{}", cfg);
-    assert_eq!(
-        cfg.matches("statuses: [active, archived]").count(),
-        10,
-        "{}",
+    assert!(
+        !cfg.contains("statuses: [active, archived]"),
+        "init writes minimal entries, not seed collections: {}",
         cfg
     );
     assert!(!cfg.contains("    default_status"), "{}", cfg);
+    assert!(!cfg.contains("    fields:"), "{}", cfg);
 
     let get = bin()
         .args([
