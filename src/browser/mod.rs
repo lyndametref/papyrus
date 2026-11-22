@@ -3197,7 +3197,7 @@ fn api_doc_list(slug: &str, state: &ServerState) -> Result<Response, HttpError> 
     if let Some(TypedHandler::Requirement(_)) = handler_of(descriptor) {
         return Ok(Response::json(200, requirements_json(descriptor, &index)));
     }
-    if descriptor.schema.is_none() {
+    if descriptor.handler().is_none() {
         let items: Vec<serde_json::Value> = index
             .records
             .iter()

@@ -1,4 +1,3 @@
-pub mod audit;
 pub mod browser;
 pub mod check;
 pub mod cli;
@@ -8,24 +7,16 @@ pub mod context;
 pub mod decision;
 pub mod document;
 pub mod error;
-pub mod glossary;
 pub mod import;
 pub mod init;
 pub mod milestone;
 pub mod record;
 pub mod registry;
 pub mod release;
-pub mod requirement;
-pub mod rule;
 pub mod sanitize;
 pub mod search;
 pub mod task;
-pub mod tech_spec;
-pub mod test_case;
-pub mod test_report;
 pub mod ui_mockup;
-pub mod ui_spec;
-pub mod use_case;
 
 /// Documented record types accepted by `papyrus search --type`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]

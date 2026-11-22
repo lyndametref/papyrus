@@ -87,7 +87,7 @@ impl Record {
     }
 
     pub fn is_generic(&self) -> bool {
-        self.descriptor.schema.is_none()
+        self.descriptor.handler().is_none()
     }
 
     pub fn is_html_mockup(&self) -> bool {
