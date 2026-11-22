@@ -5,7 +5,11 @@
   "corpus_hash": "46d64349137f7017f6ee04bcfd6a3d3042b7b6bc23245749dac400804581988f",
   "corpus_files": 1001,
   "harness_command": "cargo test --release --test benchmark_baseline -- --ignored --nocapture",
-  "git_commit": "c34cf77a209d8af09b759b4534e146fb617cc2aa",
+  "git_commit": "cd26ef564baa89e47e82f6d78e9b68642a2908ab",
+  "production_tree_commit": "3bc3ce518238f2a36b9c095df0e7226bf889184a",
+  "harness_commit": "d46d6dfee641dfb1692ff9696d6a8fdc95878db2",
+  "harness_worktree_modified": true,
+  "purpose": "recorded baseline run",
   "rustc_version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
   "build_profile": "release (lto=true, strip=true)",
   "host": {
@@ -17,7 +21,7 @@
     "kernel": "Linux 7.2.15+deb14-amd64 x86_64",
     "distribution": "Debian GNU/Linux forky/sid"
   },
-  "date": "2026-11-21T21:49:20+01:00",
+  "date": "2026-11-22T06:51:28+01:00",
   "run": "a",
   "protocol": {
     "reduced_sample_protocol": true,
@@ -49,22 +53,23 @@
       "warmups": 2,
       "measured": 20,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty",
       "baseline_only_p95": true,
       "server_observed_ms": {
-        "p50": 75682,
-        "p95": 76507,
-        "min": 74390,
-        "max": 76595,
-        "mean": 75740.65
+        "p50": 75546,
+        "p95": 76532,
+        "min": 73864,
+        "max": 76705,
+        "mean": 75464.0
       },
       "wall_us": {
-        "p50": 75683083,
-        "p95": 76507625,
-        "min": 74390570,
-        "max": 76595629,
-        "mean": 75741426.25
+        "p50": 75546337,
+        "p95": 76532400,
+        "min": 73864616,
+        "max": 76705755,
+        "mean": 75464530.4
       }
     },
     {
@@ -74,22 +79,49 @@
       "warmups": 2,
       "measured": 20,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty",
       "baseline_only_p95": true,
       "server_observed_ms": {
-        "p50": 2980,
-        "p95": 2994,
-        "min": 2889,
-        "max": 2996,
-        "mean": 2965.7
+        "p50": 2939,
+        "p95": 2998,
+        "min": 2882,
+        "max": 3010,
+        "mean": 2956.7
       },
       "wall_us": {
-        "p50": 2980624,
-        "p95": 2994441,
-        "min": 2889260,
-        "max": 2996605,
-        "mean": 2966295.85
+        "p50": 2939539,
+        "p95": 2998795,
+        "min": 2882942,
+        "max": 3010298,
+        "mean": 2957394.4
+      }
+    },
+    {
+      "label": "view-grouped-group",
+      "path": "/doc/REQ-001",
+      "band": "B",
+      "warmups": 2,
+      "measured": 20,
+      "truncated": false,
+      "forced_band": true,
+      "full_protocol_measured": 100,
+      "reason": "band B assigned by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); no value is extrapolated",
+      "baseline_only_p95": true,
+      "server_observed_ms": {
+        "p50": 23142,
+        "p95": 23648,
+        "min": 22874,
+        "max": 23664,
+        "mean": 23233.3
+      },
+      "wall_us": {
+        "p50": 23142995,
+        "p95": 23648737,
+        "min": 22874437,
+        "max": 23664667,
+        "mean": 23234078.95
       }
     },
     {
@@ -99,22 +131,23 @@
       "warmups": 2,
       "measured": 20,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty",
       "baseline_only_p95": true,
       "server_observed_ms": {
-        "p50": 23746,
-        "p95": 24154,
-        "min": 23240,
-        "max": 24229,
-        "mean": 23772.5
+        "p50": 23431,
+        "p95": 23950,
+        "min": 23080,
+        "max": 23956,
+        "mean": 23476.75
       },
       "wall_us": {
-        "p50": 23746744,
-        "p95": 24154684,
-        "min": 23240810,
-        "max": 24229967,
-        "mean": 23773353.75
+        "p50": 23431749,
+        "p95": 23950568,
+        "min": 23080875,
+        "max": 23956739,
+        "mean": 23477298.85
       }
     },
     {
@@ -124,6 +157,7 @@
       "warmups": 10,
       "measured": 100,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band A: full NFR-007 protocol (10 warm-up + 100 measured)",
       "baseline_only_p95": false,
@@ -131,15 +165,93 @@
         "p50": 2,
         "p95": 2,
         "min": 2,
-        "max": 2,
-        "mean": 2.0
+        "max": 3,
+        "mean": 2.01
       },
       "wall_us": {
-        "p50": 2945,
-        "p95": 2992,
-        "min": 2878,
-        "max": 3055,
-        "mean": 2940.86
+        "p50": 3025,
+        "p95": 3076,
+        "min": 2897,
+        "max": 3207,
+        "mean": 3022.74
+      }
+    },
+    {
+      "label": "view-unresolved-reference",
+      "path": "/doc/REQ-001.004",
+      "band": "B",
+      "warmups": 2,
+      "measured": 20,
+      "truncated": false,
+      "forced_band": true,
+      "full_protocol_measured": 100,
+      "reason": "band B assigned by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); no value is extrapolated",
+      "baseline_only_p95": true,
+      "server_observed_ms": {
+        "p50": 23651,
+        "p95": 23861,
+        "min": 23286,
+        "max": 24010,
+        "mean": 23613.55
+      },
+      "wall_us": {
+        "p50": 23651482,
+        "p95": 23861745,
+        "min": 23287025,
+        "max": 24010901,
+        "mean": 23614433.7
+      }
+    },
+    {
+      "label": "edit-single-markdown",
+      "path": "/doc/NOTE-001/edit",
+      "band": "B",
+      "warmups": 2,
+      "measured": 20,
+      "truncated": false,
+      "forced_band": true,
+      "full_protocol_measured": 100,
+      "reason": "band B assigned by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); no value is extrapolated",
+      "baseline_only_p95": true,
+      "server_observed_ms": {
+        "p50": 2942,
+        "p95": 2973,
+        "min": 2905,
+        "max": 2982,
+        "mean": 2943.55
+      },
+      "wall_us": {
+        "p50": 2942539,
+        "p95": 2973277,
+        "min": 2905751,
+        "max": 2982970,
+        "mean": 2944266.9
+      }
+    },
+    {
+      "label": "edit-grouped-group",
+      "path": "/doc/REQ-001/edit",
+      "band": "B",
+      "warmups": 2,
+      "measured": 20,
+      "truncated": false,
+      "forced_band": true,
+      "full_protocol_measured": 100,
+      "reason": "band B assigned by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); no value is extrapolated",
+      "baseline_only_p95": true,
+      "server_observed_ms": {
+        "p50": 23200,
+        "p95": 23642,
+        "min": 22965,
+        "max": 23664,
+        "mean": 23273.8
+      },
+      "wall_us": {
+        "p50": 23200687,
+        "p95": 23643173,
+        "min": 22965616,
+        "max": 23665076,
+        "mean": 23274472.5
       }
     },
     {
@@ -149,67 +261,77 @@
       "warmups": 2,
       "measured": 20,
       "truncated": false,
+      "forced_band": false,
       "full_protocol_measured": 100,
       "reason": "band B: p50 >= 1000 ms before reduction; 20 measured < 100 full-protocol samples because of pre-refactor per-request latency, not measurement uncertainty",
       "baseline_only_p95": true,
       "server_observed_ms": {
-        "p50": 23787,
-        "p95": 24008,
-        "min": 23103,
-        "max": 24046,
-        "mean": 23712.35
+        "p50": 23596,
+        "p95": 23820,
+        "min": 23268,
+        "max": 23870,
+        "mean": 23610.35
       },
       "wall_us": {
-        "p50": 23787658,
-        "p95": 24008887,
-        "min": 23104098,
-        "max": 24047100,
-        "mean": 23713159.85
+        "p50": 23597141,
+        "p95": 23820567,
+        "min": 23269063,
+        "max": 23870514,
+        "mean": 23611131.85
       }
-    }
-  ],
-  "omitted_routes": [
-    {
-      "label": "view-grouped-group",
-      "path": "/doc/REQ-001",
-      "measured": false,
-      "band": null,
-      "reason": "not measured: at 1,000 records the band-B routes are limited to the representative set; no value is extrapolated"
-    },
-    {
-      "label": "view-unresolved-reference",
-      "path": "/doc/REQ-001.004",
-      "measured": false,
-      "band": null,
-      "reason": "not measured: at 1,000 records the band-B routes are limited to the representative set; no value is extrapolated"
-    },
-    {
-      "label": "edit-single-markdown",
-      "path": "/doc/NOTE-001/edit",
-      "measured": false,
-      "band": null,
-      "reason": "not measured: at 1,000 records the band-B routes are limited to the representative set; no value is extrapolated"
-    },
-    {
-      "label": "edit-grouped-group",
-      "path": "/doc/REQ-001/edit",
-      "measured": false,
-      "band": null,
-      "reason": "not measured: at 1,000 records the band-B routes are limited to the representative set; no value is extrapolated"
     },
     {
       "label": "edit-single-html-mockup",
       "path": "/doc/MOCK-001/edit",
-      "measured": false,
-      "band": null,
-      "reason": "not measured: at 1,000 records the band-B routes are limited to the representative set; no value is extrapolated"
+      "band": "B",
+      "warmups": 2,
+      "measured": 20,
+      "truncated": false,
+      "forced_band": true,
+      "full_protocol_measured": 100,
+      "reason": "band B assigned by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); no value is extrapolated",
+      "baseline_only_p95": true,
+      "server_observed_ms": {
+        "p50": 2,
+        "p95": 2,
+        "min": 2,
+        "max": 2,
+        "mean": 2.0
+      },
+      "wall_us": {
+        "p50": 2756,
+        "p95": 2848,
+        "min": 2702,
+        "max": 2866,
+        "mean": 2762.55
+      }
     },
     {
       "label": "edit-unresolved-reference",
       "path": "/doc/REQ-001.004/edit",
-      "measured": false,
-      "band": null,
-      "reason": "not measured: at 1,000 records the band-B routes are limited to the representative set; no value is extrapolated"
+      "band": "B",
+      "warmups": 2,
+      "measured": 20,
+      "truncated": false,
+      "forced_band": true,
+      "full_protocol_measured": 100,
+      "reason": "band B assigned by TASK-292 C-1 at 1,000 records (2 warm-up + 20 measured); no value is extrapolated",
+      "baseline_only_p95": true,
+      "server_observed_ms": {
+        "p50": 23504,
+        "p95": 23777,
+        "min": 23186,
+        "max": 23828,
+        "mean": 23522.5
+      },
+      "wall_us": {
+        "p50": 23505211,
+        "p95": 23777482,
+        "min": 23187169,
+        "max": 23828689,
+        "mean": 23523315.55
+      }
     }
-  ]
+  ],
+  "omitted_routes": []
 }

@@ -2,7 +2,7 @@
 id: TASK-241
 title: "Implement the benchmark harness and record pre-refactor baselines at 100 and 1,000 records"
 created_date: '2026-11-20T17:40:57Z'
-updated_date: '2026-11-21T20:53:27Z'
+updated_date: '2026-11-22T01:41:09Z'
 labels: []
 references:
   - NFR-007.001
@@ -89,3 +89,5 @@ Definition of done: three profiles generated and measured twice each at the samp
 - **rust-dev**: records-382 table, 2 runs, server p50 and p95 ms with band and warmup+measured: inventory B 2+20 11756 11975 baseline-only; view-single-markdown A 10+100 554 566; view-grouped-group B 2+20 3566 3613 baseline-only; view-grouped-member B 2+20 3682 3718 baseline-only; view-single-html-mockup A 10+100 2 2; view-unresolved-reference B 2+20 3693 3727 baseline-only; edit-single-markdown A 10+100 554 568; edit-grouped-group B 2+20 3514 3612 baseline-only; edit-grouped-member B 2+20 3684 3723 baseline-only; edit-single-html-mockup A 10+100 1 1; edit-unresolved-reference B 2+20 3648 3730 baseline-only.
 - **rust-dev**: records-1000 table, single run A, server p50 and p95 ms with band and warmup+measured: inventory B 2+20 75682 76507 baseline-only; view-single-markdown B 2+20 2980 2994 baseline-only; view-grouped-member B 2+20 23746 24154 baseline-only; view-single-html-mockup A 10+100 2 2; edit-grouped-member B 2+20 23787 24008 baseline-only. Omitted: view-grouped-group, view-unresolved-reference, edit-single-markdown, edit-grouped-group, edit-single-html-mockup, edit-unresolved-reference. The single-run p95 is baseline-only and is never compared with the NFR-007 thresholds.
 - **orchestrator**: Acceptance met: benchmark harness and deterministic 100, 382 and 1000-record corpora, pre-refactor baselines recorded with band and sample counts (inventory p50 1041 ms, 11756 ms and 75682 ms), 1000-profile run-A-only deviation recorded, root causes evidenced, suite green with 1136 tests passing.
+- **rust-dev**: TASK-292 C-5 rationale for the TASK-241 test infrastructure changes: the project-empty fixture deletions restore the documented invariant that the pinned empty project contains only papyrus.config.yml and no record files; the three removed files had arrived in unrelated commits.
+- **rust-dev**: TASK-292 C-5 rationale for the TASK-241 test infrastructure changes: version-token normalisation maps the mtime-derived token in edit and conflict pages and JSON payloads to the {{VERSION}} placeholder, because the token changes on every copy and would make byte replay flaky.

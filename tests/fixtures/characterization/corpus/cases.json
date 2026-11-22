@@ -4063,6 +4063,221 @@
       ],
       "renderer": "board_page",
       "project": "project-empty"
+    },
+    {
+      "id": "http/conflict-nfr",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/doc/NFR-001.001",
+        "body": "version=1.0.1&title=Conflict+probe&description=Stale+description"
+      },
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "conflict_page"
+    },
+    {
+      "id": "http/conflict-glossary",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/doc/GLO-001",
+        "body": "version=1.0.1&title=Conflict+probe&description=Stale+description&labels=stale&references=REQ-999"
+      },
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "conflict_page"
+    },
+    {
+      "id": "http/conflict-ui-spec",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/doc/UI-001",
+        "body": "version=1.0.1&title=Conflict+probe&description=Stale+description"
+      },
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "conflict_page"
+    },
+    {
+      "id": "http/api-doc-post-success",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/api/doc/REQ-001.003",
+        "content_type": "application/json",
+        "body": "{\"version\":\"{{VERSION}}\",\"title\":\"API probe\"}"
+      },
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/api-doc-post-conflict",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/api/doc/REQ-001.003",
+        "content_type": "application/json",
+        "body": "{\"version\":\"1.0.1\",\"title\":\"API probe\"}"
+      },
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "payload.json"
+      ]
+    },
+    {
+      "id": "http/form-post-success",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/doc/REQ-001.003",
+        "body": "version={{VERSION}}&title=Form+probe&description=Form+description"
+      },
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json"
+      ]
+    },
+    {
+      "id": "http/form-post-validation",
+      "kind": "http",
+      "request": {
+        "method": "POST",
+        "path": "/doc/REQ-001.002",
+        "body": "version={{VERSION}}&title=&description=Invalid+description"
+      },
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "edit_page"
+    },
+    {
+      "id": "http/not-found-req",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/REQ-999.001"
+      },
+      "document_type": "req",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "document_not_found_page"
+    },
+    {
+      "id": "http/not-found-nfr",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/NFR-999.001"
+      },
+      "document_type": "nfr",
+      "model": "GroupedMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "document_not_found_page"
+    },
+    {
+      "id": "http/not-found-glossary",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/GLO-999"
+      },
+      "document_type": "glossary",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "document_not_found_page"
+    },
+    {
+      "id": "http/not-found-rule",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/BR-999"
+      },
+      "document_type": "rule",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "document_not_found_page"
+    },
+    {
+      "id": "http/not-found-audit",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/AUD-999"
+      },
+      "document_type": "audit",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "document_not_found_page"
+    },
+    {
+      "id": "http/not-found-ui-spec",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/UI-999"
+      },
+      "document_type": "ui-spec",
+      "model": "SingleMarkdown",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "document_not_found_page"
+    },
+    {
+      "id": "http/not-found-ui-mockup",
+      "kind": "http",
+      "request": {
+        "method": "GET",
+        "path": "/doc/MOCK-999"
+      },
+      "document_type": "ui-mockup",
+      "model": "SingleHtmlMockup",
+      "artifacts": [
+        "http.json",
+        "page.html"
+      ],
+      "renderer": "document_not_found_page"
     }
   ]
 }
