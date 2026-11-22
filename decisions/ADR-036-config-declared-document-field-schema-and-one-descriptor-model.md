@@ -2,7 +2,7 @@
 id: ADR-036
 title: "Config-declared document field schema and one descriptor model"
 created_date: '2026-11-20T18:28:00Z'
-updated_date: '2026-11-22T12:03:30Z'
+updated_date: '2026-11-22T12:45:34Z'
 labels: []
 references:
   - RE-010
@@ -29,6 +29,7 @@ references:
   - TECH-071
   - TECH-072
   - TECH-077
+  - ADR-042
 superseded_by: null
 ---
 # ADR-036 Config-declared document field schema and one descriptor model
@@ -40,6 +41,11 @@ accepted
 
 - **Decision 32, "An absent slug stays absent":** the eleven seed slugs of decision 29 are always part of the effective configuration and resolve from the seed table whether or not the project file declares them; a partially declared `document_types` map does not remove the other seed types. "An absent slug stays absent" applies to non-seed (user-defined) slugs, and to the written file, which never gains entries that the command did not target. The fill and replace rules for a declared entry in decision 32 are unchanged. ADR-041's seed slot sets are likewise always effective.
 - No other decision, downstream constraint, or status changes.
+
+### Clarification (2026-11-22) — audit field default
+
+- **Decision 29 seed table — `audit` carries one field default.** The `audit` seed entry carries `field_defaults: { audit_type: security }`; every other seed entry carries an empty `field_defaults`. `SeedDocumentType` gains the `field_defaults` slice and the resolved descriptor exposes the same map. On `create`, an absent field that has a seed default is written through the ordinary `PatchOp` path; on `edit` an absent field stays absent. `field_defaults` is not a `FieldSpec` key, not a configuration key, and not accepted in a project entry; a user-defined type has no field defaults (ADR-042 ruling 1). Decision 11's nine-key `FieldSpec` and decision 32's scalar-fill and collection-replace rules are unchanged; no other type gains a default.
+- **Not changed:** decisions 4-28 and 30-37, the downstream constraints, and this record's accepted status.
 ## Supersession
 
 1. This ADR supersedes ADR-0017 decisions 1, 2, 3, 4, 7, 9, and 10 and downstream constraints 1 and 4, and only those. ADR-0017 decisions 5, 6, and 8 and downstream constraints 2, 3, 5, and 6 remain in force. ADR-0017 keeps its accepted status because the supersession is by decision, not in full.
