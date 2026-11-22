@@ -1408,7 +1408,7 @@ mod tests {
         let path = dir.join("backlog/tasks/TASK-001.md");
         let doc = document::parse(content).unwrap();
         let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let ops = retire_legacy_body_ops(&doc, desc, &path);
+        let ops = retire_legacy_body_ops(&doc, &desc, &path);
         let out = patch::apply_patch(&doc, &ops).unwrap();
         assert!(!out.contains("# TASK-001 Title"), "{}", out);
         assert!(!out.contains("## Status"), "{}", out);
@@ -1436,7 +1436,7 @@ mod tests {
         let path = dir.join("backlog/milestones/MS-001.md");
         let doc = document::parse(content).unwrap();
         let desc = crate::record::descriptor::descriptor_for("milestone").unwrap();
-        let ops = retire_legacy_body_ops(&doc, desc, &path);
+        let ops = retire_legacy_body_ops(&doc, &desc, &path);
         let out = patch::apply_patch(&doc, &ops).unwrap();
         assert!(!out.contains("# MS-001 Mile"));
         assert!(!out.contains("## Release"));
@@ -1451,7 +1451,7 @@ mod tests {
         let path = dir.join("backlog/tasks/TASK-001.md");
         let doc = document::parse(&content).unwrap();
         let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let ops = retire_legacy_body_ops(&doc, desc, &path);
+        let ops = retire_legacy_body_ops(&doc, &desc, &path);
         let out = patch::apply_patch(&doc, &ops).unwrap();
         assert!(!out.contains("## Status"), "{}", out);
         assert!(out.contains("status: Done"), "{}", out);
@@ -1467,7 +1467,7 @@ mod tests {
         let path = dir.join("backlog/tasks/TASK-001.md");
         let doc = document::parse(&content).unwrap();
         let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let ops = retire_legacy_body_ops(&doc, desc, &path);
+        let ops = retire_legacy_body_ops(&doc, &desc, &path);
         let out = patch::apply_patch(&doc, &ops).unwrap();
         assert!(!out.contains("# TASK-001 Title"), "{}", out);
         assert!(out.contains("## Status\nLine one\nLine two"), "{}", out);
@@ -1480,7 +1480,7 @@ mod tests {
         let path = dir.join("backlog/tasks/TASK-001.md");
         let doc = document::parse(&content).unwrap();
         let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let ops = retire_legacy_body_ops(&doc, desc, &path);
+        let ops = retire_legacy_body_ops(&doc, &desc, &path);
         let out = patch::apply_patch(&doc, &ops).unwrap();
         assert!(out.contains("## Labels"), "{}", out);
     }
@@ -1500,7 +1500,7 @@ mod tests {
             &task_record("\n## Description\nB\n").replace("TASK-001", "TASK-0007"),
         );
         let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let conflicts = scan_migration_conflicts(&c, desc);
+        let conflicts = scan_migration_conflicts(&c, &desc);
         assert!(conflicts.iter().any(|c| matches!(
             c,
             MigrationConflict::DuplicateId { id, paths }
@@ -1522,7 +1522,7 @@ mod tests {
             &tpl.replace("{n}", "9"),
         );
         let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let conflicts = scan_migration_conflicts(&c, desc);
+        let conflicts = scan_migration_conflicts(&c, &desc);
         assert!(conflicts.is_empty(), "{:?}", conflicts);
         assert!(ensure_front_matter(&c, &dir.join("backlog/tasks/TASK-008.md")).is_ok());
         assert!(ensure_front_matter(&c, &dir.join("backlog/tasks/TASK-009.md")).is_ok());
@@ -1536,7 +1536,7 @@ mod tests {
         let path = dir.join("backlog/tasks/TASK-005.md");
         write(&path, &content);
         let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let conflicts = scan_migration_conflicts(&c, desc);
+        let conflicts = scan_migration_conflicts(&c, &desc);
         assert!(conflicts.iter().any(|c| matches!(
             c,
             MigrationConflict::FrontmatterFilenameMismatch { path: p, .. }

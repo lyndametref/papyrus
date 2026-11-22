@@ -3181,7 +3181,7 @@ fn api_doc_list(slug: &str, state: &ServerState) -> Result<Response, HttpError> 
     if let Some(TypedHandler::Requirement(_)) = handler_of(descriptor) {
         return Ok(Response::json(200, requirements_json(descriptor, &index)));
     }
-    if matches!(descriptor.content_model, ContentModel::Generic) {
+    if matches!(&descriptor.content_model, ContentModel::Generic) {
         let items: Vec<serde_json::Value> = index
             .records
             .iter()

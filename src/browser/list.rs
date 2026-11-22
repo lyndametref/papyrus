@@ -150,7 +150,7 @@ impl ListPlan {
         } else {
             None
         };
-        let show_references = !matches!(descriptor.content_model, ContentModel::Generic);
+        let show_references = !matches!(&descriptor.content_model, ContentModel::Generic);
         ListPlan {
             heading: heading.to_string(),
             count_note: count_note.to_string(),

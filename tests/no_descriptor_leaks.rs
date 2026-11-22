@@ -277,3 +277,120 @@ fn after() {\n\
     scan_files("clean:", &clean, |_, line| line.contains("Box::leak"))
         .expect("a clean file must pass");
 }
+
+// TASK-246: no descriptor type may carry static storage, and no process-global
+// descriptor state or free public document-descriptor constructor may return.
+fn forbidden_descriptor_state(_rel: &str, line: &str) -> bool {
+    let trimmed = line.trim_start();
+    line.contains("Box::leak")
+        || line.contains("mem::forget")
+        || line.contains("OnceLock")
+        || line.contains("OnceCell")
+        || line.contains("LazyLock")
+        || line.contains("lazy_static")
+        || line.contains("thread_local")
+        || (trimmed.starts_with("static ") && line.contains("Mutex"))
+        || line.contains("fn generic_document_descriptor(")
+        || line.contains("fn descriptor_for_doc_type(")
+        || line.contains("pub fn document_record(")
+        || line.contains("pub fn document_descriptor(")
+}
+
+#[test]
+fn no_process_global_descriptor_state_anywhere_in_src() {
+    let files = source_files();
+    scan_files(
+        "process-global descriptor state or free document constructor:",
+        &files,
+        forbidden_descriptor_state,
+    )
+    .expect("no production line may hold descriptor state globally");
+}
+
+#[test]
+fn descriptor_guard_detects_each_forbidden_pattern() {
+    for (label, line) in [
+        (
+            "Box::leak",
+            "fn a() { let _ = Box::leak(String::new().into_boxed_str()); }",
+        ),
+        (
+            "OnceLock",
+            "static CACHE: std::sync::OnceLock<u8> = std::sync::OnceLock::new();",
+        ),
+        (
+            "static Mutex",
+            "static CACHE: std::sync::Mutex<Vec<u8>> = std::sync::Mutex::new(Vec::new());",
+        ),
+        (
+            "thread_local",
+            "thread_local! { static CACHE: Vec<u8> = const { Vec::new() }; }",
+        ),
+        ("free constructor", "pub fn document_record(name: &str) {}"),
+    ] {
+        let files = [("fixture.rs".to_string(), format!("{line}\n"))];
+        let error = scan_files("guard:", &files, forbidden_descriptor_state)
+            .expect_err(&format!("{label} must be rejected"));
+        assert!(
+            error.contains("fixture.rs:1:"),
+            "{label} must report file:line, got: {error}"
+        );
+    }
+}
+
+/// Return the text between the braces of the struct introduced by `header`.
+fn struct_body<'a>(content: &'a str, header: &str) -> &'a str {
+    let start = content
+        .find(header)
+        .unwrap_or_else(|| panic!("missing struct header: {header}"));
+    let open = start + content[start..].find('{').expect("struct body opens");
+    let bytes = content.as_bytes();
+    let mut depth = 0i32;
+    for (offset, byte) in bytes.iter().enumerate().skip(open) {
+        match byte {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return &content[open + 1..offset];
+                }
+            }
+            _ => {}
+        }
+    }
+    panic!("unterminated struct: {header}");
+}
+
+#[test]
+fn descriptor_types_declare_no_static_member_or_lifetime_parameter() {
+    let registry = fs::read_to_string("src/registry.rs").expect("registry source");
+    let record = fs::read_to_string("src/record/descriptor.rs").expect("descriptor source");
+
+    for (source, header) in [
+        (&registry, "pub struct ArgSpec {"),
+        (&registry, "pub struct VerbSpec {"),
+        (&registry, "pub struct TypeDescriptor {"),
+        (&record, "pub struct RecordDescriptor {"),
+    ] {
+        let body = struct_body(source, header);
+        assert!(
+            !body.contains("&'static"),
+            "{header} still declares a &'static member:\n{body}"
+        );
+        assert!(
+            !header.contains('<'),
+            "{header} must not declare a lifetime parameter"
+        );
+    }
+
+    let verb = struct_body(&registry, "pub struct VerbSpec {");
+    assert!(
+        verb.contains("pub args: Vec<ArgSpec>"),
+        "VerbSpec.args must be an owned sequence, got:\n{verb}"
+    );
+    let descriptor = struct_body(&registry, "pub struct TypeDescriptor {");
+    assert!(
+        descriptor.contains("pub frontmatter_keys: Vec<String>"),
+        "TypeDescriptor.frontmatter_keys must be owned, got:\n{descriptor}"
+    );
+}

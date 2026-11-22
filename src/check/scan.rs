@@ -67,8 +67,11 @@ pub struct RecordMeta {
 
 /// The four static backlog families; a decision is one family over all
 /// configured decision-type prefixes.
-pub fn static_families(cfg: &Config) -> Vec<FamilyScan<'static>> {
-    crate::record::descriptor::descriptors()
+pub fn static_families<'a>(
+    cfg: &Config,
+    descriptors: &'a [RecordDescriptor],
+) -> Vec<FamilyScan<'a>> {
+    descriptors
         .iter()
         .map(|descriptor| {
             let shape = if descriptor.is_dotted_id() {
@@ -99,7 +102,7 @@ pub fn document_families<'a>(registry: &'a ArtifactRegistry, cfg: &Config) -> Ve
                 IdShape::Dotted => Shape::Dotted,
                 IdShape::Plain => Shape::Plain,
             };
-            let extension = match descriptor.content_model {
+            let extension = match &descriptor.content_model {
                 ContentModel::HtmlMockup(_) => "html",
                 ContentModel::Generic | ContentModel::Typed(_) => "md",
             };

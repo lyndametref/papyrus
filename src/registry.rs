@@ -151,15 +151,19 @@ pub enum TypedHandler {
 }
 
 /// The typed content model of a built-in type (ADR-0018).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+///
+/// Every member is owned: the schema is built from the same literal facts the
+/// former constants held, but the values live on the descriptor rather than in
+/// process-global storage (TECH-071 section 1).
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TypedSchema {
     pub handler: TypedHandler,
     /// Body sections in written order; empty for HTML mockups.
-    pub sections: &'static [&'static str],
+    pub sections: Vec<Cow<'static, str>>,
     /// Extension verbs this family owns; must equal the descriptor's extensions.
-    pub extensions: &'static [Verb],
+    pub extensions: Vec<Verb>,
     /// Ordered per-verb command metadata (ADR-0016 decision 4).
-    pub verbs: &'static [VerbSpec],
+    pub verbs: Vec<VerbSpec>,
 }
 
 /// How a command argument consumes values.
@@ -179,28 +183,28 @@ pub enum ArgAction {
 ///
 /// Argument declarations keep the derive order because `clap` derives help
 /// display order from insertion order.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ArgSpec {
-    pub id: &'static str,
-    pub long: Option<&'static str>,
+    pub id: Cow<'static, str>,
+    pub long: Option<Cow<'static, str>>,
     pub short: Option<char>,
     /// Explicit value name; `""` for switches.
-    pub value_name: &'static str,
-    pub help: &'static str,
+    pub value_name: Cow<'static, str>,
+    pub help: Cow<'static, str>,
     pub positional: bool,
     pub required: bool,
-    pub required_unless_present: Option<&'static str>,
+    pub required_unless_present: Option<Cow<'static, str>>,
     pub action: ArgAction,
-    pub conflicts_with: Option<&'static str>,
+    pub conflicts_with: Option<Cow<'static, str>>,
 }
 
 /// One verb of a document command family.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VerbSpec {
     pub verb: Verb,
     /// Verb help about-line; empty for `audit` and `ui-mockup`.
-    pub about: &'static str,
-    pub args: &'static [ArgSpec],
+    pub about: Cow<'static, str>,
+    pub args: Vec<ArgSpec>,
 }
 
 /// The canonical presentation order of document verbs (ADR-0016 decision 4).
@@ -217,25 +221,28 @@ pub const CANONICAL_DOCUMENT_VERB_ORDER: &[Verb] = &[
 ];
 
 /// The body model of a document type (REQ-07.004, REQ-05.008).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ContentModel {
     /// Config-defined document type (REQ-07.004, ADR-0018).
     Generic,
-    Typed(&'static TypedSchema),
-    HtmlMockup(&'static TypedSchema),
+    Typed(TypedSchema),
+    HtmlMockup(TypedSchema),
 }
 
 impl ContentModel {
     /// The ordered verb metadata used to build this content model's command.
-    pub fn verbs(self) -> &'static [VerbSpec] {
+    ///
+    /// A generic document carries no schema, so its metadata comes from the
+    /// shared document baseline; a typed model owns its copy.
+    pub fn verbs(&self) -> Vec<VerbSpec> {
         match self {
-            ContentModel::Generic => GENERIC_DOCUMENT_VERBS,
-            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => schema.verbs,
+            ContentModel::Generic => generic_document_verbs(),
+            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => schema.verbs.clone(),
         }
     }
 
     /// The module that owns typed validation and patch building, if any.
-    pub fn handler(self) -> Option<TypedHandler> {
+    pub fn handler(&self) -> Option<TypedHandler> {
         match self {
             ContentModel::Generic => None,
             ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => Some(schema.handler),
@@ -245,19 +252,20 @@ impl ContentModel {
 
 impl TypeDescriptor {
     /// The verb spec for `verb`, when the content model declares one.
-    pub fn verb_spec(&self, verb: Verb) -> Option<&'static VerbSpec> {
+    pub fn verb_spec(&self, verb: Verb) -> Option<VerbSpec> {
         self.content_model
             .verbs()
-            .iter()
+            .into_iter()
             .find(|spec| spec.verb == verb)
     }
 
     /// Every declared spec verb, in canonical presentation order.
-    pub fn ordered_verb_specs(&self) -> Vec<&'static VerbSpec> {
+    pub fn ordered_verb_specs(&self) -> Vec<VerbSpec> {
+        let specs = self.content_model.verbs();
         CANONICAL_DOCUMENT_VERB_ORDER
             .iter()
             .filter(|verb| self.has_verb(**verb))
-            .filter_map(|verb| self.verb_spec(*verb))
+            .filter_map(|verb| specs.iter().find(|spec| spec.verb == *verb).cloned())
             .collect()
     }
 }
@@ -284,7 +292,7 @@ pub struct TypeDescriptor {
     pub verbs: Vec<Verb>,
     pub create_options: CreateOptions,
     pub content_model: ContentModel,
-    pub frontmatter_keys: Vec<&'static str>,
+    pub frontmatter_keys: Vec<String>,
     pub id_shape: IdShape,
     pub archive_policy: ArchivePolicy,
     /// The record-layer descriptor for a document type (ADR-0017 decision 1).
@@ -300,10 +308,10 @@ impl TypeDescriptor {
     }
 
     /// `Some("status")` when the type stores a front-matter status.
-    pub fn frontmatter_status_key(&self) -> Option<&'static str> {
+    pub fn frontmatter_status_key(&self) -> Option<&str> {
         self.frontmatter_keys
             .iter()
-            .copied()
+            .map(String::as_str)
             .find(|key| *key == "status")
     }
 
@@ -495,7 +503,7 @@ const TEST_REPORT_SECTIONS: &[&str] = &["## Description", "## Applicability"];
 
 /// Build one argument spec with the common defaults.
 #[allow(clippy::too_many_arguments)]
-const fn arg(
+fn arg(
     id: &'static str,
     long: Option<&'static str>,
     short: Option<char>,
@@ -506,11 +514,11 @@ const fn arg(
     action: ArgAction,
 ) -> ArgSpec {
     ArgSpec {
-        id,
-        long,
+        id: Cow::Borrowed(id),
+        long: long.map(Cow::Borrowed),
         short,
-        value_name,
-        help,
+        value_name: Cow::Borrowed(value_name),
+        help: Cow::Borrowed(help),
         positional,
         required,
         required_unless_present: None,
@@ -522,1235 +530,1326 @@ const fn arg(
 /// Help shown by every option that accepts multiline standard input.
 const MULTILINE_STDIN_HELP: &str = "Use \"-\" to read multiline text from standard input.";
 
-const ARG_ID: ArgSpec = arg("id", None, None, "ID", "", true, true, ArgAction::Set);
-const ARG_VALUE: ArgSpec = arg("value", None, None, "VALUE", "", true, true, ArgAction::Set);
-const ARG_FORCE: ArgSpec = arg(
-    "force",
-    Some("force"),
-    None,
-    "",
-    "",
-    false,
-    false,
-    ArgAction::SetTrue,
-);
-const ARG_EDITOR: ArgSpec = arg(
-    "editor",
-    Some("editor"),
-    None,
-    "",
-    "Open the document body in $VISUAL or $EDITOR",
-    false,
-    false,
-    ArgAction::SetTrue,
-);
-const ARG_LABEL: ArgSpec = arg(
-    "label",
-    Some("label"),
-    None,
-    "LABEL",
-    "Label",
-    false,
-    false,
-    ArgAction::Append,
-);
-const ARG_REFERENCE: ArgSpec = arg(
-    "reference",
-    Some("reference"),
-    None,
-    "REFERENCE",
-    "Reference",
-    false,
-    false,
-    ArgAction::Append,
-);
+fn arg_id() -> ArgSpec {
+    arg("id", None, None, "ID", "", true, true, ArgAction::Set)
+}
+fn arg_value() -> ArgSpec {
+    arg("value", None, None, "VALUE", "", true, true, ArgAction::Set)
+}
+fn arg_force() -> ArgSpec {
+    arg(
+        "force",
+        Some("force"),
+        None,
+        "",
+        "",
+        false,
+        false,
+        ArgAction::SetTrue,
+    )
+}
+fn arg_editor() -> ArgSpec {
+    arg(
+        "editor",
+        Some("editor"),
+        None,
+        "",
+        "Open the document body in $VISUAL or $EDITOR",
+        false,
+        false,
+        ArgAction::SetTrue,
+    )
+}
+fn arg_label() -> ArgSpec {
+    arg(
+        "label",
+        Some("label"),
+        None,
+        "LABEL",
+        "Label",
+        false,
+        false,
+        ArgAction::Append,
+    )
+}
+fn arg_reference() -> ArgSpec {
+    arg(
+        "reference",
+        Some("reference"),
+        None,
+        "REFERENCE",
+        "Reference",
+        false,
+        false,
+        ArgAction::Append,
+    )
+}
 
-const GENERIC_DOCUMENT_VERBS: &[VerbSpec] = &[
-    VerbSpec {
-        verb: Verb::Create,
-        about: "Create a document.",
-        args: &[
-            arg(
-                "title",
-                None,
-                None,
-                "title",
-                "",
-                true,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "title_flag",
-                Some("title"),
-                None,
-                "title",
-                "",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                Some('d'),
-                "description",
-                MULTILINE_STDIN_HELP,
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "label",
-                Some("label"),
-                None,
-                "label",
-                "",
-                false,
-                false,
-                ArgAction::Append,
-            ),
-            arg(
-                "reference",
-                Some("reference"),
-                None,
-                "reference",
-                "",
-                false,
-                false,
-                ArgAction::Append,
-            ),
-        ],
-    },
-    VerbSpec {
-        verb: Verb::List,
-        about: "List documents.",
-        args: &[],
-    },
-    VerbSpec {
-        verb: Verb::View,
-        about: "View a document.",
-        args: &[arg("id", None, None, "id", "", true, true, ArgAction::Set)],
-    },
-    VerbSpec {
-        verb: Verb::Edit,
-        about: "Edit a document.",
-        args: &[
-            arg("id", None, None, "id", "", true, true, ArgAction::Set),
-            arg(
-                "title",
-                Some("title"),
-                None,
-                "title",
-                "",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                Some('d'),
-                "description",
-                MULTILINE_STDIN_HELP,
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "editor",
-                Some("editor"),
-                None,
-                "",
-                "",
-                false,
-                false,
-                ArgAction::SetTrue,
-            ),
-            arg(
-                "label",
-                Some("label"),
-                None,
-                "label",
-                "",
-                false,
-                false,
-                ArgAction::Append,
-            ),
-            arg(
-                "reference",
-                Some("reference"),
-                None,
-                "reference",
-                "",
-                false,
-                false,
-                ArgAction::Append,
-            ),
-        ],
-    },
-    VerbSpec {
-        verb: Verb::Archive,
-        about: "Archive a document.",
-        args: &[arg("id", None, None, "id", "", true, true, ArgAction::Set)],
-    },
-    VerbSpec {
-        verb: Verb::Delete,
-        about: "Delete a document.",
-        args: &[
-            arg("id", None, None, "id", "", true, true, ArgAction::Set),
-            arg(
-                "force",
-                Some("force"),
-                None,
-                "",
-                "",
-                false,
-                false,
-                ArgAction::SetTrue,
-            ),
-        ],
-    },
-    VerbSpec {
-        verb: Verb::Status,
-        about: "Set document status.",
-        args: &[
-            arg("id", None, None, "id", "", true, true, ArgAction::Set),
-            arg("value", None, None, "value", "", true, true, ArgAction::Set),
-        ],
-    },
-];
-
-const REQUIREMENT_VERBS: &[VerbSpec] = &[
-    VerbSpec {
-        verb: Verb::Create,
-        about: "Create a business requirement",
-        args: &[
-            ArgSpec {
-                required_unless_present: Some("title_flag"),
-                ..arg(
+fn generic_document_verbs() -> Vec<VerbSpec> {
+    vec![
+        VerbSpec {
+            verb: Verb::Create,
+            about: "Create a document.".into(),
+            args: vec![
+                arg(
                     "title",
                     None,
                     None,
                     "title",
-                    "Requirement title (positional)",
+                    "",
                     true,
                     false,
                     ArgAction::Set,
-                )
-            },
-            ArgSpec {
-                required_unless_present: Some("title"),
-                ..arg(
+                ),
+                arg(
                     "title_flag",
                     Some("title"),
                     None,
-                    "TITLE_FLAG",
-                    "Requirement title (flag)",
+                    "title",
+                    "",
                     false,
                     false,
                     ArgAction::Set,
-                )
-            },
-            arg(
-                "story",
-                Some("story"),
-                None,
-                "STORY",
-                "User story",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                Some('d'),
-                "DESCRIPTION",
-                MULTILINE_STDIN_HELP,
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "group",
-                Some("group"),
-                None,
-                "GROUP",
-                "Owning business-requirement group",
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::CreateGroup,
-        about: "Create a business-requirement group",
-        args: &[
-            arg(
-                "title",
-                Some("title"),
-                None,
-                "TITLE",
-                "Group title",
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "story",
-                Some("story"),
-                None,
-                "STORY",
-                "User story",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                Some('d'),
-                "DESCRIPTION",
-                "Description",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-        ],
-    },
-    VerbSpec {
-        verb: Verb::List,
-        about: "List business requirements",
-        args: &[],
-    },
-    VerbSpec {
-        verb: Verb::View,
-        about: "View a business requirement",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Edit,
-        about: "Edit a business requirement",
-        args: &[
-            ARG_ID,
-            arg(
-                "title",
-                Some("title"),
-                None,
-                "TITLE",
-                "Update the title",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "story",
-                Some("story"),
-                None,
-                "STORY",
-                "Update the user story",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                Some('d'),
-                "DESCRIPTION",
-                MULTILINE_STDIN_HELP,
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            ARG_EDITOR,
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::Archive,
-        about: "Archive a business requirement",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Delete,
-        about: "Delete a business requirement",
-        args: &[ARG_ID, ARG_FORCE],
-    },
-    VerbSpec {
-        verb: Verb::Status,
-        about: "Set business requirement status",
-        args: &[ARG_ID, ARG_VALUE],
-    },
-];
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    Some('d'),
+                    "description",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "label",
+                    Some("label"),
+                    None,
+                    "label",
+                    "",
+                    false,
+                    false,
+                    ArgAction::Append,
+                ),
+                arg(
+                    "reference",
+                    Some("reference"),
+                    None,
+                    "reference",
+                    "",
+                    false,
+                    false,
+                    ArgAction::Append,
+                ),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::List,
+            about: "List documents.".into(),
+            args: vec![],
+        },
+        VerbSpec {
+            verb: Verb::View,
+            about: "View a document.".into(),
+            args: vec![arg("id", None, None, "id", "", true, true, ArgAction::Set)],
+        },
+        VerbSpec {
+            verb: Verb::Edit,
+            about: "Edit a document.".into(),
+            args: vec![
+                arg("id", None, None, "id", "", true, true, ArgAction::Set),
+                arg(
+                    "title",
+                    Some("title"),
+                    None,
+                    "title",
+                    "",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    Some('d'),
+                    "description",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "editor",
+                    Some("editor"),
+                    None,
+                    "",
+                    "",
+                    false,
+                    false,
+                    ArgAction::SetTrue,
+                ),
+                arg(
+                    "label",
+                    Some("label"),
+                    None,
+                    "label",
+                    "",
+                    false,
+                    false,
+                    ArgAction::Append,
+                ),
+                arg(
+                    "reference",
+                    Some("reference"),
+                    None,
+                    "reference",
+                    "",
+                    false,
+                    false,
+                    ArgAction::Append,
+                ),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::Archive,
+            about: "Archive a document.".into(),
+            args: vec![arg("id", None, None, "id", "", true, true, ArgAction::Set)],
+        },
+        VerbSpec {
+            verb: Verb::Delete,
+            about: "Delete a document.".into(),
+            args: vec![
+                arg("id", None, None, "id", "", true, true, ArgAction::Set),
+                arg(
+                    "force",
+                    Some("force"),
+                    None,
+                    "",
+                    "",
+                    false,
+                    false,
+                    ArgAction::SetTrue,
+                ),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::Status,
+            about: "Set document status.".into(),
+            args: vec![
+                arg("id", None, None, "id", "", true, true, ArgAction::Set),
+                arg("value", None, None, "value", "", true, true, ArgAction::Set),
+            ],
+        },
+    ]
+}
 
-const GLOSSARY_VERBS: &[VerbSpec] = &[
-    VerbSpec {
-        verb: Verb::Create,
-        about: "Create a glossary term",
-        args: &[
-            arg(
-                "term",
-                Some("term"),
-                None,
-                "TERM",
-                "Glossary term",
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "definition",
-                Some("definition"),
-                None,
-                "DEFINITION",
-                "Definition of the term. Use \"-\" to read multiline text from standard input.",
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::List,
-        about: "List glossary terms",
-        args: &[],
-    },
-    VerbSpec {
-        verb: Verb::View,
-        about: "View a glossary term",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Edit,
-        about: "Edit a glossary term",
-        args: &[
-            ARG_ID,
-            arg(
-                "term",
-                Some("term"),
-                None,
-                "TERM",
-                "Update the glossary term",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "definition",
-                Some("definition"),
-                None,
-                "DEFINITION",
-                "Update the definition. Use \"-\" to read multiline text from standard input.",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            ARG_EDITOR,
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::Archive,
-        about: "Archive a glossary term",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Delete,
-        about: "Delete a glossary term",
-        args: &[ARG_ID, ARG_FORCE],
-    },
-    VerbSpec {
-        verb: Verb::Status,
-        about: "Set glossary term status",
-        args: &[ARG_ID, ARG_VALUE],
-    },
-];
+fn requirement_verbs() -> Vec<VerbSpec> {
+    vec![
+        VerbSpec {
+            verb: Verb::Create,
+            about: "Create a business requirement".into(),
+            args: vec![
+                ArgSpec {
+                    required_unless_present: Some("title_flag".into()),
+                    ..arg(
+                        "title",
+                        None,
+                        None,
+                        "title",
+                        "Requirement title (positional)",
+                        true,
+                        false,
+                        ArgAction::Set,
+                    )
+                },
+                ArgSpec {
+                    required_unless_present: Some("title".into()),
+                    ..arg(
+                        "title_flag",
+                        Some("title"),
+                        None,
+                        "TITLE_FLAG",
+                        "Requirement title (flag)",
+                        false,
+                        false,
+                        ArgAction::Set,
+                    )
+                },
+                arg(
+                    "story",
+                    Some("story"),
+                    None,
+                    "STORY",
+                    "User story",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    Some('d'),
+                    "DESCRIPTION",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "group",
+                    Some("group"),
+                    None,
+                    "GROUP",
+                    "Owning business-requirement group",
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::CreateGroup,
+            about: "Create a business-requirement group".into(),
+            args: vec![
+                arg(
+                    "title",
+                    Some("title"),
+                    None,
+                    "TITLE",
+                    "Group title",
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "story",
+                    Some("story"),
+                    None,
+                    "STORY",
+                    "User story",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    Some('d'),
+                    "DESCRIPTION",
+                    "Description",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::List,
+            about: "List business requirements".into(),
+            args: vec![],
+        },
+        VerbSpec {
+            verb: Verb::View,
+            about: "View a business requirement".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Edit,
+            about: "Edit a business requirement".into(),
+            args: vec![
+                arg_id(),
+                arg(
+                    "title",
+                    Some("title"),
+                    None,
+                    "TITLE",
+                    "Update the title",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "story",
+                    Some("story"),
+                    None,
+                    "STORY",
+                    "Update the user story",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    Some('d'),
+                    "DESCRIPTION",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg_editor(),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::Archive,
+            about: "Archive a business requirement".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Delete,
+            about: "Delete a business requirement".into(),
+            args: vec![arg_id(), arg_force()],
+        },
+        VerbSpec {
+            verb: Verb::Status,
+            about: "Set business requirement status".into(),
+            args: vec![arg_id(), arg_value()],
+        },
+    ]
+}
 
-const RULE_VERBS: &[VerbSpec] = &[
-    VerbSpec {
-        verb: Verb::Create,
-        about: "Create a business rule",
-        args: &[
-            arg(
-                "title",
-                None,
-                None,
-                "TITLE",
-                "Business rule title",
-                true,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                None,
-                "DESCRIPTION",
-                MULTILINE_STDIN_HELP,
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "rationale",
-                Some("rationale"),
-                None,
-                "RATIONALE",
-                "Explain why the rule exists",
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "applicability",
-                Some("applicability"),
-                None,
-                "APPLICABILITY",
-                "Describe when and where the rule applies",
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "requirement",
-                Some("requirement"),
-                None,
-                "REQUIREMENT",
-                "Reference a business requirement. Repeatable",
-                false,
-                false,
-                ArgAction::Append,
-            ),
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::List,
-        about: "List business rules",
-        args: &[],
-    },
-    VerbSpec {
-        verb: Verb::View,
-        about: "View a business rule",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Edit,
-        about: "Edit a business rule",
-        args: &[
-            ARG_ID,
-            arg(
-                "title",
-                Some("title"),
-                None,
-                "TITLE",
-                "Update the title",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                Some('d'),
-                "DESCRIPTION",
-                MULTILINE_STDIN_HELP,
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "requirement",
-                Some("requirement"),
-                None,
-                "REQUIREMENT",
-                "Add a business requirement. Repeatable",
-                false,
-                false,
-                ArgAction::Append,
-            ),
-            arg(
-                "no_requirement",
-                Some("no-requirement"),
-                None,
-                "NO_REQUIREMENT",
-                "Remove a business requirement; without an ID removes all",
-                false,
-                false,
-                ArgAction::OptionalValue,
-            ),
-            ARG_EDITOR,
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::Archive,
-        about: "Archive a business rule",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Delete,
-        about: "Delete a business rule",
-        args: &[ARG_ID, ARG_FORCE],
-    },
-    VerbSpec {
-        verb: Verb::Status,
-        about: "Set business rule status",
-        args: &[ARG_ID, ARG_VALUE],
-    },
-];
+fn glossary_verbs() -> Vec<VerbSpec> {
+    vec![
+        VerbSpec {
+            verb: Verb::Create,
+            about: "Create a glossary term".into(),
+            args: vec![
+                arg(
+                    "term",
+                    Some("term"),
+                    None,
+                    "TERM",
+                    "Glossary term",
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "definition",
+                    Some("definition"),
+                    None,
+                    "DEFINITION",
+                    "Definition of the term. Use \"-\" to read multiline text from standard input.",
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::List,
+            about: "List glossary terms".into(),
+            args: vec![],
+        },
+        VerbSpec {
+            verb: Verb::View,
+            about: "View a glossary term".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Edit,
+            about: "Edit a glossary term".into(),
+            args: vec![
+                arg_id(),
+                arg(
+                    "term",
+                    Some("term"),
+                    None,
+                    "TERM",
+                    "Update the glossary term",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "definition",
+                    Some("definition"),
+                    None,
+                    "DEFINITION",
+                    "Update the definition. Use \"-\" to read multiline text from standard input.",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg_editor(),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::Archive,
+            about: "Archive a glossary term".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Delete,
+            about: "Delete a glossary term".into(),
+            args: vec![arg_id(), arg_force()],
+        },
+        VerbSpec {
+            verb: Verb::Status,
+            about: "Set glossary term status".into(),
+            args: vec![arg_id(), arg_value()],
+        },
+    ]
+}
 
-const UI_SPEC_VERBS: &[VerbSpec] = &[
-    VerbSpec {
-        verb: Verb::Create,
-        about: "Create a UI specification",
-        args: &[
-            arg(
-                "title",
-                None,
-                None,
-                "TITLE",
-                "UI specification title",
-                true,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "view",
-                Some("view"),
-                None,
-                "VIEW",
-                "Associate the specification with a view",
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                None,
-                "DESCRIPTION",
-                MULTILINE_STDIN_HELP,
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::List,
-        about: "List UI specifications",
-        args: &[],
-    },
-    VerbSpec {
-        verb: Verb::View,
-        about: "View a UI specification",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Edit,
-        about: "Edit a UI specification",
-        args: &[
-            ARG_ID,
-            arg(
-                "view",
-                Some("view"),
-                None,
-                "VIEW",
-                "Update the associated view",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                None,
-                "DESCRIPTION",
-                MULTILINE_STDIN_HELP,
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            ARG_EDITOR,
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::Archive,
-        about: "Archive",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Delete,
-        about: "Delete",
-        args: &[ARG_ID, ARG_FORCE],
-    },
-    VerbSpec {
-        verb: Verb::Status,
-        about: "Status",
-        args: &[ARG_ID, ARG_VALUE],
-    },
-];
+fn rule_verbs() -> Vec<VerbSpec> {
+    vec![
+        VerbSpec {
+            verb: Verb::Create,
+            about: "Create a business rule".into(),
+            args: vec![
+                arg(
+                    "title",
+                    None,
+                    None,
+                    "TITLE",
+                    "Business rule title",
+                    true,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    None,
+                    "DESCRIPTION",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "rationale",
+                    Some("rationale"),
+                    None,
+                    "RATIONALE",
+                    "Explain why the rule exists",
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "applicability",
+                    Some("applicability"),
+                    None,
+                    "APPLICABILITY",
+                    "Describe when and where the rule applies",
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "requirement",
+                    Some("requirement"),
+                    None,
+                    "REQUIREMENT",
+                    "Reference a business requirement. Repeatable",
+                    false,
+                    false,
+                    ArgAction::Append,
+                ),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::List,
+            about: "List business rules".into(),
+            args: vec![],
+        },
+        VerbSpec {
+            verb: Verb::View,
+            about: "View a business rule".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Edit,
+            about: "Edit a business rule".into(),
+            args: vec![
+                arg_id(),
+                arg(
+                    "title",
+                    Some("title"),
+                    None,
+                    "TITLE",
+                    "Update the title",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    Some('d'),
+                    "DESCRIPTION",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "requirement",
+                    Some("requirement"),
+                    None,
+                    "REQUIREMENT",
+                    "Add a business requirement. Repeatable",
+                    false,
+                    false,
+                    ArgAction::Append,
+                ),
+                arg(
+                    "no_requirement",
+                    Some("no-requirement"),
+                    None,
+                    "NO_REQUIREMENT",
+                    "Remove a business requirement; without an ID removes all",
+                    false,
+                    false,
+                    ArgAction::OptionalValue,
+                ),
+                arg_editor(),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::Archive,
+            about: "Archive a business rule".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Delete,
+            about: "Delete a business rule".into(),
+            args: vec![arg_id(), arg_force()],
+        },
+        VerbSpec {
+            verb: Verb::Status,
+            about: "Set business rule status".into(),
+            args: vec![arg_id(), arg_value()],
+        },
+    ]
+}
 
-const AUDIT_VERBS: &[VerbSpec] = &[
-    VerbSpec {
-        verb: Verb::Create,
-        about: "",
-        args: &[
-            arg(
-                "title",
-                Some("title"),
-                None,
-                "TITLE",
-                "",
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "content",
-                Some("content"),
-                None,
-                "CONTENT",
-                MULTILINE_STDIN_HELP,
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "audit_type",
-                Some("audit-type"),
-                None,
-                "AUDIT_TYPE",
-                "",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            ArgSpec {
-                help: "",
-                ..ARG_LABEL
-            },
-            ArgSpec {
-                help: "",
-                ..ARG_REFERENCE
-            },
-        ],
-    },
-    VerbSpec {
-        verb: Verb::List,
-        about: "",
-        args: &[],
-    },
-    VerbSpec {
-        verb: Verb::View,
-        about: "",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Edit,
-        about: "",
-        args: &[
-            ARG_ID,
-            arg(
-                "title",
-                Some("title"),
-                None,
-                "TITLE",
-                "",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "content",
-                Some("content"),
-                None,
-                "CONTENT",
-                MULTILINE_STDIN_HELP,
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "audit_type",
-                Some("audit-type"),
-                None,
-                "AUDIT_TYPE",
-                "",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            ArgSpec {
-                help: "",
-                ..ARG_EDITOR
-            },
-            ArgSpec {
-                help: "",
-                ..ARG_LABEL
-            },
-            ArgSpec {
-                help: "",
-                ..ARG_REFERENCE
-            },
-        ],
-    },
-    VerbSpec {
-        verb: Verb::Archive,
-        about: "",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Delete,
-        about: "",
-        args: &[ARG_ID, ARG_FORCE],
-    },
-    VerbSpec {
-        verb: Verb::Status,
-        about: "",
-        args: &[ARG_ID, ARG_VALUE],
-    },
-];
+fn ui_spec_verbs() -> Vec<VerbSpec> {
+    vec![
+        VerbSpec {
+            verb: Verb::Create,
+            about: "Create a UI specification".into(),
+            args: vec![
+                arg(
+                    "title",
+                    None,
+                    None,
+                    "TITLE",
+                    "UI specification title",
+                    true,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "view",
+                    Some("view"),
+                    None,
+                    "VIEW",
+                    "Associate the specification with a view",
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    None,
+                    "DESCRIPTION",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::List,
+            about: "List UI specifications".into(),
+            args: vec![],
+        },
+        VerbSpec {
+            verb: Verb::View,
+            about: "View a UI specification".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Edit,
+            about: "Edit a UI specification".into(),
+            args: vec![
+                arg_id(),
+                arg(
+                    "view",
+                    Some("view"),
+                    None,
+                    "VIEW",
+                    "Update the associated view",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    None,
+                    "DESCRIPTION",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg_editor(),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::Archive,
+            about: "Archive".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Delete,
+            about: "Delete".into(),
+            args: vec![arg_id(), arg_force()],
+        },
+        VerbSpec {
+            verb: Verb::Status,
+            about: "Status".into(),
+            args: vec![arg_id(), arg_value()],
+        },
+    ]
+}
 
-const TECH_SPEC_VERBS: &[VerbSpec] = &[
-    VerbSpec {
-        verb: Verb::Create,
-        about: "Create a technical specification",
-        args: &[
-            arg(
-                "title",
-                None,
-                None,
-                "TITLE",
-                "Technical specification title",
-                true,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                None,
-                "DESCRIPTION",
-                MULTILINE_STDIN_HELP,
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::List,
-        about: "List technical specifications",
-        args: &[],
-    },
-    VerbSpec {
-        verb: Verb::View,
-        about: "View a technical specification",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Edit,
-        about: "Edit a technical specification",
-        args: &[
-            ARG_ID,
-            arg(
-                "title",
-                Some("title"),
-                None,
-                "TITLE",
-                "Update the title",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                None,
-                "DESCRIPTION",
-                MULTILINE_STDIN_HELP,
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            ARG_EDITOR,
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::Archive,
-        about: "Archive",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Delete,
-        about: "Delete",
-        args: &[ARG_ID, ARG_FORCE],
-    },
-    VerbSpec {
-        verb: Verb::Status,
-        about: "Status",
-        args: &[ARG_ID, ARG_VALUE],
-    },
-];
+fn audit_verbs() -> Vec<VerbSpec> {
+    vec![
+        VerbSpec {
+            verb: Verb::Create,
+            about: "".into(),
+            args: vec![
+                arg(
+                    "title",
+                    Some("title"),
+                    None,
+                    "TITLE",
+                    "",
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "content",
+                    Some("content"),
+                    None,
+                    "CONTENT",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "audit_type",
+                    Some("audit-type"),
+                    None,
+                    "AUDIT_TYPE",
+                    "",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                ArgSpec {
+                    help: "".into(),
+                    ..arg_label()
+                },
+                ArgSpec {
+                    help: "".into(),
+                    ..arg_reference()
+                },
+            ],
+        },
+        VerbSpec {
+            verb: Verb::List,
+            about: "".into(),
+            args: vec![],
+        },
+        VerbSpec {
+            verb: Verb::View,
+            about: "".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Edit,
+            about: "".into(),
+            args: vec![
+                arg_id(),
+                arg(
+                    "title",
+                    Some("title"),
+                    None,
+                    "TITLE",
+                    "",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "content",
+                    Some("content"),
+                    None,
+                    "CONTENT",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "audit_type",
+                    Some("audit-type"),
+                    None,
+                    "AUDIT_TYPE",
+                    "",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                ArgSpec {
+                    help: "".into(),
+                    ..arg_editor()
+                },
+                ArgSpec {
+                    help: "".into(),
+                    ..arg_label()
+                },
+                ArgSpec {
+                    help: "".into(),
+                    ..arg_reference()
+                },
+            ],
+        },
+        VerbSpec {
+            verb: Verb::Archive,
+            about: "".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Delete,
+            about: "".into(),
+            args: vec![arg_id(), arg_force()],
+        },
+        VerbSpec {
+            verb: Verb::Status,
+            about: "".into(),
+            args: vec![arg_id(), arg_value()],
+        },
+    ]
+}
 
-const USE_CASE_VERBS: &[VerbSpec] = &[
-    VerbSpec {
-        verb: Verb::Create,
-        about: "Create a use case",
-        args: &[
-            arg(
-                "title",
-                None,
-                None,
-                "TITLE",
-                "Use case title",
-                true,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                None,
-                "DESCRIPTION",
-                MULTILINE_STDIN_HELP,
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "applicability",
-                Some("applicability"),
-                None,
-                "APPLICABILITY",
-                "Optional applicability",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::List,
-        about: "List use cases",
-        args: &[],
-    },
-    VerbSpec {
-        verb: Verb::View,
-        about: "View a use case",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Edit,
-        about: "Edit a use case",
-        args: &[
-            ARG_ID,
-            arg(
-                "title",
-                Some("title"),
-                None,
-                "TITLE",
-                "Update the title",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                None,
-                "DESCRIPTION",
-                MULTILINE_STDIN_HELP,
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "applicability",
-                Some("applicability"),
-                None,
-                "APPLICABILITY",
-                "Update the applicability (empty clears it)",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            ARG_EDITOR,
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::Archive,
-        about: "Archive",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Delete,
-        about: "Delete",
-        args: &[ARG_ID, ARG_FORCE],
-    },
-    VerbSpec {
-        verb: Verb::Status,
-        about: "Status",
-        args: &[ARG_ID, ARG_VALUE],
-    },
-];
+fn tech_spec_verbs() -> Vec<VerbSpec> {
+    vec![
+        VerbSpec {
+            verb: Verb::Create,
+            about: "Create a technical specification".into(),
+            args: vec![
+                arg(
+                    "title",
+                    None,
+                    None,
+                    "TITLE",
+                    "Technical specification title",
+                    true,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    None,
+                    "DESCRIPTION",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::List,
+            about: "List technical specifications".into(),
+            args: vec![],
+        },
+        VerbSpec {
+            verb: Verb::View,
+            about: "View a technical specification".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Edit,
+            about: "Edit a technical specification".into(),
+            args: vec![
+                arg_id(),
+                arg(
+                    "title",
+                    Some("title"),
+                    None,
+                    "TITLE",
+                    "Update the title",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    None,
+                    "DESCRIPTION",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg_editor(),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::Archive,
+            about: "Archive".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Delete,
+            about: "Delete".into(),
+            args: vec![arg_id(), arg_force()],
+        },
+        VerbSpec {
+            verb: Verb::Status,
+            about: "Status".into(),
+            args: vec![arg_id(), arg_value()],
+        },
+    ]
+}
 
-const TEST_CASE_VERBS: &[VerbSpec] = &[
-    VerbSpec {
-        verb: Verb::Create,
-        about: "Create a test case",
-        args: &[
-            arg(
-                "title",
-                None,
-                None,
-                "TITLE",
-                "Test case title",
-                true,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                None,
-                "DESCRIPTION",
-                MULTILINE_STDIN_HELP,
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "applicability",
-                Some("applicability"),
-                None,
-                "APPLICABILITY",
-                "Optional applicability",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::List,
-        about: "List test cases",
-        args: &[],
-    },
-    VerbSpec {
-        verb: Verb::View,
-        about: "View a test case",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Edit,
-        about: "Edit a test case",
-        args: &[
-            ARG_ID,
-            arg(
-                "title",
-                Some("title"),
-                None,
-                "TITLE",
-                "Update the title",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                None,
-                "DESCRIPTION",
-                MULTILINE_STDIN_HELP,
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "applicability",
-                Some("applicability"),
-                None,
-                "APPLICABILITY",
-                "Update the applicability (empty clears it)",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            ARG_EDITOR,
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::Archive,
-        about: "Archive",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Delete,
-        about: "Delete",
-        args: &[ARG_ID, ARG_FORCE],
-    },
-    VerbSpec {
-        verb: Verb::Status,
-        about: "Status",
-        args: &[ARG_ID, ARG_VALUE],
-    },
-];
+fn use_case_verbs() -> Vec<VerbSpec> {
+    vec![
+        VerbSpec {
+            verb: Verb::Create,
+            about: "Create a use case".into(),
+            args: vec![
+                arg(
+                    "title",
+                    None,
+                    None,
+                    "TITLE",
+                    "Use case title",
+                    true,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    None,
+                    "DESCRIPTION",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "applicability",
+                    Some("applicability"),
+                    None,
+                    "APPLICABILITY",
+                    "Optional applicability",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::List,
+            about: "List use cases".into(),
+            args: vec![],
+        },
+        VerbSpec {
+            verb: Verb::View,
+            about: "View a use case".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Edit,
+            about: "Edit a use case".into(),
+            args: vec![
+                arg_id(),
+                arg(
+                    "title",
+                    Some("title"),
+                    None,
+                    "TITLE",
+                    "Update the title",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    None,
+                    "DESCRIPTION",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "applicability",
+                    Some("applicability"),
+                    None,
+                    "APPLICABILITY",
+                    "Update the applicability (empty clears it)",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg_editor(),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::Archive,
+            about: "Archive".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Delete,
+            about: "Delete".into(),
+            args: vec![arg_id(), arg_force()],
+        },
+        VerbSpec {
+            verb: Verb::Status,
+            about: "Status".into(),
+            args: vec![arg_id(), arg_value()],
+        },
+    ]
+}
 
-const TEST_REPORT_VERBS: &[VerbSpec] = &[
-    VerbSpec {
-        verb: Verb::Create,
-        about: "Create a test report",
-        args: &[
-            arg(
-                "title",
-                None,
-                None,
-                "TITLE",
-                "Test report title",
-                true,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                None,
-                "DESCRIPTION",
-                MULTILINE_STDIN_HELP,
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            arg(
-                "applicability",
-                Some("applicability"),
-                None,
-                "APPLICABILITY",
-                "Optional applicability",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::List,
-        about: "List test reports",
-        args: &[],
-    },
-    VerbSpec {
-        verb: Verb::View,
-        about: "View a test report",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Edit,
-        about: "Edit a test report",
-        args: &[
-            ARG_ID,
-            arg(
-                "title",
-                Some("title"),
-                None,
-                "TITLE",
-                "Update the title",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "description",
-                Some("description"),
-                None,
-                "DESCRIPTION",
-                MULTILINE_STDIN_HELP,
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "applicability",
-                Some("applicability"),
-                None,
-                "APPLICABILITY",
-                "Update the applicability (empty clears it)",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            ARG_EDITOR,
-            ARG_LABEL,
-            ARG_REFERENCE,
-        ],
-    },
-    VerbSpec {
-        verb: Verb::Archive,
-        about: "Archive",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Delete,
-        about: "Delete",
-        args: &[ARG_ID, ARG_FORCE],
-    },
-    VerbSpec {
-        verb: Verb::Status,
-        about: "Status",
-        args: &[ARG_ID, ARG_VALUE],
-    },
-];
+fn test_case_verbs() -> Vec<VerbSpec> {
+    vec![
+        VerbSpec {
+            verb: Verb::Create,
+            about: "Create a test case".into(),
+            args: vec![
+                arg(
+                    "title",
+                    None,
+                    None,
+                    "TITLE",
+                    "Test case title",
+                    true,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    None,
+                    "DESCRIPTION",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "applicability",
+                    Some("applicability"),
+                    None,
+                    "APPLICABILITY",
+                    "Optional applicability",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::List,
+            about: "List test cases".into(),
+            args: vec![],
+        },
+        VerbSpec {
+            verb: Verb::View,
+            about: "View a test case".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Edit,
+            about: "Edit a test case".into(),
+            args: vec![
+                arg_id(),
+                arg(
+                    "title",
+                    Some("title"),
+                    None,
+                    "TITLE",
+                    "Update the title",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    None,
+                    "DESCRIPTION",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "applicability",
+                    Some("applicability"),
+                    None,
+                    "APPLICABILITY",
+                    "Update the applicability (empty clears it)",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg_editor(),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::Archive,
+            about: "Archive".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Delete,
+            about: "Delete".into(),
+            args: vec![arg_id(), arg_force()],
+        },
+        VerbSpec {
+            verb: Verb::Status,
+            about: "Status".into(),
+            args: vec![arg_id(), arg_value()],
+        },
+    ]
+}
 
-const UI_MOCKUP_VERBS: &[VerbSpec] = &[
-    VerbSpec {
-        verb: Verb::Create,
-        about: "",
-        args: &[
-            arg("title", None, None, "TITLE", "", true, true, ArgAction::Set),
-            arg(
-                "task",
-                Some("task"),
-                None,
-                "TASK",
-                "",
-                false,
-                true,
-                ArgAction::Set,
-            ),
-            ArgSpec {
-                required: true,
-                ..arg(
+fn test_report_verbs() -> Vec<VerbSpec> {
+    vec![
+        VerbSpec {
+            verb: Verb::Create,
+            about: "Create a test report".into(),
+            args: vec![
+                arg(
+                    "title",
+                    None,
+                    None,
+                    "TITLE",
+                    "Test report title",
+                    true,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    None,
+                    "DESCRIPTION",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "applicability",
+                    Some("applicability"),
+                    None,
+                    "APPLICABILITY",
+                    "Optional applicability",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::List,
+            about: "List test reports".into(),
+            args: vec![],
+        },
+        VerbSpec {
+            verb: Verb::View,
+            about: "View a test report".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Edit,
+            about: "Edit a test report".into(),
+            args: vec![
+                arg_id(),
+                arg(
+                    "title",
+                    Some("title"),
+                    None,
+                    "TITLE",
+                    "Update the title",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "description",
+                    Some("description"),
+                    None,
+                    "DESCRIPTION",
+                    MULTILINE_STDIN_HELP,
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "applicability",
+                    Some("applicability"),
+                    None,
+                    "APPLICABILITY",
+                    "Update the applicability (empty clears it)",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg_editor(),
+                arg_label(),
+                arg_reference(),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::Archive,
+            about: "Archive".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Delete,
+            about: "Delete".into(),
+            args: vec![arg_id(), arg_force()],
+        },
+        VerbSpec {
+            verb: Verb::Status,
+            about: "Status".into(),
+            args: vec![arg_id(), arg_value()],
+        },
+    ]
+}
+
+fn ui_mockup_verbs() -> Vec<VerbSpec> {
+    vec![
+        VerbSpec {
+            verb: Verb::Create,
+            about: "".into(),
+            args: vec![
+                arg("title", None, None, "TITLE", "", true, true, ArgAction::Set),
+                arg(
+                    "task",
+                    Some("task"),
+                    None,
+                    "TASK",
+                    "",
+                    false,
+                    true,
+                    ArgAction::Set,
+                ),
+                ArgSpec {
+                    required: true,
+                    ..arg(
+                        "spec",
+                        Some("spec"),
+                        None,
+                        "SPEC",
+                        "",
+                        false,
+                        false,
+                        ArgAction::Append,
+                    )
+                },
+                arg(
+                    "ref",
+                    Some("ref"),
+                    None,
+                    "REF",
+                    "",
+                    false,
+                    false,
+                    ArgAction::Append,
+                ),
+            ],
+        },
+        VerbSpec {
+            verb: Verb::List,
+            about: "".into(),
+            args: vec![],
+        },
+        VerbSpec {
+            verb: Verb::View,
+            about: "".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Edit,
+            about: "".into(),
+            args: vec![
+                arg_id(),
+                arg(
+                    "title",
+                    Some("title"),
+                    None,
+                    "TITLE",
+                    "",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
+                    "task",
+                    Some("task"),
+                    None,
+                    "TASK",
+                    "",
+                    false,
+                    false,
+                    ArgAction::Set,
+                ),
+                arg(
                     "spec",
                     Some("spec"),
                     None,
@@ -1759,217 +1858,195 @@ const UI_MOCKUP_VERBS: &[VerbSpec] = &[
                     false,
                     false,
                     ArgAction::Append,
-                )
-            },
-            arg(
-                "ref",
-                Some("ref"),
-                None,
-                "REF",
-                "",
-                false,
-                false,
-                ArgAction::Append,
-            ),
-        ],
-    },
-    VerbSpec {
-        verb: Verb::List,
-        about: "",
-        args: &[],
-    },
-    VerbSpec {
-        verb: Verb::View,
-        about: "",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Edit,
-        about: "",
-        args: &[
-            ARG_ID,
-            arg(
-                "title",
-                Some("title"),
-                None,
-                "TITLE",
-                "",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "task",
-                Some("task"),
-                None,
-                "TASK",
-                "",
-                false,
-                false,
-                ArgAction::Set,
-            ),
-            arg(
-                "spec",
-                Some("spec"),
-                None,
-                "SPEC",
-                "",
-                false,
-                false,
-                ArgAction::Append,
-            ),
-            arg(
-                "ref",
-                Some("ref"),
-                None,
-                "REF",
-                "",
-                false,
-                false,
-                ArgAction::Append,
-            ),
-            ArgSpec {
-                conflicts_with: Some("superseded_by"),
-                ..arg(
-                    "status",
-                    Some("status"),
+                ),
+                arg(
+                    "ref",
+                    Some("ref"),
                     None,
-                    "STATUS",
+                    "REF",
                     "",
                     false,
                     false,
-                    ArgAction::Set,
-                )
-            },
-            ArgSpec {
-                conflicts_with: Some("status"),
-                ..arg(
-                    "superseded_by",
-                    Some("superseded-by"),
-                    None,
-                    "SUPERSEDED_BY",
-                    "",
-                    false,
-                    false,
-                    ArgAction::Set,
-                )
-            },
-            ArgSpec {
-                help: "",
-                ..ARG_EDITOR
-            },
-        ],
-    },
-    VerbSpec {
-        verb: Verb::Archive,
-        about: "",
-        args: &[ARG_ID],
-    },
-    VerbSpec {
-        verb: Verb::Delete,
-        about: "",
-        args: &[ARG_ID, ARG_FORCE],
-    },
-    VerbSpec {
-        verb: Verb::Supersede,
-        about: "",
-        args: &[
-            arg("old", None, None, "OLD", "", true, true, ArgAction::Set),
-            arg("new", None, None, "NEW", "", true, true, ArgAction::Set),
-        ],
-    },
-];
+                    ArgAction::Append,
+                ),
+                ArgSpec {
+                    conflicts_with: Some("superseded_by".into()),
+                    ..arg(
+                        "status",
+                        Some("status"),
+                        None,
+                        "STATUS",
+                        "",
+                        false,
+                        false,
+                        ArgAction::Set,
+                    )
+                },
+                ArgSpec {
+                    conflicts_with: Some("status".into()),
+                    ..arg(
+                        "superseded_by",
+                        Some("superseded-by"),
+                        None,
+                        "SUPERSEDED_BY",
+                        "",
+                        false,
+                        false,
+                        ArgAction::Set,
+                    )
+                },
+                ArgSpec {
+                    help: "".into(),
+                    ..arg_editor()
+                },
+            ],
+        },
+        VerbSpec {
+            verb: Verb::Archive,
+            about: "".into(),
+            args: vec![arg_id()],
+        },
+        VerbSpec {
+            verb: Verb::Delete,
+            about: "".into(),
+            args: vec![arg_id(), arg_force()],
+        },
+        VerbSpec {
+            verb: Verb::Supersede,
+            about: "".into(),
+            args: vec![
+                arg("old", None, None, "OLD", "", true, true, ArgAction::Set),
+                arg("new", None, None, "NEW", "", true, true, ArgAction::Set),
+            ],
+        },
+    ]
+}
 
-const TASK_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::Task,
-    sections: TASK_SECTIONS,
-    extensions: &[],
-    verbs: &[],
-};
-const MILESTONE_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::Milestone,
-    sections: MILESTONE_SECTIONS,
-    extensions: &[],
-    verbs: &[],
-};
-const RELEASE_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::Release,
-    sections: RELEASE_SECTIONS,
-    extensions: &[],
-    verbs: &[],
-};
-const DECISION_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::Decision,
-    sections: DECISION_SECTIONS,
-    extensions: &[],
-    verbs: &[],
-};
-const REQUIREMENT_BUSINESS_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::Requirement(RequirementKind::Business),
-    sections: REQUIREMENT_SECTIONS,
-    extensions: &[Verb::CreateGroup],
-    verbs: REQUIREMENT_VERBS,
-};
-const REQUIREMENT_NON_FUNCTIONAL_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::Requirement(RequirementKind::NonFunctional),
-    sections: REQUIREMENT_SECTIONS,
-    extensions: &[Verb::CreateGroup],
-    verbs: REQUIREMENT_VERBS,
-};
-const GLOSSARY_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::Glossary,
-    sections: GLOSSARY_SECTIONS,
-    extensions: &[],
-    verbs: GLOSSARY_VERBS,
-};
-const RULE_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::Rule,
-    sections: RULE_SECTIONS,
-    extensions: &[],
-    verbs: RULE_VERBS,
-};
-const UI_SPEC_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::UiSpec,
-    sections: UI_SPEC_SECTIONS,
-    extensions: &[],
-    verbs: UI_SPEC_VERBS,
-};
-const UI_MOCKUP_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::UiMockup,
-    sections: &[],
-    extensions: &[Verb::Supersede],
-    verbs: UI_MOCKUP_VERBS,
-};
-const AUDIT_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::Audit,
-    sections: AUDIT_SECTIONS,
-    extensions: &[],
-    verbs: AUDIT_VERBS,
-};
-const TECH_SPEC_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::TechSpec,
-    sections: TECH_SPEC_SECTIONS,
-    extensions: &[],
-    verbs: TECH_SPEC_VERBS,
-};
-const USE_CASE_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::UseCase,
-    sections: USE_CASE_SECTIONS,
-    extensions: &[],
-    verbs: USE_CASE_VERBS,
-};
-const TEST_CASE_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::TestCase,
-    sections: TEST_CASE_SECTIONS,
-    extensions: &[],
-    verbs: TEST_CASE_VERBS,
-};
-const TEST_REPORT_SCHEMA: TypedSchema = TypedSchema {
-    handler: TypedHandler::TestReport,
-    sections: TEST_REPORT_SECTIONS,
-    extensions: &[],
-    verbs: TEST_REPORT_VERBS,
-};
+/// Build the owned section list of a schema from its written-order literals.
+fn owned_sections(sections: &'static [&'static str]) -> Vec<Cow<'static, str>> {
+    sections.iter().copied().map(Cow::Borrowed).collect()
+}
+
+fn task_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::Task,
+        sections: owned_sections(TASK_SECTIONS),
+        extensions: Vec::new(),
+        verbs: Vec::new(),
+    }
+}
+fn milestone_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::Milestone,
+        sections: owned_sections(MILESTONE_SECTIONS),
+        extensions: Vec::new(),
+        verbs: Vec::new(),
+    }
+}
+fn release_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::Release,
+        sections: owned_sections(RELEASE_SECTIONS),
+        extensions: Vec::new(),
+        verbs: Vec::new(),
+    }
+}
+fn decision_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::Decision,
+        sections: owned_sections(DECISION_SECTIONS),
+        extensions: Vec::new(),
+        verbs: Vec::new(),
+    }
+}
+fn requirement_business_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::Requirement(RequirementKind::Business),
+        sections: owned_sections(REQUIREMENT_SECTIONS),
+        extensions: vec![Verb::CreateGroup],
+        verbs: requirement_verbs(),
+    }
+}
+fn requirement_non_functional_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::Requirement(RequirementKind::NonFunctional),
+        sections: owned_sections(REQUIREMENT_SECTIONS),
+        extensions: vec![Verb::CreateGroup],
+        verbs: requirement_verbs(),
+    }
+}
+fn glossary_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::Glossary,
+        sections: owned_sections(GLOSSARY_SECTIONS),
+        extensions: Vec::new(),
+        verbs: glossary_verbs(),
+    }
+}
+fn rule_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::Rule,
+        sections: owned_sections(RULE_SECTIONS),
+        extensions: Vec::new(),
+        verbs: rule_verbs(),
+    }
+}
+fn ui_spec_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::UiSpec,
+        sections: owned_sections(UI_SPEC_SECTIONS),
+        extensions: Vec::new(),
+        verbs: ui_spec_verbs(),
+    }
+}
+fn ui_mockup_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::UiMockup,
+        sections: Vec::new(),
+        extensions: vec![Verb::Supersede],
+        verbs: ui_mockup_verbs(),
+    }
+}
+fn audit_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::Audit,
+        sections: owned_sections(AUDIT_SECTIONS),
+        extensions: Vec::new(),
+        verbs: audit_verbs(),
+    }
+}
+fn tech_spec_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::TechSpec,
+        sections: owned_sections(TECH_SPEC_SECTIONS),
+        extensions: Vec::new(),
+        verbs: tech_spec_verbs(),
+    }
+}
+fn use_case_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::UseCase,
+        sections: owned_sections(USE_CASE_SECTIONS),
+        extensions: Vec::new(),
+        verbs: use_case_verbs(),
+    }
+}
+fn test_case_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::TestCase,
+        sections: owned_sections(TEST_CASE_SECTIONS),
+        extensions: Vec::new(),
+        verbs: test_case_verbs(),
+    }
+}
+fn test_report_schema() -> TypedSchema {
+    TypedSchema {
+        handler: TypedHandler::TestReport,
+        sections: owned_sections(TEST_REPORT_SECTIONS),
+        extensions: Vec::new(),
+        verbs: test_report_verbs(),
+    }
+}
 
 const DECISION_STATES: &[&str] = &[
     "proposed",
@@ -2020,6 +2097,54 @@ enum TemplateVerbs {
     DocumentBaseline { extensions: &'static [Verb] },
 }
 
+/// The typed content-model shape a template names.
+///
+/// The template table is the static source of the current section and verb
+/// facts. Building a descriptor materialises an owned [`ContentModel`] from
+/// this kind, so no descriptor borrows the table (TECH-071 section 1).
+#[derive(Clone, Copy, Debug)]
+enum SchemaKind {
+    Task,
+    Milestone,
+    Release,
+    Decision,
+    RequirementBusiness,
+    RequirementNonFunctional,
+    Glossary,
+    Rule,
+    UiSpec,
+    UiMockup,
+    Audit,
+    TechSpec,
+    UseCase,
+    TestCase,
+    TestReport,
+}
+
+impl SchemaKind {
+    fn content_model(self) -> ContentModel {
+        match self {
+            SchemaKind::Task => ContentModel::Typed(task_schema()),
+            SchemaKind::Milestone => ContentModel::Typed(milestone_schema()),
+            SchemaKind::Release => ContentModel::Typed(release_schema()),
+            SchemaKind::Decision => ContentModel::Typed(decision_schema()),
+            SchemaKind::RequirementBusiness => ContentModel::Typed(requirement_business_schema()),
+            SchemaKind::RequirementNonFunctional => {
+                ContentModel::Typed(requirement_non_functional_schema())
+            }
+            SchemaKind::Glossary => ContentModel::Typed(glossary_schema()),
+            SchemaKind::Rule => ContentModel::Typed(rule_schema()),
+            SchemaKind::UiSpec => ContentModel::Typed(ui_spec_schema()),
+            SchemaKind::UiMockup => ContentModel::HtmlMockup(ui_mockup_schema()),
+            SchemaKind::Audit => ContentModel::Typed(audit_schema()),
+            SchemaKind::TechSpec => ContentModel::Typed(tech_spec_schema()),
+            SchemaKind::UseCase => ContentModel::Typed(use_case_schema()),
+            SchemaKind::TestCase => ContentModel::Typed(test_case_schema()),
+            SchemaKind::TestReport => ContentModel::Typed(test_report_schema()),
+        }
+    }
+}
+
 /// A static, configuration-free description of a built-in type.
 ///
 /// Templates carry no prefix, directory value, or status list; everything
@@ -2038,7 +2163,7 @@ struct DescriptorTemplate {
     id_shape: IdShape,
     status: TemplateStatus,
     verbs: TemplateVerbs,
-    content: ContentModel,
+    content: SchemaKind,
     /// `Some("status")` when the type stores its state in front matter.
     frontmatter_status: Option<&'static str>,
     frontmatter_extra: &'static [&'static str],
@@ -2101,7 +2226,7 @@ const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
         id_shape: IdShape::Plain,
         status: TemplateStatus::TaskConfigurable,
         verbs: TemplateVerbs::Fixed(TASK_VERBS),
-        content: ContentModel::Typed(&TASK_SCHEMA),
+        content: SchemaKind::Task,
         frontmatter_status: Some("status"),
         frontmatter_extra: &[
             "assignee",
@@ -2125,7 +2250,7 @@ const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
         id_shape: IdShape::Plain,
         status: TemplateStatus::Fixed(MILESTONE_STATES),
         verbs: TemplateVerbs::Fixed(MILESTONE_VERBS),
-        content: ContentModel::Typed(&MILESTONE_SCHEMA),
+        content: SchemaKind::Milestone,
         frontmatter_status: Some("status"),
         frontmatter_extra: &["release"],
         // The milestone lifecycle is `open -> closed -> archived` (ADR-032).
@@ -2146,7 +2271,7 @@ const BACKLOG_TEMPLATES: &[DescriptorTemplate] = &[
         id_shape: IdShape::Plain,
         status: TemplateStatus::Fixed(RELEASE_STATES),
         verbs: TemplateVerbs::Fixed(RELEASE_VERBS),
-        content: ContentModel::Typed(&RELEASE_SCHEMA),
+        content: SchemaKind::Release,
         frontmatter_status: Some("status"),
         frontmatter_extra: &[],
         archive: ArchivePolicy::None,
@@ -2165,7 +2290,7 @@ const DECISION_TEMPLATE: DescriptorTemplate = DescriptorTemplate {
     id_shape: IdShape::Plain,
     status: TemplateStatus::Fixed(DECISION_STATES),
     verbs: TemplateVerbs::Fixed(DECISION_VERBS),
-    content: ContentModel::Typed(&DECISION_SCHEMA),
+    content: SchemaKind::Decision,
     // Decisions keep `status` in the document core, not in front matter.
     frontmatter_status: None,
     frontmatter_extra: &["superseded_by"],
@@ -2187,7 +2312,7 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         verbs: TemplateVerbs::DocumentBaseline {
             extensions: &[Verb::CreateGroup],
         },
-        content: ContentModel::Typed(&REQUIREMENT_BUSINESS_SCHEMA),
+        content: SchemaKind::RequirementBusiness,
         frontmatter_status: Some("status"),
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
@@ -2212,7 +2337,7 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         verbs: TemplateVerbs::DocumentBaseline {
             extensions: &[Verb::CreateGroup],
         },
-        content: ContentModel::Typed(&REQUIREMENT_NON_FUNCTIONAL_SCHEMA),
+        content: SchemaKind::RequirementNonFunctional,
         frontmatter_status: Some("status"),
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
@@ -2235,7 +2360,7 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         id_shape: IdShape::Plain,
         status: TemplateStatus::DocumentMain,
         verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: ContentModel::Typed(&GLOSSARY_SCHEMA),
+        content: SchemaKind::Glossary,
         frontmatter_status: Some("status"),
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
@@ -2258,7 +2383,7 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         id_shape: IdShape::Plain,
         status: TemplateStatus::DocumentMain,
         verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: ContentModel::Typed(&RULE_SCHEMA),
+        content: SchemaKind::Rule,
         frontmatter_status: Some("status"),
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
@@ -2281,7 +2406,7 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         id_shape: IdShape::Plain,
         status: TemplateStatus::DocumentMain,
         verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: ContentModel::Typed(&UI_SPEC_SCHEMA),
+        content: SchemaKind::UiSpec,
         frontmatter_status: Some("status"),
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
@@ -2306,7 +2431,7 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         verbs: TemplateVerbs::DocumentBaseline {
             extensions: &[Verb::Supersede],
         },
-        content: ContentModel::HtmlMockup(&UI_MOCKUP_SCHEMA),
+        content: SchemaKind::UiMockup,
         frontmatter_status: None,
         frontmatter_extra: &[],
         archive: HTML_METADATA_ARCHIVE,
@@ -2329,7 +2454,7 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         id_shape: IdShape::Plain,
         status: TemplateStatus::DocumentMain,
         verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: ContentModel::Typed(&AUDIT_SCHEMA),
+        content: SchemaKind::Audit,
         frontmatter_status: Some("status"),
         frontmatter_extra: &["type"],
         archive: FRONTMATTER_ARCHIVE,
@@ -2352,7 +2477,7 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         id_shape: IdShape::Plain,
         status: TemplateStatus::DocumentMain,
         verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: ContentModel::Typed(&TECH_SPEC_SCHEMA),
+        content: SchemaKind::TechSpec,
         frontmatter_status: Some("status"),
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
@@ -2375,7 +2500,7 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         id_shape: IdShape::Plain,
         status: TemplateStatus::DocumentMain,
         verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: ContentModel::Typed(&USE_CASE_SCHEMA),
+        content: SchemaKind::UseCase,
         frontmatter_status: Some("status"),
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
@@ -2398,7 +2523,7 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         id_shape: IdShape::Plain,
         status: TemplateStatus::DocumentMain,
         verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: ContentModel::Typed(&TEST_CASE_SCHEMA),
+        content: SchemaKind::TestCase,
         frontmatter_status: Some("status"),
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
@@ -2421,7 +2546,7 @@ const DOCUMENT_TEMPLATES: &[DescriptorTemplate] = &[
         id_shape: IdShape::Plain,
         status: TemplateStatus::DocumentMain,
         verbs: TemplateVerbs::DocumentBaseline { extensions: &[] },
-        content: ContentModel::Typed(&TEST_REPORT_SCHEMA),
+        content: SchemaKind::TestReport,
         frontmatter_status: Some("status"),
         frontmatter_extra: &[],
         archive: FRONTMATTER_ARCHIVE,
@@ -2534,12 +2659,20 @@ fn assemble(cfg: &Config) -> Result<Vec<TypeDescriptor>, RegistryError> {
     Ok(descriptors)
 }
 
-fn frontmatter_keys(template: &DescriptorTemplate) -> Vec<&'static str> {
-    let mut keys: Vec<&'static str> = GENERAL_FRONTMATTER_KEYS.to_vec();
+fn frontmatter_keys(template: &DescriptorTemplate) -> Vec<String> {
+    let mut keys: Vec<String> = GENERAL_FRONTMATTER_KEYS
+        .iter()
+        .map(|key| (*key).to_string())
+        .collect();
     if let Some(key) = template.frontmatter_status {
-        keys.push(key);
+        keys.push(key.to_string());
     }
-    keys.extend(template.frontmatter_extra.iter().copied());
+    keys.extend(
+        template
+            .frontmatter_extra
+            .iter()
+            .map(|key| (*key).to_string()),
+    );
     keys
 }
 
@@ -2578,7 +2711,7 @@ fn backlog_descriptor(cfg: &Config, template: &DescriptorTemplate) -> TypeDescri
         status_model,
         verbs,
         create_options: template.create_options,
-        content_model: template.content,
+        content_model: template.content.content_model(),
         frontmatter_keys: frontmatter_keys(template),
         id_shape: template.id_shape,
         archive_policy: template.archive,
@@ -2602,7 +2735,7 @@ fn decision_descriptor(slug: &str, entry: &TypeEntry) -> TypeDescriptor {
         },
         verbs: DECISION_VERBS.to_vec(),
         create_options: NO_CREATE_OPTIONS,
-        content_model: ContentModel::Typed(&DECISION_SCHEMA),
+        content_model: SchemaKind::Decision.content_model(),
         frontmatter_keys: frontmatter_keys(&DECISION_TEMPLATE),
         id_shape: IdShape::Plain,
         archive_policy: ArchivePolicy::None,
@@ -2617,75 +2750,75 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
         .iter()
         .find(|template| template.slug == slug);
 
-    let (
-        status_model,
-        verbs,
-        content_model,
-        id_shape,
-        create_options,
-        archive_policy,
-        frontmatter_keys,
-    ) = match template {
-        Some(template) => {
-            let status_model = document_status_model(slug, entry, template.status)?;
-            let mut verbs = DOCUMENT_BASELINE_VERBS.to_vec();
-            if matches!(status_model, StatusModel::DocumentMain { .. }) {
-                verbs.push(Verb::Status);
-            }
-            if let TemplateVerbs::DocumentBaseline { extensions } = template.verbs {
-                verbs.extend(extensions.iter().copied());
-            }
-            let keys = match template.content {
-                // UI mockups are HTML records and carry no front matter.
-                ContentModel::HtmlMockup(_) => Vec::new(),
-                _ => frontmatter_keys(template),
-            };
-            (
-                status_model,
-                verbs,
-                template.content,
-                template.id_shape,
-                template.create_options,
-                template.archive,
-                keys,
-            )
-        }
-        None => {
-            let status_model = document_status_model(slug, entry, TemplateStatus::DocumentMain)?;
-            let mut verbs = DOCUMENT_BASELINE_VERBS.to_vec();
-            verbs.push(Verb::Status);
-            let mut keys: Vec<&'static str> = GENERAL_FRONTMATTER_KEYS.to_vec();
-            keys.push("status");
-            (
-                status_model,
-                verbs,
-                ContentModel::Generic,
-                IdShape::Plain,
-                NO_CREATE_OPTIONS,
-                FRONTMATTER_ARCHIVE,
-                keys,
-            )
-        }
+    let content_model = match template {
+        Some(template) => template.content.content_model(),
+        None => ContentModel::Generic,
     };
+
+    let (status_model, verbs, id_shape, create_options, archive_policy, frontmatter_keys) =
+        match template {
+            Some(template) => {
+                let status_model = document_status_model(slug, entry, template.status)?;
+                let mut verbs = DOCUMENT_BASELINE_VERBS.to_vec();
+                if matches!(status_model, StatusModel::DocumentMain { .. }) {
+                    verbs.push(Verb::Status);
+                }
+                if let TemplateVerbs::DocumentBaseline { extensions } = template.verbs {
+                    verbs.extend(extensions.iter().copied());
+                }
+                let keys = match &content_model {
+                    // UI mockups are HTML records and carry no front matter.
+                    ContentModel::HtmlMockup(_) => Vec::new(),
+                    _ => frontmatter_keys(template),
+                };
+                (
+                    status_model,
+                    verbs,
+                    template.id_shape,
+                    template.create_options,
+                    template.archive,
+                    keys,
+                )
+            }
+            None => {
+                let status_model =
+                    document_status_model(slug, entry, TemplateStatus::DocumentMain)?;
+                let mut verbs = DOCUMENT_BASELINE_VERBS.to_vec();
+                verbs.push(Verb::Status);
+                let mut keys: Vec<String> = GENERAL_FRONTMATTER_KEYS
+                    .iter()
+                    .map(|key| (*key).to_string())
+                    .collect();
+                keys.push("status".to_string());
+                (
+                    status_model,
+                    verbs,
+                    IdShape::Plain,
+                    NO_CREATE_OPTIONS,
+                    FRONTMATTER_ARCHIVE,
+                    keys,
+                )
+            }
+        };
 
     let record = match template {
         Some(template) => template
             .record
-            .map(|facts| document_record(template, facts)),
+            .map(|facts| document_record(template, &content_model, facts)),
         // A config-defined type has no static template, so the registry builds
         // its record facts inline from the type it already owns. The registry
         // owns the descriptor; nothing is leaked or cached (ADR-0017 D10).
         None => Some(RecordDescriptor {
             name: Cow::Owned(slug.to_string()),
-            record_type: "document",
-            type_name: "document",
+            record_type: Cow::Borrowed("document"),
+            type_name: Cow::Borrowed("document"),
             label: Cow::Owned(slug.to_string()),
-            display_id_pattern: "GEN-###",
-            directory: "doc",
-            subpath: "",
+            display_id_pattern: Cow::Borrowed("GEN-###"),
+            directory: Cow::Borrowed("doc"),
+            subpath: Cow::Borrowed(""),
             doc_type_key: Some(Cow::Owned(slug.to_string())),
-            frontmatter_keys: &["status"],
-            sections: &["## Description"],
+            frontmatter_keys: vec![Cow::Borrowed("status")],
+            sections: vec![Cow::Borrowed("## Description")],
         }),
     };
 
@@ -2718,21 +2851,32 @@ fn document_descriptor(slug: &str, entry: &DocTypeEntry) -> Result<TypeDescripto
 /// `directory` and `subpath` stay at the record-layer defaults: the concrete
 /// location comes from the `document_types.<slug>.directory` entry that
 /// `RecordDescriptor::resolve_directory` reads through `doc_type_key`.
-fn document_record(template: &DescriptorTemplate, facts: RecordFacts) -> RecordDescriptor {
+fn document_record(
+    template: &DescriptorTemplate,
+    content: &ContentModel,
+    facts: RecordFacts,
+) -> RecordDescriptor {
     RecordDescriptor {
-        name: Cow::Borrowed(facts.record_name),
-        record_type: facts.record_type,
-        type_name: facts.type_name,
+        name: Cow::Owned(facts.record_name.to_string()),
+        record_type: Cow::Borrowed(facts.record_type),
+        type_name: Cow::Borrowed(facts.type_name),
         label: Cow::Borrowed(template.label),
-        display_id_pattern: facts.display_id_pattern,
-        directory: "doc",
-        subpath: "",
+        display_id_pattern: Cow::Borrowed(facts.display_id_pattern),
+        directory: Cow::Borrowed("doc"),
+        subpath: Cow::Borrowed(""),
         doc_type_key: Some(Cow::Borrowed(template.slug)),
-        frontmatter_keys: facts.frontmatter_keys,
-        sections: match template.content {
-            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => schema.sections,
+        frontmatter_keys: facts
+            .frontmatter_keys
+            .iter()
+            .copied()
+            .map(Cow::Borrowed)
+            .collect(),
+        sections: match content {
+            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => {
+                schema.sections.clone()
+            }
             // Unreachable for a template, but keeps the projection total.
-            ContentModel::Generic => &["## Description"],
+            ContentModel::Generic => vec![Cow::Borrowed("## Description")],
         },
     }
 }
@@ -2914,7 +3058,10 @@ fn check_invariants(descriptors: &[TypeDescriptor]) -> Result<(), RegistryError>
     // I14.
     for descriptor in documents() {
         let has_status_verb = descriptor.verbs.contains(&Verb::Status);
-        let has_status_key = descriptor.frontmatter_keys.contains(&"status");
+        let has_status_key = descriptor
+            .frontmatter_keys
+            .iter()
+            .any(|key| key == "status");
         if has_status_verb != has_status_key {
             return Err(RegistryError::StatusVerbMismatch {
                 slug: descriptor.slug.clone(),
@@ -2933,8 +3080,8 @@ fn check_invariants(descriptors: &[TypeDescriptor]) -> Result<(), RegistryError>
 
     // I15.
     for descriptor in descriptors {
-        let expected: &[Verb] = match descriptor.content_model {
-            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => schema.extensions,
+        let expected: &[Verb] = match &descriptor.content_model {
+            ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => &schema.extensions,
             // A generic document has exactly the baseline plus `status`.
             ContentModel::Generic => &[],
         };
@@ -3088,8 +3235,8 @@ mod tests {
         check_invariants(descriptors).expect_err("invariant must fail")
     }
 
-    fn schema(descriptor: &TypeDescriptor) -> &'static TypedSchema {
-        match descriptor.content_model {
+    fn schema(descriptor: &TypeDescriptor) -> &TypedSchema {
+        match &descriptor.content_model {
             ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => schema,
             ContentModel::Generic => panic!("descriptor has no typed schema: {}", descriptor.slug),
         }
@@ -3195,7 +3342,12 @@ mod tests {
             assert!(!descriptor.has_verb(Verb::Archive));
             assert!(!descriptor.has_verb(Verb::Restore));
             assert_eq!(descriptor.frontmatter_status_key(), None);
-            assert!(!descriptor.frontmatter_keys.contains(&"status"));
+            assert!(
+                !descriptor
+                    .frontmatter_keys
+                    .iter()
+                    .any(|key| key == "status")
+            );
         }
     }
 
@@ -3661,8 +3813,8 @@ mod tests {
             let expected_keys: Vec<&str> = descriptor
                 .frontmatter_keys
                 .iter()
-                .copied()
                 .skip(GENERAL_FRONTMATTER_KEYS.len())
+                .map(String::as_str)
                 .collect();
             assert_eq!(
                 record.frontmatter_keys, expected_keys,
@@ -3674,9 +3826,9 @@ mod tests {
                 "{slug} status key"
             );
 
-            let expected_sections: &[&str] = match descriptor.content_model {
-                ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => schema.sections,
-                ContentModel::Generic => &["## Description"],
+            let expected_sections: &[Cow<'static, str>] = match &descriptor.content_model {
+                ContentModel::Typed(schema) | ContentModel::HtmlMockup(schema) => &schema.sections,
+                ContentModel::Generic => &[Cow::Borrowed("## Description")],
             };
             assert_eq!(record.sections, expected_sections, "{slug} sections");
 
@@ -3742,11 +3894,12 @@ mod tests {
     // 22
     #[test]
     fn no_parallel_document_record_table_remains() {
-        use crate::record::descriptor::DESCRIPTORS as STATIC_RECORDS;
+        use crate::record::descriptor::descriptors as static_records;
 
-        assert_eq!(STATIC_RECORDS.len(), 4, "only backlog families are static");
+        let static_records = static_records();
+        assert_eq!(static_records.len(), 4, "only backlog families are static");
         assert!(
-            STATIC_RECORDS
+            static_records
                 .iter()
                 .all(|descriptor| descriptor.doc_type_key.is_none()),
             "static records must not describe document types"
@@ -4156,16 +4309,16 @@ mod tests {
             }
         }
         // A declared verb without a spec is a startup defect.
-        static NO_SPEC_SCHEMA: TypedSchema = TypedSchema {
+        let no_spec_schema = TypedSchema {
             handler: TypedHandler::Glossary,
-            sections: &[],
-            extensions: &[],
-            verbs: &[],
+            sections: Vec::new(),
+            extensions: Vec::new(),
+            verbs: Vec::new(),
         };
         let cfg = Config::default();
         let mut descriptors = assembled(&cfg);
         let glossary = find_mut(&mut descriptors, "glossary");
-        glossary.content_model = ContentModel::Typed(&NO_SPEC_SCHEMA);
+        glossary.content_model = ContentModel::Typed(no_spec_schema);
         let error = invariant_error(&descriptors);
         assert!(matches!(
             error,
@@ -4217,10 +4370,10 @@ mod tests {
             .find(|arg| arg.id == "title_flag")
             .unwrap();
         assert_eq!(title_flag.value_name, "TITLE_FLAG");
-        assert_eq!(title_flag.long, Some("title"));
+        assert_eq!(title_flag.long.as_deref(), Some("title"));
         let title = create.args.iter().find(|arg| arg.id == "title").unwrap();
         assert_eq!(title.value_name, "title");
-        assert_eq!(title.required_unless_present, Some("title_flag"));
+        assert_eq!(title.required_unless_present.as_deref(), Some("title_flag"));
 
         let mockup = registry.descriptor("ui-mockup").unwrap();
         let edit = mockup.verb_spec(Verb::Edit).unwrap();
@@ -4229,7 +4382,8 @@ mod tests {
                 .iter()
                 .find(|arg| arg.id == "status")
                 .unwrap()
-                .conflicts_with,
+                .conflicts_with
+                .as_deref(),
             Some("superseded_by")
         );
         let create = mockup.verb_spec(Verb::Create).unwrap();
@@ -4255,5 +4409,116 @@ mod tests {
                 .value_name,
             "title"
         );
+    }
+
+    // 43
+    #[test]
+    fn every_seed_type_keeps_the_pre_change_frontmatter_key_order() {
+        let registry = default_registry();
+        let general = [
+            "id",
+            "title",
+            "created_date",
+            "updated_date",
+            "labels",
+            "references",
+        ];
+        let cases: &[(&str, bool, &[&str])] = &[
+            ("req", true, &[]),
+            ("nfr", true, &[]),
+            ("glossary", true, &[]),
+            ("rule", true, &[]),
+            ("ui-spec", true, &[]),
+            ("ui-mockup", false, &[]),
+            ("audit", true, &["type"]),
+            ("tech-spec", true, &[]),
+            ("use-case", true, &[]),
+            ("test-case", true, &[]),
+            ("test-report", true, &[]),
+            (
+                "task",
+                true,
+                &[
+                    "assignee",
+                    "milestone",
+                    "dependencies",
+                    "ordinal",
+                    "documentation",
+                    "type",
+                ],
+            ),
+            ("milestone", true, &["release"]),
+            ("release", true, &[]),
+            ("adr", false, &["superseded_by"]),
+        ];
+        for (slug, has_frontmatter, extra) in cases {
+            let descriptor = registry
+                .descriptor(slug)
+                .unwrap_or_else(|| panic!("{slug}"));
+            if !has_frontmatter {
+                if *slug == "ui-mockup" {
+                    assert!(descriptor.frontmatter_keys.is_empty(), "{slug}");
+                } else {
+                    let mut expected: Vec<String> =
+                        general.iter().map(|key| (*key).to_string()).collect();
+                    expected.extend(extra.iter().map(|key| (*key).to_string()));
+                    assert_eq!(descriptor.frontmatter_keys, expected, "{slug}");
+                }
+                continue;
+            }
+            let mut expected: Vec<String> = general.iter().map(|key| (*key).to_string()).collect();
+            expected.push("status".to_string());
+            expected.extend(extra.iter().map(|key| (*key).to_string()));
+            assert_eq!(descriptor.frontmatter_keys, expected, "{slug}");
+        }
+    }
+
+    // 44
+    #[test]
+    fn config_defined_record_descriptor_is_owned_and_registry_local() {
+        let cfg = config_with("note", entry("NOTE", "notes/"));
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        let record = registry.record_descriptor("note").expect("note record");
+
+        assert_eq!(record.name, "note");
+        assert_eq!(record.label, "note");
+        assert_eq!(record.doc_type_key.as_deref(), Some("note"));
+        assert_eq!(record.frontmatter_keys, &["status"]);
+        assert_eq!(record.sections, &["## Description"]);
+        assert_eq!(record.configured_prefixes(&cfg), vec!["NOTE".to_string()]);
+        assert_eq!(record.directory.as_ref(), "doc");
+        assert_eq!(record.subpath.as_ref(), "");
+
+        // A second registry built from another map is independent.
+        let mut other = Config::default();
+        other
+            .document_types
+            .insert("memo".to_string(), entry("MEMO", "memos/"));
+        let other_registry = ArtifactRegistry::build(&other).expect("other registry");
+        assert!(other_registry.record_descriptor("note").is_none());
+        assert_eq!(
+            other_registry.record_descriptor("memo").expect("memo").name,
+            "memo"
+        );
+
+        // Repeating the lookup returns a field-equal value.
+        assert_eq!(registry.record_descriptor("note"), Some(record));
+    }
+
+    // 45
+    #[test]
+    fn verb_specs_and_arguments_are_owned_and_cloneable() {
+        let registry = default_registry();
+        let descriptor = registry.descriptor("req").expect("req");
+        let specs: Vec<VerbSpec> = descriptor.ordered_verb_specs();
+        let create = specs
+            .into_iter()
+            .find(|spec| spec.verb == Verb::Create)
+            .expect("create spec");
+        // Moving and cloning the owned values proves they carry no lifetime.
+        let moved = create.clone();
+        assert_eq!(moved.about.as_ref(), "Create a business requirement");
+        assert_eq!(moved.args.len(), 7);
+        assert_eq!(moved.args[0].id.as_ref(), "title");
     }
 }

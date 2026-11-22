@@ -68,7 +68,9 @@ pub fn run_with_io<R: BufRead, W: Write>(
         }
     }
 
-    let static_scanned = scan::collect(ctx, &cfg, scan::static_families(&cfg))?;
+    let static_descriptors = crate::record::descriptor::descriptors();
+    let static_scanned =
+        scan::collect(ctx, &cfg, scan::static_families(&cfg, &static_descriptors))?;
     findings.extend(scan::duplicate_ids(&static_scanned));
     findings.extend(scan::self_dependencies(&static_scanned));
     findings.extend(scan::dependency_cycles(&static_scanned));

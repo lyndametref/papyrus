@@ -238,7 +238,7 @@ fn load_config(ctx: &Context) -> Result<Config, AppError> {
     load_effective_config(&ctx.config_path, &ctx.project_dir)
 }
 
-fn task_descriptor() -> &'static crate::record::descriptor::RecordDescriptor {
+fn task_descriptor() -> crate::record::descriptor::RecordDescriptor {
     crate::record::descriptor::descriptor_for("task").expect("task descriptor")
 }
 
@@ -295,9 +295,9 @@ fn task_frontmatter_id(content: &str) -> Option<String> {
 fn reject_task_write_conflict(ctx: &Context, path: &std::path::Path) -> Result<(), AppError> {
     let content = fs::read_to_string(path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let desc = task_descriptor();
-    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
+    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, &desc);
     if let Some(reason) =
-        crate::record::migrate::check_conflicts_for_path(ctx, path, desc, &content, &conflicts)
+        crate::record::migrate::check_conflicts_for_path(ctx, path, &desc, &content, &conflicts)
     {
         return Err(AppError::Validation(format!(
             "migration conflict at {}: {}",
@@ -996,9 +996,9 @@ pub fn edit(
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let doc = crate::record::document::parse(&content)?;
     let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
+    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, &desc);
     if let Some(reason) =
-        crate::record::migrate::check_conflicts_for_path(ctx, &path, desc, &content, &conflicts)
+        crate::record::migrate::check_conflicts_for_path(ctx, &path, &desc, &content, &conflicts)
     {
         return Err(AppError::Validation(format!(
             "migration conflict at {}: {}",
@@ -1087,7 +1087,7 @@ pub fn edit(
     // retired on every write; user operations are applied afterwards so an
     // explicit set or clear always wins.
     let mut ops: Vec<crate::record::patch::PatchOp> =
-        crate::record::migrate::retire_legacy_body_ops(&doc, desc, &path);
+        crate::record::migrate::retire_legacy_body_ops(&doc, &desc, &path);
 
     if let Some(t) = title_raw {
         let tv = sanitize_text(t)?;
@@ -1480,7 +1480,7 @@ pub fn list(
             String,
         )> = Vec::new();
         let desc = crate::record::descriptor::descriptor_for("task").unwrap();
-        let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
+        let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, &desc);
         if let Ok(rd) = fs::read_dir(active) {
             for e in rd.flatten() {
                 let path = e.path();
@@ -1501,7 +1501,7 @@ pub fn list(
                 };
                 let content = fs::read_to_string(&safe).unwrap_or_default();
                 if let Some(conflict) = crate::record::migrate::path_migration_conflict(
-                    ctx, &safe, desc, &content, &conflicts,
+                    ctx, &safe, &desc, &content, &conflicts,
                 ) {
                     eprintln!("warning: {}", conflict);
                     continue;
@@ -1693,7 +1693,7 @@ fn retire_and_touch(ctx: &Context, path: &std::path::Path) -> Result<(), AppErro
     let doc = crate::record::document::parse(&content)?;
     let desc = crate::record::descriptor::descriptor_for("task")
         .ok_or_else(|| AppError::Runtime("task descriptor is unavailable".to_string()))?;
-    let mut ops = crate::record::migrate::retire_legacy_body_ops(&doc, desc, path);
+    let mut ops = crate::record::migrate::retire_legacy_body_ops(&doc, &desc, path);
     ops.push(crate::record::patch::PatchOp::SetFrontMatter(
         "updated_date".into(),
         crate::record::frontmatter::utc_now(),
