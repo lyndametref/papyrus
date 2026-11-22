@@ -2,7 +2,7 @@
 id: TECH-069
 title: "Three-Category Handler Set Release Verification and Packaging"
 created_date: '2026-11-16T17:46:54Z'
-updated_date: '2026-11-21T07:44:31Z'
+updated_date: '2026-11-22T15:46:06Z'
 labels: []
 references:
   - ADR-0003
@@ -40,17 +40,14 @@ references:
   - REQ-07.002
   - REQ-07.003
   - REQ-07.004
+  - ADR-043
 status: verified
 ---
 # TECH-069 Three-Category Handler Set Release Verification and Packaging
 
 ## Purpose
 
-Prove the descriptor-driven refactor at its single release boundary and package
-it once. The refactor is one deliverable with no intermediate release: the
-backlog, decision, and document handlers ship together, and the document
-handlers are one descriptor-driven surface over one `DocumentModel` and one
-engine.
+Prove the descriptor-driven refactor at its single release boundary and publish exactly one final package. The refactor is one deliverable with no intermediate release: the backlog, decision, and document handlers ship together, and the document handlers are one descriptor-driven surface over one `DocumentModel` and one engine. RC packages published at every verified milestone that carries the packaging gate are verification builds, not release artifacts; each is kept in `builds/<version>/` and marked when superseded, and exactly one final release artifact exists.
 
 Verification covers the three-category handler set across the CLI, search, the
 browser, an upgrade from a pre-refactor configuration, and the installed Debian
@@ -94,7 +91,8 @@ is not fixed here.
   than amd64.
 - Real-GUI runs in Firefox, Edge, and Safari; browser verification is HTTP,
   markup, asset, and console level.
-- A version bump. The package carries the `Cargo.toml` version.
+- A version bump. The package version is supplied to the component build
+  script by the versioning step.
 
 ## Behavior
 
@@ -235,23 +233,31 @@ is scripted and repeated by hand with the installed binary in section 6.
 ### 6. Debian package, install, offline run, and removal
 
 1. `cargo build --release` first, then `./target/release/papyrus --help` must
-   list the enabled slugs before packaging. `./scripts/build-deb.sh` produces
-   `papyrus_<version>_amd64.deb`; size and SHA-256 are recorded.
-2. The package is built once at the single release boundary. No intermediate
-   package is published for an internal stage, and the package version is the
-   `Cargo.toml` version.
+   list the enabled slugs before packaging.
+   `./scripts/build-package.sh --version <version> --out builds/<version>/.build/<component>`
+   produces `papyrus_<version>_amd64.deb` by invoking `scripts/build-deb.sh`
+   for the Debian assembly; packaging assembles the component archive,
+   `MANIFEST.txt`, and the `.sha256` file under the git-ignored
+   `builds/<version>/`; size and SHA-256 are recorded.
+2. The same script produces both package modes: an RC package at every verified
+   milestone that carries the packaging gate unless that milestone's packaging
+   is explicitly waived by the user, and the final package at this release
+   boundary. `--version` is authoritative for the control `Version:` field and
+   the artifact name and is injected without editing a tracked file. An RC
+   package is kept in `builds/<version>/`, is never overwritten, and is marked
+   when superseded; exactly one final release artifact is kept.
 3. `dpkg-deb -I` records `Package`, `Version`, `Architecture`, `Depends`,
    `Section`, `Priority`, and the maintainer; the packaged copyright declares
    `GPL-3.0-or-later`. `dpkg-deb -c` lists only `/usr/bin/papyrus` (0755) and
    `/usr/share/doc/papyrus/copyright` (0644) plus directories.
-4. The packaging check enumerates the vendored version directories and reads
-   the manifest `version` column. It fails the build when a package has no
+4. The Debian assembly step enumerates the vendored version directories and
+   reads the manifest `version` column. It fails the build when a package has no
    version directory, more than one, a manifest row with a different version,
    or a copyright section citing a different version. The Papyrus package
    version and the asset version remain unrelated.
-5. Install in an isolated dpkg root under `./.tmp/` with
-   `fakeroot dpkg --instdir --admindir --force-depends`. Record the host
-   `dpkg -l papyrus` state before and after; it must be unchanged.
+5. Install from a transient copy of the package under `./.tmp/` in an isolated
+   dpkg root with `fakeroot dpkg --instdir --admindir --force-depends`. Record
+   the host `dpkg -l papyrus` state before and after; it must be unchanged.
 6. The installed binary is `root:root` 0755, resolves on the isolated `PATH`,
    and prints the package version.
 7. With the installed binary, create a project, declare `note` by editing
@@ -265,7 +271,9 @@ is scripted and repeated by hand with the installed binary in section 6.
 9. No man page is expected or asserted for `note` or any config-defined slug.
    The man-page gap and ADR-0021 status are recorded as a release risk.
 10. `dpkg -r` removes the binary; `dpkg --purge` removes the admin entry and
-    leaves no papyrus file. The isolated roots and staged tree are deleted.
+    leaves no papyrus file. The isolated roots, the staged tree, and the
+    transient package copy are deleted; the package stays in
+    `builds/<version>/`.
 
 ### 7. No-drift checks
 
@@ -278,7 +286,7 @@ The suite fails when any of the following reappears. It scans production lines
 | D-02 | `nfreq` as a command in `src/` | the registry collision test's rejection fixture only |
 | D-03 | document `deprecate` or `restore` command variants in `src/` | none |
 | D-04 | a per-type document command variant, a static document-type command list, or a per-type document module in `src/` | none; the seed descriptors are the only type model |
-| D-05 | a document slug literal used to select behaviour by `match` or `if` in `src/cli/`, `src/document.rs`, `src/search.rs`, or `src/browser/` | none |
+| D-05 | a document slug literal used to select behaviour. **Scope:** any `match` or `if` on a document slug literal anywhere in `src/`, except the `SEED_DOCUMENT_TYPES` table in the config module; tests and documentation are exempt. | **Allowed location:** the `SEED_DOCUMENT_TYPES` table in `src/config.rs` only. |
 | D-06 | the superseded content model, `document_detail.html`, `document_edit.html`, or a document entry in the static presentation table | none |
 | D-07 | a process-global descriptor map or `Box::leak` for a document slug | none |
 | D-08 | `papyrus nfreq`, a per-type document command block, or a `deprecated/` mention in `README.md`, the upgrade notes, or `docs/business-rules/*.md` | the removal/migration wording, the inert-folder recovery section, and the legacy-folder note |
@@ -322,7 +330,8 @@ until the owner accepts the risk or a follow-up task resolves it.
    count, and the installed-binary version.
 5. Every scratch directory, isolated dpkg root, staged package tree, and
    fixture under `./.tmp/` is removed before the step ends, including on
-   failure; the built `.deb` and the written evidence remain.
+   failure; the package under `builds/<version>/` and the written evidence
+   remain.
 6. `git status` at the end lists only the verification artifacts and no product
    source, requirement, business rule, ADR, README, or upgrade-notes change.
 
@@ -332,9 +341,10 @@ until the owner accepts the risk or a follow-up task resolves it.
 |---|---|
 | Source tree | The descriptor-driven three-category implementation: one document engine, one document surface, seed-derived descriptors, and the serving snapshot. |
 | Toolchain | The pinned Rust toolchain; `dpkg-deb`, `dpkg`, `fakeroot`, `unshare`/`ip`, `curl`; the supported Debian release and amd64. |
+| Packaging entry point | `scripts/build-package.sh --version <version> --out <dir>`; it invokes `scripts/build-deb.sh` for the Debian assembly, the package layout, and the asset version check. |
 | Cross-surface test file | Cross-surface, upgrade, and installed-style checks against the built binary. |
 | No-drift test file | The mechanical scanner of section 7. |
-| `papyrus_<version>_amd64.deb` | The one package built at the release boundary; size and SHA-256 recorded. |
+| `papyrus_<version>_amd64.deb` | The package produced by `scripts/build-package.sh --version <version>` through `scripts/build-deb.sh`, assembled under `builds/<version>/`; the RC package is kept there and the final release artifact is built the same way; size and SHA-256 recorded. |
 | Isolated dpkg root | Under `./.tmp/`; removed after the run. |
 | Packaging record | Verification evidence, findings, and release-readiness statement. |
 
@@ -349,6 +359,9 @@ until the owner accepts the risk or a follow-up task resolves it.
 | A `deprecated/` file is read, listed, searched, or browsed | Release-blocking; the inert-folder contract fails. |
 | A no-drift rule fires | Blocked until the offending line is recorded and attributed; this step does not edit it. |
 | The package metadata, contents, or install differs from section 6 | Blocked; record the exact diff. |
+| The RC package is overwritten, rebuilt in place, deleted, or staged, committed, tagged, pushed, or uploaded | Blocked; a package version is immutable and is not a release artifact. |
+| More than one final release artifact exists | Blocked; exactly one final release artifact is kept. |
+| The working tree is dirty after the packaging run | Blocked; the version is injected without editing a tracked file. |
 | The host package database changes | Blocked; isolation failed. |
 | The offline run needs the network | Offline claim not verified; record and use the loopback evidence. |
 | A release-blocking finding remains open | `release-ready: no`; name the finding, owner, and requested decision. |
@@ -358,6 +371,11 @@ until the owner accepts the risk or a follow-up task resolves it.
 
 - Assumption: the verification host matches the supported Debian release and
   amd64, with the pinned toolchain, `dpkg`, and `fakeroot`/`unshare` available.
+- Assumption: packaging runs the component build script
+  `scripts/build-package.sh --version <version> --out builds/<version>/.build/<component>`,
+  which invokes `scripts/build-deb.sh` for the Debian assembly; `--version` is
+  authoritative and is injected without editing a tracked file, and
+  `build-deb.sh` keeps its `Cargo.toml`-derived default only when run directly.
 - Assumption: all three category handlers and the descriptor engine are the
   shipped behaviour; this step verifies that behaviour and does not reopen its
   implementation.
