@@ -152,7 +152,7 @@ fn load_config(ctx: &Context) -> Result<Config, AppError> {
     load_effective_config(&ctx.config_path, &ctx.project_dir)
 }
 
-fn milestone_descriptor() -> &'static crate::record::descriptor::RecordDescriptor {
+fn milestone_descriptor() -> crate::record::descriptor::RecordDescriptor {
     crate::record::descriptor::descriptor_for("milestone").expect("milestone descriptor")
 }
 
@@ -210,9 +210,9 @@ fn milestone_frontmatter_id(content: &str) -> Option<String> {
 fn reject_milestone_write_conflict(ctx: &Context, path: &std::path::Path) -> Result<(), AppError> {
     let content = fs::read_to_string(path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let desc = milestone_descriptor();
-    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
+    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, &desc);
     if let Some(reason) =
-        crate::record::migrate::check_conflicts_for_path(ctx, path, desc, &content, &conflicts)
+        crate::record::migrate::check_conflicts_for_path(ctx, path, &desc, &content, &conflicts)
     {
         return Err(AppError::Validation(format!(
             "migration conflict at {}: {}",
@@ -460,7 +460,7 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
 
     let mut items: Vec<(String, String, String)> = Vec::new();
     let desc = crate::record::descriptor::descriptor_for("milestone").unwrap();
-    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
+    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, &desc);
     if let Ok(rd) = fs::read_dir(&active) {
         for e in rd.flatten() {
             let path = e.path();
@@ -478,7 +478,7 @@ pub fn list(ctx: &Context) -> Result<crate::CommandOutput, AppError> {
             let safe = Context::ensure_within(&ctx.project_dir, &path)?;
             let content = fs::read_to_string(&safe).unwrap_or_default();
             if let Some(conflict) = crate::record::migrate::path_migration_conflict(
-                ctx, &safe, desc, &content, &conflicts,
+                ctx, &safe, &desc, &content, &conflicts,
             ) {
                 eprintln!("warning: {}", conflict);
                 continue;
@@ -582,9 +582,9 @@ pub fn edit(
     let content = fs::read_to_string(&path).map_err(|e| AppError::Runtime(e.to_string()))?;
     let doc = crate::record::document::parse(&content)?;
     let desc = crate::record::descriptor::descriptor_for("milestone").unwrap();
-    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, desc);
+    let conflicts = crate::record::migrate::scan_migration_conflicts(ctx, &desc);
     if let Some(reason) =
-        crate::record::migrate::check_conflicts_for_path(ctx, &path, desc, &content, &conflicts)
+        crate::record::migrate::check_conflicts_for_path(ctx, &path, &desc, &content, &conflicts)
     {
         return Err(AppError::Validation(format!(
             "migration conflict at {}: {}",
@@ -641,7 +641,7 @@ pub fn edit(
     // Retire the legacy title heading and `## Release` section on every
     // write; explicit user operations are applied afterwards so they win.
     let mut ops: Vec<crate::record::patch::PatchOp> =
-        crate::record::migrate::retire_legacy_body_ops(&doc, desc, &path);
+        crate::record::migrate::retire_legacy_body_ops(&doc, &desc, &path);
     if title_raw.is_some() {
         ops.push(crate::record::patch::PatchOp::SetFrontMatter(
             "title".into(),

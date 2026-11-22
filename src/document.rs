@@ -265,7 +265,7 @@ pub fn run(
         | DocumentVerb::List
         | DocumentVerb::View
         | DocumentVerb::Edit
-        | DocumentVerb::Supersede => match descriptor.content_model {
+        | DocumentVerb::Supersede => match &descriptor.content_model {
             ContentModel::Generic => match invocation.verb {
                 DocumentVerb::Create => create_generic(ctx, descriptor, record, invocation),
                 DocumentVerb::List => list_records(ctx, record),
@@ -288,7 +288,7 @@ pub fn run(
             ),
         },
         DocumentVerb::Archive | DocumentVerb::Delete | DocumentVerb::Status => {
-            match descriptor.content_model {
+            match &descriptor.content_model {
                 // UI mockups keep their HTML metadata semantics.
                 ContentModel::HtmlMockup(_) => dispatch_typed(
                     ctx,

@@ -201,7 +201,7 @@ fn dispatch_document(
     registry: &ArtifactRegistry,
 ) -> Result<CommandOutput, AppError> {
     let ctx = build_context(project_raw, config_path, json, no_color)?;
-    let generic = matches!(desc.content_model, crate::registry::ContentModel::Generic);
+    let generic = matches!(&desc.content_model, crate::registry::ContentModel::Generic);
     let invocation = crate::cli::tree::parse_document_invocation(sub, slug, generic)?;
     crate::document::run(&ctx, registry, invocation)
 }

@@ -9,27 +9,31 @@ use std::fmt;
 
 /// The behavior facts of one record family.
 ///
-/// The three configuration-derived fields `name`, `label`, and `doc_type_key`
-/// are owned-or-borrowed so the record descriptor of a config-defined document
-/// type can live in the `ArtifactRegistry` that owns its configuration
-/// (ADR-0017 decision 10: no cache). The remaining fields are static data.
+/// Every text fact is owned-or-borrowed (`Cow`) and every sequence is owned, so
+/// the record descriptor of a config-defined document type can live in the
+/// `ArtifactRegistry` that owns its configuration (ADR-0017 decision 10: no
+/// cache). Backlog and decision families still borrow their literal facts; a
+/// document family may own every value. The type is `Clone` but not `Copy`;
+/// hot paths pass `&RecordDescriptor` (TECH-071 section 1).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RecordDescriptor {
     pub name: Cow<'static, str>,
-    pub record_type: &'static str,
-    pub type_name: &'static str,
+    pub record_type: Cow<'static, str>,
+    pub type_name: Cow<'static, str>,
     pub label: Cow<'static, str>,
-    pub display_id_pattern: &'static str,
-    pub directory: &'static str,
-    pub subpath: &'static str,
+    pub display_id_pattern: Cow<'static, str>,
+    pub directory: Cow<'static, str>,
+    pub subpath: Cow<'static, str>,
     pub doc_type_key: Option<Cow<'static, str>>,
-    pub frontmatter_keys: &'static [&'static str],
-    pub sections: &'static [&'static str],
+    pub frontmatter_keys: Vec<Cow<'static, str>>,
+    pub sections: Vec<Cow<'static, str>>,
 }
 
 impl RecordDescriptor {
     pub fn has_frontmatter_key(&self, key: &str) -> bool {
-        self.frontmatter_keys.contains(&key)
+        self.frontmatter_keys
+            .iter()
+            .any(|candidate| candidate.as_ref() == key)
     }
 
     /// Configured ID prefixes that belong to this record family.
@@ -38,7 +42,7 @@ impl RecordDescriptor {
     /// one prefix per enabled decision type, and document records use the
     /// prefix of their document type entry.
     pub fn configured_prefixes(&self, cfg: &Config) -> Vec<String> {
-        match self.record_type {
+        match self.record_type.as_ref() {
             "task" => vec![cfg.task_prefix.clone()],
             "milestone" => vec![cfg.milestone_prefix.clone()],
             "release" => vec![cfg.release_prefix.clone()],
@@ -68,7 +72,7 @@ impl RecordDescriptor {
     /// Backlog-shaped stems. Document families keep their
     /// `display_id_pattern` shape.
     pub fn matches_stem(&self, cfg: &Config, stem: &str) -> bool {
-        match self.record_type {
+        match self.record_type.as_ref() {
             "task" | "milestone" | "release" | "decision" => self
                 .configured_prefixes(cfg)
                 .iter()
@@ -84,7 +88,7 @@ impl RecordDescriptor {
         cfg: &Config,
         project_dir: &std::path::Path,
     ) -> Result<std::path::PathBuf, AppError> {
-        let base = match self.directory {
+        let base = match self.directory.as_ref() {
             "backlog" => project_dir.join(&cfg.backlog_directory),
             "decision" => project_dir.join(&cfg.decision_directory),
             "doc" => project_dir.join(&cfg.doc_directory),
@@ -103,7 +107,7 @@ impl RecordDescriptor {
         } else if self.subpath.is_empty() {
             base
         } else {
-            base.join(self.subpath)
+            base.join(self.subpath.as_ref())
         };
         Context::ensure_within(project_dir, &raw)
     }
@@ -120,12 +124,12 @@ impl RecordDescriptor {
         cfg: &Config,
         project_dir: &std::path::Path,
     ) -> Option<Result<std::path::PathBuf, AppError>> {
-        match self.record_type {
+        match self.record_type.as_ref() {
             "task" | "milestone" => {
                 let raw = project_dir
                     .join(&cfg.backlog_directory)
                     .join("archive")
-                    .join(self.subpath);
+                    .join(self.subpath.as_ref());
                 Some(Context::ensure_within(project_dir, &raw))
             }
             _ => None,
@@ -143,12 +147,12 @@ impl RecordDescriptor {
         cfg: &Config,
         project_dir: &std::path::Path,
     ) -> Option<Result<std::path::PathBuf, AppError>> {
-        match self.record_type {
+        match self.record_type.as_ref() {
             "milestone" => {
                 let raw = project_dir
                     .join(&cfg.backlog_directory)
                     .join("archive")
-                    .join(self.subpath);
+                    .join(self.subpath.as_ref());
                 Some(Context::ensure_within(project_dir, &raw))
             }
             _ => None,
@@ -165,7 +169,7 @@ impl RecordDescriptor {
         cfg: &crate::config::Config,
         project_dir: &std::path::Path,
     ) -> Option<Result<std::path::PathBuf, AppError>> {
-        match self.record_type {
+        match self.record_type.as_ref() {
             "task" | "milestone" => self.resolve_archive_directory(cfg, project_dir),
             _ => {
                 if self.doc_type_key.is_some() {
@@ -185,11 +189,11 @@ impl RecordDescriptor {
         cfg: &Config,
         project_dir: &std::path::Path,
     ) -> Option<Result<std::path::PathBuf, AppError>> {
-        match self.record_type {
+        match self.record_type.as_ref() {
             "task" | "milestone" => {
                 let raw = project_dir
                     .join(&cfg.backlog_directory)
-                    .join(self.subpath)
+                    .join(self.subpath.as_ref())
                     .join("archived");
                 Some(Context::ensure_within(project_dir, &raw))
             }
@@ -199,7 +203,7 @@ impl RecordDescriptor {
 
     /// Declared status vocabulary for this record family (main + custom).
     pub fn declared_statuses(&self, cfg: &crate::config::Config) -> Vec<String> {
-        match self.record_type {
+        match self.record_type.as_ref() {
             "task" => cfg.statuses.clone(),
             "milestone" => vec![
                 "open".to_string(),
@@ -268,80 +272,88 @@ const MILESTONE_SECTIONS: &[&str] = &["## Description"];
 const RELEASE_SECTIONS: &[&str] = &["## Description"];
 const DECISION_SECTIONS: &[&str] = &["## Status", "## Decision", "## Context", "## Consequences"];
 
-pub const DESCRIPTORS: &[RecordDescriptor] = &[
-    RecordDescriptor {
-        name: Cow::Borrowed("task"),
-        record_type: "task",
-        type_name: "task",
-        label: Cow::Borrowed("Task"),
-        display_id_pattern: "TASK-###",
-        directory: "backlog",
-        subpath: "tasks",
-        doc_type_key: None,
-        frontmatter_keys: &[
-            "status",
-            "assignee",
-            "milestone",
-            "dependencies",
-            "ordinal",
-            "documentation",
-            "type",
-        ],
-        sections: TASK_SECTIONS,
-    },
-    RecordDescriptor {
-        name: Cow::Borrowed("milestone"),
-        record_type: "milestone",
-        type_name: "milestone",
-        label: Cow::Borrowed("Milestone"),
-        display_id_pattern: "MS-###",
-        directory: "backlog",
-        subpath: "milestones",
-        doc_type_key: None,
-        frontmatter_keys: &["status", "release"],
-        sections: MILESTONE_SECTIONS,
-    },
-    RecordDescriptor {
-        name: Cow::Borrowed("release"),
-        record_type: "release",
-        type_name: "release",
-        label: Cow::Borrowed("Release"),
-        display_id_pattern: "REL-###",
-        directory: "backlog",
-        subpath: "releases",
-        doc_type_key: None,
-        frontmatter_keys: &["status"],
-        sections: RELEASE_SECTIONS,
-    },
-    RecordDescriptor {
-        name: Cow::Borrowed("decision"),
-        record_type: "decision",
-        type_name: "decision",
-        label: Cow::Borrowed("Decision"),
-        display_id_pattern: "DEC-###",
-        directory: "decision",
-        subpath: "",
-        doc_type_key: None,
-        frontmatter_keys: &["superseded_by"],
-        sections: DECISION_SECTIONS,
-    },
-];
-
-pub fn descriptors() -> &'static [RecordDescriptor] {
-    DESCRIPTORS
+/// Copy a static literal sequence into an owned descriptor sequence.
+fn owned(values: &[&'static str]) -> Vec<Cow<'static, str>> {
+    values.iter().copied().map(Cow::Borrowed).collect()
 }
 
-pub fn all_descriptors() -> &'static [RecordDescriptor] {
-    DESCRIPTORS
+/// The four bespoke backlog and decision record families.
+///
+/// Document records live on the `ArtifactRegistry`, never here. The list is
+/// built on demand rather than kept as a process-global table so a descriptor
+/// owns the value it publishes (TECH-071 section 2, ADR-037 decision 7).
+pub fn descriptors() -> Vec<RecordDescriptor> {
+    vec![
+        RecordDescriptor {
+            name: Cow::Borrowed("task"),
+            record_type: Cow::Borrowed("task"),
+            type_name: Cow::Borrowed("task"),
+            label: Cow::Borrowed("Task"),
+            display_id_pattern: Cow::Borrowed("TASK-###"),
+            directory: Cow::Borrowed("backlog"),
+            subpath: Cow::Borrowed("tasks"),
+            doc_type_key: None,
+            frontmatter_keys: owned(&[
+                "status",
+                "assignee",
+                "milestone",
+                "dependencies",
+                "ordinal",
+                "documentation",
+                "type",
+            ]),
+            sections: owned(TASK_SECTIONS),
+        },
+        RecordDescriptor {
+            name: Cow::Borrowed("milestone"),
+            record_type: Cow::Borrowed("milestone"),
+            type_name: Cow::Borrowed("milestone"),
+            label: Cow::Borrowed("Milestone"),
+            display_id_pattern: Cow::Borrowed("MS-###"),
+            directory: Cow::Borrowed("backlog"),
+            subpath: Cow::Borrowed("milestones"),
+            doc_type_key: None,
+            frontmatter_keys: owned(&["status", "release"]),
+            sections: owned(MILESTONE_SECTIONS),
+        },
+        RecordDescriptor {
+            name: Cow::Borrowed("release"),
+            record_type: Cow::Borrowed("release"),
+            type_name: Cow::Borrowed("release"),
+            label: Cow::Borrowed("Release"),
+            display_id_pattern: Cow::Borrowed("REL-###"),
+            directory: Cow::Borrowed("backlog"),
+            subpath: Cow::Borrowed("releases"),
+            doc_type_key: None,
+            frontmatter_keys: owned(&["status"]),
+            sections: owned(RELEASE_SECTIONS),
+        },
+        RecordDescriptor {
+            name: Cow::Borrowed("decision"),
+            record_type: Cow::Borrowed("decision"),
+            type_name: Cow::Borrowed("decision"),
+            label: Cow::Borrowed("Decision"),
+            display_id_pattern: Cow::Borrowed("DEC-###"),
+            directory: Cow::Borrowed("decision"),
+            subpath: Cow::Borrowed(""),
+            doc_type_key: None,
+            frontmatter_keys: owned(&["superseded_by"]),
+            sections: owned(DECISION_SECTIONS),
+        },
+    ]
 }
 
-pub fn list_descriptors() -> &'static [RecordDescriptor] {
-    DESCRIPTORS
+pub fn all_descriptors() -> Vec<RecordDescriptor> {
+    descriptors()
 }
 
-pub fn descriptor_for(name: &str) -> Option<&'static RecordDescriptor> {
+pub fn list_descriptors() -> Vec<RecordDescriptor> {
+    descriptors()
+}
+
+pub fn descriptor_for(name: &str) -> Option<RecordDescriptor> {
     let needle = name.to_lowercase();
-    DESCRIPTORS.iter().find(|d| {
+    descriptors().into_iter().find(|d| {
         d.name.to_lowercase() == needle
             || d.record_type.to_lowercase() == needle
             || d.type_name.to_lowercase() == needle
@@ -402,9 +414,10 @@ mod tests {
 
     #[test]
     fn only_the_four_backlog_families_are_static() {
-        assert_eq!(DESCRIPTORS.len(), 4);
+        let records = descriptors();
+        assert_eq!(records.len(), 4);
         assert!(
-            DESCRIPTORS
+            records
                 .iter()
                 .all(|descriptor| descriptor.doc_type_key.is_none()),
             "document records must come from the artifact registry"

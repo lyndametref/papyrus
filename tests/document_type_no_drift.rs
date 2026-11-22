@@ -660,7 +660,7 @@ fn d12_document_records_have_one_source() {
 
     // Only the four backlog families stay static, and none describes a
     // document type; document records are projected from the artifact registry.
-    let records = papyrus::record::descriptor::DESCRIPTORS;
+    let records = papyrus::record::descriptor::descriptors();
     assert_eq!(
         records.len(),
         4,

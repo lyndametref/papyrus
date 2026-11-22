@@ -2,7 +2,7 @@
 id: TASK-246
 title: "Replace 'static descriptors with owned values derived from the seed and configuration"
 created_date: '2026-11-20T17:41:19Z'
-updated_date: '2026-11-22T08:49:50Z'
+updated_date: '2026-11-22T10:00:27Z'
 labels: []
 references:
   - ADR-036
@@ -10,7 +10,7 @@ references:
   - TECH-071
   - TECH-072
   - TC-128
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-033
@@ -62,3 +62,9 @@ Definition of done: `cargo build`, `cargo test`, and `cargo clippy --all-targets
 - [ ] `cargo test` reports zero failures and `cargo clippy --all-targets -- -D warnings` is clean.
 ## Comments
 - **task-refiner**: Refined for MS-033: description grounded in registry.rs ArgSpec, VerbSpec, TypeDescriptor and record descriptor.rs RecordDescriptor; 8 testable acceptance criteria added; TECH-071 and TECH-072 documented. Verb derivation sequencing clarified: storage conversion here, derivation in TASK-249 where DocumentModel exists. No dependency, ordinal, milestone, or assignee change.
+- **rust-dev**: -
+- **rust-dev**: Changed: registry.rs ArgSpec and VerbSpec own Cow text with owned Vec args; TypedSchema and ContentModel own their data; TypeDescriptor.frontmatter_keys is Vec<String>; the record descriptor owns text and sequences and the backlog and decision descriptors are built on demand; consumers updated.
+- **rust-dev**: Tests: no_descriptor_leaks guards process-global state and the four descriptor structs; registry tests cover the pre-change front-matter key order, config-defined record ownership and independence, and owned VerbSpec values.
+- **rust-dev**: Verification: cargo build clean; env -u EDITOR -u VISUAL cargo test 1145 passed, 0 failed, 26 ignored; tree_rebuild 7 of 7, cli_help_golden 2 of 2, characterization_replay 3 of 3; cargo clippy --all-targets -D warnings clean; cargo fmt --check clean.
+- **rust-dev**: Note: AC3 key order conflicts with ADR-0023 decision 5 and the pre-change code, so the pre-change order was kept. No commit made (per instruction).
+- **orchestrator**: Acceptance met: descriptor types are owned with no static member or lifetime, config-defined records carry their own registry-local descriptor, seed front-matter order unchanged, no process-global state or leaking constructors (new guards); suite 1145 passed, clippy clean.

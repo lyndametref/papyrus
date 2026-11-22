@@ -90,11 +90,11 @@ impl Record {
     }
 
     pub fn is_generic(&self) -> bool {
-        matches!(self.descriptor.content_model, ContentModel::Generic)
+        matches!(&self.descriptor.content_model, ContentModel::Generic)
     }
 
     pub fn is_html_mockup(&self) -> bool {
-        matches!(self.descriptor.content_model, ContentModel::HtmlMockup(_))
+        matches!(&self.descriptor.content_model, ContentModel::HtmlMockup(_))
     }
 
     pub fn is_requirement(&self) -> bool {
@@ -246,7 +246,7 @@ pub fn matches_stem(descriptor: &TypeDescriptor, stem: &str) -> bool {
 }
 
 fn content_extension(descriptor: &TypeDescriptor) -> &'static str {
-    match descriptor.content_model {
+    match &descriptor.content_model {
         ContentModel::HtmlMockup(_) => "html",
         _ => "md",
     }
@@ -312,7 +312,7 @@ pub fn load_record(
     descriptor: &TypeDescriptor,
     path: &Path,
 ) -> Result<Option<Record>, AppError> {
-    if matches!(descriptor.content_model, ContentModel::HtmlMockup(_)) {
+    if matches!(&descriptor.content_model, ContentModel::HtmlMockup(_)) {
         return load_ui_mockup(ctx, cfg, descriptor, path);
     }
     let safe = match Context::ensure_within(&ctx.project_dir, path) {
@@ -710,7 +710,7 @@ pub fn resolve_id(
         let Some(dir) = descriptor_directory(ctx, cfg, descriptor) else {
             continue;
         };
-        if matches!(descriptor.content_model, ContentModel::HtmlMockup(_)) {
+        if matches!(&descriptor.content_model, ContentModel::HtmlMockup(_)) {
             let Some(wanted) = canonical_id(descriptor, id) else {
                 continue;
             };

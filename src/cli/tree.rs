@@ -78,7 +78,7 @@ pub fn document_command(descriptor: &TypeDescriptor) -> Command {
         .about(format!("Manage {} documents.", descriptor.slug));
 
     for spec in descriptor.ordered_verb_specs() {
-        cmd = cmd.subcommand(verb_command(spec));
+        cmd = cmd.subcommand(verb_command(&spec));
     }
     cmd
 }
@@ -86,27 +86,27 @@ pub fn document_command(descriptor: &TypeDescriptor) -> Command {
 fn verb_command(spec: &VerbSpec) -> Command {
     let mut cmd = Command::new(spec.verb.as_str());
     if !spec.about.is_empty() {
-        cmd = cmd.about(spec.about);
+        cmd = cmd.about(spec.about.to_string());
     }
-    for arg in spec.args {
-        cmd = cmd.arg(build_arg(*arg));
+    for arg in &spec.args {
+        cmd = cmd.arg(build_arg(arg));
     }
     cmd
 }
 
-fn build_arg(spec: ArgSpec) -> Arg {
-    let mut arg = Arg::new(spec.id);
-    if let Some(long) = spec.long {
-        arg = arg.long(long);
+fn build_arg(spec: &ArgSpec) -> Arg {
+    let mut arg = Arg::new(spec.id.to_string());
+    if let Some(long) = &spec.long {
+        arg = arg.long(long.to_string());
     }
     if let Some(short) = spec.short {
         arg = arg.short(short);
     }
     if !spec.value_name.is_empty() {
-        arg = arg.value_name(spec.value_name);
+        arg = arg.value_name(spec.value_name.to_string());
     }
     if !spec.help.is_empty() {
-        arg = arg.help(spec.help);
+        arg = arg.help(spec.help.to_string());
     }
     arg = match spec.action {
         ArgAction::Set => arg,
@@ -117,11 +117,11 @@ fn build_arg(spec: ArgSpec) -> Arg {
     if spec.required {
         arg = arg.required(true);
     }
-    if let Some(other) = spec.required_unless_present {
-        arg = arg.required_unless_present(other);
+    if let Some(other) = &spec.required_unless_present {
+        arg = arg.required_unless_present(other.to_string());
     }
-    if let Some(other) = spec.conflicts_with {
-        arg = arg.conflicts_with(other);
+    if let Some(other) = &spec.conflicts_with {
+        arg = arg.conflicts_with(other.to_string());
     }
     arg
 }

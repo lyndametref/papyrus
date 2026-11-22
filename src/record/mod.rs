@@ -15,8 +15,8 @@ pub mod store;
 pub mod view;
 
 // Convenience re-exports (non-ambiguous).
-pub use descriptor::DESCRIPTORS as RECORD_DESCRIPTORS;
 pub use descriptor::RecordDescriptor;
+pub use descriptor::descriptors as record_descriptors;
 pub use document::{Document, Section, parse as parse_document, render as render_document};
 pub use frontmatter::FrontMatter;
 pub use identity::*;

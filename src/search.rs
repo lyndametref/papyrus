@@ -161,7 +161,7 @@ fn collect_document_type(
         };
         // An archived UI mockup is excluded by its HTML status without
         // relocation (Assumption A2).
-        if matches!(descriptor.content_model, ContentModel::HtmlMockup(_))
+        if matches!(&descriptor.content_model, ContentModel::HtmlMockup(_))
             && crate::ui_mockup::parse_record(&content, &stem_id).status == "archived"
         {
             continue;
@@ -207,7 +207,7 @@ fn document_active_dir(
 }
 
 fn document_extension(descriptor: &TypeDescriptor) -> &'static str {
-    match descriptor.content_model {
+    match &descriptor.content_model {
         ContentModel::HtmlMockup(_) => "html",
         ContentModel::Generic | ContentModel::Typed(_) => "md",
     }
@@ -231,7 +231,7 @@ fn document_identity_and_title(
     content: &str,
     stem_id: &str,
 ) -> (String, String) {
-    if matches!(descriptor.content_model, ContentModel::HtmlMockup(_)) {
+    if matches!(&descriptor.content_model, ContentModel::HtmlMockup(_)) {
         return (
             stem_id.to_string(),
             crate::ui_mockup::extract_title(content, stem_id),
