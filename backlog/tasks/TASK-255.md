@@ -2,7 +2,7 @@
 id: TASK-255
 title: "Implement the field-driven document handler with baseline verbs and status"
 created_date: '2026-11-20T17:41:57Z'
-updated_date: '2026-11-22T13:31:27Z'
+updated_date: '2026-11-22T13:32:09Z'
 labels: []
 references:
   - ADR-036
@@ -15,7 +15,7 @@ references:
   - ADR-0017
   - ADR-042
   - REQ-05.006
-status: In-Progress
+status: Done
 assignee:
   - rust-dev
 milestone: MS-034
@@ -79,3 +79,4 @@ One engine drives every document model; the baseline verbs and status behavior a
 - **planner**: ADR-042 ruling 2 applied: verb about lines are engine-generated generic text from the document model and field sequence; no seed verb-about data is added and TASK-260 attributes every resulting help diff to generated prose. The frozen per-type verb-about requirement is narrowed accordingly.
 - **rust-dev**: rust-dev evidence test
 - **rust-dev**: rust-dev evidence commit 57be510: document::run now resolves one descriptor, scope and record descriptor and dispatches every Markdown model through one engine (create_document, create_group_document, list_documents, view_document, edit_document); dispatch_typed and the nine per-type handle calls are gone, while SingleHtmlMockup keeps ui_mockup::handle until TASK-256. The engine builds the role field map and emits only PatchOp values applied through record::patch and written once through record::store::write_atomic, with no fs::write and no body render in production. verb_specs derives Markdown verb metadata from the model and role field sequence (key or option, text multiline or list, required, per-field verbs, label and help); list fields also derive a removal companion to keep --no-requirement; title shapes stay transitional and glossary keeps --term for TASK-257. SeedDocumentType.field_defaults and TypeDescriptor.field_defaults were added, only audit carries audit_type security, create applies an absent default through the ordinary PatchOp path, edit leaves it absent, and it is not a FieldSpec or configuration key. Dual heading and frontmatter fields write both; list fields write YAML sequences via FrontMatterValue::Sequence including one element and the empty list; optional fields clear and required fields reject clearing; missing required keys aggregate into one exit-4 validation with no write. Deltas: required flags follow the seed table so ui-spec, tech-spec, use-case, test-case and test-report view, description and applicability become optional per ADR-036 decision 29; the -d short is gone; verb about and option help prose are generated and help goldens were regenerated here for TASK-260 to attribute; the characterization corpus is green with no title delta because TASK-257 was not pre-empted; backlog and decision commands are unchanged. Checks: env -u EDITOR -u VISUAL cargo test, cargo clippy --all-targets -- -D warnings and cargo fmt --check are clean; new engine tests cover the audit default, required aggregation, required versus optional clearing, field option order, and dual storage plus list sequences. Seed-inexpressible facts to record before TASK-259: glossary and requirement view keep the trailing newline, ui-spec re-adopts frontmatter after the editor, and nfr create ignores --story.
+- **orchestrator**: Acceptance met: one field-driven document engine handles create, list, view, edit, status, archive and delete for Markdown models with field-derived options, aggregated required validation, PatchOps-only writes through the single writer, and seed field_defaults for audit; characterization green, help goldens regenerated for TASK-260 attribution.
