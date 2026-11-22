@@ -2,7 +2,7 @@
 id: TASK-251
 title: "Prove old configurations load identically and cover the schema with unit tests"
 created_date: '2026-11-20T17:41:37Z'
-updated_date: '2026-11-22T08:49:51Z'
+updated_date: '2026-11-22T11:26:57Z'
 labels: []
 references:
   - REQ-07.002
@@ -24,7 +24,7 @@ references:
   - TC-185
   - TC-190
   - TC-191
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-033
@@ -85,3 +85,26 @@ Definition of done: every listed unit test exists and passes; the five fixture c
 - [ ] `cargo test` reports zero failures and `cargo clippy --all-targets -- -D warnings` is clean.
 ## Comments
 - **task-refiner**: Refined for MS-033: description grounds the old-configuration load-identity invariant in the MS-033 start commit c3103fc oracles (cli-help goldens, corpus, lists fixtures, live config) and ADR-036 decision 29; 13 testable acceptance criteria added, including the reserved-key, seed-only-model, user-defined-default and immutable-membership unit tests; documentation paths set. No dependency, ordinal, milestone, or assignee change.
+- **rust-dev**: probe
+- **rust-dev**: rust-dev evidence: descriptor equivalence covers all six repo configurations unedited; cli-help goldens match; corpus bytes unchanged; only delta is user-defined reference visibility Hidden to Visible (TC-185).
+- **rust-dev**: rust-dev evidence: config and registry unit tests cover every reserved key as key and frontmatter_key, missing heading and frontmatter_key, duplicate keys within a role versus across group and member, independent role fill, absent slug, prefix and directory never filled, and collection replace including fields: [].
+- **rust-dev**: rust-dev evidence: unit tests also cover grouped top-level fields rejection, role-block and deterministic multi-error diagnostics, user-defined defaults and overrides, seed-only models including user-defined reuse of seed facts, immutable group membership with required --group, emitter fixture round-trips and field-sequence list classification.
+- **rust-dev**: rust-dev evidence: unit tests cover every reserved key as key and as frontmatter_key, a missing heading and frontmatter_key, and duplicate keys within a role versus the same key across group and member.
+- **rust-dev**: rust-dev evidence: unit tests cover independent group and member fill, an absent slug staying absent, prefix and directory never filled, collection replacement including fields: [], and grouped top-level fields rejection.
+- **rust-dev**: rust-dev evidence: unit tests cover role-block and deterministic multi-error diagnostics, user-defined defaults and declared overrides, and seed-only models including user-defined reuse of seed facts.
+- **rust-dev**: rust-dev evidence: unit tests cover immutable group membership with required --group, emitter fixture round-trips and field-sequence list classification. Read-path guard and runtime proof stay green.
+- **rust-dev**: rust-dev evidence: unit tests cover every reserved field key in both key and frontmatter_key positions.
+- **rust-dev**: rust-dev evidence: unit tests cover duplicate keys within a role and the same key across group and member roles.
+- **rust-dev**: rust-dev evidence: unit tests cover a field with no heading and no frontmatter_key.
+- **rust-dev**: rust-dev evidence: unit tests cover independent group and member role fill and an absent document type slug staying absent.
+- **rust-dev**: rust-dev evidence: unit tests cover prefix and directory never filled from the seed, even for a seed slug.
+- **rust-dev**: rust-dev evidence: unit tests cover collection replacement including fields: [] and grouped top-level fields rejection.
+- **rust-dev**: rust-dev evidence: unit tests cover role-block diagnostics and deterministic multi-error ordering.
+- **rust-dev**: rust-dev evidence: unit tests cover user-defined defaults and declared overrides.
+- **rust-dev**: rust-dev evidence: unit tests cover seed-only models including a user-defined slug reusing seed facts.
+- **rust-dev**: rust-dev evidence: unit tests cover immutable group membership and required --group only for GroupedMarkdown.
+- **rust-dev**: rust-dev evidence: unit tests cover emitter fixture round-trips and field-sequence list classification.
+- **rust-dev**: rust-dev evidence: read-path guard and runtime proof stay green.
+- **rust-dev**: rust-dev evidence: 66 test suites ok with 0 failures; clippy and fmt checks clean; no production behaviour change; no new crates.
+- **rust-dev**: rust-dev evidence: branch is the TASK-251 task branch; changes were not committed per the instruction.
+- **orchestrator**: Acceptance met: six repository configurations load unedited and project identically across task, milestone, release, decision and all 11 seed document types; only the documented user-defined visibility delta; additively 5 equivalence tests and 12 schema unit tests; suite green, clippy and fmt clean.

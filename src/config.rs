@@ -2580,6 +2580,31 @@ mod tests {
         &'a [ExpectedSlot<'a>],
     );
 
+    fn field(key: &str, heading: Option<&str>) -> FieldSpec {
+        FieldSpec {
+            key: key.to_string(),
+            heading: heading.map(str::to_string),
+            frontmatter_key: None,
+            option: None,
+            label: None,
+            kind: FieldKind::Text,
+            required: false,
+            verbs: vec![FieldVerb::Create, FieldVerb::Edit],
+            help: None,
+        }
+    }
+
+    /// Resolve a raw file value whose root holds `document_types`.
+    fn resolve_root(declared: &yaml_serde::Value) -> yaml_serde::Value {
+        let inner = yaml_get(declared, "document_types").expect("document_types");
+        let mut root = yaml_serde::Mapping::new();
+        root.insert(
+            yaml_serde::Value::String("document_types".to_string()),
+            resolve_document_types(inner),
+        );
+        yaml_serde::Value::Mapping(root)
+    }
+
     #[test]
     fn defaults_valid() {
         let c = Config::default();
@@ -3435,6 +3460,9 @@ mod tests {
             "document_types.audit.prefix",
             "document_types.audit.directory",
             "document_types.audit.enabled",
+            "document_types.deploy.fields",
+            "document_types.req.group.fields",
+            "document_types.req.member.fields",
             "id_padding",
             "browser_port",
             "browser_host",
@@ -4482,6 +4510,499 @@ mod tests {
                     path.display()
                 );
             }
+        }
+    }
+
+    #[test]
+    fn reserved_field_keys_are_rejected_as_key_and_frontmatter_key() {
+        for reserved in RESERVED_FIELD_KEYS {
+            let mut as_key = Config::default();
+            as_key.document_types.insert(
+                "deploy".to_string(),
+                DocTypeEntry {
+                    prefix: "DEP".to_string(),
+                    directory: "deploy/".to_string(),
+                    fields: Some(vec![field(reserved, Some("## Field"))]),
+                    ..Default::default()
+                },
+            );
+            let error = as_key.validate(None).expect_err("reserved field key");
+            assert!(
+                error.contains(&format!(
+                    "document_types.deploy.fields[{reserved}].key: reserved field key: {reserved}"
+                )),
+                "{reserved} as key: {error}"
+            );
+
+            let mut as_frontmatter = Config::default();
+            let mut spec = field("custom", Some("## Field"));
+            spec.frontmatter_key = Some(reserved.to_string());
+            as_frontmatter.document_types.insert(
+                "deploy".to_string(),
+                DocTypeEntry {
+                    prefix: "DEP".to_string(),
+                    directory: "deploy/".to_string(),
+                    fields: Some(vec![spec]),
+                    ..Default::default()
+                },
+            );
+            let error = as_frontmatter
+                .validate(None)
+                .expect_err("reserved frontmatter key");
+            assert!(
+                error.contains(&format!(
+                    "document_types.deploy.fields[custom].frontmatter_key: reserved field key: {reserved}"
+                )),
+                "{reserved} as frontmatter_key: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_field_without_a_heading_or_frontmatter_key_is_rejected() {
+        let mut cfg = Config::default();
+        cfg.document_types.insert(
+            "deploy".to_string(),
+            DocTypeEntry {
+                prefix: "DEP".to_string(),
+                directory: "deploy/".to_string(),
+                fields: Some(vec![field("empty", None)]),
+                ..Default::default()
+            },
+        );
+        let error = cfg.validate(None).expect_err("field stores no value");
+        assert!(
+            error.contains(
+                "document_types.deploy.fields[empty]: must declare heading or frontmatter_key"
+            ),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn duplicate_field_keys_are_rejected_within_a_role_only() {
+        let mut duplicate = Config::default();
+        duplicate.document_types.insert(
+            "deploy".to_string(),
+            DocTypeEntry {
+                prefix: "DEP".to_string(),
+                directory: "deploy/".to_string(),
+                fields: Some(vec![
+                    field("description", Some("## One")),
+                    field("description", Some("## Two")),
+                ]),
+                ..Default::default()
+            },
+        );
+        let error = duplicate.validate(None).expect_err("duplicate key");
+        assert!(
+            error.contains("document_types.deploy.fields[1].key: duplicate field key: description"),
+            "{error}"
+        );
+
+        let mut grouped_duplicate = Config::default();
+        grouped_duplicate.document_types.insert(
+            "req".to_string(),
+            DocTypeEntry {
+                prefix: "REQ".to_string(),
+                directory: "requirements/business/".to_string(),
+                group: Some(RoleFields {
+                    fields: Some(vec![
+                        field("story", Some("## One")),
+                        field("story", Some("## Two")),
+                    ]),
+                    reference_visibility: None,
+                }),
+                ..Default::default()
+            },
+        );
+        let error = grouped_duplicate
+            .validate(None)
+            .expect_err("duplicate group key");
+        assert!(
+            error.contains("document_types.req.group.fields[1].key: duplicate field key: story"),
+            "{error}"
+        );
+
+        // The same key in the group and member roles is two independent roles.
+        let mut across_roles = Config::default();
+        across_roles.document_types.insert(
+            "req".to_string(),
+            DocTypeEntry {
+                prefix: "REQ".to_string(),
+                directory: "requirements/business/".to_string(),
+                group: Some(RoleFields {
+                    fields: Some(vec![field("story", Some("## User Story"))]),
+                    reference_visibility: None,
+                }),
+                member: Some(RoleFields {
+                    fields: Some(vec![field("story", Some("## User Story"))]),
+                    reference_visibility: None,
+                }),
+                ..Default::default()
+            },
+        );
+        across_roles
+            .validate(None)
+            .expect("the same key is allowed across roles");
+    }
+
+    #[test]
+    fn grouped_and_non_grouped_role_blocks_are_rejected_in_the_wrong_shape() {
+        let mut grouped = Config::default();
+        grouped.document_types.insert(
+            "req".to_string(),
+            DocTypeEntry {
+                prefix: "REQ".to_string(),
+                directory: "requirements/business/".to_string(),
+                fields: Some(vec![field("description", Some("## Description"))]),
+                ..Default::default()
+            },
+        );
+        let error = grouped
+            .validate(None)
+            .expect_err("grouped top-level fields");
+        assert!(
+            error.contains("document_types.req.fields: not allowed on a grouped type"),
+            "{error}"
+        );
+
+        for role in ["group", "member"] {
+            let mut non_grouped = Config::default();
+            let block = RoleFields {
+                fields: Some(vec![field("description", Some("## Description"))]),
+                reference_visibility: None,
+            };
+            non_grouped.document_types.insert(
+                "deploy".to_string(),
+                DocTypeEntry {
+                    prefix: "DEP".to_string(),
+                    directory: "deploy/".to_string(),
+                    group: (role == "group").then(|| block.clone()),
+                    member: (role == "member").then_some(block),
+                    ..Default::default()
+                },
+            );
+            let error = non_grouped
+                .validate(None)
+                .expect_err("role on a non-grouped type");
+            assert!(
+                error.contains(&format!(
+                    "document_types.deploy.{role}: not allowed on a non-grouped type"
+                )),
+                "{error}"
+            );
+        }
+    }
+
+    #[test]
+    fn role_blocks_reject_unknown_keys_and_unknown_enums() {
+        let value: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  req:\n    prefix: REQ\n    directory: requirements/business/\n    group:\n      template: x\n      reference_visibility: maybe\n      fields:\n        - key: story\n          heading: '## Story'\n          order: 1\n    member:\n      model: SingleMarkdown\n",
+        )
+        .unwrap();
+        assert_eq!(
+            validate_document_types_declarations(&value),
+            vec![
+                "document_types.req.group.template: unknown key",
+                "document_types.req.group.reference_visibility: must be visible or hidden",
+                "document_types.req.group.fields[story].order: not a valid field key",
+                "document_types.req.member.model: not a configuration key",
+            ]
+        );
+    }
+
+    #[test]
+    fn group_and_member_roles_fill_and_override_independently() {
+        let declared: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  req:\n    prefix: REQ\n    directory: requirements/business/\n    member:\n      fields:\n        - key: story\n          heading: '## Custom Story'\n",
+        )
+        .unwrap();
+        let resolved = resolve_root(&declared);
+        assert_eq!(
+            resolve_selector(&resolved, "document_types.req.group.fields[story].heading").unwrap(),
+            &yaml_serde::Value::String("## User Story".to_string()),
+            "the undeclared group role keeps the seed field"
+        );
+        assert_eq!(
+            resolve_selector(&resolved, "document_types.req.member.fields[story].heading").unwrap(),
+            &yaml_serde::Value::String("## Custom Story".to_string())
+        );
+        let yaml_serde::Value::Sequence(member_fields) =
+            resolve_selector(&resolved, "document_types.req.member.fields").unwrap()
+        else {
+            panic!("member fields must stay a sequence")
+        };
+        assert_eq!(
+            member_fields.len(),
+            1,
+            "a declared role field collection replaces the seed collection"
+        );
+        for role in ["group", "member"] {
+            assert_eq!(
+                resolve_selector(
+                    &resolved,
+                    &format!("document_types.req.{role}.reference_visibility")
+                )
+                .unwrap(),
+                &yaml_serde::Value::String("hidden".to_string())
+            );
+        }
+
+        let only_group_visibility: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  req:\n    prefix: REQ\n    directory: requirements/business/\n    group:\n      reference_visibility: visible\n",
+        )
+        .unwrap();
+        let resolved = resolve_root(&only_group_visibility);
+        assert_eq!(
+            resolve_selector(
+                &resolved,
+                "document_types.req.group.fields[description].heading"
+            )
+            .unwrap(),
+            &yaml_serde::Value::String("## Description".to_string()),
+            "a role block that only declares visibility keeps the seed fields"
+        );
+        assert_eq!(
+            resolve_selector(&resolved, "document_types.req.member.reference_visibility").unwrap(),
+            &yaml_serde::Value::String("hidden".to_string()),
+            "the member role is independent of the group override"
+        );
+    }
+
+    #[test]
+    fn absent_document_type_slugs_stay_absent() {
+        let declared: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  nfr:\n    prefix: NFR\n    directory: requirements/non-functional/\n",
+        )
+        .unwrap();
+        let resolved = resolve_root(&declared);
+        let yaml_serde::Value::Mapping(entries) =
+            yaml_get(&resolved, "document_types").expect("document_types")
+        else {
+            panic!("document_types must stay a mapping")
+        };
+        assert_eq!(entries.len(), 1);
+        assert!(resolve_selector(&resolved, "document_types.nfr.prefix").is_ok());
+        assert!(
+            resolve_selector(&resolved, "document_types.req").is_err(),
+            "an undeclared slug must not be materialised"
+        );
+    }
+
+    #[test]
+    fn prefix_and_directory_are_never_filled_from_the_seed() {
+        let declared: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  req:\n    directory: requirements/business/\n",
+        )
+        .unwrap();
+        let resolved = resolve_root(&declared);
+        assert!(
+            resolve_selector(&resolved, "document_types.req.prefix").is_err(),
+            "a missing prefix must stay absent even for a seed slug"
+        );
+        let entry: DocTypeEntry = yaml_serde::from_value(
+            resolve_selector(&resolved, "document_types.req")
+                .unwrap()
+                .clone(),
+        )
+        .unwrap();
+        assert_eq!(entry.prefix, "");
+        assert_eq!(entry.directory, "requirements/business/");
+        assert_eq!(resolved_document_entry("req", &entry).prefix, "");
+        let mut cfg = Config::default();
+        cfg.document_types.insert("req".to_string(), entry);
+        let error = cfg.validate(None).expect_err("missing prefix");
+        assert!(
+            error.contains("document_types.req.prefix: must not be empty"),
+            "{error}"
+        );
+
+        let declared: yaml_serde::Value =
+            yaml_serde::from_str("document_types:\n  req:\n    prefix: REQ\n").unwrap();
+        let resolved = resolve_root(&declared);
+        assert!(resolve_selector(&resolved, "document_types.req.directory").is_err());
+        let entry: DocTypeEntry = yaml_serde::from_value(
+            resolve_selector(&resolved, "document_types.req")
+                .unwrap()
+                .clone(),
+        )
+        .unwrap();
+        assert_eq!(entry.directory, "");
+        let mut cfg = Config::default();
+        cfg.document_types.insert("req".to_string(), entry);
+        let error = cfg.validate(None).expect_err("missing directory");
+        assert!(
+            error.contains("document_types.req.directory: must not be empty"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn every_collection_replaces_wholesale_including_fields_empty() {
+        // Scalars fill from the seed; every collection replaces wholesale.
+        let declared = DocTypeEntry {
+            prefix: "AUD".to_string(),
+            directory: "audit-records/".to_string(),
+            statuses: Some(vec![
+                "active".to_string(),
+                "review".to_string(),
+                "archived".to_string(),
+            ]),
+            slots: Some(Vec::new()),
+            api_aliases: Some(vec!["/api/audits".to_string()]),
+            ..Default::default()
+        };
+        let entry = resolved_document_entry("audit", &declared);
+        assert_eq!(entry.label.as_deref(), Some("Audit record"));
+        assert_eq!(
+            entry.statuses,
+            Some(vec![
+                "active".to_string(),
+                "review".to_string(),
+                "archived".to_string()
+            ])
+        );
+        assert_eq!(entry.slots, Some(Vec::new()), "an empty list replaces");
+        assert_eq!(entry.api_aliases, Some(vec!["/api/audits".to_string()]));
+
+        // `fields: []` replaces the user-defined default description field.
+        let declared = DocTypeEntry {
+            prefix: "NOTE".to_string(),
+            directory: "notes/".to_string(),
+            fields: Some(Vec::new()),
+            ..Default::default()
+        };
+        let entry = resolved_document_entry("note", &declared);
+        assert_eq!(entry.fields, Some(Vec::new()));
+        assert_eq!(
+            entry.statuses,
+            Some(vec!["active".to_string(), "archived".to_string()])
+        );
+
+        // An explicit empty role collection replaces the seed role fields,
+        // while the role's scalar visibility still fills.
+        let declared: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  req:\n    prefix: REQ\n    directory: requirements/business/\n    group:\n      fields: []\n",
+        )
+        .unwrap();
+        let resolved = resolve_root(&declared);
+        let entry: DocTypeEntry = yaml_serde::from_value(
+            resolve_selector(&resolved, "document_types.req")
+                .unwrap()
+                .clone(),
+        )
+        .unwrap();
+        let entry = resolved_document_entry("req", &entry);
+        let group = entry.group.expect("group role");
+        assert_eq!(group.fields, Some(Vec::new()));
+        assert_eq!(group.reference_visibility, Some(Visibility::Hidden));
+        let member = entry.member.expect("member role fills from the seed");
+        assert_eq!(
+            member.fields.as_ref().map(Vec::len),
+            Some(2),
+            "the member role keeps the seed fields"
+        );
+    }
+
+    #[test]
+    fn unknown_keys_and_enums_are_aggregated_in_a_deterministic_order() {
+        let value: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  zulu:\n    prefix: ZUL\n    directory: zulu/\n    template: x\n    reference_visibility: maybe\n  deploy:\n    prefix: DEP\n    directory: deploy/\n    model: SingleMarkdown\n    id_shape: plain\n    title: Deploy\n    content: body\n    fields:\n      - key: b\n        heading: '## B'\n        kind: paragraph\n        verbs: [delete]\n      - key: a\n        heading: '## A'\n        template: y\n",
+        )
+        .unwrap();
+        assert_eq!(
+            validate_document_types_declarations(&value),
+            vec![
+                "document_types.deploy.content: not a configuration key",
+                "document_types.deploy.id_shape: not a configuration key",
+                "document_types.deploy.model: not a configuration key",
+                "document_types.deploy.title: not a configuration key",
+                "document_types.deploy.fields[b].kind: must be text, multiline, or list",
+                "document_types.deploy.fields[b].verbs: invalid verb delete; must be create or edit",
+                "document_types.deploy.fields[a].template: unknown key",
+                "document_types.zulu.template: unknown key",
+                "document_types.zulu.reference_visibility: must be visible or hidden",
+            ]
+        );
+    }
+
+    #[test]
+    fn user_defined_defaults_are_replaced_by_each_declared_value() {
+        let declared = DocTypeEntry {
+            prefix: "NOTE".to_string(),
+            directory: "notes/".to_string(),
+            label: Some("Note".to_string()),
+            plural: Some("Notes".to_string()),
+            order: Some(7),
+            summary: Some("Notes in this project.".to_string()),
+            type_alias: Some("memo".to_string()),
+            reference_visibility: Some(Visibility::Hidden),
+            statuses: Some(vec![
+                "active".to_string(),
+                "review".to_string(),
+                "archived".to_string(),
+            ]),
+            default_status: Some("review".to_string()),
+            slots: Some(vec![Slot {
+                key: "owner".to_string(),
+                label: "Owner".to_string(),
+            }]),
+            api_aliases: Some(vec!["/api/notes".to_string()]),
+            fields: Some(vec![field("body", Some("## Body"))]),
+            ..Default::default()
+        };
+        let entry = resolved_document_entry("note", &declared);
+        assert_eq!(entry.label.as_deref(), Some("Note"));
+        assert_eq!(entry.plural.as_deref(), Some("Notes"));
+        assert_eq!(entry.order, Some(7));
+        assert_eq!(entry.summary.as_deref(), Some("Notes in this project."));
+        assert_eq!(entry.type_alias.as_deref(), Some("memo"));
+        assert_eq!(entry.reference_visibility, Some(Visibility::Hidden));
+        assert_eq!(
+            entry.statuses,
+            Some(vec![
+                "active".to_string(),
+                "review".to_string(),
+                "archived".to_string()
+            ])
+        );
+        assert_eq!(entry.default_status.as_deref(), Some("review"));
+        assert_eq!(
+            entry.slots,
+            Some(vec![Slot {
+                key: "owner".to_string(),
+                label: "Owner".to_string(),
+            }])
+        );
+        assert_eq!(entry.api_aliases, Some(vec!["/api/notes".to_string()]));
+        let fields = entry.fields.expect("declared fields");
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].key, "body");
+    }
+
+    #[test]
+    fn to_config_yaml_reemits_every_fixture_to_an_equal_value() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let fixtures = [
+            "papyrus.config.yml",
+            "tests/fixtures/cli-help/papyrus.config.yml",
+            "tests/fixtures/characterization/corpus/project/papyrus.config.yml",
+            "tests/fixtures/characterization/corpus/project-empty/papyrus.config.yml",
+            "tests/fixtures/characterization/lists/project/papyrus.config.yml",
+            "tests/fixtures/characterization/lists/project-empty/papyrus.config.yml",
+        ];
+        for relative in fixtures {
+            let path = root.join(relative);
+            let text = std::fs::read_to_string(&path)
+                .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+            let value: yaml_serde::Value = yaml_serde::from_str(&text).unwrap();
+            let rendered = to_config_yaml(&value).unwrap();
+            let reparsed: yaml_serde::Value = yaml_serde::from_str(&rendered).unwrap();
+            assert_eq!(
+                reparsed, value,
+                "{relative} re-emits to an unequal value:\n{rendered}"
+            );
         }
     }
 }

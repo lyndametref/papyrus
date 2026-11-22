@@ -4574,6 +4574,16 @@ mod tests {
                 "{} create-group",
                 descriptor.slug
             );
+            assert_eq!(
+                descriptor.create_options.group,
+                if descriptor.document_model == DocumentModel::GroupedMarkdown {
+                    GroupRequirement::Required
+                } else {
+                    GroupRequirement::Absent
+                },
+                "{} --group requirement",
+                descriptor.slug
+            );
         }
     }
 
@@ -4637,6 +4647,56 @@ mod tests {
         let record = registry.record_descriptor("note").expect("note record");
         assert_eq!(record.record_type, "document");
         assert_eq!(record.sections, &["## Description"]);
+    }
+
+    // 65
+    #[test]
+    fn user_defined_slug_stays_single_markdown_when_it_reuses_seed_facts() {
+        // The model is seed-only and keyed by the exact slug: a similar name,
+        // a seed directory, or a seed field name cannot import another model.
+        for slug in ["note", "req-copy", "REQ", "requirements"] {
+            assert_eq!(
+                DocumentModel::for_slug(slug),
+                DocumentModel::SingleMarkdown,
+                "{slug} must not inherit a seed model"
+            );
+        }
+        assert_eq!(
+            DocumentModel::for_slug("req"),
+            DocumentModel::GroupedMarkdown,
+            "only the exact seed slug is grouped"
+        );
+
+        let story: FieldSpec =
+            yaml_serde::from_str("key: story\nheading: '## User Story'\n").unwrap();
+        let mut note = entry("NOTE", "requirements/business/");
+        note.fields = Some(vec![story]);
+        let cfg = config_with("note", note);
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        let note = registry.descriptor("note").expect("note");
+        assert_eq!(note.document_model, DocumentModel::SingleMarkdown);
+        assert_eq!(note.id_shape, IdShape::Plain);
+        assert_eq!(note.fields.len(), 1);
+        assert_eq!(note.fields[0].key, "story");
+        assert!(!note.has_verb(Verb::CreateGroup));
+        assert!(note.has_verb(Verb::Status));
+        assert_eq!(note.reference_visibility, Some(Visibility::Visible));
+    }
+
+    // 66
+    #[test]
+    fn explicit_empty_fields_yields_a_fieldless_single_markdown_descriptor() {
+        let mut note = entry("NOTE", "notes/");
+        note.fields = Some(Vec::new());
+        let cfg = config_with("note", note);
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        let note = registry.descriptor("note").expect("note");
+        assert_eq!(note.document_model, DocumentModel::SingleMarkdown);
+        assert!(note.fields.is_empty(), "fields: [] replaces the default");
+        assert!(note.group.is_none() && note.member.is_none());
+        let record = registry.record_descriptor("note").expect("note record");
+        assert!(record.sections.is_empty());
+        assert_eq!(record.frontmatter_keys, &["status"]);
     }
 
     // 64
