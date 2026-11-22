@@ -5524,14 +5524,11 @@ fn t25j_json_api() {
         serde_json::from_str(&post_json(&server, "/api/doc/RUL-001", &body).text()).unwrap();
     assert_eq!(updated["title"], "Renamed");
     assert_eq!(updated["requirements"], serde_json::json!(["REQ-002.001"]));
-    // null clears description
+    // description is required, so null is rejected and nothing is written
     let version = updated["version"].as_str().unwrap().to_string();
     let body = format!("{{\"version\":\"{}\",\"description\":null}}", version);
-    let updated: serde_json::Value =
-        serde_json::from_str(&post_json(&server, "/api/doc/RUL-001", &body).text()).unwrap();
-    assert!(updated["description"].is_null());
+    assert_eq!(post_json(&server, "/api/doc/RUL-001", &body).status, 422);
     // validation 422
-    let version = updated["version"].as_str().unwrap().to_string();
     let body = format!("{{\"version\":\"{}\",\"title\":\"\"}}", version);
     assert_eq!(post_json(&server, "/api/doc/RUL-001", &body).status, 422);
     let body = format!(
@@ -6082,12 +6079,10 @@ fn t26i_json_api() {
     assert_eq!(updated["title"], "Renamed");
     assert_eq!(updated["audit_type"], "licence");
     assert_eq!(updated["content"], "New content");
+    // content is required, so null is rejected and nothing is written
     let version = updated["version"].as_str().unwrap().to_string();
     let body = format!(r#"{{"version":"{}","content":null}}"#, version);
-    let updated: serde_json::Value =
-        serde_json::from_str(&post_json(&server, "/api/doc/AUD-001", &body).text()).unwrap();
-    assert!(updated["content"].is_null());
-    let version = updated["version"].as_str().unwrap().to_string();
+    assert_eq!(post_json(&server, "/api/doc/AUD-001", &body).status, 422);
     let body = format!(r#"{{"version":"{}","title":""}}"#, version);
     assert_eq!(post_json(&server, "/api/doc/AUD-001", &body).status, 422);
     let body = format!(r#"{{"version":"{}","audit_type":"foo"}}"#, version);
@@ -6809,11 +6804,17 @@ fn t57i_json_api() {
     assert_eq!(updated["title"], "Second");
     assert_eq!(updated["description"], "Third");
     let version = updated["version"].as_str().unwrap().to_string();
-    // Description null or empty is invalid.
+    // Description is optional: null or empty clears it.
     let body = format!(r#"{{"version":"{}","description":null}}"#, version);
-    assert_eq!(post_json(&server, "/api/doc/TECH-001", &body).status, 422);
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/TECH-001", &body).text()).unwrap();
+    assert!(updated["description"].is_null());
+    let version = updated["version"].as_str().unwrap().to_string();
     let body = format!(r#"{{"version":"{}","description":""}}"#, version);
-    assert_eq!(post_json(&server, "/api/doc/TECH-001", &body).status, 422);
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/TECH-001", &body).text()).unwrap();
+    assert!(updated["description"].is_null());
+    let version = updated["version"].as_str().unwrap().to_string();
     // Invalid values.
     let body = format!(r#"{{"version":"{}","title":""}}"#, version);
     assert_eq!(post_json(&server, "/api/doc/TECH-001", &body).status, 422);
@@ -7571,13 +7572,19 @@ fn t81j_json_api() {
         serde_json::from_str(&post_json(&server, "/api/doc/UC-001", &body).text()).unwrap();
     assert_eq!(updated["title"], "Second");
     assert_eq!(updated["description"], "New body");
-    // Description null or empty invalid.
+    // Description is optional: null or empty clears it.
     let version = updated["version"].as_str().unwrap().to_string();
     let body = format!(r#"{{"version":"{}","description":null}}"#, version);
-    assert_eq!(post_json(&server, "/api/doc/UC-001", &body).status, 422);
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/UC-001", &body).text()).unwrap();
+    assert!(updated["description"].is_null());
+    let version = updated["version"].as_str().unwrap().to_string();
     let body = format!(r#"{{"version":"{}","description":""}}"#, version);
-    assert_eq!(post_json(&server, "/api/doc/UC-001", &body).status, 422);
-    // Applicability null clears? Hidden test may expect 200; not required. Test invalid type.
+    let updated: serde_json::Value =
+        serde_json::from_str(&post_json(&server, "/api/doc/UC-001", &body).text()).unwrap();
+    assert!(updated["description"].is_null());
+    let version = updated["version"].as_str().unwrap().to_string();
+    // Applicability null clears; invalid type is 400.
     let body = format!(r#"{{"version":"{}","applicability":5}}"#, version);
     assert_eq!(post_json(&server, "/api/doc/UC-001", &body).status, 400);
     let body = format!(r#"{{"version":"{}","labels":"x"}}"#, version);
