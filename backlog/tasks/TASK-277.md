@@ -2,7 +2,7 @@
 id: TASK-277
 title: "Load Mermaid lazily and stop sending it no-store"
 created_date: '2026-11-20T17:43:20Z'
-updated_date: '2026-11-22T20:19:04Z'
+updated_date: '2026-11-22T21:35:25Z'
 labels: []
 references:
   - ADR-038
@@ -12,7 +12,7 @@ references:
   - ADR-0027
   - TC-181
   - TC-189
-status: ToDo
+status: Done
 assignee:
   - frontend-dev
 milestone: MS-036
@@ -56,3 +56,15 @@ All acceptance criteria pass; tests prove zero Mermaid requests on non-diagram p
 - [ ] The diagram page CSP is unchanged and no new CSP directive, inline script, or client script is introduced.
 - [ ] Tests assert zero Mermaid requests on non-diagram pages and exactly one on diagram pages, and compare page and render output with the pre-change fixture apart from versioned vendor URLs; the browser, diagram, math, and asset suites pass.
 - [ ] No behaviour change beyond the versioned URLs and cache headers: status codes, page HTML semantics, record content, offline behaviour, and the 404 and 405 matrix are unchanged; cargo clippy --all-targets -- -D warnings and cargo fmt --check are clean.
+## Comments
+- **rust-dev**: TASK-277 rust-dev: test-only proof added.
+- **rust-dev**: No production-code delta needed: page_assets already gates MERMAID_ASSETS on has_diagram and TASK-276 supplies the versioned immutable URL.
+- **rust-dev**: Files changed: browser diagram and math tests.
+- **rust-dev**: Measured: diagram NOTE-012 first load 3572661 vendor B + 31512 first-party B, second load 0 asset B; math NOTE-017 first load 298749 KaTeX B + 31512 first-party B, second load 0 with zero Mermaid; plain NOTE-019 first load 0 vendor B + 31512 first-party B, second load 0.
+- **rust-dev**: Cache classes: vendor public,max-age=31536000,immutable with no ETag and no 304; first-party no-cache with strong ETag and 304; pages no-store.
+- **rust-dev**: Mermaid stays one deferred 11.17.2 classic script (3572661 B) with unchanged manifest digest, licence, and notice.
+- **rust-dev**: Assertions added: exactly one deferred Mermaid reference and request on diagram pages; zero Mermaid refs and requests on 10 non-diagram pages with no preload, prefetch, module, dynamic import, or app fetch; KaTeX only on math pages with immutable no-ETag responses.
+- **rust-dev**: Also: the page asset set normalised to the pre-version fixture differs only by vendor URL version segments; figure markup, pre fallback, CSP, link neutralisation, and diagram ordering are unchanged.
+- **rust-dev**: Checks: cargo test EXIT 0 full suite with env -u EDITOR -u VISUAL (host EDITOR=nano breaks one unrelated pre-existing CLI test); cargo clippy --all-targets -- -D warnings clean; cargo fmt --check clean; characterization_replay 17 of 17 green with no corpus delta.
+- **rust-dev**: Branch task TASK-277. No git commit, merge, checkout, or push was performed, per instruction. Task status left In-Progress.
+- **orchestrator**: Acceptance met: diagram pages include exactly one deferred versioned Mermaid reference, non-diagram pages none; math pages keep KaTeX; vendor Mermaid and KaTeX are immutable with second-load transfer zero; production code already gated on diagram presence so the task adds proof and measurements; suite, clippy and fmt green.

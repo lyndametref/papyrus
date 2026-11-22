@@ -16,6 +16,12 @@ const CSP: &str = "default-src 'none'; style-src 'self'; script-src 'self'; img-
 const CSP_DIAGRAM: &str = "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
 
 const BUNDLE: &str = "/assets/mermaid/11.17.2/mermaid.min.js";
+const KATEX_CSS: &str = "/assets/katex/0.16.11/katex.min.css";
+const KATEX_JS: &str = "/assets/katex/0.16.11/katex.min.js";
+const IMMUTABLE_CACHE: &str = "public, max-age=31536000, immutable";
+const MERMAID_BYTES: usize = 3_572_661;
+const KATEX_BYTES: usize = 23_335 + 275_414;
+const FIRST_PARTY_BYTES: usize = 17_880 + 12_953 + 679;
 const LIMIT_NOTE: &str =
     "Diagram not rendered: source exceeds the 100,000-byte or 1,000-line limit.";
 const PLANTUML_NOTE: &str = "PlantUML diagrams are not supported in this release; showing source.";
@@ -366,13 +372,20 @@ impl Server {
     }
 
     fn get_raw(&self, path: &str) -> String {
+        self.get_raw_with(path, &[])
+    }
+
+    fn get_raw_with(&self, path: &str, headers: &[(&str, &str)]) -> String {
         let mut stream = TcpStream::connect(("127.0.0.1", self.port)).unwrap();
-        write!(
-            stream,
-            "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\n\r\n",
+        let mut request = format!(
+            "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\n",
             self.port
-        )
-        .unwrap();
+        );
+        for (name, value) in headers {
+            request.push_str(&format!("{name}: {value}\r\n"));
+        }
+        request.push_str("\r\n");
+        stream.write_all(request.as_bytes()).unwrap();
         let mut raw = Vec::new();
         stream.read_to_end(&mut raw).unwrap();
         String::from_utf8_lossy(&raw).to_string()
@@ -485,6 +498,29 @@ fn assert_external_scripts_only(html: &str) {
             "inline script element in served HTML"
         );
     }
+}
+
+/// Every unique `/assets/` path referenced by a `src` or `href` attribute.
+/// This is the browser's asset request set for the page, in a stable order.
+fn asset_refs(html: &str) -> Vec<String> {
+    let mut refs = Vec::new();
+    for attribute in ["src=\"", "href=\""] {
+        let mut rest = html;
+        while let Some(start) = rest.find(attribute) {
+            let after = &rest[start + attribute.len()..];
+            let Some(end) = after.find('"') else {
+                panic!("unterminated asset reference");
+            };
+            let value = &after[..end];
+            if value.starts_with("/assets/") {
+                refs.push(value.to_string());
+            }
+            rest = &after[end..];
+        }
+    }
+    refs.sort();
+    refs.dedup();
+    refs
 }
 
 fn script_src(csp: &str) -> &str {
@@ -844,6 +880,14 @@ fn vendored_pin_and_manifest_match_app_js() {
     );
     let bundle = include_bytes!("../src/browser/vendor/mermaid/11.17.2/mermaid.min.js");
     assert_eq!(bundle.len(), 3_572_661);
+    let vendor =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/browser/vendor/mermaid/11.17.2");
+    for required in ["LICENSE", "UPSTREAM.md"] {
+        assert!(
+            vendor.join(required).is_file(),
+            "missing Mermaid {required}"
+        );
+    }
     let app = include_str!("../src/browser/app.js");
     assert!(
         manifest.contains(&format!("| `/assets/app.js` | {} |", app.len())),
@@ -1137,4 +1181,219 @@ fn diagram_styling_supports_full_width_scroll() {
         "no max-width on a rendered SVG"
     );
     assert!(!css.contains("url("), "no url() in app.css");
+}
+
+// TASK-277 AC #1, #2, #3: the deferred classic Mermaid script is requested
+// only by a page whose HTML references it, exactly once; no other page
+// references it, and the app script never fetches or imports it.
+#[test]
+fn mermaid_is_requested_once_only_on_renderable_diagram_pages() {
+    let project = project("lazy");
+    let server = Server::start(&project.path);
+
+    let diagram = server.get("/doc/REQ-001.001");
+    let tag = format!("<script src=\"{BUNDLE}\" defer></script>");
+    assert_eq!(
+        diagram.matches(&tag).count(),
+        1,
+        "the diagram page has one deferred Mermaid script"
+    );
+    assert_eq!(diagram.matches(BUNDLE).count(), 1, "one Mermaid reference");
+
+    let refs = asset_refs(&diagram);
+    assert_eq!(
+        refs.iter().filter(|path| path.as_str() == BUNDLE).count(),
+        1,
+        "the page asset set names Mermaid once"
+    );
+    let mut mermaid_requests = 0;
+    for path in &refs {
+        let raw = server.get_raw(path);
+        assert!(status(&raw).contains(" 200"), "{path}: {}", status(&raw));
+        if path.as_str() == BUNDLE {
+            mermaid_requests += 1;
+            assert_eq!(body(&raw).len(), MERMAID_BYTES, "pinned bundle size");
+            assert_eq!(
+                header_value(&raw, "Cache-Control").as_deref(),
+                Some(IMMUTABLE_CACHE),
+                "Mermaid is immutable"
+            );
+            assert!(header_value(&raw, "ETag").is_none(), "no Mermaid ETag");
+        }
+    }
+    assert_eq!(mermaid_requests, 1, "exactly one Mermaid request");
+
+    for path in [
+        "/doc/NOTE-010",
+        "/doc/NOTE-011",
+        "/doc/NOTE-013",
+        "/doc/NOTE-014",
+        "/doc/NOTE-017",
+        "/doc/NOTE-018",
+        "/doc/NOTE-019",
+        "/?type=req",
+        "/",
+        "/doc/NOTE-019/edit",
+    ] {
+        let html = server.get(path);
+        assert!(
+            !html.contains("/assets/mermaid/"),
+            "{path} must not reference the Mermaid bundle"
+        );
+        assert!(
+            !html.contains("rel=\"preload\"") && !html.contains("rel=\"prefetch\""),
+            "{path} must not preload or prefetch"
+        );
+        assert!(
+            !html.contains("type=\"module\"") && !html.contains("import("),
+            "{path} must not import a module or dynamic module"
+        );
+        let requests = asset_refs(&html)
+            .iter()
+            .filter(|asset| asset.starts_with("/assets/mermaid/"))
+            .count();
+        assert_eq!(requests, 0, "{path} makes no Mermaid request");
+    }
+
+    let js = include_str!("../src/browser/app.js");
+    for forbidden in [
+        "fetch(",
+        "import(",
+        "XMLHttpRequest",
+        "new Worker",
+        "serviceWorker",
+        "CacheStorage",
+        "caches.",
+    ] {
+        assert!(
+            !js.contains(forbidden),
+            "app.js must not introduce {forbidden}"
+        );
+    }
+}
+
+// TASK-277 AC #5, #6, #7: a repeated navigation reuses every immutable
+// vendor byte and revalidates the three first-party files. First-load bytes
+// come from the actual page asset references; the second load transfers zero
+// asset body bytes.
+#[test]
+fn second_load_transfers_no_asset_bytes_for_diagram_math_or_plain_pages() {
+    let project = project("payload");
+    let server = Server::start(&project.path);
+
+    for (kind, path, vendor_bytes, mermaid_refs, katex_refs) in [
+        ("diagram", "/doc/NOTE-012", MERMAID_BYTES, 1, 0),
+        ("math", "/doc/NOTE-017", KATEX_BYTES, 0, 2),
+        ("plain", "/doc/NOTE-019", 0, 0, 0),
+    ] {
+        let html = server.get(path);
+        let refs = asset_refs(&html);
+        for expected in ["/assets/app.css", "/assets/app.js", "/assets/nav-state.js"] {
+            assert!(
+                refs.iter().any(|asset| asset.as_str() == expected),
+                "{kind} references {expected}"
+            );
+        }
+
+        let mut first_vendor = 0usize;
+        let mut first_first_party = 0usize;
+        let mut second_asset_bytes = 0usize;
+        let mut mermaid = 0usize;
+        let mut katex = 0usize;
+
+        for asset in &refs {
+            if asset.as_str() == BUNDLE {
+                mermaid += 1;
+            }
+            if asset.as_str() == KATEX_CSS || asset.as_str() == KATEX_JS {
+                katex += 1;
+            }
+            let raw = server.get_raw(asset);
+            assert!(
+                status(&raw).contains(" 200"),
+                "{kind} {asset}: {}",
+                status(&raw)
+            );
+            let cache = header_value(&raw, "Cache-Control")
+                .unwrap_or_else(|| panic!("{kind} {asset} has no Cache-Control"));
+            let length = body(&raw).len();
+            match cache.as_str() {
+                IMMUTABLE_CACHE => {
+                    assert!(header_value(&raw, "ETag").is_none(), "{kind} {asset} ETag");
+                    first_vendor += length;
+                }
+                "no-cache" => {
+                    first_first_party += length;
+                    let etag = header_value(&raw, "ETag")
+                        .unwrap_or_else(|| panic!("{kind} {asset} has no ETag"));
+                    let conditional =
+                        server.get_raw_with(asset, &[("If-None-Match", etag.as_str())]);
+                    assert!(
+                        status(&conditional).contains(" 304"),
+                        "{kind} {asset} revalidates: {}",
+                        status(&conditional)
+                    );
+                    assert!(body(&conditional).is_empty(), "{kind} {asset} 304 body");
+                    second_asset_bytes += body(&conditional).len();
+                }
+                other => panic!("{kind} {asset} has unexpected cache class {other}"),
+            }
+        }
+
+        assert_eq!(mermaid, mermaid_refs, "{kind} Mermaid references");
+        assert_eq!(katex, katex_refs, "{kind} KaTeX references");
+        assert_eq!(first_vendor, vendor_bytes, "{kind} first-load vendor bytes");
+        assert_eq!(
+            first_vendor + first_first_party,
+            vendor_bytes + FIRST_PARTY_BYTES,
+            "{kind} first-load asset bytes"
+        );
+        assert_eq!(second_asset_bytes, 0, "{kind} second-load asset bytes");
+
+        let second_page = server.get_raw(path);
+        assert!(
+            status(&second_page).contains(" 200"),
+            "{kind} page re-fetch"
+        );
+        assert_eq!(
+            header_value(&second_page, "Cache-Control").as_deref(),
+            Some("no-store"),
+            "{kind} page stays no-store"
+        );
+        assert!(header_value(&second_page, "ETag").is_none());
+        eprintln!(
+            "{kind}: first load {first_vendor} vendor B + {first_first_party} first-party B; second load {second_asset_bytes} asset B; page {} B no-store",
+            body(&second_page).len()
+        );
+    }
+}
+
+// TASK-277 AC #4, #8: with the asset-version segments stripped, the page asset
+// set is exactly the pre-change fixture; the figure markup and no-script
+// fallback are asserted byte-for-byte by the render tests above.
+#[test]
+fn page_assets_match_the_pre_version_fixture_apart_from_vendor_urls() {
+    let project = project("pre-version");
+    let server = Server::start(&project.path);
+    let html = server.get("/doc/REQ-001.001");
+
+    let normalized: Vec<String> = asset_refs(&html)
+        .into_iter()
+        .map(|path| {
+            path.replace("/assets/katex/0.16.11/", "/assets/katex/")
+                .replace("/assets/mermaid/11.17.2/", "/assets/mermaid/")
+        })
+        .collect();
+    assert_eq!(
+        normalized,
+        [
+            "/assets/app.css",
+            "/assets/app.js",
+            "/assets/katex/katex.min.css",
+            "/assets/katex/katex.min.js",
+            "/assets/mermaid/mermaid.min.js",
+            "/assets/nav-state.js",
+        ],
+        "only the vendor URL version segments differ from the pre-change fixture"
+    );
 }

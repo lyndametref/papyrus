@@ -12,6 +12,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 
 const CSP: &str = "default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
+const IMMUTABLE_CACHE: &str = "public, max-age=31536000, immutable";
+const KATEX_CSS: &str = "/assets/katex/0.16.11/katex.min.css";
+const KATEX_JS: &str = "/assets/katex/0.16.11/katex.min.js";
 
 fn bin() -> Command {
     Command::new(env!("CARGO_BIN_EXE_papyrus"))
@@ -527,6 +530,14 @@ fn katex_assets_appear_once_only_on_math_pages() {
         let js = html.find("/assets/katex/0.16.11/katex.min.js").unwrap();
         let app = html.find("/assets/app.js").unwrap();
         let app_css = html.find("/assets/app.css").unwrap();
+        assert!(
+            html.contains("<script src=\"/assets/katex/0.16.11/katex.min.js\" defer></script>"),
+            "{path} katex script is deferred"
+        );
+        assert!(
+            !html.contains("/assets/mermaid/"),
+            "{path} must not request Mermaid"
+        );
         assert!(app_css < css, "{path} math CSS follows app.css");
         assert!(js < app, "{path} katex script precedes app.js");
         assert!(css < js, "{path} stylesheet precedes script");
@@ -557,6 +568,46 @@ fn katex_assets_appear_once_only_on_math_pages() {
             "{path} must not ship KaTeX assets"
         );
         assert!(!html.contains("data-tex"), "{path} runs no pre-pass");
+        assert!(
+            !html.contains("/assets/mermaid/"),
+            "{path} must not request Mermaid"
+        );
+    }
+}
+
+// TASK-277 AC #5, #6: KaTeX is available exactly where math exists, from the
+// versioned immutable vendor class, and a math page never requests Mermaid.
+#[test]
+fn math_assets_are_immutable_and_math_pages_request_no_mermaid() {
+    let project = project("immutable-math");
+    let server = Server::start(&project.path);
+
+    for asset in [KATEX_CSS, KATEX_JS] {
+        let raw = server.get_raw(asset);
+        assert!(status(&raw).contains(" 200"), "{asset}: {}", status(&raw));
+        assert_eq!(
+            header_value(&raw, "Cache-Control").as_deref(),
+            Some(IMMUTABLE_CACHE),
+            "{asset} cache class"
+        );
+        assert!(header_value(&raw, "ETag").is_none(), "{asset} has no ETag");
+        assert!(
+            header_value(&raw, "Content-Security-Policy").is_none(),
+            "{asset} has no CSP"
+        );
+    }
+
+    for path in ["/doc/REQ-001.001", "/doc/NOTE-001", "/doc/NOTE-005"] {
+        let html = server.get(path);
+        assert!(html.contains(KATEX_CSS), "{path} without KaTeX CSS");
+        assert!(
+            html.contains("<script src=\"/assets/katex/0.16.11/katex.min.js\" defer></script>"),
+            "{path} without the deferred KaTeX script"
+        );
+        assert!(
+            !html.contains("/assets/mermaid/"),
+            "{path} must not request Mermaid"
+        );
     }
 }
 
