@@ -1,7 +1,8 @@
 //! The one shared list layout (ADR-0028 decision 2, REQ-06.016).
 //!
 //! A list page builds a [`ListPlan`] from declared data — the record index and
-//! the presentation table's slot columns — and renders it through this module.
+//! the descriptor (or static Backlog/Decision) slot columns — and renders it
+//! through this module.
 //! Family variation is limited to the declared family slot column(s) and the
 //! empty-state copy; structural columns are fixed for every family.
 
@@ -28,19 +29,14 @@ pub struct ListPlan {
     pub columns: Vec<Column>,
     pub rows: Vec<Row>,
     pub empty: Option<EmptyState>,
-    /// Whether the Title cell renders the front-matter reference list.
-    ///
-    /// Resolved from the seed bridge (ADR-035): a config-defined document type
-    /// omits the block entirely until MS-035 applies the seed default.
-    pub show_references: bool,
 }
 
 /// One column of the shared table.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Column {
     /// `id` | `title` | `status` | family slot key | `created` | `updated` | `actions`.
-    pub key: &'static str,
-    pub label: &'static str,
+    pub key: String,
+    pub label: String,
     /// Cell class; empty when none.
     pub class: &'static str,
 }
@@ -56,8 +52,10 @@ pub struct Row {
     pub cells: Vec<String>,
     /// Front-matter labels, rendered in the Title cell.
     pub labels: Vec<String>,
-    /// Front-matter references, rendered in the Title cell.
+    /// Front-matter references, rendered in the Title cell when visible.
     pub references: Vec<String>,
+    /// Whether this row's reference list renders (ADR-039 decision 32).
+    pub render_references: bool,
     /// `(label, href)` actions: View, Edit, then any family action.
     pub actions: Vec<(String, String)>,
     /// Member rows of a grouped family, rendered in the same table body.
@@ -80,68 +78,69 @@ impl ListPlan {
     /// slug or handler match in this module.
     pub fn for_descriptor(
         descriptor: &TypeDescriptor,
-        presentation_slug: &str,
         index: &Index,
         heading: &str,
         count_note: &str,
     ) -> ListPlan {
-        let slots = routes::list_slots(presentation_slug);
-        validate_slots(slots);
+        let slots = descriptor_slots(descriptor);
         let mut columns = vec![
             Column {
-                key: "id",
-                label: "ID",
+                key: "id".to_string(),
+                label: "ID".to_string(),
                 class: "id-cell",
             },
             Column {
-                key: "title",
-                label: "Title",
+                key: "title".to_string(),
+                label: "Title".to_string(),
                 class: "title-cell",
             },
             Column {
-                key: "status",
-                label: "Status",
+                key: "status".to_string(),
+                label: "Status".to_string(),
                 class: "status-cell",
             },
         ];
-        for (key, label) in slots {
+        for slot in &slots {
             columns.push(Column {
-                key,
-                label,
+                key: slot.key.clone(),
+                label: slot.label.clone(),
                 class: "slot-cell",
             });
         }
         columns.push(Column {
-            key: "created",
-            label: "Created",
+            key: "created".to_string(),
+            label: "Created".to_string(),
             class: "created-cell",
         });
         columns.push(Column {
-            key: "updated",
-            label: "Updated",
+            key: "updated".to_string(),
+            label: "Updated".to_string(),
             class: "updated-cell",
         });
         columns.push(Column {
-            key: "actions",
-            label: "Actions",
+            key: "actions".to_string(),
+            label: "Actions".to_string(),
             class: "actions-cell",
         });
 
+        let single_references =
+            descriptor.single_reference_visibility() == crate::config::Visibility::Visible;
+        let group_references =
+            descriptor.group_reference_visibility() == crate::config::Visibility::Visible;
+        let member_references =
+            descriptor.member_reference_visibility() == crate::config::Visibility::Visible;
         let rows = if descriptor.id_shape == IdShape::Grouped {
-            grouped_rows(index, slots)
+            grouped_rows(index, &slots, group_references, member_references)
         } else {
             index
                 .records
                 .iter()
-                .map(|record| row_for(record, slots))
+                .map(|record| row_for(record, &slots, single_references))
                 .collect()
         };
         let empty = if index.records.is_empty() {
             Some(EmptyState {
-                message: format!(
-                    "No {} in this project.",
-                    routes::noun(presentation_slug, 0)
-                ),
+                message: format!("No {} in this project.", routes::noun(descriptor, 0)),
                 help: Some(
                     "Records are created from the command line; this browser does not create records."
                         .to_string(),
@@ -150,14 +149,12 @@ impl ListPlan {
         } else {
             None
         };
-        let show_references = !descriptor.is_config_defined_document();
         ListPlan {
             heading: heading.to_string(),
             count_note: count_note.to_string(),
             columns,
             rows,
             empty,
-            show_references,
         }
     }
 
@@ -191,21 +188,15 @@ impl ListPlan {
         for column in &self.columns {
             header.push_str(&format!(
                 "<th scope=\"col\" data-column=\"{}\">{}</th>",
-                escape(column.key),
-                escape(column.label)
+                escape(&column.key),
+                escape(&column.label)
             ));
         }
         let mut rows = String::new();
         for row in &self.rows {
-            render_row(row, &self.columns, self.show_references, None, &mut rows);
+            render_row(row, &self.columns, None, &mut rows);
             for child in &row.children {
-                render_row(
-                    child,
-                    &self.columns,
-                    self.show_references,
-                    Some(&row.id),
-                    &mut rows,
-                );
+                render_row(child, &self.columns, Some(&row.id), &mut rows);
             }
         }
         format!(
@@ -227,7 +218,7 @@ impl ListPlan {
         assert_eq!(self.columns[0].key, "id", "first column is ID");
         assert_eq!(self.columns[1].key, "title", "second column is Title");
         assert_eq!(
-            self.columns.last().map(|column| column.key),
+            self.columns.last().map(|column| column.key.as_str()),
             Some("actions"),
             "last column is Actions"
         );
@@ -244,7 +235,7 @@ impl ListPlan {
         );
         let slots: Vec<&str> = self.columns[3..self.columns.len() - 3]
             .iter()
-            .map(|column| column.key)
+            .map(|column| column.key.as_str())
             .collect();
         for (index, key) in slots.iter().enumerate() {
             assert!(
@@ -278,6 +269,25 @@ impl ListPlan {
     }
 }
 
+/// Resolve a descriptor's columns: document slots come from the seed; the
+/// backlog and decision surfaces keep their static presentation sets.
+fn descriptor_slots(descriptor: &TypeDescriptor) -> Vec<crate::config::Slot> {
+    if descriptor.category == CategoryKind::Document {
+        validate_descriptor_slots(&descriptor.slots);
+        descriptor.slots.clone()
+    } else {
+        let slots = routes::list_slots(routes::static_slug(descriptor));
+        validate_slots(slots);
+        slots
+            .iter()
+            .map(|(key, label)| crate::config::Slot {
+                key: (*key).to_string(),
+                label: (*label).to_string(),
+            })
+            .collect()
+    }
+}
+
 /// Reject reserved keys and duplicates in a declared slot list.
 ///
 /// A violation is a programming error in the presentation table, not a page
@@ -295,16 +305,36 @@ pub fn validate_slots(slots: &[(&'static str, &'static str)]) {
     }
 }
 
+fn validate_descriptor_slots(slots: &[crate::config::Slot]) {
+    for (index, slot) in slots.iter().enumerate() {
+        assert!(
+            !RESERVED_COLUMN_KEYS.contains(&slot.key.as_str()),
+            "family slot key `{}` is a reserved structural column",
+            slot.key
+        );
+        assert!(
+            !slots[..index].iter().any(|earlier| earlier.key == slot.key),
+            "family slot key `{}` is declared twice",
+            slot.key
+        );
+    }
+}
+
 /// Grouped rows: the group row first, its members as children, then every
 /// member whose group row is absent from the filtered index as a top-level row.
-fn grouped_rows(index: &Index, slots: &[(&'static str, &'static str)]) -> Vec<Row> {
+fn grouped_rows(
+    index: &Index,
+    slots: &[crate::config::Slot],
+    group_references: bool,
+    member_references: bool,
+) -> Vec<Row> {
     let mut rows = Vec::new();
     for group in &index.groups {
-        let mut row = row_for(group, slots);
+        let mut row = row_for(group, slots, group_references);
         if let Some(positions) = index.members.get(&group.id) {
             for position in positions {
                 if let Some(member) = index.requirements.get(*position) {
-                    row.children.push(row_for(member, slots));
+                    row.children.push(row_for(member, slots, member_references));
                 }
             }
         }
@@ -317,12 +347,12 @@ fn grouped_rows(index: &Index, slots: &[(&'static str, &'static str)]) -> Vec<Ro
         .collect();
     other.sort_by(|left, right| left.id.cmp(&right.id));
     for record in other {
-        rows.push(row_for(record, slots));
+        rows.push(row_for(record, slots, member_references));
     }
     rows
 }
 
-fn row_for(record: &Record, slots: &[(&'static str, &'static str)]) -> Row {
+fn row_for(record: &Record, slots: &[crate::config::Slot], render_references: bool) -> Row {
     let id = record.id.clone();
     let href = format!("/doc/{id}");
     let title = if record.title.trim().is_empty() {
@@ -331,8 +361,8 @@ fn row_for(record: &Record, slots: &[(&'static str, &'static str)]) -> Row {
         record.title.clone()
     };
     let mut cells = vec![status_cell(record.status.as_deref())];
-    for (key, _) in slots {
-        cells.push(slot_cell(key, record));
+    for slot in slots {
+        cells.push(slot_cell(&slot.key, record));
     }
     cells.push(date_cell(record, "created_date"));
     cells.push(date_cell(record, "updated_date"));
@@ -343,6 +373,7 @@ fn row_for(record: &Record, slots: &[(&'static str, &'static str)]) -> Row {
         cells,
         labels: record.labels.clone(),
         references: record.refs.clone(),
+        render_references,
         actions: vec![
             ("View".to_string(), href),
             ("Edit".to_string(), format!("/doc/{id}/edit")),
@@ -411,10 +442,10 @@ fn date_cell(record: &Record, field: &str) -> String {
 
 /// Count note for a flat shared list (`3 milestones`, `1 milestone`, `0 milestones`).
 ///
-/// The noun is declared in the presentation table (`routes::noun`);
-/// config-defined types fall back to their lower-case slug.
-pub fn count_note(slug: &str, count: usize) -> String {
-    format!("{count} {}", routes::noun(slug, count))
+/// The noun is the descriptor's plural for a document type and the static
+/// Backlog/Decision noun otherwise (`routes::noun`).
+pub fn count_note(descriptor: &TypeDescriptor, count: usize) -> String {
+    format!("{count} {}", routes::noun(descriptor, count))
 }
 
 /// Count note for a grouped family (`1 group · 3 requirements`).
@@ -434,13 +465,7 @@ fn count_phrase(count: usize, singular: &str, plural: &str) -> String {
     }
 }
 
-fn render_row(
-    row: &Row,
-    columns: &[Column],
-    show_references: bool,
-    parent: Option<&str>,
-    out: &mut String,
-) {
+fn render_row(row: &Row, columns: &[Column], parent: Option<&str>, out: &mut String) {
     let child_of = parent
         .map(|parent| format!(" data-child-of=\"{}\"", escape(parent)))
         .unwrap_or_default();
@@ -463,7 +488,7 @@ fn render_row(
             .collect();
         title_cell.push_str(&format!("<ul class=\"row-tags\">{tags}</ul>"));
     }
-    if show_references && !row.references.is_empty() {
+    if row.render_references && !row.references.is_empty() {
         let references: String = row
             .references
             .iter()
@@ -540,7 +565,6 @@ mod tests {
             columns,
             rows,
             empty: None,
-            show_references: true,
         }
     }
 
@@ -552,6 +576,7 @@ mod tests {
             cells: cells.into_iter().map(str::to_string).collect(),
             labels: Vec::new(),
             references: Vec::new(),
+            render_references: true,
             actions: vec![
                 ("View".to_string(), format!("/doc/{id}")),
                 ("Edit".to_string(), format!("/doc/{id}/edit")),
@@ -563,7 +588,6 @@ mod tests {
     fn milestone_plan() -> ListPlan {
         ListPlan::for_descriptor(
             &descriptor("milestone"),
-            "milestone",
             &Index::default(),
             "Milestones",
             "0 milestones",
@@ -573,14 +597,22 @@ mod tests {
     #[test]
     fn reference_family_columns_are_the_amended_fixed_order() {
         let plan = milestone_plan();
-        let keys: Vec<&str> = plan.columns.iter().map(|column| column.key).collect();
+        let keys: Vec<&str> = plan
+            .columns
+            .iter()
+            .map(|column| column.key.as_str())
+            .collect();
         assert_eq!(
             keys,
             [
                 "id", "title", "status", "release", "created", "updated", "actions"
             ]
         );
-        let labels: Vec<&str> = plan.columns.iter().map(|column| column.label).collect();
+        let labels: Vec<&str> = plan
+            .columns
+            .iter()
+            .map(|column| column.label.as_str())
+            .collect();
         assert_eq!(
             labels,
             [
@@ -594,12 +626,15 @@ mod tests {
         assert_eq!(routes::list_slots("note"), &[]);
         let plan = ListPlan::for_descriptor(
             &descriptor("release"),
-            "release",
             &Index::default(),
             "Releases",
             "0 releases",
         );
-        let keys: Vec<&str> = plan.columns.iter().map(|column| column.key).collect();
+        let keys: Vec<&str> = plan
+            .columns
+            .iter()
+            .map(|column| column.key.as_str())
+            .collect();
         assert_eq!(
             keys,
             ["id", "title", "status", "created", "updated", "actions"]
@@ -610,6 +645,17 @@ mod tests {
     fn every_declared_slot_set_is_valid() {
         for entry in routes::PRESENTATION {
             validate_slots(entry.list_slots);
+        }
+        for descriptor in crate::config::SEED_DOCUMENT_TYPES.iter() {
+            let slots: Vec<crate::config::Slot> = descriptor
+                .slots
+                .iter()
+                .map(|slot| crate::config::Slot {
+                    key: slot.key.to_string(),
+                    label: slot.label.to_string(),
+                })
+                .collect();
+            validate_descriptor_slots(&slots);
         }
     }
 
@@ -693,44 +739,43 @@ mod tests {
             count_note: "1 group".to_string(),
             columns: vec![
                 Column {
-                    key: "id",
-                    label: "ID",
+                    key: "id".to_string(),
+                    label: "ID".to_string(),
                     class: "id-cell",
                 },
                 Column {
-                    key: "title",
-                    label: "Title",
+                    key: "title".to_string(),
+                    label: "Title".to_string(),
                     class: "title-cell",
                 },
                 Column {
-                    key: "status",
-                    label: "Status",
+                    key: "status".to_string(),
+                    label: "Status".to_string(),
                     class: "status-cell",
                 },
                 Column {
-                    key: "group",
-                    label: "Group",
+                    key: "group".to_string(),
+                    label: "Group".to_string(),
                     class: "slot-cell",
                 },
                 Column {
-                    key: "created",
-                    label: "Created",
+                    key: "created".to_string(),
+                    label: "Created".to_string(),
                     class: "created-cell",
                 },
                 Column {
-                    key: "updated",
-                    label: "Updated",
+                    key: "updated".to_string(),
+                    label: "Updated".to_string(),
                     class: "updated-cell",
                 },
                 Column {
-                    key: "actions",
-                    label: "Actions",
+                    key: "actions".to_string(),
+                    label: "Actions".to_string(),
                     class: "actions-cell",
                 },
             ],
             rows: vec![group],
             empty: None,
-            show_references: true,
         };
         let html = columns.render();
         assert_eq!(html.matches("<tbody>").count(), 1);
@@ -758,9 +803,10 @@ mod tests {
     }
 
     #[test]
-    fn generic_family_omits_references_but_keeps_labels_and_projection() {
+    fn user_defined_family_defaults_to_visible_references() {
+        let note_descriptor = generic_descriptor("note");
         let mut note = record("NOTE-001", false, None);
-        note.descriptor = generic_descriptor("note");
+        note.descriptor = note_descriptor.clone();
         note.labels = vec!["note-label".to_string()];
         note.refs = vec!["NOTE-REF-1".to_string()];
         let index = Index {
@@ -768,16 +814,12 @@ mod tests {
             ..Index::default()
         };
         let plan = ListPlan::for_descriptor(
-            &generic_descriptor("note"),
-            "note",
+            &note_descriptor,
             &index,
             "Notes",
-            &count_note("note", 1),
+            &count_note(&note_descriptor, 1),
         );
-        assert!(
-            !plan.show_references,
-            "Generic rows omit the reference block"
-        );
+        assert!(plan.rows[0].render_references);
         assert_eq!(
             plan.rows[0].references,
             vec!["NOTE-REF-1".to_string()],
@@ -788,12 +830,50 @@ mod tests {
         let end = html[start..].find("</tr>").unwrap() + start;
         let row = &html[start..end];
         assert!(row.contains("<ul class=\"row-tags\"><li class=\"tag\">note-label</li></ul>"));
-        assert!(!row.contains("row-refs"), "no reference element at all");
-        assert!(!row.contains("NOTE-REF-1"));
+        assert!(row.contains("<ul class=\"row-refs\"><li>NOTE-REF-1</li></ul>"));
     }
 
     #[test]
-    fn typed_and_html_mockup_families_keep_the_reference_block() {
+    fn req_and_nfr_hide_references_in_both_roles_but_keep_labels() {
+        for slug in ["req", "nfr"] {
+            let descriptor = descriptor(slug);
+            let mut group = record("REQ-001", true, None);
+            group.descriptor = descriptor.clone();
+            group.labels = vec!["group-label".to_string()];
+            group.refs = vec!["REF-GROUP".to_string()];
+            let mut member = record("REQ-001.001", false, Some("REQ-001"));
+            member.descriptor = descriptor.clone();
+            member.labels = vec!["member-label".to_string()];
+            member.refs = vec!["REF-MEMBER".to_string()];
+            let mut index = Index {
+                groups: vec![group.clone()],
+                requirements: vec![member.clone()],
+                records: vec![group, member],
+                ..Index::default()
+            };
+            index.members.insert("REQ-001".to_string(), vec![0]);
+            let plan = ListPlan::for_descriptor(
+                &descriptor,
+                &index,
+                "Requirements",
+                &grouped_count_note(&index),
+            );
+            assert!(!plan.rows[0].render_references);
+            assert!(!plan.rows[0].children[0].render_references);
+            let html = plan.render();
+            assert!(
+                !html.contains("row-refs"),
+                "{slug} hides every reference list"
+            );
+            assert!(!html.contains("REF-GROUP"));
+            assert!(!html.contains("REF-MEMBER"));
+            assert!(html.contains("<li class=\"tag\">group-label</li>"));
+            assert!(html.contains("<li class=\"tag\">member-label</li>"));
+        }
+    }
+
+    #[test]
+    fn other_seed_families_keep_visible_references() {
         for (slug, presentation) in [("milestone", "milestone"), ("ui-mockup", "ui-mockup")] {
             let mut doc = record("X-001", false, None);
             doc.descriptor = descriptor(slug);
@@ -802,14 +882,14 @@ mod tests {
                 records: vec![doc],
                 ..Index::default()
             };
-            let plan =
-                ListPlan::for_descriptor(&descriptor(slug), presentation, &index, "List", "1 item");
-            assert!(plan.show_references, "{slug} keeps references");
+            let plan = ListPlan::for_descriptor(&descriptor(slug), &index, "List", "1 item");
+            assert!(plan.rows[0].render_references, "{slug} keeps references");
             let html = plan.render();
             assert!(
                 html.contains("<ul class=\"row-refs\"><li>REF-001</li></ul>"),
                 "{slug} renders the reference block"
             );
+            let _ = presentation;
         }
     }
 
@@ -903,7 +983,6 @@ mod tests {
         let index = grouped_index();
         let plan = ListPlan::for_descriptor(
             &descriptor("req"),
-            "req",
             &index,
             "Business requirements",
             &grouped_count_note(&index),
@@ -951,12 +1030,12 @@ mod tests {
 
     #[test]
     fn empty_message_uses_the_count_note_noun() {
+        let note_descriptor = generic_descriptor("note");
         let plan = ListPlan::for_descriptor(
-            &descriptor("milestone"),
-            "note",
+            &note_descriptor,
             &Index::default(),
             "Notes",
-            &count_note("note", 0),
+            &count_note(&note_descriptor, 0),
         );
         let html = plan.render();
         assert!(html.contains("<p class=\"count\">0 notes</p>"));
@@ -976,14 +1055,12 @@ mod tests {
             records: vec![superseded, open],
             ..Index::default()
         };
-        let plan = ListPlan::for_descriptor(
-            &descriptor("adr"),
-            "decision",
-            &index,
-            "Decisions",
-            "2 decisions",
-        );
-        let keys: Vec<&str> = plan.columns.iter().map(|column| column.key).collect();
+        let plan = ListPlan::for_descriptor(&descriptor("adr"), &index, "Decisions", "2 decisions");
+        let keys: Vec<&str> = plan
+            .columns
+            .iter()
+            .map(|column| column.key.as_str())
+            .collect();
         assert_eq!(
             keys,
             [
@@ -1012,10 +1089,11 @@ mod tests {
 
     #[test]
     fn count_note_handles_singular_and_plural() {
-        assert_eq!(count_note("milestone", 0), "0 milestones");
-        assert_eq!(count_note("milestone", 1), "1 milestone");
-        assert_eq!(count_note("milestone", 3), "3 milestones");
-        assert_eq!(count_note("business-rule", 2), "2 business rules");
-        assert_eq!(count_note("note", 2), "2 notes");
+        assert_eq!(count_note(&descriptor("milestone"), 0), "0 milestones");
+        assert_eq!(count_note(&descriptor("milestone"), 1), "1 milestone");
+        assert_eq!(count_note(&descriptor("milestone"), 3), "3 milestones");
+        assert_eq!(count_note(&descriptor("rule"), 2), "2 business rules");
+        let note = generic_descriptor("note");
+        assert_eq!(count_note(&note, 2), "2 notes");
     }
 }

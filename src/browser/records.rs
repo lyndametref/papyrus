@@ -109,7 +109,7 @@ impl Record {
     }
 
     pub fn type_label(&self) -> String {
-        crate::browser::routes::label(self.slug())
+        crate::browser::routes::label(&self.descriptor)
     }
 
     /// Stored status rendered read-only, or `(none)` when absent.

@@ -129,7 +129,7 @@ fn page_assets(has_math: bool, has_diagram: bool) -> String {
 }
 
 fn category_name(slug: &str) -> String {
-    routes::heading(slug)
+    routes::static_heading(slug).unwrap_or_default().to_string()
 }
 
 fn plural(count: usize, singular: &str, plural: &str) -> String {
@@ -188,6 +188,9 @@ fn build_sidebar(selected: Option<&str>, routes: &BrowserRoutes) -> String {
 }
 
 fn breadcrumb_label(record: &Record) -> String {
+    if record.descriptor.category == CategoryKind::Document {
+        return routes::label(&record.descriptor);
+    }
     match record.handler() {
         Some(TypedHandler::Requirement(_)) => "Requirements".to_string(),
         Some(TypedHandler::Task) => "Tasks".to_string(),
@@ -214,7 +217,7 @@ fn breadcrumb(
     _related_release: Option<&Record>,
 ) -> String {
     let label = breadcrumb_label(record);
-    let type_key = routes::legacy_url_key(record.slug());
+    let type_key = routes::legacy_url_key(&record.descriptor);
     let mut items = String::new();
     items.push_str(&format!(
         "<li><a href=\"/?type={}\">{}</a></li>",
@@ -233,7 +236,7 @@ fn breadcrumb(
 
 fn edit_breadcrumb(record: &Record, _resolved_group: Option<&Record>) -> String {
     let label = breadcrumb_label(record);
-    let type_key = routes::legacy_url_key(record.slug());
+    let type_key = routes::legacy_url_key(&record.descriptor);
     let mut items = String::new();
     items.push_str(&format!(
         "<li><a href=\"/?type={}\">{}</a></li>",
@@ -532,9 +535,9 @@ fn status_filter_html(descriptor: &TypeDescriptor, selected: Option<&str>) -> St
 <select class=\"input\" id=\"status\" name=\"status\">{}</select></div>\
 <div class=\"form-actions\"><button class=\"btn btn-primary\" type=\"submit\">Apply filter</button>\
 <a class=\"link\" href=\"/?type={}\">Show all</a></div></form>",
-        escape(routes::legacy_url_key(&descriptor.slug)),
+        escape(routes::legacy_url_key(descriptor)),
         options,
-        escape(routes::legacy_url_key(&descriptor.slug))
+        escape(routes::legacy_url_key(descriptor))
     )
 }
 
@@ -959,7 +962,7 @@ fn board_empty_section(slug: &str) -> String {
 <div class=\"empty\"><p>No {1} in this project.</p><p class=\"help\">\
 Records are created from the command line; this browser does not create records.</p></div></section>",
         escape(&category_name(slug)),
-        escape(&routes::short(slug)),
+        escape(routes::static_short(slug).unwrap_or_default()),
     )
 }
 
@@ -1131,22 +1134,16 @@ pub fn list_page(
     chrome: Chrome<'_>,
 ) -> String {
     let slug = descriptor.slug.as_str();
-    let presentation_slug = chrome.routes.list_slug_for(slug);
-    let heading = routes::heading(&presentation_slug);
-    let subheading = routes::inventory_note(&presentation_slug);
+    let heading = routes::heading(descriptor);
+    let subheading = routes::inventory_note(descriptor);
     let count_note = if descriptor.id_shape == crate::registry::IdShape::Grouped {
         crate::browser::list::grouped_count_note(index)
     } else {
-        crate::browser::list::count_note(&presentation_slug, index.records.len())
+        crate::browser::list::count_note(descriptor, index.records.len())
     };
-    let section_body = crate::browser::list::ListPlan::for_descriptor(
-        descriptor,
-        &presentation_slug,
-        index,
-        &heading,
-        &count_note,
-    )
-    .render();
+    let section_body =
+        crate::browser::list::ListPlan::for_descriptor(descriptor, index, &heading, &count_note)
+            .render();
     let section = if descriptor.category == CategoryKind::Document {
         format!(
             "<div class=\"filter-wrap\">{}</div>{}",
@@ -3788,7 +3785,7 @@ pub fn document_view_page(
 
 fn document_breadcrumb(record: &Record) -> String {
     let label = record.type_label();
-    let type_key = routes::legacy_url_key(record.slug());
+    let type_key = routes::legacy_url_key(&record.descriptor);
     format!(
         "<nav class=\"breadcrumb\" aria-label=\"Breadcrumb\"><ol><li><a href=\"/?type={}\">{}</a></li><li><span aria-current=\"page\">{}</span></li></ol></nav>",
         escape(type_key),

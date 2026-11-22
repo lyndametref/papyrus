@@ -822,3 +822,22 @@ fn d16_document_typed_handlers_remain_until_ms035() {
         );
     }
 }
+
+// D-05 (TASK-268) ----------------------------------------------------------
+#[test]
+fn d05_presentation_table_holds_no_document_entry() {
+    for slug in DOCUMENT_SLUGS {
+        assert!(
+            papyrus::browser::routes::PRESENTATION
+                .iter()
+                .all(|entry| entry.slug != slug),
+            "PRESENTATION still holds a document entry: {slug}"
+        );
+    }
+    for slug in DOCUMENT_SLUGS {
+        assert!(
+            papyrus::config::seed_document_type(slug).is_some(),
+            "{slug} is a seed type"
+        );
+    }
+}

@@ -2,8 +2,9 @@
 //!
 //! [`BrowserRoutes`] is derived once from the validated [`ArtifactRegistry`]
 //! before the browser binds its listener. Every membership decision comes from
-//! the registry; the static [`PRESENTATION`] table only supplies labels,
-//! headings, curated text, navigation order, and legacy URL keys.
+//! the registry. The static [`PRESENTATION`] table supplies only the Backlog
+//! and Decision labels, headings, curated text, navigation order, and legacy
+//! URL keys; every document presentation fact comes from its descriptor.
 
 use crate::registry::{ArtifactCategory as CategoryKind, ArtifactRegistry, TypeDescriptor};
 
@@ -190,147 +191,6 @@ pub const PRESENTATION: &[Presentation] = &[
         ),
         NavGroup::Decisions,
     ),
-    with_slots(
-        builtin(
-            "req",
-            "Business requirements",
-            "Business requirements",
-            "business requirements",
-            "Business requirements in this project.",
-            None,
-            10,
-        ),
-        &[("group", "Group")],
-    ),
-    with_api(
-        with_slots(
-            builtin(
-                "rule",
-                "Business Rules",
-                "Business Rules",
-                "business rules",
-                "Business rules in this project.",
-                Some("business-rule"),
-                20,
-            ),
-            &[("applicability", "Applicability")],
-        ),
-        &["/api/business-rules", "/api/business-rule"],
-    ),
-    with_api(
-        with_slots(
-            builtin(
-                "audit",
-                "Audit Records",
-                "Audit Records",
-                "audit records",
-                "Audit records in this project.",
-                Some("audit-record"),
-                30,
-            ),
-            &[("audit_type", "Audit type")],
-        ),
-        &["/api/audit-records", "/api/audit-record"],
-    ),
-    with_api(
-        builtin(
-            "tech-spec",
-            "Technical Specifications",
-            "Technical Specifications",
-            "technical specifications",
-            "Technical specifications in this project.",
-            None,
-            40,
-        ),
-        &["/api/tech-specs", "/api/tech-spec"],
-    ),
-    with_api(
-        builtin(
-            "use-case",
-            "Use Cases",
-            "Use Cases",
-            "use cases",
-            "Use cases in this project.",
-            None,
-            50,
-        ),
-        &["/api/use-cases", "/api/use-case"],
-    ),
-    with_api(
-        builtin(
-            "test-case",
-            "Test Cases",
-            "Test Cases",
-            "test cases",
-            "Test cases in this project.",
-            None,
-            60,
-        ),
-        &["/api/test-cases", "/api/test-case"],
-    ),
-    with_api(
-        builtin(
-            "test-report",
-            "Test Reports",
-            "Test Reports",
-            "test reports",
-            "Test reports in this project.",
-            None,
-            70,
-        ),
-        &["/api/test-reports", "/api/test-report"],
-    ),
-    with_slots(
-        builtin(
-            "nfr",
-            "Non-functional requirements",
-            "Non-functional requirements",
-            "non-functional requirements",
-            "Non-functional requirements in this project.",
-            None,
-            80,
-        ),
-        &[("group", "Group")],
-    ),
-    with_api(
-        builtin(
-            "glossary",
-            "Glossary",
-            "Glossary",
-            "glossary terms",
-            "Glossary terms in this project.",
-            None,
-            90,
-        ),
-        &["/api/glossary"],
-    ),
-    with_api(
-        builtin(
-            "ui-spec",
-            "UI Specifications",
-            "UI Specifications",
-            "UI specifications",
-            "UI specifications in this project.",
-            None,
-            100,
-        ),
-        &["/api/ui-specs", "/api/ui-specifications", "/api/ui-spec"],
-    ),
-    with_api(
-        with_slots(
-            builtin(
-                "ui-mockup",
-                "UI Mockups",
-                "UI Mockups",
-                "UI mockups",
-                "UI mockups in this project.",
-                None,
-                110,
-            ),
-            &[("task", "Task"), ("specs", "Specs")],
-        ),
-        &["/api/ui-mockups", "/api/ui-mockup", "/api/mockups"],
-    ),
 ];
 
 /// Presentation lookup for a built-in slug.
@@ -338,9 +198,28 @@ pub fn presentation(slug: &str) -> Option<&'static Presentation> {
     PRESENTATION.iter().find(|entry| entry.slug == slug)
 }
 
-/// Declared family slot columns `(key, label)` for a slug.
+/// Static presentation entry for a backlog or decision descriptor.
+fn presentation_for(descriptor: &TypeDescriptor) -> Option<&'static Presentation> {
+    presentation(&descriptor.slug).or_else(|| {
+        let group = match descriptor.category {
+            CategoryKind::Decision => NavGroup::Decisions,
+            CategoryKind::Backlog => NavGroup::Backlog,
+            CategoryKind::Document => return None,
+        };
+        aggregate_slug(group).and_then(presentation)
+    })
+}
+
+/// The static presentation slug that represents a non-document descriptor.
+pub fn static_slug(descriptor: &TypeDescriptor) -> &str {
+    presentation_for(descriptor)
+        .map(|entry| entry.slug)
+        .unwrap_or(&descriptor.slug)
+}
+
+/// Declared family slot columns `(key, label)` for a Backlog or Decision slug.
 ///
-/// A config-defined type has no presentation entry, therefore no slots.
+/// A document type's slots come from its descriptor, never this table.
 pub fn list_slots(slug: &str) -> &'static [(&'static str, &'static str)] {
     presentation(slug)
         .map(|entry| entry.list_slots)
@@ -355,94 +234,121 @@ fn aggregate_slug(group: NavGroup) -> Option<&'static str> {
         .map(|entry| entry.slug)
 }
 
-/// Legacy list API aliases for a presentation slug.
-fn api_aliases(slug: &str) -> &'static [&'static str] {
-    presentation(slug)
-        .map(|entry| entry.api_paths)
-        .unwrap_or(&[])
+/// Static heading for a backlog or decision surface.
+pub fn static_heading(slug: &str) -> Option<&'static str> {
+    presentation(slug).map(|entry| entry.heading)
 }
 
-/// Legacy `?type=` value for a slug (the slug itself when none).
-pub fn legacy_url_key(slug: &str) -> &str {
-    presentation(slug)
-        .and_then(|entry| entry.legacy_type)
-        .unwrap_or(slug)
+/// Static lower-case noun for a backlog or decision surface.
+pub fn static_short(slug: &str) -> Option<&'static str> {
+    presentation(slug).map(|entry| entry.short)
 }
 
-/// Number of leading built-in document cards rendered before the Backlog and
-/// Decisions aggregate cards (presentation only).
-pub const INVENTORY_AGGREGATE_AFTER: usize = 5;
-
-/// Inventory card order for built-in document cards. It is presentation only;
-/// membership still comes from the route table.
-pub fn inventory_order() -> &'static [&'static str] {
-    &[
-        "req",
-        "rule",
-        "audit",
-        "tech-spec",
-        "nfr",
-        "glossary",
-        "ui-spec",
-        "ui-mockup",
-    ]
-}
-
-/// Sidebar label for any document slug.
-pub fn label(slug: &str) -> String {
-    presentation(slug)
-        .map(|entry| entry.label.to_string())
-        .unwrap_or_else(|| pluralize(&title_case(slug)))
-}
-
-fn pluralize(label: &str) -> String {
-    let last = label.chars().last();
-    match last {
-        Some(character) if character.is_ascii_alphabetic() && character != 's' => {
-            format!("{}s", label)
-        }
-        _ => label.to_string(),
+/// Sidebar and inventory label derived from the descriptor.
+pub fn label(descriptor: &TypeDescriptor) -> String {
+    if descriptor.category == CategoryKind::Document {
+        return capitalize_first(&descriptor.plural);
     }
+    presentation_for(descriptor)
+        .map(|entry| entry.label.to_string())
+        .unwrap_or_else(|| pluralize(&title_case(&descriptor.slug)))
 }
 
-/// List heading for any document slug.
-pub fn heading(slug: &str) -> String {
-    presentation(slug)
-        .map(|entry| entry.heading.to_string())
-        .unwrap_or_else(|| label(slug))
+/// List heading and page title derived from the descriptor.
+pub fn heading(descriptor: &TypeDescriptor) -> String {
+    if descriptor.category == CategoryKind::Document {
+        return capitalize_first(&descriptor.plural);
+    }
+    static_heading(&descriptor.slug)
+        .map(str::to_string)
+        .unwrap_or_else(|| label(descriptor))
 }
 
-/// Lower-case noun for empty-state copy.
-pub fn short(slug: &str) -> String {
-    presentation(slug)
-        .map(|entry| entry.short.to_string())
-        .unwrap_or_else(|| title_case(slug).to_lowercase())
+/// Lower-case noun for count and empty-state copy.
+pub fn short(descriptor: &TypeDescriptor) -> String {
+    if descriptor.category == CategoryKind::Document {
+        return descriptor.plural.clone();
+    }
+    static_short(&descriptor.slug)
+        .map(str::to_string)
+        .unwrap_or_else(|| title_case(&descriptor.slug).to_lowercase())
 }
 
 /// Singular or plural noun for a count and empty-state copy.
-///
-/// The presentation table already declares the plural noun; a config-defined
-/// type falls back to its lower-case slug (`notes` for `note`).
-pub fn noun(slug: &str, count: usize) -> String {
-    let plural = short(slug);
+pub fn noun(descriptor: &TypeDescriptor, count: usize) -> String {
+    noun_for_plural(&short(descriptor), count)
+}
+
+fn noun_for_plural(plural: &str, count: usize) -> String {
     if count == 1 {
-        if plural.ends_with('s') && !plural.ends_with("ss") {
-            plural[..plural.len() - 1].to_string()
-        } else {
-            plural
+        if let Some(singular) = plural.strip_suffix('s')
+            && !plural.ends_with("ss")
+        {
+            return singular.to_string();
         }
+        plural.to_string()
     } else if plural.ends_with('s') {
-        plural
+        plural.to_string()
     } else {
         format!("{plural}s")
     }
 }
 
-/// Inventory note.
-pub fn inventory_note(slug: &str) -> String {
-    presentation(slug)
+/// Inventory note derived from the descriptor.
+pub fn inventory_note(descriptor: &TypeDescriptor) -> String {
+    if descriptor.category == CategoryKind::Document {
+        return descriptor
+            .summary
+            .clone()
+            .unwrap_or_else(|| CONFIG_DEFINED_NOTE.to_string());
+    }
+    presentation_for(descriptor)
         .map(|entry| entry.note.to_string())
-        .unwrap_or_else(|| "Config-defined document records in this project.".to_string())
+        .unwrap_or_else(|| CONFIG_DEFINED_NOTE.to_string())
+}
+
+/// Fixed generic inventory note for a type without a seed summary.
+const CONFIG_DEFINED_NOTE: &str = "Config-defined document records in this project.";
+
+/// Legacy `?type=` value for a descriptor (the slug itself when none).
+pub fn legacy_url_key(descriptor: &TypeDescriptor) -> &str {
+    if descriptor.category == CategoryKind::Document {
+        return descriptor.type_alias.as_deref().unwrap_or(&descriptor.slug);
+    }
+    presentation_for(descriptor)
+        .and_then(|entry| entry.legacy_type)
+        .unwrap_or(&descriptor.slug)
+}
+
+/// Legacy list API aliases for a descriptor.
+pub fn api_aliases(descriptor: &TypeDescriptor) -> Vec<&str> {
+    if descriptor.category == CategoryKind::Document {
+        return descriptor.api_aliases.iter().map(String::as_str).collect();
+    }
+    static_api_aliases(&descriptor.slug)
+}
+
+fn static_api_aliases(slug: &str) -> Vec<&str> {
+    presentation(slug)
+        .map(|entry| entry.api_paths.to_vec())
+        .unwrap_or_default()
+}
+
+fn capitalize_first(value: &str) -> String {
+    let mut characters = value.chars();
+    match characters.next() {
+        Some(first) => first.to_uppercase().collect::<String>() + characters.as_str(),
+        None => String::new(),
+    }
+}
+
+fn pluralize(label: &str) -> String {
+    match label.chars().last() {
+        Some(character) if character.is_ascii_alphabetic() && character != 's' => {
+            format!("{}s", label)
+        }
+        _ => label.to_string(),
+    }
 }
 
 fn title_case(slug: &str) -> String {
@@ -458,6 +364,10 @@ fn title_case(slug: &str) -> String {
         .collect::<Vec<_>>()
         .join(" ")
 }
+
+/// Number of leading built-in document cards rendered before the Backlog and
+/// Decisions aggregate cards (presentation only).
+pub const INVENTORY_AGGREGATE_AFTER: usize = 5;
 
 /// One generated sidebar entry.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -536,7 +446,10 @@ impl BrowserRoutes {
             nav.push(NavItem {
                 slug: aggregate.clone(),
                 label: NavGroup::Backlog.heading().to_string(),
-                url_key: legacy_url_key(&aggregate).to_string(),
+                url_key: registry
+                    .descriptor(&aggregate)
+                    .map(|descriptor| legacy_url_key(descriptor).to_string())
+                    .unwrap_or_else(|| aggregate.clone()),
                 group: NavGroup::Backlog,
             });
         }
@@ -564,7 +477,10 @@ impl BrowserRoutes {
             nav.push(NavItem {
                 slug: aggregate.clone(),
                 label: NavGroup::Decisions.heading().to_string(),
-                url_key: legacy_url_key(aggregate).to_string(),
+                url_key: registry
+                    .descriptor(aggregate)
+                    .map(|descriptor| legacy_url_key(descriptor).to_string())
+                    .unwrap_or_else(|| aggregate.clone()),
                 group: NavGroup::Decisions,
             });
         }
@@ -572,24 +488,23 @@ impl BrowserRoutes {
         let mut documents: Vec<&TypeDescriptor> =
             registry.enabled(CategoryKind::Document).collect();
         documents.sort_by(|left, right| {
-            presentation_order(left)
-                .cmp(&presentation_order(right))
+            left.order
+                .cmp(&right.order)
                 .then_with(|| left.slug.cmp(&right.slug))
         });
         for descriptor in &documents {
             type_values.insert(descriptor.slug.clone(), descriptor.slug.clone());
-            if let Some(entry) = presentation(&descriptor.slug)
-                && let Some(legacy) = entry.legacy_type
-            {
+            let legacy = legacy_url_key(descriptor);
+            if legacy != descriptor.slug {
                 type_values.insert(legacy.to_string(), descriptor.slug.clone());
             }
             nav_selection.insert(descriptor.slug.clone(), descriptor.slug.clone());
             nav.push(nav_item(descriptor));
             inventory.push(InventoryEntry {
                 slug: descriptor.slug.clone(),
-                title: label(&descriptor.slug),
-                note: inventory_note(&descriptor.slug),
-                url_key: legacy_url_key(&descriptor.slug).to_string(),
+                title: label(descriptor),
+                note: inventory_note(descriptor),
+                url_key: legacy_url_key(descriptor).to_string(),
             });
         }
 
@@ -600,15 +515,15 @@ impl BrowserRoutes {
             let slug = descriptor.slug.clone();
             if descriptor.category == CategoryKind::Document {
                 api_lists.insert(format!("/api/docs/{}", slug), slug.clone());
-                for path in api_aliases(&slug) {
-                    api_lists.insert((*path).to_string(), slug.clone());
+                for path in api_aliases(descriptor) {
+                    api_lists.insert(path.to_string(), slug.clone());
                 }
             } else if let Some(target) = match descriptor.category {
                 CategoryKind::Decision => decision_aggregate.as_deref(),
                 CategoryKind::Backlog | CategoryKind::Document => Some(slug.as_str()),
             } {
-                for path in api_aliases(target) {
-                    api_lists.insert((*path).to_string(), target.to_string());
+                for path in static_api_aliases(target) {
+                    api_lists.insert(path.to_string(), target.to_string());
                 }
             }
         }
@@ -698,8 +613,8 @@ fn presentation_order(descriptor: &TypeDescriptor) -> u32 {
 fn nav_item(descriptor: &TypeDescriptor) -> NavItem {
     NavItem {
         slug: descriptor.slug.clone(),
-        label: label(&descriptor.slug),
-        url_key: legacy_url_key(&descriptor.slug).to_string(),
+        label: label(descriptor),
+        url_key: legacy_url_key(descriptor).to_string(),
         group: NavGroup::from_category(descriptor.category),
     }
 }
@@ -774,7 +689,7 @@ mod tests {
     }
 
     #[test]
-    fn declared_slots_match_the_amended_adr_table() {
+    fn declared_slots_match_the_amended_adr_table_for_static_surfaces() {
         assert_eq!(
             list_slots("task"),
             &[("milestone", "Milestone"), ("assignee", "Assignee")]
@@ -784,22 +699,21 @@ mod tests {
             list_slots("decision"),
             &[("type", "Type"), ("superseded_by", "Superseded by")]
         );
-        assert_eq!(list_slots("req"), &[("group", "Group")]);
-        assert_eq!(list_slots("nfr"), &[("group", "Group")]);
-        assert_eq!(list_slots("audit"), &[("audit_type", "Audit type")]);
-        assert_eq!(list_slots("rule"), &[("applicability", "Applicability")]);
-        assert_eq!(
-            list_slots("ui-mockup"),
-            &[("task", "Task"), ("specs", "Specs")]
-        );
         assert_eq!(list_slots("note"), &[]);
     }
 
-    /// Temporary cross-check until MS-035 switches the browser to descriptor
-    /// slots: every seed entry's declared slots must equal this static table.
-    /// It fails on any drift in either direction.
     #[test]
-    fn seed_slots_match_static_presentation_until_ms_035() {
+    fn presentation_holds_no_document_entry() {
+        let cfg = Config::default();
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        for descriptor in registry.enabled(CategoryKind::Document) {
+            assert!(
+                presentation(&descriptor.slug).is_none(),
+                "{} must not have a static presentation entry",
+                descriptor.slug
+            );
+            assert_eq!(list_slots(&descriptor.slug), &[]);
+        }
         for slug in [
             "req",
             "nfr",
@@ -813,19 +727,157 @@ mod tests {
             "test-case",
             "test-report",
         ] {
-            let seed = crate::config::seed_document_type(slug)
-                .unwrap_or_else(|| panic!("{slug} is a seed type"));
-            let declared: Vec<(&str, &str)> = seed
-                .slots
-                .iter()
-                .map(|slot| (slot.key, slot.label))
-                .collect();
+            assert!(presentation(slug).is_none(), "{slug} is a document type");
+        }
+    }
+
+    #[test]
+    fn document_presentation_facts_match_the_seed() {
+        let cfg = Config::default();
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        for seed in crate::config::SEED_DOCUMENT_TYPES.iter() {
+            let descriptor = registry.descriptor(seed.slug).expect(seed.slug);
+            assert_eq!(descriptor.plural, seed.plural, "{} plural", seed.slug);
             assert_eq!(
-                list_slots(slug),
-                declared.as_slice(),
-                "{slug}: seed slots drifted from routes::PRESENTATION"
+                descriptor.summary.as_deref(),
+                Some(seed.summary),
+                "{} summary",
+                seed.slug
+            );
+            assert_eq!(descriptor.order, seed.order, "{} order", seed.slug);
+            assert_eq!(
+                descriptor.type_alias.as_deref(),
+                seed.type_alias,
+                "{} type alias",
+                seed.slug
+            );
+            assert_eq!(
+                descriptor.api_aliases,
+                seed.api_aliases
+                    .iter()
+                    .map(|alias| (*alias).to_string())
+                    .collect::<Vec<_>>(),
+                "{} api aliases",
+                seed.slug
+            );
+            assert_eq!(
+                label(descriptor),
+                {
+                    let mut chars = seed.plural.chars();
+                    let first = chars.next().unwrap().to_uppercase().collect::<String>();
+                    first + chars.as_str()
+                },
+                "{} label",
+                seed.slug
+            );
+            assert_eq!(heading(descriptor), label(descriptor));
+            assert_eq!(short(descriptor), seed.plural);
+            assert_eq!(inventory_note(descriptor), seed.summary);
+            assert_eq!(
+                legacy_url_key(descriptor),
+                seed.type_alias.unwrap_or(seed.slug)
             );
         }
+    }
+
+    #[test]
+    fn seed_reference_visibility_matrix_is_resolved_per_role() {
+        let cfg = Config::default();
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        for seed in crate::config::SEED_DOCUMENT_TYPES.iter() {
+            let descriptor = registry.descriptor(seed.slug).expect(seed.slug);
+            let expected = if seed.slug == "req" || seed.slug == "nfr" {
+                crate::config::Visibility::Hidden
+            } else {
+                crate::config::Visibility::Visible
+            };
+            if let Some(group) = seed.group {
+                assert_eq!(
+                    descriptor.group_reference_visibility(),
+                    group.reference_visibility,
+                    "{} group",
+                    seed.slug
+                );
+            }
+            if let Some(member) = seed.member {
+                assert_eq!(
+                    descriptor.member_reference_visibility(),
+                    member.reference_visibility,
+                    "{} member",
+                    seed.slug
+                );
+            }
+            if seed.group.is_none() {
+                assert_eq!(
+                    descriptor.single_reference_visibility(),
+                    expected,
+                    "{} single",
+                    seed.slug
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn user_defined_type_gets_slug_derived_presentation_defaults() {
+        let mut cfg = Config::default();
+        cfg.document_types.insert(
+            "note".to_string(),
+            crate::config::DocTypeEntry {
+                prefix: "NOTE".to_string(),
+                directory: "notes/".to_string(),
+                ..Default::default()
+            },
+        );
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        let descriptor = registry.descriptor("note").expect("note");
+        assert_eq!(descriptor.plural, "notes");
+        assert_eq!(descriptor.summary, None);
+        assert!(descriptor.order > 110);
+        assert_eq!(descriptor.type_alias, None);
+        assert!(descriptor.api_aliases.is_empty());
+        assert!(descriptor.slots.is_empty());
+        assert_eq!(
+            descriptor.single_reference_visibility(),
+            crate::config::Visibility::Visible
+        );
+        assert_eq!(label(descriptor), "Notes");
+        assert_eq!(legacy_url_key(descriptor), "note");
+    }
+
+    #[test]
+    fn inventory_and_navigation_follow_descriptor_order_with_slug_tie_break() {
+        let cfg = Config::default();
+        let registry = ArtifactRegistry::build(&cfg).expect("registry");
+        let routes = BrowserRoutes::build(&registry);
+        let inventory: Vec<&str> = routes
+            .inventory
+            .iter()
+            .map(|entry| entry.slug.as_str())
+            .collect();
+        assert_eq!(
+            inventory,
+            [
+                "req",
+                "rule",
+                "audit",
+                "tech-spec",
+                "use-case",
+                "test-case",
+                "test-report",
+                "nfr",
+                "glossary",
+                "ui-spec",
+                "ui-mockup",
+            ]
+        );
+        let nav_documents: Vec<&str> = routes
+            .nav
+            .iter()
+            .filter(|item| item.group == NavGroup::Documents)
+            .map(|item| item.slug.as_str())
+            .collect();
+        assert_eq!(nav_documents, inventory);
     }
 
     #[test]
