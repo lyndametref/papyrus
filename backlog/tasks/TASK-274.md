@@ -2,7 +2,7 @@
 id: TASK-274
 title: "Implement the mtime-invalidated config, registry, and route snapshot with fail-closed reload"
 created_date: '2026-11-20T17:43:07Z'
-updated_date: '2026-11-22T20:17:46Z'
+updated_date: '2026-11-22T20:57:17Z'
 labels: []
 references:
   - ADR-037
@@ -16,7 +16,7 @@ references:
   - NFR-007.002
   - TC-178
   - TC-179
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-036
@@ -68,3 +68,6 @@ All acceptance criteria pass; targeted tests, the full suite, `cargo clippy --al
 - [ ] No per-record or per-request configuration read, YAML parse, validation, or registry construction remains on the read path; a call-site audit and tests prove that the only configuration access is the once-per-request fingerprint check and the service accessor.
 - [ ] Behaviour preservation: for a valid configuration the pages, status codes, JSON payloads, record bytes, and all headers other than the TASK-276 asset cache headers are unchanged; the existing browser, record, configuration, characterization, and no-drift suites pass; cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check are clean.
 - [ ] Tests cover invalidation by a configuration edit, the unchanged-fingerprint fast path, atomic generation, a single rebuild under concurrent observers, fail-closed reload with one warning and de-duplication, startup exit codes, and the non-rebind rule; evidence is recorded on this task.
+## Comments
+- **rust-dev**: TASK-274 implementation evidence (rust-dev). Design: one ServingSnapshot (config, registry, routes, fingerprint) built once by load_serving_snapshot (load, ArtifactRegistry::build, BrowserRoutes::build) and held in ServerState as RwLock of Arc of ServingSnapshot; a Mutex of the last failed fingerprint serialises reloads and remembers the failing state. request_state takes one Arc handle per request and RequestState derefs to the snapshot, so routing, validation, handlers, rendering, and error pages all use one generation; no ServerState config, registry, or routes field and no per-request load remains. Fingerprint scope: std::fs::metadata on the selected config file only, modification SystemTime plus byte length; registry and routes share it and are invalidated only together. Reload takes the mutex with try_lock (a request that cannot take it serves its current handle without waiting), re-checks the fingerprint under the lock, reuses the startup constructor, publishes by one write-lock Arc swap, and drops the new snapshot on any load, validation, registry, or route error. Fail-closed: the last known good snapshot keeps serving with its normal page and status; one warning line names the config path and error; the failing fingerprint is remembered and not re-reported, and a changed or fixed file retries. Startup still requires the first snapshot: missing config exits 1 and invalid config exits 4. Startup-only host, port, open, concurrency cap, and Host and Origin allowlist are unchanged; the record snapshot stays request-scoped and writes still read live bytes and token. Tests: unit tests prove unchanged-fingerprint Arc reuse, config and registry reload together, fail-closed dedup plus fixed-file retry, and startup build requirements; browser_cli task274 tests prove a config edit between requests changes project name and decision nav together, one warning per failing state with retry on fix, eight concurrent observers produce one warning, reload does not rebind or change the allowlist, and missing config exits 1; tests browser_snapshot.rs audits one load call, one swap point, and request-handle signatures. Checks: cargo test 1371 passed, 0 failed across 70 suites (characterization_replay, list_characterization_replay, no_drift, document_type_no_drift included); cargo clippy, all targets, warnings denied, clean; cargo fmt check clean. Note: browser_console_is_quiet_by_default now asserts the fail-closed 200 plus the single warning instead of the old config-corruption 500, which ADR-037 removes from the served surface. Files: browser mod.rs, cli dispatch.rs, tests browser_cli.rs, tests browser_snapshot.rs. Branch task/TASK-274; commit bc19fc4.
+- **orchestrator**: Acceptance met: ServingSnapshot of config, registry and routes behind one RwLock Arc with mtime plus length fingerprint, single request accessor, atomic publication, deduped fail-closed reload with one warning and last-good serving, startup semantics and server rebinding unchanged; 1371 tests pass.
