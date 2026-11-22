@@ -936,6 +936,10 @@ fn inventory_page(state: &RequestState<'_>) -> Result<Response, HttpError> {
     let cfg = &state.config;
     let ctx = state.context();
     let snapshot = records::RecordSnapshot::new(&ctx, cfg, &state.registry);
+    // One registry-wide scan serves every card and both aggregate cards.
+    let indexes = snapshot.scan_indexes();
+    let count_for =
+        |slug: &str| -> usize { indexes.get(slug).map_or(0, |index| index.records.len()) };
     let (project, bind_note) = chrome_for(cfg, state);
     let chrome = render::Chrome {
         project: &project,
@@ -950,9 +954,7 @@ fn inventory_page(state: &RequestState<'_>) -> Result<Response, HttpError> {
             .inventory
             .iter()
             .find(|entry| entry.slug == slug)?;
-        let count = enabled_index(&ctx, cfg, state, slug, &snapshot)
-            .records
-            .len();
+        let count = count_for(slug);
         Some(render::InventoryCard {
             title: entry.title.clone(),
             count: count.to_string(),
@@ -968,9 +970,15 @@ fn inventory_page(state: &RequestState<'_>) -> Result<Response, HttpError> {
     let mut aggregates: Vec<render::InventoryCard> = Vec::new();
     for group in [routes::NavGroup::Backlog, routes::NavGroup::Decisions] {
         if let Some(item) = state.routes.nav.iter().find(|item| item.group == group) {
-            let count = enabled_index(&ctx, cfg, state, &item.slug, &snapshot)
-                .records
-                .len();
+            let count = if group == routes::NavGroup::Decisions {
+                state
+                    .registry
+                    .enabled(CategoryKind::Decision)
+                    .map(|descriptor| count_for(&descriptor.slug))
+                    .sum()
+            } else {
+                count_for(&item.slug)
+            };
             aggregates.push(render::InventoryCard {
                 title: item.label.clone(),
                 count: count.to_string(),

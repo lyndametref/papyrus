@@ -196,6 +196,22 @@ pub fn ensure_front_matter_quiet(
     ensure_front_matter_internal(ctx, cfg, registry, path, false).map(|(content, _)| content)
 }
 
+/// Read adoption with one family conflict scan supplied by the caller.
+///
+/// A request-scoped display snapshot scans a descriptor family once and reuses
+/// the result for every record it reads, so one request performs one directory
+/// listing per family instead of one per record.
+pub fn ensure_front_matter_quiet_with_conflicts(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    path: &Path,
+    conflicts: &[MigrationConflict],
+) -> Result<String, AppError> {
+    ensure_front_matter_internal_with_conflicts(ctx, cfg, registry, path, false, Some(conflicts))
+        .map(|(content, _)| content)
+}
+
 /// Like [`ensure_front_matter`], but returns the record path unchanged.
 ///
 /// Lazy adoption never relocates or renames a record, so the returned path is
@@ -215,6 +231,17 @@ fn ensure_front_matter_internal(
     registry: &ArtifactRegistry,
     path: &Path,
     announce: bool,
+) -> Result<(String, PathBuf), AppError> {
+    ensure_front_matter_internal_with_conflicts(ctx, cfg, registry, path, announce, None)
+}
+
+fn ensure_front_matter_internal_with_conflicts(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    path: &Path,
+    announce: bool,
+    conflicts: Option<&[MigrationConflict]>,
 ) -> Result<(String, PathBuf), AppError> {
     let safe = crate::record::store::resolve_path(ctx, path).map_err(|_| {
         AppError::Runtime(format!(
@@ -236,8 +263,15 @@ fn ensure_front_matter_internal(
     // Conflict detection applies to both shapes. A record that already
     // carries front matter is returned byte-identically: adoption never
     // completes missing keys and never retires sections on read.
-    let conflicts = scan_migration_conflicts(ctx, cfg, registry, &desc);
-    if let Some(reason) = blocking_conflict_for_path(ctx, &safe, &desc, &content, &conflicts) {
+    let scanned;
+    let conflicts = match conflicts {
+        Some(conflicts) => conflicts,
+        None => {
+            scanned = scan_migration_conflicts(ctx, cfg, registry, &desc);
+            &scanned
+        }
+    };
+    if let Some(reason) = blocking_conflict_for_path(ctx, &safe, &desc, &content, conflicts) {
         return Err(AppError::Validation(format!(
             "migration conflict at {}: {}",
             rel_path(&ctx.project_dir, &safe),
