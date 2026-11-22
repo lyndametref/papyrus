@@ -14,7 +14,7 @@ use std::time::Duration;
 
 const PHRASE: &str = "quick brown fox";
 const SECOND_PHRASE: &str = "hidden zebra fact";
-const NOT_FOUND_HELP: &str = "Archived technical specifications are not listed and cannot be opened. The same page is used for an unknown address.";
+const NOT_FOUND_HELP: &str = "The requested record was not found.";
 
 fn bin() -> Command {
     Command::new(env!("CARGO_BIN_EXE_papyrus"))
@@ -651,15 +651,10 @@ fn milestone_technical_specifications_flow() {
     // Deprecated technical specifications are neither listed nor reachable.
     assert_eq!(server.get("/doc/TECH-002").status, 404);
     let not_found = server.get("/doc/TECH-002").text();
-    assert!(not_found.contains("Record not found"));
+    assert!(not_found.contains("Not found"));
     assert!(not_found.contains(NOT_FOUND_HELP));
-    assert!(not_found.contains("href=\"/?type=tech-spec\""));
-    assert_eq!(
-        not_found
-            .matches(">Back to technical specifications</a>")
-            .count(),
-        1
-    );
+    assert!(not_found.contains("href=\"/\""));
+    assert!(!not_found.contains("TECH-002"));
     let unknown = server.get("/doc/TECH-404");
     assert_eq!(unknown.status, 404);
     assert_eq!(not_found, unknown.text());

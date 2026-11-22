@@ -103,3 +103,71 @@ configuration map order (slug order); seed `order` is presentation-only
 (`ADR-042` item 4). No order delta is expected or recorded.
 
 No other difference is expected.
+
+## TASK-266: generic document edit form and form_post
+
+The document edit and submission surface collapsed to one field-map-driven
+builder and one handler (ADR-039 decisions 22-28, TECH-068 sections 4.2-4.3).
+Compared with the frozen MS-034 reference (`214a252`), every byte difference in
+this regeneration is one of the following semantic deltas.
+
+9. **One document edit form.** `http/edit-*` for every Markdown document type
+   and for `note` now renders the fixed title control, the editable
+   `ResolvedField` controls in descriptor sequence order, the general
+   `labels`/`references` controls, read-only `status`, `created_date`,
+   `updated_date`, and the hidden version token. The control type follows
+   `kind` (`text` input, `multiline` textarea, `list` tag box), the seed
+   `help` is bound with `aria-describedby`, and the seed `required` supplies
+   the marker. The glossary title label becomes the uniform `Title` (was
+   `Term`). Every form gains the read-only status row, labels/references, and
+   the `hidden-field version-note` annotation; `data-form-note` returns.
+   Source: ADR-039 decisions 22 and 26-28, TECH-068 section 4.2, REQ-07.003.
+
+10. **Create-only fields are read-only.** A field whose verbs exclude `edit`
+    is rendered as a label and read-only value and is never writable. The
+    business-rule `Rationale` and `Applicability` are no longer editable
+    controls (`http/edit-rule`). Source: ADR-039 decision 22, TECH-040
+    section 7 item 6.
+
+11. **Role fields come from the field map.** `http/edit-req`, `http/edit-nfr`,
+    and the grouped conflict pages use the group or member field sequence.
+    The NFR member form now shows the seeded `User story` field; the group
+    link is a read-only page-head row and membership is never a control.
+    Source: ADR-039 decisions 22 and 26, TECH-068 section 4.2 item 4.
+
+12. **Mockup form.** `http/edit-ui-mockup` offers the title and the list-valued
+    `specs` and `refs` controls only. `Labels`, `References`, `Status`, `Task`,
+    and `Superseded by` are read-only; there is no field sequence and no
+    `status` control. Source: ADR-039 decision 22, TECH-068 section 4.2 item 3.
+
+13. **One conflict page.** `http/conflict-*` (all document types, both grouped
+    roles, and `note`) now render the same edit form with the submitted
+    values, the live version token, and a conflict notice plus reload/view
+    links, returning `409` and writing nothing. The per-type read-only
+    conflict layouts are gone. Because the form echoes the live token,
+    `Content-Length` is recorded as `{{LENGTH}}` where it was previously a
+    fixed number. Source: ADR-039 decision 23, TECH-068 section 4.3.
+
+14. **One not-found page.** `http/not-found-tech-spec`,
+    `http/not-found-test-case`, `http/not-found-test-report`, and
+    `http/not-found-use-case` now render the one generic document not-found
+    page (`Not found`, "The requested record was not found.", back to
+    requirements), identical for an archived, unknown, or disabled ID and
+    never echoing the ID. The status stays `404`; only the page body and its
+    `Content-Length` change. Source: ADR-039 decision 24, REQ-05.007.
+
+15. **Validation follows the field map.** `http/form-post-validation` now
+    re-renders the generic edit page with the submitted values and the
+    field-level error, still `422`. Requiredness comes only from
+    `field.required`, so tech-spec, use-case, test-case, and test-report
+    descriptions and the audit type are optional on edit; glossary
+    `Definition`, audit `Content`, and rule `Description` remain required.
+    `text` fields are single-line, `multiline` fields preserve line breaks,
+    and `list` fields accept repeated values in submission order and collapse
+    duplicates. An undeclared key (including `status`, `id`, `group`, and
+    `form`) is `422` instead of silently ignored. Source: ADR-039 decisions
+    26-28, TECH-040 section 7.
+
+No other difference is expected. The `415`, `400`, `404`, `409`, `422`, `303`,
+and `500` status-code surface is unchanged, and no Backlog or Decision page or
+payload changed.

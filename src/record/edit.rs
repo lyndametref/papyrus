@@ -144,6 +144,75 @@ pub fn apply(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> {
     apply_patch(doc, &dated)
 }
 
+/// One submitted field value for a document edit.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DocumentFieldChange {
+    /// Leave the stored value unchanged.
+    Keep,
+    /// Clear an optional field.
+    Clear,
+    /// Replace a scalar or multi-line value.
+    Set(String),
+    /// Replace a list value, in submission order.
+    List(Vec<String>),
+}
+
+/// Build the one patch for a Markdown document edit from the record's field
+/// map and the submitted values (TECH-040 section 7).
+///
+/// The field-to-`PatchOp` mapping is the shared one in [`crate::document`];
+/// this helper only pairs a resolved field with its submitted change and adds
+/// the general title, labels, and references operations.
+pub fn document_edit_ops(
+    doc: &Document,
+    title: &str,
+    fields: &[(
+        &crate::record::field_map::ResolvedField,
+        DocumentFieldChange,
+    )],
+    labels: Option<&[String]>,
+    references: Option<&[String]>,
+) -> Vec<PatchOp> {
+    let mut ops = title_ops(doc, title);
+    if let Some(front_matter) = &doc.front_matter {
+        if let Some(labels) = labels
+            && (!labels.is_empty()
+                || crate::record::frontmatter::contains_key(&front_matter.raw, "labels"))
+        {
+            ops.push(PatchOp::SetFrontMatterValue(
+                "labels".into(),
+                crate::record::frontmatter::FrontMatterValue::Sequence(labels.to_vec()),
+            ));
+        }
+        if let Some(references) = references
+            && (!references.is_empty()
+                || crate::record::frontmatter::contains_key(&front_matter.raw, "references"))
+        {
+            ops.push(PatchOp::SetFrontMatterValue(
+                "references".into(),
+                crate::record::frontmatter::FrontMatterValue::Sequence(references.to_vec()),
+            ));
+        }
+    }
+    for (field, change) in fields {
+        let heading = field.heading.as_deref();
+        let frontmatter_key = field.frontmatter_key.as_deref();
+        match change {
+            DocumentFieldChange::Keep => {}
+            DocumentFieldChange::Clear => {
+                crate::document::clear_field_ops(&mut ops, heading, frontmatter_key);
+            }
+            DocumentFieldChange::Set(value) => {
+                crate::document::set_scalar_ops(&mut ops, heading, frontmatter_key, value);
+            }
+            DocumentFieldChange::List(values) => {
+                crate::document::list_field_ops(&mut ops, heading, frontmatter_key, values);
+            }
+        }
+    }
+    ops
+}
+
 /// Generic config-defined document edit: title/heading, the Description
 /// section, and the `labels`/`references` front-matter lists. Unknown
 /// sections and keys are preserved; status is never touched.

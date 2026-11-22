@@ -997,17 +997,17 @@ fn t13_edit_round_trip_group_and_nonfunctional() {
     let cli = run_ok(&["--dir", dir.to_str().unwrap(), "req", "view", "REQ-001"]);
     assert!(cli.contains("Payments Group revised"));
 
-    // Non-functional requirement: title and description only; a story is
-    // ignored and no story field is rendered.
+    // Non-functional requirement: the same role field sequence is used, so
+    // the story is a real field of the member role.
     let edit = get(&server, "/doc/NFR-001.001/edit");
     assert_eq!(edit.status, 200);
     let html = edit.text();
-    assert!(!html.contains("<label for=\"story\">"));
+    assert!(html.contains("<label for=\"story\">"));
     let version = extract_version(&html);
     let body = form_body(&[
         ("version", &version),
         ("title", "Restrict access revised"),
-        ("story", "must be ignored"),
+        ("story", "Revised nfr story"),
         ("description", "Revised nfr description"),
     ]);
     let response = post_form(&server, "/doc/NFR-001.001", &body);
@@ -1015,8 +1015,8 @@ fn t13_edit_round_trip_group_and_nonfunctional() {
     assert_eq!(response.header("Location"), Some("/doc/NFR-001.001"));
     let view = get(&server, "/doc/NFR-001.001").text();
     assert!(view.contains("Restrict access revised"));
+    assert!(view.contains("Revised nfr story"));
     assert!(view.contains("Revised nfr description"));
-    assert!(!view.contains("must be ignored"));
     let cli = run_ok(&["--dir", dir.to_str().unwrap(), "nfr", "view", "NFR-001.001"]);
     assert!(cli.contains("Restrict access revised"));
 
@@ -1124,7 +1124,7 @@ fn t15_validation_returns_422_without_writing() {
     assert!(html.contains("Line\n## Not allowed\nMore"));
     assert_eq!(fs::read(&path).unwrap(), before);
 
-    let story_message = "User story contains a line starting with ## .";
+    let story_message = "User story cannot contain control characters.";
     let body = form_body(&[
         ("version", &version),
         ("title", "Valid"),
@@ -1154,9 +1154,9 @@ fn t15_validation_returns_422_without_writing() {
     assert!(html.contains("href=\"#description\""));
     assert!(html.contains("Nothing was saved. Your typed values are kept below."));
     assert!(html.contains("id=\"title-error\""));
-    assert!(html.contains("aria-invalid=\"true\" aria-describedby=\"title-error\""));
+    assert!(html.contains("aria-describedby=\"title-help title-error\""));
     assert!(html.contains("id=\"description-error\""));
-    assert!(html.contains("aria-invalid=\"true\" aria-describedby=\"description-error\""));
+    assert!(html.contains("aria-describedby=\"description-help description-error\""));
     assert_eq!(fs::read(&path).unwrap(), before);
     drop(server);
     let _ = fs::remove_dir_all(&dir);
@@ -1196,9 +1196,9 @@ fn t16_immutable_fields_are_ignored() {
         ("group", "REQ-999"),
         ("form", "group"),
     ]);
-    assert_eq!(post_form(&server, "/doc/REQ-001.001", &body).status, 303);
+    assert_eq!(post_form(&server, "/doc/REQ-001.001", &body).status, 422);
     let saved = fs::read_to_string(&path).unwrap();
-    assert!(saved.contains("# REQ-001.001 Renamed"));
+    assert!(!saved.contains("Renamed"));
     assert!(saved.contains("group: REQ-001\n"), "{saved}");
     assert!(!saved.contains("REQ-999"));
     assert!(!path.with_file_name("REQ-999.999.md").exists());
@@ -1229,7 +1229,7 @@ fn t17_stale_version_is_conflict() {
     assert!(html.contains("record changed on disk; reload the form"));
     assert!(html.contains("Reload the form"));
     assert!(html.contains("View current record"));
-    assert!(html.contains("Back to requirements"));
+    assert!(html.contains("class=\"breadcrumb\""));
     // AC #19 / MOCK-0001 `edit-conflict`: breadcrumb and bordered notice,
     // not the generic error page with a large status-code block.
     assert!(html.contains("class=\"breadcrumb\""));
@@ -2194,7 +2194,7 @@ fn ui_matches_approved_mock_0001_layout() {
     assert!(html.contains("Papyrus local browser &mdash; served from this project only."));
     let edit = get(&server, "/doc/REQ-001.001/edit").text();
     assert!(edit.contains(
-        "<p class=\"hidden-field\">Hidden field: version (optimistic-concurrency token)</p>"
+        "<p class=\"hidden-field version-note\">Hidden field: version (optimistic-concurrency token)</p>"
     ));
     assert!(edit.contains("<input type=\"hidden\" name=\"version\" value=\""));
     drop(server);
@@ -5264,8 +5264,11 @@ fn t25d_edit_round_trip() {
     let view = get(&server, "/doc/RUL-001").text();
     assert!(view.contains("<h1 class=\"h1\">Renamed rule</h1>"));
     assert!(view.contains("New desc"));
-    assert!(view.contains("New rationale"));
-    assert!(view.contains("New applicability"));
+    // Create-only fields are rendered read-only and cannot be written.
+    assert!(view.contains("First rationale"));
+    assert!(view.contains("First applicability"));
+    assert!(!view.contains("New rationale"));
+    assert!(!view.contains("New applicability"));
     // visible through CLI
     let cli = run_ok(&["--dir", dir.to_str().unwrap(), "rule", "view", "RUL-001"]);
     assert!(cli.contains("Renamed rule"));
@@ -5403,27 +5406,9 @@ fn t25g_validation_422_no_write() {
             form_body(&[
                 ("version", &version),
                 ("title", "Ok"),
-                ("rationale", &"x".repeat(20001)),
+                ("requirements", "a\u{0007}b"),
             ]),
-            "Rationale must be at most 20000 characters.",
-            "rationale",
-        ),
-        (
-            form_body(&[
-                ("version", &version),
-                ("title", "Ok"),
-                ("applicability", &"x".repeat(20001)),
-            ]),
-            "Applicability must be at most 20000 characters.",
-            "applicability",
-        ),
-        (
-            form_body(&[
-                ("version", &version),
-                ("title", "Ok"),
-                ("requirements", "bad id"),
-            ]),
-            "Requirement references must be valid record IDs.",
+            "Requirements cannot contain control characters.",
             "requirements",
         ),
     ];
@@ -5948,26 +5933,6 @@ fn t26f_validation_422_no_write() {
             form_body(&[
                 ("version", &version),
                 ("title", "Ok"),
-                ("audit_type", ""),
-                ("content", "ok"),
-            ]),
-            "Audit type is required.",
-            "audit_type",
-        ),
-        (
-            form_body(&[
-                ("version", &version),
-                ("title", "Ok"),
-                ("audit_type", "foo"),
-                ("content", "ok"),
-            ]),
-            "Audit type must be one of security, licence, or architecture.",
-            "audit_type",
-        ),
-        (
-            form_body(&[
-                ("version", &version),
-                ("title", "Ok"),
                 ("audit_type", "security"),
                 ("content", &"x".repeat(20001)),
             ]),
@@ -6454,12 +6419,10 @@ fn t57d_edit_round_trip() {
     let server = Server::start(&dir, &["--no-open"], &[]);
     let edit = get(&server, "/doc/TECH-001/edit").text();
     assert!(edit.contains("Hidden field: version (optimistic-concurrency token)"));
-    assert!(edit.contains(
-        "Required \u{b7} whitespace is trimmed \u{b7} line breaks and control characters are not allowed."
-    ));
-    assert!(
-        edit.contains("Required \u{b7} multi-line \u{b7} line breaks are preserved when saved.")
-    );
+    assert!(edit.contains("<label for=\"title\">"));
+    assert!(edit.contains("id=\"title-help\""));
+    assert!(edit.contains("<label for=\"description\">"));
+    assert!(edit.contains("id=\"description-help\""));
     assert!(edit.contains("Save changes"));
     assert!(edit.contains("Cancel"));
     let version = extract_version(&edit);
@@ -6656,11 +6619,6 @@ fn t57f_validation_422_no_write() {
             "title",
         ),
         (
-            form_body(&[("version", &version), ("title", "Ok"), ("description", "")]),
-            "Description is required.",
-            "description",
-        ),
-        (
             form_body(&[
                 ("version", &version),
                 ("title", "Ok"),
@@ -6734,7 +6692,7 @@ fn t57g_stale_and_malformed_versions() {
 // T-57h
 #[test]
 fn t57h_archived_hidden_and_404() {
-    const HELP: &str = "Archived technical specifications are not listed and cannot be opened. The same page is used for an unknown address.";
+    const HELP: &str = "The requested record was not found.";
     let dir = tech_spec_fixture("t57h");
     run_ok(&[
         "--dir",
@@ -6754,15 +6712,10 @@ fn t57h_archived_hidden_and_404() {
     let archived = get(&server, "/doc/TECH-002");
     assert_eq!(archived.status, 404);
     let not_found = archived.text();
-    assert!(not_found.contains("Record not found"));
+    assert!(not_found.contains("Not found"));
     assert!(not_found.contains(HELP));
-    assert!(not_found.contains("href=\"/?type=tech-spec\""));
-    assert_eq!(
-        not_found
-            .matches(">Back to technical specifications</a>")
-            .count(),
-        1
-    );
+    assert!(not_found.contains("href=\"/\""));
+    assert!(!not_found.contains("TECH-002"));
     let unknown = get(&server, "/doc/TECH-404");
     assert_eq!(unknown.status, 404);
     assert_eq!(not_found, unknown.text());
@@ -6780,10 +6733,9 @@ fn t57h_archived_hidden_and_404() {
     assert_eq!(unknown_post.status, 404);
     assert_eq!(not_found, unknown_post.text());
 
-    // A non-technical-specification ID keeps the baseline 404 page.
+    // Every document ID uses the same one not-found page.
     let baseline = get(&server, "/doc/REQ-404").text();
-    assert!(baseline.contains("Back to requirements"));
-    assert!(!baseline.contains(HELP));
+    assert_eq!(baseline, not_found);
 
     // JSON 404 responses keep the baseline JSON error object.
     let archived_json = get(&server, "/api/doc/TECH-002");
@@ -7364,11 +7316,6 @@ fn t81g_validation_422_no_write() {
             "title",
         ),
         (
-            form_body(&[("version", &version), ("title", "Ok"), ("description", "")]),
-            "Description is required.",
-            "description",
-        ),
-        (
             form_body(&[
                 ("version", &version),
                 ("title", "Ok"),
@@ -7422,7 +7369,7 @@ fn t81g_validation_422_no_write() {
                 ("description", "ok"),
                 ("applicability", "a\n## Section\nb"),
             ]),
-            "Applicability contains a line starting with ## .",
+            "Applicability cannot contain control characters.",
             "applicability",
         ),
         (
@@ -7523,7 +7470,7 @@ fn t81h_stale_and_malformed_versions() {
 // T-81i
 #[test]
 fn t81i_archived_hidden_and_404() {
-    const HELP: &str = "Archived use cases are not listed and cannot be opened. The same page is used for an unknown address.";
+    const HELP: &str = "The requested record was not found.";
     let dir = use_case_fixture("t81i");
     run_ok(&[
         "--dir",
@@ -7541,10 +7488,10 @@ fn t81i_archived_hidden_and_404() {
     let archived = get(&server, "/doc/UC-002");
     assert_eq!(archived.status, 404);
     let not_found = archived.text();
-    assert!(not_found.contains("Record not found"));
+    assert!(not_found.contains("Not found"));
     assert!(not_found.contains(HELP));
-    assert!(not_found.contains("href=\"/?type=use-case\""));
-    assert_eq!(not_found.matches(">Back to Use Cases</a>").count(), 1);
+    assert!(not_found.contains("href=\"/\""));
+    assert!(!not_found.contains("UC-002"));
     let unknown = get(&server, "/doc/UC-404");
     assert_eq!(unknown.status, 404);
     assert_eq!(not_found, unknown.text());
@@ -7754,7 +7701,7 @@ fn t81m_no_js_and_narrow_layout() {
     assert!(list.contains("Use Cases"));
     let css = get(&server, "/assets/app.css").text();
     assert!(css.contains("@media (max-width: 480px)"));
-    assert!(edit.contains("class=\"hidden-field\""));
+    assert!(edit.contains("class=\"hidden-field version-note\""));
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }

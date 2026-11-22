@@ -14,7 +14,7 @@ pub mod shell;
 
 use crate::CommandOutput;
 use crate::commands::load_effective_config;
-use crate::config::{Config, is_loopback_host, validate_browser_host};
+use crate::config::{Config, FieldKind, is_loopback_host, validate_browser_host};
 use crate::context::Context;
 use crate::error::AppError;
 use crate::record::edit::{self, FieldChange};
@@ -23,7 +23,7 @@ use crate::registry::{
 };
 use http::{HttpError, Method, Request, Response};
 use records::Record;
-use routes::{BrowserRoutes, NotFoundPage};
+use routes::BrowserRoutes;
 use std::io::Write;
 use std::net::{IpAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
@@ -627,12 +627,12 @@ fn handle_request(request: Request, state: &ServerState) -> Response {
     match result {
         Ok(response) => response,
         Err(error) => {
-            // A missing technical specification always renders the same
-            // technical-specifications 404 page, whether the ID is archived
-            // or unknown. JSON responses keep the baseline error object.
+            // One document not-found builder for every document route and
+            // every unknown, archived, or disabled ID (ADR-039 decision 24).
+            // JSON responses keep the baseline error object.
             if error.status == 404
                 && !api
-                && let Some(id) = html_doc_id(&path)
+                && html_doc_id(&path).is_some()
                 && let Ok(cfg) = state.config()
             {
                 let (project, bind_note) = chrome_for(&cfg, state);
@@ -641,27 +641,7 @@ fn handle_request(request: Request, state: &ServerState) -> Response {
                     bind_note: &bind_note,
                     routes: &state.routes,
                 };
-                match state.routes.not_found_page(id) {
-                    Some(NotFoundPage::TechSpec) => {
-                        return Response::html(404, render::tech_spec_not_found_page(&cfg, chrome));
-                    }
-                    Some(NotFoundPage::UseCase) => {
-                        return Response::html(404, render::use_case_not_found_page(&cfg, chrome));
-                    }
-                    Some(NotFoundPage::TestCase) => {
-                        return Response::html(404, render::test_case_not_found_page(&cfg, chrome));
-                    }
-                    Some(NotFoundPage::TestReport) => {
-                        return Response::html(
-                            404,
-                            render::test_report_not_found_page(&cfg, chrome),
-                        );
-                    }
-                    Some(NotFoundPage::GenericDocument) => {
-                        return Response::html(404, render::document_not_found_page(&cfg, chrome));
-                    }
-                    None => {}
-                }
+                return Response::html(404, render::document_not_found_page(&cfg, chrome));
             }
             error_response(error.status, api, state)
         }
@@ -1532,214 +1512,94 @@ fn edit_page(id: &str, state: &ServerState) -> Result<Response, HttpError> {
         bind_note: &bind_note,
         routes: &state.routes,
     };
-    let html = match record.handler() {
-        Some(TypedHandler::Requirement(_)) => {
-            let values = render::EditValues {
-                title: record.title.clone(),
-                story: record.story.clone().unwrap_or_default(),
-                description: record.description.clone().unwrap_or_default(),
-            };
-            render::edit_page(
-                &record,
-                group,
-                &values,
-                &render::FieldErrors::default(),
-                &record.version,
-                &cfg,
-                chrome,
-            )
-        }
-        Some(TypedHandler::Task) => {
-            let values = render::TaskEditValues {
-                title: record.title.clone(),
-                description: record.description.clone().unwrap_or_default(),
-                status: record.status.clone().unwrap_or_default(),
-                milestone: record.milestone_id.clone().unwrap_or_default(),
-                assignee: record.assignee.clone().unwrap_or_default(),
-                labels: record.labels.join("\n"),
-                dependencies: record.dependencies.join("\n"),
-                acceptance_criteria: record.acceptance_criteria.join("\n"),
-            };
-            render::edit_page_task(
-                &record,
-                &values,
-                &render::TaskFieldErrors::default(),
-                &record.version,
-                &cfg,
-                chrome,
-            )
-        }
-        Some(TypedHandler::Milestone) => {
-            let values = render::MilestoneEditValues {
-                title: record.title.clone(),
-                description: record.description.clone().unwrap_or_default(),
-                release: record.release_id.clone().unwrap_or_default(),
-            };
-            render::edit_page_milestone(
-                &record,
-                &values,
-                &render::MilestoneFieldErrors::default(),
-                &record.version,
-                &cfg,
-                chrome,
-            )
-        }
-        Some(TypedHandler::Release) => {
-            let values = render::ReleaseEditValues {
-                title: record.title.clone(),
-                description: record.description.clone().unwrap_or_default(),
-            };
-            render::edit_page_release(
-                &record,
-                &values,
-                &render::ReleaseFieldErrors::default(),
-                &record.version,
-                &cfg,
-                chrome,
-            )
-        }
-        Some(TypedHandler::Decision) => {
-            let values = render::DecisionEditValues {
-                title: record.title.clone(),
-                status: record.status.clone().unwrap_or_default(),
-                decision: record.decision.clone().unwrap_or_default(),
-                context: record.context.clone().unwrap_or_default(),
-                consequences: record.consequences.clone().unwrap_or_default(),
-                superseded_by: record.superseded_by.clone().unwrap_or_default(),
-            };
-            render::edit_page_decision(
-                &record,
-                &values,
-                &render::DecisionFieldErrors::default(),
-                &record.version,
-                &cfg,
-                chrome,
-            )
-        }
-        Some(TypedHandler::Glossary) => {
-            let values = render::GlossaryEditValues {
-                title: record.title.clone(),
-                definition: record.definition.clone().unwrap_or_default(),
-            };
-            render::edit_page_glossary(
-                &record,
-                &values,
-                &render::GlossaryFieldErrors::default(),
-                &record.version,
-                &cfg,
-                chrome,
-            )
-        }
-        Some(TypedHandler::UiSpec) => {
-            let values = render::UiSpecEditValues {
-                title: record.title.clone(),
-                view: record.view.clone().unwrap_or_default(),
-                description: record.description.clone().unwrap_or_default(),
-            };
-            render::edit_page_ui_spec(
-                &record,
-                &values,
-                &render::UiSpecFieldErrors::default(),
-                &record.version,
-                &cfg,
-                chrome,
-            )
-        }
-        Some(TypedHandler::UiMockup) => {
-            let values = render::UiMockupEditValues {
-                title: record.title.clone(),
-                specs: record.specs.clone(),
-                refs: record.refs.clone(),
-            };
-            render::edit_page_ui_mockup(
-                &record,
-                &values,
-                &render::UiMockupFieldErrors::default(),
-                &record.version,
-                &cfg,
-                chrome,
-            )
-        }
-        Some(TypedHandler::Rule) => {
-            let values = render::BusinessRuleEditValues {
-                title: record.title.clone(),
-                description: record.description.clone().unwrap_or_default(),
-                rationale: record.rationale.clone().unwrap_or_default(),
-                applicability: record.applicability.clone().unwrap_or_default(),
-                requirements: record.requirements.clone(),
-            };
-            render::edit_page_business_rule(
-                &record,
-                &values,
-                &render::BusinessRuleFieldErrors::default(),
-                &record.version,
-                &cfg,
-                chrome,
-            )
-        }
-        Some(TypedHandler::TechSpec) => {
-            let values = render::TechSpecEditValues {
-                title: record.title.clone(),
-                description: record.description.clone().unwrap_or_default(),
-            };
-            render::edit_page_tech_spec(
-                &record,
-                &values,
-                &render::TechSpecFieldErrors::default(),
-                &record.version,
-                &cfg,
-                chrome,
-            )
-        }
-        Some(TypedHandler::UseCase)
-        | Some(TypedHandler::TestCase)
-        | Some(TypedHandler::TestReport) => {
-            let values = render::UseCaseEditValues {
-                title: record.title.clone(),
-                description: record.description.clone().unwrap_or_default(),
-                applicability: record.applicability.clone().unwrap_or_default(),
-                labels: record.labels.clone(),
-                references: record.refs.clone(),
-            };
-            render::edit_page_use_case(
-                &record,
-                &values,
-                &render::UseCaseFieldErrors::default(),
-                &record.version,
-                &cfg,
-                chrome,
-            )
-        }
-        None => render::document_edit_page(
+    let html = if record.descriptor.category == CategoryKind::Document {
+        render::document_edit_page(
             &record,
-            &render::DocumentEditValues {
-                title: record.title.clone(),
-                description: record.description.clone().unwrap_or_default(),
-                labels: record.labels.clone(),
-                references: record.refs.clone(),
-            },
-            &render::DocumentFieldErrors::default(),
+            group,
+            &render::DocumentFormValues::from_record(&record),
+            &render::DocumentFormErrors::default(),
             &record.version,
             &cfg,
             chrome,
-        ),
-        Some(TypedHandler::Audit) => {
-            let values = render::AuditEditValues {
-                title: record.title.clone(),
-                audit_type: record
-                    .audit_type
-                    .clone()
-                    .unwrap_or_else(|| "security".to_string()),
-                content: record.description.clone().unwrap_or_default(),
-            };
-            render::edit_page_audit_record(
+        )
+    } else {
+        match record.handler() {
+            Some(TypedHandler::Task) => {
+                let values = render::TaskEditValues {
+                    title: record.title.clone(),
+                    description: record.description.clone().unwrap_or_default(),
+                    status: record.status.clone().unwrap_or_default(),
+                    milestone: record.milestone_id.clone().unwrap_or_default(),
+                    assignee: record.assignee.clone().unwrap_or_default(),
+                    labels: record.labels.join("\n"),
+                    dependencies: record.dependencies.join("\n"),
+                    acceptance_criteria: record.acceptance_criteria.join("\n"),
+                };
+                render::edit_page_task(
+                    &record,
+                    &values,
+                    &render::TaskFieldErrors::default(),
+                    &record.version,
+                    &cfg,
+                    chrome,
+                )
+            }
+            Some(TypedHandler::Milestone) => {
+                let values = render::MilestoneEditValues {
+                    title: record.title.clone(),
+                    description: record.description.clone().unwrap_or_default(),
+                    release: record.release_id.clone().unwrap_or_default(),
+                };
+                render::edit_page_milestone(
+                    &record,
+                    &values,
+                    &render::MilestoneFieldErrors::default(),
+                    &record.version,
+                    &cfg,
+                    chrome,
+                )
+            }
+            Some(TypedHandler::Release) => {
+                let values = render::ReleaseEditValues {
+                    title: record.title.clone(),
+                    description: record.description.clone().unwrap_or_default(),
+                };
+                render::edit_page_release(
+                    &record,
+                    &values,
+                    &render::ReleaseFieldErrors::default(),
+                    &record.version,
+                    &cfg,
+                    chrome,
+                )
+            }
+            Some(TypedHandler::Decision) => {
+                let values = render::DecisionEditValues {
+                    title: record.title.clone(),
+                    status: record.status.clone().unwrap_or_default(),
+                    decision: record.decision.clone().unwrap_or_default(),
+                    context: record.context.clone().unwrap_or_default(),
+                    consequences: record.consequences.clone().unwrap_or_default(),
+                    superseded_by: record.superseded_by.clone().unwrap_or_default(),
+                };
+                render::edit_page_decision(
+                    &record,
+                    &values,
+                    &render::DecisionFieldErrors::default(),
+                    &record.version,
+                    &cfg,
+                    chrome,
+                )
+            }
+            _ => render::document_edit_page(
                 &record,
-                &values,
-                &render::AuditFieldErrors::default(),
+                group,
+                &render::DocumentFormValues::from_record(&record),
+                &render::DocumentFormErrors::default(),
                 &record.version,
                 &cfg,
                 chrome,
-            )
+            ),
         }
     };
     Ok(Response::html(200, html))
@@ -1791,6 +1651,282 @@ fn form_fields(fields: &[(String, String)], name: &str) -> Vec<String> {
         .filter(|(key, _)| key == name)
         .map(|(_, value)| value.clone())
         .collect()
+}
+
+/// The keys a document edit form may submit. `version` is the concurrency
+/// token, not a writable value. A `SingleHtmlMockup` adds its two list fields.
+fn document_allowed_keys(record: &Record) -> Vec<String> {
+    let mut keys = vec![
+        "version".to_string(),
+        "title".to_string(),
+        "labels".to_string(),
+        "references".to_string(),
+    ];
+    for field in &record.field_map.fields {
+        keys.push(field.key.clone());
+    }
+    if record.is_html_mockup() {
+        keys.push("specs".to_string());
+        keys.push("refs".to_string());
+    }
+    keys
+}
+
+/// The submitted values shown again on a 409 or 422 page.
+fn document_submitted_values(
+    record: &Record,
+    fields: &[(String, String)],
+) -> render::DocumentFormValues {
+    let mut values = render::DocumentFormValues::from_record(record);
+    if fields.iter().any(|(key, _)| key == "title") {
+        values.title = form_field(fields, "title").unwrap_or("").to_string();
+    }
+    for field in &record.field_map.fields {
+        if !field.editable || !fields.iter().any(|(key, _)| key == &field.key) {
+            continue;
+        }
+        let occurrences = form_fields(fields, &field.key);
+        if field.kind == FieldKind::List {
+            values.fields.insert(
+                field.key.clone(),
+                records::submitted_tag_values(&occurrences),
+            );
+        } else {
+            values.fields.insert(
+                field.key.clone(),
+                vec![occurrences.last().cloned().unwrap_or_default()],
+            );
+        }
+    }
+    if record.is_html_mockup() {
+        if fields.iter().any(|(key, _)| key == "specs") {
+            values.specs = records::submitted_tag_values(&form_fields(fields, "specs"));
+        }
+        if fields.iter().any(|(key, _)| key == "refs") {
+            values.refs = records::submitted_tag_values(&form_fields(fields, "refs"));
+        }
+    } else {
+        if fields.iter().any(|(key, _)| key == "labels") {
+            values.labels = records::submitted_tag_values(&form_fields(fields, "labels"));
+        }
+        if fields.iter().any(|(key, _)| key == "references") {
+            values.references = records::submitted_tag_values(&form_fields(fields, "references"));
+        }
+    }
+    values
+}
+
+/// Validate and save one `SingleHtmlMockup` submission. The HTML metadata
+/// writer is the one model writer; it still writes through `record::store`.
+fn save_mockup_document(
+    record: &Record,
+    cfg: &Config,
+    state: &ServerState,
+    fields: &[(String, String)],
+    group: Option<&Record>,
+    chrome: render::Chrome<'_>,
+) -> Result<Response, HttpError> {
+    let mut errors = render::DocumentFormErrors::default();
+    let submitted_title = form_field(fields, "title").unwrap_or("").to_string();
+    let title = match records::validate_title(&submitted_title) {
+        Ok(title) => title,
+        Err(message) => {
+            errors.title = Some(message);
+            String::new()
+        }
+    };
+    let specs = match records::validate_specs(&form_fields(fields, "specs")) {
+        Ok(values) => values,
+        Err(message) => {
+            errors.specs = Some(message);
+            Vec::new()
+        }
+    };
+    let refs = match records::validate_refs(&form_fields(fields, "refs")) {
+        Ok(values) => values,
+        Err(message) => {
+            errors.refs = Some(message);
+            Vec::new()
+        }
+    };
+    if errors.any() {
+        let values = document_submitted_values(record, fields);
+        return Ok(Response::html(
+            422,
+            render::document_edit_page(
+                record,
+                group,
+                &values,
+                &errors,
+                &record.version,
+                cfg,
+                chrome,
+            ),
+        ));
+    }
+    // An unchanged submission performs no write, so the HTML record stays
+    // byte-identical.
+    if title == record.title && specs == record.specs && refs == record.refs {
+        return Ok(Response::redirect(&format!("/doc/{}", record.id)));
+    }
+    let original = std::fs::read_to_string(&record.path).unwrap_or_default();
+    let content = records::edit_ui_mockup(&original, &record.id, &title, &specs, &refs);
+    let ctx = state.context();
+    save_content(&ctx, cfg, &state.registry, record, content)?;
+    Ok(Response::redirect(&format!("/doc/{}", record.id)))
+}
+
+/// One `POST /doc/{id}` handler for every document type and both grouped
+/// roles (ADR-039 decisions 26-28, TECH-068 section 4.3).
+fn document_form_post(
+    record: &Record,
+    cfg: &Config,
+    state: &ServerState,
+    fields: &[(String, String)],
+    chrome: render::Chrome<'_>,
+) -> Result<Response, HttpError> {
+    let ctx = state.context();
+    let index = records::build_index(&ctx, cfg, &state.registry, &record.descriptor, None);
+    let group = resolved_group(record, &index);
+    let live_version = record.version.as_str();
+
+    // 5. A stale token renders the one conflict page and writes nothing.
+    if form_field(fields, "version").unwrap_or("") != live_version {
+        let values = document_submitted_values(record, fields);
+        return Ok(Response::html(
+            409,
+            render::document_conflict_page(record, group, &values, live_version, cfg, chrome),
+        ));
+    }
+
+    // 6. Only the fixed keys and declared field keys are accepted.
+    let allowed = document_allowed_keys(record);
+    if let Some((key, _)) = fields
+        .iter()
+        .find(|(key, _)| !allowed.iter().any(|allowed| allowed == key))
+    {
+        let errors = render::DocumentFormErrors {
+            form: Some(format!(
+                "The form field '{}' is not accepted for this record.",
+                key
+            )),
+            ..Default::default()
+        };
+        let values = document_submitted_values(record, fields);
+        return Ok(Response::html(
+            422,
+            render::document_edit_page(record, group, &values, &errors, live_version, cfg, chrome),
+        ));
+    }
+
+    if record.is_html_mockup() {
+        return save_mockup_document(record, cfg, state, fields, group, chrome);
+    }
+
+    // 7. Validate every value and collect every error.
+    let mut errors = render::DocumentFormErrors::default();
+    let submitted_title = form_field(fields, "title").unwrap_or("").to_string();
+    let title = match records::validate_title(&submitted_title) {
+        Ok(title) => title,
+        Err(message) => {
+            errors.title = Some(message);
+            String::new()
+        }
+    };
+    let mut changes: Vec<(
+        &crate::record::field_map::ResolvedField,
+        edit::DocumentFieldChange,
+    )> = Vec::new();
+    for field in &record.field_map.fields {
+        if !field.editable {
+            continue;
+        }
+        let present = fields.iter().any(|(key, _)| key == &field.key);
+        let change = match field.kind {
+            FieldKind::List => {
+                let occurrences = form_fields(fields, &field.key);
+                match records::validate_list_items(&field.label, &occurrences.join("\n")) {
+                    Ok(items) => {
+                        if field.required && items.is_empty() {
+                            errors
+                                .fields
+                                .insert(field.key.clone(), format!("{} is required.", field.label));
+                            edit::DocumentFieldChange::Keep
+                        } else {
+                            edit::DocumentFieldChange::List(items)
+                        }
+                    }
+                    Err(message) => {
+                        errors.fields.insert(field.key.clone(), message);
+                        edit::DocumentFieldChange::Keep
+                    }
+                }
+            }
+            FieldKind::Text | FieldKind::Multiline => {
+                if !present {
+                    edit::DocumentFieldChange::Keep
+                } else {
+                    let raw = form_field(fields, &field.key).unwrap_or("");
+                    let validated = if field.kind == FieldKind::Text {
+                        records::validate_single_line(&field.label, raw)
+                    } else {
+                        records::validate_multiline(&field.label, raw)
+                    };
+                    match validated {
+                        Ok(Some(value)) => edit::DocumentFieldChange::Set(value),
+                        Ok(None) => {
+                            if field.required {
+                                errors.fields.insert(
+                                    field.key.clone(),
+                                    format!("{} is required.", field.label),
+                                );
+                                edit::DocumentFieldChange::Keep
+                            } else {
+                                edit::DocumentFieldChange::Clear
+                            }
+                        }
+                        Err(message) => {
+                            errors.fields.insert(field.key.clone(), message);
+                            edit::DocumentFieldChange::Keep
+                        }
+                    }
+                }
+            }
+        };
+        changes.push((field, change));
+    }
+    let labels = match records::validate_labels(&form_fields(fields, "labels")) {
+        Ok(values) => values,
+        Err(message) => {
+            errors.labels = Some(message);
+            Vec::new()
+        }
+    };
+    let references = match records::validate_refs(&form_fields(fields, "references")) {
+        Ok(values) => values,
+        Err(message) => {
+            errors.references = Some(message);
+            Vec::new()
+        }
+    };
+    if errors.any() {
+        let values = document_submitted_values(record, fields);
+        return Ok(Response::html(
+            422,
+            render::document_edit_page(record, group, &values, &errors, live_version, cfg, chrome),
+        ));
+    }
+
+    // 8. One patch from the field map, applied once through `record::store`.
+    let ops = edit::document_edit_ops(
+        &record.doc,
+        &title,
+        &changes,
+        Some(&labels),
+        Some(&references),
+    );
+    save_ops(&ctx, cfg, &state.registry, record, ops)?;
+    Ok(Response::redirect(&format!("/doc/{}", record.id)))
 }
 
 /// Re-render the whole board after a failed status submission. The affected
@@ -1895,64 +2031,6 @@ fn board_status_submit(
     Ok(Response::redirect(&location))
 }
 
-fn save_generic_document(
-    record: &Record,
-    cfg: &Config,
-    state: &ServerState,
-    fields: &[(String, String)],
-    chrome: render::Chrome<'_>,
-) -> Result<Response, HttpError> {
-    let submitted = render::DocumentEditValues {
-        title: form_field(fields, "title").unwrap_or("").to_string(),
-        description: form_field(fields, "description").unwrap_or("").to_string(),
-        labels: records::submitted_tag_values(&form_fields(fields, "labels")),
-        references: records::submitted_tag_values(&form_fields(fields, "references")),
-    };
-    let mut errors = render::DocumentFieldErrors::default();
-    let title = match records::validate_title(&submitted.title) {
-        Ok(value) => Some(value),
-        Err(message) => {
-            errors.title = Some(message);
-            None
-        }
-    };
-    let mut description_change = FieldChange::Keep;
-    match records::validate_multiline("Description", &submitted.description) {
-        Ok(value) => description_change = render::change(value),
-        Err(message) => errors.description = Some(message),
-    }
-    let labels = match records::validate_labels(&submitted.labels) {
-        Ok(value) => Some(value),
-        Err(message) => {
-            errors.labels = Some(message);
-            None
-        }
-    };
-    let references = match records::validate_refs(&submitted.references) {
-        Ok(value) => Some(value),
-        Err(message) => {
-            errors.references = Some(message);
-            None
-        }
-    };
-    if errors.any() {
-        return Ok(Response::html(
-            422,
-            render::document_edit_page(record, &submitted, &errors, &record.version, cfg, chrome),
-        ));
-    }
-    let ctx = state.context();
-    let ops = edit::generic_document_ops(
-        &record.doc,
-        &title.unwrap_or_default(),
-        description_change,
-        &labels.unwrap_or_default(),
-        &references.unwrap_or_default(),
-    );
-    save_ops(&ctx, cfg, &state.registry, record, ops)?;
-    Ok(Response::redirect(&format!("/doc/{}", record.id)))
-}
-
 fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response, HttpError> {
     if media_type(&request) != "application/x-www-form-urlencoded" {
         return Err(HttpError::new(415));
@@ -1971,118 +2049,15 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
         routes: &state.routes,
     };
 
-    if record.is_generic()
-        && (form_field(&fields, "status").is_some()
-            || form_field(&fields, "status_change").is_some())
-    {
-        return Err(HttpError::new(422));
+    if record.descriptor.category == CategoryKind::Document {
+        return document_form_post(&record, &cfg, state, &fields, chrome);
     }
+
     if form_field(&fields, "status_change") == Some("1") {
         return board_status_submit(&record, &cfg, state, &fields);
     }
 
     if version != record.version {
-        if record.is_generic() {
-            let title = form_field(&fields, "title").unwrap_or("").to_string();
-            let description = form_field(&fields, "description").unwrap_or("").to_string();
-            let labels = records::submitted_tag_values(&form_fields(&fields, "labels"));
-            let references = records::submitted_tag_values(&form_fields(&fields, "references"));
-            return Ok(Response::html(
-                409,
-                render::document_conflict_page(
-                    &record,
-                    &title,
-                    &description,
-                    &labels,
-                    &references,
-                    &cfg,
-                    chrome,
-                ),
-            ));
-        }
-        if record.handler() == Some(TypedHandler::UiMockup) {
-            let title = form_field(&fields, "title").unwrap_or("").to_string();
-            let specs = records::submitted_tag_values(&form_fields(&fields, "specs"));
-            let refs = records::submitted_tag_values(&form_fields(&fields, "refs"));
-            return Ok(Response::html(
-                409,
-                render::conflict_page_ui_mockup(&record, &title, &specs, &refs, &cfg, chrome),
-            ));
-        }
-        if record.handler() == Some(TypedHandler::Rule) {
-            let title = form_field(&fields, "title").unwrap_or("").to_string();
-            let description = form_field(&fields, "description").unwrap_or("").to_string();
-            let rationale = form_field(&fields, "rationale").unwrap_or("").to_string();
-            let applicability = form_field(&fields, "applicability")
-                .unwrap_or("")
-                .to_string();
-            let requirements = records::submitted_tag_values(&form_fields(&fields, "requirements"));
-            return Ok(Response::html(
-                409,
-                render::conflict_page_business_rule(
-                    &record,
-                    &title,
-                    &description,
-                    &rationale,
-                    &applicability,
-                    &requirements,
-                    &cfg,
-                    chrome,
-                ),
-            ));
-        }
-
-        if record.handler() == Some(TypedHandler::Audit) {
-            let title = form_field(&fields, "title").unwrap_or("").to_string();
-            let audit_type = form_field(&fields, "audit_type").unwrap_or("").to_string();
-            let content = form_field(&fields, "content").unwrap_or("").to_string();
-            return Ok(Response::html(
-                409,
-                render::conflict_page_audit_record(
-                    &record,
-                    &title,
-                    &audit_type,
-                    &content,
-                    &cfg,
-                    chrome,
-                ),
-            ));
-        }
-        if record.handler() == Some(TypedHandler::TechSpec) {
-            let title = form_field(&fields, "title").unwrap_or("").to_string();
-            let description = form_field(&fields, "description").unwrap_or("").to_string();
-            return Ok(Response::html(
-                409,
-                render::conflict_page_tech_spec(&record, &title, &description, &cfg, chrome),
-            ));
-        }
-        if matches!(
-            record.handler(),
-            Some(TypedHandler::UseCase)
-                | Some(TypedHandler::TestCase)
-                | Some(TypedHandler::TestReport)
-        ) {
-            let title = form_field(&fields, "title").unwrap_or("").to_string();
-            let description = form_field(&fields, "description").unwrap_or("").to_string();
-            let applicability = form_field(&fields, "applicability")
-                .unwrap_or("")
-                .to_string();
-            let labels = records::submitted_tag_values(&form_fields(&fields, "labels"));
-            let references = records::submitted_tag_values(&form_fields(&fields, "references"));
-            return Ok(Response::html(
-                409,
-                render::conflict_page_use_case(
-                    &record,
-                    &title,
-                    &description,
-                    &applicability,
-                    &labels,
-                    &references,
-                    &cfg,
-                    chrome,
-                ),
-            ));
-        }
         // Conflict page with submitted values (best-effort).
         let submitted = render::EditValues {
             title: form_field(&fields, "title").unwrap_or("").to_string(),
@@ -2096,63 +2071,6 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
     }
 
     match record.handler() {
-        Some(TypedHandler::Requirement(_)) => {
-            let submitted = render::EditValues {
-                title: form_field(&fields, "title").unwrap_or("").to_string(),
-                story: form_field(&fields, "story").unwrap_or("").to_string(),
-                description: form_field(&fields, "description").unwrap_or("").to_string(),
-            };
-            let mut errors = render::FieldErrors::default();
-            let title = match records::validate_title(&submitted.title) {
-                Ok(title) => Some(title),
-                Err(message) => {
-                    errors.title = Some(message);
-                    None
-                }
-            };
-            let mut story_change = FieldChange::Keep;
-            if record.supports_story()
-                && let Some(raw) = form_field(&fields, "story")
-            {
-                match records::validate_multiline("User story", raw) {
-                    Ok(value) => story_change = render::change(value),
-                    Err(message) => errors.story = Some(message),
-                }
-            }
-            let mut description_change = FieldChange::Keep;
-            if let Some(raw) = form_field(&fields, "description") {
-                match records::validate_multiline("Description", raw) {
-                    Ok(value) => description_change = render::change(value),
-                    Err(message) => errors.description = Some(message),
-                }
-            }
-            if errors.any() {
-                let index =
-                    records::build_index(&ctx, &cfg, &state.registry, &record.descriptor, None);
-                return Ok(Response::html(
-                    422,
-                    render::edit_page(
-                        &record,
-                        resolved_group(&record, &index),
-                        &submitted,
-                        &errors,
-                        &record.version,
-                        &cfg,
-                        chrome,
-                    ),
-                ));
-            }
-            let title = title.unwrap_or_default();
-            let ops = edit::requirement_ops(
-                &record.doc,
-                &title,
-                story_change,
-                description_change,
-                record.supports_story(),
-            );
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            Ok(Response::redirect(&format!("/doc/{}", record.id)))
-        }
         Some(TypedHandler::Task) => {
             let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
             let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
@@ -2541,414 +2459,7 @@ fn form_post(id: &str, request: Request, state: &ServerState) -> Result<Response
             save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
             Ok(Response::redirect(&format!("/doc/{}", record.id)))
         }
-        Some(TypedHandler::Glossary) => {
-            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
-            let raw_definition = form_field(&fields, "definition").unwrap_or("").to_string();
-
-            let mut errors = render::GlossaryFieldErrors::default();
-            let title = match records::validate_title(&raw_title) {
-                Ok(t) => Some(t),
-                Err(m) => {
-                    errors.title = Some(m);
-                    None
-                }
-            };
-
-            let mut definition_change = FieldChange::Keep;
-            if form_field(&fields, "definition").is_some() {
-                match records::validate_multiline("Definition", &raw_definition) {
-                    Ok(v) => definition_change = render::change(v),
-                    Err(m) => errors.definition = Some(m),
-                }
-            }
-
-            if errors.any() {
-                let values = render::GlossaryEditValues {
-                    title: raw_title.clone(),
-                    definition: raw_definition.clone(),
-                };
-                return Ok(Response::html(
-                    422,
-                    render::edit_page_glossary(
-                        &record,
-                        &values,
-                        &errors,
-                        &record.version,
-                        &cfg,
-                        chrome,
-                    ),
-                ));
-            }
-
-            let title = title.unwrap_or_default();
-            let ops = edit::glossary_ops(&record.doc, &title, definition_change);
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            Ok(Response::redirect(&format!("/doc/{}", record.id)))
-        }
-        Some(TypedHandler::UiSpec) => {
-            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
-            let raw_view = form_field(&fields, "view").unwrap_or("").to_string();
-            let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
-
-            let mut errors = render::UiSpecFieldErrors::default();
-            let title = match records::validate_title(&raw_title) {
-                Ok(t) => Some(t),
-                Err(m) => {
-                    errors.title = Some(m);
-                    None
-                }
-            };
-            let view = match records::validate_title(&raw_view) {
-                Ok(t) => Some(t),
-                Err(m) => {
-                    errors.view = Some(m);
-                    None
-                }
-            };
-            let mut description_change = FieldChange::Keep;
-            if form_field(&fields, "description").is_some() {
-                match records::validate_multiline("Description", &raw_description) {
-                    Ok(v) => description_change = render::change(v),
-                    Err(m) => errors.description = Some(m),
-                }
-            }
-            if errors.any() {
-                let values = render::UiSpecEditValues {
-                    title: raw_title.clone(),
-                    view: raw_view.clone(),
-                    description: raw_description.clone(),
-                };
-                return Ok(Response::html(
-                    422,
-                    render::edit_page_ui_spec(
-                        &record,
-                        &values,
-                        &errors,
-                        &record.version,
-                        &cfg,
-                        chrome,
-                    ),
-                ));
-            }
-            let title = title.unwrap_or_default();
-            let view_change = match view {
-                Some(v) => render::change(Some(v)),
-                None => FieldChange::Keep,
-            };
-            let ops = edit::ui_spec_ops(&record.doc, &title, view_change, description_change);
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            Ok(Response::redirect(&format!("/doc/{}", record.id)))
-        }
-        Some(TypedHandler::UiMockup) => {
-            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
-            // Tag fields submit one occurrence per value; all occurrences are
-            // collected in order (section 6.7 overrides last-value-wins).
-            let raw_specs = form_fields(&fields, "specs");
-            let raw_refs = form_fields(&fields, "refs");
-
-            let mut errors = render::UiMockupFieldErrors::default();
-            let title = match records::validate_title(&raw_title) {
-                Ok(t) => Some(t),
-                Err(m) => {
-                    errors.title = Some(m);
-                    None
-                }
-            };
-            let specs = match records::validate_specs(&raw_specs) {
-                Ok(values) => Some(values),
-                Err(message) => {
-                    errors.specs = Some(message);
-                    None
-                }
-            };
-            let refs = match records::validate_refs(&raw_refs) {
-                Ok(values) => Some(values),
-                Err(message) => {
-                    errors.refs = Some(message);
-                    None
-                }
-            };
-            if errors.any() {
-                let values = render::UiMockupEditValues {
-                    title: raw_title.clone(),
-                    specs: records::submitted_tag_values(&raw_specs),
-                    refs: records::submitted_tag_values(&raw_refs),
-                };
-                return Ok(Response::html(
-                    422,
-                    render::edit_page_ui_mockup(
-                        &record,
-                        &values,
-                        &errors,
-                        &record.version,
-                        &cfg,
-                        chrome,
-                    ),
-                ));
-            }
-            let title = title.unwrap_or_default();
-            let specs = specs.unwrap_or_default();
-            let refs = refs.unwrap_or_default();
-            let original = std::fs::read_to_string(&record.path).unwrap_or_default();
-            let content = records::edit_ui_mockup(&original, &record.id, &title, &specs, &refs);
-            save_content(&ctx, &cfg, &state.registry, &record, content)?;
-            Ok(Response::redirect(&format!("/doc/{}", record.id)))
-        }
-        Some(TypedHandler::Rule) => {
-            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
-            let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
-            let raw_rationale = form_field(&fields, "rationale").unwrap_or("").to_string();
-            let raw_applicability = form_field(&fields, "applicability")
-                .unwrap_or("")
-                .to_string();
-            let raw_requirements = form_fields(&fields, "requirements");
-
-            let mut errors = render::BusinessRuleFieldErrors::default();
-            let title = match records::validate_title(&raw_title) {
-                Ok(t) => Some(t),
-                Err(m) => {
-                    errors.title = Some(m);
-                    None
-                }
-            };
-            let mut description_change = FieldChange::Keep;
-            match records::validate_multiline("Description", &raw_description) {
-                Ok(v) => description_change = render::change(v),
-                Err(m) => errors.description = Some(m),
-            }
-            let mut rationale_change = FieldChange::Keep;
-            match records::validate_multiline("Rationale", &raw_rationale) {
-                Ok(v) => rationale_change = render::change(v),
-                Err(m) => errors.rationale = Some(m),
-            }
-            let mut applicability_change = FieldChange::Keep;
-            match records::validate_multiline("Applicability", &raw_applicability) {
-                Ok(v) => applicability_change = render::change(v),
-                Err(m) => errors.applicability = Some(m),
-            }
-            let requirements = match records::validate_requirement_refs(&raw_requirements) {
-                Ok(v) => Some(v),
-                Err(m) => {
-                    errors.requirements = Some(m);
-                    None
-                }
-            };
-            if errors.any() {
-                let values = render::BusinessRuleEditValues {
-                    title: raw_title.clone(),
-                    description: raw_description.clone(),
-                    rationale: raw_rationale.clone(),
-                    applicability: raw_applicability.clone(),
-                    requirements: records::submitted_tag_values(&raw_requirements),
-                };
-                return Ok(Response::html(
-                    422,
-                    render::edit_page_business_rule(
-                        &record,
-                        &values,
-                        &errors,
-                        &record.version,
-                        &cfg,
-                        chrome,
-                    ),
-                ));
-            }
-            let title = title.unwrap_or_default();
-            let requirements = requirements.unwrap_or_default();
-            let ops = edit::business_rule_ops(
-                &record.doc,
-                &title,
-                description_change,
-                rationale_change,
-                applicability_change,
-                requirements,
-            );
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            Ok(Response::redirect(&format!("/doc/{}", record.id)))
-        }
-        Some(TypedHandler::TechSpec) => {
-            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
-            let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
-
-            let mut errors = render::TechSpecFieldErrors::default();
-            let title = match records::validate_title(&raw_title) {
-                Ok(t) => Some(t),
-                Err(m) => {
-                    errors.title = Some(m);
-                    None
-                }
-            };
-            let mut description_change = FieldChange::Keep;
-            match records::validate_multiline("Description", &raw_description) {
-                Ok(Some(value)) => description_change = FieldChange::Set(value),
-                Ok(None) => {
-                    errors.description = Some("Description is required.".to_string());
-                }
-                Err(m) => errors.description = Some(m),
-            }
-            if errors.any() {
-                let values = render::TechSpecEditValues {
-                    title: raw_title.clone(),
-                    description: raw_description.clone(),
-                };
-                return Ok(Response::html(
-                    422,
-                    render::edit_page_tech_spec(
-                        &record,
-                        &values,
-                        &errors,
-                        &record.version,
-                        &cfg,
-                        chrome,
-                    ),
-                ));
-            }
-            let title = title.unwrap_or_default();
-            let ops = edit::tech_spec_ops(&record.doc, &title, description_change);
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            Ok(Response::redirect(&format!("/doc/{}", record.id)))
-        }
-        Some(TypedHandler::UseCase)
-        | Some(TypedHandler::TestCase)
-        | Some(TypedHandler::TestReport) => {
-            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
-            let raw_description = form_field(&fields, "description").unwrap_or("").to_string();
-            let raw_applicability = form_field(&fields, "applicability")
-                .unwrap_or("")
-                .to_string();
-            let raw_labels = form_fields(&fields, "labels");
-            let raw_references = form_fields(&fields, "references");
-
-            let mut errors = render::UseCaseFieldErrors::default();
-            let title = match records::validate_title(&raw_title) {
-                Ok(t) => Some(t),
-                Err(m) => {
-                    errors.title = Some(m);
-                    None
-                }
-            };
-            let mut description_change = FieldChange::Keep;
-            match records::validate_multiline("Description", &raw_description) {
-                Ok(Some(value)) => description_change = FieldChange::Set(value),
-                Ok(None) => {
-                    errors.description = Some("Description is required.".to_string());
-                }
-                Err(m) => errors.description = Some(m),
-            }
-            let mut applicability_change = FieldChange::Keep;
-            match records::validate_multiline("Applicability", &raw_applicability) {
-                Ok(Some(value)) => applicability_change = FieldChange::Set(value),
-                Ok(None) => applicability_change = FieldChange::Clear,
-                Err(m) => errors.applicability = Some(m),
-            }
-            let labels = match records::validate_labels(&raw_labels) {
-                Ok(v) => Some(v),
-                Err(m) => {
-                    errors.labels = Some(m);
-                    None
-                }
-            };
-            let references = match records::validate_refs(&raw_references) {
-                Ok(v) => Some(v),
-                Err(m) => {
-                    errors.references = Some(m);
-                    None
-                }
-            };
-            if errors.any() {
-                let values = render::UseCaseEditValues {
-                    title: raw_title.clone(),
-                    description: raw_description.clone(),
-                    applicability: raw_applicability.clone(),
-                    labels: records::submitted_tag_values(&raw_labels),
-                    references: records::submitted_tag_values(&raw_references),
-                };
-                return Ok(Response::html(
-                    422,
-                    render::edit_page_use_case(
-                        &record,
-                        &values,
-                        &errors,
-                        &record.version,
-                        &cfg,
-                        chrome,
-                    ),
-                ));
-            }
-            let title = title.unwrap_or_default();
-            let labels = labels.unwrap_or_default();
-            let references = references.unwrap_or_default();
-            let ops = edit::use_case_ops(
-                &record.doc,
-                &title,
-                description_change,
-                applicability_change,
-                labels,
-                references,
-            );
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            Ok(Response::redirect(&format!("/doc/{}", record.id)))
-        }
-        Some(TypedHandler::Audit) => {
-            let raw_title = form_field(&fields, "title").unwrap_or("").to_string();
-            let raw_audit_type = form_field(&fields, "audit_type").unwrap_or("").to_string();
-            let raw_content = form_field(&fields, "content").unwrap_or("").to_string();
-
-            let mut errors = render::AuditFieldErrors::default();
-            let title = match records::validate_title(&raw_title) {
-                Ok(t) => Some(t),
-                Err(m) => {
-                    errors.title = Some(m);
-                    None
-                }
-            };
-            let audit_type_trimmed = raw_audit_type.trim();
-            let audit_type_value = if audit_type_trimmed.is_empty() {
-                errors.audit_type = Some("Audit type is required.".to_string());
-                audit_type_trimmed.to_string()
-            } else if !["security", "licence", "architecture"].contains(&audit_type_trimmed) {
-                errors.audit_type = Some(
-                    "Audit type must be one of security, licence, or architecture.".to_string(),
-                );
-                audit_type_trimmed.to_string()
-            } else {
-                audit_type_trimmed.to_string()
-            };
-            let mut content_change = FieldChange::Keep;
-            match records::validate_multiline("Content", &raw_content) {
-                Ok(v) => content_change = render::change(v),
-                Err(m) => errors.content = Some(m),
-            }
-
-            if errors.any() {
-                let values = render::AuditEditValues {
-                    title: raw_title.clone(),
-                    audit_type: raw_audit_type.clone(),
-                    content: raw_content.clone(),
-                };
-                return Ok(Response::html(
-                    422,
-                    render::edit_page_audit_record(
-                        &record,
-                        &values,
-                        &errors,
-                        &record.version,
-                        &cfg,
-                        chrome,
-                    ),
-                ));
-            }
-            let title = title.unwrap_or_default();
-            let final_audit_type = if audit_type_value.is_empty() {
-                "security".to_string()
-            } else {
-                audit_type_value
-            };
-            let ops = edit::audit_ops(&record.doc, &title, &final_audit_type, content_change);
-            save_ops(&ctx, &cfg, &state.registry, &record, ops)?;
-            Ok(Response::redirect(&format!("/doc/{}", record.id)))
-        }
-        None => save_generic_document(&record, &cfg, state, &fields, chrome),
+        _ => Err(HttpError::new(400)),
     }
 }
 
