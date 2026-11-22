@@ -64,6 +64,13 @@ declares `story` for both nfr roles (REQ-05.002) and the pre-refactor module
 ignored it; no corpus case supplies `--story` to nfr, so the snapshot is
 unchanged. Source: REQ-05.002, ADR-036 decisions 26-29.
 
+Recorded engine exception without a byte delta: the ui-spec editor
+front-matter re-adoption quirk is expressed as one descriptor-keyed engine rule
+(not a slug literal and not a name comparison) and covered by
+`tests/ui_spec_cli.rs::ui_spec_editor_rewrites_without_renaming`. It preserves
+the pre-refactor output, so no corpus byte delta is recorded. Source: MS-035
+TASK-269 (269b); TECH-040.
+
 ## Measured verb-about-line delta (TASK-260)
 
 The `TASK-260` regeneration measured one systematic help delta that the earlier
