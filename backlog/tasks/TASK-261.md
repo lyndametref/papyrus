@@ -2,7 +2,7 @@
 id: TASK-261
 title: "Verify MS-034 CLI engine: command equivalence and help attribution"
 created_date: '2026-11-20T17:42:17Z'
-updated_date: '2026-11-22T13:01:38Z'
+updated_date: '2026-11-22T15:26:45Z'
 labels: []
 references:
   - REQ-07.003
@@ -20,6 +20,7 @@ assignee:
 milestone: MS-034
 dependencies:
   - TASK-260
+  - TASK-310
 ordinal: 90
 documentation:
   - tests/golden/cli-help

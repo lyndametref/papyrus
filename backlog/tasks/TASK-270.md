@@ -2,7 +2,7 @@
 id: TASK-270
 title: "Verify MS-035 browser engine: route and semantic equivalence"
 created_date: '2026-11-20T17:42:52Z'
-updated_date: '2026-11-22T12:31:50Z'
+updated_date: '2026-11-22T15:23:46Z'
 labels: []
 references:
   - REQ-06.014
@@ -14,6 +14,7 @@ assignee:
 milestone: MS-035
 dependencies:
   - TASK-269
+  - TASK-309
 ordinal: 90
 documentation: []
 type: milestone-verification
