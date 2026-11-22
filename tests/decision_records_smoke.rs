@@ -54,7 +54,7 @@ fn decision_fixture(dir: &Path) {
             "decision",
             "create",
             "Decision One",
-            "-d",
+            "--decision",
             "quick brown fox decision",
         ]),
         "ADR-001"

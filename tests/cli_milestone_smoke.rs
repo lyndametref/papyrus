@@ -429,7 +429,7 @@ fn installed_layout_has_no_runtime_asset_dependency() {
             "decision",
             "create",
             "Decision One",
-            "-d",
+            "--decision",
             PHRASE,
         ]),
         "ADR-001"

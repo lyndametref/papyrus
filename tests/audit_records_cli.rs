@@ -354,10 +354,15 @@ fn audit_json_output() {
 fn audit_missing_args_exit_2() {
     let d = tmpdir("missing");
     init(&d);
+    // The title is a command-level requirement (usage, exit 2).
     let out = run(&d, &["audit", "create", "--content", "d"]);
     assert_eq!(out.status.code(), Some(2));
+    // A missing required field is one validation outcome (exit 4).
     let out = run(&d, &["audit", "create", "--title", "t"]);
-    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(out.status.code(), Some(4));
+    let message = String::from_utf8_lossy(&out.stderr);
+    assert!(message.contains("content"), "{message}");
+    assert!(!d.join("docs/audit-records/AUD-001.md").exists());
     let _ = fs::remove_dir_all(&d);
 }
 

@@ -1039,8 +1039,14 @@ fn t117_08_browser_matrix_over_http() {
     let scratch = Scratch::new("browser");
     let project = init(&scratch, "proj");
     add_note(&project);
-    run_ok(&project, &["note", "create", "Alpha", "-d", "alpha body"]);
-    run_ok(&project, &["note", "create", "Beta", "-d", "beta body"]);
+    run_ok(
+        &project,
+        &["note", "create", "Alpha", "--description", "alpha body"],
+    );
+    run_ok(
+        &project,
+        &["note", "create", "Beta", "--description", "beta body"],
+    );
     write_file(
         &project.join("docs/notes/NOTE-003.md"),
         "---\nid: NOTE-003\ntitle: \"Gamma\"\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels:\n  - keep\nauthor_note: preserve-me\nstatus: active\n---\n# NOTE-003 Gamma\n\n## Description\ngamma body\n\n## Custom section\nunknown body\n",

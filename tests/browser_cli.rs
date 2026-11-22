@@ -61,7 +61,7 @@ fn create_req(dir: &Path, title: &str, group: &str) -> String {
         group,
         "--story",
         &story,
-        "-d",
+        "--description",
         &description,
     ])
 }
@@ -87,7 +87,7 @@ fn create_nfr(dir: &Path, title: &str, group: &str) -> String {
         title,
         "--group",
         group,
-        "-d",
+        "--description",
         &description,
     ])
 }
@@ -2309,7 +2309,7 @@ fn create_release(dir: &Path, title: &str) -> String {
         "release",
         "create",
         title,
-        "-d",
+        "--description",
         "Release description",
     ])
 }
@@ -2321,7 +2321,7 @@ fn create_milestone(dir: &Path, title: &str, release: &str) -> String {
         "milestone",
         "create",
         title,
-        "-d",
+        "--description",
         "Milestone description",
         "--release",
         release,
@@ -2335,7 +2335,7 @@ fn create_task(dir: &Path, title: &str, milestone: &str) -> String {
         "task",
         "create",
         title,
-        "-d",
+        "--description",
         "Task description",
         "--ac",
         "Acceptance one",
@@ -2363,7 +2363,7 @@ fn backlog_fixture(name: &str) -> PathBuf {
         "task",
         "create",
         "Task Two",
-        "-d",
+        "--description",
         "Task description two",
         "--ac",
         "Acceptance two",
@@ -2852,7 +2852,7 @@ fn create_milestone_no_release(dir: &Path, title: &str) -> String {
         "milestone",
         "create",
         title,
-        "-d",
+        "--description",
         "Milestone description",
     ])
 }
@@ -2864,7 +2864,7 @@ fn create_task_no_milestone(dir: &Path, title: &str) -> String {
         "task",
         "create",
         title,
-        "-d",
+        "--description",
         "Task description",
         "--ac",
         "Acceptance one",
@@ -3795,7 +3795,7 @@ fn create_decision_full(
         args.push(t.to_string());
     }
     if let Some(d) = decision {
-        args.push("-d".to_string());
+        args.push("--decision".to_string());
         args.push(d.to_string());
     }
     if let Some(c) = context {
@@ -8835,7 +8835,7 @@ fn tc038_removal_does_not_change_records_or_config() {
         "task",
         "create",
         "Snapshot task",
-        "-d",
+        "--description",
         "Task description",
     ]);
 

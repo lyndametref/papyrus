@@ -124,6 +124,25 @@ pub fn resolve_stdin_fields(
     Ok(Some(StdinInput { field, text }))
 }
 
+/// Read one multiline field value from standard input.
+///
+/// Shared by the fixed resolvers and the field-driven document engine, which
+/// cannot name its fields with `'static` strings.
+pub fn read_stdin_text() -> Result<String, AppError> {
+    let mut bytes = Vec::new();
+    std::io::stdin()
+        .lock()
+        .read_to_end(&mut bytes)
+        .map_err(|e| AppError::Runtime(format!("failed to read standard input: {e}")))?;
+    let raw = String::from_utf8(bytes)
+        .map_err(|_| AppError::Validation("standard input is not valid UTF-8".to_string()))?;
+    sanitize_multiline(&raw).ok_or_else(|| {
+        AppError::Validation(
+            "standard input is empty or contains unsupported control characters".to_string(),
+        )
+    })
+}
+
 /// Pair a possibly-sentinel option value with a resolved stdin input.
 pub fn text_value(field: &str, value: Option<String>, stdin: Option<&StdinInput>) -> Option<Text> {
     value.map(|literal| match stdin {

@@ -156,19 +156,18 @@ fn test_report_create_requires_all_arguments() {
     let d = tmpdir("missing");
     init(&d);
 
-    let cases: Vec<Vec<&str>> = vec![
-        vec!["test-report", "create", "T"],
-        vec!["test-report", "create", "--description", "d"],
-        vec!["test-report", "create", "T", "--description"],
-    ];
-    for args in cases {
-        let out = run(&d, &args);
-        assert_eq!(out.status.code(), Some(2), "args={:?}", args);
-    }
-    assert!(!d.join("docs/test-reports/TR-001.md").exists());
+    // The title is required; description and applicability are optional.
+    let out = run(&d, &["test-report", "create", "T"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(d.join("docs/test-reports/TR-001.md").exists());
 
-    // unknown option
-    let out = run(&d, &["test-report", "create", "T", "--bogus", "x"]);
+    let out = run(&d, &["test-report", "create"]);
+    assert_eq!(out.status.code(), Some(2));
+    let out = run(&d, &["test-report", "create", "T2", "--bogus", "x"]);
     assert_eq!(out.status.code(), Some(2));
 
     let _ = fs::remove_dir_all(&d);

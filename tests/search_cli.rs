@@ -92,7 +92,12 @@ fn setup_standard(d: &Path) {
         "req",
         "Capture payment",
         "REQ-001",
-        &["--story", "as a cashier", "-d", "The quick brown fox jumps"],
+        &[
+            "--story",
+            "as a cashier",
+            "--description",
+            "The quick brown fox jumps",
+        ],
     );
     assert_eq!(req, "REQ-001.001");
 
@@ -103,7 +108,7 @@ fn setup_standard(d: &Path) {
         "nfr",
         "Latency budget",
         "NFR-001",
-        &["-d", "response time"],
+        &["--description", "response time"],
     );
     assert_eq!(nfr, "NFR-001.001");
 }
@@ -1260,7 +1265,7 @@ fn cross_type_unified_search() {
             "release",
             "create",
             "Release title",
-            "-d",
+            "--description",
             "quick brown fox",
         ],
     );
@@ -1271,14 +1276,20 @@ fn cross_type_unified_search() {
             "milestone",
             "create",
             "Milestone title",
-            "-d",
+            "--description",
             "quick brown fox",
         ],
     );
     assert_eq!(stdout(&out).trim(), "MS-001", "stderr={}", stderr(&out));
     let out = run(
         &d,
-        &["task", "create", "Task title", "-d", "quick brown fox"],
+        &[
+            "task",
+            "create",
+            "Task title",
+            "--description",
+            "quick brown fox",
+        ],
     );
     assert_eq!(stdout(&out).trim(), "TASK-001", "stderr={}", stderr(&out));
     let out = run(
@@ -1287,7 +1298,7 @@ fn cross_type_unified_search() {
             "decision",
             "create",
             "Decision title",
-            "-d",
+            "--decision",
             "quick brown fox",
         ],
     );
@@ -1301,7 +1312,7 @@ fn cross_type_unified_search() {
             "create-group",
             "--title",
             "Req Group",
-            "-d",
+            "--description",
             "quick brown fox",
         ],
     );
@@ -1311,7 +1322,7 @@ fn cross_type_unified_search() {
         "req",
         "Req Title",
         "REQ-001",
-        &["-d", "quick brown fox"],
+        &["--description", "quick brown fox"],
     );
     assert_eq!(req, "REQ-001.001");
 
@@ -1323,7 +1334,7 @@ fn cross_type_unified_search() {
             "create-group",
             "--title",
             "Nfr Group",
-            "-d",
+            "--description",
             "quick brown fox",
         ],
     );
@@ -1333,7 +1344,7 @@ fn cross_type_unified_search() {
         "nfr",
         "Nfr Title",
         "NFR-001",
-        &["-d", "quick brown fox"],
+        &["--description", "quick brown fox"],
     );
     assert_eq!(nfr, "NFR-001.001");
 

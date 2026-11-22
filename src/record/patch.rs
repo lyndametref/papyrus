@@ -114,6 +114,11 @@ pub fn apply_patch(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> 
                             frontmatter::current_value_string(&f.raw, key).as_deref()
                                 == Some(&n.to_string())
                         }
+                        FrontMatterValue::Sequence(_items) => {
+                            let expected = crate::record::frontmatter::format_kv_value(key, value);
+                            frontmatter::current_key_block(&f.raw, key).as_deref()
+                                == Some(expected.as_str())
+                        }
                         FrontMatterValue::String(s) => {
                             if frontmatter::current_value_string(&f.raw, key).as_deref()
                                 == Some(s.as_str())

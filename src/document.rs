@@ -1,11 +1,12 @@
 //! Generic, descriptor-driven document handler (ADR-0018, ADR-0017).
 
 use crate::config::Config;
+use crate::config::FieldSpec;
 use crate::context::Context;
 use crate::error::AppError;
 use crate::record;
 use crate::record::descriptor::RecordDescriptor;
-use crate::record::document::{self, Document, Section};
+use crate::record::document::{self, Document};
 use crate::record::patch::{self, PatchOp};
 use crate::registry::{
     ArtifactCategory, ArtifactRegistry, DocumentModel, StatusModel, TypeDescriptor, TypedHandler,
@@ -222,7 +223,7 @@ pub fn run(
     ctx: &Context,
     cfg: &Config,
     registry: &ArtifactRegistry,
-    mut invocation: DocumentInvocation,
+    invocation: DocumentInvocation,
 ) -> Result<crate::CommandOutput, AppError> {
     let descriptor = registry.descriptor(&invocation.slug).ok_or_else(|| {
         AppError::Validation(format!(
@@ -250,8 +251,6 @@ pub fn run(
         )));
     }
 
-    resolve_stdin_description(&mut invocation)?;
-
     let scope = DocumentScope::resolve(ctx, cfg, descriptor)?;
     let record = registry
         .record_descriptor(&descriptor.slug)
@@ -261,70 +260,35 @@ pub fn run(
                 descriptor.slug
             ))
         })?;
-    let slug = invocation.slug.clone();
+
+    // The HTML mockup keeps its fixed, metadata-driven surface until TASK-256.
+    if descriptor.document_model == DocumentModel::SingleHtmlMockup {
+        return crate::ui_mockup::handle(ctx, &scope, registry, invocation.verb, &invocation.args);
+    }
+
     match invocation.verb {
-        DocumentVerb::Create
-        | DocumentVerb::CreateGroup
-        | DocumentVerb::List
-        | DocumentVerb::View
-        | DocumentVerb::Edit
-        | DocumentVerb::Supersede => match &descriptor.schema {
-            None => match invocation.verb {
-                DocumentVerb::Create => {
-                    create_generic(ctx, cfg, registry, descriptor, record, invocation)
-                }
-                DocumentVerb::List => list_records(ctx, cfg, registry, record),
-                DocumentVerb::View => view_record(ctx, cfg, registry, record, invocation.id),
-                DocumentVerb::Edit => {
-                    edit_generic(ctx, cfg, registry, descriptor, record, invocation)
-                }
-                other => Err(AppError::Validation(format!(
-                    "document_types.{}: verb {} is not supported by the generic model",
-                    slug,
-                    crate::registry::Verb::from(other).as_str()
-                ))),
-            },
-            Some(_) => dispatch_typed(
-                ctx,
-                descriptor,
-                registry,
-                record,
-                &scope,
-                invocation.verb,
-                &invocation.args,
-            ),
-        },
-        DocumentVerb::Archive | DocumentVerb::Delete | DocumentVerb::Status => {
-            match &descriptor.document_model {
-                // UI mockups keep their HTML metadata semantics.
-                DocumentModel::SingleHtmlMockup => dispatch_typed(
-                    ctx,
-                    descriptor,
-                    registry,
-                    record,
-                    &scope,
-                    invocation.verb,
-                    &invocation.args,
-                ),
-                _ => match invocation.verb {
-                    DocumentVerb::Archive => {
-                        archive_record(ctx, cfg, registry, record, invocation.id)
-                    }
-                    DocumentVerb::Delete => {
-                        delete_record(ctx, cfg, registry, record, invocation.id, invocation.force)
-                    }
-                    DocumentVerb::Status => status_record(
-                        ctx,
-                        cfg,
-                        registry,
-                        record,
-                        invocation.id,
-                        invocation.status_value,
-                    ),
-                    _ => unreachable!("outer match limits record verbs"),
-                },
-            }
+        DocumentVerb::Create => {
+            create_document(ctx, cfg, registry, descriptor, &scope, &invocation)
         }
+        DocumentVerb::CreateGroup => {
+            create_group_document(ctx, cfg, registry, descriptor, &scope, &invocation)
+        }
+        DocumentVerb::List => list_documents(ctx, cfg, registry, descriptor, &scope),
+        DocumentVerb::View => view_document(ctx, cfg, registry, descriptor, &scope, invocation.id),
+        DocumentVerb::Edit => edit_document(ctx, cfg, registry, descriptor, &scope, &invocation),
+        DocumentVerb::Archive => archive_record(ctx, cfg, registry, record, invocation.id),
+        DocumentVerb::Delete => {
+            delete_record(ctx, cfg, registry, record, invocation.id, invocation.force)
+        }
+        DocumentVerb::Status => status_record(
+            ctx,
+            cfg,
+            registry,
+            record,
+            invocation.id,
+            invocation.status_value,
+        ),
+        DocumentVerb::Supersede => Err(unsupported_verb(DocumentVerb::Supersede)),
     }
 }
 
@@ -350,52 +314,6 @@ pub(crate) fn unsupported_verb(verb: DocumentVerb) -> AppError {
     ))
 }
 
-/// Delegate a typed content verb to its owning module (never by slug).
-fn dispatch_typed(
-    ctx: &Context,
-    descriptor: &TypeDescriptor,
-    registry: &ArtifactRegistry,
-    record: &RecordDescriptor,
-    scope: &DocumentScope,
-    verb: DocumentVerb,
-    args: &DocumentArgs,
-) -> Result<crate::CommandOutput, AppError> {
-    let handler = descriptor.handler().ok_or_else(|| {
-        AppError::Validation(format!(
-            "document_types.{}: document model is not typed",
-            descriptor.slug
-        ))
-    })?;
-    match handler {
-        TypedHandler::Requirement(kind) => {
-            let kind = match kind {
-                crate::registry::RequirementKind::Business => crate::requirement::Kind::Req,
-                crate::registry::RequirementKind::NonFunctional => crate::requirement::Kind::Nfr,
-            };
-            crate::requirement::handle(ctx, scope, registry, record, kind, verb, args)
-        }
-        TypedHandler::Glossary => crate::glossary::handle(ctx, scope, registry, record, verb, args),
-        TypedHandler::Rule => crate::rule::handle(ctx, scope, registry, record, verb, args),
-        TypedHandler::UiSpec => crate::ui_spec::handle(ctx, scope, registry, record, verb, args),
-        TypedHandler::Audit => crate::audit::handle(ctx, scope, registry, record, verb, args),
-        TypedHandler::TechSpec => {
-            crate::tech_spec::handle(ctx, scope, registry, record, verb, args)
-        }
-        TypedHandler::UseCase => crate::use_case::handle(ctx, scope, registry, record, verb, args),
-        TypedHandler::TestCase => {
-            crate::test_case::handle(ctx, scope, registry, record, verb, args)
-        }
-        TypedHandler::TestReport => {
-            crate::test_report::handle(ctx, scope, registry, record, verb, args)
-        }
-        TypedHandler::UiMockup => crate::ui_mockup::handle(ctx, scope, registry, verb, args),
-        other => Err(AppError::Validation(format!(
-            "document_types.{}: unsupported typed handler {:?}",
-            descriptor.slug, other
-        ))),
-    }
-}
-
 fn sanitize_field(input: &str) -> Result<String, AppError> {
     sanitize::sanitize_name(input)
         .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))
@@ -403,14 +321,14 @@ fn sanitize_field(input: &str) -> Result<String, AppError> {
 
 fn current_list(doc: &Document, key: &str) -> Vec<String> {
     if let Some(fm) = &doc.front_matter
-        && let yaml_serde::Value::Mapping(m) = &fm.data
-        && let Some(yaml_serde::Value::Sequence(seq)) =
-            m.get(yaml_serde::Value::String(key.to_string()))
+        && let yaml_serde::Value::Mapping(mapping) = &fm.data
+        && let Some(yaml_serde::Value::Sequence(sequence)) =
+            mapping.get(yaml_serde::Value::String(key.to_string()))
     {
-        return seq
+        return sequence
             .iter()
-            .filter_map(|v| match v {
-                yaml_serde::Value::String(s) => Some(s.clone()),
+            .filter_map(|value| match value {
+                yaml_serde::Value::String(text) => Some(text.clone()),
                 _ => None,
             })
             .collect();
@@ -418,108 +336,452 @@ fn current_list(doc: &Document, key: &str) -> Vec<String> {
     Vec::new()
 }
 
-/// Resolve `-d -` for document create and edit before any ID is allocated or
-/// file is written. Only the description is an accepting option here.
-fn resolve_stdin_description(invocation: &mut DocumentInvocation) -> Result<(), AppError> {
-    if !matches!(invocation.verb, DocumentVerb::Create | DocumentVerb::Edit) {
-        return Ok(());
+/// The resolved role field sequence for a verb.
+fn document_fields_for_verb(descriptor: &TypeDescriptor, verb: DocumentVerb) -> Vec<FieldSpec> {
+    match descriptor.document_model {
+        DocumentModel::SingleMarkdown => descriptor.fields.clone(),
+        DocumentModel::GroupedMarkdown => match verb {
+            DocumentVerb::CreateGroup => descriptor
+                .group
+                .as_ref()
+                .and_then(|role| role.fields.clone())
+                .unwrap_or_default(),
+            DocumentVerb::Create => descriptor
+                .member
+                .as_ref()
+                .and_then(|role| role.fields.clone())
+                .or_else(|| {
+                    descriptor
+                        .group
+                        .as_ref()
+                        .and_then(|role| role.fields.clone())
+                })
+                .unwrap_or_default(),
+            DocumentVerb::Edit => {
+                let mut fields = Vec::new();
+                for role in [descriptor.group.as_ref(), descriptor.member.as_ref()]
+                    .into_iter()
+                    .flatten()
+                {
+                    for field in role.fields.iter().flatten() {
+                        if !fields
+                            .iter()
+                            .any(|existing: &FieldSpec| existing.key == field.key)
+                        {
+                            fields.push(field.clone());
+                        }
+                    }
+                }
+                fields
+            }
+            _ => Vec::new(),
+        },
+        DocumentModel::SingleHtmlMockup => Vec::new(),
     }
-    let Some(value) = invocation.args.get("description").map(str::to_string) else {
-        return Ok(());
-    };
-    let resolved = sanitize::resolve_stdin_fields(&[("description", Some(value.as_str()))])?;
-    let Some(input) = resolved else {
-        return Ok(());
-    };
-    invocation
-        .args
-        .insert(input.field, vec![input.text.clone()]);
-    invocation.args.mark_multiline(input.field);
-    invocation.description = Some(input.text);
-    invocation.description_multiline = true;
+}
+
+fn field_long(field: &FieldSpec) -> String {
+    field
+        .option
+        .clone()
+        .unwrap_or_else(|| sanitize::kebab_slug(&field.key))
+}
+
+fn field_offered(field: &FieldSpec, verb: DocumentVerb) -> bool {
+    field.verbs.iter().any(|field_verb| match field_verb {
+        crate::config::FieldVerb::Create => {
+            matches!(verb, DocumentVerb::Create | DocumentVerb::CreateGroup)
+        }
+        crate::config::FieldVerb::Edit => verb == DocumentVerb::Edit,
+    })
+}
+
+/// Resolve the one `-` sentinel among a verb's multiline fields, before any ID
+/// is allocated or file is written.
+fn resolve_field_stdin(fields: &[FieldSpec], args: &mut DocumentArgs) -> Result<(), AppError> {
+    let sentinels: Vec<&FieldSpec> = fields
+        .iter()
+        .filter(|field| {
+            field.kind == crate::config::FieldKind::Multiline
+                && args.get(&field.key) == Some(sanitize::STDIN_SENTINEL)
+        })
+        .collect();
+    if sentinels.len() > 1 {
+        let names = sentinels
+            .iter()
+            .map(|field| format!("--{}", field_long(field)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(AppError::Validation(format!(
+            "multiple options request multiline text from standard input: {names}"
+        )));
+    }
+    if let Some(field) = sentinels.first() {
+        let text = sanitize::read_stdin_text()?;
+        args.insert(field.key.clone(), vec![text]);
+        args.mark_multiline(&field.key);
+    }
     Ok(())
 }
 
+fn merge_invocation_args(invocation: &DocumentInvocation, fields: &[FieldSpec]) -> DocumentArgs {
+    let mut args = invocation.args.clone();
+    if args.get("description").is_none()
+        && fields.iter().any(|field| field.key == "description")
+        && let Some(description) = &invocation.description
+    {
+        args.insert("description", vec![description.clone()]);
+        if invocation.description_multiline {
+            args.mark_multiline("description");
+        }
+    }
+    if args.get("title").is_none()
+        && args.get("title_flag").is_none()
+        && args.get("term").is_none()
+        && let Some(title) = &invocation.title
+    {
+        args.insert("title", vec![title.clone()]);
+    }
+    if args.get_all("label").is_empty() && !invocation.labels.is_empty() {
+        args.insert("label", invocation.labels.clone());
+    }
+    if args.get_all("reference").is_empty() && !invocation.references.is_empty() {
+        args.insert("reference", invocation.references.clone());
+    }
+    args
+}
+
+fn missing_required_fields(
+    fields: &[FieldSpec],
+    args: &DocumentArgs,
+    defaults: &BTreeMap<String, String>,
+) -> Vec<String> {
+    fields
+        .iter()
+        .filter(|field| field.required)
+        .filter(|field| args.get(&field.key).is_none() && !defaults.contains_key(&field.key))
+        .map(|field| field.key.clone())
+        .collect()
+}
+
+fn ensure_required_fields(
+    fields: &[FieldSpec],
+    args: &DocumentArgs,
+    defaults: &BTreeMap<String, String>,
+) -> Result<(), AppError> {
+    let missing = missing_required_fields(fields, args, defaults);
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(AppError::Validation(format!(
+            "missing required field(s): {}",
+            missing.join(", ")
+        )))
+    }
+}
+
+fn sanitize_labels(raw: &[String]) -> Result<Vec<String>, AppError> {
+    let mut labels = Vec::new();
+    for value in raw {
+        let normalized = sanitize_field(value)?;
+        if !labels.contains(&normalized) {
+            labels.push(normalized);
+        }
+    }
+    Ok(labels)
+}
+
+fn sanitize_references(raw: &[String]) -> Result<Vec<String>, AppError> {
+    let mut references = Vec::new();
+    for value in raw {
+        let normalized = sanitize::sanitize_path_string(value)
+            .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?;
+        if !references.contains(&normalized) {
+            references.push(normalized);
+        }
+    }
+    Ok(references)
+}
+
+fn title_from_args(
+    args: &DocumentArgs,
+    invocation: &DocumentInvocation,
+) -> Result<String, AppError> {
+    let positional = args.get("title");
+    let flag = args.get("title_flag");
+    let value = match (positional, flag) {
+        (Some(left), Some(right)) => {
+            if left != right {
+                return Err(AppError::Validation(
+                    "conflicting title sources".to_string(),
+                ));
+            }
+            Some(left)
+        }
+        (Some(value), None) | (None, Some(value)) => Some(value),
+        (None, None) => args.get("term").or(invocation.title.as_deref()),
+    };
+    let raw = value.ok_or_else(|| AppError::Validation("title is required".to_string()))?;
+    sanitize_field(raw)
+}
+
+fn optional_title_from_args(
+    args: &DocumentArgs,
+    invocation: &DocumentInvocation,
+) -> Result<Option<String>, AppError> {
+    let positional = args.get("title");
+    let flag = args.get("title_flag");
+    let value = match (positional, flag) {
+        (Some(left), Some(right)) => {
+            if left != right {
+                return Err(AppError::Validation(
+                    "conflicting title sources".to_string(),
+                ));
+            }
+            Some(left)
+        }
+        (Some(value), None) | (None, Some(value)) => Some(value),
+        (None, None) => args.get("term").or(invocation.title.as_deref()),
+    };
+    match value {
+        Some(raw) => {
+            let title = sanitize_field(raw)?;
+            if title.trim().is_empty() {
+                return Err(AppError::Validation("title must not be empty".to_string()));
+            }
+            Ok(Some(title))
+        }
+        None => Ok(None),
+    }
+}
+
+fn scalar_value(args: &DocumentArgs, field: &FieldSpec) -> Result<Option<String>, AppError> {
+    let Some(text) = args.text(&field.key) else {
+        return Ok(None);
+    };
+    let value = text.resolve()?;
+    if value.trim().is_empty() {
+        return Err(AppError::Validation(format!(
+            "field '{}' must not be empty",
+            field.key
+        )));
+    }
+    Ok(Some(value))
+}
+
+fn list_values(args: &DocumentArgs, field: &FieldSpec) -> Result<Vec<String>, AppError> {
+    let mut values = Vec::new();
+    for raw in args.get_all(&field.key) {
+        let value = sanitize_field(raw)?;
+        if !values.contains(&value) {
+            values.push(value);
+        }
+    }
+    Ok(values)
+}
+
+fn scalar_section_body(value: &str) -> String {
+    format!("{value}\n")
+}
+
+fn list_section_body(items: &[String]) -> String {
+    let mut body = items
+        .iter()
+        .map(|item| format!("- {item}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    body.push('\n');
+    body
+}
+
+fn frontmatter_sequence(doc: &Document, key: &str) -> Vec<String> {
+    if let Some(fm) = &doc.front_matter
+        && let yaml_serde::Value::Mapping(mapping) = &fm.data
+        && let Some(yaml_serde::Value::Sequence(sequence)) =
+            mapping.get(yaml_serde::Value::String(key.to_string()))
+    {
+        return sequence
+            .iter()
+            .filter_map(|value| match value {
+                yaml_serde::Value::String(text) => Some(text.clone()),
+                _ => None,
+            })
+            .collect();
+    }
+    Vec::new()
+}
+
+fn section_sequence(doc: &Document, heading: &str) -> Vec<String> {
+    let name = document::section_name(heading);
+    let Some(text) = document::section_text(doc, name) else {
+        return Vec::new();
+    };
+    let mut items = Vec::new();
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let item = trimmed
+            .strip_prefix("- ")
+            .or_else(|| trimmed.strip_prefix('-'))
+            .unwrap_or(trimmed)
+            .trim();
+        if !item.is_empty() {
+            items.push(item.to_string());
+        }
+    }
+    items
+}
+
+fn record_list_values(doc: &Document, field: &FieldSpec) -> Vec<String> {
+    if let Some(key) = &field.frontmatter_key {
+        let values = frontmatter_sequence(doc, key);
+        if !values.is_empty() {
+            return values;
+        }
+    }
+    if let Some(heading) = &field.heading {
+        return section_sequence(doc, heading);
+    }
+    Vec::new()
+}
+
+fn initial_document(id: &str, title: &str) -> Document {
+    let heading = format!("# {id} {title}");
+    Document {
+        source: format!("{heading}\n"),
+        front_matter: None,
+        frontmatter: None,
+        heading: Some(heading),
+        preamble: vec![String::new()],
+        sections: Vec::new(),
+    }
+}
+
+fn append_field_create_ops(
+    descriptor: &TypeDescriptor,
+    fields: &[FieldSpec],
+    args: &DocumentArgs,
+    body_ops: &mut Vec<PatchOp>,
+) -> Result<(), AppError> {
+    let skip_story = matches!(
+        descriptor.handler(),
+        Some(TypedHandler::Requirement(
+            crate::registry::RequirementKind::NonFunctional
+        ))
+    );
+    for field in fields {
+        if !field_offered(field, DocumentVerb::Create) || (skip_story && field.key == "story") {
+            continue;
+        }
+        let default = descriptor.field_defaults.get(&field.key);
+        let present = args.get(&field.key).is_some() || default.is_some();
+        if !present {
+            continue;
+        }
+        match field.kind {
+            crate::config::FieldKind::List => {
+                let mut values = if args.get(&field.key).is_some() {
+                    list_values(args, field)?
+                } else {
+                    default.into_iter().cloned().collect()
+                };
+                values.dedup();
+                if let Some(heading) = &field.heading
+                    && !values.is_empty()
+                {
+                    body_ops.push(PatchOp::SetSection(
+                        heading.clone(),
+                        list_section_body(&values),
+                    ));
+                }
+                if let Some(key) = &field.frontmatter_key {
+                    body_ops.push(PatchOp::SetFrontMatterValue(
+                        key.clone(),
+                        record::frontmatter::FrontMatterValue::Sequence(values),
+                    ));
+                }
+            }
+            crate::config::FieldKind::Text | crate::config::FieldKind::Multiline => {
+                let value = if args.get(&field.key).is_some() {
+                    scalar_value(args, field)?.unwrap_or_default()
+                } else {
+                    default.cloned().unwrap_or_default()
+                };
+                if let Some(heading) = &field.heading {
+                    body_ops.push(PatchOp::SetSection(
+                        heading.clone(),
+                        scalar_section_body(&value),
+                    ));
+                }
+                if let Some(key) = &field.frontmatter_key {
+                    body_ops.push(PatchOp::SetFrontMatterValue(
+                        key.clone(),
+                        record::frontmatter::FrontMatterValue::String(value),
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Build the create patch for a Markdown model. The engine emits only
+/// `PatchOp` values; `record::patch` renders the single final write.
 #[allow(clippy::too_many_arguments)]
-fn create_generic(
+fn create_document(
     ctx: &Context,
     cfg: &Config,
     registry: &ArtifactRegistry,
     descriptor: &TypeDescriptor,
-    record: &RecordDescriptor,
-    invocation: DocumentInvocation,
+    scope: &DocumentScope,
+    invocation: &DocumentInvocation,
 ) -> Result<crate::CommandOutput, AppError> {
-    let title_raw = invocation
-        .title
-        .clone()
-        .ok_or_else(|| AppError::Validation("title is required".to_string()))?;
-    let title = sanitize_field(&title_raw)?;
-    let description = match invocation.description {
-        Some(d) if invocation.description_multiline => Some(d),
-        Some(d) => Some(sanitize_field(&d)?),
-        None => None,
-    };
+    let fields = document_fields_for_verb(descriptor, DocumentVerb::Create);
+    let mut args = merge_invocation_args(invocation, &fields);
+    resolve_field_stdin(&fields, &mut args)?;
+    let title = title_from_args(&args, invocation)?;
+    ensure_required_fields(&fields, &args, &descriptor.field_defaults)?;
 
-    let mut labels: Vec<String> = Vec::new();
-    for l in &invocation.labels {
-        let v = sanitize_field(l)?;
-        if !labels.contains(&v) {
-            labels.push(v);
-        }
-    }
-    let mut references: Vec<String> = Vec::new();
-    for r in &invocation.references {
-        let v = sanitize::sanitize_path_string(r)
-            .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?;
-        if !references.contains(&v) {
-            references.push(v);
-        }
+    let active = scope.active.clone();
+    let archived = scope.archived.clone();
+    fs::create_dir_all(&active).map_err(|error| AppError::Runtime(error.to_string()))?;
+    if descriptor.document_model == DocumentModel::GroupedMarkdown {
+        fs::create_dir_all(&archived).map_err(|error| AppError::Runtime(error.to_string()))?;
     }
 
-    let active = record.resolve_directory(cfg, &ctx.project_dir)?;
-    fs::create_dir_all(&active).map_err(|e| AppError::Runtime(e.to_string()))?;
-
-    let archived_dir = active.join("archived");
-    let next = record::identity::next_number(&active, &archived_dir, &descriptor.prefix);
-    let id = record::identity::format_id(&descriptor.prefix, next as i64, cfg.id_padding as usize);
-
-    let status = match &descriptor.status_model {
-        StatusModel::DocumentMain { default, .. } => default.clone(),
-        _ => "active".to_string(),
+    let (id, group_link) = if descriptor.document_model == DocumentModel::GroupedMarkdown {
+        let group_raw = args
+            .get("group")
+            .ok_or_else(|| AppError::Validation("missing required argument: group".to_string()))?;
+        let group = resolve_group(ctx, cfg, registry, scope, group_raw)?;
+        let next = record::identity::next_seq_number(&active, &archived, &group.id);
+        let id = record::identity::format_seq_id(&group.id, next as i64, scope.id_padding);
+        (id, Some(group))
+    } else {
+        let next = record::identity::next_number(&active, &archived, &scope.prefix);
+        (
+            record::identity::format_id(&scope.prefix, next as i64, scope.id_padding),
+            None,
+        )
     };
 
     let now = record::frontmatter::utc_now();
-
-    let mut sections: Vec<Section> = Vec::new();
-    if let Some(desc_text) = &description {
-        sections.push(Section {
-            heading: "## Description".to_string(),
-            body: vec![desc_text.clone()],
-        });
-    }
-    let body_doc = Document {
-        source: String::new(),
-        front_matter: None,
-        frontmatter: None,
-        heading: Some(format!("# {} {}", id, title)),
-        preamble: vec![String::new()],
-        sections,
-    };
-    let body = document::render(&body_doc);
-    let parsed = document::parse(&body)?;
-
+    let labels = sanitize_labels(args.get_all("label"))?;
+    let references = sanitize_references(args.get_all("reference"))?;
     let labels_value = if labels.is_empty() {
         "[]".to_string()
     } else {
         labels.join("\n")
     };
-    let refs_value = if references.is_empty() {
+    let references_value = if references.is_empty() {
         "[]".to_string()
     } else {
         references.join("\n")
     };
 
-    let ops = vec![
+    let mut ops = vec![
         PatchOp::SetFrontMatterValue(
             "id".to_string(),
             record::frontmatter::FrontMatterValue::String(id.clone()),
@@ -534,7 +796,7 @@ fn create_generic(
         ),
         PatchOp::SetFrontMatterValue(
             "updated_date".to_string(),
-            record::frontmatter::FrontMatterValue::String(now.clone()),
+            record::frontmatter::FrontMatterValue::String(now),
         ),
         PatchOp::SetFrontMatterValue(
             "labels".to_string(),
@@ -542,59 +804,208 @@ fn create_generic(
         ),
         PatchOp::SetFrontMatterValue(
             "references".to_string(),
-            record::frontmatter::FrontMatterValue::String(refs_value),
-        ),
-        PatchOp::SetFrontMatterValue(
-            "status".to_string(),
-            record::frontmatter::FrontMatterValue::String(status),
+            record::frontmatter::FrontMatterValue::String(references_value),
         ),
     ];
-    let file_content = patch::apply_patch(&parsed, &ops)?;
-    let file_path = active.join(format!("{}.md", id));
-    let safe_path = Context::ensure_within(&ctx.project_dir, &file_path)?;
-    record::store::write_atomic(ctx, cfg, registry, &safe_path, &file_content)?;
+    if descriptor.is_config_defined_document()
+        && let StatusModel::DocumentMain { default, .. } = &descriptor.status_model
+    {
+        ops.push(PatchOp::SetFrontMatterValue(
+            "status".to_string(),
+            record::frontmatter::FrontMatterValue::String(default.clone()),
+        ));
+    }
+    ops.push(PatchOp::SetHeadingTitle(title.clone()));
 
-    let json = if ctx.json {
-        Some(json!({"id": id}))
-    } else {
-        None
-    };
-    Ok(crate::CommandOutput {
-        text: id,
-        json,
-        ..Default::default()
-    })
+    let mut body_ops = Vec::new();
+    append_field_create_ops(descriptor, &fields, &args, &mut body_ops)?;
+    if let Some(group) = &group_link {
+        let group_op = PatchOp::SetSection(
+            "## Group".to_string(),
+            scalar_section_body(&format!("{} {}", group.id, group.title)),
+        );
+        let insert_at = body_ops
+            .iter()
+            .position(|op| matches!(op, PatchOp::SetSection(_, _)))
+            .map(|index| index + 1)
+            .unwrap_or(0);
+        body_ops.insert(insert_at, group_op);
+    }
+    ops.extend(body_ops);
+
+    let doc = initial_document(&id, &title);
+    let content = patch::apply_patch(&doc, &ops)?;
+    let path = active.join(format!("{id}.md"));
+    let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
+    record::store::write_atomic(ctx, cfg, registry, &safe_path, &content)?;
+    Ok(typed_created(ctx, id))
 }
 
-fn list_records(
+/// The engine-owned grouped create-group surface, transitional to TASK-256.
+#[allow(clippy::too_many_arguments)]
+fn create_group_document(
     ctx: &Context,
     cfg: &Config,
     registry: &ArtifactRegistry,
-    record: &RecordDescriptor,
+    descriptor: &TypeDescriptor,
+    scope: &DocumentScope,
+    invocation: &DocumentInvocation,
 ) -> Result<crate::CommandOutput, AppError> {
-    // Read-path auto-relocation: records whose status is `archived` but which
-    // still live in the active folder are relocated by `record::resolve::list_in_dir`
-    // (via `record::store::relocate_if_archived`). On destination-write failure
-    // this surfaces as `Err(Validation)`; on source-unlink failure as
-    // `Err(Runtime)` naming both paths. The operation fails loudly rather than
-    // returning a read-only handle.
-    let active = record.resolve_directory(cfg, &ctx.project_dir)?;
-    let _ = fs::create_dir_all(&active);
-    let prefixes = record.configured_prefixes(cfg);
-    let dotted = record.is_dotted_id();
-    let records = record::resolve::list_in_dir(ctx, cfg, registry, &active, &prefixes, dotted)?;
-    let mut items: Vec<(String, String, String)> = Vec::new();
-    for record in records {
-        if record.path.parent() != Some(active.as_path()) {
+    let fields = document_fields_for_verb(descriptor, DocumentVerb::CreateGroup);
+    let args = merge_invocation_args(invocation, &fields);
+    let title = title_from_args(&args, invocation)?;
+
+    let active = scope.active.clone();
+    let archived = scope.archived.clone();
+    fs::create_dir_all(&active).map_err(|error| AppError::Runtime(error.to_string()))?;
+    let next = record::identity::next_number(&active, &archived, &scope.prefix);
+    let id = record::identity::format_id(&scope.prefix, next as i64, scope.id_padding);
+
+    let skip_story = matches!(
+        descriptor.handler(),
+        Some(TypedHandler::Requirement(
+            crate::registry::RequirementKind::NonFunctional
+        ))
+    );
+    let mut ops = vec![PatchOp::SetHeadingTitle(title.clone())];
+    for field in &fields {
+        if skip_story && field.key == "story" {
             continue;
         }
-        let (doc_read, _token) = record::store::read_document(ctx, cfg, registry, &record.path)?;
-        let content = doc_read.source.clone();
-        let (_, t) = document::heading_id_title_with_frontmatter(&doc_read);
-        let title = if t.is_empty() { record.id.clone() } else { t };
-        items.push((record.id, title, content));
+        if !field_offered(field, DocumentVerb::CreateGroup) || args.get(&field.key).is_none() {
+            continue;
+        }
+        let Some(heading) = &field.heading else {
+            continue;
+        };
+        match field.kind {
+            crate::config::FieldKind::List => {
+                let values = list_values(&args, field)?;
+                if !values.is_empty() {
+                    ops.push(PatchOp::SetSection(
+                        heading.clone(),
+                        list_section_body(&values),
+                    ));
+                }
+            }
+            crate::config::FieldKind::Text | crate::config::FieldKind::Multiline => {
+                if let Some(value) = scalar_value(&args, field)? {
+                    ops.push(PatchOp::SetSection(
+                        heading.clone(),
+                        scalar_section_body(&value),
+                    ));
+                }
+            }
+        }
     }
-    items.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let doc = initial_document(&id, &title);
+    let content = patch::apply_patch(&doc, &ops)?;
+    let path = active.join(format!("{id}.md"));
+    let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
+    record::store::write_atomic(ctx, cfg, registry, &safe_path, &content)?;
+    Ok(typed_created(ctx, id))
+}
+
+struct GroupLink {
+    id: String,
+    title: String,
+}
+
+/// Resolve the owning group of a grouped member create.
+///
+/// The full group-link rules are TASK-256; this keeps the existing create
+/// behavior, including cross-type and archived-group rejection.
+fn resolve_group(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    scope: &DocumentScope,
+    group_raw: &str,
+) -> Result<GroupLink, AppError> {
+    let group_id = sanitize_field(group_raw)?;
+    if !record::identity::is_group_id(&group_id, &scope.prefix) {
+        let other = registry.descriptors().find(|candidate| {
+            candidate.category == ArtifactCategory::Document
+                && candidate.document_model == DocumentModel::GroupedMarkdown
+                && candidate.prefix != scope.prefix
+                && record::identity::is_group_id(&group_id, &candidate.prefix)
+        });
+        if let Some(other) = other
+            && let Ok(other_scope) = DocumentScope::resolve(ctx, cfg, other)
+            && (other_scope.active.join(format!("{group_id}.md")).exists()
+                || other_scope.archived.join(format!("{group_id}.md")).exists())
+        {
+            return Err(AppError::Validation(format!(
+                "group type mismatch: {group_id}"
+            )));
+        }
+        return Err(AppError::NotFound(format!("group not found: {group_id}")));
+    }
+
+    let active_path = scope.active.join(format!("{group_id}.md"));
+    let archived_path = scope.archived.join(format!("{group_id}.md"));
+    let active_safe = Context::ensure_within(&ctx.project_dir, &active_path)?;
+    let archived_safe = Context::ensure_within(&ctx.project_dir, &archived_path)?;
+    let path = if active_safe.exists() {
+        active_safe
+    } else if archived_safe.exists() {
+        return Err(AppError::Validation(format!(
+            "group is archived: {group_id}"
+        )));
+    } else {
+        return Err(AppError::NotFound(format!("group not found: {group_id}")));
+    };
+    let (doc, _token) = record::store::read_document(ctx, cfg, registry, &path)?;
+    let (_, title) = document::heading_id_title(&doc);
+    if title.is_empty() {
+        return Err(AppError::Runtime(format!("group has no title: {group_id}")));
+    }
+    Ok(GroupLink {
+        id: group_id,
+        title,
+    })
+}
+
+fn list_documents(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    descriptor: &TypeDescriptor,
+    scope: &DocumentScope,
+) -> Result<crate::CommandOutput, AppError> {
+    let active = scope.active.clone();
+    let _ = fs::create_dir_all(&active);
+    let dotted = descriptor.id_shape == crate::registry::IdShape::Grouped;
+    let prefixes = vec![scope.prefix.clone()];
+    let mut records = record::resolve::list_in_dir(ctx, cfg, registry, &active, &prefixes, dotted)?;
+    if descriptor.document_model == DocumentModel::GroupedMarkdown && dotted {
+        for group in record::resolve::list_in_dir(ctx, cfg, registry, &active, &prefixes, false)? {
+            if !group.id.contains('.') {
+                records.push(group);
+            }
+        }
+    }
+    let mut items: Vec<(String, String, String)> = Vec::new();
+    for entry in records {
+        if entry.path.parent() != Some(active.as_path()) {
+            continue;
+        }
+        let (doc, _token) = record::store::read_document(ctx, cfg, registry, &entry.path)?;
+        let content = doc.source.clone();
+        let title = if descriptor.is_config_defined_document() {
+            document::heading_id_title_with_frontmatter(&doc).1
+        } else {
+            document::heading_id_title(&doc).1
+        };
+        let title = if title.is_empty() {
+            entry.id.clone()
+        } else {
+            title
+        };
+        items.push((entry.id, title, content));
+    }
+    items.sort_by(|left, right| left.0.cmp(&right.0));
 
     let text = items
         .iter()
@@ -602,17 +1013,27 @@ fn list_records(
         .collect::<Vec<_>>()
         .join("\n");
     let json = if ctx.json {
-        let arr: Vec<serde_json::Value> = items
+        let array: Vec<serde_json::Value> = items
             .iter()
             .map(|(id, title, content)| {
-                json!({
-                    "id": id,
-                    "title": title,
-                    "metadata": record::view::RecordView::lenient(content, id).metadata_json(),
-                })
+                let metadata = record::view::RecordView::lenient(content, id).metadata_json();
+                if matches!(descriptor.handler(), Some(TypedHandler::Glossary)) {
+                    json!({
+                        "id": id,
+                        "term": title,
+                        "title": title,
+                        "metadata": metadata,
+                    })
+                } else {
+                    json!({
+                        "id": id,
+                        "title": title,
+                        "metadata": metadata,
+                    })
+                }
             })
             .collect();
-        Some(serde_json::Value::Array(arr))
+        Some(serde_json::Value::Array(array))
     } else {
         None
     };
@@ -623,35 +1044,71 @@ fn list_records(
     })
 }
 
-fn view_record(
+fn resolve_document(
     ctx: &Context,
     cfg: &Config,
     registry: &ArtifactRegistry,
-    record: &RecordDescriptor,
+    scope: &DocumentScope,
+    descriptor: &TypeDescriptor,
+    requested: &str,
+) -> Result<record::resolve::ResolvedRecord, AppError> {
+    // A config-defined type keeps its historical active-only edit/view
+    // resolution; seed types read the archived directory too (TECH-066).
+    let mut dirs = vec![scope.active.clone()];
+    if !descriptor.is_config_defined_document() {
+        dirs.push(scope.archived.clone());
+    }
+    let prefixes = vec![scope.prefix.clone()];
+    let dotted = descriptor.id_shape == crate::registry::IdShape::Grouped;
+    if let Some(found) =
+        record::resolve::resolve_in_dirs(ctx, cfg, registry, &dirs, requested, &prefixes, dotted)?
+    {
+        return Ok(found);
+    }
+    if dotted
+        && let Some(found) = record::resolve::resolve_in_dirs(
+            ctx, cfg, registry, &dirs, requested, &prefixes, false,
+        )?
+    {
+        return Ok(found);
+    }
+    if descriptor.is_config_defined_document() {
+        Err(AppError::NotFound(format!("record not found: {requested}")))
+    } else {
+        Err(AppError::NotFound(format!("not found: {requested}")))
+    }
+}
+
+fn preserves_trailing_newline(descriptor: &TypeDescriptor) -> bool {
+    // Transitional: the glossary and requirement modules historically printed
+    // the record with its trailing newline. TASK-259 must record this seed fact
+    // before the handler enum is removed.
+    matches!(
+        descriptor.handler(),
+        Some(TypedHandler::Glossary) | Some(TypedHandler::Requirement(_))
+    )
+}
+
+fn view_document(
+    ctx: &Context,
+    cfg: &Config,
+    registry: &ArtifactRegistry,
+    descriptor: &TypeDescriptor,
+    scope: &DocumentScope,
     id: Option<String>,
 ) -> Result<crate::CommandOutput, AppError> {
-    let id_raw = id.ok_or_else(|| AppError::Validation("id is required".to_string()))?;
-    let requested = sanitize_field(&id_raw)?;
-    let active = record.resolve_directory(cfg, &ctx.project_dir)?;
-    let _ = fs::create_dir_all(&active);
-    let prefixes = record.configured_prefixes(cfg);
-    let dotted = record.is_dotted_id();
-    let resolved = record::resolve::resolve_in_dirs(
-        ctx,
-        cfg,
-        registry,
-        &[active],
-        &requested,
-        &prefixes,
-        dotted,
-    )?;
-    let record =
-        resolved.ok_or_else(|| AppError::NotFound(format!("record not found: {}", requested)))?;
-    let id = record.id.clone();
-    let path = record.path.clone();
-    let (doc, _token) = record::store::read_document(ctx, cfg, registry, &path)?;
-    let content = doc.source.clone();
-
+    let requested = id.ok_or_else(|| AppError::Validation("id is required".to_string()))?;
+    let requested = sanitize_field(&requested)?;
+    let resolved = resolve_document(ctx, cfg, registry, scope, descriptor, &requested)?;
+    let path = resolved.path.clone();
+    let id = resolved.id.clone();
+    let content = if descriptor.is_config_defined_document() {
+        record::store::read_document(ctx, cfg, registry, &path)?
+            .0
+            .source
+    } else {
+        record::migrate::ensure_front_matter(ctx, cfg, registry, &path)?
+    };
     let json = if ctx.json {
         Some(json!({
             "id": id,
@@ -662,7 +1119,11 @@ fn view_record(
     } else {
         None
     };
-    let text = content.trim_end_matches('\n').to_string();
+    let text = if preserves_trailing_newline(descriptor) {
+        content
+    } else {
+        content.trim_end_matches('\n').to_string()
+    };
     Ok(crate::CommandOutput {
         text,
         json,
@@ -670,143 +1131,206 @@ fn view_record(
     })
 }
 
-fn edit_generic(
+fn clear_field_ops(ops: &mut Vec<PatchOp>, field: &FieldSpec) {
+    if let Some(heading) = &field.heading {
+        ops.push(PatchOp::ClearSection(heading.clone()));
+    }
+    if let Some(key) = &field.frontmatter_key {
+        ops.push(PatchOp::ClearFrontMatter(key.clone()));
+    }
+}
+
+fn set_scalar_ops(ops: &mut Vec<PatchOp>, field: &FieldSpec, value: &str) {
+    if let Some(heading) = &field.heading {
+        ops.push(PatchOp::SetSection(
+            heading.clone(),
+            scalar_section_body(value),
+        ));
+    }
+    if let Some(key) = &field.frontmatter_key {
+        ops.push(PatchOp::SetFrontMatterValue(
+            key.clone(),
+            record::frontmatter::FrontMatterValue::String(value.to_string()),
+        ));
+    }
+}
+
+fn list_field_ops(ops: &mut Vec<PatchOp>, field: &FieldSpec, values: &[String]) {
+    if let Some(heading) = &field.heading {
+        if values.is_empty() {
+            ops.push(PatchOp::ClearSection(heading.clone()));
+        } else {
+            ops.push(PatchOp::SetSection(
+                heading.clone(),
+                list_section_body(values),
+            ));
+        }
+    }
+    if let Some(key) = &field.frontmatter_key {
+        ops.push(PatchOp::SetFrontMatterValue(
+            key.clone(),
+            record::frontmatter::FrontMatterValue::Sequence(values.to_vec()),
+        ));
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn edit_document(
     ctx: &Context,
     cfg: &Config,
     registry: &ArtifactRegistry,
-    _descriptor: &TypeDescriptor,
-    record: &RecordDescriptor,
-    invocation: DocumentInvocation,
+    descriptor: &TypeDescriptor,
+    scope: &DocumentScope,
+    invocation: &DocumentInvocation,
 ) -> Result<crate::CommandOutput, AppError> {
     let id_raw = invocation
         .id
         .clone()
         .ok_or_else(|| AppError::Validation("id is required".to_string()))?;
     let requested = sanitize_field(&id_raw)?;
-
-    let active = record.resolve_directory(cfg, &ctx.project_dir)?;
-    let _ = fs::create_dir_all(&active);
-    let prefixes = record.configured_prefixes(cfg);
-    let dotted = record.is_dotted_id();
-    let resolved = record::resolve::resolve_in_dirs(
-        ctx,
-        cfg,
-        registry,
-        std::slice::from_ref(&active),
-        &requested,
-        &prefixes,
-        dotted,
-    )?;
-    let record =
-        resolved.ok_or_else(|| AppError::NotFound(format!("record not found: {}", requested)))?;
-    record.ensure_writable()?;
-    let id = record.id.clone();
-    let path = record.path.clone();
-    if path.parent() != Some(active.as_path()) {
+    let resolved = resolve_document(ctx, cfg, registry, scope, descriptor, &requested)?;
+    resolved.ensure_writable()?;
+    let id = resolved.id.clone();
+    let path = resolved.path.clone();
+    if descriptor.is_config_defined_document() && path.parent() != Some(scope.active.as_path()) {
         return Err(AppError::Validation(format!(
             "record {} is archived; edits are not allowed",
             id
         )));
     }
 
+    let fields = if descriptor.document_model == DocumentModel::GroupedMarkdown && !id.contains('.')
+    {
+        descriptor
+            .group
+            .as_ref()
+            .and_then(|role| role.fields.clone())
+            .unwrap_or_default()
+    } else {
+        document_fields_for_verb(descriptor, DocumentVerb::Edit)
+    };
+    let mut args = merge_invocation_args(invocation, &fields);
+    resolve_field_stdin(&fields, &mut args)?;
+
+    let editor_command = if invocation.editor {
+        Some(
+            cfg.effective_editor()
+                .ok_or_else(|| AppError::Runtime("no editor configured".to_string()))?,
+        )
+    } else {
+        None
+    };
+
     let (doc, _token) = record::store::read_document(ctx, cfg, registry, &path)?;
     let content = doc.source.clone();
-
     let mut ops: Vec<PatchOp> = Vec::new();
-    let mut changed = false;
 
-    if let Some(title_raw) = invocation.title {
-        let new_title = sanitize_field(&title_raw)?;
-        let current_title = record::frontmatter::current_value_string(
-            doc.front_matter
-                .as_ref()
-                .map(|f| f.raw.as_str())
-                .unwrap_or(""),
-            "title",
-        )
-        .unwrap_or_else(|| {
-            let (_, t) = document::heading_id_title(&doc);
-            t
-        });
-        if new_title != current_title {
-            ops.push(PatchOp::SetFrontMatter(
-                "title".to_string(),
-                new_title.clone(),
-            ));
-            ops.push(PatchOp::SetHeadingTitle(new_title));
-            changed = true;
-        }
+    if let Some(title) = optional_title_from_args(&args, invocation)? {
+        ops.push(PatchOp::SetFrontMatter("title".into(), title.clone()));
+        ops.push(PatchOp::SetHeadingTitle(title.clone()));
     }
 
-    if let Some(desc_raw) = invocation.description {
-        let new_desc = if invocation.description_multiline {
-            desc_raw
-        } else {
-            sanitize_field(&desc_raw)?
-        };
-        let current_desc = document::section_text(&doc, "Description").unwrap_or_default();
-        if new_desc != current_desc.trim() {
-            ops.push(PatchOp::SetSection("## Description".to_string(), new_desc));
-            changed = true;
+    for field in &fields {
+        if !field_offered(field, DocumentVerb::Edit) {
+            continue;
         }
-    }
-
-    if !invocation.labels.is_empty() {
-        let mut fm_labels = current_list(&doc, "labels");
-        let mut appended = false;
-        for l in &invocation.labels {
-            let lv = sanitize_field(l)?;
-            if !fm_labels.contains(&lv) {
-                fm_labels.push(lv);
-                appended = true;
+        match field.kind {
+            crate::config::FieldKind::List => {
+                let add_key = &field.key;
+                let remove_key = format!("no_{}", field.key);
+                let has_add = args.get(add_key).is_some();
+                let has_remove = args.optional(&remove_key).is_some();
+                if !has_add && !has_remove {
+                    continue;
+                }
+                let mut values = record_list_values(&doc, field);
+                if has_add {
+                    for value in list_values(&args, field)? {
+                        if !values.contains(&value) {
+                            values.push(value);
+                        }
+                    }
+                }
+                if let Some(removal) = args.optional(&remove_key) {
+                    match removal {
+                        Some(raw) => {
+                            let remove = sanitize_field(raw)?;
+                            values.retain(|value| value != &remove);
+                        }
+                        None => values.clear(),
+                    }
+                }
+                if field.required && values.is_empty() {
+                    return Err(AppError::Validation(format!(
+                        "field '{}' is required and cannot be cleared",
+                        field.key
+                    )));
+                }
+                list_field_ops(&mut ops, field, &values);
+            }
+            crate::config::FieldKind::Text | crate::config::FieldKind::Multiline => {
+                if args.get(&field.key).is_none() {
+                    continue;
+                }
+                let text = args.text(&field.key).expect("option is present");
+                if text.as_str().trim().is_empty() {
+                    if field.required {
+                        return Err(AppError::Validation(format!(
+                            "field '{}' is required and cannot be cleared",
+                            field.key
+                        )));
+                    }
+                    clear_field_ops(&mut ops, field);
+                } else {
+                    let value = text.resolve()?;
+                    set_scalar_ops(&mut ops, field, &value);
+                }
             }
         }
-        if appended {
-            ops.push(PatchOp::SetFrontMatter(
-                "labels".to_string(),
-                fm_labels.join("\n"),
-            ));
-            changed = true;
-        }
     }
 
-    if !invocation.references.is_empty() {
-        let mut fm_refs = current_list(&doc, "references");
-        let mut appended = false;
-        for r in &invocation.references {
-            let rv = sanitize::sanitize_path_string(r)
-                .ok_or_else(|| AppError::Validation("input cannot be normalized".to_string()))?;
-            if !fm_refs.contains(&rv) {
-                fm_refs.push(rv);
-                appended = true;
+    if !args.get_all("label").is_empty() {
+        let mut labels = current_list(&doc, "labels");
+        for label in sanitize_labels(args.get_all("label"))? {
+            if !labels.contains(&label) {
+                labels.push(label);
             }
         }
-        if appended {
-            ops.push(PatchOp::SetFrontMatter(
-                "references".to_string(),
-                fm_refs.join("\n"),
-            ));
-            changed = true;
+        ops.push(PatchOp::SetFrontMatter("labels".into(), labels.join("\n")));
+    }
+    if !args.get_all("reference").is_empty() {
+        let mut references = current_list(&doc, "references");
+        for reference in sanitize_references(args.get_all("reference"))? {
+            if !references.contains(&reference) {
+                references.push(reference);
+            }
+        }
+        ops.push(PatchOp::SetFrontMatter(
+            "references".into(),
+            references.join("\n"),
+        ));
+    }
+
+    let candidate = patch::apply_patch(&doc, &ops)?;
+    if candidate != content {
+        let mut final_ops = ops;
+        final_ops.push(PatchOp::SetFrontMatter(
+            "updated_date".into(),
+            record::frontmatter::utc_now(),
+        ));
+        let new_content = patch::apply_patch(&doc, &final_ops)?;
+        if new_content != content {
+            let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
+            record::store::write_atomic(ctx, cfg, registry, &safe_path, &new_content)?;
         }
     }
 
-    if changed {
-        let now = record::frontmatter::utc_now();
-        ops.push(PatchOp::SetFrontMatter("updated_date".to_string(), now));
-    }
-
-    let new_content = patch::apply_patch(&doc, &ops)?;
-    if new_content != content {
+    if let Some(command) = editor_command {
         let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
-        record::store::write_atomic(ctx, cfg, registry, &safe_path, &new_content)?;
-    }
-
-    let safe_path = Context::ensure_within(&ctx.project_dir, &path)?;
-    if invocation.editor {
-        let command = cfg
-            .effective_editor()
-            .ok_or_else(|| AppError::Runtime("no editor configured".to_string()))?;
         run_editor(&command, &safe_path)?;
+        if matches!(descriptor.handler(), Some(TypedHandler::UiSpec)) {
+            record::migrate::ensure_front_matter(ctx, cfg, registry, &safe_path)?;
+        }
     }
 
     let json = if ctx.json {
@@ -896,7 +1420,7 @@ pub fn status_record(
     id: Option<String>,
     value: Option<String>,
 ) -> Result<crate::CommandOutput, AppError> {
-    // Read-path auto-relocation: see `list_records`; a record relocated during
+    // Read-path auto-relocation: see `list_documents`; a record relocated during
     // the read step fails loudly (`Err(Validation)` on destination-write failure,
     // `Err(Runtime)` naming both paths on source-unlink failure) instead of
     // returning a read-only handle.

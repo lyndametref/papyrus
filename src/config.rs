@@ -533,6 +533,13 @@ const MOCKUP_SLOTS: &[SeedSlot] = &[
 ];
 const NO_SLOTS: &[SeedSlot] = &[];
 
+/// Seed field defaults applied on create when the field is absent (ADR-042).
+///
+/// A default is not a [`FieldSpec`] key, a configuration key, or a project
+/// entry: only the seed table may declare one.
+const NO_FIELD_DEFAULTS: &[(&str, &str)] = &[];
+const AUDIT_FIELD_DEFAULTS: &[(&str, &str)] = &[("audit_type", "security")];
+
 const RULE_API_ALIASES: &[&str] = &["/api/business-rules", "/api/business-rule"];
 const AUDIT_API_ALIASES: &[&str] = &["/api/audit-records", "/api/audit-record"];
 const TECH_SPEC_API_ALIASES: &[&str] = &["/api/tech-specs", "/api/tech-spec"];
@@ -601,6 +608,8 @@ pub struct SeedDocumentType {
     pub fields: &'static [SeedField],
     pub group: Option<SeedRole>,
     pub member: Option<SeedRole>,
+    /// Values written on create when the field is absent (ADR-042 ruling 1).
+    pub field_defaults: &'static [(&'static str, &'static str)],
     pub record: SeedRecord,
 }
 
@@ -636,6 +645,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
             fields: REQ_FIELDS,
             reference_visibility: Visibility::Hidden,
         }),
+        field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "business requirement",
             record_type: "requirement",
@@ -667,6 +677,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
             fields: REQ_FIELDS,
             reference_visibility: Visibility::Hidden,
         }),
+        field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "non-functional requirement",
             record_type: "nfr",
@@ -692,6 +703,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: GLOSSARY_FIELDS,
         group: None,
         member: None,
+        field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "glossary term",
             record_type: "glossary",
@@ -717,6 +729,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: RULE_FIELDS,
         group: None,
         member: None,
+        field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "business rule",
             record_type: "rule",
@@ -742,6 +755,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: UI_SPEC_FIELDS,
         group: None,
         member: None,
+        field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "ui specification",
             record_type: "ui-spec",
@@ -767,6 +781,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: &[],
         group: None,
         member: None,
+        field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "ui mockup",
             record_type: "ui-mockup",
@@ -792,6 +807,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: AUDIT_FIELDS,
         group: None,
         member: None,
+        field_defaults: AUDIT_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "audit record",
             record_type: "audit",
@@ -817,6 +833,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: TECH_SPEC_FIELDS,
         group: None,
         member: None,
+        field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "technical specification",
             record_type: "tech-spec",
@@ -842,6 +859,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: DESCRIPTION_APPLICABILITY_FIELDS,
         group: None,
         member: None,
+        field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "use case",
             record_type: "use-case",
@@ -867,6 +885,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: DESCRIPTION_APPLICABILITY_FIELDS,
         group: None,
         member: None,
+        field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "test case",
             record_type: "test-case",
@@ -892,6 +911,7 @@ pub(crate) const SEED_DOCUMENT_TYPES: [SeedDocumentType; 11] = [
         fields: DESCRIPTION_APPLICABILITY_FIELDS,
         group: None,
         member: None,
+        field_defaults: NO_FIELD_DEFAULTS,
         record: SeedRecord {
             name: "test report",
             record_type: "test-report",

@@ -209,7 +209,7 @@ fn milestone_content_management_flow() {
             "Req Title",
             "--group",
             "REQ-001",
-            "-d",
+            "--description",
             PHRASE
         ]),
         "REQ-001.001"
@@ -228,14 +228,22 @@ fn milestone_content_management_flow() {
             "Nfr Title",
             "--group",
             "NFR-001",
-            "-d",
+            "--description",
             PHRASE
         ]),
         "NFR-001.001"
     );
 
     assert_eq!(
-        run_ok(&["--dir", &p, "task", "create", "Task Title", "-d", PHRASE]),
+        run_ok(&[
+            "--dir",
+            &p,
+            "task",
+            "create",
+            "Task Title",
+            "--description",
+            PHRASE
+        ]),
         "TASK-001"
     );
     assert_eq!(
@@ -245,7 +253,7 @@ fn milestone_content_management_flow() {
             "milestone",
             "create",
             "Milestone Title",
-            "-d",
+            "--description",
             PHRASE
         ]),
         "MS-001"
@@ -257,7 +265,7 @@ fn milestone_content_management_flow() {
             "release",
             "create",
             "Release Title",
-            "-d",
+            "--description",
             PHRASE
         ]),
         "REL-001"
@@ -269,7 +277,7 @@ fn milestone_content_management_flow() {
             "decision",
             "create",
             "Decision Title",
-            "-d",
+            "--decision",
             PHRASE
         ]),
         "ADR-001"
@@ -433,7 +441,7 @@ fn content_management_cross_type_resolution() {
             "Req Title",
             "--group",
             "REQ-001",
-            "-d",
+            "--description",
             PHRASE
         ]),
         "REQ-001.001"
@@ -493,7 +501,7 @@ fn installed_layout_has_no_runtime_asset_dependency() {
             "decision",
             "create",
             "Decision One",
-            "-d",
+            "--decision",
             PHRASE
         ]),
         "ADR-001"

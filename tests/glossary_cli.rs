@@ -408,7 +408,9 @@ fn glossary_missing_args_exit_2() {
         .args(["--dir", p, "glossary", "create", "--term", "t"])
         .output()
         .unwrap();
-    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(out.status.code(), Some(4));
+    let message = String::from_utf8_lossy(&out.stderr);
+    assert!(message.contains("definition"), "{message}");
     let _ = fs::remove_dir_all(&d);
 }
 

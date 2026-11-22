@@ -76,7 +76,7 @@ fn fixture(dir: &Path) {
             "REQ-001",
             "--story",
             "As a cashier I capture a payment",
-            "-d",
+            "--description",
             "The quick brown fox jumps over the lazy dog.",
         ]),
         "REQ-001.001"
@@ -101,7 +101,7 @@ fn fixture(dir: &Path) {
             "Latency budget",
             "--group",
             "NFR-001",
-            "-d",
+            "--description",
             "Response time stays within budget.",
         ]),
         "NFR-001.001"

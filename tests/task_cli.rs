@@ -38,7 +38,7 @@ fn task_basic_lifecycle() {
             "task",
             "create",
             "T1",
-            "-d",
+            "--description",
             "desc",
             "--ac",
             "ac1",

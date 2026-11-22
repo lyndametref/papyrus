@@ -44,14 +44,35 @@ fn search(project: &Path, args: &[&str]) -> Output {
 fn basic_task_milestone_release_search() {
     let d = tmpdir("basic");
     init(&d);
-    run(&d, &["task", "create", "Task title", "-d", "needle task"]);
     run(
         &d,
-        &["milestone", "create", "Milestone title", "-d", "needle ms"],
+        &[
+            "task",
+            "create",
+            "Task title",
+            "--description",
+            "needle task",
+        ],
     );
     run(
         &d,
-        &["release", "create", "Release title", "-d", "needle rel"],
+        &[
+            "milestone",
+            "create",
+            "Milestone title",
+            "--description",
+            "needle ms",
+        ],
+    );
+    run(
+        &d,
+        &[
+            "release",
+            "create",
+            "Release title",
+            "--description",
+            "needle rel",
+        ],
     );
 
     let out = search(&d, &["needle"]);
@@ -66,14 +87,35 @@ fn basic_task_milestone_release_search() {
 fn type_filters_restrict() {
     let d = tmpdir("filters");
     init(&d);
-    run(&d, &["task", "create", "Task title", "-d", "needle task"]);
     run(
         &d,
-        &["milestone", "create", "Milestone title", "-d", "needle ms"],
+        &[
+            "task",
+            "create",
+            "Task title",
+            "--description",
+            "needle task",
+        ],
     );
     run(
         &d,
-        &["release", "create", "Release title", "-d", "needle rel"],
+        &[
+            "milestone",
+            "create",
+            "Milestone title",
+            "--description",
+            "needle ms",
+        ],
+    );
+    run(
+        &d,
+        &[
+            "release",
+            "create",
+            "Release title",
+            "--description",
+            "needle rel",
+        ],
     );
 
     let out = search(&d, &["needle", "--type", "task"]);
@@ -94,14 +136,35 @@ fn type_filters_restrict() {
 fn archive_hides_task_and_delete_hides_milestone() {
     let d = tmpdir("archive");
     init(&d);
-    run(&d, &["task", "create", "Task title", "-d", "needle task"]);
     run(
         &d,
-        &["milestone", "create", "Milestone title", "-d", "needle ms"],
+        &[
+            "task",
+            "create",
+            "Task title",
+            "--description",
+            "needle task",
+        ],
     );
     run(
         &d,
-        &["release", "create", "Release title", "-d", "needle rel"],
+        &[
+            "milestone",
+            "create",
+            "Milestone title",
+            "--description",
+            "needle ms",
+        ],
+    );
+    run(
+        &d,
+        &[
+            "release",
+            "create",
+            "Release title",
+            "--description",
+            "needle rel",
+        ],
     );
 
     run(&d, &["task", "archive", "TASK-001"]);
@@ -120,7 +183,16 @@ fn archive_hides_task_and_delete_hides_milestone() {
 fn json_output_shape() {
     let d = tmpdir("json");
     init(&d);
-    run(&d, &["task", "create", "Task title", "-d", "needle task"]);
+    run(
+        &d,
+        &[
+            "task",
+            "create",
+            "Task title",
+            "--description",
+            "needle task",
+        ],
+    );
 
     let out = search(&d, &["needle", "--json"]);
     assert_eq!(out.status.code(), Some(0));
@@ -144,7 +216,13 @@ fn quoted_phrase_and_metacharacters() {
     init(&d);
     run(
         &d,
-        &["task", "create", "Task title", "-d", "quick brown fox"],
+        &[
+            "task",
+            "create",
+            "Task title",
+            "--description",
+            "quick brown fox",
+        ],
     );
 
     let out = search(&d, &["quick brown"]);
@@ -172,7 +250,16 @@ fn missing_store_dirs_no_error() {
 fn non_utf8_skipped() {
     let d = tmpdir("nonutf8");
     init(&d);
-    run(&d, &["task", "create", "Task title", "-d", "needle task"]);
+    run(
+        &d,
+        &[
+            "task",
+            "create",
+            "Task title",
+            "--description",
+            "needle task",
+        ],
+    );
     fs::write(d.join("backlog/tasks/BROKEN.md"), [0xffu8, 0xfe, 0x00]).unwrap();
 
     let out = search(&d, &["needle"]);
@@ -185,7 +272,16 @@ fn limit_caps_combined() {
     let d = tmpdir("limit");
     init(&d);
     for _ in 0..3 {
-        run(&d, &["task", "create", "Task title", "-d", "needle task"]);
+        run(
+            &d,
+            &[
+                "task",
+                "create",
+                "Task title",
+                "--description",
+                "needle task",
+            ],
+        );
     }
     // ids TASK-001..003
     let out = search(&d, &["needle", "--limit", "2"]);
@@ -205,7 +301,7 @@ fn decision_search_basic() {
             "decision",
             "create",
             "Decision title",
-            "-d",
+            "--decision",
             "needle decision",
         ],
     );
