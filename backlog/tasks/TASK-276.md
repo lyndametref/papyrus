@@ -2,7 +2,7 @@
 id: TASK-276
 title: "Implement versioned immutable vendor assets and ETag revalidation for app assets"
 created_date: '2026-11-20T17:43:20Z'
-updated_date: '2026-11-22T20:24:56Z'
+updated_date: '2026-11-22T21:27:28Z'
 labels: []
 references:
   - ADR-038
@@ -20,7 +20,7 @@ references:
   - TC-181
   - TC-187
   - TC-189
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-036
@@ -88,3 +88,10 @@ All acceptance criteria pass; the retargeted and new header assertions cover eve
 - [ ] #15 Build-path asset-version guard (ADR-038 decision 30): the Debian assembly script rejects a vendor-directory and manifest version mismatch before assembling the package; it enumerates the version directories under the vendor tree, reads the version column of the asset manifest and the version cited in the copyright section, and exits non-zero with a clear stderr diagnostic when a package has no version directory, more than one version directory, a manifest row whose version differs, or a copyright section citing a different version; an automated test asserts the guard passes on the committed tree and fails on a fixture for each mismatch class; the asset version is not derived from the package version and no tracked file is edited by the check.
 ## Comments
 - **planner**: planner: MS-036 owns asset versioning, so the ADR-038 decision 30 build-time guard is in scope here: AC #15 adds the script check in the Debian assembly build path (vendor version directories vs manifest version column vs copyright version) plus its test. No RC or package work; no tracked file edited by the check.
+- **rust-dev**: Progress: implementation complete
+- **rust-dev**: Cache classes implemented.
+- **rust-dev**: Cache classes: vendor immutable; app no-cache; pages no-store.
+- **rust-dev**: App assets use SHA-256 ETag.
+- **rust-dev**: HTML JSON errors and 404 and 405 stay no-store.
+- **rust-dev**: TASK-276 implemented at commit 235c9cd. Cache: versioned vendor URLs are public, max-age=31536000, immutable with no ETag; app.css, app.js and nav-state.js are no-cache with strong SHA-256 ETags computed once at browser startup; HTML, JSON, error, 404 and 405 responses stay no-store. A strong If-None-Match match on GET and HEAD returns a bodyless 304 with no Content-Type, Content-Length or CSP; weak, stale and malformed tags and all vendor conditionals return 200. Pages and the manifest use versioned vendor URLs; unversioned vendor paths return 404. The Debian build script checks each vendor version directory against the manifest version column and the copyright citation before assembly, failing non-zero with a stderr diagnostic on mismatch. cargo test --all-targets, clippy -D warnings and fmt --check are green; the guard passes the committed tree and rejects no-version, multiple-version, manifest-version and copyright-version fixtures.
+- **orchestrator**: Acceptance met: three cache classes (immutable versioned vendor, no-cache with strong SHA-256 ETag and 304 for app assets, no-store for HTML and JSON), version binding with unversioned 404, no compression or Vary, and the build-time vendor, manifest and copyright guard with mismatch tests; suite, clippy and fmt green.
