@@ -1213,6 +1213,26 @@ fn declared_field_option(field: &yaml_serde::Mapping) -> Option<String> {
     ))
 }
 
+/// Check one optional string-typed field property.
+///
+/// A non-string value is reported against the field's selector path, like the
+/// `kind`, `required`, and `verbs` checks, instead of surfacing the bare serde
+/// deserialization message (AUD-140 L-1). An absent property is valid.
+fn validate_field_string_property(
+    field: &yaml_serde::Mapping,
+    property: &str,
+    selector: &str,
+    errors: &mut Vec<String>,
+) -> bool {
+    match mapping_get(field, property) {
+        None | Some(yaml_serde::Value::String(_)) => true,
+        Some(_) => {
+            errors.push(format!("{}.{}: must be a string", selector, property));
+            false
+        }
+    }
+}
+
 fn validate_field_sequence(
     slug: &str,
     path: &str,
@@ -1258,26 +1278,35 @@ fn validate_field_sequence(
             errors.push(format!("{}.{}: {}", selector, name, message));
         }
 
-        let key = mapping_get(field, "key").and_then(value_as_str);
-        match key {
-            Some("") => {
-                errors.push(format!("{}.key: must not be empty", selector));
+        let key_is_string = validate_field_string_property(field, "key", &selector, errors);
+        let key = if key_is_string {
+            mapping_get(field, "key").and_then(value_as_str)
+        } else {
+            None
+        };
+        if key_is_string {
+            match key {
+                Some("") => {
+                    errors.push(format!("{}.key: must not be empty", selector));
+                }
+                Some(key) if !is_valid_field_key(key) => {
+                    errors.push(format!(
+                        "{}.key: must match [a-z0-9_-]+ and must not be all digits",
+                        selector
+                    ));
+                }
+                Some(_) => {}
+                None => errors.push(format!("{}.key: must be a non-empty string", selector)),
             }
-            Some(key) if !is_valid_field_key(key) => {
-                errors.push(format!(
-                    "{}.key: must match [a-z0-9_-]+ and must not be all digits",
-                    selector
-                ));
-            }
-            Some(_) => {}
-            None => errors.push(format!("{}.key: must be a non-empty string", selector)),
         }
         if let Some(key) = key
             && RESERVED_FIELD_KEYS.contains(&key)
         {
             errors.push(format!("{}.key: reserved field key: {}", selector, key));
         }
-        if let Some(frontmatter_key) = mapping_get(field, "frontmatter_key").and_then(value_as_str)
+        if validate_field_string_property(field, "frontmatter_key", &selector, errors)
+            && let Some(frontmatter_key) =
+                mapping_get(field, "frontmatter_key").and_then(value_as_str)
             && RESERVED_FIELD_KEYS.contains(&frontmatter_key)
         {
             errors.push(format!(
@@ -1286,13 +1315,17 @@ fn validate_field_sequence(
             ));
         }
 
-        if let Some(heading) = mapping_get(field, "heading") {
+        if validate_field_string_property(field, "heading", &selector, errors)
+            && let Some(heading) = mapping_get(field, "heading")
+        {
             let valid = value_as_str(heading).is_some_and(|text| text.starts_with("## "));
             if !valid {
                 errors.push(format!("{}.heading: must begin with \"## \"", selector));
             }
         }
-        if let Some(option) = mapping_get(field, "option") {
+        if validate_field_string_property(field, "option", &selector, errors)
+            && let Some(option) = mapping_get(field, "option")
+        {
             let valid = value_as_str(option).is_some_and(|text| {
                 !text.is_empty()
                     && !text.starts_with("--")
@@ -1305,6 +1338,8 @@ fn validate_field_sequence(
                 ));
             }
         }
+        validate_field_string_property(field, "label", &selector, errors);
+        validate_field_string_property(field, "help", &selector, errors);
         if matches!(
             mapping_get(field, "required"),
             Some(yaml_serde::Value::Bool(true))
@@ -4283,6 +4318,33 @@ mod tests {
                 "document_types.deploy.fields[description].order: not a valid field key",
                 "document_types.deploy.fields[description].kind: must be text, multiline, or list",
             ]
+        );
+    }
+
+    #[test]
+    fn field_string_type_errors_use_keyed_and_indexed_selector_paths() {
+        let value: yaml_serde::Value = yaml_serde::from_str(
+            "document_types:\n  deploy:\n    prefix: DEP\n    directory: deploy/\n    fields:\n      - key: description\n        heading: '## Description'\n        label: 5\n        help: 6\n        frontmatter_key: 7\n        option: 8\n      - heading: '## Indexed'\n        label: 9\n      - key: 3\n        heading: 4\n",
+        )
+        .unwrap();
+        let errors = validate_document_types_declarations(&value);
+        for needle in [
+            "document_types.deploy.fields[description].label: must be a string",
+            "document_types.deploy.fields[description].help: must be a string",
+            "document_types.deploy.fields[description].frontmatter_key: must be a string",
+            "document_types.deploy.fields[description].option: must be a string",
+            "document_types.deploy.fields[1].label: must be a string",
+            "document_types.deploy.fields[2].key: must be a string",
+            "document_types.deploy.fields[2].heading: must be a string",
+        ] {
+            assert!(
+                errors.iter().any(|error| error == needle),
+                "missing {needle:?}: {errors:?}"
+            );
+        }
+        assert!(
+            !errors.iter().any(|error| error.contains("invalid type")),
+            "type errors must not fall through to serde: {errors:?}"
         );
     }
 

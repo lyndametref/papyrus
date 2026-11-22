@@ -709,7 +709,7 @@ fn config_set_type_errors_use_selector_paths() {
         (
             "document_types.req.slots",
             "bogus",
-            "document_types.req.slots: must be a sequence of mappings",
+            "document_types.req.slots: declarative file data and cannot be changed by config set",
         ),
     ] {
         let stderr = project.rejected(&["config", "set", key, value]);
@@ -723,6 +723,88 @@ fn config_set_type_errors_use_selector_paths() {
     assert!(
         stderr.contains("document_types.deploy.statuses: must be a sequence of strings"),
         "{stderr}"
+    );
+}
+
+#[test]
+fn field_string_type_errors_name_keyed_and_indexed_selector_paths() {
+    let project = Project::new("field-string-types");
+    project.write(
+        "document_types:\n  deploy:\n    prefix: DEP\n    directory: deploy/\n    fields:\n      - key: description\n        heading: '## Description'\n        label: 5\n        help: 6\n        frontmatter_key: 7\n        option: 8\n      - heading: '## Indexed'\n        label: 9\n",
+    );
+    let stderr = project.rejected(&["deploy", "list"]);
+    for needle in [
+        "document_types.deploy.fields[description].label: must be a string",
+        "document_types.deploy.fields[description].help: must be a string",
+        "document_types.deploy.fields[description].frontmatter_key: must be a string",
+        "document_types.deploy.fields[description].option: must be a string",
+        "document_types.deploy.fields[1].label: must be a string",
+    ] {
+        assert!(stderr.contains(needle), "missing {needle:?}: {stderr}");
+    }
+    assert!(
+        !stderr.contains("invalid type"),
+        "type errors must not fall through to serde: {stderr}"
+    );
+
+    // A single non-string property is enough; the diagnostic still names the
+    // field selector path rather than the bare deserialization message.
+    project.write(
+        "document_types:\n  deploy:\n    prefix: DEP\n    directory: deploy/\n    fields:\n      - key: description\n        heading: '## Description'\n        label: 5\n",
+    );
+    let stderr = project.rejected(&["deploy", "list"]);
+    assert!(
+        stderr.contains("document_types.deploy.fields[description].label: must be a string"),
+        "{stderr}"
+    );
+    assert!(!stderr.contains("invalid type"), "{stderr}");
+}
+
+#[test]
+fn api_aliases_and_slots_are_declarative_file_data_for_set_and_unset() {
+    let project = Project::initialized("declarative-data");
+    let before = project.read();
+    for key in ["document_types.req.api_aliases", "document_types.req.slots"] {
+        for command in ["set", "unset"] {
+            let args: Vec<&str> = if command == "set" {
+                vec!["config", "set", key, "a,b"]
+            } else {
+                vec!["config", "unset", key]
+            };
+            let stderr = project.rejected(&args);
+            assert!(
+                stderr.contains(key),
+                "{command} {key} must name the selector: {stderr}"
+            );
+            assert!(
+                stderr.contains("declarative file data"),
+                "{command} {key}: {stderr}"
+            );
+        }
+    }
+    // A sequence-shaped value is still refused: csv syntax is only for statuses.
+    let stderr = project.rejected(&[
+        "config",
+        "set",
+        "document_types.req.slots",
+        "[{key: owner, label: Owner}]",
+    ]);
+    assert!(stderr.contains("document_types.req.slots"), "{stderr}");
+    assert_eq!(project.read(), before);
+
+    // Reads still resolve both declarative collections.
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.req.api_aliases"])
+            .trim(),
+        "[]"
+    );
+    assert_eq!(
+        project
+            .ok(&["config", "get", "document_types.req.slots"])
+            .trim(),
+        "[{key: group, label: Group}]",
+        "the seed slots are effective and readable"
     );
 }
 

@@ -1,8 +1,8 @@
 use crate::CommandOutput;
 use crate::config::{
-    Config, is_list_valued_key, merge_yaml, parse_list_value, render_yaml_flow, resolve_selector,
-    selector_targets_field, to_config_yaml, valid_config_selector, validate_browser_host,
-    validate_document_types_declarations, yaml_get, yaml_set, yaml_unset,
+    Config, is_list_valued_key, merge_yaml, parse_list_value, parse_selector, render_yaml_flow,
+    resolve_selector, selector_targets_field, to_config_yaml, valid_config_selector,
+    validate_browser_host, validate_document_types_declarations, yaml_get, yaml_set, yaml_unset,
 };
 use crate::context::Context;
 use crate::error::AppError;
@@ -281,6 +281,7 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
             key
         )));
     }
+    reject_declarative_data_selector(key, "set")?;
     reject_bracketed_selector(key, "set")?;
     // The key is classified before the value is parsed (ADR-0024 decision 1).
     // A list-valued key takes the comma-separated form and never enters the
@@ -371,6 +372,7 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
             key
         )));
     }
+    reject_declarative_data_selector(key, "unset")?;
     reject_bracketed_selector(key, "unset")?;
     let mut file_val = if ctx.config_path.exists() {
         let raw = std::fs::read_to_string(&ctx.config_path)
@@ -406,6 +408,31 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
         json,
         ..Default::default()
     })
+}
+
+/// Whether a selector addresses declarative file data (`api_aliases` or
+/// `slots`).
+fn selector_targets_declarative_data(key: &str) -> bool {
+    parse_selector(key).is_ok_and(|segments| {
+        segments
+            .iter()
+            .any(|segment| matches!(segment.key.as_str(), "api_aliases" | "slots"))
+    })
+}
+
+/// Reject `api_aliases` and `slots` as `config set`/`unset` targets.
+///
+/// Both are declarative file data (ADR-042 ruling 6): a comma-separated scalar
+/// cannot express a slot mapping, and neither is a scalar leaf. The selector
+/// path is reported so the caller knows which entry to edit in the file.
+fn reject_declarative_data_selector(key: &str, command: &str) -> Result<(), AppError> {
+    if selector_targets_declarative_data(key) {
+        return Err(AppError::Validation(format!(
+            "{}: declarative file data and cannot be changed by config {}",
+            key, command
+        )));
+    }
+    Ok(())
 }
 
 /// Reject an indexed or keyed sequence selector for `config set`/`unset`.
