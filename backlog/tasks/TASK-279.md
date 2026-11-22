@@ -2,7 +2,7 @@
 id: TASK-279
 title: "Verify MS-036 performance: NFR targets and cache headers"
 created_date: '2026-11-20T17:43:25Z'
-updated_date: '2026-11-22T22:37:41Z'
+updated_date: '2026-11-22T23:24:16Z'
 labels: []
 references:
   - NFR-007.001
@@ -27,7 +27,7 @@ references:
   - TASK-276
   - TASK-277
   - TASK-278
-status: In-Progress
+status: Done
 assignee:
   - quality-gatekeeper
 milestone: MS-036
@@ -114,3 +114,4 @@ Every MS-036 acceptance criterion has a recorded pass verdict with a reproducibl
 - **planner**: planner: MS-036 is an internal checkpoint (MS-036 AC-9). Verification compiles and discards a build; no RC version, no retained package, no package evidence. Recorded waiver: scope MS-036 only, reason MS-037 AC-6 and AC-7 require exactly one retained release artifact, timestamp 2026-11-22T20:22:22Z (AC #21 supersedes AC 1, AC 2, AC 3, AC 19). ADR-043 decision 21 still requires an RC from MS-035 onward; flagged for the architect to amend with the MS-035 and MS-036 exception. Hardware deviation: verify on the available 6 physical and 12 logical core, 15.3 GiB host and report measured figures with the deviation, never as NFR-007.001 or NFR-007.002 satisfaction (AC #22).
 - **planner**: planner: TASK-313 (read-path optimisation, ordinal 75) added to MS-036 after the TASK-278 threshold misses; it is now a prerequisite of this verification task alongside TASK-278, so its measurements and results table must be present before verification. Prerequisite list is TASK-273 to TASK-278 plus TASK-313.
 - **planner**: planner: TASK-314 (AUD-148 corrections, ordinal 85) added as a prerequisite of this verification task. It depends on TASK-313; all audit findings must be corrected and evidenced before MS-036 verification proceeds.
+- **orchestrator**: Verification PASS (AUD-150): AC-1 to AC-9 met, 0 blocker, 0 high, 0 medium, 4 low (AC-8 wording, ADR-043 d21, duplicate audit records, hardware headroom for MS-037); code gate clear via AUD-149; 1398 tests pass; packaging waived.
