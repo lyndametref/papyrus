@@ -5,6 +5,7 @@ created_date: '{{TIMESTAMP}}'
 updated_date: '{{TIMESTAMP}}'
 labels: []
 references: []
+status: active
 ---
 # TECH-003 Corpus tech spec
 

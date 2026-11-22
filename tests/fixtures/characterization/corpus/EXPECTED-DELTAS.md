@@ -35,6 +35,17 @@ and the post-refactor behaviour. Any other difference is a regression.
    `nfr/create`, `nfr/create-json`. Source: REQ-05.001, REQ-05.002,
    REQ-05.010, ADR-036 decision 9.
 
+8. **Seeded status on create.** Every Markdown document `create` and
+   `create-group` now writes `status` into front matter: the type's configured
+   `default_status`, or `active` when none is declared. A created group record
+   therefore gains a front-matter block holding only `status`; created members
+   and single Markdown records carry the key in key order. `SingleHtmlMockup`
+   is unchanged and keeps `status: pending` in its HTML metadata. Existing
+   records without `status` are not migrated, and no create option sets the
+   value. Bytes: `*/create`, `*/create-json`, `req/create-group`,
+   `nfr/create-group` for every Markdown type except `ui-mockup`. Source:
+   REQ-05.011, TECH-042 7.4, TC-138.
+
 Corrected behaviour without a byte delta: `nfr create` and `nfr create-group`
 now write the `## User Story` section when `--story` is supplied. The seed
 declares `story` for both nfr roles (REQ-05.002) and the pre-refactor module

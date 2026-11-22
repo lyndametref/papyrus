@@ -794,9 +794,11 @@ fn create_document(
             record::frontmatter::FrontMatterValue::String(references_value),
         ),
     ];
-    if descriptor.is_config_defined_document()
-        && let StatusModel::DocumentMain { default, .. } = &descriptor.status_model
-    {
+    // Every front-matter-backed Markdown model seeds its status from the
+    // type's configured `default_status`, or `active` when none is declared
+    // (REQ-05.011). The HTML mockup keeps `pending` in its HTML metadata and
+    // never reaches this path.
+    if let StatusModel::DocumentMain { default, .. } = &descriptor.status_model {
         ops.push(PatchOp::SetFrontMatterValue(
             "status".to_string(),
             record::frontmatter::FrontMatterValue::String(default.clone()),
@@ -844,7 +846,17 @@ fn create_group_document(
     let next = record::identity::next_number(&active, &archived, &scope.prefix);
     let id = record::identity::format_id(&scope.prefix, next as i64, scope.id_padding);
 
-    let mut ops = vec![PatchOp::SetHeadingTitle(title.clone())];
+    let mut ops = Vec::new();
+    // Every front-matter-backed Markdown model seeds its status from the
+    // type's configured `default_status`, or `active` when none is declared
+    // (REQ-05.011). A group is a record of the same type.
+    if let StatusModel::DocumentMain { default, .. } = &descriptor.status_model {
+        ops.push(PatchOp::SetFrontMatterValue(
+            "status".to_string(),
+            record::frontmatter::FrontMatterValue::String(default.clone()),
+        ));
+    }
+    ops.push(PatchOp::SetHeadingTitle(title.clone()));
     for field in &fields {
         if !field_offered(field, DocumentVerb::CreateGroup) || args.get(&field.key).is_none() {
             continue;
@@ -1686,6 +1698,60 @@ mod tests {
         assert_eq!(out.text, "NOTE-001");
         let content = fs::read_to_string(dir.join("docs/notes/NOTE-001.md")).unwrap();
         assert!(content.contains("status: review"));
+    }
+
+    #[test]
+    fn generic_create_writes_status_for_a_seed_markdown_record() {
+        let dir = tmpdir("seedstatus");
+        default_config(&dir);
+        let c = ctx(&dir);
+        let reg = registry(&c);
+        let mut invocation = generic_invocation(
+            "glossary",
+            DocumentVerb::Create,
+            None,
+            Some("Cache".to_string()),
+            None,
+            vec![],
+            vec![],
+            None,
+        );
+        invocation.args.insert(
+            "definition",
+            vec!["A store of reusable results".to_string()],
+        );
+        let out = run(&c, &access(&c).0, &reg, invocation).unwrap();
+        assert_eq!(out.text, "GLO-001");
+        let content = fs::read_to_string(dir.join("docs/glossary/GLO-001.md")).unwrap();
+        assert!(content.contains("status: active"), "{content}");
+    }
+
+    #[test]
+    fn generic_create_group_writes_status_for_a_grouped_type() {
+        let dir = tmpdir("groupstatus");
+        default_config(&dir);
+        let c = ctx(&dir);
+        let reg = registry(&c);
+        let out = run(
+            &c,
+            &access(&c).0,
+            &reg,
+            generic_invocation(
+                "req",
+                DocumentVerb::CreateGroup,
+                None,
+                Some("Group one".to_string()),
+                None,
+                vec![],
+                vec![],
+                None,
+            ),
+        )
+        .unwrap();
+        assert_eq!(out.text, "REQ-001");
+        let content =
+            fs::read_to_string(dir.join("docs/requirements/business/REQ-001.md")).unwrap();
+        assert!(content.contains("status: active"), "{content}");
     }
 
     #[test]

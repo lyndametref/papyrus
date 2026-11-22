@@ -5,6 +5,7 @@ created_date: '{{TIMESTAMP}}'
 updated_date: '{{TIMESTAMP}}'
 labels: []
 references: []
+status: active
 ---
 # BR-003 Corpus rule
 

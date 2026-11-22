@@ -291,6 +291,38 @@ fn req_symlink_escape_exits_one() {
     let _ = fs::remove_dir_all(&root);
 }
 
+#[test]
+fn grouped_create_and_create_group_write_the_default_status() {
+    let d = tmpdir("group-status");
+    init(&d);
+    let p = d.to_str().unwrap();
+    let out = bin()
+        .args(["--dir", p, "req", "create-group", "--title", "Group one"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let group = fs::read_to_string(record_path(&d, "REQ-001")).unwrap();
+    assert!(group.contains("status: active"), "{group}");
+
+    let out = bin()
+        .args([
+            "--dir",
+            p,
+            "req",
+            "create",
+            "Member one",
+            "--group",
+            "REQ-001",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let member = fs::read_to_string(record_path(&d, "REQ-001.001")).unwrap();
+    assert!(member.contains("status: active"), "{member}");
+
+    let _ = fs::remove_dir_all(&d);
+}
+
 fn record_path(d: &std::path::Path, id: &str) -> std::path::PathBuf {
     d.join("docs/requirements/business")
         .join(format!("{id}.md"))
