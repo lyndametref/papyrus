@@ -148,10 +148,10 @@ fn fixture_config() -> String {
         .expect("fixture configuration is readable")
 }
 
-fn project_dir() -> PathBuf {
+fn project_dir(tag: &str) -> PathBuf {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join(".tmp")
-        .join(format!("cli-help-golden-{}", std::process::id()));
+        .join(format!("cli-help-golden-{}-{tag}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).expect("temp project directory");
     fs::write(dir.join("papyrus.config.yml"), fixture_config()).expect("fixture config written");
@@ -175,7 +175,7 @@ fn render(stdout: &[u8], stderr: &[u8], code: Option<i32>) -> String {
 
 #[test]
 fn cli_help_matches_golden_snapshots() {
-    let project = project_dir();
+    let project = project_dir("snapshots");
     let golden = golden_dir();
     if std::env::var_os("PAPYRUS_UPDATE_CLI_HELP").is_some() {
         fs::create_dir_all(&golden).expect("golden directory");
@@ -233,6 +233,145 @@ fn golden_snapshot_set_is_complete() {
         cases().len(),
         "golden directory holds stale snapshots; regenerate intentionally"
     );
+}
+
+fn run_case(project: &Path, args: &[String], cwd: &Path, envs: &[(&str, &str)]) -> String {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_papyrus"));
+    command
+        .env_clear()
+        .arg("--dir")
+        .arg(project)
+        .args(args)
+        .current_dir(cwd);
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+    let output = command.output().expect("papyrus runs");
+    render(&output.stdout, &output.stderr, output.status.code())
+}
+
+fn contains_bounded(text: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return false;
+    }
+    text.match_indices(needle).any(|(start, _)| {
+        let before = text[..start].chars().next_back();
+        let after = text[start + needle.len()..].chars().next();
+        !before.is_some_and(|c| c.is_ascii_alphanumeric() || c == '_')
+            && !after.is_some_and(|c| c.is_ascii_alphanumeric() || c == '_')
+    })
+}
+
+fn contains_timestamp(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    bytes.windows(20).any(|window| {
+        window[4] == b'-'
+            && window[7] == b'-'
+            && window[10] == b'T'
+            && window[13] == b':'
+            && window[16] == b':'
+            && window[..4].iter().all(u8::is_ascii_digit)
+            && window[5..7].iter().all(u8::is_ascii_digit)
+            && window[8..10].iter().all(u8::is_ascii_digit)
+            && window[11..13].iter().all(u8::is_ascii_digit)
+            && window[14..16].iter().all(u8::is_ascii_digit)
+            && window[17..19].iter().all(u8::is_ascii_digit)
+    })
+}
+
+fn contains_memory_address(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    bytes.windows(6).any(|window| {
+        window[0] == b'0'
+            && (window[1] == b'x' || window[1] == b'X')
+            && window[2..].iter().all(u8::is_ascii_hexdigit)
+    })
+}
+
+fn assert_no_volatile_tokens(name: &str, rendered: &str, project: &Path) {
+    let manifest = env!("CARGO_MANIFEST_DIR");
+    assert!(
+        !rendered.contains(manifest),
+        "{name}: help leaks the manifest path"
+    );
+    let project_path = project.to_string_lossy();
+    assert!(
+        !rendered.contains(project_path.as_ref()),
+        "{name}: help leaks the project directory"
+    );
+    let pid = std::process::id().to_string();
+    // Short identifiers collide with version digits; a real PID is longer.
+    if pid.len() >= 4 {
+        assert!(
+            !contains_bounded(rendered, &pid),
+            "{name}: help leaks the process id {pid}"
+        );
+    }
+    if let Ok(host) = fs::read_to_string("/proc/sys/kernel/hostname") {
+        let host = host.trim();
+        // The program name and the loopback alias are not host leaks.
+        if !host.is_empty() && host != "localhost" && host != "papyrus" {
+            assert!(
+                !contains_bounded(rendered, host),
+                "{name}: help leaks the host name {host}"
+            );
+        }
+    }
+    assert!(
+        !contains_timestamp(rendered),
+        "{name}: help leaks a timestamp"
+    );
+    assert!(
+        !contains_memory_address(rendered),
+        "{name}: help leaks a memory address"
+    );
+}
+
+#[test]
+fn help_output_is_deterministic_and_free_of_volatile_tokens() {
+    let project = project_dir("determinism");
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let home = project.to_string_lossy().into_owned();
+    let first_env: [(&str, &str); 5] = [
+        ("LC_ALL", "C"),
+        ("LANG", "C"),
+        ("COLUMNS", "80"),
+        ("TZ", "UTC"),
+        ("HOME", home.as_str()),
+    ];
+    let second_env: [(&str, &str); 5] = [
+        ("LC_ALL", "C.UTF-8"),
+        ("LANG", "C.UTF-8"),
+        ("COLUMNS", "200"),
+        ("TZ", "Pacific/Kiritimati"),
+        ("HOME", home.as_str()),
+    ];
+    let corpus = cases();
+    let selected = [
+        "top",
+        "verb-req-create",
+        "verb-glossary-create",
+        "verb-audit-create",
+        "verb-ui-mockup-create",
+        "verb-req-edit",
+        "err-missing-required",
+    ];
+    for name in selected {
+        let (_, args) = corpus
+            .iter()
+            .find(|(case, _)| case == name)
+            .unwrap_or_else(|| panic!("case {name} exists"));
+        let first = run_case(&project, args, &manifest, &first_env);
+        let repeat = run_case(&project, args, &manifest, &first_env);
+        assert_eq!(first, repeat, "{name}: two consecutive runs differ");
+        let varied = run_case(&project, args, &project, &second_env);
+        assert_eq!(
+            first, varied,
+            "{name}: help depends on cwd, locale, COLUMNS, or timezone"
+        );
+        assert_no_volatile_tokens(name, &first, &project);
+    }
+    let _ = fs::remove_dir_all(&project);
 }
 
 #[allow(dead_code)]

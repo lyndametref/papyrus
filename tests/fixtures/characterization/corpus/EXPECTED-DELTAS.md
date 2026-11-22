@@ -8,14 +8,26 @@ and the post-refactor behaviour. Any other difference is a regression.
    including the glossary. Bytes: `*/create`, `*/edit`, `glossary/create`,
    `glossary/edit`, and `verb-*/create|edit` help goldens. Source: REQ-07.003,
    REQ-05.001, REQ-05.003, BR-011.
-2. **`--term` removed and answered as a usage error.** `glossary create` no
-   longer takes `--term`/`--definition`, and `glossary edit` no longer takes
-   `--term`; a `--term` invocation becomes an exit-2 usage error. Bytes:
-   `glossary/create`, `glossary/edit`, `verb-glossary-create`,
+2. **`--term` removed, `--definition` kept, and answered as a usage error.**
+   `glossary create` no longer takes `--term`; the term is the positional
+   `TITLE` and `--definition` remains the definition option. `glossary edit`
+   no longer takes `--term`; the term is edited through the uniform `--title`.
+   A `--term` invocation becomes an exit-2 usage error and writes no record.
+   Corpus cases:
+   `glossary/create` and `glossary/create-json` (positional `TITLE`,
+   `--definition` kept, exit 0), `glossary/edit` and `glossary/edit-json`
+   (uniform `--title`, exit 0), and the captured usage-error cases
+   `glossary/create-term-removed` and `glossary/edit-term-removed` (exit 2, no
+   record). Bytes: those six cases plus `verb-glossary-create`,
    `verb-glossary-edit`. Source: REQ-05.003, BR-011.
-3. **Help prose.** Document command help text changes with the title contract
-   and the shared verbs; the prose, not the option grammar alone. Bytes:
-   `tests/golden/cli-help/*`. Source: REQ-07.003.
+3. **Help prose and derived field options.** Every verb about line is generated
+   by the engine from the document model and field sequence; per-type about
+   text is not preserved (ADR-042 item 2). Option prose is derived from the
+   seed `label`/`help`/kind, field options follow the seed field sequence, and
+   the `-d` short on `--description` disappears because `FieldSpec` has no
+   short-name equivalent. Bytes: `tests/golden/cli-help/*` and the `* create`
+   and `* edit` fixture stdout. Source: REQ-07.003, ADR-042 item 2,
+   ADR-036 decision 29.
 4. **Asset cache headers and versioned vendor URLs.** Static assets gain cache
    headers and the vendor URLs become version-qualified. Bytes:
    `http/asset-app-css`, `http/asset-app-js`, `http/asset-nav-state-js`
@@ -51,5 +63,36 @@ now write the `## User Story` section when `--story` is supplied. The seed
 declares `story` for both nfr roles (REQ-05.002) and the pre-refactor module
 ignored it; no corpus case supplies `--story` to nfr, so the snapshot is
 unchanged. Source: REQ-05.002, ADR-036 decisions 26-29.
+
+## Measured verb-about-line delta (TASK-260)
+
+The `TASK-260` regeneration measured one systematic help delta that the earlier
+item 3 wording left implicit. Every per-verb about line becomes engine-generated
+text from the document model and the field sequence (`ADR-042` item 2):
+
+| Verb | Generated about line |
+| --- | --- |
+| `create` | `Create a <slug> document.` |
+| `create-group` | `Create a <slug> group.` |
+| `list` | `List <slug> documents.` |
+| `view` | `View a <slug> document.` |
+| `edit` | `Edit a <slug> document.` |
+| `archive` | `Archive a <slug> document.` |
+| `delete` | `Delete a <slug> document.` |
+| `status` | `Set the status of a <slug> document.` |
+
+The root about line (`Project-level backlog and documentation manager.`) and
+each type's `Manage <slug> documents.` line are unchanged. Option prose follows
+the same ruling: for example `--story` is `User story`, `--description` is
+`Description Use "-" to read multiline text from standard input.`,
+`--applicability` is `Applicability`, `--view` is `View`, and `--group` is
+`Owning group`. `ui-mockup create` has no verb about line. Every measured help
+delta, including the `-d` short removal and the engine title/group validation,
+is attributed file by file in
+[`docs/specifications/technical/cli-help-deltas.md`](../../../../docs/specifications/technical/cli-help-deltas.md).
+
+The enabled-type order in `top.json` is unchanged and remains effective
+configuration map order (slug order); seed `order` is presentation-only
+(`ADR-042` item 4). No order delta is expected or recorded.
 
 No other difference is expected.
