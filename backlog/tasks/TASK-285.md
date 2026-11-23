@@ -2,7 +2,7 @@
 id: TASK-285
 title: "Run the code audit on the refactored document engine"
 created_date: '2026-11-20T17:44:13Z'
-updated_date: '2026-11-23T06:17:42Z'
+updated_date: '2026-11-23T07:32:02Z'
 labels: []
 references:
   - ADR-036
@@ -14,7 +14,7 @@ references:
   - REL-001
   - AUD-146
   - AUD-149
-status: ToDo
+status: In-Progress
 assignee:
   - code-analyzer
 milestone: MS-037
@@ -76,3 +76,7 @@ One `AUD` record exists with type `code`, references MS-037 and REL-001 and the 
 - [ ] The audit explicitly checks for dead code left after TASK-282 and the refactor.
 - [ ] No blocking finding is left open: each blocker or high finding is reported to the orchestrator with a proposed fix task, and the task does not repair it.
 - [ ] The audit record is referenced in a task comment and papyrus check reports no new finding.
+## Comments
+- **requirements-engineer**: REQ-07.002 aligned with ADR-036 clarifications (2026-11-22 seed resolution; 2026-11-23 values and reserved keys). Description: field-item list gains tenth key `values` with its semantics; reserved set now 13 (adds version, kind, form, path, metadata); merge rule now 'eleven seed slugs always effective, present document_types is an overlay, absent slug scoped to user-defined slugs and the written file'. Acceptance criteria: field-item key list gains `values`; new `values` validation criterion; reserved-key criterion now 13 keys; merge criterion now the overlay rule. Verified: `papyrus req view REQ-07.002` parses; `papyrus check` output identical to baseline (no new findings, exit 4 from pre-existing findings). Impact flags: BR-016 clauses on field-item keys, reserved keys and seed merge are stale (delegation to business-analyst blocked by subagent depth limit); REQ-05.010 still cites 8 reserved keys; TECH-077 section 3 lists 9 field keys and 8 reserved keys; docs release-1.0-upgrade-notes.md line 339. No other requirement or task changed.
+- **requirements-engineer**: BR-016 and REQ-05.010 aligned with ADR-036 decisions 11 and 23 and the 2026-11-22 seed-overlay clarification. BR-016: line 46 field-item key list now the ten keys including `values` (optional; absent means no restriction beyond `kind`; an allowed-string sequence restricts a scalar, `record-ids` requires every `list` item to be a record ID; adds no option and no verb); line 49 reserved field keys now the 13-key set (id, title, status, labels, references, created_date, updated_date, group, version, kind, form, path, metadata); line 61 merge rule now states the eleven seed slugs are always effective, a present `document_types` map is an overlay, an absent user-defined slug stays absent, and the written file never gains an untargeted entry. REQ-05.010: line 35 reserved-key statement now the 13-key set; line 63 reserved-key acceptance criterion now the 13-key set. No other clause changed; both updated_date lines (BR-016 line 5, REQ-05.010 line 5) set to 2026-11-23T07:27:35Z. Verified: papyrus rule view BR-016 and papyrus req view REQ-05.010 parse; papyrus check identical to baseline (same 5 pre-existing findings, exit 4). Impact flags: TECH-077 section 3 still lists 9 field keys and 8 reserved keys; docs release-1.0-upgrade-notes.md line 339 still stale; REQ-05.010 traceability line naming "the eight reserved keys" left intact per instruction. No request artifact was changed; TASK-285 still In-Progress.
+- **rust-dev**: ADR-036 clarification (2026-11-23), documentation only, no code change. TECH-077 section 3: field-item key list now the ten keys including values, with a new values bullet (optional; a non-empty allowed-string sequence, or record-ids for a list whose items must be record IDs; enforced by the field-domain validator; no option and no verb of its own). TECH-077 section 3: reserved field-key list now the 13 keys, adding version, kind, form, path, and metadata, with the reason that they collide with the envelope, token, and form-post keys. docs release-1.0-upgrade-notes.md line 339 now states the eleven seed slugs are always effective, a present document_types map is an overlay, and collections replace per declared entry. TECH-077 status left verified (consistent clarification); body edited in place because the managed CLI edits only the Description field. Verified: papyrus tech-spec view TECH-077 exits 0; relative links in the upgrade notes resolve; papyrus check shows the same 5 pre-existing findings (exit 4) and no new finding.

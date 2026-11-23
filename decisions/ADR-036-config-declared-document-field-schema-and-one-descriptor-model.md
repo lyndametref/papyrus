@@ -2,7 +2,7 @@
 id: ADR-036
 title: "Config-declared document field schema and one descriptor model"
 created_date: '2026-11-20T18:28:00Z'
-updated_date: '2026-11-22T12:45:34Z'
+updated_date: '2026-11-23T07:19:14Z'
 labels: []
 references:
   - RE-010
@@ -46,6 +46,33 @@ accepted
 
 - **Decision 29 seed table — `audit` carries one field default.** The `audit` seed entry carries `field_defaults: { audit_type: security }`; every other seed entry carries an empty `field_defaults`. `SeedDocumentType` gains the `field_defaults` slice and the resolved descriptor exposes the same map. On `create`, an absent field that has a seed default is written through the ordinary `PatchOp` path; on `edit` an absent field stays absent. `field_defaults` is not a `FieldSpec` key, not a configuration key, and not accepted in a project entry; a user-defined type has no field defaults (ADR-042 ruling 1). Decision 11's nine-key `FieldSpec` and decision 32's scalar-fill and collection-replace rules are unchanged; no other type gains a default.
 - **Not changed:** decisions 4-28 and 30-37, the downstream constraints, and this record's accepted status.
+
+### Clarification (2026-11-23) — `values` is the tenth FieldSpec key
+
+- **Decision 11 — the key list gains `values`.** A field is one `FieldSpec` with exactly these keys: `key`, `heading`, `frontmatter_key`, `option`, `label`, `kind`, `required`, `verbs`, `help`, and `values`. Decision 11's "exactly these keys" list, and every "nine keys" or "nine-key" phrase elsewhere in this record, reads as these ten keys.
+- **Semantics of `values`.** It is optional; absent means no restriction beyond the field `kind`. It is either a non-empty sequence of allowed strings, which restricts a scalar field to those exact values, or the string `record-ids`, which requires every item of a `list` field to be a valid record ID. The domain is descriptor data, not a per-type option branch: the submission paths that validate a document field value (the browser form and the JSON API) reject a scalar outside the declared list and a list item that is not a record ID, and the diagnostic names the field and its allowed values. `values` adds no option and no verb.
+- **Seed use.** `audit`'s `audit_type` declares `[security, licence, architecture]`; `rule`'s `requirements` list declares `record-ids`.
+- **Not changed.** `values` is an ordinary field-item key. Decision 32's scalar-fill and collection-replace rules still apply unchanged: a present `fields` collection replaces the seed collection wholesale, and each field item carries its own `values`. The reserved-key rules of decision 23 cover other keys and are unchanged by this note; `values` is not a reserved key. No verb, title, or kind rule changes.
+- **Follow-up outside this record.** TECH-077 section 3 ("A field item has exactly the keys ...") still lists nine keys and needs the same line.
+
+### Clarification (2026-11-23) — the reserved field-key set has 13 keys
+
+- **Decision 23 — the reserved set gains five keys.** The reserved field keys are `id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, `group`, `version`, `kind`, `form`, `path`, and `metadata`. A field may use none of them as its `key` or as its `frontmatter_key`.
+- **Reasons for the added keys:**
+  - `version` — the engine-owned optimistic-concurrency token. It is a form-post key on the document edit form and a key of the record payload, so a field of that name would collide with the token and shadow the version check of the write.
+  - `kind` — the record payload's type discriminator key.
+  - `form` — the record payload's browser-form discriminator key.
+  - `path` — the record payload's relative-path key.
+  - `metadata` — the record payload's general metadata block key.
+  `kind`, `form`, `path`, and `metadata` are envelope keys inserted into the same JSON object as the field values, so a front-matter key of one of those names would collide in the list and view payloads.
+- **Not changed.** `group` stays reserved because the engine owns the group link (decision 9); no other reserved-key rule changes, and the check still runs in configuration validation and again when a patch is built.
+- **Follow-up outside this record.** TECH-077 section 3 ("The reserved field keys are ...") still lists eight keys and needs the same line.
+
+### Clarification (2026-11-23) — REQ-07.002 still states wholesale replacement
+
+- **Conflict.** REQ-07.002 still says a present `document_types` replaces the seed set wholesale: its "Defaults, fill, and merge" bullet "An absent slug stays absent. `document_types` is replaced wholesale when present in the project file, and no seed entry is re-added", and its acceptance criterion "A present `document_types` replaces the seed set wholesale, and an absent slug stays absent; no seed entry is re-added". Both contradict this record's clarification of 2026-11-22 ("seed slugs are always effective", decision 32): a present `document_types` map is an overlay, the eleven seed slugs always resolve from the seed table, and "an absent slug stays absent" applies only to non-seed (user-defined) slugs and to the written file.
+- **Which wording must change.** A requirements-engineer follow-up must rewrite that merge bullet and that acceptance criterion to say the seed slugs are always effective and the map is an overlay, with "an absent slug stays absent" scoped to user-defined slugs and to the written file. No other requirement clause changes.
+- **Not changed here.** This record does not edit the requirement. REQ-07.002's eight-key reserved list (decision 23 as amended here) and its nine-key field-item list (decision 11 as amended here) are two further requirements follow-ups, not part of this note.
 ## Supersession
 
 1. This ADR supersedes ADR-0017 decisions 1, 2, 3, 4, 7, 9, and 10 and downstream constraints 1 and 4, and only those. ADR-0017 decisions 5, 6, and 8 and downstream constraints 2, 3, 5, and 6 remain in force. ADR-0017 keeps its accepted status because the supersession is by decision, not in full.

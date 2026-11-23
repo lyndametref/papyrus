@@ -2,7 +2,7 @@
 id: REQ-07.002
 title: "Configure Document Types and Slugs"
 created_date: '2026-11-13T21:19:03Z'
-updated_date: '2026-11-20T20:22:39Z'
+updated_date: '2026-11-23T07:22:05Z'
 labels: []
 references:
   - RE-010
@@ -69,12 +69,13 @@ A `fields` sequence contains field items. A field item has exactly these keys:
 - `required` — a boolean; a required field must be supplied on create and may be changed but not cleared on edit.
 - `verbs` — the verbs on which the field's option is offered, a subset of `create` and `edit`, defaulting to `[create, edit]`.
 - `help` — the option help text.
+- `values` — an optional restriction; absent means no restriction beyond `kind`. It is either a non-empty sequence of allowed strings, which restricts a scalar field to those exact values, or the string `record-ids`, which requires every item of a `list` field to be a valid record ID. `values` adds no option and no verb.
 
 `label` and `help` are presentation-only. Field sequence position is the field's order everywhere — body sections, CLI option and help order, and browser form order; a field declares no `order` and no `enabled`, and either key is rejected.
 
 A field must declare `heading`, `frontmatter_key`, or both; a field with neither is rejected. A field with both writes both the body section and the front-matter key; a field with only `heading` is body-only, and a field with only `frontmatter_key` is metadata-only.
 
-The keys `id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, and `group` are reserved. A field may not use a reserved key as its `key` or as its `frontmatter_key`. Field keys are unique within a role — inside `fields`, inside `group.fields`, and inside `member.fields` — while the same key may appear in both the group and member roles.
+The keys `id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, `group`, `version`, `kind`, `form`, `path`, and `metadata` are reserved. A field may not use a reserved key as its `key` or as its `frontmatter_key`. Field keys are unique within a role — inside `fields`, inside `group.fields`, and inside `member.fields` — while the same key may appear in both the group and member roles.
 
 ### Defaults, fill, and merge
 
@@ -84,7 +85,7 @@ Configuration is resolved per entry against the seed entry of the same slug:
 - Collections replace wholesale when present: `fields`, `group.fields`, `member.fields`, `statuses`, `slots`, and `api_aliases`. An absent collection inherits the seed collection; a present collection replaces it, including `fields: []`.
 - The `group` and `member` blocks resolve independently: a present block replaces only that role's collection, and an absent block inherits that role's seed collection.
 - `prefix` and `directory` are never filled from the seed. Every entry, including an entry for a seed slug, declares both; a missing or invalid value is rejected.
-- An absent slug stays absent. `document_types` is replaced wholesale when present in the project file, and no seed entry is re-added.
+- The eleven seed slugs are always effective: each resolves from its seed entry whether or not the project file declares it, so a present `document_types` map is an overlay and declaring one entry never removes the other seed types. An absent user-defined slug stays absent, and the written file never gains an entry that the command did not target.
 
 A user-defined slug has no seed entry. It defaults to `SingleMarkdown`, `enabled: true`, a label derived from the slug, an order after the seed types, an empty summary and empty aliases, visible reference visibility, `statuses: [active, archived]`, no `default_status`, and one optional `description` field with heading `## Description` and kind `multiline`. A declared value replaces the default under the same scalar-fill and collection-replace rules.
 
@@ -139,19 +140,20 @@ Adding an entry adds a document type and its command; disabling an entry removes
 - Every entry declares `prefix` and `directory`, and accepts `enabled`, `label`, `plural`, `order`, `summary`, `type_alias`, `reference_visibility`, `statuses`, `default_status`, `slots`, and `api_aliases`.
 - A single-role entry uses a top-level `fields` sequence of field items and no role block; `fields: []` is valid and declares no field.
 - A grouped entry uses `group` and `member` blocks, each with a `fields` sequence and an optional `reference_visibility`; a top-level `fields` on a grouped type is rejected.
-- A field item accepts exactly `key`, `heading`, `frontmatter_key`, `option`, `label`, `kind`, `required`, `verbs`, and `help`; a field `order` or `enabled` key is rejected.
+- A field item accepts exactly `key`, `heading`, `frontmatter_key`, `option`, `label`, `kind`, `required`, `verbs`, `help`, and `values`; a field `order` or `enabled` key is rejected.
+- `values`, when present, is a non-empty sequence of allowed strings, or the string `record-ids` for a `list` field whose items must be record IDs; an empty sequence, a scalar outside the declared sequence, or a `list` item that is not a record ID is rejected with a diagnostic naming the field and, for a sequence, its allowed values.
 - A field declares `key`, at least one of `heading` and `frontmatter_key`, a `kind` of `text`, `multiline`, or `list`, a `required` flag, and `verbs`; a field with neither `heading` nor `frontmatter_key` is rejected.
 - `verbs` defaults to `[create, edit]` and accepts only `create` and `edit`; any other verb is rejected.
 - `option` is the long option name without the leading `--` and is derived from `key` in kebab case when absent.
 - A required field must be supplied on create and may be changed but not cleared on edit; an optional field may be cleared.
-- A field `key` or `frontmatter_key` equal to `id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, or `group` is rejected.
+- A field `key` or `frontmatter_key` equal to `id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, `group`, `version`, `kind`, `form`, `path`, or `metadata` is rejected.
 - A duplicate field key within a role is rejected, while the same key may appear in `group.fields` and `member.fields`.
 - Field sequence position is the field's order in body sections, CLI options and help, and the browser form.
 - Scalars fill from the seed when absent: `enabled`, `label`, `plural`, `order`, `summary`, `type_alias`, `default_status`, and `reference_visibility`.
 - Collections replace wholesale when present: `fields`, `group.fields`, `member.fields`, `statuses`, `slots`, and `api_aliases`; an absent collection inherits the seed collection, and `fields: []` replaces it with an empty collection.
 - The `group` and `member` blocks resolve independently: a present block replaces only its role's collection, and an absent block inherits its role's seed collection.
 - `prefix` and `directory` are never filled; an entry that omits either is rejected, including an entry for a seed slug.
-- A present `document_types` replaces the seed set wholesale, and an absent slug stays absent; no seed entry is re-added.
+- A present `document_types` map is an overlay: the eleven seed slugs always resolve from their seed entries whether or not the file declares them, an absent user-defined slug stays absent, and the written file never gains an entry the command did not target.
 - A user-defined slug defaults to `SingleMarkdown`, enabled, a slug-derived label, an order after the seed types, empty summary and aliases, visible reference visibility, `[active, archived]` statuses, no default status, and one optional multiline `description` field with heading `## Description`.
 - An unknown top-level or field-item key is rejected with a `document_types.<slug>.<path>` diagnostic.
 - An unknown enum value — a `kind` other than `text`, `multiline`, or `list`, a `verbs` entry other than `create` or `edit`, or a `reference_visibility` other than `visible` or `hidden` — is rejected with a `document_types.<slug>.<path>` diagnostic.

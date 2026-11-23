@@ -2,7 +2,7 @@
 id: REQ-05.010
 title: "Record Metadata in YAML Front Matter"
 created_date: '2026-11-13T20:58:56Z'
-updated_date: '2026-11-20T20:45:08Z'
+updated_date: '2026-11-23T07:27:35Z'
 labels: []
 references:
   - RE-010
@@ -32,7 +32,7 @@ Must have
 ## Description
 **Scope.** Every Markdown file managed by Papyrus begins with a YAML front-matter block at byte 0, delimited by `---` lines. Front matter is authoritative for the keys it carries and replaces the equivalent information in the document core for records Papyrus writes. The scope is Markdown records: UI mockups keep their metadata in their HTML content and carry no front matter (REQ-05.008), and Backlog.md `docs` and `drafts` directories are not managed record types.
 
-**General keys are registry-owned.** The general front-matter keys are `id`, `title`, `status`, `labels`, `references`, `created_date`, and `updated_date`, plus `group` on a grouped member record. These eight keys are the reserved field keys (ADR-036 decision 23): Papyrus writes and maintains them, they are never declared in `document_types`, and no field may use one of them as its `key` or as its `frontmatter_key` (REQ-07.002). `title` is fixed and is not a field; `status` is reserved and read-only outside the verbs that own it; `group` is the engine-owned link of a `GroupedMarkdown` member. `labels`, `references`, `created_date`, and `updated_date` are general record metadata rather than fields (ADR-039 decision 18).
+**General keys are registry-owned.** The general front-matter keys are `id`, `title`, `status`, `labels`, `references`, `created_date`, and `updated_date`, plus `group` on a grouped member record. The reserved field keys are `id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, `group`, `version`, `kind`, `form`, `path`, and `metadata` (ADR-036 decision 23): Papyrus writes and maintains the eight general keys above, no reserved key is ever declared in `document_types`, and no field may use one of them as its `key` or as its `frontmatter_key` (REQ-07.002). `title` is fixed and is not a field; `status` is reserved and read-only outside the verbs that own it; `group` is the engine-owned link of a `GroupedMarkdown` member. `labels`, `references`, `created_date`, and `updated_date` are general record metadata rather than fields (ADR-039 decision 18).
 
 Key ownership is therefore split in exactly one way: the general keys belong to the record registry, and every other document key belongs to the type's descriptor. A document key exists only because a declared field names it in `frontmatter_key` — additional keys are config-declared, never supplied by code, by a per-type module, or by a document-type configuration key (RE-010 D14, ADR-036 decisions 14 and 28).
 
@@ -60,7 +60,7 @@ Document front-matter keys follow field sequence order after the general keys, s
 ## Acceptance Criteria
 - Every managed Markdown record file created by Papyrus begins with a YAML front-matter block at byte 0, delimited by `---` lines.
 - Every managed Markdown record type carries `id`, `title`, `created_date`, `updated_date`, `labels`, and `references` in its front matter.
-- The general keys `id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, and `group` are reserved; a field whose `key` or `frontmatter_key` equals one of them is rejected (REQ-07.002).
+- A field whose `key` or `frontmatter_key` equals any of the thirteen reserved field keys `id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, `group`, `version`, `kind`, `form`, `path`, and `metadata` is rejected (REQ-07.002).
 - The general keys are written and maintained by Papyrus and are never declared in `document_types`.
 - `title` is fixed and is not a field, `status` is reserved and read-only outside the `status` and `archive` verbs, and `group` is the engine-owned link of a `GroupedMarkdown` member record.
 - For a document type, every front-matter key beyond the general keys corresponds to the `frontmatter_key` of a declared field of the record's role, and no other document key is written.

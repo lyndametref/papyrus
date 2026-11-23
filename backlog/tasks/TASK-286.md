@@ -2,7 +2,7 @@
 id: TASK-286
 title: "Run the security audit on configuration, assets, and the browser surface"
 created_date: '2026-11-20T17:44:13Z'
-updated_date: '2026-11-23T06:17:55Z'
+updated_date: '2026-11-23T07:53:01Z'
 labels: []
 references:
   - ADR-037
@@ -19,6 +19,7 @@ milestone: MS-037
 dependencies:
   - TASK-283
   - TASK-284
+  - TASK-315
 ordinal: 70
 documentation:
   - src/browser/render.rs

@@ -82,8 +82,8 @@ impl Config {
 ## 3. Field item vocabulary and reserved keys
 
 A field item has exactly the keys `key`, `heading`, `frontmatter_key`,
-`option`, `label`, `kind`, `required`, `verbs`, and `help`. It declares no
-`order` and no `enabled`; either key is rejected.
+`option`, `label`, `kind`, `required`, `verbs`, `help`, and `values`. It
+declares no `order` and no `enabled`; either key is rejected.
 
 - `key` is required and stable. It identifies the field in field maps,
   selector paths, diagnostics, and browser form submissions.
@@ -97,14 +97,20 @@ A field item has exactly the keys `key`, `heading`, `frontmatter_key`,
 - `kind` is exactly one of `text`, `multiline`, or `list`.
 - `required` is a boolean.
 - `verbs` is a subset of `create` and `edit` and defaults to both.
+- `values` is optional. It is either a non-empty sequence of allowed strings,
+  which restricts a scalar field to those exact values, or `record-ids` for a
+  `list` field whose items must be valid record IDs. The field-domain
+  validator enforces it; it adds no option and no verb of its own.
 - A field must declare `heading`, `frontmatter_key`, or both. A field with
   neither is invalid. A field with both writes both locations from one value.
 - Field keys are unique within a role: `fields`, `group.fields`, and
   `member.fields` separately, while the same key may appear in the group and
   member roles.
 - The reserved field keys are `id`, `title`, `status`, `labels`, `references`,
-  `created_date`, `updated_date`, and `group`. A field may not use a reserved
-  key as its `key` or as its `frontmatter_key`.
+  `created_date`, `updated_date`, `group`, `version`, `kind`, `form`, `path`,
+  and `metadata`. A field may not use a reserved key as its `key` or as its
+  `frontmatter_key`. `version`, `kind`, `form`, `path`, and `metadata`
+  collide with the envelope, token, and form-post keys.
 - Title is fixed and non-configurable: it is not a field, is always present,
   is single-line and non-empty, is required on create, and can never be cleared
   on edit. It is the first positional `TITLE` on `create` and `create-group`
