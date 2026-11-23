@@ -65,7 +65,7 @@ Expected:
 scripts/build-package.sh --version 1.0.0 --out builds/1.0.0/
 ```
 
-- `--version` is authoritative for the `Version:` field in `DEBIAN/control` and the `papyrus_<version>_amd64.deb` artifact name. The version is injected while the package is staged; no tracked file is edited and `Cargo.toml` is not bumped.
+- `--version` is authoritative for the `Version:` field in `DEBIAN/control` and the `papyrus_<version>_amd64.deb` artifact name. The version is injected while the package is staged; no tracked file is edited. Release 1.0 pins `Cargo.toml` to `1.0.0`, and the supplied `--version` matches it.
 - The entry point runs `cargo build --release --locked`, validates the asset versions through the assembly step, and writes the package only under `--out`.
 - `--out` must be absent or empty. With `--force`, the contents of a non-empty directory are replaced.
 - Success prints the artifact path on standard output; diagnostics go to standard error.
@@ -79,15 +79,16 @@ scripts/build-package.sh --version 1.0.0 --out builds/1.0.0/
 
 ### Assembly only
 
-`scripts/build-deb.sh` can be run directly to assemble a package from an existing binary:
+`scripts/build-deb.sh` can be run directly to assemble a package:
 
 ```sh
-scripts/build-deb.sh [--version <version>] [--out <dir>]
+scripts/build-deb.sh [--version <version>] [--out <dir>] [--force]
 ```
 
 - Version: `--version`, then `PAPYRUS_DEB_VERSION`, then the `Cargo.toml` version.
 - Output: `--out`, then `PAPYRUS_DEB_OUT`, then the default `./.tmp/deb/`.
-- A direct run does not force a rebuild: it reuses `target/release/papyrus` and builds only when the binary is missing.
+- Every assembly run rebuilds with `cargo build --release --locked` before staging, so a direct run can never package a stale `target/release/papyrus` (AUD-153 L-4).
+- The output-emptiness policy also applies: `--out` must be absent or empty, and `--force` replaces a non-empty directory (AUD-153 L-4). The default `./.tmp/deb/` therefore needs `--force` on a second run.
 - `--check-assets-only` verifies the asset versions and exits without assembling.
 
 ### Asset-version guard

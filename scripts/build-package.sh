@@ -108,7 +108,12 @@ cd "$ROOT"
 cargo build --release --locked >&2
 
 echo "Assembling the Debian package..." >&2
-"${SCRIPT_DIR}/build-deb.sh" --version "$VERSION" --out "$OUT_DIR" >&2
+FORCE_ARGS=()
+if [[ "$FORCE" == "true" ]]; then
+    FORCE_ARGS+=(--force)
+fi
+"${SCRIPT_DIR}/build-deb.sh" --version "$VERSION" --out "$OUT_DIR" \
+    ${FORCE_ARGS[@]+"${FORCE_ARGS[@]}"} >&2
 
 ARTIFACT="${OUT_DIR}/papyrus_${VERSION}_amd64.deb"
 if [[ ! -s "$ARTIFACT" ]]; then

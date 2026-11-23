@@ -163,7 +163,10 @@ fn parse_response(bytes: &[u8]) -> HttpResponse {
 fn milestone_cli_records_flow() {
     let out = bin().arg("--version").output().unwrap();
     assert!(out.status.success(), "version failed");
-    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "papyrus 0.1.0");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        format!("papyrus {}", env!("CARGO_PKG_VERSION"))
+    );
 
     let out = bin().arg("--help").output().unwrap();
     assert!(out.status.success(), "help failed");

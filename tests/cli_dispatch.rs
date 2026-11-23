@@ -173,7 +173,6 @@ fn table_driven_builtin_help() {
             &["--from", "--dry-run"],
         ),
         ("help", &["help"], &["Usage:"]),
-        ("version", &["--version"], &["papyrus 0.1.0"]),
         ("top help", &["--help"], &["Usage:"]),
     ];
 
@@ -196,6 +195,13 @@ fn table_driven_builtin_help() {
             );
         }
     }
+
+    let out = bin().arg("--version").output().unwrap();
+    assert!(out.status.success(), "version failed");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        format!("papyrus {}", env!("CARGO_PKG_VERSION"))
+    );
 }
 
 #[test]
