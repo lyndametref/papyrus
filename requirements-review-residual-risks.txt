@@ -441,12 +441,56 @@ SESSION TOTAL
 ====================================================================
 
 Before: 7 groups, 60 records, 51,573 words.
-After:  6 groups, 42 records, 29,542 words (-43%).
+After:  7 groups, 46 records, 30,809 words (-40%).
 Archived records: 27 in docs/requirements/business/archived/ (24 from this session,
 3 pre-existing).
 
 Capabilities added while shrinking the corpus (all recorded above): release archive
 and delete (R52), milestone acceptance criteria (R53), the `--ac` view option (R54),
-decision status verbs and delete (R58-R60), decision archiving (R61).
+decision status verbs and delete (R58-R60), decision archiving (R61), the user
+documentation group (REQ-008).
+
+====================================================================
+GROUP REQ-008 — User Documentation  (new)
+====================================================================
+
+Group created with 3 atomics: .001 Provide the Papyrus Manual, .002 Provide
+Per-Command Help, .003 Provide the Help Command. REQ-001.004 hands its help clause to
+this group; REQ-007.003 cites .002 for generated document-command help.
+
+R65. `papyrus req create-group` writes a defective group record
+    Severity: high (tool defect)
+    With `--title`, `--story`, and `--description`, `req create-group` wrote a file
+    whose front matter contained only `status: active`: no `id`, `title`,
+    `created_date`, or `updated_date`. The requirement was invisible to `req list`
+    and absent from the browser. It was repaired by writing the front matter through
+    `papyrus req edit REQ-008 --editor`. A regression test is needed for group
+    creation through the option form (the positional form is untested as well).
+
+R66. NFR-003.003 contradicts dynamic document commands
+    Severity: medium
+    It requires "a man page for every command", but document-type commands are
+    generated from configuration and cannot be enumerated statically. REQ-008.001
+    documents the family once and defers per-type options to `--help`. The NFR must
+    say "every built-in command". Not edited in this pass.
+
+R67. `papyrus help` currently prints CLI usage, not the manual
+    Severity: medium (product change)
+    REQ-008.003 requires `papyrus help` to print the manual and `papyrus help
+    <COMMAND>` to print that command's help. Neither exists today.
+
+R68. The manual source lives in the README
+    Severity: medium
+    `papyrus(1)` and `papyrus-config(5)` are sections of README.md today. REQ-008.001
+    requires one packaged source from which the installed pages and `papyrus help`
+    are generated. Moving the source out of the README while keeping the README
+    readable is a documentation restructuring, not a requirements task.
+
+R69. Timestamps corrected after the fact
+    Severity: low
+    Ten records created during this session carried hand-written `updated_date` (and
+    in five cases `created_date`) values later than the actual creation time. They
+    were reset to the file modification time through the CLI editor. Future writes
+    should rely on the writer's automatic timestamps.
 
 
