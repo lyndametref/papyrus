@@ -2,7 +2,7 @@
 id: TASK-286
 title: "Run the security audit on configuration, assets, and the browser surface"
 created_date: '2026-11-20T17:44:13Z'
-updated_date: '2026-11-23T08:51:08Z'
+updated_date: '2026-11-23T09:08:47Z'
 labels: []
 references:
   - ADR-037
@@ -12,7 +12,7 @@ references:
   - MS-037
   - REL-001
   - NFR-007.003
-status: In-Progress
+status: Done
 assignee:
   - security-officer
 milestone: MS-037
@@ -62,3 +62,5 @@ One `AUD` record of type `security` with references, a verdict, severity counts,
 - [ ] Every finding has a severity, a file and line, evidence, and a disposition; the record states severity counts and a pass or fail verdict.
 - [ ] No blocker or high finding is left open; each is reported to the orchestrator with a proposed fix task.
 - [ ] The audit record is referenced in a task comment and papyrus check reports no new finding.
+## Comments
+- **orchestrator**: Security audit AUD-153: Pass with findings, 0 blocker, 0 high, 2 medium (tracked stale deb in TASK-288; non-loopback auth decision), 6 low; suite green, live probes verified Host, Origin, traversal, cache and CSP controls; release closure held for TASK-287 to TASK-289 and M-1.
