@@ -2,7 +2,7 @@
 id: TASK-286
 title: "Run the security audit on configuration, assets, and the browser surface"
 created_date: '2026-11-20T17:44:13Z'
-updated_date: '2026-11-23T07:53:01Z'
+updated_date: '2026-11-23T08:51:08Z'
 labels: []
 references:
   - ADR-037
@@ -12,7 +12,7 @@ references:
   - MS-037
   - REL-001
   - NFR-007.003
-status: ToDo
+status: In-Progress
 assignee:
   - security-officer
 milestone: MS-037
