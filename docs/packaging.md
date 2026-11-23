@@ -66,7 +66,7 @@ scripts/build-package.sh --version 1.0.0 --out builds/1.0.0/.build/papyrus
 ```
 
 - `--version` is authoritative for the `Version:` field in `DEBIAN/control` and the `papyrus_<version>_amd64.deb` artifact name. The version is injected while the package is staged; no tracked file is edited. Release 1.0 pins `Cargo.toml` to `1.0.0`, and the supplied `--version` matches it.
-- The retained Release 1.0 package is `builds/1.0.0/.build/papyrus/papyrus_1.0.0_amd64.deb`, built from release commit `cceed99` (the TASK-288 release-package commit, merged at `440b9fe`).
+- The retained Release 1.0 package is `builds/1.0.0/.build/papyrus/papyrus_1.0.0_amd64.deb`, rebuilt from commit `38736ae` (TASK-289 security reissue; the original TASK-288 release package was built from `cceed99`, merged at `440b9fe`). SHA-256 `b2d747ac017a65659b5147300775d423b95961c3b611bfbc733df09c57ddf43c`, 2,429,284 bytes.
 - The entry point runs `cargo build --release --locked`, validates the asset versions through the assembly step, and writes the package only under `--out`.
 - `--out` must be absent or empty. With `--force`, the contents of a non-empty directory are replaced.
 - Success prints the artifact path on standard output; diagnostics go to standard error.
