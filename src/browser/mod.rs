@@ -477,6 +477,22 @@ fn log_method(request: &Request) -> String {
     }
 }
 
+/// The request path written to the debug log line.
+///
+/// The target path is percent-decoded before it is logged, so it can carry
+/// control characters (for example `%0A`). Only printable ASCII is kept and the
+/// result is capped, so a hostile path cannot inject control characters into
+/// the terminal or grow the log line without bound (AUD-153 reissue L-3).
+fn log_path(request: &Request) -> String {
+    request
+        .target
+        .path
+        .chars()
+        .filter(|character| character.is_ascii_graphic())
+        .take(200)
+        .collect()
+}
+
 fn handle_connection(mut stream: TcpStream, state: &ServerState) {
     let started = Instant::now();
     let _ = stream.set_read_timeout(Some(IO_TIMEOUT));
@@ -497,7 +513,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) {
     };
 
     let method = log_method(&request);
-    let log_path: String = request.target.path.chars().take(200).collect();
+    let logged_path = log_path(&request);
     let head_only = request.method == Method::Head;
     let api = request.target.path.starts_with("/api/");
 
@@ -512,7 +528,10 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) {
     let _ = http::write_response(&mut stream, &response, head_only);
     if state.debug {
         let duration = started.elapsed().as_millis();
-        eprintln!("{} {} {} {}ms", method, log_path, response.status, duration);
+        eprintln!(
+            "{} {} {} {}ms",
+            method, logged_path, response.status, duration
+        );
     }
 }
 
@@ -1494,7 +1513,6 @@ fn board_release_cleanup_submit(
                 && m.status.as_deref() != Some("closed")
         })
         .map(|m| m.id.clone());
-    eprintln!("DEBUG closed={:?}", closed);
     let mut archived = 0usize;
     let total = closed.len();
     let mut failures: Vec<String> = Vec::new();
@@ -4212,6 +4230,19 @@ mod tests {
             request.raw_method = raw.to_string();
             assert_eq!(log_method(&request), expected, "raw: {raw:?}");
         }
+    }
+
+    #[test]
+    fn log_path_sanitizes_decoded_control_characters_and_caps_length() {
+        let mut request = request_for(Method::Get, &[]);
+        // `%0A` is decoded before the path reaches the log line.
+        request.target.path = "/a\nb\u{1b}[31m".to_string();
+        assert_eq!(log_path(&request), "/ab[31m");
+
+        request.target.path = format!("/{}", "a".repeat(250));
+        let logged = log_path(&request);
+        assert_eq!(logged.chars().count(), 200);
+        assert!(logged.starts_with('/'));
     }
 
     #[test]

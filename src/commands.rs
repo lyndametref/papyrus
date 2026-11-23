@@ -69,6 +69,24 @@ fn read_raw_config(config_path: &Path) -> Result<yaml_serde::Value, AppError> {
     yaml_serde::from_str(&raw).map_err(|e| AppError::Validation(e.to_string()))
 }
 
+/// Read the configuration overlay that `config set`/`config unset` mutate.
+///
+/// An absent file is an empty mapping (the command then creates one). A
+/// present file goes through [`read_raw_config`], so it is subject to the same
+/// byte-size and anchor/alias budget as every other configuration read; the
+/// raw parse must never bypass it (AUD-153 L-3, reissue L-2).
+fn read_config_overlay(config_path: &Path) -> Result<yaml_serde::Value, AppError> {
+    if !config_path.exists() {
+        return Ok(yaml_serde::Value::Mapping(yaml_serde::Mapping::new()));
+    }
+    let value = read_raw_config(config_path)?;
+    Ok(if matches!(value, yaml_serde::Value::Mapping(_)) {
+        value
+    } else {
+        yaml_serde::Value::Mapping(yaml_serde::Mapping::new())
+    })
+}
+
 fn effective_value_from_raw(overlay: &yaml_serde::Value) -> Result<yaml_serde::Value, AppError> {
     let default_cfg = Config::default();
     let mut base =
@@ -319,16 +337,7 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
     };
 
     // load file value (or empty mapping)
-    let mut file_val = if ctx.config_path.exists() {
-        let raw = std::fs::read_to_string(&ctx.config_path)
-            .map_err(|e| AppError::Runtime(e.to_string()))?;
-        yaml_serde::from_str(&raw).map_err(|e| AppError::Validation(e.to_string()))?
-    } else {
-        yaml_serde::Value::Mapping(yaml_serde::Mapping::new())
-    };
-    if !matches!(file_val, yaml_serde::Value::Mapping(_)) {
-        file_val = yaml_serde::Value::Mapping(yaml_serde::Mapping::new());
-    }
+    let mut file_val = read_config_overlay(&ctx.config_path)?;
 
     // Materialize only the target entry when the file declares no
     // `document_types` map. The entry carries its seed prefix and directory,
@@ -412,16 +421,7 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
     }
     reject_declarative_data_selector(key, "unset")?;
     reject_bracketed_selector(key, "unset")?;
-    let mut file_val = if ctx.config_path.exists() {
-        let raw = std::fs::read_to_string(&ctx.config_path)
-            .map_err(|e| AppError::Runtime(e.to_string()))?;
-        yaml_serde::from_str(&raw).map_err(|e| AppError::Validation(e.to_string()))?
-    } else {
-        yaml_serde::Value::Mapping(yaml_serde::Mapping::new())
-    };
-    if !matches!(file_val, yaml_serde::Value::Mapping(_)) {
-        file_val = yaml_serde::Value::Mapping(yaml_serde::Mapping::new());
-    }
+    let mut file_val = read_config_overlay(&ctx.config_path)?;
 
     yaml_unset(&mut file_val, key).map_err(AppError::Validation)?;
 
